@@ -50,12 +50,7 @@ import {
 import {InsufficientChainBalance} from "contracts/common/L1ContractErrors.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
-import {
-    ClaimFailedDepositFailed,
-    EmptyToken,
-    NativeTokenVaultAlreadySet,
-    WrongCounterpart
-} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {EmptyToken, NativeTokenVaultAlreadySet, WrongCounterpart} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
@@ -334,7 +329,10 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert(ClaimFailedDepositFailed.selector);
+        // The NTV was drained above, so the ETH send-back during recovery fails. Recovery now routes through
+        // the shared `_disburseFailedTransfer` -> `_withdrawFunds` path, which reverts `WithdrawFailed` (the
+        // dedicated `ClaimFailedDepositFailed` error from the pre-consolidation recovery path no longer exists).
+        vm.expectRevert(WithdrawFailed.selector);
         l1Nullifier.bridgeRecoverFailedTransfer({
             _chainId: chainId,
             _depositSender: alice,

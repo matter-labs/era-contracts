@@ -28,11 +28,7 @@ import {
     WithdrawFailed,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
-import {
-    ClaimFailedDepositFailed,
-    WrongCounterpart,
-    OnlyFailureStatusAllowed
-} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {WrongCounterpart, OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 contract MockERC20 is ERC20 {
     constructor() ERC20("MockToken", "MTK") {

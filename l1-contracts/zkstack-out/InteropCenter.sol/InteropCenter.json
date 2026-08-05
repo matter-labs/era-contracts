@@ -245,14 +245,14 @@
             "internalType": "uint256"
           },
           {
-            "name": "indirectCall",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
             "name": "indirectCallMessageValue",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "indirectCall",
+            "type": "bool",
+            "internalType": "bool"
           }
         ]
       },
@@ -318,6 +318,69 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "previewBundleHash",
+    "inputs": [
+      {
+        "name": "_destinationChainId",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_callStarters",
+        "type": "tuple[]",
+        "internalType": "struct InteropCallStarter[]",
+        "components": [
+          {
+            "name": "to",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "callAttributes",
+            "type": "bytes[]",
+            "internalType": "bytes[]"
+          }
+        ]
+      },
+      {
+        "name": "_bundleAttributes",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "previewMessageHash",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_payload",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_attributes",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -836,26 +899,15 @@
   },
   {
     "type": "error",
-    "name": "AttributeAlreadySet",
-    "inputs": [
-      {
-        "name": "selector",
-        "type": "bytes4",
-        "internalType": "bytes4"
-      }
-    ]
+    "name": "AtomicBundleToL1NotSupported",
+    "inputs": []
   },
   {
     "type": "error",
-    "name": "AttributeViolatesRestriction",
+    "name": "CannotInitiateInteropOnL1",
     "inputs": [
       {
-        "name": "selector",
-        "type": "bytes4",
-        "internalType": "bytes4"
-      },
-      {
-        "name": "restriction",
+        "name": "destinationChainId",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -874,8 +926,24 @@
   },
   {
     "type": "error",
+    "name": "DirectCallToL1NotSupported",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "FeeWithdrawalFailed",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "IndirectCallCannotCarryValue",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",
@@ -908,6 +976,33 @@
         "internalType": "bytes32"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "InteropCallToL1NotToAssetRouter",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InteropPreviewHash",
+    "inputs": [
+      {
+        "name": "bundleHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InteropToSelfNotSupported",
+    "inputs": []
   },
   {
     "type": "error",
@@ -960,8 +1055,30 @@
   },
   {
     "type": "error",
-    "name": "NotInGatewayMode",
+    "name": "MultiCallToL1NotSupported",
+    "inputs": [
+      {
+        "name": "callCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NonAtomicSendUnsupported",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NonZeroValueToL1NotSupported",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

@@ -57,7 +57,7 @@ const REQUIRED_CONTRACTS = [
   "L1NativeTokenVault.sol",
   "TestnetERC20Token.sol",
   "L1AssetRouter.sol",
-  "InteropHandler.sol",
+  "L2InteropHandler.sol",
   "IERC7786Attributes.sol",
   "L2ComplexUpgrader.sol",
   "L2GenesisUpgrade.sol",
@@ -68,8 +68,13 @@ const REQUIRED_CONTRACTS = [
   "DummyL1MessageRoot.sol",
   "Migrator.sol",
   "L1Nullifier.sol",
+  "L1InteropHandler.sol",
   "IBaseToken.sol",
   "BaseTokenHolder.sol",
+  // L1-free atomic interop (bundle model) — used by the anvil-interop atomic spec / CLI.
+  "AtomicFlowManager.sol",
+  "IAtomicFlowManager.sol",
+  "L2InteropCommitmentTree.sol",
 ];
 
 async function copyContractAbi(src: string, dest: string): Promise<void> {

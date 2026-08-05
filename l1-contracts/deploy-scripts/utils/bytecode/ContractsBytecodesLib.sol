@@ -82,7 +82,7 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCodeEra.
-        string[54] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[55] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction",
             "BaseTokenHolder",
             "L2BaseTokenEra",
@@ -106,9 +106,10 @@ library ContractsBytecodesLib {
             "EraSettlementLayerV31Upgrade",
             "ZKsyncOSSettlementLayerV31Upgrade",
             "InteropCenter",
-            "InteropHandler",
+            "InteropAttributeParser",
+            "L2InteropHandler",
             "EraDualVerifier",
-            "ZKsyncOSDualVerifier",
+            "ZKsyncOSVerifier",
             "L1GenesisUpgrade",
             "L2AdminFactory",
             "L2AssetRouter",
@@ -175,8 +176,6 @@ library ContractsBytecodesLib {
             return Utils.readBytecodeL1(false, "EraVerifierFflonk.sol", "EraVerifierFflonk");
         } else if (Utils.compareStrings(contractIdentifier, "EraVerifierPlonk")) {
             return Utils.readBytecodeL1(false, "EraVerifierPlonk.sol", "EraVerifierPlonk");
-        } else if (Utils.compareStrings(contractIdentifier, "ZKsyncOSVerifierFflonk")) {
-            return Utils.readBytecodeL1(false, "ZKsyncOSVerifierFflonk.sol", "ZKsyncOSVerifierFflonk");
         } else if (Utils.compareStrings(contractIdentifier, "ZKsyncOSVerifierPlonk")) {
             return Utils.readBytecodeL1(false, "ZKsyncOSVerifierPlonk.sol", "ZKsyncOSVerifierPlonk");
         }

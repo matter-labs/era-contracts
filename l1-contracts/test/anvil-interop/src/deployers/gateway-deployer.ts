@@ -6,6 +6,7 @@ import {
   L2_MESSAGE_ROOT_ADDR,
   L2_CHAIN_ASSET_HANDLER_ADDR,
   INTEROP_CENTER_ADDR,
+  INTEROP_ATTRIBUTE_PARSER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
   L2_MESSAGE_VERIFICATION_ADDR,
 } from "../core/const";
@@ -46,7 +47,8 @@ export class GatewayDeployer {
       { addr: L2_MESSAGE_ROOT_ADDR, name: "L2MessageRoot" },
       { addr: L2_CHAIN_ASSET_HANDLER_ADDR, name: "L2ChainAssetHandler" },
       { addr: INTEROP_CENTER_ADDR, name: "InteropCenter" },
-      { addr: L2_INTEROP_HANDLER_ADDR, name: "InteropHandler" },
+      { addr: INTEROP_ATTRIBUTE_PARSER_ADDR, name: "InteropAttributeParser" },
+      { addr: L2_INTEROP_HANDLER_ADDR, name: "L2InteropHandler" },
       { addr: L2_MESSAGE_VERIFICATION_ADDR, name: "L2MessageVerification" },
     ];
 

@@ -38,7 +38,8 @@ import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenge
 import {DummyL2BaseTokenHolder} from "contracts/dev-contracts/test/DummyL2BaseTokenHolder.sol";
 
 /// @title L2BaseTokenZKOSTest
-/// @notice Unit tests for L2BaseTokenZKOS contract
+/// @notice Unit tests for L2BaseTokenZKOS (init, pre-V31 total-supply backfill, totalSupply).
+/// See {protocol-docs/bridging.md#l2-asset-bookkeeping}.
 contract L2BaseTokenZKOSTest is Test {
     L2BaseTokenZKOS internal l2BaseToken;
 
@@ -352,19 +353,16 @@ contract L2BaseTokenZKOSTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_initL2_success() public {
-        // Mock the mint hook to succeed
         vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
 
-        // Give the L2BaseToken contract the minted balance (simulating what mint hook does)
+        // The mocked mint hook does not actually mint, so fund the contract manually.
         vm.deal(address(l2BaseToken), INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
 
-        // Call from ComplexUpgrader
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2BaseToken.initL2(1);
 
-        // Verify BaseTokenHolder received the tokens
         assertEq(
             L2_BASE_TOKEN_HOLDER_ADDR.balance,
             holderBalanceBefore + INITIAL_BASE_TOKEN_HOLDER_BALANCE,
@@ -381,24 +379,19 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function test_initL2_revertsOnSecondCall() public {
-        // Mock the mint hook to succeed
         vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
 
-        // Give the L2BaseToken contract the minted balance
         vm.deal(address(l2BaseToken), INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        // First call succeeds
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2BaseToken.initL2(1);
 
-        // Second call reverts with BaseTokenHolderAlreadyInitialized
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         vm.expectRevert(BaseTokenHolderAlreadyInitialized.selector);
         l2BaseToken.initL2(1);
     }
 
     function test_initL2_revertIfMintFails() public {
-        // Mock the mint hook to fail
         vm.mockCallRevert(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), "Mint failed");
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
@@ -407,13 +400,10 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function test_initL2_revertIfTransferFails() public {
-        // Mock the mint hook to succeed
         vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
 
-        // Give the contract some balance but not enough
         vm.deal(address(l2BaseToken), INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        // Make BaseTokenHolder reject transfers
         RejectingContract rejecting = new RejectingContract();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(rejecting).code);
 
@@ -422,28 +412,22 @@ contract L2BaseTokenZKOSTest is Test {
         l2BaseToken.initL2(1);
     }
 
-    /// @notice Verifies that initL2 works with actual BaseTokenHolder
-    /// @dev This test ensures L2BaseToken is in the trusted sender list of BaseTokenHolder
-    /// @dev CRITICAL: This test validates that BaseTokenHolder can receive ETH from L2BaseToken
+    /// @notice initL2 works against the real BaseTokenHolder: L2BaseToken must be a trusted sender.
     function test_initL2_withActualBaseTokenHolder() public {
         // Deploy real BaseTokenHolder for this integration test
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
 
-        // Deploy L2BaseTokenZKOS at the expected system contract address
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
 
-        // Mock the mint hook to succeed
         vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
 
-        // Give the L2BaseToken contract the minted balance (simulating what mint hook does)
+        // The mocked mint hook does not actually mint, so fund the contract manually.
         vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        // Call from ComplexUpgrader - this should succeed because L2BaseToken is a trusted sender
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(1);
 
-        // Verify BaseTokenHolder received the tokens
         assertEq(
             L2_BASE_TOKEN_HOLDER_ADDR.balance,
             INITIAL_BASE_TOKEN_HOLDER_BALANCE,
@@ -451,12 +435,10 @@ contract L2BaseTokenZKOSTest is Test {
         );
     }
 
-    /// @notice Verifies that BaseTokenHolder rejects ETH from untrusted senders via receive()
-    /// @dev This test ensures that only L2BaseToken can send ETH via receive()
+    /// @notice BaseTokenHolder rejects receive() from untrusted senders.
     function test_baseTokenHolder_rejectsUntrustedSenders_receive() public {
         // Deploy real BaseTokenHolder for access-control tests
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
-        // Try to send ETH from an untrusted address via receive()
         address untrustedSender = makeAddr("untrustedSender");
         vm.deal(untrustedSender, 1 ether);
 
@@ -465,12 +447,10 @@ contract L2BaseTokenZKOSTest is Test {
         assertFalse(success, "Transfer should fail from untrusted sender");
     }
 
-    /// @notice Verifies that BaseTokenHolder rejects burnAndStartBridging from untrusted senders
-    /// @dev This test ensures that only bridging callers can use burnAndStartBridging
+    /// @notice BaseTokenHolder rejects burnAndStartBridging from non-bridging callers.
     function test_baseTokenHolder_rejectsUntrustedSenders_burnAndStartBridging() public {
         // Deploy real BaseTokenHolder for access-control tests
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
-        // Try to call burnAndStartBridging from an untrusted address
         address untrustedSender = makeAddr("untrustedSender");
         vm.deal(untrustedSender, 1 ether);
 
@@ -549,17 +529,14 @@ contract L2BaseTokenZKOSTest is Test {
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
 
-        // Mock the mint hook to succeed
         vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
 
-        // Give the L2BaseToken contract the minted balance
         vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
         // Call initL2
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(1);
 
-        // Verify BaseTokenHolder received the initial balance
         assertEq(
             L2_BASE_TOKEN_HOLDER_ADDR.balance,
             INITIAL_BASE_TOKEN_HOLDER_BALANCE,
@@ -616,7 +593,6 @@ contract L2BaseTokenZKOSTest is Test {
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new DummyL2BaseTokenHolder()).code);
         vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        // Set the pre-V31 total supply
         vm.prank(SERVICE_TRANSACTION_SENDER);
         L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).setZKsyncOSPreV31TotalSupply(preV31Supply);
 
@@ -652,7 +628,6 @@ contract L2BaseTokenZKOSTest is Test {
         uint256 totalSupply = 42 ether;
         _initializeBackfill(l2BaseToken, true);
 
-        // First call succeeds
         vm.prank(SERVICE_TRANSACTION_SENDER);
         l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
 
@@ -693,7 +668,6 @@ contract L2BaseTokenZKOSTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_totalSupply_revertsWhenBackfillNeeded() public {
-        // Deploy at system address
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
 
@@ -704,7 +678,6 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function test_totalSupply_worksWhenBackfillNotNeeded() public {
-        // Deploy at system address
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
 
@@ -721,7 +694,6 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function test_totalSupply_worksWhenBaseTokenHolderBalanceGreaterThanInitial() public {
-        // Deploy at system address
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
 
@@ -747,7 +719,6 @@ contract L2BaseTokenZKOSTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_implementsIL2BaseTokenBase() public view {
-        // Verify the contract implements the interface
         IL2BaseTokenBase token = IL2BaseTokenBase(address(l2BaseToken));
         assert(address(token) == address(l2BaseToken));
     }

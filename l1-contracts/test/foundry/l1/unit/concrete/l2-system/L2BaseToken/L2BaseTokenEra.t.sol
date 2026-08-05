@@ -76,12 +76,10 @@ contract L2BaseTokenEraTest is Test {
     /// @dev Helper to set up eraAccountBalance for an address via transferFromTo from bootloader.
     /// First gives the bootloader a balance, then transfers to the target.
     function _setEraBalance(address _account, uint256 _amount) internal {
-        // Set bootloader balance directly via store
         // eraAccountBalance is at slot 0 (first storage variable in L2BaseTokenBase)
         bytes32 bootloaderSlot = keccak256(abi.encode(L2_BOOTLOADER_ADDRESS, uint256(0)));
         vm.store(address(l2BaseToken), bootloaderSlot, bytes32(_amount));
 
-        // Transfer from bootloader to account
         vm.prank(L2_BOOTLOADER_ADDRESS);
         l2BaseToken.transferFromTo(L2_BOOTLOADER_ADDRESS, _account, _amount);
     }
@@ -106,17 +104,14 @@ contract L2BaseTokenEraTest is Test {
     }
 
     function test_totalSupply_afterInitializationWithExistingSupply() public {
-        // Simulate existing supply of 50 ether
         uint256 existingSupply = 50 ether;
 
         // Set __DEPRECATED_totalSupply (slot 1)
         vm.store(address(l2BaseToken), bytes32(uint256(1)), bytes32(existingSupply));
 
-        // Initialize holder balance
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2BaseToken.initL2(1);
 
-        // totalSupply should equal existing supply
         // holder = INITIAL + 0 => totalSupply = existingSupply + INITIAL - INITIAL = existingSupply
         assertEq(l2BaseToken.totalSupply(), existingSupply, "totalSupply should match existing supply after init");
     }
@@ -345,7 +340,6 @@ contract L2BaseTokenEraTest is Test {
         vm.prank(L2_BOOTLOADER_ADDRESS);
         l2BaseToken.mint(alice, mintAmount);
 
-        // Verify balances
         assertEq(l2BaseToken.balanceOf(uint256(uint160(alice))), mintAmount, "Alice should receive minted tokens");
         assertEq(
             l2BaseToken.balanceOf(uint256(uint160(L2_BASE_TOKEN_HOLDER_ADDR))),
@@ -423,7 +417,6 @@ contract L2BaseTokenEraTest is Test {
             "Holder balance should be INITIAL"
         );
 
-        // totalSupply should match existing supply
         assertEq(l2BaseToken.totalSupply(), existingSupply, "totalSupply should equal existing supply");
     }
 
@@ -434,7 +427,6 @@ contract L2BaseTokenEraTest is Test {
         // Set __DEPRECATED_totalSupply
         vm.store(address(l2BaseToken), bytes32(uint256(1)), bytes32(existingSupply));
 
-        // Set existing holder balance in eraAccountBalance
         _setHolderBalance(existingHolderBalance);
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
@@ -481,11 +473,9 @@ contract L2BaseTokenEraTest is Test {
         uint256 existingSupply = 100 ether;
         vm.store(address(l2BaseToken), bytes32(uint256(1)), bytes32(existingSupply));
 
-        // First call succeeds
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2BaseToken.initL2(1);
 
-        // Second call reverts with BaseTokenHolderAlreadyInitialized
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         vm.expectRevert(BaseTokenHolderAlreadyInitialized.selector);
         l2BaseToken.initL2(1);
@@ -739,20 +729,16 @@ contract L2BaseTokenEraTest is Test {
         uint256 mintAmount = 10 ether;
         uint256 transferAmount = 3 ether;
 
-        // Mint to alice
         vm.prank(L2_BOOTLOADER_ADDRESS);
         l2BaseToken.mint(alice, mintAmount);
 
         uint256 totalSupplyAfterMint = l2BaseToken.totalSupply();
 
-        // Transfer from alice to bob
         vm.prank(L2_BOOTLOADER_ADDRESS);
         l2BaseToken.transferFromTo(alice, bob, transferAmount);
 
-        // totalSupply should not change from a transfer
         assertEq(l2BaseToken.totalSupply(), totalSupplyAfterMint, "totalSupply should not change on transfer");
 
-        // Balances should be correct
         assertEq(
             l2BaseToken.balanceOf(uint256(uint160(alice))),
             mintAmount - transferAmount,
@@ -840,7 +826,6 @@ contract L2BaseTokenEraTest is Test {
             "recordBaseTokenDeposit must be called BEFORE totalSupply changes"
         );
 
-        // Confirm totalSupply actually changed after the call
         assertEq(
             l2BaseToken.totalSupply(),
             totalSupplyBefore + mintAmount,

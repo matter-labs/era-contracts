@@ -307,6 +307,7 @@ contract L1AssetRouterTest is Test {
                     batchLeafProofLen: 0,
                     batchSettlementRoot: 0,
                     chainIdLeaf: 0,
+                    l1BatchTimestamp: 0,
                     ptr: 0,
                     finalProofNode: false
                 })

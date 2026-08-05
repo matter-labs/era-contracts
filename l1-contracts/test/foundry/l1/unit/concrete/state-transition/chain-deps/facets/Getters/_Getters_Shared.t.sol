@@ -9,7 +9,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {ILegacyGetters} from "contracts/state-transition/chain-interfaces/ILegacyGetters.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {L2DACommitmentScheme, PubdataContent} from "contracts/common/Config.sol";
 
 contract GettersFacetWrapper is GettersFacet, Test {
     function util_setVerifier(address _verifier) external {
@@ -186,6 +186,10 @@ contract GettersFacetWrapper is GettersFacet, Test {
 
     function util_setL2DACommitmentScheme(uint8 _scheme) external {
         s.l2DACommitmentScheme = L2DACommitmentScheme(_scheme);
+    }
+
+    function util_setPubdataContent(uint8 _pubdataContent) external {
+        s.pubdataContent = PubdataContent(_pubdataContent);
     }
 
     function util_setSettlementLayer(address _settlementLayer) external {
