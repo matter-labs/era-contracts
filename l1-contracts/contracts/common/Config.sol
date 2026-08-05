@@ -297,6 +297,9 @@ uint256 constant INITIAL_BASE_TOKEN_HOLDER_BALANCE = (2 ** 127) - 1;
 /// @dev The total number of supported interop attributes.
 uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 7;
 
+/// @dev The total number of interop attributes supported by the L1InteropCenter.
+uint256 constant SUPPORTED_L1_INTEROP_ATTRIBUTES = 4;
+
 /// @dev Whether chain migrations between settlement layers are enabled in the current release.
 /// @dev Release-level switch (disabled in v32): lifting the ban requires a protocol upgrade, unlike
 /// the runtime `migrationPaused` flag. See {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}.

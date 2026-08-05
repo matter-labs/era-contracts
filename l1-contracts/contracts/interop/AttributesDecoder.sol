@@ -29,4 +29,18 @@ library AttributesDecoder {
     function decodeBytes32(bytes calldata _data) internal pure returns (bytes32) {
         return abi.decode(_data[4:], (bytes32));
     }
+
+    function decodeL1ToL2TransactionParams(
+        bytes calldata _data
+    )
+        internal
+        pure
+        returns (uint256 mintValue, uint256 l2GasLimit, uint256 l2GasPerPubdataByteLimit, address refundRecipient)
+    {
+        return abi.decode(_data[4:], (uint256, uint256, uint256, address));
+    }
+
+    function decodeBytesArray(bytes calldata _data) internal pure returns (bytes[] memory) {
+        return abi.decode(_data[4:], (bytes[]));
+    }
 }

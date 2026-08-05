@@ -38,4 +38,24 @@ interface IERC7786Attributes {
     ///      most once, so the salt must be fresh per bundle. Omitting it (salt 0) works at most once per
     ///      sender. See {protocol-docs/interop.md#replay-protection-and-bundle-uniqueness}.
     function interopBundleSalt(bytes32 _salt) external pure;
+
+    /// @notice Parameters of the L1->L2 priority transaction that delivers a message sent from L1.
+    /// @param _mintValue The total amount of the destination chain's base token to be minted with the transaction.
+    /// It must cover both the transaction fee (base cost) and the value passed with the message.
+    /// @param _l2GasLimit The gas limit of the L2 transaction.
+    /// @param _l2GasPerPubdataByteLimit The maximum amount of L2 gas that the operator may charge per pubdata byte.
+    /// @param _refundRecipient The address on the destination chain that receives the fee refund. If zero, the
+    /// refund is sent to the (possibly aliased) sender of the message.
+    /// @dev L1-only: required by the L1InteropCenter and not supported by the L2 InteropCenter.
+    function l1ToL2TransactionParams(
+        uint256 _mintValue,
+        uint256 _l2GasLimit,
+        uint256 _l2GasPerPubdataByteLimit,
+        address _refundRecipient
+    ) external pure;
+
+    /// @notice Factory dependencies to be published with the L1->L2 priority transaction.
+    /// @dev L1-only and direct calls only: for indirect calls the factory dependencies are provided by the
+    /// cross-chain sender. Not supported by the L2 InteropCenter.
+    function factoryDeps(bytes[] calldata _factoryDeps) external pure;
 }
