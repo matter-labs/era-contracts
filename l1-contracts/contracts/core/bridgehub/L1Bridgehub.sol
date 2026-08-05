@@ -150,8 +150,8 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// the msg.sender has approved mintValue allowance for the nativeTokenVault.
     /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token.
     /// In case allowance is provided to the Asset Router, then it will be transferred to NTV.
-    /// @custom:deprecated Superseded by `L1InteropCenter.sendMessage` without an `indirectCall` attribute;
-    /// see {protocol-docs/l1-request-migration.md}. Do not add new callers.
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
@@ -206,8 +206,8 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// the user to approve for each token only its respective bridge
     /// @notice This function is great for contract calls to L2, the secondBridge can be any contract.
     /// @param _request the request for the L2 transaction
-    /// @custom:deprecated Superseded by `L1InteropCenter.sendMessage` with the `indirectCall` attribute;
-    /// see {protocol-docs/l1-request-migration.md}. Do not add new callers.
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {

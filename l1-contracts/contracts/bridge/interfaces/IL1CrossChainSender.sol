@@ -14,8 +14,8 @@ interface IL1CrossChainSender {
     /// @param _value The `msg.value` to be deposited on the target chain.
     /// @param _data The calldata for the second bridge deposit.
     /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
-    /// @custom:deprecated Renamed to `initiateIndirectCall` and called by the `L1InteropCenter` instead of the
-    /// Bridgehub; see {protocol-docs/l1-request-migration.md}.
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function bridgehubDeposit(
         uint256 _chainId,
         address _originalCaller,
@@ -29,7 +29,7 @@ interface IL1CrossChainSender {
     /// @param _chainId The chain ID of the ZK chain to which confirm the deposit.
     /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
     /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
-    /// @custom:deprecated Renamed to `confirmL2Transaction` and called by the `L1InteropCenter` instead of the
-    /// Bridgehub; see {protocol-docs/l1-request-migration.md}.
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 }

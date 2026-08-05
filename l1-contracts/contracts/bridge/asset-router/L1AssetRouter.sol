@@ -103,8 +103,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
-    /// @custom:deprecated Becomes `onlyInteropCenterOrEra`, authorizing `bridgehub.interopCenter()` instead of the
-    /// Bridgehub; see {protocol-docs/l1-request-migration.md}.
+    /// @custom:deprecated Expected to be deprecated in the next release: L1->L2 requests move to a more
+    /// interop-native entry point, so the Bridgehub will no longer be the caller.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
             msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == address(ERA_DIAMOND_PROXY)),
@@ -126,8 +126,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Checks that the message sender is the bridgehub.
-    /// @custom:deprecated Becomes `onlyInteropCenter`, authorizing `bridgehub.interopCenter()` instead of the
-    /// Bridgehub; see {protocol-docs/l1-request-migration.md}.
+    /// @custom:deprecated Expected to be deprecated in the next release: L1->L2 requests move to a more
+    /// interop-native entry point, so the Bridgehub will no longer be the caller.
     modifier onlyBridgehub() {
         if (msg.sender != address(BRIDGE_HUB)) {
             revert Unauthorized(msg.sender);
@@ -263,7 +263,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @inheritdoc IL1CrossChainSender
-    /// @custom:deprecated Renamed to `initiateIndirectCall`; see {protocol-docs/l1-request-migration.md}.
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function bridgehubDeposit(
         uint256 _chainId,
         address _originalCaller,
@@ -311,7 +312,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @inheritdoc IL1CrossChainSender
-    /// @custom:deprecated Renamed to `confirmL2Transaction`; see {protocol-docs/l1-request-migration.md}.
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,
@@ -588,8 +590,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                 factoryDeps: new bytes[](0),
                 refundRecipient: refundRecipient
             });
-            // The only in-repo call site of a deprecated Bridgehub entry point that is not a pure rename: it has to
-            // build an `L1InteropCenter.sendMessage` call instead; see {protocol-docs/l1-request-migration.md}.
             txHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
         }
 

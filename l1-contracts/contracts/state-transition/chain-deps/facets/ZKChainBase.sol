@@ -103,9 +103,8 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
-    /// @custom:deprecated Becomes `onlyL1InteropCenter`, resolving the authorized caller as
-    /// `IL1Bridgehub(s.bridgehub).interopCenter()`, so the Bridgehub itself stops being an authorized request
-    /// caller; see {protocol-docs/l1-request-migration.md}.
+    /// @custom:deprecated Expected to be deprecated in the next release: L1->L2 requests move to a more
+    /// interop-native entry point, so the Bridgehub will no longer be the caller.
     modifier onlyBridgehub() {
         if (msg.sender != s.bridgehub) {
             revert Unauthorized(msg.sender);

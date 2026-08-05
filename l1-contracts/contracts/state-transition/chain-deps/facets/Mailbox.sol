@@ -119,8 +119,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
     }
 
     /// @inheritdoc IMailboxImpl
-    /// @dev The function keeps its name, but its gate becomes `onlyL1InteropCenter`: the caller becomes the
-    /// `L1InteropCenter` instead of the Bridgehub; see {protocol-docs/l1-request-migration.md}.
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
     ) external onlyBridgehub returns (bytes32 canonicalTxHash) {

@@ -43,8 +43,8 @@ contract ChainRegistrationSender is
         public chainRegisteredOnChain;
 
     /// @notice Checks that the message sender is the bridgehub.
-    /// @custom:deprecated Becomes `onlyInteropCenter`, authorizing `bridgehub.interopCenter()` instead of the
-    /// Bridgehub; see {protocol-docs/l1-request-migration.md}.
+    /// @custom:deprecated Expected to be deprecated in the next release: L1->L2 requests move to a more
+    /// interop-native entry point, so the Bridgehub will no longer be the caller.
     modifier onlyBridgehub() {
         if (msg.sender != address(BRIDGE_HUB)) {
             revert Unauthorized(msg.sender);
@@ -85,8 +85,8 @@ contract ChainRegistrationSender is
     /// @inheritdoc IL1CrossChainSender
     /// @dev Registers a chain on the L2 via a normal deposit: anyone can trigger it (via the
     /// Bridgehub), but the caller provides the base tokens.
-    /// @custom:deprecated Renamed to `initiateIndirectCall` and triggered through the `L1InteropCenter`;
-    /// see {protocol-docs/l1-request-migration.md}.
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
         uint256 chainRegisteredOn,
@@ -151,7 +151,7 @@ contract ChainRegistrationSender is
 
     /// @inheritdoc IL1CrossChainSender
     /// @dev No-op: failed L1->L2 transactions need no recovery here.
-    /// @custom:deprecated Renamed to `confirmL2Transaction` and gated on the interop center like the other
-    /// cross-chain senders; see {protocol-docs/l1-request-migration.md}.
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external override {}
 }

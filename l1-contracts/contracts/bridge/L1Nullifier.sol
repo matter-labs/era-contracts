@@ -263,7 +263,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @inheritdoc IL1Nullifier
-    /// @custom:deprecated Renamed to `confirmL2TransactionForwarded`; see {protocol-docs/l1-request-migration.md}.
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function bridgehubConfirmL2TransactionForwarded(
         uint256 _chainId,
         bytes32 _txDataHash,
