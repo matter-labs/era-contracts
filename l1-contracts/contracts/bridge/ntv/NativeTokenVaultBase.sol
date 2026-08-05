@@ -12,6 +12,7 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
+import {IL2AssetHandler} from "../interfaces/IL2AssetHandler.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
@@ -43,7 +44,8 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the ZK chains.
+/// @notice The default asset handler for ETH and ERC20 tokens: escrows tokens native to this chain and
+/// mints/burns bridged representations. See {protocol-docs/bridging.md#native-token-vault}.
 /// @dev Designed for use with a proxy for upgradability.
 abstract contract NativeTokenVaultBase is
     INativeTokenVaultBase,
@@ -70,19 +72,14 @@ abstract contract NativeTokenVaultBase is
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
     IBeacon public bridgedTokenBeacon;
 
-    /// @dev A mapping assetId => originChainId
-    /// @dev It is assumed, that `originChainId`, `tokenAddress` and `assetId`
-    /// mappings are always atomically populated
+    /// @dev A mapping assetId => originChainId. The `originChainId`, `tokenAddress` and `assetId`
+    /// mappings are always populated atomically.
     mapping(bytes32 assetId => uint256 originChainId) public originChainId;
 
-    /// @dev A mapping assetId => tokenAddress
-    /// @dev It is assumed, that `originChainId`, `tokenAddress` and `assetId`
-    /// mappings are always atomically populated
+    /// @dev A mapping assetId => tokenAddress; populated atomically with `originChainId`.
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
-    /// @dev A mapping tokenAddress => assetId
-    /// @dev It is assumed, that `originChainId`, `tokenAddress` and `assetId`
-    /// mappings are always atomically populated
+    /// @dev A mapping tokenAddress => assetId; populated atomically with `originChainId`.
     mapping(address tokenAddress => bytes32 assetId) public assetId;
 
     /// @dev The number of bridged tokens.
@@ -104,12 +101,13 @@ abstract contract NativeTokenVaultBase is
      */
     uint256[43] private __gap;
 
-    /// @notice Checks that the message sender is the bridgehub.
+    /// @notice Checks that the message sender is the asset router.
     modifier onlyAssetRouter() {
         require(msg.sender == address(_assetRouter()), Unauthorized(msg.sender));
         _;
     }
 
+    /// @inheritdoc INativeTokenVaultBase
     function originToken(bytes32 _assetId) public view virtual returns (address) {
         address token = tokenAddress[_assetId];
         if (token == address(0)) {
@@ -132,10 +130,7 @@ abstract contract NativeTokenVaultBase is
     }
 
     function _registerToken(address _nativeToken) internal virtual returns (bytes32 newAssetId) {
-        // We allow registering `_wethToken()` inside `NativeTokenVault` only for L1 native token vault.
-        // It is needed to allow withdrawing such assets. We restrict all WETH-related
-        // operations to deposits from L1 only to be able to upgrade their logic more easily in the
-        // future.
+        // WETH may only be registered in the L1 NTV. See {protocol-docs/bridging.md#native-token-vault}.
         require(_nativeToken != _wethToken() || block.chainid == _l1ChainId(), TokenNotSupported(_wethToken()));
         require(_nativeToken.code.length > 0, EmptyToken());
         require(assetId[_nativeToken] == bytes32(0), AssetIdAlreadyRegistered());
@@ -178,19 +173,8 @@ abstract contract NativeTokenVaultBase is
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetHandler
-    /// @notice Used when the chain receives a transfer from another chain's Asset Router and correspondingly mints the asset.
-    /// @param _chainId The chainId that the message is from.
-    /// @param _assetId The assetId of the asset being bridged.
-    /// @param _data The abi.encoded transfer data.
-    /// @dev Note, the `_data` is provided by the potentially malicious `_chainId`. The best way to treat
-    /// the security of this function is "_chainId sent a message that _assetId needs to be minted with _data".
-    /// The following checks are applied to ensure safety:
-    /// - assetIdcheck must be performed. It does not verify the metadata.
-    /// - metadata not being verified is a known issue and will be addressed in the future releases. In the short term, we only expect
-    /// chains with decently trusted chain type managers. This issue might affect the user experience, but never lead
-    /// to loss of funds.
-    /// - Correctness of the minted amounts is guaranteed by the ZK proofs of the sending chain
-    /// (plus 2FA on ZKsync OS chains); there is no on-chain per-chain balance enforcement.
+    /// @dev `_data` comes from a potentially malicious `_chainId`.
+    /// See {protocol-docs/bridging.md#native-token-vault}.
     function bridgeMint(
         uint256 _chainId,
         bytes32 _assetId,
@@ -209,6 +193,32 @@ abstract contract NativeTokenVaultBase is
         emit BridgeMint(_chainId, _assetId, receiver, amount);
     }
 
+    /// @inheritdoc IL2AssetHandler
+    /// @dev The mint data is forwarded verbatim from the bundle, so the refund targets the data's
+    /// `originalCaller` regardless of its `remoteReceiver`. `_chainId` must be the destination chain used
+    /// at burn time so `_handleBridgeFromChain` undoes the matching `_handleBridgeToChain`.
+    function bridgeRecoverFailedTransfer(
+        uint256 _chainId,
+        bytes32 _assetId,
+        bytes calldata _data
+    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused {
+        // slither-disable-next-line unused-return
+        (address originalCaller, , address originTokenAddress, uint256 amount, bytes memory erc20Data) = DataEncoding
+            .decodeBridgeMintData(_data);
+        bool isNative = originChainId[_assetId] == block.chainid;
+        _disburseFailedTransfer({
+            _chainId: _chainId,
+            _assetId: _assetId,
+            _receiver: originalCaller,
+            _amount: amount,
+            _isNative: isNative,
+            _originToken: originTokenAddress,
+            _erc20Data: erc20Data
+        });
+        // solhint-disable-next-line func-named-parameters
+        emit BridgeRecoverFailedTransfer(_chainId, _assetId, originalCaller, amount);
+    }
+
     function _bridgeMintBridgedToken(
         uint256 _chainId,
         bytes32 _assetId,
@@ -217,12 +227,12 @@ abstract contract NativeTokenVaultBase is
         // Either it was bridged before, therefore address is not zero, or it is first time bridging and standard erc20 will be deployed
         address token = tokenAddress[_assetId];
         bytes memory erc20Data;
-        address originToken;
+        address originTokenAddress;
         // slither-disable-next-line unused-return
-        (, receiver, originToken, amount, erc20Data) = DataEncoding.decodeBridgeMintData(_data);
+        (, receiver, originTokenAddress, amount, erc20Data) = DataEncoding.decodeBridgeMintData(_data);
 
         if (token == address(0)) {
-            token = _ensureAndSaveTokenDeployed(_assetId, originToken, erc20Data);
+            token = _ensureAndSaveTokenDeployed(_assetId, originTokenAddress, erc20Data);
         }
 
         // IMPORTANT: We must handle chain balance decrease before giving out funds to the user,
@@ -250,13 +260,49 @@ abstract contract NativeTokenVaultBase is
 
     function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal virtual;
 
+    /// @notice Disburses a failed/recovered transfer's funds to `_receiver`, reversing the source-side
+    /// `bridgeBurn` that locked/burned them.
+    /// @dev Shared by `bridgeRecoverFailedTransfer` (atomic-interop recovery) and the L1
+    /// `bridgeConfirmTransferResult` (failed-deposit claim).
+    /// @dev Virtual: on L2 the base token is escrowed off-vault (in `BaseTokenHolder`), so
+    /// {L2NativeTokenVault} overrides this to route the base token there.
+    /// @param _chainId The chain the funds are being recovered from (the burn-time destination chain).
+    /// @param _assetId The assetId of the asset being recovered.
+    /// @param _receiver The address that receives the recovered funds (always the original depositor).
+    /// @param _amount The amount to recover.
+    /// @param _isNative Whether `_assetId` is native to this chain (unlock) or bridged (re-mint).
+    /// @param _originToken The origin token address, used to deploy the bridged token if it is not yet known.
+    /// @param _erc20Data The ERC20 metadata, used to deploy the bridged token if it is not yet known.
+    function _disburseFailedTransfer(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _receiver,
+        uint256 _amount,
+        bool _isNative,
+        address _originToken,
+        bytes memory _erc20Data
+    ) internal virtual {
+        // IMPORTANT: We must handle chain balance decrease before giving out funds to the user,
+        // because otherwise the latter operation (via a malicious token or ETH recipient)
+        // could've overwritten the transient values from L1Nullifier.
+        _handleBridgeFromChain({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
+        if (_isNative) {
+            _withdrawFunds(_assetId, _receiver, tokenAddress[_assetId], _amount);
+        } else {
+            address token = tokenAddress[_assetId];
+            if (token == address(0)) {
+                token = _ensureAndSaveTokenDeployed(_assetId, _originToken, _erc20Data);
+            }
+            IBridgedStandardToken(token).bridgeMint(_receiver, _amount);
+        }
+    }
+
     /*//////////////////////////////////////////////////////////////
                             Start transaction Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetHandler
-    /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
-    /// @dev In case of native token vault _data is the tuple of _depositAmount and _receiver.
+    /// @dev `_data` is the encoded bridge-burn data: (amount, receiver, token address).
     function bridgeBurn(
         uint256 _chainId,
         uint256 _l2MsgValue,
@@ -295,6 +341,7 @@ abstract contract NativeTokenVaultBase is
         }
     }
 
+    /// @inheritdoc INativeTokenVaultBase
     function tryRegisterTokenFromBurnData(bytes calldata _burnData, bytes32 _expectedAssetId) external {
         // slither-disable-next-line unused-return
         (, , address tokenAddress) = DataEncoding.decodeBridgeBurnData(_burnData);
@@ -437,8 +484,7 @@ abstract contract NativeTokenVaultBase is
     ) internal view virtual returns (bytes memory) {
         uint256 originChainId = originChainId[_assetId];
         if (_bridgedToken) {
-            // we set all originChainId for all already bridged tokens with the setLegacyTokenAssetId and updateChainBalancesFromSharedBridge functions.
-            // for native tokens the originChainId is set when they register.
+            // The origin chain id is set when a token is registered/deployed; zero means unregistered.
             require(originChainId != 0, ZeroAddress());
         }
         return getERC20Getters(_token, originChainId);
@@ -458,13 +504,12 @@ abstract contract NativeTokenVaultBase is
         if (_assetId == _baseTokenAssetId()) {
             require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
             if (_isBridgedToken) {
-                // This is the interop/asset-router case where this chain's base token is being
-                // bridged to a chain with a different base token. NTV still has to produce the
-                // bridge burn data for the asset-router flow, but the actual source-side base
-                // token burn/accounting goes through BaseTokenHolder.
+                // This chain's base token is bridged to a chain with a different base token: the NTV
+                // still produces the bridge-burn data, but the source-side burn/accounting goes through
+                // BaseTokenHolder.
                 L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: msg.value}(_chainId);
             } else {
-                /// This is  only the case on L1, on L2 the base token is always bridged.
+                // The native branch only occurs on L1 for ETH; on L2 the base token is always bridged.
                 _handleBridgeToChain(_chainId, _assetId, _depositAmount);
             }
         } else {
@@ -504,8 +549,7 @@ abstract contract NativeTokenVaultBase is
         return balanceAfter - balanceBefore;
     }
 
-    /// @param _token The address of token of interest.
-    /// @dev Receives and parses (name, symbol, decimals) from the token contract
+    /// @inheritdoc INativeTokenVaultBase
     function getERC20Getters(address _token, uint256 _originChainId) public view override returns (bytes memory) {
         return _getERC20GettersInner(_token, _originChainId);
     }
@@ -518,7 +562,7 @@ abstract contract NativeTokenVaultBase is
     }
 
     /// @notice Registers a native token address for the vault.
-    /// @dev It does not perform any checks for the correctnesss of the token contract.
+    /// @dev It does not perform any checks for the correctness of the token contract.
     /// @param _nativeToken The address of the token to be registered.
     function _unsafeRegisterNativeToken(address _nativeToken) internal returns (bytes32 newAssetId) {
         newAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
@@ -658,11 +702,10 @@ abstract contract NativeTokenVaultBase is
                             PAUSE
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev This pausability is inherited by both L1 and L2 vaults through the shared base.
-    /// @dev On L1 it is part of the emergency controls for asset movement.
-    /// On L2 it is kept only for legacy/shared-code reasons and should not be used as an emergency mechanism.
-    /// Future L2 logic should rely on the L1/GW freeze flow instead of local pausability.
     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
+    /// @dev On L1 this is part of the emergency controls; on L2 it exists only for shared-code reasons
+    /// and should not be used as an emergency mechanism (future L2 logic should rely on the L1/GW freeze
+    /// flow instead).
     function pause() external onlyOwner {
         _pause();
     }

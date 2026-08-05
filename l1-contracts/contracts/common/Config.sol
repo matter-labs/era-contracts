@@ -5,6 +5,7 @@ pragma solidity ^0.8.21;
 // solhint-disable no-unused-import
 import {
     L2DACommitmentScheme,
+    PubdataContent,
     L2_TO_L1_LOG_SERIALIZE_SIZE,
     L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
     L2_TO_L1_LOGS_MERKLE_TREE_DEPTH,
@@ -62,8 +63,28 @@ uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 1 hours;
 /// @dev Shift to apply to verify public input before verifying.
 uint256 constant PUBLIC_INPUT_SHIFT = 32;
 
+/// @dev Proof type used by the ZKsync OS PLONK verifier.
+uint256 constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
+
+/// @dev Proof type used by the proof-skipping ZKsync OS testnet verifier.
+uint256 constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
+
+/// @dev Number of proof words consumed by ZKsync OS metadata before the underlying PLONK proof.
+uint256 constant ZKSYNC_OS_PROOF_METADATA_LENGTH = 2;
+
+/// @dev Number of words expected in a proof-skipping ZKsync OS testnet proof.
+uint256 constant ZKSYNC_OS_MOCK_PROOF_LENGTH = 2;
+
+/// @dev Marker expected as the first word in a proof-skipping ZKsync OS testnet proof.
+uint256 constant ZKSYNC_OS_MOCK_PROOF_MAGIC = 13;
+
 /// @dev Maximum number of linked-list leaves checked when correcting a stale indexed Merkle tree low leaf.
 uint256 constant MAX_LOW_INDEX_SEARCH_ATTEMPTS = 5;
+
+/// @dev Padding value for empty/unused leaves in an {IndexedMerkleTree}. Deliberately NOT a valid
+/// `hashLeaf(IMTLeaf)` output, so an unused padded index can't be presented as a `{0,0,0}` low leaf to forge
+/// a non-inclusion proof. The off-chain imt-engine must use the same value.
+bytes32 constant IMT_EMPTY_LEAF_HASH = keccak256("zkSync:IndexedMerkleTree:emptyLeaf");
 
 /// @dev The maximum number of L2 gas that a user can request for an L2 transaction
 uint256 constant MAX_GAS_PER_TRANSACTION = 80_000_000;
@@ -274,7 +295,12 @@ uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 uint256 constant INITIAL_BASE_TOKEN_HOLDER_BALANCE = (2 ** 127) - 1;
 
 /// @dev The total number of supported interop attributes.
-uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 6;
+uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 7;
+
+/// @dev Whether chain migrations between settlement layers are enabled in the current release.
+/// @dev Release-level switch (disabled in v32): lifting the ban requires a protocol upgrade, unlike
+/// the runtime `migrationPaused` flag. See {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}.
+bool constant CHAIN_MIGRATIONS_ENABLED = false;
 
 /// @dev Migration number used when a chain migrates from L1 to a settlement layer.
 uint256 constant MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER = 1;

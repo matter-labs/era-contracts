@@ -7,6 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {SavedTotalSupply} from "contracts/common/L2AssetBookkeeping.sol";
 import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {
@@ -21,8 +22,10 @@ import {
 import {
     BaseTokenBookkeepingAlreadyInitialized,
     BaseTokenBookkeepingNotInitialized,
+    BaseTokenNativeToThisChain,
     BaseTokenTotalSupplyBackfillNotNeeded,
     L1ChainIdNotSet,
+    RecoverToL1NotSupported,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
 
@@ -36,6 +39,7 @@ contract BaseTokenHolderTest is Test {
     uint256 internal constant L1_CHAIN_ID = 9;
     uint256 internal constant ERA_CHAIN_ID = 271;
     uint256 internal constant GATEWAY_CHAIN_ID = 505;
+    bytes32 internal constant BASE_TOKEN_ASSET_ID = bytes32(uint256(0xba5e));
 
     function setUp() public {
         baseTokenHolder = new BaseTokenHolder();
@@ -49,6 +53,17 @@ contract BaseTokenHolderTest is Test {
         vm.mockCall(
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(ISystemContext.currentSettlementLayerChainId.selector),
+            abi.encode(L1_CHAIN_ID)
+        );
+        // The recovery path reads the base token's origin chain to assert it is not native here.
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeWithSelector(IL2NativeTokenVault.BASE_TOKEN_ASSET_ID.selector),
+            abi.encode(BASE_TOKEN_ASSET_ID)
+        );
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, BASE_TOKEN_ASSET_ID),
             abi.encode(L1_CHAIN_ID)
         );
 
@@ -175,14 +190,14 @@ contract BaseTokenHolderTest is Test {
     }
 
     function test_receive_rejectFromInteropHandler() public {
-        // InteropHandler should use give() not receive()
+        // L2InteropHandler should use give() not receive()
         uint256 amount = 1 ether;
         vm.deal(L2_INTEROP_HANDLER_ADDR, amount);
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         (bool success, ) = address(baseTokenHolder).call{value: amount}("");
 
-        assertFalse(success, "Transfer should fail - InteropHandler should use give()");
+        assertFalse(success, "Transfer should fail - L2InteropHandler should use give()");
     }
 
     function test_receive_rejectFromInteropCenter() public {
@@ -267,6 +282,8 @@ contract BaseTokenHolderTest is Test {
         _burnAndStartBridging_success(L2_NATIVE_TOKEN_VAULT_ADDR, ERA_CHAIN_ID);
     }
 
+    /// @dev L2BaseToken is an authorized bridging caller: its `withdraw`/`withdrawWithMessage` entrypoints
+    /// burn the sent value by forwarding it to the BaseTokenHolder via `burnAndStartBridging`.
     function test_burnAndStartBridging_successFromL2BaseToken() public {
         _burnAndStartBridging_success(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, ERA_CHAIN_ID);
     }
@@ -440,6 +457,73 @@ contract BaseTokenHolderTest is Test {
         vm.deal(L2_INTEROP_CENTER_ADDR, 1);
         vm.prank(L2_INTEROP_CENTER_ADDR);
         holder.burnAndStartBridging{value: 1}(ERA_CHAIN_ID);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        recoverBaseToken() TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Covers base-token bridge-out recovery via `recoverBaseToken`.
+    /// See {protocol-docs/bridging.md#base-token-handling}.
+    function test_recoverBaseToken_successFromNativeTokenVault() public {
+        uint256 amount = 3 ether;
+        uint256 recipientBalanceBefore = recipient.balance;
+        uint256 holderBalanceBefore = address(baseTokenHolder).balance;
+
+        vm.expectEmit(true, false, false, true, address(baseTokenHolder));
+        emit IBaseTokenHolder.BaseTokenRecovered(recipient, amount);
+
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        baseTokenHolder.recoverBaseToken(recipient, amount, GATEWAY_CHAIN_ID);
+
+        assertEq(recipient.balance, recipientBalanceBefore + amount, "recipient must receive the recovered value");
+        assertEq(address(baseTokenHolder).balance, holderBalanceBefore - amount, "holder balance must decrease");
+    }
+
+    /// @dev Recovery is only accounting-neutral for L2->L2 bridge-outs: `totalWithdrawalsToL1` is
+    /// append-only, so an L1-destined recovery must be rejected outright.
+    function test_recoverBaseToken_revertsForL1Destination() public {
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        vm.expectRevert(RecoverToL1NotSupported.selector);
+        baseTokenHolder.recoverBaseToken(recipient, 1 ether, L1_CHAIN_ID);
+    }
+
+    /// @dev The base token never originates from this chain, so `L2NativeTokenVault.bridgedOut` holds
+    /// nothing to re-credit; a chain-native base token would invalidate that assumption.
+    function test_recoverBaseToken_revertsWhenBaseTokenIsNativeToThisChain() public {
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, BASE_TOKEN_ASSET_ID),
+            abi.encode(block.chainid)
+        );
+
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        vm.expectRevert(BaseTokenNativeToThisChain.selector);
+        baseTokenHolder.recoverBaseToken(recipient, 1 ether, GATEWAY_CHAIN_ID);
+    }
+
+    function test_recoverBaseToken_zeroAmountIsNoop() public {
+        uint256 holderBalanceBefore = address(baseTokenHolder).balance;
+
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        baseTokenHolder.recoverBaseToken(recipient, 0, GATEWAY_CHAIN_ID);
+
+        assertEq(recipient.balance, 0);
+        assertEq(address(baseTokenHolder).balance, holderBalanceBefore);
+    }
+
+    /// @dev Recovery is NativeTokenVault-only — tighter than burnAndStartBridging (which also allows the
+    /// InteropCenter). Neither the InteropCenter nor the InteropHandler may trigger a base-token recovery.
+    function test_recoverBaseToken_revertFromInteropCenter() public {
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, L2_INTEROP_CENTER_ADDR));
+        baseTokenHolder.recoverBaseToken(recipient, 1 ether, GATEWAY_CHAIN_ID);
+    }
+
+    function test_recoverBaseToken_revertFromInteropHandler() public {
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, L2_INTEROP_HANDLER_ADDR));
+        baseTokenHolder.recoverBaseToken(recipient, 1 ether, GATEWAY_CHAIN_ID);
     }
 }
 

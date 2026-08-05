@@ -43,8 +43,8 @@ contract FacetCutTest is DiamondCutTest {
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
         mailboxFacet = new MailboxFacet(eraChainId, block.chainid, address(0), eip7702Checker, false);
         gettersFacet = new GettersFacet();
-        executorFacet1 = new ExecutorFacet(block.chainid);
-        executorFacet2 = new ExecutorFacet(block.chainid);
+        executorFacet1 = new ExecutorFacet();
+        executorFacet2 = new ExecutorFacet();
     }
 
     function test_AddingFacetsToFreeSelectors() public {

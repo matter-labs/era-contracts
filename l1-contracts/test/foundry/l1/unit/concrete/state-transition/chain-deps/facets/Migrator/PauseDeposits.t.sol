@@ -118,7 +118,6 @@ contract PauseDepositsTest is MigratorTest {
         bytes32 slot = bytes32(uint256(51));
         vm.store(address(migratorFacet), slot, bytes32(uint256(1)));
 
-        // Mock the requestPauseDepositsForChainOnGateway call routed via the chain asset handler
         vm.mockCall(
             chainAssetHandler,
             abi.encodeWithSelector(IL1ChainAssetHandler.requestPauseDepositsForChainOnGateway.selector, chainId),

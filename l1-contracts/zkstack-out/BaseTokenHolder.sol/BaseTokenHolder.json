@@ -163,6 +163,29 @@
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "recoverBaseToken",
+    "inputs": [
+      {
+        "name": "_to",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_toChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "event",
     "name": "BaseTokenBurntInterop",
     "inputs": [
@@ -207,6 +230,25 @@
     "anonymous": false
   },
   {
+    "type": "event",
+    "name": "BaseTokenRecovered",
+    "inputs": [
+      {
+        "name": "to",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
     "type": "error",
     "name": "BaseTokenBookkeepingAlreadyInitialized",
     "inputs": []
@@ -218,12 +260,22 @@
   },
   {
     "type": "error",
+    "name": "BaseTokenNativeToThisChain",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "BaseTokenTotalSupplyBackfillNotNeeded",
     "inputs": []
   },
   {
     "type": "error",
     "name": "L1ChainIdNotSet",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RecoverToL1NotSupported",
     "inputs": []
   },
   {

@@ -14,7 +14,6 @@ import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
-import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {IWETH9} from "../interfaces/IWETH9.sol";
@@ -31,12 +30,13 @@ import {
     WithdrawFailed,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
-import {ClaimFailedDepositFailed, OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
+import {OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
 import {InsufficientChainBalance} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the ZK chains.
+/// @notice The L1 vault holding native ETH and ERC20 tokens bridged into the ZK chains.
+/// See {protocol-docs/bridging.md#native-token-vault}.
 /// @dev Designed for use with a proxy for upgradability.
 contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeTokenVaultBase {
     using SafeERC20 for IERC20;
@@ -68,10 +68,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     address private __DEPRECATED_l1AssetTracker;
 
     /// @notice Net amount of each L1-native token currently bridged out of L1.
-    /// @dev Increases on outbound flows (deposits/interop sends) and decreases on inbound ones
-    /// (withdrawal finalizations and failed-deposit refunds), so unlike the vault's raw `balanceOf`
-    /// it cannot be skewed by direct transfers into the vault. It is bounded by the amount actually
-    /// escrowed in the vault, so it cannot overflow even for tokens with an astronomic total supply.
+    /// See {protocol-docs/bridging.md#native-token-vault}.
     mapping(bytes32 assetId => uint256 amount) public bridgedOut;
 
     /*//////////////////////////////////////////////////////////////
@@ -143,8 +140,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
                             Check counterpart Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Used to register the Asset Handler asset in L2 AssetRouter.
-    /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
+    /// @notice Validates the asset handler being set on a counterpart chain: for NTV-managed assets it
+    /// must be the L2 NTV.
+    /// @param _assetHandlerAddressOnCounterpart The address of the asset handler on the counterpart chain.
     function bridgeCheckCounterpartAddress(
         uint256,
         bytes32,
@@ -154,6 +152,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         require(_assetHandlerAddressOnCounterpart == L2_NATIVE_TOKEN_VAULT_ADDR, WrongCounterpart());
     }
 
+    /// @dev Resolves the token's origin chain, falling back to vault/nullifier balance heuristics for
+    /// legacy deposits made before the token was registered; returns 0 if it cannot be determined.
     function _getOriginChainId(bytes32 _assetId) internal view returns (uint256) {
         uint256 chainId = originChainId[_assetId];
         if (chainId != 0) {
@@ -217,32 +217,25 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         require(_txStatus == TxStatus.Failure, OnlyFailureStatusAllowed());
         // slither-disable-next-line unused-return
         (uint256 _amount, , ) = DataEncoding.decodeBridgeBurnData(_data);
-        address l1Token = tokenAddress[_assetId];
         require(_amount != 0, NoFundsTransferred());
 
-        // Record the refund before giving out funds so the flow counters are already
-        // consistent if the recipient re-enters a view of them.
-        _handleBridgeFromChain(_chainId, _assetId, _amount);
-
-        if (l1Token == ETH_TOKEN_ADDRESS) {
-            bool callSuccess;
-            // Low-level assembly call, to avoid any memory copying (save gas)
-            assembly {
-                callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
-            }
-            require(callSuccess, ClaimFailedDepositFailed());
-        } else {
-            uint256 originChainId = _getOriginChainId(_assetId);
-            if (originChainId == block.chainid) {
-                IERC20(l1Token).safeTransfer(_depositSender, _amount);
-            } else if (originChainId != 0) {
-                IBridgedStandardToken(l1Token).bridgeMint(_depositSender, _amount);
-            } else {
-                revert OriginChainIdNotFound();
-            }
-            // Note we don't allow weth deposits anymore, but there might be legacy weth deposits.
-            // until we add Weth bridging capabilities, we don't wrap/unwrap weth to ether.
+        uint256 originChain = _getOriginChainId(_assetId);
+        if (originChain == 0) {
+            revert OriginChainIdNotFound();
         }
+        // The token is always already known here, so `_disburseFailedTransfer`'s deploy branch is never
+        // taken and the `_originToken`/`_erc20Data` arguments are unused. Legacy WETH deposits may still
+        // be claimed (no wrap/unwrap is performed) even though new WETH deposits are not allowed.
+        bool isNative = originChain == block.chainid;
+        _disburseFailedTransfer({
+            _chainId: _chainId,
+            _assetId: _assetId,
+            _receiver: _depositSender,
+            _amount: _amount,
+            _isNative: isNative,
+            _originToken: address(0),
+            _erc20Data: ""
+        });
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -254,9 +247,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return bytes32(0);
     }
 
-    /// @notice Used to get the expected bridged token address corresponding to its native counterpart.
-    /// @param _originChainId The chain id of the origin token.
-    /// @param _nonNativeToken The address of token on its origin chain.
+    /// @inheritdoc NativeTokenVaultBase
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
         address _nonNativeToken
@@ -284,7 +275,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     }
 
     function _deployBeaconProxy(bytes32 _salt, uint256) internal override returns (BeaconProxy proxy) {
-        // Use CREATE2 to deploy the BeaconProxy
         address proxyAddress = Create2.deploy(
             0,
             _salt,

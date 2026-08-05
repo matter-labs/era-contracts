@@ -11,7 +11,7 @@ import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "../../core/chain-asset-handler/IChainAssetHandler.sol";
 import {IInteropCenter} from "../../interop/IInteropCenter.sol";
-import {IInteropHandler} from "../../interop/IInteropHandler.sol";
+import {IL2InteropHandler} from "../../interop/interop-handler/IL2InteropHandler.sol";
 import {IL2AssetRouter} from "../../bridge/asset-router/IL2AssetRouter.sol";
 import {IBaseTokenHolder} from "../../l2-system/interfaces/IBaseTokenHolder.sol";
 import {ISystemContext} from "../interfaces/ISystemContext.sol";
@@ -38,6 +38,8 @@ import {
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
+    L2_INTEROP_COMMITMENT_TREE_ADDR,
+    L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
     MAX_BUILT_IN_CONTRACT_ADDR,
     L2_BOOTLOADER_ADDRESS
 } from "./L2ContractAddresses.sol";
@@ -81,7 +83,7 @@ IChainAssetHandlerBase constant L2_CHAIN_ASSET_HANDLER = IChainAssetHandlerBase(
 IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADDR);
 
 /// @dev the L2 interop handler
-IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(L2_INTEROP_HANDLER_ADDR);
+IL2InteropHandler constant L2_INTEROP_HANDLER = IL2InteropHandler(L2_INTEROP_HANDLER_ADDR);
 
 /// @dev The base token holder contract that holds chain's base token reserves.
 IBaseTokenHolder constant L2_BASE_TOKEN_HOLDER = IBaseTokenHolder(payable(L2_BASE_TOKEN_HOLDER_ADDR));

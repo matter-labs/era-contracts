@@ -5,33 +5,29 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {
-    IBridgehubBase,
     L2TransactionRequestDirect,
     L2TransactionRequestTwoBridgesOuter
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
+import {SharedBridgehubWithdrawal} from "./_SharedBridgehubWithdrawal.t.sol";
 import {
     DEFAULT_L2_LOGS_TREE_ROOT_HASH,
     EMPTY_STRING_KECCAK,
     ETH_TOKEN_ADDRESS,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
 } from "contracts/common/Config.sol";
-import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
-
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+contract BridgehubInvariantTests_1 is SharedBridgehubWithdrawal {
     //@check Why is this file practically the same as BridgehubTests.t.sol???
     uint256 constant TEST_USERS_COUNT = 10;
 
@@ -56,11 +52,7 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
     address[] public users;
     address[] public l2ContractAddresses;
     address[] public addressesToExclude;
-    address public currentUser;
-    uint256 public currentChainId;
     address public currentChainAddress;
-    address public currentTokenAddress = ETH_TOKEN_ADDRESS;
-    TestnetERC20Token currentToken;
 
     // Amounts deposited by each user, mapped by user address and token address
     mapping(address user => mapping(address token => uint256 deposited)) public depositsUsers;
@@ -68,8 +60,6 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
     mapping(address chain => mapping(address token => uint256 deposited)) public depositsBridge;
     // Total sum of deposits into the bridge, mapped by token address
     mapping(address token => uint256 deposited) public tokenSumDeposit;
-    // Total sum of withdrawn tokens, mapped by token address
-    mapping(address token => uint256 deposited) public tokenSumWithdrawal;
     // Total sum of L2 values transferred to mock contracts, mapped by token address
     mapping(address token => uint256 deposited) public l2ValuesSum;
     // Deposits into the ZK chains contract, mapped by L2 contract address and token address
@@ -89,13 +79,6 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
     modifier useZKChain(uint256 chainIndexSeed) {
         currentChainId = zkChainIds[bound(chainIndexSeed, 0, zkChainIds.length - 1)];
         currentChainAddress = getZKChainAddress(currentChainId);
-        _;
-    }
-
-    // use token specified by address, set contract variables
-    modifier useGivenToken(address tokenAddress) {
-        currentToken = TestnetERC20Token(tokenAddress);
-        currentTokenAddress = tokenAddress;
         _;
     }
 
@@ -488,128 +471,6 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
         depositsBridge[currentChainAddress][currentTokenAddress] += mintValue;
         tokenSumDeposit[currentTokenAddress] += mintValue;
         l2ValuesSum[currentTokenAddress] += l2Value;
-    }
-
-    function withdrawERC20Token(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {
-        uint256 l2BatchNumber = uint256(uint160(makeAddr("l2BatchNumber")));
-        uint256 l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
-        uint16 l2TxNumberInBatch = uint16(uint160(makeAddr("l2TxNumberInBatch")));
-        bytes32[] memory merkleProof = new bytes32[](1);
-
-        _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
-        uint256 beforeChainBalance = addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
-        uint256 beforeBalance = currentToken.balanceOf(address(addresses.sharedBridge));
-
-        if (beforeChainBalance < amountToWithdraw) {
-            vm.expectRevert("L1AR: not enough funds 2");
-        } else {
-            tokenSumWithdrawal[currentTokenAddress] += amountToWithdraw;
-        }
-
-        bytes memory message = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector,
-            currentUser,
-            currentTokenAddress,
-            amountToWithdraw
-        );
-
-        L2Message memory l2ToL1Message = L2Message({
-            txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            data: message
-        });
-
-        vm.mockCall(
-            addresses.bridgehubProxyAddress,
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
-                currentChainId,
-                l2BatchNumber,
-                l2MessageIndex,
-                l2ToL1Message,
-                merkleProof
-            ),
-            abi.encode(true)
-        );
-
-        addresses.sharedBridge.finalizeWithdrawal({
-            _chainId: currentChainId,
-            _l2BatchNumber: l2BatchNumber,
-            _l2MessageIndex: l2MessageIndex,
-            _l2TxNumberInBatch: l2TxNumberInBatch,
-            _message: message,
-            _merkleProof: merkleProof
-        });
-
-        // check if the balance was updated correctly
-        if (beforeChainBalance > amountToWithdraw) {
-            assertEq(
-                beforeChainBalance - addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
-                amountToWithdraw
-            );
-            assertEq(beforeBalance - currentToken.balanceOf(address(addresses.sharedBridge)), amountToWithdraw);
-        }
-    }
-
-    function withdrawETHToken(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {
-        uint256 l2BatchNumber = uint256(uint160(makeAddr("l2BatchNumber")));
-        uint256 l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
-        uint16 l2TxNumberInBatch = uint16(uint160(makeAddr("l2TxNumberInBatch")));
-        bytes32[] memory merkleProof = new bytes32[](1);
-
-        _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
-        uint256 beforeChainBalance = addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
-        uint256 beforeBalance = address(addresses.sharedBridge).balance;
-
-        if (beforeChainBalance < amountToWithdraw) {
-            vm.expectRevert("L1AR: not enough funds 2");
-        } else {
-            tokenSumWithdrawal[currentTokenAddress] += amountToWithdraw;
-        }
-
-        bytes memory message = abi.encodePacked(
-            IMailboxLegacy.finalizeEthWithdrawal.selector,
-            currentUser,
-            amountToWithdraw
-        );
-        L2Message memory l2ToL1Message = L2Message({
-            txNumberInBatch: l2TxNumberInBatch,
-            sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            data: message
-        });
-
-        vm.mockCall(
-            addresses.bridgehubProxyAddress,
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
-                currentChainId,
-                l2BatchNumber,
-                l2MessageIndex,
-                l2ToL1Message,
-                merkleProof
-            ),
-            abi.encode(true)
-        );
-
-        addresses.sharedBridge.finalizeWithdrawal({
-            _chainId: currentChainId,
-            _l2BatchNumber: l2BatchNumber,
-            _l2MessageIndex: l2MessageIndex,
-            _l2TxNumberInBatch: l2TxNumberInBatch,
-            _message: message,
-            _merkleProof: merkleProof
-        });
-
-        // check if the balance was updated correctly
-        if (beforeChainBalance > amountToWithdraw) {
-            assertEq(
-                beforeChainBalance - addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
-                amountToWithdraw
-            );
-            assertEq(beforeBalance - address(addresses.sharedBridge).balance, amountToWithdraw);
-        }
     }
 
     function depositEthToBridgeSuccess(

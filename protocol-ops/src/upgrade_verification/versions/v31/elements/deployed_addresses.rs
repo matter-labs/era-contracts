@@ -126,8 +126,8 @@ mod ctm_signatures {
         contract V31DualVerifier {
             constructor(address _fflonkVerifier, address _plonkVerifier);
         }
-        contract V31ZKsyncOSDualVerifier {
-            constructor(address _fflonkVerifier, address _plonkVerifier, address _initialOwner);
+        contract V31ZKsyncOSVerifier {
+            constructor(address _plonkVerifier);
         }
         contract V31GovernanceUpgradeTimer {
             constructor(
@@ -989,7 +989,7 @@ async fn verify_ctm_provenance(
 ) -> Result<()> {
     use ctm_signatures::*;
 
-    verify_ctm_base_provenance(artifact, ctm, verifiers, l1_chain_id, result)?;
+    verify_ctm_base_provenance(ctm, verifiers, l1_chain_id, result)?;
 
     let bridgehub_addr = context.bridgehub_addr;
     let label = ctm.flavor.label();
@@ -1149,7 +1149,6 @@ async fn verify_ctm_provenance(
 /// All required addresses come from the CTM's own `[ctms.<flavor>]`
 /// section via `required_address`.
 fn verify_ctm_base_provenance(
-    artifact: &EcosystemUpgradeArtifact,
     ctm: &CtmArtifact,
     verifiers: &Verifiers,
     l1_chain_id: u64,
@@ -1163,18 +1162,18 @@ fn verify_ctm_base_provenance(
     // Per-flavor verifier file names. `AllContractsHashes.json` ships
     // per-flavor verifiers since v30, so we match each CTM's deploys
     // against the matching set.
-    let (verifier_plonk_file, verifier_fflonk_file, dual_verifier_file, testnet_verifier_file) =
+    let (verifier_plonk_file, verifier_fflonk_file, main_verifier_file, testnet_verifier_file) =
         match ctm.flavor {
             CtmFlavor::Era => (
                 "l1-contracts/EraVerifierPlonk",
-                "l1-contracts/EraVerifierFflonk",
+                Some("l1-contracts/EraVerifierFflonk"),
                 "l1-contracts/EraDualVerifier",
                 "l1-contracts/EraTestnetVerifier",
             ),
             CtmFlavor::ZksyncOs => (
                 "l1-contracts/ZKsyncOSVerifierPlonk",
-                "l1-contracts/ZKsyncOSVerifierFflonk",
-                "l1-contracts/ZKsyncOSDualVerifier",
+                None,
+                "l1-contracts/ZKsyncOSVerifier",
                 "l1-contracts/ZKsyncOSTestnetVerifier",
             ),
         };
@@ -1208,11 +1207,6 @@ fn verify_ctm_base_provenance(
             &["state_transition", "verifier_plonk_addr"],
             verifier_plonk_file,
         ),
-        // {Era,ZKsyncOS}VerifierFflonk() — no ctor args.
-        (
-            &["state_transition", "verifier_fflonk_addr"],
-            verifier_fflonk_file,
-        ),
         // ServerNotifier impl() — no ctor args; owner set later via initialize.
         (
             &["state_transition", "server_notifier_implementation_addr"],
@@ -1227,6 +1221,20 @@ fn verify_ctm_base_provenance(
     for (path, expected_file) in no_args {
         let addr = required_address(&ctm.value, &scope, path)?;
         result.expect_create2_params(verifiers, &addr, Vec::<u8>::new(), expected_file);
+    }
+
+    if let Some(verifier_fflonk_file) = verifier_fflonk_file {
+        let verifier_fflonk = required_address(
+            &ctm.value,
+            &scope,
+            &["state_transition", "verifier_fflonk_addr"],
+        )?;
+        result.expect_create2_params(
+            verifiers,
+            &verifier_fflonk,
+            Vec::<u8>::new(),
+            verifier_fflonk_file,
+        );
     }
 
     // DiamondInit(bool _isZKsyncOS) — encoded as a single 32-byte word.
@@ -1279,18 +1287,10 @@ fn verify_ctm_base_provenance(
         "l1-contracts/AdminFacet",
     );
 
-    // DualVerifier(fflonk, plonk) / *TestnetVerifier.
-    // The choice is fixed by the env: mainnet expects `*DualVerifier`;
-    // stage/testnet expect the `*TestnetVerifier` flavor instead.
+    // Main verifier / *TestnetVerifier. Era receives both verifier implementations;
+    // ZKsync OS receives only PLONK.
     //
-    // ZKsyncOS verifiers take a third `_initialOwner` constructor arg: the
-    // deployer EOA from `DeployCTMUtils.verifierOwner = getBroadcasterAddress()`.
     let verifier = required_address(&ctm.value, &scope, &["state_transition", "verifier_addr"])?;
-    let fflonk = required_address(
-        &ctm.value,
-        &scope,
-        &["state_transition", "verifier_fflonk_addr"],
-    )?;
     let plonk = required_address(
         &ctm.value,
         &scope,
@@ -1299,12 +1299,16 @@ fn verify_ctm_base_provenance(
     let verifier_file = if !verifiers.env.is_mainnet() {
         testnet_verifier_file
     } else {
-        dual_verifier_file
+        main_verifier_file
     };
     let encoded = if is_zksync_os {
-        let initial_owner = required_address(&artifact.misc, "misc", &["deployer_addr"])?;
-        V31ZKsyncOSDualVerifier::constructorCall::new((fflonk, plonk, initial_owner)).abi_encode()
+        V31ZKsyncOSVerifier::constructorCall::new((plonk,)).abi_encode()
     } else {
+        let fflonk = required_address(
+            &ctm.value,
+            &scope,
+            &["state_transition", "verifier_fflonk_addr"],
+        )?;
         V31DualVerifier::constructorCall::new((fflonk, plonk)).abi_encode()
     };
     result.expect_create2_params(verifiers, &verifier, encoded, verifier_file);

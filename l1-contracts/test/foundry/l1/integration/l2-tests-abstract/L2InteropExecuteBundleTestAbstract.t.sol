@@ -12,7 +12,8 @@ import {
     L2_INTEROP_HANDLER,
     L2_INTEROP_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {InteropBundle, MessageInclusionProof} from "contracts/common/Messaging.sol";
+import {InteropBundle} from "contracts/common/Messaging.sol";
+import {AtomicFinalityProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 
 import {BundleExecutionResult, L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
@@ -36,23 +37,25 @@ abstract contract L2InteropExecuteBundleTestAbstract is L2InteropTestUtils {
             (bytes32, bytes32, InteropBundle)
         );
 
-        // Verify the original bundle has valid data
-        assertTrue(l2l1MsgHash != bytes32(0), "L2 to L1 message hash should be non-zero");
+        // Verify the original bundle has valid data. Atomic bundles are never published to L1, so the
+        // InteropBundleSent event carries a zero L2->L1 message hash; only the interop bundle hash is set.
+        assertEq(l2l1MsgHash, bytes32(0), "Atomic bundle should have no L2->L1 message hash");
         assertTrue(interopBundleHash != bytes32(0), "Interop bundle hash should be non-zero");
         assertTrue(interopBundle.calls.length > 0, "Bundle should contain calls");
 
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR, block.chainid);
+        // Atomic interop: the destination-side finality is proven via the AtomicFlowManager IMT gate
+        // (mocked in these unit tests), so a default AtomicFinalityProof suffices in the rescue payload.
+        AtomicFinalityProof memory proof;
 
         vm.recordLogs();
 
-        // Send the wrapper bundle with a distinct salt. Both sends originate from `address(this)`, and InteropCenter
-        // enforces a unique (sender, salt) pair, so the wrapper must use a different salt than the first bundle (which
-        // used the default salt 0) to avoid reverting with `InteropBundleSaltAlreadyUsed`.
+        // Distinct salt for the wrapper bundle: both sends originate from `address(this)` and InteropCenter
+        // enforces a unique (sender, salt) pair.
         InteropLibrary.sendDirectCall(
             destinationChainId,
             L2_INTEROP_HANDLER_ADDR,
-            abi.encodeCall(L2_INTEROP_HANDLER.executeBundle, (bundle, proof)),
+            abi.encodeCall(L2_INTEROP_HANDLER.executeAtomicBundle, (bundle, proof)),
             EXECUTION_ADDRESS,
             UNBUNDLER_ADDRESS,
             bytes32(uint256(1))

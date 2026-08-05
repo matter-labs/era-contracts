@@ -32,6 +32,8 @@ error InitializeNotAvailable();
 error InvalidBatchesDataLength(uint256 batchesDataLength, uint256 priorityOpsDataLength);
 // 0xc06789fa
 error InvalidCommitment();
+// 0x15a8be2c
+error InvalidInteropRootTimestamp(uint256 expectedTimestamp, uint256 providedTimestamp);
 // 0xd2531c15
 error InvalidL2DAOutputHash(bytes32 l2DAValidatorOutputHash);
 // 0x30043900
@@ -108,8 +110,6 @@ error PubdataLengthTooBig(uint256 pubdataLength, uint256 totalBlobSizeBytes);
 error SettlementLayerChainIdMismatch();
 // 0x97f58c80
 error TotalPriorityTxsIsZero();
-// 0x0baf1d48
-error UnknownVerifierVersion();
 // 0x79274f04
 error UnsupportedProofMetadataVersion(uint256 metadataVersion);
 // 0x52595598

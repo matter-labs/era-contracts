@@ -142,8 +142,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     }
 
     sourceTokenAddress = state.testTokens![sourceChainId];
-    // The pre-generated states carry no NTV registrations (the balance-migration setup
-    // that used to register test tokens was removed), so register on demand.
+    // The pre-generated chain states carry no NTV registrations, so register on demand.
     await registerL2NativeTokenIfNeeded(sourceProvider, sourceTokenAddress);
     sourceAssetId = await getAssetIdForToken(sourceProvider, sourceTokenAddress);
 
@@ -592,7 +591,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     await expectRevert(
       () => simulateExecuteBundle(destProvider, sendResult.bundleData, sourceChainId),
       "replay executeBundle",
-      customError("InteropHandler", "BundleAlreadyProcessed(bytes32)"),
+      customError("L2InteropHandler", "BundleAlreadyProcessed(bytes32)"),
       destProvider
     );
 
@@ -627,7 +626,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     await expectRevert(
       () => simulateExecuteBundle(destProvider, sendResult.bundleData, sourceChainId),
       "execute from wrong executionAddress",
-      customError("InteropHandler", "ExecutingNotAllowed(bytes32,bytes,bytes)"),
+      customError("L2InteropHandler", "ExecutingNotAllowed(bytes32,bytes,bytes)"),
       destProvider
     );
 
@@ -694,8 +693,8 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       name: "Live Interop Chain A Native Token",
       symbol: "LIA",
     });
-    // Interop eligibility no longer requires an on-chain balance migration;
-    // cross-chain asset correctness is guaranteed by ZK proofs.
+    // Interop requires no on-chain balance migration ({protocol-docs/bridging.md#l2-asset-bookkeeping}),
+    // so the assetId is derived locally.
     const chainAAssetId = encodeNtvAssetId(sourceChainId, chainAToken);
 
     const chainBToken = await sendAndExecuteTokenInterop({

@@ -124,6 +124,8 @@ library AddressIntrospector {
         return _getBridgesDeployedAddressesInternal(_assetRouter, false);
     }
 
+    /// @dev Despite the `V29` name, this legacy path is correct for every pre-v32 deployment (v29/v30/v31):
+    /// the only version-dependent bridge getter is `l1InteropHandler()`, added in v32.
     function getBridgesDeployedAddressesV29(
         address _assetRouter
     ) public view returns (BridgesDeployedAddresses memory info) {
@@ -135,13 +137,15 @@ library AddressIntrospector {
 
     function _getBridgesDeployedAddressesInternal(
         address _assetRouter,
-        bool isV29
+        bool isPreV32
     ) private view returns (BridgesDeployedAddresses memory info) {
         L1AssetRouter assetRouter = L1AssetRouter(_assetRouter);
 
         address erc20BridgeProxy = address(assetRouter.legacyBridge());
         address l1NullifierProxy = address(assetRouter.L1_NULLIFIER());
         address l1NativeTokenVaultProxy = address(assetRouter.nativeTokenVault());
+        // `l1InteropHandler()` only exists on the nullifier from v32 onward; skip the call for pre-v32 deployments.
+        address l1InteropHandlerProxy = isPreV32 ? address(0) : L1Nullifier(l1NullifierProxy).l1InteropHandler();
 
         require(l1NativeTokenVaultProxy != address(0), "NativeTokenVault address is zero");
         NativeTokenVaultBase ntv = NativeTokenVaultBase(l1NativeTokenVaultProxy);
@@ -154,13 +158,17 @@ library AddressIntrospector {
             erc20Bridge: erc20BridgeProxy,
             l1AssetRouter: _assetRouter,
             l1Nullifier: l1NullifierProxy,
-            l1NativeTokenVault: l1NativeTokenVaultProxy
+            l1NativeTokenVault: l1NativeTokenVaultProxy,
+            l1InteropHandler: l1InteropHandlerProxy
         });
         BridgeContracts memory implementations = BridgeContracts({
             erc20Bridge: Utils.getImplementation(erc20BridgeProxy),
             l1AssetRouter: Utils.getImplementation(_assetRouter),
             l1Nullifier: Utils.getImplementation(l1NullifierProxy),
-            l1NativeTokenVault: Utils.getImplementation(l1NativeTokenVaultProxy)
+            l1NativeTokenVault: Utils.getImplementation(l1NativeTokenVaultProxy),
+            l1InteropHandler: l1InteropHandlerProxy == address(0)
+                ? address(0)
+                : Utils.getImplementation(l1InteropHandlerProxy)
         });
 
         info = BridgesDeployedAddresses({
@@ -493,9 +501,9 @@ library AddressIntrospector {
         return address(0);
     }
 
-    /// @notice Get fflonk and plonk sub-verifiers from a dual verifier
+    /// @notice Get the sub-verifiers used by the active verifier.
     /// @param _verifier The verifier address
-    /// @param _isZKsyncOS If true, uses ZKsyncOSDualVerifier interface; otherwise EraDualVerifier
+    /// @param _isZKsyncOS If true, returns only the ZKsync OS PLONK verifier; otherwise both Era verifiers.
     function _getSubVerifiers(
         address _verifier,
         bool _isZKsyncOS

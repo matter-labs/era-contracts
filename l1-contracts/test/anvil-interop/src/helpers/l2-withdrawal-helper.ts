@@ -5,13 +5,14 @@ import { getAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   ETH_TOKEN_ADDRESS,
+  INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
-  L2_BASE_TOKEN_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
-  FINALIZE_DEPOSIT_SIG,
 } from "../core/const";
-import { encodeBridgeBurnData, encodeBridgeMintData, encodeNtvAssetId } from "../core/data-encoding";
+import { encodeAssetRouterBridgehubDepositData, encodeBridgeBurnData, encodeNtvAssetId } from "../core/data-encoding";
 import type { CoreDeployedAddresses } from "../core/types";
+import { indirectCallAttr, interopCallValueAttr, sendInteropBundle } from "./interop-helpers";
+import { encodeEvmAddress } from "./erc7930";
 
 export interface WithdrawETHParams {
   l1RpcUrl: string;
@@ -29,28 +30,18 @@ export interface WithdrawETHResult {
 }
 
 /**
- * A withdrawal that has been initiated on L2 but not yet finalised on L1.
- *
- * Carries everything needed to either finalise it (when the L1 state allows) or
- * assert that finalisation reverts (when it does not — e.g. before reverse TBM
- * has restored the chain's L1 `chainBalance`).
+ * A withdrawal that has been initiated on L2 but not yet finalised on L1. Carries the exact interop
+ * bundle the L2 InteropCenter emitted (captured from `InteropBundleSent`), so L1 finalisation runs
+ * on the same bytes the L2 send produced; only the message-inclusion proof is mocked.
  */
 export interface PendingWithdrawal {
   l2TxHash: string;
   chainId: number;
-  assetId: string;
   amount: BigNumber;
   l1Recipient: string;
   tokenAddress: string;
-  originalCaller: string;
-  /**
-   * ERC20 metadata bytes that the L2 NTV injects into the withdrawal message
-   * via `_getERC20Metadata` / `getERC20Getters`. Empty for base-token (ETH)
-   * withdrawals; required for ERC20 withdrawals so that `L1Nullifier.finalizeDeposit`
-   * can call `DataEncoding.decodeTokenData(erc20Metadata)` without reverting
-   * with `EmptyData()`.
-   */
-  erc20Metadata: string;
+  /** ABI-encoded `InteropBundle` emitted by the L2 InteropCenter, reused verbatim for `executeBundle` on L1. */
+  bundleData: string;
 }
 
 export interface InitiateWithdrawalParams {
@@ -74,8 +65,10 @@ export interface InitiateErc20WithdrawalParams extends InitiateWithdrawalParams 
 }
 
 /**
- * Initiate an ETH withdrawal from L2 to L1 via `L2BaseToken.withdraw()` and
- * return a {@link PendingWithdrawal} handle that can be finalised later.
+ * Initiate an ETH (base-token) withdrawal from L2 to L1 via the InteropCenter and return a
+ * {@link PendingWithdrawal} handle that can be finalised later. Base-token withdrawals use the same
+ * unified interop-bundle path as ERC20s (the dedicated `L2BaseToken.withdraw` entrypoint was
+ * removed). See {protocol-docs/bridging.md#deposit-initiation-source-side}.
  */
 export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): Promise<PendingWithdrawal> {
   const { l2RpcUrl, l1RpcUrl, chainId, l1Addresses, amount } = params;
@@ -86,40 +79,58 @@ export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): P
   const l2Wallet = new Wallet(privateKey, l2Provider);
   const l1Recipient = params.l1Recipient || l2Wallet.address;
 
+  // The base-token assetId is the ETH NTV assetId (identical on L1 and L2).
   const ntv = new Contract(l1Addresses.l1NativeTokenVault, getAbi("L1NativeTokenVault"), l1Provider);
   const l1EthAssetId = await ntv.assetId(ETH_TOKEN_ADDRESS);
 
-  const l2BaseToken = new Contract(L2_BASE_TOKEN_ADDR, getAbi("IBaseToken"), l2Wallet);
+  // The burn token address is left as `address(0)` so the NTV resolves the base token from the
+  // assetId; the withdrawn ETH rides as the indirect-call message value (`interopCallValue` is 0).
+  const transferData = encodeBridgeBurnData(amount, l1Recipient, ethers.constants.AddressZero);
+  const depositData = encodeAssetRouterBridgehubDepositData(l1EthAssetId, transferData);
+  const callStarter = {
+    to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
+    data: depositData,
+    callAttributes: [indirectCallAttr(amount), interopCallValueAttr(ethers.constants.Zero)],
+  };
 
-  console.log(`   Initiating ETH withdrawal from chain ${chainId} via L2BaseToken.withdraw()...`);
-  const l2Tx = await l2BaseToken.withdraw(l1Recipient, { value: amount, gasLimit: 5_000_000 });
-  await l2Tx.wait();
-  console.log(`   L2 withdraw tx: cast run ${l2Tx.hash} -r ${l2RpcUrl}`);
+  const l1ChainId = (await l1Provider.getNetwork()).chainId;
+
+  console.log(
+    `   Initiating ETH withdrawal from chain ${chainId} via InteropCenter.sendBundle (destination L1 chain ${l1ChainId})...`
+  );
+  // L2->L1 withdrawals are free (no interop protocol fee); only the withdrawn ETH rides as value.
+  const sendResult = await sendInteropBundle({
+    sourceProvider: l2Provider,
+    destinationChainId: l1ChainId,
+    callStarters: [callStarter],
+    value: amount,
+    // L2->L1 withdrawal: non-atomic, published to L1 (no atomic flow / bundleHash preview).
+    atomic: false,
+  });
+  console.log(`   L2 withdraw tx: cast run ${sendResult.txHash} -r ${l2RpcUrl}`);
 
   return {
-    l2TxHash: l2Tx.hash,
+    l2TxHash: sendResult.txHash,
     chainId,
-    assetId: l1EthAssetId,
     amount,
     l1Recipient,
     tokenAddress: ETH_TOKEN_ADDRESS,
-    originalCaller: l2Wallet.address,
-    erc20Metadata: "0x",
+    bundleData: sendResult.bundleData,
   };
 }
 
 /**
- * Initiate an ERC20 withdrawal from L2 to L1 via `L2AssetRouter.withdraw(assetId, data)`.
- *
- * Approves the L2 `NativeTokenVault` to transfer the tokens, then calls
- * `L2AssetRouter.withdraw` which burns on L2 and emits the L2→L1 message that
- * `L1Nullifier.finalizeDeposit` consumes.
+ * Initiate an ERC20 withdrawal from L2 to L1 via the InteropCenter: approve the L2 NTV, then send
+ * an interop bundle whose single indirect call targets the L2 AssetRouter with destination L1 (the
+ * legacy `L2AssetRouter.withdraw(assetId, data)` entrypoint was removed). See
+ * {protocol-docs/bridging.md#deposit-initiation-source-side}.
  */
 export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalParams): Promise<PendingWithdrawal> {
-  const { l2RpcUrl, l2TokenAddress, tokenOriginChainId, chainId, amount } = params;
+  const { l2RpcUrl, l1RpcUrl, l2TokenAddress, tokenOriginChainId, chainId, amount } = params;
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
   const l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
+  const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
   const l2Wallet = new Wallet(privateKey, l2Provider);
   const l1Recipient = params.l1Recipient || l2Wallet.address;
 
@@ -127,41 +138,49 @@ export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalPar
   // L2 NTV assigns the same value during `registerToken`.
   const assetId = encodeNtvAssetId(tokenOriginChainId, l2TokenAddress);
 
-  // Approve the L2 NTV to spend the caller's tokens, then withdraw via the
-  // AssetRouter. The `_assetData` format is `abi.encode(amount, l1Receiver, l2TokenAddress)`.
+  // The burn pulls the tokens from the original caller (the `sendBundle` sender) via the NTV,
+  // hence the NTV approval.
   const erc20 = new Contract(l2TokenAddress, getAbi("TestnetERC20Token"), l2Wallet);
   const approveTx = await erc20.approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount, { gasLimit: 500_000 });
   await approveTx.wait();
 
-  const assetData = encodeBridgeBurnData(amount, l1Recipient, l2TokenAddress);
-  const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, getAbi("L2AssetRouter"), l2Wallet);
+  const transferData = encodeBridgeBurnData(amount, l1Recipient, l2TokenAddress);
+  const depositData = encodeAssetRouterBridgehubDepositData(assetId, transferData);
+  const callStarter = {
+    to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
+    data: depositData,
+    callAttributes: [indirectCallAttr(), interopCallValueAttr(ethers.constants.Zero)],
+  };
 
-  // Capture the exact ERC20 metadata bytes that the L2 NTV injects into the
-  // withdrawal message via `_getERC20Metadata` / `getERC20Getters`. Reading
-  // from the NTV view matches what the on-chain burn will emit, so the
-  // reconstructed L1 finalisation message round-trips correctly.
-  const l2Ntv = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), l2Provider);
-  const erc20Metadata: string = await l2Ntv.getERC20Getters(l2TokenAddress, tokenOriginChainId);
+  const l1ChainId = (await l1Provider.getNetwork()).chainId;
 
-  console.log(`   Initiating ERC20 withdrawal from chain ${chainId} via L2AssetRouter.withdraw()...`);
-  const l2Tx = await l2AssetRouter["withdraw(bytes32,bytes)"](assetId, assetData, { gasLimit: 5_000_000 });
-  await l2Tx.wait();
-  console.log(`   L2 withdraw tx: cast run ${l2Tx.hash} -r ${l2RpcUrl}`);
+  console.log(
+    `   Initiating ERC20 withdrawal from chain ${chainId} via InteropCenter.sendBundle (destination L1 chain ${l1ChainId})...`
+  );
+  // L2->L1 withdrawals are free (no interop protocol fee), so no value rides along.
+  const sendResult = await sendInteropBundle({
+    sourceProvider: l2Provider,
+    destinationChainId: l1ChainId,
+    callStarters: [callStarter],
+    value: ethers.constants.Zero,
+    // L2->L1 withdrawal: non-atomic, published to L1 (no atomic flow / bundleHash preview).
+    atomic: false,
+  });
+  console.log(`   L2 withdraw tx: cast run ${sendResult.txHash} -r ${l2RpcUrl}`);
 
   return {
-    l2TxHash: l2Tx.hash,
+    l2TxHash: sendResult.txHash,
     chainId,
-    assetId,
     amount,
     l1Recipient,
     tokenAddress: l2TokenAddress,
-    originalCaller: l2Wallet.address,
-    erc20Metadata,
+    bundleData: sendResult.bundleData,
   };
 }
 
 /**
- * Finalise a pending withdrawal on L1 via the real `L1Nullifier.finalizeDeposit`.
+ * Finalise a pending withdrawal on L1 via the real `L1InteropHandler.executeBundle`
+ * (the nullifier points to the handler, which re-invokes the L1 asset router's `finalizeDeposit`).
  *
  * Returns `{ success: true, txHash }` if the L1 tx lands, otherwise
  * `{ success: false, errorMessage, revertData }` — callers can drive the
@@ -178,42 +197,25 @@ export async function finalizeWithdrawalOnL1(
 
   const settlementLayerChainId = await getSettlementLayerChainId(l1Provider, l1Addresses.bridgehub, pending.chainId);
 
-  const isBaseToken = pending.tokenAddress === ETH_TOKEN_ADDRESS;
-  let message: string;
-  let l2Sender: string;
+  const l1Wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
+  const l1Nullifier = new Contract(l1Addresses.l1NullifierProxy, getAbi("L1Nullifier"), l1Provider);
+  const interopHandlerAddress = await l1Nullifier.l1InteropHandler();
+  const l1InteropHandler = new Contract(interopHandlerAddress, getAbi("L1InteropHandler"), l1Wallet);
 
-  if (isBaseToken) {
-    const selector = ethers.utils.id("finalizeEthWithdrawal(uint256,uint256,uint16,bytes,bytes32[])").slice(0, 10);
-    message = ethers.utils.solidityPack(
-      ["bytes4", "address", "uint256"],
-      [selector, pending.l1Recipient, pending.amount]
-    );
-    l2Sender = L2_BASE_TOKEN_ADDR;
-  } else {
-    const transferData = encodeBridgeMintData(
-      pending.originalCaller,
-      pending.l1Recipient,
-      pending.tokenAddress,
-      pending.amount,
-      pending.erc20Metadata
-    );
-    const selector = ethers.utils.id(FINALIZE_DEPOSIT_SIG).slice(0, 10);
-    message = ethers.utils.solidityPack(
-      ["bytes4", "uint256", "bytes32", "bytes"],
-      [selector, pending.chainId, pending.assetId, transferData]
-    );
-    l2Sender = L2_ASSET_ROUTER_ADDR;
-  }
-
-  const merkleProof = buildWithdrawalMerkleProof(settlementLayerChainId);
+  // The exact bundle the L2 InteropCenter emitted (see {PendingWithdrawal.bundleData}); its salt
+  // keeps distinct withdrawals from colliding into the same bundle hash.
+  const bundle = pending.bundleData;
 
   const l2BatchNumber = ++finalizationCounter;
-  const l1Wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
-  const l1Nullifier = new Contract(l1Addresses.l1NullifierProxy, getAbi("L1Nullifier"), l1Wallet);
-  const finalizeArgs = [pending.chainId, l2BatchNumber, 0, l2Sender, 0, message, merkleProof];
+  const l2Sender = INTEROP_CENTER_ADDR;
+
+  const merkleProof = buildWithdrawalMerkleProof(settlementLayerChainId);
+  // MessageInclusionProof: the handler substitutes `message.data` with the bundle while proving inclusion, so the
+  // data field is a placeholder here. The batch number only needs to be unique per finalization under the mock.
+  const proof = [pending.chainId, l2BatchNumber, 0, [0, l2Sender, "0x"], merkleProof];
 
   console.log(
-    `   Finalizing withdrawal on L1 via L1Nullifier (settlement layer: ${settlementLayerChainId || "direct"})...`
+    `   Finalizing withdrawal on L1 via L1InteropHandler.executeBundle (settlement layer: ${settlementLayerChainId || "direct"})...`
   );
 
   // Simulate via `callStatic` first so we can surface revert data (the exact
@@ -221,14 +223,14 @@ export async function finalizeWithdrawalOnL1(
   // Anvil tx receipts strip revert data, so this is the only way to expose it
   // to the caller.
   try {
-    await l1Nullifier.callStatic.finalizeDeposit(finalizeArgs, { gasLimit: 5_000_000 });
+    await l1InteropHandler.callStatic.executeBundle(bundle, proof, { gasLimit: 5_000_000 });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const revertData = extractRevertDataFromError(error);
     return { success: false, errorMessage, revertData };
   }
 
-  const tx = await l1Nullifier.finalizeDeposit(finalizeArgs, { gasLimit: 5_000_000 });
+  const tx = await l1InteropHandler.executeBundle(bundle, proof, { gasLimit: 5_000_000 });
   const receipt = await tx.wait();
   console.log(`   L1 finalize tx: cast run ${receipt.transactionHash} -r ${l1RpcUrl}`);
   return { success: true, txHash: receipt.transactionHash };

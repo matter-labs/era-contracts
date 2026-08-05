@@ -215,28 +215,18 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function deployVerifiers() internal {
-        (, string memory fflonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierFflonk);
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierPlonk);
         (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
             config.isZKsyncOS,
             config.testnetVerifier
         );
 
-        ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
+        if (!config.isZKsyncOS) {
+            (, string memory fflonkName) = DeployCTML1OrGateway.resolve(false, CTMContract.VerifierFflonk);
+            ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
+        }
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
-
-        // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
-        vm.startBroadcast(getDeployerAddress());
-        // Called as library (not through vms) to preserve msg.sender
-        DeployCTML1OrGateway.initializeVerifier(
-            ctmAddresses.stateTransition.verifiers.verifier,
-            ctmAddresses.stateTransition.verifiers.verifierFflonk,
-            ctmAddresses.stateTransition.verifiers.verifierPlonk,
-            config.ownerAddress,
-            config.isZKsyncOS
-        );
-        vm.stopBroadcast();
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -316,15 +306,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ctm.setPendingAdmin(ctmAddresses.chainAdmin);
 
         IOwnable(ctmAddresses.stateTransition.proxies.serverNotifier).transferOwnership(ctmAddresses.chainAdmin);
-        IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
-
-        // Called as library (not through vms) to preserve msg.sender
-        DeployCTML1OrGateway.transferVerifierOwnership(
-            ctmAddresses.stateTransition.verifiers.verifier,
-            ctmAddresses.admin.governance,
-            config.isZKsyncOS
-        );
-
         IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
         vm.stopBroadcast();
         console.log("Owners updated");
@@ -508,7 +489,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             CoreContract.UpgradeableBeaconDeployer,
             CoreContract.L2ChainAssetHandler,
             CoreContract.InteropCenter,
-            CoreContract.InteropHandler,
+            CoreContract.L2InteropHandler,
             CoreContract.BaseTokenHolder
         ];
 
@@ -621,7 +602,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             baseTokenHolderBytecodeInfo: _getBytecodeInfo(CoreContract.BaseTokenHolder),
             chainAssetHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2ChainAssetHandler),
             interopCenterBytecodeInfo: _getBytecodeInfo(CoreContract.InteropCenter),
-            interopHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.InteropHandler),
+            interopHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2InteropHandler),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
@@ -648,7 +629,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             IEIP7702Checker(address(1)),
             false
         );
-        ExecutorFacet executorFacet = new ExecutorFacet(block.chainid);
+        ExecutorFacet executorFacet = new ExecutorFacet();
         MigratorFacet migratorFacet = new MigratorFacet(1, false);
         CommitterFacet committerFacet = new CommitterFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);

@@ -11,16 +11,22 @@ import {
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER,
     L2_INTEROP_HANDLER_ADDR,
-    L2_MESSAGE_VERIFICATION,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {InteropBundle, MessageInclusionProof} from "contracts/common/Messaging.sol";
+import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {InteropBundle} from "contracts/common/Messaging.sol";
+import {
+    AtomicFinalityProof,
+    AtomicFlowPreimage,
+    ATOMIC_FLOW_PREIMAGE_VERSION
+} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
+import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {InteropHandler} from "contracts/interop/InteropHandler.sol";
+import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 
 /// @notice Struct to hold bundle execution result for assertions
 struct BundleExecutionResult {
@@ -32,6 +38,36 @@ struct BundleExecutionResult {
 abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
     uint256 destinationChainId = 271;
     bytes32 destinationBaseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+
+    /// @dev The AtomicFlowManager `append`/`requireFlowFinalized` gates are mocked to succeed in
+    /// {SharedL2ContractDeployer.setUp} (installed unconditionally there, inert for non-interop suites), so
+    /// interop concretes need no setUp/MRO boilerplate. The IMT proof machinery itself is exercised
+    /// end-to-end in the anvil-interop atomic-swap spec.
+
+    /// @notice Returns a copy of `_attrs` with the mandatory ERC-7786 `atomicBundle` attribute appended.
+    /// @dev Every interop send must be atomic (see {InteropCenter}); without this attribute the send
+    ///      reverts with `NonAtomicSendUnsupported`. The flow metadata is a placeholder because the
+    ///      `AtomicFlowManager.append` gate is mocked in setUp. Use this to wrap inline attribute arrays;
+    ///      arrays produced by {InteropLibrary.buildBundleAttributes} already include the attribute.
+    function _withAtomicBundle(bytes[] memory _attrs) internal pure returns (bytes[] memory out) {
+        out = new bytes[](_attrs.length + 1);
+        for (uint256 i = 0; i < _attrs.length; ++i) {
+            out[i] = _attrs[i];
+        }
+        out[_attrs.length] = abi.encodeCall(
+            IERC7786Attributes.atomicBundle,
+            (
+                AtomicFlowPreimage({
+                    version: ATOMIC_FLOW_PREIMAGE_VERSION,
+                    deadline: type(uint64).max,
+                    settlementLayerChainId: 0,
+                    legBundleHashes: new bytes32[](0),
+                    legSourceChainIds: new uint256[](0)
+                }),
+                uint256(0)
+            )
+        );
+    }
 
     function extractAndExecuteSingleBundle(
         Vm.Log[] memory logs,
@@ -67,19 +103,22 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
             (bytes32, bytes32, InteropBundle)
         );
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR, block.chainid);
 
-        // Calculate bundle hash for assertions
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+        // Interop is atomic: the cross-chain binding is the bundle's own sourceChainId, and finality is
+        // proven via the AtomicFlowManager's IMT gate. We mock that gate to succeed here (the IMT-proof
+        // machinery is exercised end-to-end in the anvil-interop atomic-swap spec, not in these unit-level
+        // Foundry tests). A default AtomicFinalityProof suffices since the gate is mocked.
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
+        AtomicFinalityProof memory finality;
 
         vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
+            L2_ATOMIC_FLOW_MANAGER_ADDR,
+            abi.encodeWithSelector(IAtomicFlowManager.requireFlowFinalized.selector),
+            ""
         );
         vm.chainId(_destinationChainId);
         vm.prank(executionAddress);
-        L2_INTEROP_HANDLER.executeBundle(bundle, proof);
+        L2_INTEROP_HANDLER.executeAtomicBundle(bundle, finality);
 
         result = BundleExecutionResult({
             bundleHash: bundleHash,
@@ -93,7 +132,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
     function assertBundleExecuted(BundleExecutionResult memory result) internal view {
         // Verify bundle status is FullyExecuted (value 2)
         assertEq(
-            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(result.bundleHash)),
+            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(result.bundleHash)),
             2,
             "Bundle status should be FullyExecuted"
         );
@@ -101,7 +140,7 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         // Verify all call statuses are Executed (value 1)
         for (uint256 i = 0; i < result.callCount; i++) {
             assertEq(
-                uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(result.bundleHash, i)),
+                uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(result.bundleHash, i)),
                 1,
                 string(abi.encodePacked("Call ", vm.toString(i), " status should be Executed"))
             );

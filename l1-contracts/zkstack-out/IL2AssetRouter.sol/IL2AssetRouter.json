@@ -133,7 +133,7 @@
     "name": "setAssetHandlerAddress",
     "inputs": [
       {
-        "name": "_originChainId",
+        "name": "_sourceChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -333,7 +333,7 @@
     "name": "DepositFinalizedAssetRouter",
     "inputs": [
       {
-        "name": "chainId",
+        "name": "sourceChainId",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
