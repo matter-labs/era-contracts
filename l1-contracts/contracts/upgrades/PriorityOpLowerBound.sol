@@ -4,7 +4,11 @@ pragma solidity 0.8.28;
 
 import {IPriorityOpLowerBound} from "./IPriorityOpLowerBound.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
-import {BaseTokenPreV31TotalSupplyNotSet, LowerBoundAlreadyRecorded} from "../common/L1ContractErrors.sol";
+import {
+    BaseTokenPreV31TotalSupplyNotSet,
+    LowerBoundAlreadyRecorded,
+    ZeroPriorityOpCount
+} from "../common/L1ContractErrors.sol";
 
 /// @title PriorityOpLowerBound
 /// @author Matter Labs
@@ -30,9 +34,13 @@ contract PriorityOpLowerBound is IPriorityOpLowerBound {
             revert BaseTokenPreV31TotalSupplyNotSet();
         }
 
-        // The flag implies at least the backfill service transaction was requested, so the count
-        // is nonzero and zero can safely mean "not recorded".
+        // A backfilled chain has at least the backfill service transaction, so a zero count can
+        // only come from a chain that never needed one (e.g. created at v31 with the flag from
+        // DiamondInit). Rejecting it keeps zero an unambiguous "not recorded" sentinel.
         uint256 totalPriorityTxs = IGetters(_chain).getTotalPriorityTxs();
+        if (totalPriorityTxs == 0) {
+            revert ZeroPriorityOpCount();
+        }
         lowerBound[_chain] = totalPriorityTxs;
         emit LowerBoundRecorded(_chain, totalPriorityTxs);
     }

@@ -434,8 +434,8 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
     //  Base-token flow recording (reported by BaseTokenHolder)
     // ═══════════════════════════════════════════════════════════════════
 
-    /// @notice Only the BaseTokenHolder — which escrows the base token and therefore observes all
-    /// of its bridge flows — may record base-token flows in the vault.
+    /// @notice Only the BaseTokenHolder — which escrows the base token and therefore observes its
+    /// contract-level bridge flows — may record base-token flows in the vault.
     function test_recordBaseTokenBridging_revertNotBaseTokenHolder() public {
         vm.expectRevert(abi.encodeWithSelector(InvalidCaller.selector, address(this)));
         _ntv().recordBaseTokenBridgingToChain(L1_CHAIN_ID, 1 ether);

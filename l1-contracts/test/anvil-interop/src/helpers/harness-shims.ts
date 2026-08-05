@@ -103,8 +103,11 @@ export async function forceBatchExecutedEqualsCommitted(
  *
  * On a forked draft-v31 chain that was really backfilled, (a) already holds and (b) goes through
  * the registry's real permissionless entry point. A forked v30 state predates draft-v31 entirely
- * (its facets lack `baseTokenSupportsTotalSupply`, so even the registry's guard cannot run):
- * there we substitute the missing draft-v31 history with direct writes, same rationale as
+ * (its facets lack `baseTokenSupportsTotalSupply`, so even the registry's guard cannot run).
+ * A direct v30 -> v31 upgrade is intentionally NOT a supported production path — real chains
+ * acquire this state by passing through draft-v31 and its backfill — but the v30 fixture is the
+ * only ZKsync OS state available for exercising the upgrade machinery end to end, so we
+ * substitute that unreachable history with direct writes, same rationale as
  * `forceBatchExecutedEqualsCommitted` above.
  */
 export async function modelDraftV31BackfillPrerequisite(params: {

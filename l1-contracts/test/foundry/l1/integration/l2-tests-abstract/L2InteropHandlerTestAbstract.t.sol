@@ -651,9 +651,10 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     //  Helper: set up base-token bookkeeping dependencies
     // ══════════════════════════════════════════════════════════════
 
-    /// @dev The holder reads both the L1 chain id and current settlement layer when updating
-    /// L1-attributable counters. The vault is initialized by the shared setup; only settlement and
-    /// the migration-number dependency need explicit configuration here.
+    /// @dev The holder forwards flows to the vault, which reads the L1 chain id and current
+    /// settlement layer when updating L1-attributable counters. The vault is initialized by the
+    /// shared setup; only settlement and the migration-number dependency need explicit
+    /// configuration here.
     function _setupBaseTokenBookkeeping() internal {
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),

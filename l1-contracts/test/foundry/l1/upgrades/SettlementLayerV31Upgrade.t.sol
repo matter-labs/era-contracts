@@ -8,7 +8,8 @@ import {
     LowerBoundAlreadyRecorded,
     LowerBoundNotRecorded,
     PriorityQueueNotReady,
-    UnexpectedUpgradeSelector
+    UnexpectedUpgradeSelector,
+    ZeroPriorityOpCount
 } from "contracts/common/L1ContractErrors.sol";
 import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
@@ -732,6 +733,31 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
 
         assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
         assertTrue(zkosUpgrade.getBaseTokenHasTotalSupply(), "the tracked-supply flag must survive the upgrade");
+    }
+
+    /// @notice The anti-griefing property of the lower-bound design: priority ops enqueued AFTER
+    /// the bound was recorded may stay pending without blocking the upgrade (an empty-queue
+    /// requirement would let anyone stall it indefinitely).
+    function test_SuccessfulUpgrade_ZKOSWithPendingUnrelatedPriorityOps() public {
+        _prepareZKOSProposedUpgrade();
+        zkosUpgrade.setBaseTokenHasTotalSupply(true);
+        _recordLowerBound();
+        // Two unrelated ops were enqueued after the bound: total 9, first unprocessed still 7.
+        _mockFirstUnprocessedPriorityTx(TOTAL_PRIORITY_TXS_AT_RECORD_TIME);
+        vm.mockCall(
+            address(zkosUpgrade),
+            abi.encodeWithSelector(IGetters.getTotalPriorityTxs.selector),
+            abi.encode(TOTAL_PRIORITY_TXS_AT_RECORD_TIME + 2)
+        );
+        vm.mockCall(
+            address(zkosUpgrade),
+            abi.encodeWithSelector(IGetters.getPriorityQueueSize.selector),
+            abi.encode(2)
+        );
+
+        bytes32 result = zkosUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
     }
 
     function test_RewritesZKsyncOSV30UniversalUpgradeWithChainSpecificV31Arguments() public {
