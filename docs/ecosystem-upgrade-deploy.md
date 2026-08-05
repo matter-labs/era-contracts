@@ -227,6 +227,17 @@ machine that compiled the upgrade and whoever deploys or audits it:
 | `extra-verification-logs.txt` | `forge verify-contract` commands, constructor args included                                                                            |
 | `README.md`                   | the two commands below, pre-filled for that bundle                                                                                     |
 
+**The broadcasting EOA must be the bundle's `deployer_address`.** The deployer is
+not just the fork-rehearsal signer: the prepare passes it as the initial owner of
+two proxies (`initialize(deployer)`) and to `ZKsyncOSDualVerifier`'s constructor, so
+it sits in their init code and their CREATE2 addresses are a function of it.
+Broadcasting with a different EOA puts those contracts at different addresses while
+`ecosystem.toml` and the governance calldata still name the original ones — a
+silently broken upgrade. The bundle lists them under
+`deployer_dependent_deployments`, its README repeats the required signer, and
+`deploy-ecosystem-upgrade.yaml` refuses to start on a mismatch. Generate with the
+EOA that will deploy; never with a placeholder.
+
 **Check out the commit `bundle-metadata.json` names.** PUVT identifies deployed
 contracts by matching their code against the committed `AllContractsHashes.json`;
 from a different commit the deployments are not recognised and the verdict is

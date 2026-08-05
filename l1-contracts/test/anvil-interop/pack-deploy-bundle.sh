@@ -145,6 +145,28 @@ for b in sorted(manifest["bundles"], key=lambda b: b["index"]):
         "sha256": hashlib.sha256(open(path, "rb").read()).hexdigest(),
     })
 
+# Which deployments have the deployer baked INTO their init code — i.e. whose
+# CREATE2 address moves if a different EOA broadcasts. The prepare passes the
+# deployer as the initial owner of a couple of proxies (`initialize(deployer)`)
+# and to the verifier's constructor, so those addresses are a function of the
+# deployer, not just of the salt and the init code. Read off the logged
+# `--constructor-args`, which is exactly what went into the init code.
+#
+# This is why the deployer is NOT a free parameter: whoever broadcasts must be the
+# EOA the bundle was generated for, or these land elsewhere and the governance
+# calldata in `ecosystem.toml` points at contracts that were never deployed.
+deployer_dependent = []
+verify_log = f"{bundle}/extra-verification-logs.txt"
+if deployer and os.path.exists(verify_log):
+    pat = re.compile(
+        r"forge verify-contract\s+(0x[0-9a-fA-F]{40})\s+(\S+)\s+--constructor-args\s+(0x[0-9a-fA-F]+)"
+    )
+    seen = set()
+    for addr, name, args in pat.findall(open(verify_log).read()):
+        if deployer[2:] in args.lower() and addr.lower() not in seen:
+            seen.add(addr.lower())
+            deployer_dependent.append({"address": addr, "contract": name})
+
 # Protocol version transition, as recorded per CTM flavor in ecosystem.toml.
 toml = open(os.environ["ECOSYSTEM_TOML"]).read()
 def ints(key):
@@ -174,6 +196,9 @@ meta = {
         "forked_at_block": int(os.environ["FORKED_AT_BLOCK"]) if os.environ.get("FORKED_AT_BLOCK") else None,
     },
     "deployer_address": os.environ.get("DEPLOYER_ADDR") or None,
+    # Deployments whose CREATE2 address depends on `deployer_address` (it is in
+    # their init code). The broadcasting EOA must be that same address.
+    "deployer_dependent_deployments": deployer_dependent,
     "zk_governance_commit": os.environ.get("ZK_GOVERNANCE_COMMIT") or None,
     "toolchain": {
         "forge": os.environ["FORGE_VERSION"],
@@ -225,6 +250,12 @@ executed by their own multisig:
 {chr(10).join(f'  - `{f}` (target `{t}`)' for t, f in other) or '  (none)'}
 
 ## Deploy for real
+
+**The broadcasting EOA must be `{meta['deployer_address']}`.** The deployer is not a
+free parameter: it is baked into the init code of {len(deployer_dependent)} deployment(s),
+so a different signer puts them at different CREATE2 addresses while
+`ecosystem.toml` and the governance calldata still name these ones —
+{chr(10).join(f'  - `{d["address"]}`  {d["contract"]}' for d in deployer_dependent) or '  (none in this bundle)'}
 
 ```bash
 git checkout {meta['contracts_commit']}        # bytecode identity: must match

@@ -30,13 +30,21 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 #   gh workflow run generate-ecosystem-upgrade-calldata.yaml --ref <branch> \
 #     -f environment=<env> \
 #     -f verify_mode=strict \                 # report-only for battlechain
-#     -f deployer_address=0x…                 # public; impersonated, nothing signed
+#     -f deployer_address=0x…                 # MUST be the EOA that will broadcast
 #     [-f fork_block=<n>]                     # see TROUBLESHOOTING
 #
 # `environment` is the basename of a config pair
 # (`upgrade-envs/permanent-values/<env>.toml` + `upgrade-envs/v0.31.0-interopB/<env>.toml`);
 # the L1 to fork is taken from that env's `l1_chain_id`. Nothing is signed and
 # nothing touches real L1 — this runs entirely against an anvil fork.
+#
+# `deployer_address` is part of the OUTPUT, not just of the rehearsal: the prepare
+# passes it as the initial owner of two proxies (`initialize(deployer)`) and to the
+# verifier's constructor, so those three CREATE2 addresses are a function of it.
+# Generate with the EOA that will actually broadcast — a placeholder produces a
+# bundle whose `ecosystem.toml` addresses nobody can reproduce. The bundle lists the
+# affected deployments under `deployer_dependent_deployments`, and the deploy
+# workflow refuses to broadcast with a key for a different address.
 #
 # Two artifacts come out:
 #
@@ -133,6 +141,14 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 #                                               PUH-governed env.
 # `No deploy bundle was published`            → the prepare died before the pack
 #                                               step; fix the generate job first.
+# deploy job: "bundle was prepared for X but    → the key in CI is not the EOA the
+# this key is Y"                                  bundle was generated for. Those two
+#                                                 must match: the deployer is in the
+#                                                 init code of some deployments, so a
+#                                                 different signer moves them.
+#                                                 Re-generate with
+#                                                 `-f deployer_address=Y`, or use X's
+#                                                 key.
 #
 # Full prose version: `docs/ecosystem-upgrade-deploy.md`.
 # ═════════════════════════════════════════════════════════════════════════════
@@ -258,7 +274,7 @@ on:
         default: ""
         type: string
       deployer_address:
-        description: "Deployer EOA address (public). This is a fork rehearsal — the deployer is impersonated, nothing is signed — so only the address is needed, not a key. BLANK = derive it from the DEPLOYER_PRIVATE_KEY_* secret."
+        description: "Deployer EOA address (public). Only the address is needed — this is a fork rehearsal, the deployer is impersonated and nothing is signed. It is NOT a free parameter though: it goes into the init code of a few deployments (initialize(deployer) on two proxies, and the verifier's constructor), so their CREATE2 addresses depend on it and whoever broadcasts MUST be this same EOA. The bundle records which deployments those are. BLANK = derive it from the DEPLOYER_PRIVATE_KEY_* secret."
         required: false
         default: ""
         type: string
