@@ -22,6 +22,7 @@ import { getChainIdsByRole, timeIt } from "./core/utils";
 import { getAbi, getCreationBytecode } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS, INTEROP_CENTER_ADDR } from "./core/const";
 import { getInteropSourcePrivateKey, isLiveInteropMode } from "./core/accounts";
+import { getGenesisProtocolVersionString } from "./core/genesis";
 import { encodeNtvAssetId } from "./core/data-encoding";
 import { deployTestTokens } from "./helpers/deploy-test-token";
 import { depositERC20ToL2 } from "./helpers/l1-deposit-helper";
@@ -74,10 +75,7 @@ export class DeploymentRunner {
 
   /** Read protocol version from configs/genesis/era/latest.json (the source of truth). */
   getProtocolVersionString(): string {
-    const genesisPath = path.resolve(this.configDir, "../../../../configs/genesis/era/latest.json");
-    const genesis = JSON.parse(fs.readFileSync(genesisPath, "utf-8"));
-    const { major, minor, patch } = genesis.protocol_semantic_version;
-    return `v${major}.${minor}.${patch}`;
+    return getGenesisProtocolVersionString(false);
   }
 
   loadState(): DeploymentState {

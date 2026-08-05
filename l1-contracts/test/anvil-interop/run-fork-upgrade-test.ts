@@ -395,7 +395,7 @@ async function main(): Promise<void> {
       console.log("\n=== Step 9: Skipped protocol-version verify (FORK_SKIP_CHAIN_UPGRADES=1) ===\n");
     } else {
       console.log(`\n=== Step 9: Verifying protocol versions (${elapsed()}) ===\n`);
-      await verifyProtocolVersions(l1Provider, upgradeChainAddresses);
+      await verifyProtocolVersions(l1Provider, upgradeChainAddresses, scenarioIsZKsyncOS);
     }
 
     console.log(`\n=== Fork-mode upgrade test completed successfully! (${elapsed()}) ===\n`);
