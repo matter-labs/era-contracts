@@ -27,7 +27,7 @@ import {IContractDeployer, L2ContractHelper} from "../../common/l2-helpers/L2Con
 
 import {SystemContractsCaller} from "../../common/l2-helpers/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {InteropL2Info} from "../../common/L2AssetBookkeeping.sol";
+import {InteropL2Info, SavedTotalSupply} from "../../common/L2AssetBookkeeping.sol";
 
 import {
     AddressMismatch,
@@ -103,6 +103,13 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @dev The base token's counters (under `BASE_TOKEN_ASSET_ID`) are reported by
     /// `BaseTokenHolder`, which escrows it; every other asset is recorded by this vault itself.
     mapping(bytes32 assetId => InteropL2Info info) public interopInfo;
+
+    /// @notice The token's net inbound flow — total successful deposits minus total successful
+    /// withdrawals — accumulated before the upgrade introduced this bookkeeping.
+    /// @dev For a bridged token that is its pre-tracking `totalSupply()`. Tokens native to this
+    /// chain use the removed tracker's infinite-deposit convention, offsetting the same net flow
+    /// by `type(uint256).max`: `type(uint256).max - bridgedOut`.
+    mapping(bytes32 assetId => SavedTotalSupply snapshot) public preTrackingTotalSupply;
 
     /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
@@ -219,9 +226,15 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     }
 
     /// @dev Marks a newly registered token as tracked so that its (empty) escrow is never
-    /// mistaken for a legacy pre-tracking escrow by `_trackLegacyTokenIfNeeded`.
-    function _registerTokenForTracking(bytes32 _assetId, uint256) internal override {
+    /// mistaken for a legacy pre-tracking escrow by `_trackLegacyTokenIfNeeded`, and records the
+    /// zero-flow baseline.
+    function _registerTokenForTracking(bytes32 _assetId, uint256 _originChainId) internal override {
         isAssetTracked[_assetId] = true;
+
+        // No flows predate the bookkeeping for a token registered after it: a bridged token starts
+        // at zero, a native token at the infinite-deposit baseline (zero `bridgedOut`).
+        uint256 initialSupply = _originChainId == block.chainid ? type(uint256).max : 0;
+        preTrackingTotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: initialSupply});
     }
 
     function _registerTokenIfBridgedLegacy(address _tokenAddress) internal override returns (bytes32) {
@@ -496,8 +509,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         _trackLegacyTokenIfNeeded(_assetId);
     }
 
-    /// @dev Seeds `bridgedOut` for an asset registered before this implementation.
-    /// Called before the bridge operation changes token supply or escrow.
+    /// @dev Seeds `bridgedOut` and the pre-tracking baseline for an asset registered before this
+    /// implementation. Called before the bridge operation changes token supply or escrow.
     function _trackLegacyTokenIfNeeded(bytes32 _assetId) internal {
         if (isAssetTracked[_assetId]) {
             return;
@@ -512,7 +525,15 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         if (tokenOriginChainId == block.chainid) {
             // Before this mapping existed, the vault escrow was the exact outstanding amount except
             // for indistinguishable direct donations, which are conservatively treated as escrow.
-            bridgedOut[_assetId] = IERC20(token).balanceOf(address(this));
+            uint256 escrowedAmount = IERC20(token).balanceOf(address(this));
+            bridgedOut[_assetId] = escrowedAmount;
+            preTrackingTotalSupply[_assetId] = SavedTotalSupply({
+                isSaved: true,
+                amount: type(uint256).max - escrowedAmount
+            });
+        } else {
+            // A bridged token's totalSupply is exactly its pre-tracking net inbound flow.
+            preTrackingTotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: IERC20(token).totalSupply()});
         }
     }
 

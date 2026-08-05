@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {SettlementLayerV31UpgradeBase} from "./SettlementLayerV31UpgradeBase.sol";
+import {IPriorityOpLowerBound} from "./IPriorityOpLowerBound.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {L2UpgradeTxLib} from "./L2UpgradeTxLib.sol";
@@ -15,6 +16,9 @@ import {Bytes} from "../vendor/Bytes.sol";
 /// @custom:security-contact security@matterlabs.dev
 contract EraSettlementLayerV31Upgrade is SettlementLayerV31UpgradeBase {
     using Bytes for bytes;
+
+    // solhint-disable-next-line no-empty-blocks
+    constructor(IPriorityOpLowerBound _priorityOpLowerBound) SettlementLayerV31UpgradeBase(_priorityOpLowerBound) {}
 
     /// @inheritdoc SettlementLayerV31UpgradeBase
     function getL2UpgradeTxData(

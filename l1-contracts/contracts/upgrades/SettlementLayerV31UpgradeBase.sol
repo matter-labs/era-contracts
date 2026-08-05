@@ -7,12 +7,17 @@ import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {BaseTokenPreV31TotalSupplyNotSet, PriorityQueueNotReady} from "../common/L1ContractErrors.sol";
+import {
+    BaseTokenPreV31TotalSupplyNotSet,
+    LowerBoundNotRecorded,
+    PriorityQueueNotReady
+} from "../common/L1ContractErrors.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {L2DACommitmentScheme} from "../common/Config.sol";
 import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
+import {IPriorityOpLowerBound} from "./IPriorityOpLowerBound.sol";
 
 /// @author Matter Labs
 /// @title SettlementLayerV31UpgradeBase
@@ -20,6 +25,14 @@ import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors
 /// delegates L2 tx construction to subclasses (Era vs ZKsyncOS).
 /// @custom:security-contact security@matterlabs.dev
 abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
+    /// @notice Standalone registry of per-chain priority-op lower bounds; see the ZKsync OS
+    /// branch in `upgrade` below.
+    IPriorityOpLowerBound public immutable PRIORITY_OP_LOWER_BOUND;
+
+    constructor(IPriorityOpLowerBound _priorityOpLowerBound) {
+        PRIORITY_OP_LOWER_BOUND = _priorityOpLowerBound;
+    }
+
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
@@ -75,14 +88,14 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
         } else {
             require(s.baseTokenHasTotalSupply, BaseTokenPreV31TotalSupplyNotSet());
             // The flag is set eagerly when the draft-v31 backfill service transaction is
-            // *requested*. An empty priority queue (all batches are executed, see above) proves
-            // the transaction also *executed* on L2 — this upgrade removes its L2 entry point,
-            // so a still-pending backfill would be lost and the supply permanently undercounted.
-            // Queue emptiness is the only execution evidence available on L1 for deployed
-            // draft-v31 chains (the request hash was never stored). Anyone can delay the upgrade
-            // by front-running it with a fresh priority request; that bounded, attacker-funded
-            // griefing is accepted — the executor can submit through a private lane.
-            require(IGetters(address(this)).getPriorityQueueSize() == 0, PriorityQueueNotReady());
+            // *requested*; this upgrade removes the backfill's L2 entry point, so it must not run
+            // before that transaction *executed*. `PRIORITY_OP_LOWER_BOUND` pins (permissionlessly,
+            // while the flag is already set) a priority-op count that includes the backfill;
+            // requiring all ops below it to be processed proves execution without demanding an
+            // empty — and therefore griefable — priority queue.
+            uint256 lowerBound = PRIORITY_OP_LOWER_BOUND.lowerBound(address(this));
+            require(lowerBound != 0, LowerBoundNotRecorded());
+            require(IGetters(address(this)).getFirstUnprocessedPriorityTx() >= lowerBound, PriorityQueueNotReady());
         }
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;

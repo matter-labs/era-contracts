@@ -35,8 +35,8 @@ contract L2NativeTokenVaultBookkeepingHarness is L2NativeTokenVault {
 }
 
 /// @notice Tests for the chain-local bookkeeping that replaced the removed
-/// L2AssetTracker: `bridgedOut` / `interopInfo` on the L2NativeTokenVault, including the
-/// base-token flows reported by the BaseTokenHolder.
+/// L2AssetTracker: `bridgedOut` / `interopInfo` / `preTrackingTotalSupply` on the
+/// L2NativeTokenVault, including the base-token flows reported by the BaseTokenHolder.
 abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
     function _ntv() internal pure returns (L2NativeTokenVault) {
         return L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
@@ -78,13 +78,16 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
     //  Token registration
     // ═══════════════════════════════════════════════════════════════════
 
-    /// @notice Registering a fresh native token initializes its bookkeeping: tracked and nothing
-    /// bridged out yet.
+    /// @notice Registering a fresh native token initializes its bookkeeping: tracked, nothing
+    /// bridged out yet, and the infinite-deposit pre-tracking baseline recorded.
     function test_registerToken_native_initializesBookkeeping() public {
         (, bytes32 assetId) = _deployAndRegisterNativeToken(makeAddr("caller"), 0);
 
         assertTrue(_ntv().isAssetTracked(assetId), "native token should be tracked on registration");
         assertEq(_ntv().bridgedOut(assetId), 0, "fresh native token has nothing bridged out");
+        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
+        assertTrue(isSaved, "native tokens should record their pre-tracking baseline");
+        assertEq(savedAmount, type(uint256).max, "a fresh native token starts at the infinite-deposit baseline");
     }
 
     /// @notice The first deposit of a previously unseen bridged token registers and tracks it
@@ -115,6 +118,9 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
         address token = _ntv().tokenAddress(assetId);
         assertNotEq(token, address(0), "the bridged token should be deployed");
         assertTrue(_ntv().isAssetTracked(assetId), "the bridged token should be tracked during registration");
+        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
+        assertTrue(isSaved, "bridged tokens should record their pre-tracking baseline");
+        assertEq(savedAmount, 0, "no flows predate a token registered by its first deposit");
         assertEq(IERC20(token).totalSupply(), amount, "the first deposit should mint the full amount");
         assertEq(IERC20(token).balanceOf(receiver), amount, "the receiver should receive the first deposit");
         assertEq(_readTotalSuccessfulDepositsFromL1(assetId), amount, "the first L1 deposit should be recorded");
@@ -314,6 +320,13 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
 
         assertTrue(_ntv().isAssetTracked(assetId), "legacy token should be tracked");
         assertEq(_ntv().bridgedOut(assetId), escrowed, "bridgedOut should be seeded with the escrow");
+        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
+        assertTrue(isSaved, "legacy native tokens should record their pre-tracking baseline");
+        assertEq(
+            savedAmount,
+            type(uint256).max - escrowed,
+            "the native baseline offsets the pre-tracking net inbound flow by MAX"
+        );
 
         // Tracking is idempotent: a second call (or a subsequent bridge op) must not re-seed.
         token.mint(L2_NATIVE_TOKEN_VAULT_ADDR, 1 ether);
@@ -321,17 +334,22 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
         assertEq(_ntv().bridgedOut(assetId), escrowed, "re-tracking must not re-seed bridgedOut");
     }
 
-    /// @notice A legacy bridged token only gets marked as tracked: there is no escrow to seed.
-    function test_trackLegacyToken_bridged_marksTrackedWithoutSeeding() public {
+    /// @notice A legacy bridged token records its pre-tracking net inbound flow (== its current
+    /// totalSupply) and has no escrow to seed.
+    function test_trackLegacyToken_bridged_capturesSupplySnapshot() public {
         TestnetERC20Token token = new TestnetERC20Token("LegacyBridged", "LGB", 18);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, makeAddr("legacy_l1_token"));
-        token.mint(makeAddr("someHolder"), 1000);
+        uint256 preTrackingSupply = 1000;
+        token.mint(makeAddr("someHolder"), preTrackingSupply);
 
         _writeLegacyVaultRegistration(assetId, address(token), L1_CHAIN_ID);
 
         _ntv().trackLegacyToken(assetId);
 
         assertTrue(_ntv().isAssetTracked(assetId), "legacy token should be tracked");
+        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
+        assertTrue(isSaved, "bridged tokens should record their pre-tracking baseline");
+        assertEq(savedAmount, preTrackingSupply, "the baseline equals the pre-tracking net inbound flow");
         assertEq(_ntv().bridgedOut(assetId), 0, "bridged tokens carry no bridgedOut accounting");
     }
 
@@ -374,6 +392,13 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
             token.balanceOf(L2_NATIVE_TOKEN_VAULT_ADDR),
             escrowed + amount,
             "escrow should stay in lockstep with bridgedOut"
+        );
+        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
+        assertTrue(isSaved, "lazy tracking should record the pre-operation baseline");
+        assertEq(
+            savedAmount,
+            type(uint256).max - escrowed,
+            "the baseline must be captured before the newly burnt amount enters escrow"
         );
     }
 

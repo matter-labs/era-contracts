@@ -207,13 +207,17 @@ its empty compatibility stub because pre-v31 chains did deploy code there.
   too, under `BASE_TOKEN_ASSET_ID`, reported by the `BaseTokenHolder` (below). For the base token, failed
   deposits are refunded on L2 to the `refundRecipient` rather than claimed on L1, so the gap between
   initiated deposits and this counter is not uniformly "claimable on L1" across asset types.
-- `isAssetTracked[assetId]` guards the one-time seeding of a legacy L2-native token's `bridgedOut`:
-  tokens registered before this bookkeeping existed have their outstanding amount seeded from the vault's
-  current escrow (indistinguishable direct donations are conservatively treated as escrow, since they are
-  effectively frozen). Seeding happens lazily on the token's first touch — before the operation changes
-  any supply or escrow — or eagerly by anyone via `trackLegacyToken`; it is idempotent, newly registered
-  tokens are marked tracked immediately, and `trackLegacyToken` rejects the base token, which has no vault
-  escrow to seed.
+- `preTrackingTotalSupply[assetId]` records the token's net inbound flow — total successful deposits
+  minus total successful withdrawals — accumulated before this bookkeeping existed. For a bridged token
+  that is exactly its pre-tracking `totalSupply()`; native tokens offset the same net flow by
+  `type(uint256).max` (the removed tracker's infinite-deposit convention): `2^256 - 1 - bridgedOut`.
+  Newly registered tokens start at the zero-flow baseline (`0` bridged, `max` native).
+- `isAssetTracked[assetId]` guards the one-time initialization of the two fields above for a legacy
+  L2-native token: its outstanding amount is seeded from the vault's current escrow (indistinguishable
+  direct donations are conservatively treated as escrow, since they are effectively frozen). Seeding
+  happens lazily on the token's first touch — before the operation changes any supply or escrow — or
+  eagerly by anyone via `trackLegacyToken`; it is idempotent, newly registered tokens are marked tracked
+  immediately, and `trackLegacyToken` rejects the base token, which has no vault escrow to seed.
 
 ### `BaseTokenHolder` (base token)
 
@@ -228,9 +232,11 @@ balance directly, so the base token's `totalSuccessfulDepositsFromL1` counter is
 - The pre-v31 total supply of an upgraded ZKsync OS chain lives in `L2BaseTokenZKOS.zkosPreV31TotalSupply`,
   populated while the chain ran draft-v31 (via the since-removed backfill service transaction). This
   release has no backfill path: the v31 upgrade of a ZKsync OS chain is forbidden on L1
-  (`SettlementLayerV31UpgradeBase` requires `baseTokenHasTotalSupply`, which only the draft-v31 backfill
-  sets), so `totalSupply()` is always available on upgraded chains. Fresh chains have no pre-v31 history
-  and keep zero.
+  (`SettlementLayerV31UpgradeBase`) unless `baseTokenHasTotalSupply` was set by the draft-v31 backfill
+  _and_ the backfill's L2 execution is proven — a `PriorityOpLowerBound` registry permissionlessly pins a
+  priority-op count observed after the flag was set, and the upgrade requires all ops below it to be
+  processed. So `totalSupply()` is always available on upgraded chains; fresh chains have no pre-v31
+  history and keep zero.
 - `recoverBaseToken` (NativeTokenVault only) returns the escrow of a failed/timed-out base-token bridge-out
   and asserts the two invariants that make the recovery accounting-neutral: the destination was not L1
   (`RecoverToL1NotSupported`, so `totalWithdrawalsToL1` stays append-only) and the base token is not native

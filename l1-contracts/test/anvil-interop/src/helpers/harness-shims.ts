@@ -32,6 +32,11 @@ const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6
 // `forceBatchExecutedEqualsCommitted`.
 const ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT = 11;
 const ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT = 13;
+// Packed word holding `baseTokenHasTotalSupply` in its lowest byte (with `zksyncOSMaxTxGasLimit`
+// and `pubdataContent` above it).
+const ZK_CHAIN_BASE_TOKEN_HAS_TOTAL_SUPPLY_SLOT = 68;
+// `PriorityOpLowerBound.lowerBound` is the contract's first state variable (mapping slot 0).
+const PRIORITY_OP_LOWER_BOUND_MAPPING_SLOT = 0;
 
 const systemContextAbi = getAbi("SystemContext") as ContractInterface;
 
@@ -86,6 +91,76 @@ export async function forceBatchExecutedEqualsCommitted(
     diamondProxyAddr,
     ethers.utils.hexValue(ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT),
     committedHex,
+  ]);
+}
+
+/**
+ * Harness-only shim: model the draft-v31 base-token backfill prerequisite for a ZKsync OS chain.
+ *
+ * The v31 upgrade of a ZKsync OS chain requires (a) `s.baseTokenHasTotalSupply`, which draft-v31
+ * sets when the backfill service transaction is requested, and (b) a bound recorded in the
+ * upgrade's `PriorityOpLowerBound` registry proving that transaction also executed on L2.
+ *
+ * On a forked draft-v31 chain that was really backfilled, (a) already holds and (b) goes through
+ * the registry's real permissionless entry point. A forked v30 state predates draft-v31 entirely
+ * (its facets lack `baseTokenSupportsTotalSupply`, so even the registry's guard cannot run):
+ * there we substitute the missing draft-v31 history with direct writes, same rationale as
+ * `forceBatchExecutedEqualsCommitted` above.
+ */
+export async function modelDraftV31BackfillPrerequisite(params: {
+  l1Provider: providers.JsonRpcProvider;
+  diamondProxyAddr: string;
+  settlementLayerUpgradeAddr: string;
+}): Promise<void> {
+  const { l1Provider, diamondProxyAddr, settlementLayerUpgradeAddr } = params;
+
+  const getters = new Contract(diamondProxyAddr, getAbi("GettersFacet"), l1Provider);
+  let flagReadable = false;
+  try {
+    flagReadable = await getters.baseTokenSupportsTotalSupply();
+  } catch {
+    // Pre-v31 facets: the selector does not exist on the fork.
+  }
+
+  const settlementLayerUpgrade = new Contract(
+    settlementLayerUpgradeAddr,
+    getAbi("ZKsyncOSSettlementLayerV31Upgrade"),
+    l1Provider
+  );
+  const registryAddr: string = await settlementLayerUpgrade.PRIORITY_OP_LOWER_BOUND();
+  const registry = new Contract(registryAddr, getAbi("PriorityOpLowerBound"), l1Provider);
+  if (!(await registry.lowerBound(diamondProxyAddr)).isZero()) {
+    return; // already modeled / recorded
+  }
+
+  if (flagReadable) {
+    // Draft-v31 fork with a completed backfill: use the real permissionless entry point.
+    const caller = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
+    const tx = await registry.connect(caller).lowerBoundPriorityOp(diamondProxyAddr, { gasLimit: 500_000 });
+    await tx.wait();
+    return;
+  }
+
+  // v30 fork: write the flag bit (lowest byte of the packed word, preserving the rest)...
+  const slotHex = ethers.utils.hexValue(ZK_CHAIN_BASE_TOKEN_HAS_TOTAL_SUPPLY_SLOT);
+  const word = ethers.utils.hexZeroPad(
+    await l1Provider.send("eth_getStorageAt", [diamondProxyAddr, slotHex, "latest"]),
+    32
+  );
+  await l1Provider.send("anvil_setStorageAt", [diamondProxyAddr, slotHex, word.slice(0, 64) + "01"]);
+
+  // ...and record the current priority-op count directly in the registry mapping.
+  const totalPriorityTxs = await getters.getTotalPriorityTxs();
+  const boundSlot = ethers.utils.keccak256(
+    ethers.utils.defaultAbiCoder.encode(
+      ["address", "uint256"],
+      [diamondProxyAddr, PRIORITY_OP_LOWER_BOUND_MAPPING_SLOT]
+    )
+  );
+  await l1Provider.send("anvil_setStorageAt", [
+    registryAddr,
+    boundSlot,
+    ethers.utils.hexZeroPad(totalPriorityTxs.toHexString(), 32),
   ]);
 }
 

@@ -38,6 +38,10 @@ interface IL2NativeTokenVault is INativeTokenVaultBase {
     /// @notice Whether the chain-local bookkeeping for the token has been initialized.
     function isAssetTracked(bytes32 _assetId) external view returns (bool);
 
+    /// @notice The token's net inbound flow (successful deposits minus successful withdrawals)
+    /// accumulated before this bookkeeping existed; native tokens offset it by `type(uint256).max`.
+    function preTrackingTotalSupply(bytes32 _assetId) external view returns (bool isSaved, uint256 amount);
+
     /// @notice L2-side accounting of L1 <-> L2 flows while this chain settles on L1.
     function interopInfo(
         bytes32 _assetId

@@ -130,6 +130,10 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
     /// @notice Override to deploy the correct v31 upgrade contract based on chain type.
     function deployUsedUpgradeContract() internal virtual override returns (address) {
+        // The registry must exist first: the upgrade contract embeds its address as an immutable.
+        priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound", false);
+        console.log("Deployed PriorityOpLowerBound at", priorityOpLowerBound);
+
         string memory contractName = config.isZKsyncOS
             ? "ZKsyncOSSettlementLayerV31Upgrade"
             : "EraSettlementLayerV31Upgrade";

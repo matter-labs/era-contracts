@@ -98,6 +98,10 @@ struct GeneratedData {
 }
 
 abstract contract DeployCTMUtils is DeployUtils {
+    /// @dev Deployed together with the v31 upgrade contract (see `CTMUpgrade_v31`), which embeds
+    /// it as an immutable.
+    address internal priorityOpLowerBound;
+
     using stdToml for string;
 
     Config public config;
@@ -328,6 +332,10 @@ abstract contract DeployCTMUtils is DeployUtils {
             compareStrings(contractName, "EraSettlementLayerV31Upgrade") ||
             compareStrings(contractName, "ZKsyncOSSettlementLayerV31Upgrade")
         ) {
+            // The v31 upgrade pins the priority-op lower-bound registry as an immutable.
+            require(priorityOpLowerBound != address(0), "PriorityOpLowerBound not deployed");
+            return abi.encode(priorityOpLowerBound);
+        } else if (compareStrings(contractName, "PriorityOpLowerBound")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Governance")) {
             return

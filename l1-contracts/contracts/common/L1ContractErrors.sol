@@ -208,10 +208,6 @@ error InvalidCaller(address);
 error InvalidChainId();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
-// 0xd95d4d82
-error PubdataContentLockedForPermanentRollup();
-// 0x3731bfa2
-error NonFullPubdataContentForPermanentRollup();
 // 0x4fbe5dba
 error InvalidDelay();
 // 0x3f98a77e
@@ -262,6 +258,10 @@ error LegacyMethodForNonL1Token();
 error LengthIsNotDivisibleBy32(uint256 length);
 // 0x1b6825bb
 error LogAlreadyProcessed(uint8);
+// 0xe4623697
+error LowerBoundAlreadyRecorded();
+// 0x5c25a57b
+error LowerBoundNotRecorded();
 // 0x43e266b0
 error MalformedBytecode(BytecodeError);
 // 0xafbb7a4e
@@ -314,6 +314,8 @@ error NonCanonicalRepresentation();
 error NonEmptyCalldata();
 // 0x536ec84b
 error NonEmptyMsgValue();
+// 0x3731bfa2
+error NonFullPubdataContentForPermanentRollup();
 // 0xd018e08e
 error NonIncreasingTimestamp();
 // 0x0105f9c0
@@ -386,6 +388,8 @@ error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 error ProtocolIdMismatch(uint256 expectedProtocolVersion, uint256 providedProtocolId);
 // 0x64f94ec2
 error ProtocolIdNotGreater();
+// 0xd95d4d82
+error PubdataContentLockedForPermanentRollup();
 // 0x959f26fb
 error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 // 0x63c36549

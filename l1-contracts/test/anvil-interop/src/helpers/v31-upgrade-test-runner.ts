@@ -35,7 +35,11 @@ import {
 } from "../core/const";
 import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
-import { forceBatchExecutedEqualsCommitted, transferOwnable2Step } from "./harness-shims";
+import {
+  forceBatchExecutedEqualsCommitted,
+  modelDraftV31BackfillPrerequisite,
+  transferOwnable2Step,
+} from "./harness-shims";
 import { impersonateAndRun } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
@@ -648,6 +652,16 @@ export async function runChainUpgradesAndRelayL2(params: {
     // batches at fork time, copy committed onto executed to model the
     // "all batches executed" prerequisite without running the executor.
     await forceBatchExecutedEqualsCommitted(l1Provider, chain.diamondProxy);
+
+    // ZKsync OS chains must additionally have the draft-v31 base-token backfill behind them
+    // (flag + executed-priority-op lower bound); model the missing history on the fork.
+    if (isZKsyncOS) {
+      await modelDraftV31BackfillPrerequisite({
+        l1Provider,
+        diamondProxyAddr: chain.diamondProxy,
+        settlementLayerUpgradeAddr,
+      });
+    }
 
     runProtocolOps([
       "chain",

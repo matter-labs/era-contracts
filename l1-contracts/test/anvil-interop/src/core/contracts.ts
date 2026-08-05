@@ -63,6 +63,7 @@ const ARTIFACTS = {
   MockMintBaseTokenHook: "MockMintBaseTokenHook.sol/MockMintBaseTokenHook.json",
   Ownable2Step: "Ownable2Step.sol/Ownable2Step.json",
   EraSettlementLayerV31Upgrade: "EraSettlementLayerV31Upgrade.sol/EraSettlementLayerV31Upgrade.json",
+  PriorityOpLowerBound: "PriorityOpLowerBound.sol/PriorityOpLowerBound.json",
   ZKsyncOSSettlementLayerV31Upgrade: "ZKsyncOSSettlementLayerV31Upgrade.sol/ZKsyncOSSettlementLayerV31Upgrade.json",
   SystemContractProxy: "SystemContractProxy.sol/SystemContractProxy.json",
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",

@@ -5,6 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {EraSettlementLayerV31Upgrade} from "contracts/upgrades/EraSettlementLayerV31Upgrade.sol";
 import {
     BaseTokenPreV31TotalSupplyNotSet,
+    LowerBoundAlreadyRecorded,
+    LowerBoundNotRecorded,
     PriorityQueueNotReady,
     UnexpectedUpgradeSelector
 } from "contracts/common/L1ContractErrors.sol";
@@ -34,8 +36,12 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2UpgradeTxLib} from "contracts/upgrades/L2UpgradeTxLib.sol";
 import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+import {IPriorityOpLowerBound} from "contracts/upgrades/IPriorityOpLowerBound.sol";
+import {PriorityOpLowerBound} from "contracts/upgrades/PriorityOpLowerBound.sol";
 
 contract DummySettlementLayerV31Upgrade is EraSettlementLayerV31Upgrade, BaseUpgradeUtils {
+    constructor(IPriorityOpLowerBound _priorityOpLowerBound) EraSettlementLayerV31Upgrade(_priorityOpLowerBound) {}
+
     function setTotalBatchesCommitted(uint256 _totalBatchesCommitted) public {
         s.totalBatchesCommitted = _totalBatchesCommitted;
     }
@@ -126,7 +132,7 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
         mockGWChain = makeAddr("gwChain");
         mockChainTypeManager = makeAddr("chainTypeManager");
 
-        upgrade = new DummySettlementLayerV31Upgrade();
+        upgrade = new DummySettlementLayerV31Upgrade(new PriorityOpLowerBound());
         upgrade.setBridgehub(mockBridgehub);
         upgrade.setChainId(testChainId);
         upgrade.setChainTypeManager(mockChainTypeManager);
@@ -505,6 +511,8 @@ contract SettlementLayerV31UpgradeEraV29Test is SettlementLayerV31UpgradeTestBas
 }
 
 contract DummyZKsyncOSSettlementLayerV31Upgrade is ZKsyncOSSettlementLayerV31Upgrade, BaseUpgradeUtils {
+    constructor(IPriorityOpLowerBound _priorityOpLowerBound) ZKsyncOSSettlementLayerV31Upgrade(_priorityOpLowerBound) {}
+
     function setBridgehub(address _bridgehub) public {
         s.bridgehub = _bridgehub;
     }
@@ -547,6 +555,7 @@ contract DummyZKsyncOSSettlementLayerV31Upgrade is ZKsyncOSSettlementLayerV31Upg
 
 contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
     DummyZKsyncOSSettlementLayerV31Upgrade internal zkosUpgrade;
+    PriorityOpLowerBound internal priorityOpLowerBound;
 
     address internal mockBridgehub;
     address internal mockAssetRouter;
@@ -564,7 +573,8 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
         mockMessageRoot = makeAddr("messageRoot");
         mockChainTypeManager = makeAddr("chainTypeManager");
 
-        zkosUpgrade = new DummyZKsyncOSSettlementLayerV31Upgrade();
+        priorityOpLowerBound = new PriorityOpLowerBound();
+        zkosUpgrade = new DummyZKsyncOSSettlementLayerV31Upgrade(priorityOpLowerBound);
         zkosUpgrade.setBridgehub(mockBridgehub);
         zkosUpgrade.setChainId(testChainId);
         zkosUpgrade.setZksyncOS(true);
@@ -653,11 +663,29 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
         );
     }
 
-    function _mockPriorityQueueSize(uint256 _size) internal {
+    uint256 internal constant TOTAL_PRIORITY_TXS_AT_RECORD_TIME = 7;
+
+    /// @dev Records the chain's lower bound in the registry, mocking the pre-upgrade getters the
+    /// registry reads on the chain (the dummy upgrade contract stands in for the diamond).
+    function _recordLowerBound() internal {
         vm.mockCall(
             address(zkosUpgrade),
-            abi.encodeWithSelector(IGetters.getPriorityQueueSize.selector),
-            abi.encode(_size)
+            abi.encodeWithSelector(IGetters.baseTokenSupportsTotalSupply.selector),
+            abi.encode(true)
+        );
+        vm.mockCall(
+            address(zkosUpgrade),
+            abi.encodeWithSelector(IGetters.getTotalPriorityTxs.selector),
+            abi.encode(TOTAL_PRIORITY_TXS_AT_RECORD_TIME)
+        );
+        priorityOpLowerBound.lowerBoundPriorityOp(address(zkosUpgrade));
+    }
+
+    function _mockFirstUnprocessedPriorityTx(uint256 _value) internal {
+        vm.mockCall(
+            address(zkosUpgrade),
+            abi.encodeWithSelector(IGetters.getFirstUnprocessedPriorityTx.selector),
+            abi.encode(_value)
         );
     }
 
@@ -665,30 +693,40 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
     /// total supply was backfilled while the chain ran draft-v31 (this release has no backfill path).
     function test_RevertWhen_ZKOSBaseTokenTotalSupplyNotBackfilled() public {
         _prepareZKOSProposedUpgrade();
-        _mockPriorityQueueSize(0);
 
         vm.expectRevert(BaseTokenPreV31TotalSupplyNotSet.selector);
         zkosUpgrade.upgrade(proposedUpgrade);
     }
 
-    /// @notice The backfill flag is set eagerly when the service transaction is requested, so the
-    /// upgrade must additionally refuse to run while any priority transaction is still pending —
-    /// otherwise a pending backfill would be lost when its L2 entry point is removed.
-    function test_RevertWhen_ZKOSBackfillFlagSetButPriorityQueueNotEmpty() public {
+    /// @notice The backfill flag alone is not enough: a lower bound proving the backfill's L2
+    /// execution must have been recorded in the registry.
+    function test_RevertWhen_ZKOSLowerBoundNotRecorded() public {
         _prepareZKOSProposedUpgrade();
         zkosUpgrade.setBaseTokenHasTotalSupply(true);
-        _mockPriorityQueueSize(1);
+
+        vm.expectRevert(LowerBoundNotRecorded.selector);
+        zkosUpgrade.upgrade(proposedUpgrade);
+    }
+
+    /// @notice The upgrade must refuse to run until every priority op below the recorded bound —
+    /// the backfill service transaction included — has been processed.
+    function test_RevertWhen_ZKOSPriorityOpsBelowLowerBoundNotProcessed() public {
+        _prepareZKOSProposedUpgrade();
+        zkosUpgrade.setBaseTokenHasTotalSupply(true);
+        _recordLowerBound();
+        _mockFirstUnprocessedPriorityTx(TOTAL_PRIORITY_TXS_AT_RECORD_TIME - 1);
 
         vm.expectRevert(PriorityQueueNotReady.selector);
         zkosUpgrade.upgrade(proposedUpgrade);
     }
 
-    /// @notice A ZKsync OS chain that was backfilled on draft-v31 (flag set, no pending priority
-    /// transactions) upgrades successfully and keeps the flag set.
+    /// @notice A ZKsync OS chain that was backfilled on draft-v31 (flag set, recorded bound
+    /// processed) upgrades successfully and keeps the flag set.
     function test_SuccessfulUpgrade_ZKOSWithBackfilledTotalSupply() public {
         _prepareZKOSProposedUpgrade();
         zkosUpgrade.setBaseTokenHasTotalSupply(true);
-        _mockPriorityQueueSize(0);
+        _recordLowerBound();
+        _mockFirstUnprocessedPriorityTx(TOTAL_PRIORITY_TXS_AT_RECORD_TIME);
 
         bytes32 result = zkosUpgrade.upgrade(proposedUpgrade);
 
@@ -750,5 +788,56 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
 
         vm.expectRevert(abi.encodeWithSelector(UnexpectedZKsyncOSFlag.selector, true, false));
         zkosUpgrade.getL2UpgradeTxData(mockBridgehub, testChainId, false, upgradeTxData);
+    }
+}
+
+contract PriorityOpLowerBoundTest is Test {
+    PriorityOpLowerBound internal registry;
+    address internal chain;
+
+    uint256 internal constant TOTAL_PRIORITY_TXS = 42;
+
+    function setUp() public {
+        registry = new PriorityOpLowerBound();
+        chain = makeAddr("chainDiamond");
+        vm.mockCall(chain, abi.encodeWithSelector(IGetters.baseTokenSupportsTotalSupply.selector), abi.encode(true));
+        vm.mockCall(
+            chain,
+            abi.encodeWithSelector(IGetters.getTotalPriorityTxs.selector),
+            abi.encode(TOTAL_PRIORITY_TXS)
+        );
+    }
+
+    function test_recordsCurrentPriorityOpCountOnce() public {
+        vm.expectEmit(true, false, false, true, address(registry));
+        emit IPriorityOpLowerBound.LowerBoundRecorded(chain, TOTAL_PRIORITY_TXS);
+
+        registry.lowerBoundPriorityOp(chain);
+
+        assertEq(registry.lowerBound(chain), TOTAL_PRIORITY_TXS, "the current priority-op count should be pinned");
+    }
+
+    /// @dev First call wins: a later caller must not be able to raise the bound and delay the upgrade.
+    function test_revertsOnSecondRecording() public {
+        registry.lowerBoundPriorityOp(chain);
+
+        vm.mockCall(
+            chain,
+            abi.encodeWithSelector(IGetters.getTotalPriorityTxs.selector),
+            abi.encode(TOTAL_PRIORITY_TXS + 10)
+        );
+        vm.expectRevert(LowerBoundAlreadyRecorded.selector);
+        registry.lowerBoundPriorityOp(chain);
+
+        assertEq(registry.lowerBound(chain), TOTAL_PRIORITY_TXS, "the first recorded bound must stay");
+    }
+
+    /// @dev A bound recorded before the backfill was requested could miss it, so recording is
+    /// only possible once the chain reports the supply as tracked.
+    function test_revertsWhenBaseTokenTotalSupplyNotBackfilled() public {
+        vm.mockCall(chain, abi.encodeWithSelector(IGetters.baseTokenSupportsTotalSupply.selector), abi.encode(false));
+
+        vm.expectRevert(BaseTokenPreV31TotalSupplyNotSet.selector);
+        registry.lowerBoundPriorityOp(chain);
     }
 }
