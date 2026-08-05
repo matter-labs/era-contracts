@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {DefaultUpgrade} from "./DefaultUpgrade.sol";
 import {ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {L2UpgradeTxLib} from "./L2UpgradeTxLib.sol";
-import {NotAllBatchesVerified} from "../state-transition/L1StateTransitionErrors.sol";
+import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -14,20 +14,16 @@ import {NotAllBatchesVerified} from "../state-transition/L1StateTransitionErrors
 /// substitution their L2 upgrade transaction needs.
 /// @dev The CTM upgrade emits a single ecosystem-wide L2 upgrade transaction whose inner
 /// `IL2V32Upgrade.upgrade` calldata carries a placeholder for the chain-specific force-deployments data.
-/// Substituting the real data can only happen per chain, which is what this contract adds, on top of the
-/// verifier precondition below.
+/// Substituting the real data can only happen per chain, which is what this contract adds.
 contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
     /// @inheritdoc DefaultUpgrade
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public virtual override returns (bytes32) {
-        // The base implementation installs the new protocol version's verifier (see `_setVerifier`), which
-        // is a freshly deployed contract in this release, so a batch that was committed but not yet proven
-        // under the old verifier would stop being provable. Best-effort: it catches an operator upgrading a
-        // chain that still has unproven batches, but it is not an invariant — the check and the batches it
-        // looks at are only as current as the block the upgrade lands in.
-        require(
-            s.totalBatchesCommitted == s.totalBatchesVerified,
-            NotAllBatchesVerified(s.totalBatchesVerified, s.totalBatchesCommitted)
-        );
+        // This is a generic upgrade implementation, so as good practice it requires every outstanding batch
+        // to have been processed before proceeding. It is not an invariant: the upgrade sees only the state
+        // of the block it lands in. It does catch the case that matters in practice — the new protocol
+        // version's verifier is installed here (see `_setVerifier`), and this release deploys a fresh one, so
+        // batches still awaiting proof under the old verifier would stop being provable.
+        require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 
         _proposedUpgrade.l2ProtocolUpgradeTx.data = getL2UpgradeTxData(
             s.bridgehub,

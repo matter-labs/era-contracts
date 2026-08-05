@@ -190,10 +190,10 @@ emitting one that redoes v31's one-time work — and neither are gateway-settled
 the `s.settlementLayer != address(0)` path through their settlement layer instead of recording the L2
 upgrade transaction on L1.
 
-Each chain's upgrade (`DefaultUpgradeZKsyncOS`) requires every committed batch to be proven first: the
-generic upgrade installs the protocol version's verifier, and this release deploys a fresh one, so a batch
-committed but not yet proven under the old verifier would stop being provable. The check is best effort —
-it catches an operator upgrading a chain with unproven batches, it is not an invariant.
+Each chain's upgrade requires every outstanding batch to have been processed first. This is good practice
+for a generic upgrade rather than an invariant, but it does catch the case that matters here: the upgrade
+installs the protocol version's verifier, and this release deploys a fresh one, so batches still awaiting
+proof under the old verifier would stop being provable.
 
 Address discovery has to match the ecosystem's version, because the getters it reads were introduced in
 different releases (`chainRegistrationSender` in v31, `l1InteropHandler` in v32): `AddressIntrospector`

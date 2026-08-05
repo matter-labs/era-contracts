@@ -69,7 +69,6 @@ error MismatchNumberOfLayer1Txs(uint256 numberOfLayer1Txs, uint256 expectedLengt
 // 0xf9ba09d6
 error NotAllBatchesExecuted();
 // 0x7695a2f8
-error NotAllBatchesVerified(uint256 batchesVerified, uint256 batchesCommitted);
 // 0x61d9af9e
 error NotAPatchUpgrade(uint256 oldProtocolVersion, uint256 newProtocolVersion);
 // 0xf05c64c6

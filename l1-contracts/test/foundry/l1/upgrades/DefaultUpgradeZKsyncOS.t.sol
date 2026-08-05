@@ -10,7 +10,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {ETH_TOKEN_ADDRESS, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
-import {NotAllBatchesVerified} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -28,14 +28,14 @@ contract DummyDefaultUpgradeZKsyncOS is DefaultUpgradeZKsyncOS, BaseUpgradeUtils
         s.zksyncOS = _zksyncOS;
     }
 
-    function setBatchCounters(uint256 _committed, uint256 _verified) public {
+    function setBatchCounters(uint256 _committed, uint256 _executed) public {
         s.totalBatchesCommitted = _committed;
-        s.totalBatchesVerified = _verified;
+        s.totalBatchesExecuted = _executed;
     }
 }
 
-/// @notice Unit tests for the ZKsync OS per-chain upgrade: the verifier precondition it enforces before the
-///         generic upgrade runs, and the per-chain force-deployments-data substitution it performs.
+/// @notice Unit tests for the ZKsync OS per-chain upgrade: the outstanding-batches precondition it enforces
+///         before the generic upgrade runs, and the per-chain force-deployments-data substitution it does.
 /// @dev The ecosystem contracts the substitution reads (bridgehub, asset router, native token vault) are
 ///      mocked: the behaviour under test is which values end up in the rewritten transaction, not how the
 ///      vault stores them. The end-to-end composition is covered by the anvil `v31 -> v32` scenario.
@@ -68,7 +68,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         upgradeContract.setBridgehub(mockBridgehub);
         upgradeContract.setChainId(CHAIN_ID);
         upgradeContract.setZKsyncOS(true);
-        // The default shape: every committed batch proven.
+        // The default shape: every committed batch processed.
         upgradeContract.setBatchCounters(7, 7);
         _mockEcosystemForSubstitution();
 
@@ -77,7 +77,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         proposedUpgrade.l2ProtocolUpgradeTx.txType = ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
     }
 
-    function test_upgradesWhenEveryCommittedBatchIsVerified() public {
+    function test_upgradesWhenEveryCommittedBatchIsProcessed() public {
         bytes32 result = upgradeContract.upgrade(proposedUpgrade);
 
         assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
@@ -85,11 +85,11 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
     }
 
     /// @dev The generic upgrade installs the new protocol version's verifier, a freshly deployed contract in
-    ///      this release, so a batch committed but not yet proven under the old one would stop being provable.
-    function test_revertWhen_aCommittedBatchIsNotVerified() public {
+    ///      this release, so batches still awaiting proof under the old one would stop being provable.
+    function test_revertWhen_aCommittedBatchIsNotProcessed() public {
         upgradeContract.setBatchCounters(8, 7);
 
-        vm.expectRevert(abi.encodeWithSelector(NotAllBatchesVerified.selector, 7, 8));
+        vm.expectRevert(NotAllBatchesExecuted.selector);
         upgradeContract.upgrade(proposedUpgrade);
     }
 
