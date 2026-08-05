@@ -530,8 +530,10 @@ contract L2BaseTokenEraTest is Test {
         );
     }
 
-    function test_withdraw_recordsBookkeepingWithL1ChainId() public {
-        // Deploy the real holder so the full withdrawal bookkeeping path executes; the holder
+    /// @dev Covers the holder->vault forwarding only: the vault is a recording mock, so the real
+    /// vault's settlement gating / `interopInfo` update is exercised in L2AssetBookkeeping.t.sol.
+    function test_withdraw_forwardsBookkeepingWithL1ChainIdToVault() public {
+        // Deploy the real holder so the withdrawal reporting path executes; the holder
         // reports the flow to the vault, so a recording mock stands in for it.
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, address(new MockRecordingVault()).code);

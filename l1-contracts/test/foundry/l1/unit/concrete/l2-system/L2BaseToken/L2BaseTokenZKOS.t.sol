@@ -139,8 +139,10 @@ contract L2BaseTokenZKOSTest is Test {
         );
     }
 
-    function test_withdraw_recordsBaseTokenBookkeeping() public {
-        // Use the actual holder to verify the withdrawal counter.
+    /// @dev Covers the holder->vault forwarding only: the vault is a recording mock, so the real
+    /// vault's settlement gating / `interopInfo` update is exercised in L2AssetBookkeeping.t.sol.
+    function test_withdraw_forwardsBaseTokenBookkeepingToVault() public {
+        // Use the actual holder to verify the forwarded withdrawal.
         BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
 
@@ -256,8 +258,9 @@ contract L2BaseTokenZKOSTest is Test {
         );
     }
 
-    function test_withdrawWithMessage_recordsBaseTokenBookkeeping() public {
-        // Use the actual holder to verify the withdrawal counter.
+    /// @dev Forwarding-only coverage, like `test_withdraw_forwardsBaseTokenBookkeepingToVault`.
+    function test_withdrawWithMessage_forwardsBaseTokenBookkeepingToVault() public {
+        // Use the actual holder to verify the forwarded withdrawal.
         BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
 
