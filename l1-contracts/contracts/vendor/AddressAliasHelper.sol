@@ -59,8 +59,9 @@ library AddressAliasHelper {
             // `code.length`-based check in `actualRefundRecipientMailbox` cannot recognize it as a contract
             // and would leave it unaliased — so the alias is applied here.
             // IMPORTANT: callers with deployed code are left as is — the Mailbox is still expected to finish
-            // the aliasing: `actualRefundRecipientMailbox` aliases them (unless they are EIP-7702 accounts,
-            // which it exempts).
+            // the aliasing via `actualRefundRecipientMailbox`. The reason is that only the Mailbox has the
+            // ability to check whether an account is an EIP-7702 one (and so must be exempted from aliasing);
+            // this helper cannot make that distinction, as EIP-7702 accounts also have non-empty code.
             // solhint-disable avoid-tx-origin
             // slither-disable-next-line tx-origin
             _recipient = (_originalCaller == tx.origin || _originalCaller.code.length != 0)
