@@ -1197,11 +1197,6 @@ fn verify_ctm_base_provenance(
             &["state_transition", "getters_facet_addr"],
             "l1-contracts/GettersFacet",
         ),
-        // {Era,ZKsyncOS}SettlementLayerV31Upgrade() — no ctor args.
-        (
-            &["state_transition", "default_upgrade_addr"],
-            default_upgrade_file,
-        ),
         // {Era,ZKsyncOS}VerifierPlonk() — no ctor args.
         (
             &["state_transition", "verifier_plonk_addr"],
@@ -1236,6 +1231,35 @@ fn verify_ctm_base_provenance(
             verifier_fflonk_file,
         );
     }
+
+    // PriorityOpLowerBound() — no ctor args; the registry the settlement-layer upgrade embeds.
+    let priority_op_lower_bound = required_address(
+        &ctm.value,
+        &scope,
+        &["state_transition", "priority_op_lower_bound_addr"],
+    )?;
+    result.expect_create2_params(
+        verifiers,
+        &priority_op_lower_bound,
+        Vec::<u8>::new(),
+        "l1-contracts/PriorityOpLowerBound",
+    );
+
+    // {Era,ZKsyncOS}SettlementLayerV31Upgrade(IPriorityOpLowerBound) — the ctor arg is the
+    // registry address, encoded as a single left-padded 32-byte word.
+    let default_upgrade = required_address(
+        &ctm.value,
+        &scope,
+        &["state_transition", "default_upgrade_addr"],
+    )?;
+    let mut default_upgrade_ctor = vec![0u8; 32];
+    default_upgrade_ctor[12..].copy_from_slice(priority_op_lower_bound.as_slice());
+    result.expect_create2_params(
+        verifiers,
+        &default_upgrade,
+        default_upgrade_ctor,
+        default_upgrade_file,
+    );
 
     // DiamondInit(bool _isZKsyncOS) — encoded as a single 32-byte word.
     let diamond_init = required_address(

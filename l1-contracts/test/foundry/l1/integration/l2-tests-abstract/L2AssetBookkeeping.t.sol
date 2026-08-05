@@ -402,6 +402,34 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
         );
     }
 
+    /// @notice The lazy tracking also fires on the inbound hook: when a legacy native token's
+    /// FIRST post-upgrade touch is an inbound finalization, `bridgedOut` is seeded from the escrow
+    /// before being decremented, so a legitimately outstanding amount is released.
+    function test_bridgeMint_legacyNativeToken_lazySeedAllowsOutstandingRelease() public {
+        _setCurrentSettlementLayer(L1_CHAIN_ID);
+        address receiver = makeAddr("receiver");
+        uint256 escrowed = 10 ether;
+        uint256 amount = 4 ether;
+        TestnetERC20Token token = new TestnetERC20Token("LegacyNative", "LGN", 18);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
+        token.mint(L2_NATIVE_TOKEN_VAULT_ADDR, escrowed);
+        _writeLegacyVaultRegistration(assetId, address(token), block.chainid);
+        assertFalse(_ntv().isAssetTracked(assetId), "legacy token starts untracked");
+
+        _bridgeMintErc20(L1_CHAIN_ID, assetId, receiver, amount);
+
+        assertTrue(_ntv().isAssetTracked(assetId), "the inbound first touch should track the token");
+        assertEq(token.balanceOf(receiver), amount, "the outstanding amount should be released from escrow");
+        assertEq(_ntv().bridgedOut(assetId), escrowed - amount, "bridgedOut = seeded escrow - released amount");
+        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
+        assertTrue(isSaved, "the inbound first touch should record the baseline");
+        assertEq(
+            savedAmount,
+            type(uint256).max - escrowed,
+            "the baseline must be captured from the pre-release escrow"
+        );
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     //  Base-token flow recording (reported by BaseTokenHolder)
     // ═══════════════════════════════════════════════════════════════════

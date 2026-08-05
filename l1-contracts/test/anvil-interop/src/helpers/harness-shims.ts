@@ -115,11 +115,19 @@ export async function modelDraftV31BackfillPrerequisite(params: {
   const { l1Provider, diamondProxyAddr, settlementLayerUpgradeAddr } = params;
 
   const getters = new Contract(diamondProxyAddr, getAbi("GettersFacet"), l1Provider);
-  let flagReadable = false;
+  let backfilled: boolean | undefined;
   try {
-    flagReadable = await getters.baseTokenSupportsTotalSupply();
+    backfilled = await getters.baseTokenSupportsTotalSupply();
   } catch {
-    // Pre-v31 facets: the selector does not exist on the fork.
+    backfilled = undefined; // Pre-v31 facets: the selector does not exist on the fork.
+  }
+  if (backfilled === false) {
+    // The getter exists (draft-v31 facets) and reports an un-backfilled chain: that is exactly
+    // the state the gate must reject, so fail here instead of fabricating the prerequisite.
+    throw new Error(
+      `Chain ${diamondProxyAddr} runs draft-v31 facets but its base-token supply was never ` +
+        "backfilled (baseTokenSupportsTotalSupply() == false); run the draft-v31 backfill first."
+    );
   }
 
   const settlementLayerUpgrade = new Contract(
@@ -133,7 +141,7 @@ export async function modelDraftV31BackfillPrerequisite(params: {
     return; // already modeled / recorded
   }
 
-  if (flagReadable) {
+  if (backfilled === true) {
     // Draft-v31 fork with a completed backfill: use the real permissionless entry point.
     const caller = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
     const tx = await registry.connect(caller).lowerBoundPriorityOp(diamondProxyAddr, { gasLimit: 500_000 });

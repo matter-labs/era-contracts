@@ -940,6 +940,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
                 ctmAddresses.stateTransition.implementations.serverNotifier
             );
         }
+        if (priorityOpLowerBound != address(0)) {
+            vm.serializeAddress("state_transition", "priority_op_lower_bound_addr", priorityOpLowerBound);
+        }
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",

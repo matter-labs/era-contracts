@@ -2,8 +2,9 @@
 
 pragma solidity ^0.8.20;
 
-/// @dev A recorded total-supply value and whether it was recorded (so a genuine zero is
-/// distinguishable from "never saved").
+/// @dev A saved bookkeeping baseline and whether it was recorded (so a genuine zero is
+/// distinguishable from "never saved"). The meaning of `amount` is defined at the storage site —
+/// see `L2NativeTokenVault.preTrackingTotalSupply`.
 struct SavedTotalSupply {
     bool isSaved;
     uint256 amount;

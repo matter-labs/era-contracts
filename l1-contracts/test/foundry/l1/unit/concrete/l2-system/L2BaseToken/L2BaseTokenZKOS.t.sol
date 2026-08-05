@@ -35,6 +35,7 @@ contract MockRecordingVault {
     uint256 public recordedToChainId;
     uint256 public recordedToAmount;
     uint256 public toChainCalls;
+    uint256 public fromChainCalls;
 
     function recordBaseTokenBridgingToChain(uint256 _toChainId, uint256 _amount) external {
         if (msg.sender != L2_BASE_TOKEN_HOLDER_ADDR) {
@@ -49,6 +50,7 @@ contract MockRecordingVault {
         if (msg.sender != L2_BASE_TOKEN_HOLDER_ADDR) {
             revert InvalidCaller(msg.sender);
         }
+        fromChainCalls++;
     }
 }
 
@@ -525,14 +527,19 @@ contract L2BaseTokenZKOSTest is Test {
         assertTrue(success, "Transfer should succeed");
 
         MockRecordingVault vault = MockRecordingVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        assertEq(vault.toChainCalls(), 0, "initialization receive must not be reported as a bridge flow");
+        assertEq(vault.toChainCalls(), 0, "initialization receive must not be reported as an outbound flow");
+        assertEq(vault.fromChainCalls(), 0, "initialization receive must not be reported as an inbound flow");
     }
 
-    /// @notice Verifies that initL2 does not record a bridge operation.
+    /// @notice Verifies that initL2 does not record a bridge operation: the initialization
+    /// transfer goes through the real holder's neutral receive() path, so the recording vault
+    /// must observe no flow in either direction.
     function test_initL2_doesNotRecordBridgeOperation() public {
-        // Deploy L2BaseTokenZKOS at the expected system contract address
+        // Deploy L2BaseTokenZKOS at the expected system contract address and the REAL holder,
+        // so a regression routing the initialization through a bookkeeping entry point is caught.
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
 
         vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
 
@@ -547,6 +554,9 @@ contract L2BaseTokenZKOSTest is Test {
             INITIAL_BASE_TOKEN_HOLDER_BALANCE,
             "BaseTokenHolder should have received initial balance"
         );
+        MockRecordingVault vault = MockRecordingVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        assertEq(vault.toChainCalls(), 0, "initL2 must not be reported as an outbound flow");
+        assertEq(vault.fromChainCalls(), 0, "initL2 must not be reported as an inbound flow");
     }
 
     /*//////////////////////////////////////////////////////////////
