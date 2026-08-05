@@ -69,7 +69,7 @@ export async function transferOwnable2Step(
 
 /**
  * Harness-only shim: copy `s.totalBatchesCommitted` onto `s.totalBatchesExecuted`
- * for a chain's diamond proxy so `SettlementLayerV31UpgradeBase.upgrade` passes
+ * for a chain's diamond proxy so the per-chain upgrade passes
  * its `totalBatchesCommitted == totalBatchesExecuted` guard.
  *
  * In production all committed batches must be executed before the v31 upgrade
@@ -124,20 +124,21 @@ export async function modelDraftV31BackfillPrerequisite(params: {
   } catch {
     backfilled = undefined; // Pre-v31 facets: the selector does not exist on the fork.
   }
+
   if (backfilled === false) {
-    // The getter exists (draft-v31 facets) and reports an un-backfilled chain: that is exactly
-    // the state the gate must reject, so fail here instead of fabricating the prerequisite.
-    throw new Error(
-      `Chain ${diamondProxyAddr} runs draft-v31 facets but its base-token supply was never ` +
-        "backfilled (baseTokenSupportsTotalSupply() == false); run the draft-v31 backfill first."
-    );
+    // v31 facets whose fixture never ran the backfill: request it through the REAL v31 Admin entry
+    // point (impersonated chain admin), which sets the L1 flag exactly like production. The L2
+    // service transaction it enqueues cannot execute here — the harness has no sequencer — which
+    // is what the registry substitution below stands in for.
+    const admin: string = await getters.getAdmin();
+    const adminFacet = new Contract(diamondProxyAddr, getAbi("AdminFacet"), l1Provider);
+    await impersonateAndRun(l1Provider, admin, async (signer) => {
+      const tx = await adminFacet.connect(signer).setZKsyncOSPreV31TotalSupply(0, { gasLimit: 1_000_000 });
+      await tx.wait();
+    });
   }
 
-  const settlementLayerUpgrade = new Contract(
-    settlementLayerUpgradeAddr,
-    getAbi("ZKsyncOSSettlementLayerV31Upgrade"),
-    l1Provider
-  );
+  const settlementLayerUpgrade = new Contract(settlementLayerUpgradeAddr, getAbi("DefaultUpgradeZKsyncOS"), l1Provider);
   const registryAddr: string = await settlementLayerUpgrade.PRIORITY_OP_LOWER_BOUND();
   const registry = new Contract(registryAddr, getAbi("PriorityOpLowerBound"), l1Provider);
   if (!(await registry.lowerBound(diamondProxyAddr)).isZero()) {
@@ -145,23 +146,29 @@ export async function modelDraftV31BackfillPrerequisite(params: {
   }
 
   if (backfilled === true) {
-    // Draft-v31 fork with a completed backfill: use the real permissionless entry point.
+    // v31 fork with a completed backfill: use the real permissionless entry point. Works when the
+    // fixture froze with all priority ops processed (the recorded bound equals the processed count).
     const caller = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
     const tx = await registry.connect(caller).lowerBoundPriorityOp(diamondProxyAddr, { gasLimit: 500_000 });
     await tx.wait();
     return;
   }
 
-  // v30 fork: write the flag bit (lowest byte of the packed word, preserving the rest)...
-  const slotHex = ethers.utils.hexValue(ZK_CHAIN_BASE_TOKEN_HAS_TOTAL_SUPPLY_SLOT);
-  const word = ethers.utils.hexZeroPad(
-    await l1Provider.send("eth_getStorageAt", [diamondProxyAddr, slotHex, "latest"]),
-    32
-  );
-  await l1Provider.send("anvil_setStorageAt", [diamondProxyAddr, slotHex, word.slice(0, 64) + "01"]);
+  if (backfilled === undefined) {
+    // Pre-v31 fixture: no facet can set the flag, so write the bit directly (lowest byte of the
+    // packed word, preserving the rest) — the substitution for history the fixture predates.
+    const slotHex = ethers.utils.hexValue(ZK_CHAIN_BASE_TOKEN_HAS_TOTAL_SUPPLY_SLOT);
+    const word = ethers.utils.hexZeroPad(
+      await l1Provider.send("eth_getStorageAt", [diamondProxyAddr, slotHex, "latest"]),
+      32
+    );
+    await l1Provider.send("anvil_setStorageAt", [diamondProxyAddr, slotHex, word.slice(0, 64) + "01"]);
+  }
 
-  // ...and record the current priority-op count directly in the registry mapping.
-  const totalPriorityTxs = await getters.getTotalPriorityTxs();
+  // Record a bound equal to the processed priority-op count directly in the registry mapping: the
+  // production bound (taken from the total count after the backfill executes on L2) is unreachable
+  // here because the harness cannot process priority ops.
+  const firstUnprocessed = await getters.getFirstUnprocessedPriorityTx();
   const boundSlot = ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
       ["address", "uint256"],
@@ -171,7 +178,7 @@ export async function modelDraftV31BackfillPrerequisite(params: {
   await l1Provider.send("anvil_setStorageAt", [
     registryAddr,
     boundSlot,
-    ethers.utils.hexZeroPad(totalPriorityTxs.toHexString(), 32),
+    ethers.utils.hexZeroPad(firstUnprocessed.toHexString(), 32),
   ]);
 }
 

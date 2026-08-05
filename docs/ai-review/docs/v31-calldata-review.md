@@ -760,11 +760,11 @@ At minimum, v31 provenance must cover:
 - core implementations: Bridgehub, L1AssetRouter, L1Nullifier,
   NativeTokenVault, AssetTracker, CTMDeploymentTracker, MessageRoot,
   ChainAssetHandler, GovernanceUpgradeTimer, and EIP7702Checker;
-- the `PriorityOpLowerBound` registry (no-arg deploy) and, bound to it, both
-  settlement-layer upgrade contracts: `{Era,ZKsyncOS}SettlementLayerV31Upgrade`
-  take the registry address as their only constructor argument (immutable), so
-  their constructor bytes must be the ABI-encoded registry address — not empty.
-  A ZKsync OS chain's upgrade additionally requires a bound recorded through
+- the `PriorityOpLowerBound` registry (no-arg deploy) and, bound to it, the
+  per-chain upgrade contract `DefaultUpgradeZKsyncOS`, which takes the registry
+  address as its only constructor argument (immutable), so its constructor
+  bytes must be the ABI-encoded registry address — not empty. A ZKsync OS
+  chain's upgrade additionally requires a bound recorded through
   `lowerBoundPriorityOp` (see `RecordPriorityOpLowerBound.s.sol`) in a separate,
   earlier transaction, with the chain processed past it;
 - for Sepolia stage, MessageRoot may intentionally resolve to the

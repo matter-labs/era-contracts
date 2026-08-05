@@ -8,9 +8,9 @@ import {Script, console} from "forge-std/Script.sol";
 import {IPriorityOpLowerBound} from "contracts/upgrades/IPriorityOpLowerBound.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-/// @notice Records a ZKsync OS chain's priority-op lower bound ahead of its v31 upgrade.
+/// @notice Records a ZKsync OS chain's priority-op lower bound ahead of its v32 upgrade.
 /// @dev The upgrade requires a recorded bound and all priority ops below it processed (see
-/// `SettlementLayerV31UpgradeBase`), so this must run in a transaction well before the chain's
+/// `DefaultUpgradeZKsyncOS`), so this must run in a transaction well before the chain's
 /// upgrade executes — never in the same bundle. The registry address is the CTM upgrade output's
 /// `priority_op_lower_bound_addr`. The call is permissionless and this script is idempotent.
 contract RecordPriorityOpLowerBound is Script {

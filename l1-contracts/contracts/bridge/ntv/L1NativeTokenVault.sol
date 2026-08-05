@@ -18,7 +18,7 @@ import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {IWETH9} from "../interfaces/IWETH9.sol";
 
-import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, MAX_TOKEN_BALANCE} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {TxStatus} from "../../common/Messaging.sol";
@@ -30,7 +30,10 @@ import {
     WithdrawFailed,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
-import {OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
+import {AssetNotNativeToL1, OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
+import {ILegacyL1AssetTracker} from "../asset-tracker/ILegacyL1AssetTracker.sol";
+
+import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -61,10 +64,15 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) internal DEPRECATED_chainBalance;
 
-    /// @dev Slot previously holding the removed L1AssetTracker address. Retained to preserve the
-    ///      storage layout of already-deployed vaults across the in-place upgrade.
-    // slither-disable-next-line unused-state
-    address private __DEPRECATED_l1AssetTracker;
+    /// @dev Slot holding the address of the removed L1AssetTracker. Retained to preserve the storage
+    ///      layout of already-deployed vaults across the in-place upgrade, and read by
+    ///      `populateBridgedOut` to locate the legacy per-chain accounting.
+    address internal __DEPRECATED_l1AssetTracker;
+
+    /// @inheritdoc IL1NativeTokenVault
+    /// @dev `bridgedOut` itself lives in `NativeTokenVaultBase`; only the population marker is
+    /// L1-specific.
+    mapping(bytes32 assetId => bool populated) public bridgedOutPopulated;
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
@@ -96,6 +104,78 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _assetId Asset, the balance of which is being queried.
     function chainBalance(uint256 _chainId, bytes32 _assetId) external view returns (uint256) {
         return DEPRECATED_chainBalance[_chainId][_assetId];
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        Populating bridgedOut
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IL1NativeTokenVault
+    function legacyL1AssetTracker() external view returns (address) {
+        return __DEPRECATED_l1AssetTracker;
+    }
+
+    /// @inheritdoc IL1NativeTokenVault
+    function legacyBridgedOut(bytes32 _assetId) public view returns (uint256 amount) {
+        // The bulkhead complement below is only a net outflow for an asset whose origin chain is L1: for an
+        // L2-native asset L1's entry is a bridged-in balance, so the complement would be a ~`2^256` garbage
+        // number. `bridgedOut` only governs L1-native assets anyway.
+        uint256 assetOriginChainId = originChainId[_assetId];
+        require(assetOriginChainId == L1_CHAIN_ID, AssetNotNativeToL1(_assetId, assetOriginChainId));
+
+        address legacyTracker = __DEPRECATED_l1AssetTracker;
+
+        // The v31 tracker seeds the asset's origin chain — L1, for the assets `bridgedOut` tracks — with
+        // the `MAX_TOKEN_BALANCE` bulkhead and moves amounts in and out of that entry on every L1 outflow
+        // and inflow, so its complement is the net amount bridged out of L1. Reading it instead of summing
+        // the per-chain entries keeps the result immune to amounts moving between chains, which the
+        // tracker's own migration entry points can still perform after the upgrade.
+        // Registration in the tracker also means this vault holds nothing for the asset:
+        // `L1AssetTracker.registerLegacyToken` moved each chain's amount over with
+        // `migrateTokenBalanceToAssetTracker`, which zeroed the entry it read, for every chain except the
+        // asset's origin chain — and that origin chain is L1, whose entry is excluded below anyway. Nothing
+        // has written these entries since, so chains registered later hold nothing either.
+        // Neither function is in the tree any more — they went away with the trackers in `1df271ef2`, so
+        // the argument above is checked against `1df271ef2^`; the accounting itself is described in
+        // {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}.
+        if (legacyTracker != address(0) && ILegacyL1AssetTracker(legacyTracker).isAssetRegistered(_assetId)) {
+            return MAX_TOKEN_BALANCE - ILegacyL1AssetTracker(legacyTracker).chainBalance(L1_CHAIN_ID, _assetId);
+        }
+
+        // Assets that never went through the tracker migration still have their amounts here. Nothing writes
+        // these entries anymore, so summing them over the registered chains is exact. The list holds ZK
+        // chains only, never L1 itself, so no entry of this vault's own chain can enter the sum.
+        uint256[] memory chainIds = IBridgehubBase(address(L1_NULLIFIER.BRIDGE_HUB())).getAllZKChainChainIDs();
+        uint256 chainIdsLength = chainIds.length;
+        for (uint256 i = 0; i < chainIdsLength; ++i) {
+            amount += DEPRECATED_chainBalance[chainIds[i]][_assetId];
+        }
+    }
+
+    /// @inheritdoc IL1NativeTokenVault
+    function populateBridgedOut(bytes32[] calldata _assetIds) external returns (uint256[] memory populatedAmounts) {
+        uint256 assetIdsLength = _assetIds.length;
+        populatedAmounts = new uint256[](assetIdsLength);
+
+        for (uint256 i = 0; i < assetIdsLength; ++i) {
+            bytes32 assetIdToPopulate = _assetIds[i];
+
+            // Repeated assets are skipped rather than reverted so that a partially mined batch can simply
+            // be re-submitted.
+            if (bridgedOutPopulated[assetIdToPopulate]) {
+                continue;
+            }
+            bridgedOutPopulated[assetIdToPopulate] = true;
+
+            // Reverts for anything that is not native to L1, which is a caller mistake rather than a no-op
+            // worth tolerating.
+            uint256 legacyAmount = legacyBridgedOut(assetIdToPopulate);
+            if (legacyAmount != 0) {
+                bridgedOut[assetIdToPopulate] += legacyAmount;
+                populatedAmounts[i] = legacyAmount;
+            }
+            emit BridgedOutPopulated(assetIdToPopulate, legacyAmount);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

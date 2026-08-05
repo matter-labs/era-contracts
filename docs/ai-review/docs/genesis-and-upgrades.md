@@ -47,11 +47,11 @@ The only assumptions that the upgrade logic can use is that the:
 
 - ComplexUpgrader contract is present and force deployment via a hook (ZKsync OS only) or via a call to the ContractDeployer system contract (EraVM only) works.
 
-Additionally, the v31 upgrade of a **ZKsync OS** chain assumes the chain passed through
-draft-v31 and completed its base-token backfill there: on L1 the upgrade requires
+Additionally, the v32 upgrade of a **ZKsync OS** chain (`DefaultUpgradeZKsyncOS`) assumes
+the chain completed its base-token backfill on v31: on L1 the upgrade requires
 `s.baseTokenHasTotalSupply` plus a bound recorded in the `PriorityOpLowerBound` registry
 (with the chain processed past it), proving the backfill service transaction executed
-before its L2 entry point disappears. Chains that never ran the draft-v31 backfill cannot
+before its L2 entry point disappears. Chains that never ran the v31 backfill cannot
 take this upgrade.
 
 Note, that on ZKsync Era, the old version of the ComplexUpgrader is used, which only supports this function:

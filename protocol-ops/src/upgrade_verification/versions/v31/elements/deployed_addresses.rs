@@ -1177,13 +1177,6 @@ fn verify_ctm_base_provenance(
                 "l1-contracts/ZKsyncOSTestnetVerifier",
             ),
         };
-    // Per-flavor SettlementLayerV31Upgrade variant. `default_upgrade_addr`
-    // holds the new settlement-layer upgrade contract for the CTM.
-    let default_upgrade_file = match ctm.flavor {
-        CtmFlavor::Era => "l1-contracts/EraSettlementLayerV31Upgrade",
-        CtmFlavor::ZksyncOs => "l1-contracts/ZKsyncOSSettlementLayerV31Upgrade",
-    };
-
     // No-arg CTM contracts. `eip7702_checker_addr` lives in the da-contracts
     // tree; everything else is l1-contracts.
     let no_args: &[(&[&str], &str)] = &[
@@ -1232,34 +1225,38 @@ fn verify_ctm_base_provenance(
         );
     }
 
-    // PriorityOpLowerBound() — no ctor args; the registry the settlement-layer upgrade embeds.
-    let priority_op_lower_bound = required_address(
-        &ctm.value,
-        &scope,
-        &["state_transition", "priority_op_lower_bound_addr"],
-    )?;
-    result.expect_create2_params(
-        verifiers,
-        &priority_op_lower_bound,
-        Vec::<u8>::new(),
-        "l1-contracts/PriorityOpLowerBound",
-    );
+    // Only ZKsync OS chains can be upgraded onto this release, so the per-chain upgrade contract
+    // and its registry exist for ZKsync OS CTMs only.
+    if is_zksync_os {
+        // PriorityOpLowerBound() — no ctor args; the registry the per-chain upgrade embeds.
+        let priority_op_lower_bound = required_address(
+            &ctm.value,
+            &scope,
+            &["state_transition", "priority_op_lower_bound_addr"],
+        )?;
+        result.expect_create2_params(
+            verifiers,
+            &priority_op_lower_bound,
+            Vec::<u8>::new(),
+            "l1-contracts/PriorityOpLowerBound",
+        );
 
-    // {Era,ZKsyncOS}SettlementLayerV31Upgrade(IPriorityOpLowerBound) — the ctor arg is the
-    // registry address, encoded as a single left-padded 32-byte word.
-    let default_upgrade = required_address(
-        &ctm.value,
-        &scope,
-        &["state_transition", "default_upgrade_addr"],
-    )?;
-    let mut default_upgrade_ctor = vec![0u8; 32];
-    default_upgrade_ctor[12..].copy_from_slice(priority_op_lower_bound.as_slice());
-    result.expect_create2_params(
-        verifiers,
-        &default_upgrade,
-        default_upgrade_ctor,
-        default_upgrade_file,
-    );
+        // DefaultUpgradeZKsyncOS(IPriorityOpLowerBound) — the per-chain upgrade contract embeds the
+        // registry address as its single constructor argument, encoded as a left-padded 32-byte word.
+        let default_upgrade = required_address(
+            &ctm.value,
+            &scope,
+            &["state_transition", "default_upgrade_addr"],
+        )?;
+        let mut default_upgrade_ctor = vec![0u8; 32];
+        default_upgrade_ctor[12..].copy_from_slice(priority_op_lower_bound.as_slice());
+        result.expect_create2_params(
+            verifiers,
+            &default_upgrade,
+            default_upgrade_ctor,
+            "l1-contracts/DefaultUpgradeZKsyncOS",
+        );
+    }
 
     // DiamondInit(bool _isZKsyncOS) — encoded as a single 32-byte word.
     let diamond_init = required_address(

@@ -62,8 +62,6 @@ import {
 import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 
 import {CTMDeployedAddresses} from "../utils/Types.sol";
-import {EraSettlementLayerV31Upgrade} from "contracts/upgrades/EraSettlementLayerV31Upgrade.sol";
-import {ZKsyncOSSettlementLayerV31Upgrade} from "contracts/upgrades/ZKsyncOSSettlementLayerV31Upgrade.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -328,11 +326,8 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
             return abi.encode();
-        } else if (
-            compareStrings(contractName, "EraSettlementLayerV31Upgrade") ||
-            compareStrings(contractName, "ZKsyncOSSettlementLayerV31Upgrade")
-        ) {
-            // The v31 upgrade pins the priority-op lower-bound registry as an immutable.
+        } else if (compareStrings(contractName, "DefaultUpgradeZKsyncOS")) {
+            // The upgrade contract pins the priority-op lower-bound registry as an immutable.
             require(priorityOpLowerBound != address(0), "PriorityOpLowerBound not deployed");
             return abi.encode(priorityOpLowerBound);
         } else if (compareStrings(contractName, "PriorityOpLowerBound")) {
