@@ -68,6 +68,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Slot holding the address of the removed L1AssetTracker. Retained to preserve the storage
     ///      layout of already-deployed vaults across the in-place upgrade, and read by
     ///      `populateBridgedOut` to locate the legacy per-chain accounting.
+    // slither-disable-next-line uninitialized-state
     address internal __DEPRECATED_l1AssetTracker;
 
     /// @inheritdoc IL1NativeTokenVault
