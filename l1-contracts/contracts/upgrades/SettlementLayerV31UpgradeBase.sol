@@ -74,6 +74,11 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
             s.baseTokenHasTotalSupply = true;
         } else {
             require(s.baseTokenHasTotalSupply, BaseTokenPreV31TotalSupplyNotSet());
+            // The flag is set eagerly when the draft-v31 backfill service transaction is
+            // *requested*. An empty priority queue (all batches are executed, see above) proves
+            // the transaction also *executed* on L2 — this upgrade removes its L2 entry point,
+            // so a still-pending backfill would be lost and the supply permanently undercounted.
+            require(IGetters(address(this)).getPriorityQueueSize() == 0, PriorityQueueNotReady());
         }
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;

@@ -23,9 +23,10 @@ import {BaseTokenNativeToThisChain, RecoverToL1NotSupported, Unauthorized} from 
  * See {protocol-docs/bridging.md#base-token-handling}.
  * @dev Initialized with 2^127 - 1 tokens. No balance can overflow (users only gain what the holder
  * loses); the operator must keep the base token's total supply below 2^127 to avoid underflow.
- * @dev The base token is escrowed here, so all of its bridge flows converge in this contract; each
- * one is reported to `L2NativeTokenVault`, which keeps the interop bookkeeping for every asset
- * (the base token included) in one place.
+ * @dev The base token is escrowed here, so its contract-level bridge flows converge in this
+ * contract; each one is reported to `L2NativeTokenVault`, which keeps the interop bookkeeping for
+ * every asset (the base token included) in one place. Flows performed by the VM directly (see the
+ * note on `give`) bypass this reporting.
  */
 // slither-disable-next-line locked-ether
 contract BaseTokenHolder is IBaseTokenHolder {

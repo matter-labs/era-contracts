@@ -12,8 +12,8 @@ pragma solidity ^0.8.20;
 /// only accepts calls from the L2BaseToken address — and is then transferred here.
 interface IBaseTokenHolder {
     /// @notice Emitted when base tokens are given out from the holder via interop bridging.
-    /// @dev Only emitted for inbound bridging through `give`; bootloader deposits minted through
-    /// `L2BaseToken.mint()` do not emit it, so summing it may undercount total inbound volume.
+    /// @dev Only emitted for inbound bridging through `give`; bootloader-minted L1 deposits do not
+    /// pass through it, so summing it may undercount total inbound volume.
     /// @param to The address that received the base tokens.
     /// @param amount The amount of base tokens given out.
     event BaseTokenMintedInterop(address indexed to, uint256 amount);
@@ -55,6 +55,8 @@ interface IBaseTokenHolder {
     function burnAndStartBridging(uint256 _toChainId) external payable;
 
     /// @notice Records an inbound base-token bridge finalized outside this contract.
-    /// @dev Callable only by L2BaseToken; used by the bootloader deposit path.
+    /// @dev Callable only by L2BaseToken; used where bootloader deposits mint through a contract
+    /// call (`L2BaseTokenEra.mint`). On ZKsync OS the VM credits deposits by moving the holder's
+    /// balance directly, without any contract call, so those flows are not recorded.
     function recordBaseTokenDeposit(uint256 _fromChainId, uint256 _amount) external;
 }

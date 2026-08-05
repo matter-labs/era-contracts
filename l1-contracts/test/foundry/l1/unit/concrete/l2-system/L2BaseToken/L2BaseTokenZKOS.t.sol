@@ -567,8 +567,8 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     /// @dev Simulates an upgraded chain whose `zkosPreV31TotalSupply` slot was backfilled while it
-    /// ran draft-v31, plus post-upgrade mints (holder balance above the initial value is impossible,
-    /// below means minted supply).
+    /// ran draft-v31, plus post-upgrade mints (a holder balance below the initial value means
+    /// minted supply).
     function test_totalSupply_addsPreV31SupplyToMintedDelta() public {
         L2BaseTokenZKOSHarness harness = new L2BaseTokenZKOSHarness();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(harness).code);
@@ -581,6 +581,49 @@ contract L2BaseTokenZKOSTest is Test {
 
         // totalSupply = preV31Supply + INITIAL - holder.balance = 200 + 100 = 300
         assertEq(token.totalSupply(), 300, "totalSupply returns wrong value");
+    }
+
+    /// @dev An upgraded chain can be in a net-burn state: withdrawals move value INTO the holder,
+    /// so its balance can exceed the initial value by up to the pre-v31 circulating supply.
+    /// totalSupply() must not revert there. The burn goes through a real withdrawal.
+    function test_totalSupply_supportsNetBurnOfPreV31Supply() public {
+        L2BaseTokenZKOSHarness harness = new L2BaseTokenZKOSHarness();
+        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(harness).code);
+        L2BaseTokenZKOSHarness token = L2BaseTokenZKOSHarness(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        token.harnessSetZkosPreV31TotalSupply(200);
+
+        // Post-upgrade steady state: the holder holds exactly the initial balance.
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new DummyL2BaseTokenHolder()).code);
+        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
+
+        // A holder of pre-v31 supply withdraws 150 wei to L1: the value flows into the holder.
+        address preV31Holder = makeAddr("preV31Holder");
+        vm.deal(preV31Holder, 150);
+        vm.prank(preV31Holder);
+        token.withdraw{value: 150}(l1Receiver);
+
+        assertEq(
+            L2_BASE_TOKEN_HOLDER_ADDR.balance,
+            INITIAL_BASE_TOKEN_HOLDER_BALANCE + 150,
+            "the withdrawal must flow into the holder"
+        );
+        // totalSupply = preV31Supply + INITIAL - holder.balance = 200 - 150 = 50
+        assertEq(token.totalSupply(), 50, "net-burn state should decrease totalSupply without reverting");
+    }
+
+    /// @dev Pins `zkosPreV31TotalSupply` to storage slot 50: the value is written by draft-v31's
+    /// backfill service transaction, and this release (which removes the backfill path) must keep
+    /// reading the exact same slot. The write goes through a derived-contract setter, the read
+    /// through the raw slot.
+    function test_zkosPreV31TotalSupply_stableStorageSlot() public {
+        L2BaseTokenZKOSHarness harness = new L2BaseTokenZKOSHarness();
+        harness.harnessSetZkosPreV31TotalSupply(31337);
+
+        assertEq(
+            uint256(vm.load(address(harness), bytes32(uint256(50)))),
+            31337,
+            "zkosPreV31TotalSupply must stay at slot 50 (populated on draft-v31)"
+        );
     }
 
     /*//////////////////////////////////////////////////////////////

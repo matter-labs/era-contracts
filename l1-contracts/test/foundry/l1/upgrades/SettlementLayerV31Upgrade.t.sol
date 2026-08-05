@@ -653,20 +653,42 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
         );
     }
 
+    function _mockPriorityQueueSize(uint256 _size) internal {
+        vm.mockCall(
+            address(zkosUpgrade),
+            abi.encodeWithSelector(IGetters.getPriorityQueueSize.selector),
+            abi.encode(_size)
+        );
+    }
+
     /// @notice The v31 upgrade of a ZKsync OS chain is forbidden until its pre-v31 base-token
     /// total supply was backfilled while the chain ran draft-v31 (this release has no backfill path).
     function test_RevertWhen_ZKOSBaseTokenTotalSupplyNotBackfilled() public {
         _prepareZKOSProposedUpgrade();
+        _mockPriorityQueueSize(0);
 
         vm.expectRevert(BaseTokenPreV31TotalSupplyNotSet.selector);
         zkosUpgrade.upgrade(proposedUpgrade);
     }
 
-    /// @notice A ZKsync OS chain that was backfilled on draft-v31 upgrades successfully and keeps
-    /// the flag set.
+    /// @notice The backfill flag is set eagerly when the service transaction is requested, so the
+    /// upgrade must additionally refuse to run while any priority transaction is still pending —
+    /// otherwise a pending backfill would be lost when its L2 entry point is removed.
+    function test_RevertWhen_ZKOSBackfillFlagSetButPriorityQueueNotEmpty() public {
+        _prepareZKOSProposedUpgrade();
+        zkosUpgrade.setBaseTokenHasTotalSupply(true);
+        _mockPriorityQueueSize(1);
+
+        vm.expectRevert(PriorityQueueNotReady.selector);
+        zkosUpgrade.upgrade(proposedUpgrade);
+    }
+
+    /// @notice A ZKsync OS chain that was backfilled on draft-v31 (flag set, no pending priority
+    /// transactions) upgrades successfully and keeps the flag set.
     function test_SuccessfulUpgrade_ZKOSWithBackfilledTotalSupply() public {
         _prepareZKOSProposedUpgrade();
         zkosUpgrade.setBaseTokenHasTotalSupply(true);
+        _mockPriorityQueueSize(0);
 
         bytes32 result = zkosUpgrade.upgrade(proposedUpgrade);
 

@@ -217,11 +217,13 @@ its empty compatibility stub because pre-v31 chains did deploy code there.
 
 ### `BaseTokenHolder` (base token)
 
-The holder escrows the base token, so all of its bridge flows converge here; each one is reported to the
-vault, which records it under `BASE_TOKEN_ASSET_ID` in the same `interopInfo` used for every other asset
-(`recordBaseTokenBridgingToChain` / `recordBaseTokenBridgingFromChain`, holder-only). `burnAndStartBridging`
-reports outbound flows, `give` reports inbound interop flows before the external transfer, and
-`L2BaseToken.mint` calls `recordBaseTokenDeposit` before changing balances on the bootloader deposit path.
+The holder escrows the base token, so its contract-level bridge flows converge here; each one is reported
+to the vault, which records it under `BASE_TOKEN_ASSET_ID` in the same `interopInfo` used for every other
+asset (`recordBaseTokenBridgingToChain` / `recordBaseTokenBridgingFromChain`, holder-only).
+`burnAndStartBridging` reports outbound flows and `give` reports inbound interop flows before the external
+transfer. Bootloader-minted L1 deposits are reported through `recordBaseTokenDeposit` only where the mint
+is a contract call (`L2BaseTokenEra.mint`); on ZKsync OS the VM credits deposits by moving the holder's
+balance directly, so the base token's `totalSuccessfulDepositsFromL1` counter is **not exhaustive** there.
 
 - The pre-v31 total supply of an upgraded ZKsync OS chain lives in `L2BaseTokenZKOS.zkosPreV31TotalSupply`,
   populated while the chain ran draft-v31 (via the since-removed backfill service transaction). This
