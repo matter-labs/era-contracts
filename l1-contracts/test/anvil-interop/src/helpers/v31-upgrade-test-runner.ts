@@ -187,7 +187,7 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     const settlementLayerUpgradeAddr = readNestedString(
       ctmOutputToml,
       ["state_transition", "default_upgrade_addr"],
-      "SettlementLayerV31Upgrade address"
+      "per-chain upgrade contract address"
     );
     await runChainUpgradesAndRelayL2({
       l1Provider,
@@ -680,7 +680,7 @@ export async function runChainUpgradesAndRelayL2(params: {
 
   const settlementLayerUpgrade = new ethers.Contract(
     settlementLayerUpgradeAddr,
-    getAbi(isZKsyncOS ? "ZKsyncOSSettlementLayerV31Upgrade" : "EraSettlementLayerV31Upgrade"),
+    getAbi("DefaultUpgradeZKsyncOS"),
     l1Provider
   );
   const l1Chain = anvilManager.getL1Chain()!;
@@ -690,7 +690,7 @@ export async function runChainUpgradesAndRelayL2(params: {
     const chainOutDir = path.join(protocolOpsOutDir, `chain-${chain.chainId}`);
     fs.rmSync(chainOutDir, { recursive: true, force: true });
 
-    // `SettlementLayerV31UpgradeBase.upgrade` requires `totalBatchesCommitted ==
+    // The v31 per-chain upgrade required `totalBatchesCommitted ==
     // totalBatchesExecuted`. On a forked chain that has uncommitted-but-pending
     // batches at fork time, copy committed onto executed to model the
     // "all batches executed" prerequisite without running the executor.
@@ -759,7 +759,7 @@ export async function runChainUpgradesAndRelayL2(params: {
 /**
  * Multi-CTM aware variant of `runChainUpgradesAndRelayL2`. Used by env-preset
  * fork tests (e.g. stage) where the bridgehub has both an Era CTM and an
- * Atlas (zkOS) CTM, each with its own SettlementLayerV31Upgrade address.
+ * Atlas (zkOS) CTM, each with its own per-chain upgrade contract address.
  *
  * Groups chains by their on-chain CTM, looks up the per-CTM
  * `script-out/v31-upgrade-ctm-<ctm>.toml` (written by
@@ -835,7 +835,7 @@ export async function runChainUpgradesPerCtm(params: {
     const settlementLayerUpgradeAddr = readNestedString(
       ctmOutputToml,
       ["state_transition", "default_upgrade_addr"],
-      "SettlementLayerV31Upgrade address"
+      "per-chain upgrade contract address"
     );
     const isZKsyncOS = (ctmOutputToml as { is_zk_sync_os?: boolean }).is_zk_sync_os === true;
 
@@ -875,7 +875,7 @@ async function prepareAndRelayL2Upgrade(
 
   // Send the original upgrade calldata to ComplexUpgrader.
   // The outer force deployments no-op (MockContractDeployer), then upgrade() delegatecalls
-  // to L2V31Upgrade which runs performForceDeployedContractsInit (inner deploys also no-op).
+  // to L2V32Upgrade which runs performForceDeployedContractsInit (inner deploys also no-op).
   const txHash = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
     const tx = await signer.sendTransaction({
       to: L2_COMPLEX_UPGRADER_ADDR,
@@ -939,7 +939,7 @@ async function deployL2Contracts(
   const contractMap = buildAddressToContract(isZKsyncOS);
   for (const entry of forceDeployEntries) {
     // ZKsyncOSUnsafeForceDeployment entries are direct deployments (e.g. the SystemContractProxyAdmin
-    // at L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, and L2V31Upgrade at a random delegate address).
+    // at L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, and L2V32Upgrade at a random delegate address).
     // Both are already set up above (anvil_setCode for the proxy admin, and the delegateTo code
     // is set separately below), so we skip them here.
     if (entry.upgradeType === UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY) {
@@ -969,8 +969,8 @@ async function deployL2Contracts(
     }
   }
 
-  // Deploy the delegateTo target (L2V31Upgrade).
-  await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V31Upgrade")]);
+  // Deploy the delegateTo target (L2V32Upgrade).
+  await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V32Upgrade")]);
 
   // L2BaseToken: for Era it's deployed directly as L2BaseTokenEra (not in force deployment list).
   // For ZKsyncOS it's in the force deployment list as ZKsyncOSSystemProxyUpgrade and handled above.
@@ -1135,7 +1135,7 @@ function decodeUpgradeTxData(upgradeTxData: string): {
  *
  * Walks transactions in reverse looking for a ChainAdminOwnable.multicall
  * containing a single upgradeChainFromVersion call, then extracts the
- * l2ProtocolUpgradeTx.data from the SettlementLayerV31Upgrade.upgrade calldata.
+ * l2ProtocolUpgradeTx.data from the per-chain upgrade calldata.
  */
 function decodeLatestL2UpgradeTx(broadcastPath: string): {
   tx: Record<string, unknown>;
@@ -1154,7 +1154,7 @@ function decodeLatestL2UpgradeTx(broadcastPath: string): {
   // Legacy ABI: v29/v30 states have upgradeChainFromVersion(uint256, DiamondCutData) (2 params).
   // Current ABI has upgradeChainFromVersion(address, uint256, DiamondCutData) (3 params).
   const legacyAdminIface = new ethers.utils.Interface(LEGACY_ADMIN_ABI);
-  const settlementLayerIface = new ethers.utils.Interface(getAbi("EraSettlementLayerV31Upgrade"));
+  const settlementLayerIface = new ethers.utils.Interface(getAbi("DefaultUpgradeZKsyncOS"));
 
   const errors: string[] = [];
 

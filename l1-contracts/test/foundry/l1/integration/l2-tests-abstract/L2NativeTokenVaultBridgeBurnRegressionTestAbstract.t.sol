@@ -74,7 +74,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(baseTokenAssetIdLocal);
         if (!IL2AssetTracker(L2_ASSET_TRACKER_ADDR).isAssetRegistered(baseTokenAssetIdLocal)) {
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            IL2AssetTracker(L2_ASSET_TRACKER_ADDR).registerBaseTokenDuringUpgrade();
+            l2NativeTokenVault.registerBaseTokenIfNeeded();
         }
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),

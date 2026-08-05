@@ -25,11 +25,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
-import {
-    AssetAlreadyRegistered,
-    AssetIdNotRegistered,
-    BaseTokenNativeToThisChain
-} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {AssetIdNotRegistered, BaseTokenNativeToThisChain} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
@@ -315,61 +311,6 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(505, 100);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  registerBaseTokenDuringUpgrade
-    // ═══════════════════════════════════════════════════════════════════
-
-    /// @notice Verifies that registerBaseTokenDuringUpgrade registers the base token correctly.
-    function test_registerBaseTokenDuringUpgrade_registersBaseToken() public {
-        bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
-
-        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
-
-        assertFalse(
-            L2AssetTracker(L2_ASSET_TRACKER_ADDR).isAssetRegistered(baseTokenAssetId),
-            "Should not be registered before call"
-        );
-
-        vm.expectEmit(true, false, false, false, L2_ASSET_TRACKER_ADDR);
-        emit IL2AssetTracker.BaseTokenRegisteredDuringUpgrade(baseTokenAssetId);
-
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2_ASSET_TRACKER.registerBaseTokenDuringUpgrade();
-
-        assertTrue(
-            L2AssetTracker(L2_ASSET_TRACKER_ADDR).isAssetRegistered(baseTokenAssetId),
-            "Should be registered after call"
-        );
-
-        (bool isSaved, uint256 amount) = L2AssetTracker(L2_ASSET_TRACKER_ADDR).totalPreV31TotalSupply(baseTokenAssetId);
-        assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
-        assertEq(amount, 0, "totalPreV31TotalSupply.amount should be 0");
-    }
-
-    /// @notice Verifies that registerBaseTokenDuringUpgrade reverts if already registered.
-    function test_registerBaseTokenDuringUpgrade_revertIfAlreadyRegistered() public {
-        bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
-
-        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
-
-        stdstore
-            .target(L2_ASSET_TRACKER_ADDR)
-            .sig("isAssetRegistered(bytes32)")
-            .with_key(baseTokenAssetId)
-            .checked_write(true);
-
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        vm.expectRevert(abi.encodeWithSelector(AssetAlreadyRegistered.selector, baseTokenAssetId));
-        L2_ASSET_TRACKER.registerBaseTokenDuringUpgrade();
-    }
-
-    /// @notice Verifies that only the ComplexUpgrader can call registerBaseTokenDuringUpgrade.
-    function test_registerBaseTokenDuringUpgrade_revertUnauthorized() public {
-        vm.prank(RAND_ADDRESS);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, RAND_ADDRESS));
-        L2_ASSET_TRACKER.registerBaseTokenDuringUpgrade();
-    }
-
     function test_handleFinalizeBaseTokenBridgingOnL2_succeedsWhileBackfillPending() public {
         bytes32 baseTokenAssetId = keccak256("zkos_base_token_pending_backfill");
         uint256 l1ChainId = 1;
@@ -392,9 +333,12 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         vm.expectRevert(BaseTokenPreV31TotalSupplyNotSet.selector);
         IERC20(address(L2_BASE_TOKEN_SYSTEM_CONTRACT)).totalSupply();
 
-        // Register the base token exactly as the V31 upgrade does for an existing chain.
+        // Register the base token the way the genesis path does, through the vault.
+        stdstore.target(L2_NATIVE_TOKEN_VAULT_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(
+            uint256(baseTokenAssetId)
+        );
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2_ASSET_TRACKER.registerBaseTokenDuringUpgrade();
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
 
         // Settle on L1 so the deposit is accounted (same mock the sibling base-token tests use).
         vm.mockCall(

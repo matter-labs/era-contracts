@@ -64,7 +64,7 @@ export async function transferOwnable2Step(
 
 /**
  * Harness-only shim: copy `s.totalBatchesCommitted` onto `s.totalBatchesExecuted`
- * for a chain's diamond proxy so `SettlementLayerV31UpgradeBase.upgrade` passes
+ * for a chain's diamond proxy so the per-chain upgrade passes
  * its `totalBatchesCommitted == totalBatchesExecuted` guard.
  *
  * In production all committed batches must be executed before the v31 upgrade

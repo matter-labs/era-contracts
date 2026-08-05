@@ -17,7 +17,6 @@ import {
 import {RecoverToL1NotSupported, Unauthorized} from "../../common/L1ContractErrors.sol";
 
 import {
-    AssetAlreadyRegistered,
     AssetIdNotRegistered,
     BaseTokenNativeToThisChain,
     BaseTokenTotalSupplyBackfillNotNeeded,
@@ -124,14 +123,9 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
     }
 
     /// @inheritdoc IL2AssetTracker
-    function initL2(
-        uint256 _l1ChainId,
-        bytes32 _baseTokenAssetId,
-        bool _needBaseTokenTotalSupplyBackfill
-    ) external reentrancyGuardInitializer onlyUpgrader {
+    function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external reentrancyGuardInitializer onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
-        needBaseTokenTotalSupplyBackfill = _needBaseTokenTotalSupplyBackfill;
     }
 
     /// @inheritdoc IL2AssetTracker
@@ -151,21 +145,6 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
             // has never been bridged before v31, so its pre-v31 supply is zero.
             totalPreV31TotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: 0});
         }
-    }
-
-    /// @inheritdoc IL2AssetTracker
-    /// @dev The base token originates on L1 (non-native to this chain). Reverts on double registration,
-    /// which would indicate a broken upgrade invariant (this is called first during the upgrade).
-    /// @dev Retained for chains that went through the v31 upgrade: it was the v31 upgrade path that called
-    /// this, and from this release on the tracker is initialized on the genesis path only, so no upgrade
-    /// script calls it any more.
-    function registerBaseTokenDuringUpgrade() external onlyUpgrader {
-        bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
-        require(!isAssetRegistered[baseTokenAssetId], AssetAlreadyRegistered(baseTokenAssetId));
-        isAssetRegistered[baseTokenAssetId] = true;
-        totalPreV31TotalSupply[baseTokenAssetId] = SavedTotalSupply({isSaved: true, amount: 0});
-
-        emit BaseTokenRegisteredDuringUpgrade(baseTokenAssetId);
     }
 
     /// @inheritdoc IL2AssetTracker

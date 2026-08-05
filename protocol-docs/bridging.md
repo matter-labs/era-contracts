@@ -248,10 +248,9 @@ to preserve the deployed storage layout.
 - **ZKsync OS base token**: `totalSupply()` of the base token is not available by default on ZKsync OS
   chains, so the pre-v31 supply must be backfilled (`needBaseTokenTotalSupplyBackfill`,
   `backFillZKSyncOSBaseTokenV31MigrationData`, called by `L2BaseTokenZKOS`) before the value is used;
-  chains that went through the v31 upgrade registered the base token during it via
-  `registerBaseTokenDuringUpgrade` with a zero placeholder — from v32 on the tracker is initialized on the
-  genesis path only, so no upgrade calls that entry point. These fields are expected to be deleted once every
-  ZKsync OS chain is backfilled.
+  chains that went through the v31 upgrade had the base token registered by it with a zero placeholder. From
+  v32 on the tracker is initialized on the genesis path only, so that upgrade-only entry point is gone; the
+  remaining fields are expected to be deleted once every ZKsync OS chain is backfilled.
 
 ## L1Nullifier and failed-deposit recovery
 

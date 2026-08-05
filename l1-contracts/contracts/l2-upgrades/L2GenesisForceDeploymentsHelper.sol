@@ -392,13 +392,9 @@ library L2GenesisForceDeploymentsHelper {
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,
         ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
     ) private {
-        // `false`: the backfill is only pending on ZKsync OS chains that predate v31, and a chain reaching
-        // genesis is new. Chains that do need it had the flag set by the v31 upgrade, in storage this
-        // release's implementation inherits.
         L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(
             _fixedForceDeploymentsData.l1ChainId,
-            _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
-            false
+            _additionalForceDeploymentsData.baseTokenBridgingData.assetId
         );
 
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2();

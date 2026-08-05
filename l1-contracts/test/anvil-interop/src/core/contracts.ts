@@ -31,7 +31,6 @@ const ARTIFACTS = {
   InteropCenter: "InteropCenter.sol/InteropCenter.json",
   InteropAttributeParser: "InteropAttributeParser.sol/InteropAttributeParser.json",
   L2InteropHandler: "L2InteropHandler.sol/L2InteropHandler.json",
-  IComplexUpgraderZKsyncOSV29: "IComplexUpgraderZKsyncOSV29.sol/IComplexUpgraderZKsyncOSV29.json",
   ITransparentUpgradeableProxy: "TransparentUpgradeableProxy.sol/ITransparentUpgradeableProxy.json",
   L1AssetRouter: "L1AssetRouter.sol/L1AssetRouter.json",
   L1MessengerZKOS: "L1MessengerZKOS.sol/L1MessengerZKOS.json",
@@ -64,8 +63,7 @@ const ARTIFACTS = {
   MockMintBaseTokenHook: "MockMintBaseTokenHook.sol/MockMintBaseTokenHook.json",
   Ownable2Step: "Ownable2Step.sol/Ownable2Step.json",
   ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
-  EraSettlementLayerV31Upgrade: "EraSettlementLayerV31Upgrade.sol/EraSettlementLayerV31Upgrade.json",
-  ZKsyncOSSettlementLayerV31Upgrade: "ZKsyncOSSettlementLayerV31Upgrade.sol/ZKsyncOSSettlementLayerV31Upgrade.json",
+  DefaultUpgradeZKsyncOS: "DefaultUpgradeZKsyncOS.sol/DefaultUpgradeZKsyncOS.json",
   SystemContractProxy: "SystemContractProxy.sol/SystemContractProxy.json",
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
@@ -76,7 +74,7 @@ const ARTIFACTS = {
   IAtomicFlowManager: "IAtomicFlowManager.sol/IAtomicFlowManager.json",
   L2MessageVerification: "L2MessageVerification.sol/L2MessageVerification.json",
   L2InteropRootStorage: "L2InteropRootStorage.sol/L2InteropRootStorage.json",
-  L2V31Upgrade: "L2V31Upgrade.sol/L2V31Upgrade.json",
+  L2V32Upgrade: "L2V32Upgrade.sol/L2V32Upgrade.json",
   UpgradeableBeaconDeployer: "UpgradeableBeaconDeployer.sol/UpgradeableBeaconDeployer.json",
 } as const;
 

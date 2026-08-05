@@ -29,10 +29,6 @@ interface IL2AssetTracker {
         uint256 totalSuccessfulDepositsFromL1;
     }
 
-    /// @notice Emitted when the base token is registered during a V31 upgrade.
-    /// @param assetId The base token asset ID that was registered.
-    event BaseTokenRegisteredDuringUpgrade(bytes32 indexed assetId);
-
     function L1_CHAIN_ID() external view returns (uint256);
 
     /// @notice Balance tracked only for tokens native to this chain; write-mostly bookkeeping that no
@@ -48,12 +44,10 @@ interface IL2AssetTracker {
     /// @param _originChainId The chain ID the token is native to.
     function registerNewTokenIfNeeded(bytes32 _assetId, uint256 _originChainId) external;
 
-    /// @notice Initializes the tracker during genesis or upgrade.
+    /// @notice Initializes the tracker at genesis.
     /// @param _l1ChainId The chain ID of the L1 network.
     /// @param _baseTokenAssetId The asset ID of the chain's base token.
-    /// @param _needBaseTokenTotalSupplyBackfill Whether the base token's pre-v31 total supply still
-    /// needs to be backfilled (ZKsync OS chains only).
-    function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId, bool _needBaseTokenTotalSupplyBackfill) external;
+    function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external;
 
     /// @notice Records an outgoing transfer from this chain (L2 -> L1 withdrawal or L2 -> L2 interop).
     /// @param _toChainId The destination chain id of the transfer.
@@ -101,10 +95,6 @@ interface IL2AssetTracker {
     /// @notice Eagerly registers a pre-v31 (legacy) token, storing its total-supply snapshot before its
     /// first post-v31 bridge operation. Permissionless; no-op if already registered.
     function registerLegacyToken(bytes32 _assetId) external;
-
-    /// @notice Registers the base token during the v31 upgrade of an existing chain, with a zero
-    /// pre-v31 supply placeholder to be backfilled via `backFillZKSyncOSBaseTokenV31MigrationData`.
-    function registerBaseTokenDuringUpgrade() external;
 
     /// @notice True while the ZKsync OS base token's pre-v31 total supply still needs to be backfilled.
     function needBaseTokenTotalSupplyBackfill() external view returns (bool);

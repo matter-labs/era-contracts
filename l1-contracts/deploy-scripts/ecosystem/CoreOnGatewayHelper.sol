@@ -232,7 +232,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2MessageVerification) return "L2MessageVerification";
         if (_c == CoreContract.L2InteropRootStorage) return "L2InteropRootStorage";
         if (_c == CoreContract.BeaconProxy) return "BeaconProxy";
-        if (_c == CoreContract.L2V31Upgrade) return "L2V31Upgrade";
+        if (_c == CoreContract.L2V32Upgrade) return "L2V32Upgrade";
         if (_c == CoreContract.L2SharedBridgeLegacy) return "L2SharedBridgeLegacy";
         if (_c == CoreContract.BridgedStandardERC20) return "BridgedStandardERC20";
         if (_c == CoreContract.DiamondProxy) return "DiamondProxy";
@@ -267,7 +267,7 @@ library CoreOnGatewayHelper {
     /// @notice Resolve a CoreContract enum to its canonical L2 address.
     /// @dev Only covers contracts with well-known constant addresses.
     function _resolveAddress(CoreContract _c) internal pure returns (address) {
-        if (_c == CoreContract.L2V31Upgrade) {
+        if (_c == CoreContract.L2V32Upgrade) {
             return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
         }
         if (_c == CoreContract.L2Bridgehub) return L2_BRIDGEHUB_ADDR;

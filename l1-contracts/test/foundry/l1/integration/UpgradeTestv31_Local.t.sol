@@ -30,10 +30,12 @@ import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
     /// @notice This fixture is an Era ecosystem, which this release refuses to generate a per-chain upgrade
     ///         for (`deployUsedUpgradeContract` reverts). The fixture exists to exercise the ecosystem-side
-    ///         flow — proxy upgrades, stage calls, wiring — so it keeps the v31 Era contract for the chain
-    ///         step rather than skipping the chain upgrade entirely.
+    ///         flow — proxy upgrades, stage calls, wiring — so it falls back to the plain `DefaultUpgrade`
+    ///         for the chain step rather than skipping the chain upgrade entirely. The per-chain
+    ///         force-deployments-data substitution that ZKsync OS chains get is covered by the anvil
+    ///         v31 -> v32 scenario.
     function deployUsedUpgradeContract() internal override returns (address) {
-        return deploySimpleContract("EraSettlementLayerV31Upgrade", false);
+        return deploySimpleContract("DefaultUpgrade", false);
     }
 
     /// @notice Override to return dummy bytecode hashes instead of reading huge JSON files

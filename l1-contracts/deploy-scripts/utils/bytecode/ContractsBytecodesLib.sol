@@ -82,7 +82,7 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCodeEra.
-        string[57] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[55] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction",
             "BaseTokenHolder",
             "L2AssetTracker",
@@ -104,8 +104,6 @@ library ContractsBytecodesLib {
             "DiamondInit",
             "DiamondProxy",
             "DefaultUpgrade",
-            "EraSettlementLayerV31Upgrade",
-            "ZKsyncOSSettlementLayerV31Upgrade",
             "DefaultUpgradeZKsyncOS",
             "InteropCenter",
             "InteropAttributeParser",
@@ -137,7 +135,7 @@ library ContractsBytecodesLib {
             "ValidiumL1DAValidator",
             "L2InteropRootStorage",
             "L2MessageVerification",
-            "L2V31Upgrade",
+            "L2V32Upgrade",
             "UpgradeableBeaconDeployer",
             "SystemContractProxyAdmin"
         ];
