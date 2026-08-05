@@ -69,7 +69,7 @@ contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
             selectors: Utils.getUtilsFacetSelectors()
         });
         facetCuts[2] = Diamond.FacetCut({
-            facet: address(new ExecutorFacet(block.chainid)),
+            facet: address(new ExecutorFacet()),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getExecutorSelectors()

@@ -263,11 +263,6 @@
                     "name": "chainRegistrationSender",
                     "type": "address",
                     "internalType": "address"
-                  },
-                  {
-                    "name": "assetTracker",
-                    "type": "address",
-                    "internalType": "address"
                   }
                 ]
               },
@@ -300,11 +295,6 @@
                     "name": "chainRegistrationSender",
                     "type": "address",
                     "internalType": "address"
-                  },
-                  {
-                    "name": "assetTracker",
-                    "type": "address",
-                    "internalType": "address"
                   }
                 ]
               }
@@ -334,6 +324,11 @@
                     "name": "l1NativeTokenVault",
                     "type": "address",
                     "internalType": "address"
+                  },
+                  {
+                    "name": "l1InteropHandler",
+                    "type": "address",
+                    "internalType": "address"
                   }
                 ]
               },
@@ -354,6 +349,11 @@
                   },
                   {
                     "name": "l1NativeTokenVault",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "l1InteropHandler",
                     "type": "address",
                     "internalType": "address"
                   }
@@ -475,11 +475,6 @@
                 "name": "chainRegistrationSender",
                 "type": "address",
                 "internalType": "address"
-              },
-              {
-                "name": "assetTracker",
-                "type": "address",
-                "internalType": "address"
               }
             ]
           },
@@ -510,11 +505,6 @@
               },
               {
                 "name": "chainRegistrationSender",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "assetTracker",
                 "type": "address",
                 "internalType": "address"
               }

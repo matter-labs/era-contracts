@@ -19,7 +19,13 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
-import {NonEmptyMsgValue, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {
+    AddressAlreadySet,
+    AssetDeploymentTrackerNotSet,
+    NonEmptyMsgValue,
+    Unauthorized,
+    ZeroAddress
+} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
@@ -31,8 +37,8 @@ import {TxStatus} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Handles the L1 side of asset routing for L1 <-> ZK chain bridging,
-/// supporting both ETH and ERC20 tokens.
+/// @notice The L1 side of asset routing for L1 <-> ZK chain bridging, supporting both ETH and ERC20
+/// tokens. See {protocol-docs/bridging.md#asset-routing-burn--mint}.
 /// @dev Designed for use with a proxy for upgradability.
 contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -63,9 +69,19 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     // slither-disable-next-line uninitialized-state
     address private __DEPRECATED_legacyBridge;
 
+    /// @dev Address of the L1 interop handler that finalizes L2 -> L1 withdrawals.
+    address public l1InteropHandler;
+
     /// @notice Checks that the message sender is the nullifier.
     modifier onlyNullifier() {
         require(msg.sender == address(L1_NULLIFIER), Unauthorized(msg.sender));
+        _;
+    }
+
+    /// @notice Checks that the message sender is this contract itself.
+    /// @dev `finalizeDeposit` is reached only via `receiveMessage`'s self-call, mirroring the L2 asset router.
+    modifier onlySelf() {
+        require(msg.sender == address(this), Unauthorized(msg.sender));
         _;
     }
 
@@ -134,6 +150,15 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _setAssetHandler(ETH_TOKEN_ASSET_ID, address(_nativeTokenVault));
     }
 
+    /// @notice Sets the L1 interop handler contract address, the only caller allowed to finalize withdrawals.
+    /// @dev Should be called only once by the owner.
+    /// @param _l1InteropHandler The address of the L1 interop handler.
+    function setL1InteropHandler(address _l1InteropHandler) external onlyOwner {
+        require(l1InteropHandler == address(0), AddressAlreadySet(l1InteropHandler));
+        require(_l1InteropHandler != address(0), ZeroAddress());
+        l1InteropHandler = _l1InteropHandler;
+    }
+
     /// @notice Used to set the asset deployment tracker address for given asset data.
     /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
     /// @param _assetDeploymentTracker The whitelisted address of asset deployment tracker for provided asset.
@@ -166,6 +191,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _assetId,
         address _assetHandlerAddressOnCounterpart
     ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
+        require(assetDeploymentTracker[_assetId] != address(0), AssetDeploymentTrackerNotSet(_assetId));
         IL1AssetDeploymentTracker(assetDeploymentTracker[_assetId]).bridgeCheckCounterpartAddress(
             _chainId,
             _assetId,
@@ -190,6 +216,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                             INITIATE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
+    /// @inheritdoc AssetRouterBase
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,
@@ -251,13 +278,28 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc AssetRouterBase
+    /// @dev Withdrawal bundles are executed by the configured L1 interop handler.
+    function _interopHandler() internal view override returns (address) {
+        return l1InteropHandler;
+    }
+
+    /// @inheritdoc AssetRouterBase
+    /// @dev Withdrawals arriving on L1 are emitted by the L2 asset router on the source L2 chain (never L1 itself).
+    function _isValidInteropSender(
+        uint256 _senderChainId,
+        address _senderAddress
+    ) internal view override returns (bool) {
+        return _senderChainId != block.chainid && _senderAddress == L2_ASSET_ROUTER_ADDR;
+    }
+
+    /// @inheritdoc AssetRouterBase
     function finalizeDeposit(
-        uint256 _chainId,
+        uint256 _sourceChainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public payable override onlyNullifier {
-        _finalizeDeposit(_chainId, _assetId, _transferData, address(nativeTokenVault));
-        emit DepositFinalizedAssetRouter(_chainId, _assetId, _transferData);
+    ) public payable override onlySelf nonReentrant {
+        _finalizeDeposit(_sourceChainId, _assetId, _transferData, address(nativeTokenVault));
+        emit DepositFinalizedAssetRouter(_sourceChainId, _assetId, _transferData);
     }
 
     /*//////////////////////////////////////////////////////////////

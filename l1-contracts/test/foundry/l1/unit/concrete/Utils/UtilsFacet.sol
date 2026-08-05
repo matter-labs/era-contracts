@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {FeeParams, IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {L2DACommitmentScheme, PubdataContent} from "contracts/common/Config.sol";
 import {PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 
 contract UtilsFacet is ZKChainBase {
@@ -95,6 +95,10 @@ contract UtilsFacet is ZKChainBase {
 
     function util_getAdmin() external view returns (address) {
         return s.admin;
+    }
+
+    function util_getPubdataContent() external view returns (PubdataContent) {
+        return s.pubdataContent;
     }
 
     function util_setValidator(address _validator, bool _active) external {
@@ -243,10 +247,6 @@ contract UtilsFacet is ZKChainBase {
         return s.pausedDepositsTimestamp;
     }
 
-    function util_setAssetTracker(address _assetTracker) external {
-        s.assetTracker = _assetTracker;
-    }
-
     function util_setNativeTokenVault(address _nativeTokenVault) external {
         s.nativeTokenVault = _nativeTokenVault;
     }
@@ -297,6 +297,14 @@ contract UtilsFacet is ZKChainBase {
 
     function util_setZksyncOS(bool _zksyncOS) external {
         s.zksyncOS = _zksyncOS;
+    }
+
+    function util_setZKsyncOSMaxTxGasLimit(uint64 _maxTxGasLimit) external {
+        s.zksyncOSMaxTxGasLimit = _maxTxGasLimit;
+    }
+
+    function util_getZKsyncOSMaxTxGasLimit() external view returns (uint64) {
+        return s.zksyncOSMaxTxGasLimit;
     }
 
     function util_setBaseTokenHasTotalSupply(bool _hasTotalSupply) external {

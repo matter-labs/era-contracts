@@ -9,10 +9,11 @@ import {RegisterCTM} from "../../../../deploy-scripts/ecosystem/RegisterCTM.s.so
 import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {InteropWithdrawalBundleEncoder} from "test-utils/InteropWithdrawalBundleEncoder.sol";
 import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {CoreDeployedAddresses} from "../../../../deploy-scripts/ecosystem/DeployL1CoreUtils.s.sol";
@@ -34,8 +35,8 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         IInteropCenter interopCenter;
         CTMDeploymentTracker ctmDeploymentTracker;
         L1AssetRouter sharedBridge;
-        L1AssetTracker l1AssetTracker;
         L1Nullifier l1Nullifier;
+        L1InteropHandler l1InteropHandler;
         L1NativeTokenVault l1NativeTokenVault;
         IChainTypeManager chainTypeManager;
         ChainRegistrationSender chainRegistrationSender;
@@ -97,6 +98,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
 
         addresses.sharedBridge = L1AssetRouter(ecosystemAddresses.bridges.proxies.l1AssetRouter);
         addresses.l1Nullifier = L1Nullifier(ecosystemAddresses.bridges.proxies.l1Nullifier);
+        addresses.l1InteropHandler = L1InteropHandler(ecosystemAddresses.bridges.proxies.l1InteropHandler);
         addresses.l1NativeTokenVault = L1NativeTokenVault(payable(address(addresses.l1Nullifier.l1NativeTokenVault())));
 
         addresses.chainRegistrationSender = ChainRegistrationSender(
@@ -136,6 +138,33 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         for (uint256 i = 0; i < _tokens.length; i++) {
             _registerNewToken(_tokens[i]);
         }
+    }
+
+    /// @dev Nonce making each reconstructed withdrawal bundle unique, so repeated withdrawals do not
+    /// collide into the same bundle hash (`BundleAlreadyProcessed`).
+    uint256 private withdrawalBundleSaltNonce;
+
+    /// @notice Wraps an asset-router `finalizeDeposit` payload in the single-call InteropBundle message
+    /// form emitted by the L2 InteropCenter — the only withdrawal message form accepted on L1
+    /// (see `InteropHandlerBase` / `L1AssetRouter.receiveMessage`).
+    function _encodeWithdrawalBundleMessage(
+        uint256 _sourceChainId,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal returns (bytes memory) {
+        return
+            InteropWithdrawalBundleEncoder.encodeInteropWithdrawalBundleMessage(
+                _sourceChainId,
+                address(addresses.sharedBridge),
+                _assetId,
+                _transferData,
+                _nextWithdrawalBundleSalt()
+            );
+    }
+
+    /// @notice Returns a fresh unique salt for a reconstructed withdrawal bundle.
+    function _nextWithdrawalBundleSalt() internal returns (bytes32) {
+        return keccak256(abi.encodePacked("test-withdrawal-bundle-salt", withdrawalBundleSaltNonce++));
     }
 
     // add this to be excluded from coverage report

@@ -85,7 +85,6 @@ library ContractsBytecodesLib {
         string[56] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction",
             "BaseTokenHolder",
-            "GWAssetTracker",
             "L2AssetTracker",
             "L2BaseTokenEra",
             "L2BaseTokenZKOS",
@@ -108,7 +107,8 @@ library ContractsBytecodesLib {
             "EraSettlementLayerV31Upgrade",
             "ZKsyncOSSettlementLayerV31Upgrade",
             "InteropCenter",
-            "InteropHandler",
+            "InteropAttributeParser",
+            "L2InteropHandler",
             "EraDualVerifier",
             "ZKsyncOSDualVerifier",
             "L1GenesisUpgrade",

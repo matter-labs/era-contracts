@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
-import {IL1AssetTracker} from "../asset-tracker/IL1AssetTracker.sol";
 
 /// @title L1 Native token vault contract interface
 /// @author Matter Labs
@@ -18,14 +17,16 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     /// @notice The base token asset ID
     function BASE_TOKEN_ASSET_ID() external view returns (bytes32);
 
-    /// @notice Returns the total number of specific tokens locked for some chain
+    /// @notice Deprecated per-chain balance getter, kept for backwards compatibility only; it will
+    /// revert in the next release. Use `bridgedOut` instead.
     function chainBalance(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 
     /// @notice Registers ETH token. Should be called once on local/new deployments.
     /// ETH token is expected to have been already initialized in production.
     function registerEthToken() external;
 
-    function l1AssetTracker() external view returns (IL1AssetTracker);
+    /// @notice Net amount of the given L1-native asset currently bridged out of L1.
+    function bridgedOut(bytes32 _assetId) external view returns (uint256);
 
     event TokenBeaconUpdated(address indexed l2TokenBeacon);
 }

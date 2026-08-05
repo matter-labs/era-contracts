@@ -72,6 +72,8 @@ pub const L2_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal:
     "000000000000000000000000000000000001000f"
 )));
 
+/// Reserved — formerly the GWAssetTracker; an empty stub is deployed here so new chains' genesis
+/// matches upgraded chains, which retain the old bytecode. See {protocol-docs/bridging.md#l2-asset-tracker}.
 pub const GW_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010010"
 )));
@@ -121,6 +123,19 @@ const L2_INTEROP_ROOT_STORAGE: Address = Address(FixedBytes::<20>(hex_literal::h
 const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010009"
 )));
+const L2_INTEROP_COMMITMENT_TREE: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "0000000000000000000000000000000000010012"
+)));
+// 0x10013 is reserved (formerly L2GlobalInteropRootImporter). See {protocol-docs/atomicity/README.md#contracts}.
+const L2_ATOMIC_FLOW_MANAGER: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "0000000000000000000000000000000000010014"
+)));
+
+// Stateless ERC-7786 attribute parser split out of the InteropCenter to keep the latter under the
+// EIP-170 runtime code-size limit. Deployed as a SystemProxy, matching the L1 deploy scripts.
+const L2_INTEROP_ATTRIBUTE_PARSER: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "0000000000000000000000000000000000010015"
+)));
 
 /// All contracts to deploy at genesis, together with their deployment strategy.
 ///
@@ -134,7 +149,7 @@ const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::h
 /// - `L2_WRAPPED_BASE_TOKEN` – uses its own proxy mechanism.
 /// - `SYSTEM_CONTRACT_PROXY_ADMIN` – the proxy admin itself.
 /// - `DETERMINISTIC_CREATE2_ADDRESS` – standard Create2 factory, not a system contract.
-pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 22] = [
+pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 25] = [
     (
         L2_COMPLEX_UPGRADER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2ComplexUpgrader")),
@@ -181,6 +196,7 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 22] = [
         L2_ASSET_TRACKER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2AssetTracker")),
     ),
+    // Empty stub at the reserved GWAssetTracker address; see GW_ASSET_TRACKER_ADDR.
     (
         GW_ASSET_TRACKER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("GWAssetTracker")),
@@ -191,7 +207,7 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 22] = [
     ),
     (
         L2_INTEROP_HANDLER_ADDR,
-        ContractDeployment::SystemProxy(ContractSource::L1ContractName("InteropHandler")),
+        ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2InteropHandler")),
     ),
     (
         L2_BASE_TOKEN_HOLDER_ADDR,
@@ -226,5 +242,18 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 22] = [
     (
         L2_MESSAGE_VERIFICATION,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2MessageVerification")),
+    ),
+    // Atomic interop built-ins. See {protocol-docs/atomicity/README.md#zksync-os-genesis}.
+    (
+        L2_INTEROP_COMMITMENT_TREE,
+        ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2InteropCommitmentTree")),
+    ),
+    (
+        L2_ATOMIC_FLOW_MANAGER,
+        ContractDeployment::SystemProxy(ContractSource::L1ContractName("AtomicFlowManager")),
+    ),
+    (
+        L2_INTEROP_ATTRIBUTE_PARSER,
+        ContractDeployment::SystemProxy(ContractSource::L1ContractName("InteropAttributeParser")),
     ),
 ];

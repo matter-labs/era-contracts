@@ -303,7 +303,7 @@
     "name": "finalizeDeposit",
     "inputs": [
       {
-        "name": "_chainId",
+        "name": "_sourceChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -362,6 +362,19 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "l1InteropHandler",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -424,6 +437,35 @@
   },
   {
     "type": "function",
+    "name": "receiveMessage",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "sender",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "payload",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      }
+    ],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
     "name": "renounceOwnership",
     "inputs": [],
     "outputs": [],
@@ -458,6 +500,19 @@
       },
       {
         "name": "_assetHandlerAddress",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setL1InteropHandler",
+    "inputs": [
+      {
+        "name": "_l1InteropHandler",
         "type": "address",
         "internalType": "address"
       }
@@ -640,7 +695,7 @@
     "name": "DepositFinalizedAssetRouter",
     "inputs": [
       {
-        "name": "chainId",
+        "name": "sourceChainId",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
@@ -739,6 +794,28 @@
   },
   {
     "type": "error",
+    "name": "AddressAlreadySet",
+    "inputs": [
+      {
+        "name": "addr",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AssetDeploymentTrackerNotSet",
+    "inputs": [
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "AssetHandlerDoesNotExist",
     "inputs": [
       {
@@ -766,6 +843,44 @@
   },
   {
     "type": "error",
+    "name": "InteropSenderChainIdMismatch",
+    "inputs": [
+      {
+        "name": "senderChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "payloadSourceChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InteroperableAddressParsingError",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidSelector",
+    "inputs": [
+      {
+        "name": "func",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "NativeTokenVaultAlreadySet",
     "inputs": []
   },
@@ -777,6 +892,11 @@
   {
     "type": "error",
     "name": "NotInitializedReentrancyGuard",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PayloadTooShort",
     "inputs": []
   },
   {

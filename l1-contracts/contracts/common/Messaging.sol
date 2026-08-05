@@ -140,14 +140,28 @@ struct BridgehubL2TransactionRequest {
 /// @param chainId The chain id of the dependency chain
 /// @param blockOrBatchNumber The block number or the batch number where the message root was created
 /// For proof based interop it is block number. For commit based interop it is batch number.
+/// @param timestamp The block timestamp at which the imported root was created on the dependency
+/// chain. Double checked against `MessageRoot.historicalRoot` during batch execution.
+/// See {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}.
 /// @param sides The sides of the dynamic incremental merkle tree emitted in the L2ToL1Messenger for precommit based interop
 /// For proof and commit based interop, the sides contain a single root.
 struct InteropRoot {
     uint256 chainId;
     uint256 blockOrBatchNumber;
+    uint256 timestamp;
     // We are double overloading this. The sides of the dynamic incremental merkle tree normally contains the root, as well as the sides of the tree.
     // Second overloading: if the length is 1, we are importing a chainBatchRoot/messageRoot instead of sides.
     bytes32[] sides;
+}
+
+/// @dev An aggregated (interop) root stored together with its creation timestamp. Shared by the
+/// settlement layer's `MessageRoot` (`historicalRoot`) and the L2 `L2InteropRootStorage`
+/// (`interopRoots`). See {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}.
+/// @param root The aggregated root.
+/// @param timestamp The block timestamp at which the root was created on its origin chain.
+struct StoredInteropRoot {
+    bytes32 root;
+    uint256 timestamp;
 }
 
 /// @param chainId The chain ID of the transaction to check.
@@ -190,35 +204,24 @@ struct InteropCallStarterInternal {
 }
 
 /// @param interopCallValue Base token value on destination chain to send for interop call.
-/// @param indirectCall An indirect call first calls a contract as specified by the call starter which returns an actual call starter that will be used to form an interop call. In particular, this is used for interop token transfers. In contrast, a direct call uses the call starter to form an interop call.
+/// @param indirectCall If true, the call starter is first called on the source chain and returns
+/// the actual call starter (used e.g. for token transfers); a direct call uses the starter as-is.
+/// See {protocol-docs/interop.md#direct-vs-indirect-calls}.
 /// @param indirectCallMessageValue Base token value on sending chain to send for indirect call.
 struct CallAttributes {
     uint256 interopCallValue;
-    bool indirectCall;
     uint256 indirectCallMessageValue;
+    bool indirectCall;
 }
 
 /// @param executionAddress ERC-7930 Address allowed to execute the bundle on the destination chain. If the byte array is empty then execution is permissionless.
 /// @param unbundlerAddress ERC-7930 Address allowed to unbundle the bundle on the destination chain. Note, that it is required to be nonempty, unlike `executionAddress`.
-/// @param useFixedFee If true, user pays fixed ZK fees instead of base token fees controlled by chain operator.
-///                    This is a bundle-level attribute - all calls within a bundle share the same fee mode.
-///                    Users are free to choose which fee mode to use when creating their bundle.
-///                    In more details, any user of interop functionality is able to choose between two fee options:
-///                    - Fixed fee in ZK (ZK_INTEROP_FEE constant in InteropCenter). User pays this fee directly in ZK tokens via ERC20 transfer.
-///                    - Dynamic fee in base token of source chain where the interop is initiated. This value is fully under control of chain operator via interopProtocolFee in InteropCenter.
-///                    In any case, gateway settlement fees (gatewaySettlementFee per call, set by governance in GWAssetTracker) are charged from the settlementFeePayer address
-///                    (encoded within the batch data of executeBatchesSharedBridge) when the chain settles on Gateway via processLogsAndMessages(). The settlementFeePayer must have pre-approved
-///                    GWAssetTracker to spend wrapped ZK tokens.
-///                    Note on ZK-as-base-token chains: On chains where ZK is the base token, useFixedFee=true still requires wrapped ZK tokens
-///                    (paid via ERC20 transfer), while useFixedFee=false accepts native ZK via msg.value. This is intentional behavior.
-///                    IMPORTANT: useFixedFee=true requires ZK token to be bridged to the source chain. If ZK token is not yet available
-///                    in the chain's NativeTokenVault, the transaction will revert with ZKTokenNotAvailable().
-/// @param salt User-provided salt used to derive the `interopBundleSalt` of the resulting `InteropBundle`. Provide a
-///             random salt: it keeps the bundle hash unpredictable and thus preserves the bundle's privacy. The final
-///             `interopBundleSalt` is `keccak256(abi.encodePacked(msg.sender, salt))`, and each salt must be unique per
-///             sender: a sender MUST provide a distinct salt for every bundle it sends, regardless of the bundle
-///             contents. Passing `bytes32(0)` (or omitting the `interopBundleSalt` ERC-7786 attribute) is allowed but
-///             discouraged — since salts must be unique per sender, `bytes32(0)` can be used at most once per sender.
+/// @param useFixedFee If true, the user pays the fixed ZK fee (via ERC20 transfer) instead of the
+///                    operator-controlled base-token fee. Bundle-level: all calls share the fee mode.
+///                    Fee model details: {protocol-docs/interop.md#fee-model}.
+/// @param salt User-provided salt used to derive `interopBundleSalt` as
+///             `keccak256(abi.encodePacked(msg.sender, salt))`. Must be unique per sender for every
+///             bundle (`InteropBundleSaltAlreadyUsed` otherwise).
 struct BundleAttributes {
     bytes executionAddress;
     bytes unbundlerAddress;
@@ -228,9 +231,9 @@ struct BundleAttributes {
 
 /// @dev A single call.
 /// @param version Version of the InteropCall.
-/// @param shadowAccount If true, execute via a shadow account, otherwise normal. In current release always false, as it's not yet implemented.
-///                      Shadow accounts help with interop when `to` doesn't support 7786. In this case, a "shadow" account could be deployed, allowing
-///                      the user to hold funds securely on the destination chain, and interact with anything on destination chain using this shadow account.
+/// @param shadowAccount Reserved field, always false. ShadowAccount routing was removed; this slot is
+///                      kept to preserve the on-wire InteropBundle encoding (bundleHash / event topic /
+///                      pre-generated chain states) and may host a future feature.
 /// @param to Destination contract address on the target chain.
 /// @param from Original sender address that initiated the call.
 /// @param value Amount of base token to send with the call.
@@ -258,12 +261,9 @@ enum CallStatus {
 /// @param version Version of the InteropBundle.
 /// @param destinationChainId ChainId of the target chain.
 /// @param destinationBaseTokenAssetId Asset ID of the base token of the target chain.
-/// @param interopBundleSalt Salt of the interopBundle. It's required to ensure that all bundles have distinct hashes.
-///                          It's equal to the keccak256(abi.encodePacked(senderOfTheBundle, userProvidedSalt)), where
-///                          `userProvidedSalt` is supplied by the sender via the `interopBundleSalt` ERC-7786 bundle attribute.
-///                          Mixing in the sender ensures bundles from different senders can never collide, while letting the
-///                          sender control uniqueness of their own bundles. Each salt must be unique per sender: a sender
-///                          must provide a distinct salt for every bundle it sends, regardless of the bundle contents.
+/// @param interopBundleSalt Ensures all bundles have distinct hashes: equal to
+///                          `keccak256(abi.encodePacked(senderOfTheBundle, userProvidedSalt))`, so bundles from
+///                          different senders can never collide while each sender controls its own uniqueness.
 /// @param calls Array of InteropCall structs to execute.
 /// @param bundleAttributes Bundle execution and unbundling attributes.
 struct InteropBundle {
@@ -288,20 +288,11 @@ enum BundleStatus {
     Unbundled
 }
 
-/// @dev Message sent by InteropHandler to GWAssetTracker for each successfully executed interop call.
-/// @dev Allows GWAssetTracker to move the corresponding balance from pendingInteropBalance to chainBalance.
-/// @param destinationBaseTokenAssetId Asset ID of the base token of the destination chain.
-/// @param interopCall The interop call that was executed.
-struct InteropCallExecutedMessage {
-    bytes32 destinationBaseTokenAssetId;
-    InteropCall interopCall;
-}
-
 /// @dev Inclusion proof for a cross-chain message payload (bundle) coming from L2→L1.
 /// @param chainId Source chain identifier.
 /// @param l1BatchNumber Batch number on L1 where the message root was committed.
 /// @param l2MessageIndex Position in the L2 logs Merkle tree of this message.
-/// @param message The raw L2 message payload (including `BUNDLE_IDENTIFIER` prefix).
+/// @param message The raw L2 message payload.
 /// @param proof Merkle‐proof for verifying the message inclusion.
 struct MessageInclusionProof {
     uint256 chainId;
@@ -346,92 +337,12 @@ struct ProofData {
     uint256 batchLeafProofLen;
     bytes32 batchSettlementRoot;
     bytes32 chainIdLeaf;
+    /// @dev Settlement-layer block timestamp at which the batch root was aggregated into the message
+    /// root (bound into the batch leaf, so it is proven by the inclusion proof). Zero for final-node
+    /// proofs, which carry no aggregation hop.
+    uint256 l1BatchTimestamp;
     uint256 ptr;
     bool finalProofNode;
-}
-
-/// @dev L2 -> L1 message payload used when migrating token balance from L1 tracking to Gateway tracking.
-/// @param version Encoding version.
-/// @param originToken Token address on origin chain.
-/// @param chainId Chain that is migrating.
-/// @param assetId Asset id being migrated.
-/// @param tokenOriginChainId Origin chain for the token.
-/// @param chainMigrationNumber Chain migration number this message is tied to.
-/// @param assetMigrationNumber Asset migration number currently known on L2. Not yet used, kept for future use.
-/// @param totalWithdrawalsToL1 Total withdrawals initiated from L2 to L1 since v31 tracking started.
-/// @param totalSuccessfulDepositsFromL1 Total successful deposits finalized on L2 since v31 tracking started.
-/// @param totalPreV31TotalSupply Token total supply snapshot captured on L2 before first post-v31 bridge operation.
-struct L1ToGatewayTokenBalanceMigrationData {
-    bytes1 version;
-    address originToken;
-    uint256 chainId;
-    bytes32 assetId;
-    uint256 tokenOriginChainId;
-    uint256 chainMigrationNumber;
-    uint256 assetMigrationNumber;
-    uint256 totalWithdrawalsToL1;
-    uint256 totalSuccessfulDepositsFromL1;
-    uint256 totalPreV31TotalSupply;
-}
-
-/// @dev L2 -> L1 message payload used when migrating token balance from Gateway tracking back to L1 tracking.
-/// @param version Encoding version.
-/// @param originToken Token address on origin chain.
-/// @param chainId Chain that is migrating.
-/// @param assetId Asset id being migrated.
-/// @param tokenOriginChainId Origin chain for the token.
-/// @param amount Chain balance amount to migrate from Gateway to L1.
-/// @param chainMigrationNumber Chain migration number this message is tied to.
-/// @param assetMigrationNumber Asset migration number currently known on Gateway.
-struct GatewayToL1TokenBalanceMigrationData {
-    bytes1 version;
-    address originToken;
-    uint256 chainId;
-    bytes32 assetId;
-    uint256 tokenOriginChainId;
-    uint256 amount;
-    uint256 chainMigrationNumber;
-    uint256 assetMigrationNumber;
-}
-
-/// @dev L1 -> L2 service transaction payload used to confirm migration processing.
-/// @param chainId Chain that was migrated.
-/// @param assetId Asset id that was migrated.
-/// @param tokenOriginChainId Origin chain for the token.
-/// @param originToken Token address on origin chain.
-/// @param amount Amount moved during the migration finalization on L1.
-/// @param assetMigrationNumber New migration number that should be persisted on L2/Gateway.
-/// @param isL1ToGateway Whether this confirmation corresponds to L1 -> Gateway direction.
-// solhint-disable-next-line gas-struct-packing
-struct MigrationConfirmationData {
-    uint256 chainId;
-    bytes32 assetId;
-    uint256 tokenOriginChainId;
-    address originToken;
-    uint256 amount;
-    uint256 assetMigrationNumber;
-    bool isL1ToGateway;
-}
-
-struct BalanceChange {
-    bytes1 version;
-    address originToken;
-    bytes32 baseTokenAssetId;
-    uint256 baseTokenAmount;
-    bytes32 assetId;
-    uint256 amount;
-    uint256 tokenOriginChainId;
-}
-
-struct AssetBalanceChange {
-    bytes32 assetId;
-    uint256 amount;
-}
-
-struct InteropBalanceChange {
-    bytes1 version;
-    uint256 baseTokenAmount;
-    AssetBalanceChange[] assetBalanceChanges;
 }
 
 /// @param _chainId The ZK chain id to which deposit was initiated.

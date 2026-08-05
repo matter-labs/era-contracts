@@ -32,6 +32,7 @@ import {
   getZkTokenAddress,
   deployDummyInteropRecipient,
   sendAndExecuteTokenInterop,
+  registerL2NativeTokenIfNeeded,
 } from "../../src/helpers/interop-helpers";
 import type { CallStarter } from "../../src/helpers/interop-helpers";
 import {
@@ -49,7 +50,6 @@ import {
   randomBigNumber,
 } from "../../src/helpers/balance-helpers";
 import { deployL2NativeToken } from "../../src/helpers/deploy-test-token";
-import { migrateTokenToGateway } from "../../src/helpers/token-balance-migration-helper";
 
 // Randomized per-test amount ranges (small enough for balance safety, large enough to detect)
 const BASE_TOKEN_MIN = ethers.utils.parseUnits("10", "gwei");
@@ -82,10 +82,6 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   let destChainId: number;
   let sourceProvider: ethers.providers.JsonRpcProvider;
   let destProvider: ethers.providers.JsonRpcProvider;
-  let l1RpcUrl: string;
-  let l1Provider: ethers.providers.JsonRpcProvider;
-  let gatewayChainId: number;
-  let gatewayRpcUrl: string;
 
   // Token-related values resolved per-chain
   let sourceTokenAddress: string;
@@ -129,22 +125,16 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     if (gatewayChainIds.length !== 1) {
       throw new Error(`Expected exactly one gateway chain in interop state, got ${gatewayChainIds.length}`);
     }
-    gatewayChainId = gatewayChainIds[0];
-    gatewayRpcUrl = getL2Chain(state.chains, gatewayChainId).rpcUrl;
 
     if (isLiveInteropMode()) {
-      const liveL1RpcUrl = process.env.LIVE_L1_RPC?.trim();
-      if (!liveL1RpcUrl) {
+      if (!process.env.LIVE_L1_RPC?.trim()) {
         throw new Error("LIVE_L1_RPC is required when ANVIL_INTEROP_LIVE=1");
       }
-      l1RpcUrl = liveL1RpcUrl;
     } else {
       if (!state.chains.l1) {
         throw new Error("L1 chain is required for local interop bridge tests");
       }
-      l1RpcUrl = state.chains.l1.rpcUrl;
     }
-    l1Provider = new ethers.providers.JsonRpcProvider(l1RpcUrl);
 
     if (!isLiveInteropMode()) {
       await setInteropProtocolFee(sourceProvider, ANVIL_INTEROP_PROTOCOL_FEE);
@@ -152,6 +142,8 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     }
 
     sourceTokenAddress = state.testTokens![sourceChainId];
+    // The pre-generated chain states carry no NTV registrations, so register on demand.
+    await registerL2NativeTokenIfNeeded(sourceProvider, sourceTokenAddress);
     sourceAssetId = await getAssetIdForToken(sourceProvider, sourceTokenAddress);
 
     // Query the per-call interop protocol fee
@@ -599,7 +591,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     await expectRevert(
       () => simulateExecuteBundle(destProvider, sendResult.bundleData, sourceChainId),
       "replay executeBundle",
-      customError("InteropHandler", "BundleAlreadyProcessed(bytes32)"),
+      customError("L2InteropHandler", "BundleAlreadyProcessed(bytes32)"),
       destProvider
     );
 
@@ -634,7 +626,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     await expectRevert(
       () => simulateExecuteBundle(destProvider, sendResult.bundleData, sourceChainId),
       "execute from wrong executionAddress",
-      customError("InteropHandler", "ExecutingNotAllowed(bytes32,bytes,bytes)"),
+      customError("L2InteropHandler", "ExecutingNotAllowed(bytes32,bytes,bytes)"),
       destProvider
     );
 
@@ -694,26 +686,16 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     console.log("   [edge] Excess msg.value rejected");
   });
 
-  it("can migrate a chain-A-native token to Gateway and round-trip it over interop", async function () {
+  it("can round-trip a chain-A-native token over interop", async function () {
     const chainAToken = await deployL2NativeToken({
       provider: sourceProvider,
       chainId: sourceChainId,
       name: "Live Interop Chain A Native Token",
       symbol: "LIA",
     });
-    const chainAAssetId = await migrateTokenToGateway({
-      chainId: sourceChainId,
-      l2RpcUrl: sourceProvider.connection.url,
-      tokenAddress: chainAToken,
-      l1RpcUrl,
-      l1Provider,
-      gwRpcUrl: gatewayRpcUrl,
-      l1NativeTokenVaultAddr: state.l1Addresses!.l1NativeTokenVault,
-      l1AssetTrackerAddr: state.l1Addresses!.l1AssetTracker,
-      chainAddresses: state.chainAddresses!,
-      gatewayChainId,
-    });
-    expect(chainAAssetId, "chain A native token assetId").to.equal(encodeNtvAssetId(sourceChainId, chainAToken));
+    // Interop requires no on-chain balance migration ({protocol-docs/bridging.md#l2-asset-tracker}),
+    // so the assetId is derived locally.
+    const chainAAssetId = encodeNtvAssetId(sourceChainId, chainAToken);
 
     const chainBToken = await sendAndExecuteTokenInterop({
       sendProvider: sourceProvider,
@@ -739,6 +721,6 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       label: "chain A native token B->A interop",
     });
 
-    console.log("   [roundtrip] Chain-A-native token migrated to Gateway and round-tripped over interop");
+    console.log("   [roundtrip] Chain-A-native token round-tripped over interop");
   });
 });

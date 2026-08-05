@@ -147,14 +147,14 @@ contract BaseTokenHolderTest is Test {
     }
 
     function test_receive_rejectFromInteropHandler() public {
-        // InteropHandler should use give() not receive()
+        // L2InteropHandler should use give() not receive()
         uint256 amount = 1 ether;
         vm.deal(L2_INTEROP_HANDLER_ADDR, amount);
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         (bool success, ) = address(baseTokenHolder).call{value: amount}("");
 
-        assertFalse(success, "Transfer should fail - InteropHandler should use give()");
+        assertFalse(success, "Transfer should fail - L2InteropHandler should use give()");
     }
 
     function test_receive_rejectFromInteropCenter() public {
@@ -244,8 +244,14 @@ contract BaseTokenHolderTest is Test {
         _burnAndStartBridging_success(L2_NATIVE_TOKEN_VAULT_ADDR, ERA_CHAIN_ID);
     }
 
-    function test_burnAndStartBridging_successFromL2BaseToken() public {
-        _burnAndStartBridging_success(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, ERA_CHAIN_ID);
+    /// @dev L2BaseToken is no longer a bridging caller: base-token withdrawals go through the InteropCenter,
+    /// which is the contract that burns the value via `burnAndStartBridging`.
+    function test_burnAndStartBridging_revertFromL2BaseToken() public {
+        vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, 1 ether);
+
+        vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR));
+        baseTokenHolder.burnAndStartBridging{value: 1 ether}(ERA_CHAIN_ID);
     }
 
     function test_burnAndStartBridging_revertFromUnauthorizedCaller() public {
@@ -349,6 +355,69 @@ contract BaseTokenHolderTest is Test {
         vm.deal(L2_INTEROP_CENTER_ADDR, 1);
         vm.prank(L2_INTEROP_CENTER_ADDR);
         holder.burnAndStartBridging{value: 1}(ERA_CHAIN_ID);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        recoverBaseToken() TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Covers base-token bridge-out recovery via `recoverBaseToken`.
+    /// See {protocol-docs/bridging.md#base-token-handling}.
+    function test_recoverBaseToken_successFromNativeTokenVault() public {
+        uint256 amount = 3 ether;
+        uint256 recipientBalanceBefore = recipient.balance;
+        uint256 holderBalanceBefore = address(baseTokenHolder).balance;
+
+        vm.expectEmit(true, false, false, true, address(baseTokenHolder));
+        emit IBaseTokenHolder.BaseTokenRecovered(recipient, amount);
+
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        baseTokenHolder.recoverBaseToken(recipient, amount, GATEWAY_CHAIN_ID);
+
+        assertEq(recipient.balance, recipientBalanceBefore + amount, "recipient must receive the recovered value");
+        assertEq(address(baseTokenHolder).balance, holderBalanceBefore - amount, "holder balance must decrease");
+    }
+
+    /// @dev The tracker hook asserts the bridge-out is recoverable (L2->L2 only); the holder must stay
+    /// wired to it so those invariants gate every recovery.
+    function test_recoverBaseToken_notifiesAssetTracker() public {
+        uint256 amount = 1 ether;
+
+        vm.expectCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(
+                IL2AssetTracker.handleRecoverBaseTokenBridgingOnL2.selector,
+                GATEWAY_CHAIN_ID,
+                amount
+            )
+        );
+
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        baseTokenHolder.recoverBaseToken(recipient, amount, GATEWAY_CHAIN_ID);
+    }
+
+    function test_recoverBaseToken_zeroAmountIsNoop() public {
+        uint256 holderBalanceBefore = address(baseTokenHolder).balance;
+
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        baseTokenHolder.recoverBaseToken(recipient, 0, GATEWAY_CHAIN_ID);
+
+        assertEq(recipient.balance, 0);
+        assertEq(address(baseTokenHolder).balance, holderBalanceBefore);
+    }
+
+    /// @dev Recovery is NativeTokenVault-only — tighter than burnAndStartBridging (which also allows the
+    /// InteropCenter). Neither the InteropCenter nor the InteropHandler may trigger a base-token recovery.
+    function test_recoverBaseToken_revertFromInteropCenter() public {
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, L2_INTEROP_CENTER_ADDR));
+        baseTokenHolder.recoverBaseToken(recipient, 1 ether, GATEWAY_CHAIN_ID);
+    }
+
+    function test_recoverBaseToken_revertFromInteropHandler() public {
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, L2_INTEROP_HANDLER_ADDR));
+        baseTokenHolder.recoverBaseToken(recipient, 1 ether, GATEWAY_CHAIN_ID);
     }
 }
 

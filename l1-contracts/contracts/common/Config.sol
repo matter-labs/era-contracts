@@ -5,6 +5,7 @@ pragma solidity ^0.8.21;
 // solhint-disable no-unused-import
 import {
     L2DACommitmentScheme,
+    PubdataContent,
     L2_TO_L1_LOG_SERIALIZE_SIZE,
     L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
     L2_TO_L1_LOGS_MERKLE_TREE_DEPTH,
@@ -65,6 +66,11 @@ uint256 constant PUBLIC_INPUT_SHIFT = 32;
 /// @dev Maximum number of linked-list leaves checked when correcting a stale indexed Merkle tree low leaf.
 uint256 constant MAX_LOW_INDEX_SEARCH_ATTEMPTS = 5;
 
+/// @dev Padding value for empty/unused leaves in an {IndexedMerkleTree}. Deliberately NOT a valid
+/// `hashLeaf(IMTLeaf)` output, so an unused padded index can't be presented as a `{0,0,0}` low leaf to forge
+/// a non-inclusion proof. The off-chain imt-engine must use the same value.
+bytes32 constant IMT_EMPTY_LEAF_HASH = keccak256("zkSync:IndexedMerkleTree:emptyLeaf");
+
 /// @dev The maximum number of L2 gas that a user can request for an L2 transaction
 uint256 constant MAX_GAS_PER_TRANSACTION = 80_000_000;
 
@@ -104,32 +110,32 @@ uint256 constant MAX_PRICE_CHANGE_DENOMINATOR = 10;
 /// @dev Reference L1 gas price used for price-change bound calculations.
 uint256 constant PRICE_REFERENCE_L1_GAS = 1 gwei;
 
-/// @dev The native price for L1->L2 transactions in ZKsync OS.
-uint256 constant ZKSYNC_OS_L1_TX_NATIVE_PRICE = 10;
-
 /// @dev The intrinsic cost of the L1->L2 transaction in computational L2 gas for ZKsync OS.
 uint256 constant L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS = 21000;
 
-/// @dev The cost of calldata byte for the L1->L2 transaction in computational L2 gas for ZKsync OS.
-uint256 constant L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS = 16;
+/// @dev The floor cost(EIP-7623) of non-zero calldata byte for the L1->L2 transaction in computational L2 gas for ZKsync OS.
+uint256 constant L1_TX_CALLDATA_FLOOR_PRICE_L2_GAS_ZKSYNC_OS = 40;
 
-/// @dev The static part of the L1->l2 transaction native cost for ZKsync OS.
-/// It includes hashing (126_000) and coinbase/refund mint_base_token intrinsic native worst case costs.
-uint256 constant L1_TX_STATIC_NATIVE_ZKSYNC_OS = 2_875_420;
-
-/// @dev The encoding cost per keccak256 round(136 bytes) of the L1->l2 transaction in native resource for ZKsync OS.
-uint256 constant L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS = 17500;
-
-/// @dev The cost of calldata byte for the L1->L2 transaction in native resource for ZKsync OS.
-uint256 constant L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS = 1;
+/// @dev The maximal computational native limit for transaction in ZKsync OS.
+uint256 constant MAX_NATIVE_COMPUTATIONAL_ZKSYNC_OS = 1 << 35;
 
 /// @dev The intrinsic cost of the L1->l2 transaction in pubdata for ZKsync OS
 /// It includes tx log, coinbase, treasury, refund recipient and asset tracker pubdata.
 uint256 constant L1_TX_INTRINSIC_PUBDATA_ZKSYNC_OS = 351;
 
-/// @dev The native per gas ratio for 0 gas price(service/upgrade/gateway) transactions in ZKsync OS.
+/// @dev The native per gas ratio for l1 -> l2 txs, including upgrade/service/gateway transactions in ZKsync OS.
 /// This value is big enough to cover computational native resources usage for any operations.
-uint256 constant FREE_TX_NATIVE_PER_GAS = 10_000;
+uint256 constant L1_TX_NATIVE_PER_GAS = 100_000_000;
+
+/// @dev The default ZKsync OS single-transaction gas limit (EIP-7825, 2^24). This is both the
+/// default per-tx gas cap and the lower bound for any chain-configured value: a chain may raise
+/// the cap above Ethereum's limit but must not set it below.
+uint64 constant ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT = uint64(1) << 24;
+
+/// @dev The upper bound for the ZKsync OS single-transaction gas limit (EIP-7825), matching the
+/// ZKsync OS block gas limit. It equals `type(uint64).max / 256` (`2^56 - 1`), the maximum gas
+/// representable once ZKsync OS scales gas into its `uint64` ergs counter (256 ergs/gas).
+uint64 constant ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT = type(uint64).max / 256;
 
 /// @dev The mask which should be applied to the packed batch and L2 block timestamp in order
 /// to obtain the L2 block timestamp. Applying this mask is equivalent to calculating modulo 2**128
@@ -274,7 +280,12 @@ uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 uint256 constant INITIAL_BASE_TOKEN_HOLDER_BALANCE = (2 ** 127) - 1;
 
 /// @dev The total number of supported interop attributes.
-uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 6;
+uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 7;
+
+/// @dev Whether chain migrations between settlement layers are enabled in the current release.
+/// @dev Release-level switch (disabled in v32): lifting the ban requires a protocol upgrade, unlike
+/// the runtime `migrationPaused` flag. See {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}.
+bool constant CHAIN_MIGRATIONS_ENABLED = false;
 
 /// @dev Migration number used when a chain migrates from L1 to a settlement layer.
 uint256 constant MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER = 1;

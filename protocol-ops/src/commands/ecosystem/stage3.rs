@@ -1,18 +1,14 @@
-//! `protocol-ops ecosystem stage3` — Phase 3: legacy-token registration.
+//! `protocol-ops ecosystem stage3` — Phase 3: bridged-token registration.
 //!
 //! Runs `CoreUpgrade_v31.stage3(bridgehubProxy)` on the env's bridgehub:
-//!   - registers ETH + every entry in the v31-bridged-tokens config in NTV's
-//!     bridgedTokens list,
-//!   - calls `registerLegacyToken` on the L1AssetTracker (moves chainBalances
-//!     out of the NTV) for every token with non-zero balance.
+//!   - registers ETH + every entry in the v31-bridged-tokens config in the
+//!     NTV's `bridgedTokens` list.
 //!
-//! Sequencing: runs *before* the per-chain upgrades (Phase 4). The L1NTV
-//! starts routing every withdrawal through the L1AssetTracker the moment
-//! stage 1 of governance lands, so registering tokens early means each
-//! chain's withdrawals unblock immediately when its diamond upgrade lands —
-//! both `_requireRegistered(assetId)` (this phase) and
-//! `v31UpgradeChainBatchNumber` (per-chain upgrade) gates are cleared back
-//! to back instead of leaving an extra registration freeze afterwards.
+//! Sequencing: runs *before* the per-chain upgrades (Phase 4), so the NTV
+//! `_requireRegistered(assetId)` gate is cleared before each chain's diamond
+//! upgrade lands and its `v31UpgradeChainBatchNumber` gate opens — the two
+//! gates clear back to back instead of leaving an extra registration freeze
+//! afterwards.
 //!
 //! Any signer can run this — no governance privileges needed. The caller
 //! must pass `--sender <EOA>`. We deliberately do not fall back to the

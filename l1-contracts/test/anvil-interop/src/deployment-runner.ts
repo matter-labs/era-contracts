@@ -16,7 +16,6 @@ import type {
   DeploymentState,
   L2ChainInfo,
   PriorityRequestData,
-  TbmAccountingSnapshot,
 } from "./core/types";
 import { getChainIdsByRole, timeIt } from "./core/utils";
 import { getAbi, getCreationBytecode } from "./core/contracts";
@@ -25,7 +24,6 @@ import { getInteropSourcePrivateKey, isLiveInteropMode } from "./core/accounts";
 import { encodeNtvAssetId } from "./core/data-encoding";
 import { deployTestTokens } from "./helpers/deploy-test-token";
 import { depositERC20ToL2 } from "./helpers/l1-deposit-helper";
-import { registerAndMigrateTestTokens, tbmAccountingSnapshotKey } from "./helpers/token-balance-migration-helper";
 import { asViemAddress, createLiveZksyncSdk } from "./helpers/temp-sdk";
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;
@@ -73,14 +71,10 @@ export class DeploymentRunner {
   }
 
   /**
-   * Protocol version string used to name the chain-states folder (e.g. "v0.32.0").
-   *
-   * Read from the anvil-interop harness's OWN config (`config/anvil-config.json`
-   * → `stateVersion`), NOT the shared `configs/genesis/era/latest.json`. The
-   * shared genesis is the base protocol version for the L1 foundry suite (v31);
-   * the anvil harness runs atomic-interop (v32). Keeping the harness version
-   * local decouples the two, so the anvil state can live under `v0.32.0` without
-   * re-versioning the whole L1 test suite (which pins v31).
+   * Protocol version string used to name the chain-states folder (e.g. "v0.32.0"). Read from the
+   * harness's OWN config (`stateVersion`), NOT the shared `configs/genesis/era/latest.json`: the
+   * shared genesis pins the L1 foundry suite's base version (v31) while the anvil harness runs
+   * atomic-interop (v32), and keeping the harness version local decouples the two.
    */
   getProtocolVersionString(): string {
     const cfg = JSON.parse(fs.readFileSync(this.configPath, "utf-8")) as { stateVersion?: string };
@@ -139,7 +133,6 @@ export class DeploymentRunner {
       l1SharedBridge: params.l1AssetRouter,
       l1NullifierProxy: params.l1Nullifier ?? ZERO_ADDRESS,
       l1NativeTokenVault: params.l1NativeTokenVault ?? ZERO_ADDRESS,
-      l1AssetTracker: ZERO_ADDRESS,
       governance: ZERO_ADDRESS,
       transparentProxyAdmin: ZERO_ADDRESS,
       blobVersionedHashRetriever: ZERO_ADDRESS,
@@ -719,8 +712,7 @@ export class DeploymentRunner {
       throw new Error(`addresses.json not found in ${stateDir}`);
     }
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
-    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, customBaseTokens, tbmAccountingSnapshots, zkToken } =
-      addresses;
+    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, customBaseTokens, zkToken } = addresses;
 
     // Decompress hex-gzip state files to native JSON for --load-state CLI.
     // This is more portable than anvil_loadState RPC across anvil versions.
@@ -777,9 +769,6 @@ export class DeploymentRunner {
     }
     if (customBaseTokens) {
       state.customBaseTokens = customBaseTokens;
-    }
-    if (tbmAccountingSnapshots) {
-      state.tbmAccountingSnapshots = tbmAccountingSnapshots;
     }
     if (zkToken) {
       state.zkToken = zkToken;
@@ -843,11 +832,9 @@ export class DeploymentRunner {
       delete raw.transactions;
       delete raw.historical_states;
 
-      // Commit the state gzip-compressed (`<chainId>.json.gz`) rather than as raw
-      // JSON. These dumps are multi-MB; committing them as text floods every
-      // regeneration with an enormous, unreviewable diff. GitHub renders .gz as
-      // binary ("Binary file not shown"), keeping it out of PR diffs, and gzip
-      // shrinks the files ~10x. loadChainStates() gunzips them on the fly.
+      // Commit the state gzip-compressed (`<chainId>.json.gz`): the dumps are multi-MB, and as raw
+      // JSON every regeneration floods PRs with an unreviewable text diff. loadChainStates()
+      // gunzips them on the fly.
       const gzipPath = `${statePath}.gz`;
       fs.writeFileSync(gzipPath, zlib.gzipSync(JSON.stringify(raw), { level: 9 }));
       // Drop the raw JSON dump so only the compressed artifact is committed.
@@ -933,7 +920,6 @@ export class DeploymentRunner {
       gwSettledChainIds,
       l2ChainRpcUrls
     );
-    this.saveTbmAccountingSnapshots(gatewaySetupResult.tbmAccountingSnapshots);
     const gatewayCTMAddr = gatewaySetupResult.gatewayCTMAddr;
 
     console.log(`  Gateway CTM: ${gatewayCTMAddr}`);
@@ -969,11 +955,11 @@ export class DeploymentRunner {
   }
 
   /**
-   * Full setup: deploy + test tokens + Token Balance Migration (TBM).
+   * Full setup: deploy + test tokens + wrapped-ZK seeding.
    *
    * Used by both `setup-and-dump-state.ts` and `run-hardhat-interop-test.ts` (fresh deploy path).
-   * TBM registers and migrates test tokens on GW-settled chains so that
-   * assetMigrationNumber matches migrationNumber (required for interop transfers).
+   * Thin wrapper over {@link deployAndSetup} that additionally seeds wrapped ZK balances on
+   * ETH-base-token L2 chains (no on-chain balance migration step is needed anymore).
    */
   async deployAndSetupWithTBM(
     anvilManager: AnvilManager,
@@ -981,49 +967,10 @@ export class DeploymentRunner {
   ): Promise<FullDeploymentResult> {
     const result = await this.deployAndSetup(anvilManager, options);
 
-    const config = this.getConfig();
-    const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
-    const gatewayConfig = config.chains.find((c) => c.role === "gateway");
-
-    if (gwSettledChainIds.length > 0 && gatewayConfig) {
-      const state = this.loadState();
-      if (state.testTokens && Object.keys(state.testTokens).length > 0) {
-        const gwChain = state.chains!.l2.find((c) => c.chainId === gatewayConfig.chainId)!;
-        const gwDiamondProxy = state.chainAddresses!.find((c) => c.chainId === gatewayConfig.chainId)!.diamondProxy;
-        const l2ChainRpcUrls = new Map(state.chains!.l2.map((c) => [c.chainId, c.rpcUrl]));
-
-        const tbmAccountingSnapshots = await registerAndMigrateTestTokens({
-          gwSettledChainIds,
-          l2ChainRpcUrls,
-          testTokens: state.testTokens,
-          l1RpcUrl: state.chains!.l1!.rpcUrl,
-          gwRpcUrl: gwChain.rpcUrl,
-          l1AssetTrackerAddr: result.l1Addresses.l1AssetTracker,
-          gwDiamondProxyAddr: gwDiamondProxy,
-          chainAddresses: state.chainAddresses!,
-          logger: (line) => console.log(line),
-        });
-        this.saveTbmAccountingSnapshots(tbmAccountingSnapshots);
-      }
-    }
-
-    const stateAfterTbm = this.loadState();
-    await this.seedWrappedZkOnEthChains(stateAfterTbm);
+    const state = this.loadState();
+    await this.seedWrappedZkOnEthChains(state);
 
     return result;
-  }
-
-  private saveTbmAccountingSnapshots(snapshots: TbmAccountingSnapshot[] | undefined): void {
-    if (!snapshots || snapshots.length === 0) {
-      return;
-    }
-
-    const state = this.loadState();
-    state.tbmAccountingSnapshots = state.tbmAccountingSnapshots || {};
-    for (const snapshot of snapshots) {
-      state.tbmAccountingSnapshots[tbmAccountingSnapshotKey(snapshot.chainId, snapshot.assetId)] = snapshot;
-    }
-    this.saveState(state);
   }
 }
 

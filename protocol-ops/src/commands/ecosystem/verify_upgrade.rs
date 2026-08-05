@@ -138,7 +138,6 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     })?;
     let new_gateway_chain_id = new_gateway.chain_id;
     let new_gateway_representative_chain_id = new_gateway.ctm_representative_chain_id;
-    let new_gateway_settlement_fee = new_gateway.settlement_fee;
 
     // Collect every pinned CREATE2 salt declared in the env config — the Core
     // salt from `[contracts] create2_factory_salt` plus the per-CTM salts under
@@ -195,9 +194,6 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     logger::info(format!(
         "New Gateway representative chain ID: {new_gateway_representative_chain_id}"
     ));
-    logger::info(format!(
-        "New Gateway settlement fee: {new_gateway_settlement_fee}"
-    ));
     logger::info(format!("L1 chain ID (expected): {l1_chain_id}"));
     logger::info(format!("CREATE2 factory: {create2_factory}"));
     logger::info(format!("ZK token asset ID: {zk_token_asset_id}"));
@@ -233,7 +229,6 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         &legacy_gateway_chain_intervals,
         new_gateway_chain_id,
         new_gateway_representative_chain_id,
-        new_gateway_settlement_fee,
         l1_chain_id,
         &tx_hashes,
         create2_factory,

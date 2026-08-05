@@ -15,11 +15,7 @@ import {
     OnlyPriorityMode,
     MustBeEraChain
 } from "../../../common/L1ContractErrors.sol";
-import {
-    GW_ASSET_TRACKER_ADDR,
-    L2_CHAIN_ASSET_HANDLER_ADDR,
-    L2_INTEROP_CENTER_ADDR
-} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
@@ -29,6 +25,7 @@ import {
     SYSTEM_UPGRADE_L2_TX_TYPE,
     ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
+    ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
     L2DACommitmentScheme,
     DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH
 } from "../../../common/Config.sol";
@@ -120,13 +117,6 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
-    modifier onlyGatewayAssetTracker() {
-        if (msg.sender != GW_ASSET_TRACKER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     modifier onlyL2ChainAssetHandler() {
         if (msg.sender != L2_CHAIN_ASSET_HANDLER_ADDR) {
             revert Unauthorized(msg.sender);
@@ -184,11 +174,8 @@ contract ZKChainBase is ReentrancyGuard {
             msg.sender != address(this) &&
             /// For registering chains in the L2Bridgehub. This is used for interop initiation.
             msg.sender != bridgehub.chainRegistrationSender() &&
-            /// For sending the token balance migration confirmation txs to L2s and the Gateway.
-            /// confirmMigrationOnL2, confirmMigrationOnGateway.
-            msg.sender != address(s.assetTracker) &&
-            /// 1. For setting the legacy shared bridge in the L2Asset Tracker.
-            /// 2. Also for sending the demarcation txs for token balance migration. It might be deleted.
+            /// For sending the deposit-pause request to the settlement layer's L2ChainAssetHandler
+            /// when a chain migrates away from it.
             msg.sender != address(bridgehub.chainAssetHandler())
         ) {
             revert Unauthorized(msg.sender);
@@ -224,6 +211,14 @@ contract ZKChainBase is ReentrancyGuard {
 
     function _getUpgradeTxType() internal view returns (uint256) {
         return s.zksyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+    }
+
+    /// @notice Returns the effective ZKsync OS single-transaction gas limit (EIP-7825).
+    /// @dev `0` in storage means the value was never set explicitly (chains deployed before the
+    /// field was introduced) and falls back to the default cap.
+    function _getZKsyncOSMaxTxGasLimit() internal view returns (uint64) {
+        uint64 storedMaxTxGasLimit = s.zksyncOSMaxTxGasLimit;
+        return storedMaxTxGasLimit == 0 ? ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT : storedMaxTxGasLimit;
     }
 
     /// @notice Returns whether deposits are currently paused.

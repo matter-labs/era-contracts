@@ -8,9 +8,10 @@ bytes1 constant NEW_ENCODING_VERSION = 0x01;
 /// @dev The encoding version used for txs that set the asset handler on the counterpart contract.
 bytes1 constant SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION = 0x02;
 
-/// @title L1 Bridge contract interface
+/// @title Asset router base interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @notice Events and getters shared by the L1 and L2 asset routers. See {protocol-docs/bridging.md#asset-routing-burn--mint}.
 interface IAssetRouterBase {
     event BridgehubDepositBaseTokenInitiated(
         uint256 indexed chainId,
@@ -35,7 +36,7 @@ interface IAssetRouterBase {
 
     event AssetHandlerRegistered(bytes32 indexed assetId, address indexed _assetHandlerAddress);
 
-    event DepositFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
+    event DepositFinalizedAssetRouter(uint256 indexed sourceChainId, bytes32 indexed assetId, bytes assetData);
 
     function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 }

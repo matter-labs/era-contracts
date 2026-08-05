@@ -4,7 +4,7 @@
     "l1SharedBridge": "0xdcaF9D32175AF577576dECf5CA550FB4BBF47843",
     "l1NullifierProxy": "0xD6007965C39Bf5f76f0C8D65Dfe97a8559265d00",
     "l1NativeTokenVault": "0x7b1807E041CdA40CB7a6cAcd384fB20dD7a45047",
-    "l1AssetTracker": "0xb6e5AdB38F305Cfb102cF03D6ea3d4D09Ced4C95",
+    "l1ChainAssetHandler": "0xb6e5AdB38F305Cfb102cF03D6ea3d4D09Ced4C95",
     "l1ERC20Bridge": "0xbF4a04F90D61A5EEcfB55739Ce170F270Caf2658",
     "governance": "0x5d2f74Fe0BAa15397Ec74d39b1f962D5d29014dE",
     "transparentProxyAdmin": "0xC128f7d1493b7dBf4E0A5b6430D29BA546f0a98d",

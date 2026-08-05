@@ -7,10 +7,14 @@ import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol"
 import {L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof} from "../core/bridgehub/L1BridgehubErrors.sol";
 
-/// @title The interface of the ZKsync L2MessageVerification contract that can be used to prove L2 message inclusion on the L2.
+/// @title L2MessageVerification
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @notice Proves L2->L1 message inclusion on an L2, anchoring the shared recursive proof logic to
+/// the imported interop roots. See {protocol-docs/interop.md#message-verification-l2messageverification}.
 contract L2MessageVerification is MessageVerification {
+    /// @dev Overrides the shared recursion with the L2 terminal step; recursion depth is limited to
+    /// one hop.
     function _proveL2LeafInclusionRecursive(
         uint256 _chainId,
         uint256 _blockOrBatchNumber,
@@ -27,18 +31,18 @@ contract L2MessageVerification is MessageVerification {
             _proof: _proof
         });
         if (proofData.finalProofNode) {
-            // For proof based interop this is the SL InteropRoot at block number _blockOrBatchNumber
-            bytes32 correctBatchRoot = L2_INTEROP_ROOT_STORAGE.interopRoots(_chainId, _blockOrBatchNumber);
+            // finalProofNode terminates on an L2 consumer: it anchors to the imported L1 aggregate interop
+            // root (`interopRoots`), since an L2 has no per-chain roots. (On L1 — the settlement layer of
+            // every chain in this release — `MessageRootBase` terminates at its own `chainBatchRoots`.)
+            bytes32 correctBatchRoot = L2_INTEROP_ROOT_STORAGE.interopRoots(_chainId, _blockOrBatchNumber).root;
             return correctBatchRoot == proofData.batchSettlementRoot && correctBatchRoot != bytes32(0);
         }
         if (_depth == 1) {
             revert DepthMoreThanOneForRecursiveMerkleProof();
         }
 
-        // Note that here we assume that all settlement layers that the chain has ever settled on are trustworthy,
-        // i.e. all chains inside the ecosystem trust that they will not accept a message for a batch
-        // that never happened.
-
+        // Assumes all settlement layers the chain has ever settled on are trustworthy (see
+        // {protocol-docs/interop.md#message-verification-l2messageverification}).
         return
             this.proveL2LeafInclusionSharedRecursive({
                 _chainId: proofData.settlementLayerChainId,

@@ -29,11 +29,7 @@ function readStateJson(p: string): unknown {
   return JSON.parse(buf.toString("utf-8"));
 }
 
-// `number` is wall-clock-volatile: the harness runs Anvil with interval mining
-// (`--block-time 1`, required so the interop relayers/TBM keep progressing), so
-// the final block height depends on how long generation took, not on the state
-// itself. Ignore it alongside timestamp/basefee/etc. so the check validates the
-// substantive state (accounts/code/storage) rather than the block count.
+// `number` is wall-clock-volatile under interval mining — see the drift note below.
 const IGNORED_BLOCK_FIELDS = new Set([
   "number",
   "timestamp",
@@ -55,30 +51,19 @@ const BALANCE_TOLERANCE_WEI = BigInt("10000000000000000"); // 10^16
 // EOA, not contract state, so this is safe to ignore.
 const GAS_PAYER_BALANCE_ACCOUNTS = new Set(["0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"]);
 
-// The interop harness runs Anvil with interval mining (`--block-time 1`, needed
-// so the relayers/TBM keep progressing), so the number of L2 blocks produced is
-// wall-clock-dependent. Two identical runs therefore differ ONLY in state that
-// records the current L2 block/batch number. That drift is confined to the
-// specific account and slots below (verified by diffing two fresh Linux
-// generations); everything else is byte-for-byte deterministic. We ignore
-// exactly these by explicit identity — NOT by value magnitude, since many real
-// slots legitimately hold small integers (0/1/2).
+// Interval mining (`--block-time 1`, needed so the interop relayers keep progressing) makes the
+// number of L2 blocks produced wall-clock-dependent, so two identical runs differ ONLY in state
+// that records the current L2 block/batch number. That drift is confined to the account and slots
+// below (verified by diffing two fresh Linux generations). We ignore exactly these by explicit
+// identity — NOT by value magnitude, since many real slots legitimately hold small integers.
 
-// Accounts whose storage is a block/batch-indexed accumulator (or otherwise
-// tracks the non-deterministic block count / gas cost), so ~all of their storage
-// legitimately drifts run-to-run — skip storage compare for them entirely.
-//
-// Two sources:
-//  1. Fixed L2 predeploys listed here — 0x…010005 = L2MessageRoot
-//     (`historicalRoot[blockNumber]`, `chainBatchRoots`, incremental Merkle trees
-//     and batch counters all grow with the number of blocks/batches produced).
-//  2. Deployment-specific L1 contracts resolved by ROLE from addresses.json (see
-//     collectSkipStorageAccounts): the L1 messageRoot, every chain diamond proxy
-//     (per-batch `storedBatchHashes`/`l2LogsRootHashes` + batch counters) and the
-//     L1 asset tracker (gas-cost-dependent balances).
-//
-// Everything NOT in this set is still storage-compared exactly, so real drift in
-// the bridgehub, CTM, bridges, NTV, tokens, etc. is still caught.
+// Accounts whose storage is a block/batch-indexed accumulator, so ~all of it legitimately drifts
+// run-to-run — skip storage compare entirely. Two sources: the fixed L2MessageRoot predeploy
+// (0x…010005; block-indexed roots, trees, batch counters), plus deployment-specific L1 contracts
+// resolved by role from addresses.json (L1 messageRoot and every chain diamond proxy — see
+// collectSkipStorageAccounts). The L1NativeTokenVault is NOT skipped wholesale; its single
+// gas-dependent `bridgedOut[ETH]` slot is handled by GAS_DEPENDENT_VALUE_SLOTS. Everything not in
+// this set is still storage-compared exactly.
 const BLOCK_INDEXED_STORAGE_ACCOUNTS = new Set(["0x0000000000000000000000000000000000010005"]);
 
 // Resolve the deployment-specific batch-indexed / fee-dependent L1 contracts by
@@ -88,29 +73,46 @@ function collectSkipStorageAccounts(versionDir: string): Set<string> {
   const p = path.join(versionDir, "addresses.json");
   if (!fs.existsSync(p)) return skip;
   const a = JSON.parse(fs.readFileSync(p, "utf-8")) as {
-    l1Addresses?: { messageRoot?: string; l1AssetTracker?: string };
+    l1Addresses?: { messageRoot?: string };
     chainAddresses?: Array<{ diamondProxy?: string }>;
   };
   const add = (v: unknown) => {
     if (typeof v === "string" && /^0x[0-9a-fA-F]{40}$/.test(v)) skip.add(v.toLowerCase());
   };
   add(a.l1Addresses?.messageRoot);
-  add(a.l1Addresses?.l1AssetTracker);
   for (const c of a.chainAddresses ?? []) add(c.diamondProxy);
   return skip;
 }
 
-// Specific storage slots (keccak-derived, so collision-free across contracts)
-// that hold an L2 block/batch number in the interop bookkeeping contracts
-// (L2InteropRootStorage / ChainAssetHandler / AssetTracker instances). These
-// were the only common-slot value diffs between two fresh runs, each differing
-// by exactly the block-count delta. Ignored in whichever account they appear.
+// Keccak-derived slots (collision-free across contracts) holding an L2 block/batch number in the
+// interop bookkeeping contracts. These were the only common-slot value diffs between two fresh
+// runs, each differing by exactly the block-count delta. Ignored in whichever account they appear.
 const BLOCK_NUMBER_STORAGE_SLOTS = new Set([
   "0x22157c206018468b45ae7922bc7a0b0cb8feed201dac3c6fb5e7876aa94e11e9",
   "0xcae482817da5739a72d01cb9874e04d330e5e8dc74bc0bece220f5b3532c14b8",
   "0xe12917faa952038297cceeb966eb4f054126fd0f1307df22b19432454cb24b37",
   "0xa1a0bcd6e1eb10e34e86589f0737ed295f21e2780238b04598ea22e184199ff6",
 ]);
+
+// Slots holding a gas-cost-dependent ETH amount (the harness bridges a gas-dependent mintValue on
+// L1->L2 deposits): compared with BALANCE_TOLERANCE_WEI slack rather than skipped, so large (real)
+// drift is still caught. Currently the L1NativeTokenVault's `bridgedOut[ETH]` entry:
+//   slot = keccak256(abi.encode(ethAssetId, 253)), 253 = `bridgedOut` mapping storage index.
+//   Recompute with `cast index bytes32 <ethAssetId> 253` if the NTV layout changes.
+const GAS_DEPENDENT_VALUE_SLOTS = new Set(["0xa779570f23bf75d0370baade00c3f15fe23265e729cfb55c61a10ccf98dc7093"]);
+
+// True when two raw storage words differ by no more than the native-balance
+// tolerance (used only for slots known to hold a gas-dependent ETH amount).
+function withinBalanceTolerance(v1?: string, v2?: string): boolean {
+  try {
+    const a = BigInt(v1 ?? "0x0");
+    const b = BigInt(v2 ?? "0x0");
+    const diff = a > b ? a - b : b - a;
+    return diff <= BALANCE_TOLERANCE_WEI;
+  } catch {
+    return false;
+  }
+}
 
 interface ChainStateAccount {
   nonce?: number;
@@ -183,16 +185,21 @@ function compareChainState(
     }
 
     // Skip storage for batch-indexed / fee-dependent contracts (MessageRoots,
-    // chain diamonds, asset tracker): their state tracks the non-deterministic
-    // block count / gas cost.
+    // chain diamonds): their state tracks the non-deterministic block count.
     if (!skipStorageAccounts.has(addr.toLowerCase())) {
       const s1 = a1.storage || {};
       const s2 = a2.storage || {};
       if (JSON.stringify(s1) !== JSON.stringify(s2)) {
         const allSlots = [...new Set([...Object.keys(s1), ...Object.keys(s2)])].sort();
-        // Drop the explicitly-listed block-number slots (see above); everything
-        // else must match exactly.
-        const diffSlots = allSlots.filter((s) => s1[s] !== s2[s] && !BLOCK_NUMBER_STORAGE_SLOTS.has(s));
+        // Drop the explicitly-listed block-number slots (see above) and tolerate
+        // gas-scale drift on the known gas-dependent value slots; everything else
+        // must match exactly.
+        const diffSlots = allSlots.filter((s) => {
+          if (s1[s] === s2[s]) return false;
+          if (BLOCK_NUMBER_STORAGE_SLOTS.has(s)) return false;
+          if (GAS_DEPENDENT_VALUE_SLOTS.has(s) && withinBalanceTolerance(s1[s], s2[s])) return false;
+          return true;
+        });
         if (diffSlots.length > 0) {
           diffs.push(`  ${name}: account ${addr} storage differs in ${diffSlots.length} slot(s)`);
           for (const slot of diffSlots.slice(0, 5)) {

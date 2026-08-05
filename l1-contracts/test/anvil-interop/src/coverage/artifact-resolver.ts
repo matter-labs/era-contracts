@@ -107,7 +107,6 @@ const KNOWN_CONTRACT_NAMES: Record<string, string[]> = {
   bridgehub: ["L1Bridgehub"],
   l1SharedBridge: ["L1AssetRouter"],
   l1NativeTokenVault: ["L1NativeTokenVault"],
-  l1AssetTracker: ["L1AssetTracker"],
   l1Nullifier: ["L1Nullifier"],
   l1NullifierProxy: ["L1Nullifier"],
   stateTransitionProxy: ["ChainTypeManager"],
