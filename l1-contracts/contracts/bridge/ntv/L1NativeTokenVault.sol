@@ -18,7 +18,7 @@ import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {IWETH9} from "../interfaces/IWETH9.sol";
 
-import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, MAX_TOKEN_BALANCE} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {TxStatus} from "../../common/Messaging.sol";
@@ -33,7 +33,7 @@ import {
 import {AssetNotNativeToL1, OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
 import {InsufficientChainBalance} from "../asset-tracker/AssetTrackerErrors.sol";
 import {ILegacyL1AssetTracker} from "../asset-tracker/ILegacyL1AssetTracker.sol";
-import {MAX_TOKEN_BALANCE} from "../asset-tracker/IL2AssetTracker.sol";
+
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 
 /// @author Matter Labs
@@ -145,14 +145,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         }
 
         // Assets that never went through the tracker migration still have their amounts here. Nothing writes
-        // these entries anymore, so summing them over the registered chains is exact. L1's own entry is
-        // skipped: it only ever tracked assets native to other chains.
+        // these entries anymore, so summing them over the registered chains is exact. The list holds ZK
+        // chains only, never L1 itself, so no entry of this vault's own chain can enter the sum.
         uint256[] memory chainIds = IBridgehubBase(address(L1_NULLIFIER.BRIDGE_HUB())).getAllZKChainChainIDs();
         uint256 chainIdsLength = chainIds.length;
         for (uint256 i = 0; i < chainIdsLength; ++i) {
-            if (chainIds[i] == L1_CHAIN_ID) {
-                continue;
-            }
             amount += DEPRECATED_chainBalance[chainIds[i]][_assetId];
         }
     }

@@ -27,7 +27,8 @@ import {
     TotalPreV31SupplyShouldBeZero
 } from "./AssetTrackerErrors.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
-import {IL2AssetTracker, SavedTotalSupply, MAX_TOKEN_BALANCE} from "./IL2AssetTracker.sol";
+import {IL2AssetTracker, SavedTotalSupply} from "./IL2AssetTracker.sol";
+import {MAX_TOKEN_BALANCE} from "../../common/Config.sol";
 
 /// @notice Chain-local, write-mostly token bookkeeping; correctness of transfers is guaranteed by ZK
 /// proofs, not by these balances. See {protocol-docs/bridging.md#l2-asset-tracker}.

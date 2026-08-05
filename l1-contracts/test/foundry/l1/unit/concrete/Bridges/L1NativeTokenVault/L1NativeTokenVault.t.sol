@@ -31,7 +31,7 @@ import {OriginChainIdNotFound, Unauthorized} from "contracts/common/L1ContractEr
 import {AssetNotNativeToL1, OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {InsufficientChainBalance} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {ILegacyL1AssetTracker} from "contracts/bridge/asset-tracker/ILegacyL1AssetTracker.sol";
-import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
+import {MAX_TOKEN_BALANCE} from "contracts/common/Config.sol";
 
 /// @dev Test helper contract that exposes internal functions
 contract L1NativeTokenVaultTestHelper is L1NativeTokenVault {

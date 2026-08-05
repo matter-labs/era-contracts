@@ -2,11 +2,6 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-/// @dev By convention, tokens native to a chain are treated as if an infinite amount was deposited
-/// at the chain's inception, so their tracked balances start at this value and decrease as tokens
-/// are bridged out.
-uint256 constant MAX_TOKEN_BALANCE = type(uint256).max;
-
 /// @dev A token's total-supply snapshot; `isSaved` distinguishes "not captured yet" from a zero amount.
 struct SavedTotalSupply {
     bool isSaved;
