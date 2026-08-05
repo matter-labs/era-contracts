@@ -866,4 +866,15 @@ contract PriorityOpLowerBoundTest is Test {
         vm.expectRevert(BaseTokenPreV31TotalSupplyNotSet.selector);
         registry.lowerBoundPriorityOp(chain);
     }
+
+    /// @dev Zero must stay an unambiguous "not recorded" sentinel: a chain with no priority ops
+    /// (only possible when the flag came from DiamondInit, not from a backfill) cannot record.
+    function test_revertsWhenChainHasNoPriorityOps() public {
+        vm.mockCall(chain, abi.encodeWithSelector(IGetters.getTotalPriorityTxs.selector), abi.encode(uint256(0)));
+
+        vm.expectRevert(ZeroPriorityOpCount.selector);
+        registry.lowerBoundPriorityOp(chain);
+
+        assertEq(registry.lowerBound(chain), 0, "a rejected recording must leave the mapping unset");
+    }
 }

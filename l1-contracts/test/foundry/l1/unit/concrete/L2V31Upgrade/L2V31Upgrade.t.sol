@@ -5,7 +5,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
-    L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
