@@ -37,6 +37,8 @@ contract MockL2CrossChainSender is IL2CrossChainSender {
     address public returnRecipient;
     uint256 public callCount;
     uint256 public totalReceivedMsgValue;
+    /// @dev Per-call msg.value log, in call order.
+    uint256[] public receivedMsgValues;
     /// @dev When non-empty, returned verbatim as the starter's `to` — lets tests exercise the
     /// InteropCenter's validation of the RETURNED recipient (malformed / chain-carrying / zero forms).
     bytes public returnToOverride;
@@ -55,6 +57,7 @@ contract MockL2CrossChainSender is IL2CrossChainSender {
         returnRecipient = _returnRecipient;
         callCount = 0;
         totalReceivedMsgValue = 0;
+        delete receivedMsgValues;
         delete returnToOverride;
     }
 
@@ -74,6 +77,7 @@ contract MockL2CrossChainSender is IL2CrossChainSender {
         lastOriginalCaller = _originalCaller;
         callCount++;
         totalReceivedMsgValue += msg.value;
+        receivedMsgValues.push(msg.value);
 
         bytes[] memory callAttributes = new bytes[](1);
         callAttributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, (_value));
@@ -103,7 +107,9 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         // plumbing and returned-starter validation from the real router's burn logic (covered by
         // L2AtomicInteropSendRefundTestAbstract). The router's own logic is not exercised here; its
         // storage is re-initialized for the mock's layout via `initMockState` (constructor state does
-        // not survive `vm.etch`).
+        // not survive `vm.etch`). That re-init is safe because the mock's slots land inside the router's
+        // OZ upgradeable-base storage gap (slot 0 is Initializable's flags; slots 1-50 are the
+        // ContextUpgradeable gap, all zero) — if that layout ever changes, re-derive this argument.
         MockL2CrossChainSender template = new MockL2CrossChainSender(finalRecipient);
         vm.etch(L2_ASSET_ROUTER_ADDR, address(template).code);
         mockCrossChainSender = MockL2CrossChainSender(payable(L2_ASSET_ROUTER_ADDR));
@@ -307,18 +313,20 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             _withAtomicBundle(bundleAttributes)
         );
 
+        // Per-call value attribution: each initiateIndirectCall must carry exactly its own
+        // indirectCallMessageValue as msg.value, in call order.
         assertEq(mockCrossChainSender.callCount(), 2, "initiateIndirectCall should be called once per call");
         assertEq(
-            mockCrossChainSender.totalReceivedMsgValue(),
-            totalValue,
-            "Starter should receive both indirectCallMessageValues in total"
+            mockCrossChainSender.receivedMsgValues(0),
+            indirectCallMessageValue1,
+            "First call should carry indirectCallMessageValue1"
         );
         assertEq(
-            mockCrossChainSender.lastReceivedMsgValue(),
+            mockCrossChainSender.receivedMsgValues(1),
             indirectCallMessageValue2,
-            "Last call should carry indirectCallMessageValue2"
+            "Second call should carry indirectCallMessageValue2"
         );
-        assertEq(mockCrossChainSender.lastInteropCallValue(), interopCallValue2, "interopCallValue should be zero");
+        assertEq(mockCrossChainSender.lastInteropCallValue(), 0, "indirect calls carry no interopCallValue");
     }
 
     /// @notice Test mixed bundle with direct and indirect calls
@@ -400,10 +408,9 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
     }
 
-    /// @notice The recipient RETURNED by an (arbitrary, user-chosen) indirect call starter gets the same
-    /// validation as a user-supplied one: a chain-carrying ERC-7930 form is rejected — the bundle-level
-    /// destination chain is authoritative, and a smuggled chain reference would otherwise be silently
-    /// ignored.
+    /// @notice The recipient RETURNED by an indirect call starter gets the same validation as a
+    /// user-supplied one: a chain-carrying ERC-7930 form is rejected — the bundle-level destination
+    /// chain is authoritative, and a smuggled chain reference would otherwise be silently ignored.
     function test_indirectStarterReturnedRecipientWithChainReferenceReverts() public {
         bytes memory chainCarryingTo = InteroperableAddress.formatEvmV1(destinationChainId + 1, finalRecipient);
         mockCrossChainSender.setReturnToOverride(chainCarryingTo);
@@ -627,17 +634,18 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             _withAtomicBundle(bundleAttributes)
         );
 
-        // Verify both indirect calls were processed
+        // Verify both indirect calls were processed, each carrying exactly its own
+        // indirectCallMessageValue as msg.value, in call order.
         assertEq(mockCrossChainSender.callCount(), 2, "initiateIndirectCall should be called once per call");
         assertEq(
-            mockCrossChainSender.totalReceivedMsgValue(),
-            totalIndirectValue,
-            "Starter should receive both indirectCallMessageValues in total"
+            mockCrossChainSender.receivedMsgValues(0),
+            indirectCallMessageValue1,
+            "First call should carry indirectCallMessageValue1"
         );
         assertEq(
-            mockCrossChainSender.lastReceivedMsgValue(),
+            mockCrossChainSender.receivedMsgValues(1),
             indirectCallMessageValue2,
-            "Last call should carry indirectCallMessageValue2"
+            "Second call should carry indirectCallMessageValue2"
         );
     }
 
@@ -748,14 +756,18 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         vm.deal(address(this), indirectCallMessageValue);
+        // Pins the check ordering: if the starter were invoked before the rejection, the send would
+        // revert with "starter must not be invoked" instead of the expected error.
+        vm.mockCallRevert(
+            address(nonRouterStarter),
+            abi.encodeWithSelector(IL2CrossChainSender.initiateIndirectCall.selector),
+            "starter must not be invoked"
+        );
         vm.expectRevert(abi.encodeWithSelector(IndirectCallOnlyToAssetRouter.selector, address(nonRouterStarter)));
         L2_INTEROP_CENTER.sendBundle{value: indirectCallMessageValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
             calls,
             _withAtomicBundle(bundleAttributes)
         );
-
-        // The rejection happens before the starter is ever invoked.
-        assertEq(nonRouterStarter.callCount(), 0, "non-router starter must never be invoked");
     }
 }

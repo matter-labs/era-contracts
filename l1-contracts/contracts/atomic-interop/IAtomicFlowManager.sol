@@ -51,7 +51,8 @@ interface IAtomicFlowManager {
     /// (see {AtomicInteropProof.verifyTimeoutAbsence}).
     function authorizeRefund(AtomicFlow calldata _flow, uint256 _missingLegIndex, ImtProof calldata _absence) external;
 
-    /// @notice Claims a `Revertable` leg's refund: reverses the bundle's asset-router calls
+    /// @notice Claims a `Revertable` leg's refund (best-effort — see
+    /// {protocol-docs/atomicity/recovery.md#non-guarantees}): reverses the bundle's asset-router calls
     /// (re-minting each burned asset to its depositor) and refunds a direct call's base-token `value`.
     /// Permissionless. State `Revertable -> Reverted`.
     /// @param _flowId The flow the leg belongs to.

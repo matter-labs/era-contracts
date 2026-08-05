@@ -285,8 +285,8 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// they do not recognise). Send-time validation restricts indirect calls to the asset router
     /// ({InteropCenter}'s `IndirectCallOnlyToAssetRouter`), so this dispatch reaches every indirect burn.
     /// @dev Native base-token `value` is reversed separately. Router-produced calls (`from == asset
-    /// router`) never carry it — the send path forces `interopCallValue == 0` on indirect calls and the
-    /// router itself never initiates direct sends; neither is re-checked here — and take only the
+    /// router`) never carry it — the send path forces `interopCallValue == 0` on indirect calls, and the
+    /// router does not initiate direct sends today; neither is re-checked here — and take only the
     /// `recoverAtomicCall` branch. A direct call's `value` routes through the asset router/NTV base-token
     /// recovery path (reusing the existing accounting) back to its `from`.
     /// @dev A bundle where no call is recoverable has no source funds to return: the refund then simply
@@ -304,12 +304,12 @@ contract AtomicFlowManager is IAtomicFlowManager {
         for (uint256 i = 0; i < callsLen; ++i) {
             InteropCall memory c = _bundle.calls[i];
             // Indirect calls are restricted to the asset router at send (`IndirectCallOnlyToAssetRouter`),
-            // so `from == L2_ASSET_ROUTER_ADDR` selects exactly the burn-producing indirect calls. Any
-            // other `from` is a direct call's sender (possibly an EOA — probing it would revert the whole
-            // claim) and is skipped here as defense-in-depth; its `value`, if any, is handled below. The
+            // so `from == L2_ASSET_ROUTER_ADDR` selects exactly the burn-producing indirect calls, and
+            // any other `from` is a direct call's sender (possibly an EOA, which must not be probed —
+            // the revert would take down the whole claim); its `value`, if any, is handled below. The
             // sender reports via the return value whether it recognised (and reversed) the call; nothing
-            // is done with the answer — an unrecognised call is skipped (see known issue 1 in
-            // {protocol-docs/atomicity/security.md#known-issues-to-be-fixed-in-this-release}).
+            // is done with the answer — an unrecognised call simply has nothing to recover (see known
+            // issue 1 in {protocol-docs/atomicity/security.md#known-issues-to-be-fixed-in-this-release}).
             if (c.from == L2_ASSET_ROUTER_ADDR) {
                 // slither-disable-next-line unused-return
                 IAtomicRecoverable(c.from).recoverAtomicCall(destChainId, c.data);

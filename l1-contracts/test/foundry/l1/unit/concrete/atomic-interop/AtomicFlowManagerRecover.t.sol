@@ -188,12 +188,12 @@ contract AtomicFlowManagerRecoverTest is Test {
     }
 
     function test_recoverBundle_nonRouterIndirectStarterIsNotDispatched() public {
-        // Defense-in-depth: send-time validation (`IndirectCallOnlyToAssetRouter`) makes the asset
-        // router the only possible indirect call sender, so a non-router `from` is always treated as a
-        // direct call. Even for a bundle shaped like a non-router indirect call, the manager must not
-        // probe the sender (a revert would block the whole claim): its recoverAtomicCall and both
-        // router entry points are set to revert, so any dispatch would fail the test; the claim still
-        // goes through.
+        // Send-time validation (`IndirectCallOnlyToAssetRouter`) makes the asset router the only
+        // possible indirect call sender, so a non-router `from` is always treated as a direct call.
+        // Even for a crafted bundle shaped like a non-router indirect call, `_recoverBundle` must not
+        // probe the sender (probing an EOA would revert and, via claimRefund, block the whole claim):
+        // the sender's recoverAtomicCall and both router entry points are set to revert, so any
+        // dispatch would fail the test; the recovery walk still completes.
         address starter = makeAddr("customIndirectStarter");
         bytes memory callData = abi.encodeWithSignature("finalizeDeposit(uint256,bytes32,bytes)");
         vm.mockCallRevert(
