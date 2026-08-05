@@ -78,6 +78,10 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
             // *requested*. An empty priority queue (all batches are executed, see above) proves
             // the transaction also *executed* on L2 — this upgrade removes its L2 entry point,
             // so a still-pending backfill would be lost and the supply permanently undercounted.
+            // Queue emptiness is the only execution evidence available on L1 for deployed
+            // draft-v31 chains (the request hash was never stored). Anyone can delay the upgrade
+            // by front-running it with a fresh priority request; that bounded, attacker-funded
+            // griefing is accepted — the executor can submit through a private lane.
             require(IGetters(address(this)).getPriorityQueueSize() == 0, PriorityQueueNotReady());
         }
 

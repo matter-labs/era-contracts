@@ -611,6 +611,24 @@ contract L2BaseTokenZKOSTest is Test {
         assertEq(token.totalSupply(), 50, "net-burn state should decrease totalSupply without reverting");
     }
 
+    /// @dev Simulates a draft-v31 chain (slot 50 already backfilled) going through this release's
+    /// initL2: the historical value must survive and feed totalSupply().
+    function test_initL2_preservesBackfilledPreV31Supply() public {
+        L2BaseTokenZKOSHarness harness = new L2BaseTokenZKOSHarness();
+        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(harness).code);
+        L2BaseTokenZKOSHarness token = L2BaseTokenZKOSHarness(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        token.harnessSetZkosPreV31TotalSupply(200);
+
+        vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
+        vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        token.initL2(1);
+
+        assertEq(token.zkosPreV31TotalSupply(), 200, "initL2 must not touch the backfilled slot");
+        // Holder now holds exactly the initial balance, so totalSupply() equals the pre-v31 value.
+        assertEq(token.totalSupply(), 200, "totalSupply must keep the pre-v31 baseline after initL2");
+    }
+
     /// @dev Pins `zkosPreV31TotalSupply` to storage slot 50: the value is written by draft-v31's
     /// backfill service transaction, and this release (which removes the backfill path) must keep
     /// reading the exact same slot. The write goes through a derived-contract setter, the read

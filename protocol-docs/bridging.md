@@ -157,8 +157,8 @@ tokens) and rejects fee-on-transfer tokens (`TokensWithFeesNotSupported`).
 - The chain's base token is escrowed off-vault in `BaseTokenHolder`, initialized with `2^127 - 1` base
   tokens; transfers from the holder replace minting (better EVM/Foundry compatibility). `give` (interop
   handler only) pays out inbound value; `burnAndStartBridging` (InteropCenter or NTV) receives outbound
-  value; both record the flow in the holder's own bookkeeping first. Its balance means "funds the chain
-  can still mint";
+  value; both report the flow to the `L2NativeTokenVault` bookkeeping first (the holder itself stores
+  nothing). Its balance means "funds the chain can still mint";
   force-sent funds (refund recipient, selfdestruct on ZK OS) only skew the `totalSupply()` view, never
   bridging accounting.
   - The operator must keep the base-token total supply below `2^127`, otherwise the holder's balance

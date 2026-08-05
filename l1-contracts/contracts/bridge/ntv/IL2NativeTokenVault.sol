@@ -45,7 +45,7 @@ interface IL2NativeTokenVault is INativeTokenVaultBase {
 
     /// @notice Records an outbound base-token bridge flow under `BASE_TOKEN_ASSET_ID`.
     /// @dev Callable only by BaseTokenHolder, which escrows the base token and therefore observes
-    /// all of its bridge flows.
+    /// its contract-level bridge flows.
     /// @param _toChainId The chain ID which the funds are sent to.
     /// @param _amount The bridged amount.
     function recordBaseTokenBridgingToChain(uint256 _toChainId, uint256 _amount) external;

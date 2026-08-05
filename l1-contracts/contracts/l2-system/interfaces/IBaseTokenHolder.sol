@@ -46,7 +46,8 @@ interface IBaseTokenHolder {
     /// `_to` rejects it — recovery targets the original depositor by design.
     /// @param _to The original depositor to refund.
     /// @param _amount The amount of base tokens to return.
-    /// @param _toChainId The original bridge-out destination chain id (to reverse the matching accounting).
+    /// @param _toChainId The original bridge-out destination chain id (used to assert the recovery
+    /// needs no accounting reversal).
     function recoverBaseToken(address _to, uint256 _amount, uint256 _toChainId) external;
 
     /// @notice Receives outbound base-token value and records the outbound flow (replaces burning).

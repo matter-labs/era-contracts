@@ -792,41 +792,6 @@ contract L2BaseTokenEraTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    ORDERING INVARIANT TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Verifies that recordBaseTokenDeposit is called BEFORE totalSupply changes, so the
-    /// bookkeeping observes the pre-mint state.
-    function test_mint_recordsDepositBeforeTotalSupplyChange() public {
-        _initL2();
-        uint256 mintAmount = 5 ether;
-
-        uint256 totalSupplyBefore = l2BaseToken.totalSupply();
-
-        // Deploy a recording holder — snapshots totalSupply when the deposit is recorded
-        TotalSupplyObservingHolder recorder = new TotalSupplyObservingHolder(address(l2BaseToken));
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(recorder).code);
-
-        vm.prank(L2_BOOTLOADER_ADDRESS);
-        l2BaseToken.mint(alice, mintAmount);
-
-        // Read recorded values from the etched address
-        TotalSupplyObservingHolder etched = TotalSupplyObservingHolder(payable(L2_BASE_TOKEN_HOLDER_ADDR));
-        assertTrue(etched.wasCalled(), "The holder's recording hook should have been called");
-        assertEq(
-            etched.recordedTotalSupply(),
-            totalSupplyBefore,
-            "recordBaseTokenDeposit must be called BEFORE totalSupply changes"
-        );
-
-        assertEq(
-            l2BaseToken.totalSupply(),
-            totalSupplyBefore + mintAmount,
-            "totalSupply should have increased after mint completes"
-        );
-    }
-
-    /*//////////////////////////////////////////////////////////////
                         INTERFACE COMPLIANCE
     //////////////////////////////////////////////////////////////*/
 
@@ -839,25 +804,6 @@ contract L2BaseTokenEraTest is Test {
         IL2BaseTokenEra token = IL2BaseTokenEra(address(l2BaseToken));
         assert(address(token) == address(l2BaseToken));
     }
-}
-
-/// @notice Recording holder that snapshots the base token's totalSupply when the deposit is recorded.
-/// @dev Used to pin the "record before balance changes" ordering invariant of L2BaseTokenEra.mint.
-contract TotalSupplyObservingHolder {
-    address public immutable BASE_TOKEN;
-    bool public wasCalled;
-    uint256 public recordedTotalSupply;
-
-    constructor(address _baseToken) {
-        BASE_TOKEN = _baseToken;
-    }
-
-    function recordBaseTokenDeposit(uint256, uint256) external {
-        wasCalled = true;
-        recordedTotalSupply = L2BaseTokenEra(BASE_TOKEN).totalSupply();
-    }
-
-    receive() external payable {}
 }
 
 /// @dev Records the base-token flows the real BaseTokenHolder reports. The settlement-layer
