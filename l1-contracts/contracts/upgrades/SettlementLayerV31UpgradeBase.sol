@@ -7,7 +7,7 @@ import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {PriorityQueueNotReady} from "../common/L1ContractErrors.sol";
+import {BaseTokenPreV31TotalSupplyNotSet, PriorityQueueNotReady} from "../common/L1ContractErrors.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
@@ -65,11 +65,15 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
             require(IGetters(address(this)).getPriorityQueueSize() == 0, PriorityQueueNotReady());
         }
 
-        // Era chains automatically have it tracked.
-        // ZKsync OS chains haven't been tracking this value until the v31 upgrade.
-        // It will have to be backfilled.
+        // Era chains automatically have the base-token total supply tracked.
+        // ZKsync OS chains haven't been tracking this value on-chain before v31: existing chains
+        // must have had it backfilled while running draft-v31 (`setZKsyncOSPreV31TotalSupply`,
+        // which sets this flag). This release has no backfill path, so the upgrade is forbidden
+        // until the backfill happened.
         if (!s.zksyncOS) {
             s.baseTokenHasTotalSupply = true;
+        } else {
+            require(s.baseTokenHasTotalSupply, BaseTokenPreV31TotalSupplyNotSet());
         }
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;

@@ -32,6 +32,7 @@ import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
+import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
@@ -668,7 +669,9 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     }
 
     function _readBaseTokenInteropInfo() internal view returns (uint256 withdrawals, uint256 deposits) {
-        (withdrawals, deposits) = BaseTokenHolder(payable(L2_BASE_TOKEN_HOLDER_ADDR)).baseTokenInteropInfo();
+        // The holder reports its flows to the vault, which keeps them under BASE_TOKEN_ASSET_ID.
+        L2NativeTokenVault vault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        (withdrawals, deposits) = vault.interopInfo(vault.BASE_TOKEN_ASSET_ID());
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -677,7 +680,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
 
     /// @notice Verifies the full inbound interop flow through the base-token bookkeeping.
     /// @dev Executes a bundle with value > 0 through InteropHandler, which calls
-    /// BaseTokenHolder.give(), recording the flow in `baseTokenInteropInfo`.
+    /// BaseTokenHolder.give(), which reports the flow to the vault's `interopInfo`.
     function test_give_inboundFlow_recordsBookkeeping() public {
         BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);

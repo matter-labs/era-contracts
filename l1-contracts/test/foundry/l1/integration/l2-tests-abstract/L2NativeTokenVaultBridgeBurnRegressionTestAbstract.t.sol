@@ -65,7 +65,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         vm.deal(L2_ASSET_ROUTER_ADDR, depositAmount);
 
         // Replace the dummy holder with the real implementation so the regression test
-        // observes the full bookkeeping path (base-token counters live on the BaseTokenHolder).
+        // observes the full bookkeeping path (the holder reports base-token flows to the vault).
         BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
         vm.mockCall(
@@ -77,7 +77,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         // Record the BaseTokenHolder balance before
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
         uint256 bridgedOutBefore = l2NativeTokenVault.bridgedOut(baseTokenAssetIdLocal);
-        (uint256 totalWithdrawalsBefore, ) = BaseTokenHolder(payable(L2_BASE_TOKEN_HOLDER_ADDR)).baseTokenInteropInfo();
+        (uint256 totalWithdrawalsBefore, ) = l2NativeTokenVault.interopInfo(baseTokenAssetIdLocal);
 
         // Call bridgeBurn from the asset router (which is the only allowed caller)
         // Before the fix: This would revert because bridgeBurn would try to call
@@ -104,7 +104,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
             bridgedOutBefore,
             "bridgedOut should not change for bridged base token burns on L2"
         );
-        (uint256 totalWithdrawalsAfter, ) = BaseTokenHolder(payable(L2_BASE_TOKEN_HOLDER_ADDR)).baseTokenInteropInfo();
+        (uint256 totalWithdrawalsAfter, ) = l2NativeTokenVault.interopInfo(baseTokenAssetIdLocal);
         assertEq(
             totalWithdrawalsAfter - totalWithdrawalsBefore,
             depositAmount,

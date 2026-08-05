@@ -3,7 +3,11 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {EraSettlementLayerV31Upgrade} from "contracts/upgrades/EraSettlementLayerV31Upgrade.sol";
-import {PriorityQueueNotReady, UnexpectedUpgradeSelector} from "contracts/common/L1ContractErrors.sol";
+import {
+    BaseTokenPreV31TotalSupplyNotSet,
+    PriorityQueueNotReady,
+    UnexpectedUpgradeSelector
+} from "contracts/common/L1ContractErrors.sol";
 import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -29,6 +33,7 @@ import {
     L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2UpgradeTxLib} from "contracts/upgrades/L2UpgradeTxLib.sol";
+import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 
 contract DummySettlementLayerV31Upgrade is EraSettlementLayerV31Upgrade, BaseUpgradeUtils {
     function setTotalBatchesCommitted(uint256 _totalBatchesCommitted) public {
@@ -57,6 +62,10 @@ contract DummySettlementLayerV31Upgrade is EraSettlementLayerV31Upgrade, BaseUpg
 
     function getL2SystemContractsUpgradeTxHash() public view returns (bytes32) {
         return s.l2SystemContractsUpgradeTxHash;
+    }
+
+    function getBaseTokenHasTotalSupply() public view returns (bool) {
+        return s.baseTokenHasTotalSupply;
     }
 
     function getConstructedCalldata(
@@ -315,6 +324,8 @@ contract SettlementLayerV31UpgradeSharedTest is SettlementLayerV31UpgradeTestBas
 
         assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
         assertEq(upgrade.getNativeTokenVault(), mockNativeTokenVault);
+        // Era chains have always tracked the base-token total supply, so the flag is simply set.
+        assertTrue(upgrade.getBaseTokenHasTotalSupply(), "Era upgrade should mark the total supply as tracked");
     }
 
     function test_SuccessfulUpgrade_WhitelistedSettlementLayerWithEmptyQueue() public {
@@ -506,6 +517,14 @@ contract DummyZKsyncOSSettlementLayerV31Upgrade is ZKsyncOSSettlementLayerV31Upg
         s.zksyncOS = _v;
     }
 
+    function setBaseTokenHasTotalSupply(bool _v) public {
+        s.baseTokenHasTotalSupply = _v;
+    }
+
+    function getBaseTokenHasTotalSupply() public view returns (bool) {
+        return s.baseTokenHasTotalSupply;
+    }
+
     function setTotalBatchesCommitted(uint256 _v) public {
         s.totalBatchesCommitted = _v;
     }
@@ -613,6 +632,46 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
             abi.encode(address(zkosUpgrade))
         );
         vm.mockCall(address(zkosUpgrade), abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(true));
+    }
+
+    function _prepareZKOSProposedUpgrade() internal {
+        _prepareProposedUpgrade();
+        // `protocolVersion` is only assigned above, so the verifier mock must be (re-)registered here.
+        zkosUpgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
+        proposedUpgrade.l2ProtocolUpgradeTx.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
+        proposedUpgrade.l2ProtocolUpgradeTx.txType = ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
+
+        IComplexUpgrader.UniversalContractUpgradeInfo[]
+            memory forceDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
+        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgradeUniversal,
+            (
+                forceDeployments,
+                L2_VERSION_SPECIFIC_UPGRADER_ADDR,
+                abi.encodeCall(IL2V31Upgrade.upgrade, (true, address(0), "", ""))
+            )
+        );
+    }
+
+    /// @notice The v31 upgrade of a ZKsync OS chain is forbidden until its pre-v31 base-token
+    /// total supply was backfilled while the chain ran draft-v31 (this release has no backfill path).
+    function test_RevertWhen_ZKOSBaseTokenTotalSupplyNotBackfilled() public {
+        _prepareZKOSProposedUpgrade();
+
+        vm.expectRevert(BaseTokenPreV31TotalSupplyNotSet.selector);
+        zkosUpgrade.upgrade(proposedUpgrade);
+    }
+
+    /// @notice A ZKsync OS chain that was backfilled on draft-v31 upgrades successfully and keeps
+    /// the flag set.
+    function test_SuccessfulUpgrade_ZKOSWithBackfilledTotalSupply() public {
+        _prepareZKOSProposedUpgrade();
+        zkosUpgrade.setBaseTokenHasTotalSupply(true);
+
+        bytes32 result = zkosUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
+        assertTrue(zkosUpgrade.getBaseTokenHasTotalSupply(), "the tracked-supply flag must survive the upgrade");
     }
 
     function test_RewritesZKsyncOSV30UniversalUpgradeWithChainSpecificV31Arguments() public {

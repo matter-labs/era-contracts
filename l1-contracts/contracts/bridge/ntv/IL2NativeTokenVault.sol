@@ -35,24 +35,30 @@ interface IL2NativeTokenVault is INativeTokenVaultBase {
     // solhint-disable-next-line func-name-mixedcase
     function L1_CHAIN_ID() external view returns (uint256);
 
-    /// @notice Net amount of each L2-native token currently bridged out of this chain.
-    function bridgedOut(bytes32 _assetId) external view returns (uint256);
-
     /// @notice Whether the chain-local bookkeeping for the token has been initialized.
     function isAssetTracked(bytes32 _assetId) external view returns (bool);
-
-    /// @notice Supply baseline captured before the token's first tracked bridge operation.
-    /// @dev For bridged tokens this is the ERC20 total supply. For native tokens this is
-    /// `type(uint256).max - bridgedOut`, preserving the removed asset tracker's convention.
-    function preTrackingTotalSupply(bytes32 _assetId) external view returns (bool isSaved, uint256 amount);
 
     /// @notice L2-side accounting of L1 <-> L2 flows while this chain settles on L1.
     function interopInfo(
         bytes32 _assetId
     ) external view returns (uint256 totalWithdrawalsToL1, uint256 totalSuccessfulDepositsFromL1);
 
+    /// @notice Records an outbound base-token bridge flow under `BASE_TOKEN_ASSET_ID`.
+    /// @dev Callable only by BaseTokenHolder, which escrows the base token and therefore observes
+    /// all of its bridge flows.
+    /// @param _toChainId The chain ID which the funds are sent to.
+    /// @param _amount The bridged amount.
+    function recordBaseTokenBridgingToChain(uint256 _toChainId, uint256 _amount) external;
+
+    /// @notice Records an inbound base-token bridge flow under `BASE_TOKEN_ASSET_ID`.
+    /// @dev Callable only by BaseTokenHolder.
+    /// @param _fromChainId The source chain ID of the bridging operation.
+    /// @param _amount The bridged amount.
+    function recordBaseTokenBridgingFromChain(uint256 _fromChainId, uint256 _amount) external;
+
     /// @notice Eagerly initializes the chain-local bookkeeping for a legacy non-base token.
-    /// @dev Base-token bookkeeping lives in BaseTokenHolder and is intentionally not duplicated here.
+    /// @dev The base token is rejected: it is escrowed in BaseTokenHolder and has no vault escrow
+    /// to seed.
     function trackLegacyToken(bytes32 _assetId) external;
 
     function setLegacyTokenAssetId(address _l2TokenAddress) external;

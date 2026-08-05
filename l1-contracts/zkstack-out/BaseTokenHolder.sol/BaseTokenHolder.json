@@ -5,81 +5,6 @@
   },
   {
     "type": "function",
-    "name": "backfillBaseTokenPreTrackingTotalSupply",
-    "inputs": [
-      {
-        "name": "_amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "baseTokenInteropInfo",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "totalWithdrawalsToL1",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "totalSuccessfulDepositsFromL1",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "baseTokenPreTrackingTotalSupply",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "isSaved",
-        "type": "bool",
-        "internalType": "bool"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "baseTokenPreTrackingTotalSupplyBackfillPending",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "bookkeepingInitialized",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "burnAndStartBridging",
     "inputs": [
       {
@@ -109,36 +34,6 @@
         "name": "_fromChainId",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "initializeBookkeeping",
-    "inputs": [
-      {
-        "name": "_preTrackingTotalSupply",
-        "type": "tuple",
-        "internalType": "struct SavedTotalSupply",
-        "components": [
-          {
-            "name": "isSaved",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-      },
-      {
-        "name": "_needsBackfill",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "outputs": [],
@@ -250,27 +145,7 @@
   },
   {
     "type": "error",
-    "name": "BaseTokenBookkeepingAlreadyInitialized",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "BaseTokenBookkeepingNotInitialized",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "BaseTokenNativeToThisChain",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "BaseTokenTotalSupplyBackfillNotNeeded",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "L1ChainIdNotSet",
     "inputs": []
   },
   {

@@ -31,7 +31,6 @@ import {
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
 import {OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
-import {InsufficientChainBalance} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -66,10 +65,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     ///      storage layout of already-deployed vaults across the in-place upgrade.
     // slither-disable-next-line unused-state
     address private __DEPRECATED_l1AssetTracker;
-
-    /// @notice Net amount of each L1-native token currently bridged out of L1.
-    /// See {protocol-docs/bridging.md#native-token-vault}.
-    mapping(bytes32 assetId => uint256 amount) public bridgedOut;
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
@@ -281,25 +276,5 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, ""))
         );
         return BeaconProxy(payable(proxyAddress));
-    }
-
-    /// @dev Records the outbound flow of L1-native tokens; see `bridgedOut`.
-    function _handleBridgeToChain(uint256, bytes32 _assetId, uint256 _amount) internal override {
-        if (originChainId[_assetId] == block.chainid) {
-            bridgedOut[_assetId] += _amount;
-        }
-    }
-
-    /// @dev Records the inbound flow of L1-native tokens; see `bridgedOut`.
-    /// @dev An inbound amount exceeding the outstanding bridged-out amount is only possible if
-    /// bridged representations of the asset were forged somewhere upstream, so such a transfer
-    /// is blocked rather than recorded.
-    function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
-        if (originChainId[_assetId] == block.chainid) {
-            if (bridgedOut[_assetId] < _amount) {
-                revert InsufficientChainBalance(_chainId, _assetId, _amount);
-            }
-            bridgedOut[_assetId] -= _amount;
-        }
     }
 }

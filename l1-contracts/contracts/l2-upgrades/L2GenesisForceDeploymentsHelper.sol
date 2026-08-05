@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {
     L2_ASSET_ROUTER_ADDR,
-    L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
@@ -20,9 +19,6 @@ import {
     L2_ATOMIC_FLOW_MANAGER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
-import {IL2BaseTokenZKOS} from "../l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
-import {IBaseTokenHolder} from "../l2-system/interfaces/IBaseTokenHolder.sol";
-import {SavedTotalSupply} from "../common/L2AssetBookkeeping.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {
     FixedForceDeploymentsData,
@@ -373,7 +369,7 @@ library L2GenesisForceDeploymentsHelper {
         });
     }
 
-    /// @notice Initializes the v31 interop contracts, base token, and its local bookkeeping.
+    /// @notice Initializes the v31 interop contracts and the base token.
     /// @dev Called after `_finalizeDeployments` as part of `performForceDeployedContractsInit()`.
     /// Keeping this in the library ensures a single source of truth for v31-specific initialization.
     function _initializeV31Contracts(
@@ -389,30 +385,10 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.zkTokenAssetId
         );
 
-        // Move the ZKsync OS backfill guard into L2BaseToken before the retired tracker disappears.
-        // Fresh chains have no pre-v31 history; an upgraded chain stays unreadable until governance
-        // supplies its pre-v31 total supply.
-        if (_isZKsyncOS) {
-            IL2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initializeTotalSupplyBackfill(!_isGenesisUpgrade);
-        }
-
         // Initialize L2BaseToken: sets L1_CHAIN_ID and initializes the BaseTokenHolder balance.
         // For Era: initializes holder balance, with __DEPRECATED_totalSupply kept in totalSupply().
         // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder.
-        IL2BaseTokenBase l2BaseToken = IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
-        l2BaseToken.initL2(_fixedForceDeploymentsData.l1ChainId);
-
-        // Existing Era chains can expose their exact pre-bookkeeping supply after initL2 establishes
-        // the holder-balance invariant. ZKsync OS chains need the existing service-transaction
-        // backfill and therefore begin with a provisional zero; fresh chains also begin at zero.
-        uint256 preTrackingTotalSupply;
-        if (!_isGenesisUpgrade && !_isZKsyncOS) {
-            preTrackingTotalSupply = l2BaseToken.totalSupply();
-        }
-        IBaseTokenHolder(payable(L2_BASE_TOKEN_HOLDER_ADDR)).initializeBookkeeping(
-            SavedTotalSupply({isSaved: true, amount: preTrackingTotalSupply}),
-            _isZKsyncOS && !_isGenesisUpgrade
-        );
+        IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
 
         // The atomic-interop built-ins are predeployed only in the ZKsync OS genesis; a pre-existing
         // chain upgraded to v31 has no code at these addresses and calling `initL2()` there would

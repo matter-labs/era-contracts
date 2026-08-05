@@ -25,10 +25,7 @@ import "contracts/bridge/interfaces/IL2WrappedBaseToken.sol";
 import "contracts/bridge/UpgradeableBeaconDeployer.sol";
 import "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
 import "contracts/l2-upgrades/ISystemContractProxy.sol";
-import {SavedTotalSupply} from "contracts/common/L2AssetBookkeeping.sol";
 import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.sol";
-import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
-import {IL2BaseTokenZKOS} from "contracts/l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
 
 /**
  * @title L2GenesisForceDeploymentsHelperTest
@@ -95,18 +92,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
         // Etch all deferred mock contracts now that deployment is complete
         _etchAllDeferredContracts();
-        vm.expectCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeCall(IL2BaseTokenZKOS.initializeTotalSupplyBackfill, (false))
-        );
         vm.expectCall(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, abi.encodeCall(IL2BaseTokenBase.initL2, (L1_CHAIN_ID)));
-        vm.expectCall(
-            L2_BASE_TOKEN_HOLDER_ADDR,
-            abi.encodeCall(
-                IBaseTokenHolder.initializeBookkeeping,
-                (SavedTotalSupply({isSaved: true, amount: 0}), false)
-            )
-        );
         // Execute the deployment
         vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
@@ -163,15 +149,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         _deployMockContract(L2_ATOMIC_FLOW_MANAGER_ADDR);
 
         vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
-        vm.expectCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeCall(IL2BaseTokenZKOS.initializeTotalSupplyBackfill, (true))
-        );
         vm.expectCall(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, abi.encodeCall(IL2BaseTokenBase.initL2, (L1_CHAIN_ID)));
-        vm.expectCall(
-            L2_BASE_TOKEN_HOLDER_ADDR,
-            abi.encodeCall(IBaseTokenHolder.initializeBookkeeping, (SavedTotalSupply({isSaved: true, amount: 0}), true))
-        );
 
         vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
@@ -213,13 +191,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // proxy-admin-managed system contract upgrades.
         vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
         vm.expectCall(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, abi.encodeCall(IL2BaseTokenBase.initL2, (L1_CHAIN_ID)));
-        vm.expectCall(
-            L2_BASE_TOKEN_HOLDER_ADDR,
-            abi.encodeCall(
-                IBaseTokenHolder.initializeBookkeeping,
-                (SavedTotalSupply({isSaved: true, amount: 0}), false)
-            )
-        );
         vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
             false, // _isZKsyncOS

@@ -8,8 +8,6 @@ import {L2BaseTokenEra} from "contracts/l2-system/era/L2BaseTokenEra.sol";
 import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.sol";
 import {IL2BaseTokenEra} from "contracts/l2-system/era/interfaces/IL2BaseTokenEra.sol";
 import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
-import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -26,6 +24,7 @@ import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailb
 import {
     BaseTokenHolderAlreadyInitialized,
     InsufficientFunds,
+    InvalidCaller,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
@@ -532,18 +531,10 @@ contract L2BaseTokenEraTest is Test {
     }
 
     function test_withdraw_recordsBookkeepingWithL1ChainId() public {
-        // Deploy the real holder so the full withdrawal bookkeeping path executes.
+        // Deploy the real holder so the full withdrawal bookkeeping path executes; the holder
+        // reports the flow to the vault, so a recording mock stands in for it.
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
-        vm.mockCall(
-            L2_NATIVE_TOKEN_VAULT_ADDR,
-            abi.encodeWithSelector(IL2NativeTokenVault.L1_CHAIN_ID.selector),
-            abi.encode(uint256(1))
-        );
-        vm.mockCall(
-            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(ISystemContext.currentSettlementLayerChainId.selector),
-            abi.encode(uint256(1))
-        );
+        vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, address(new MockRecordingVault()).code);
 
         // Deploy at system contract address so it passes onlyBridgingCaller check
         L2BaseTokenEra l2BaseTokenAtSystemAddr = new L2BaseTokenEra();
@@ -558,8 +549,10 @@ contract L2BaseTokenEraTest is Test {
         vm.prank(sender);
         L2BaseTokenEra(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
 
-        (uint256 withdrawals, ) = BaseTokenHolder(payable(L2_BASE_TOKEN_HOLDER_ADDR)).baseTokenInteropInfo();
-        assertEq(withdrawals, WITHDRAW_AMOUNT);
+        MockRecordingVault vault = MockRecordingVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        assertEq(vault.toChainCalls(), 1, "withdrawal should be reported to the vault");
+        assertEq(vault.recordedToChainId(), 1, "withdrawal destination should be the L1 chain id");
+        assertEq(vault.recordedToAmount(), WITHDRAW_AMOUNT, "withdrawal amount should be forwarded verbatim");
     }
 
     function test_withdraw_callsL1Messenger() public {
@@ -865,6 +858,29 @@ contract TotalSupplyObservingHolder {
     }
 
     receive() external payable {}
+}
+
+/// @dev Records the base-token flows the real BaseTokenHolder reports. The settlement-layer
+/// gating of these flows lives in the real L2NativeTokenVault and is covered by its own tests.
+contract MockRecordingVault {
+    uint256 public recordedToChainId;
+    uint256 public recordedToAmount;
+    uint256 public toChainCalls;
+
+    function recordBaseTokenBridgingToChain(uint256 _toChainId, uint256 _amount) external {
+        if (msg.sender != L2_BASE_TOKEN_HOLDER_ADDR) {
+            revert InvalidCaller(msg.sender);
+        }
+        recordedToChainId = _toChainId;
+        recordedToAmount = _amount;
+        toChainCalls++;
+    }
+
+    function recordBaseTokenBridgingFromChain(uint256, uint256) external {
+        if (msg.sender != L2_BASE_TOKEN_HOLDER_ADDR) {
+            revert InvalidCaller(msg.sender);
+        }
+    }
 }
 
 /// @notice Helper contract that rejects burnAndStartBridging calls

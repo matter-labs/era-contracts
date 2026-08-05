@@ -31,6 +31,7 @@ import {
     BurningNativeWETHNotSupported,
     DeployingBridgedTokenForNativeToken,
     EmptyDeposit,
+    InsufficientChainBalance,
     NonEmptyMsgValue,
     TokenNotLegacy,
     TokenNotSupported,
@@ -94,12 +95,20 @@ abstract contract NativeTokenVaultBase is
     /// @dev Used to record the index of the bridged token in the bridgedTokens array.
     mapping(bytes32 assetId => uint256 tokenIndex) public tokenIndex;
 
+    /// @notice Net amount of each token native to this chain currently bridged away from it.
+    /// @dev Outgoing transfers increase it and incoming transfers may not exceed it. Unlike the
+    /// vault's raw token balance, it is not affected by donations.
+    /// See {protocol-docs/bridging.md#native-token-vault}.
+    /// @dev Takes a slot from the pre-existing storage gap below, so already-deployed vaults keep
+    /// their layout (the slot was never written before).
+    mapping(bytes32 assetId => uint256 amount) public bridgedOut;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[43] private __gap;
+    uint256[42] private __gap;
 
     /// @notice Checks that the message sender is the asset router.
     modifier onlyAssetRouter() {
@@ -499,8 +508,8 @@ abstract contract NativeTokenVaultBase is
         bytes32 _assetId,
         address _originalCaller
     ) internal {
-        // Note, that in order to capture the pre-tracking total-supply snapshot of legacy tokens
-        // correctly, we have to call _handleBridgeToChain before any balance changes will be performed.
+        // Note, that in order to seed the legacy-token escrow (`bridgedOut`) correctly, we have to
+        // call _handleBridgeToChain before any balance changes will be performed.
         if (_assetId == _baseTokenAssetId()) {
             require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
             if (_isBridgedToken) {
@@ -576,12 +585,27 @@ abstract contract NativeTokenVaultBase is
     /// @dev Chain-local bookkeeping hook invoked when funds are bridged out towards `_chainId`.
     /// @dev Increases the net `bridgedOut` amount of tokens native to this chain; on L2 it
     /// additionally records the L1-destined interop counters.
-    function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual;
+    function _handleBridgeToChain(uint256, bytes32 _assetId, uint256 _amount) internal virtual {
+        if (originChainId[_assetId] == block.chainid) {
+            bridgedOut[_assetId] += _amount;
+        }
+    }
 
     /// @dev Chain-local bookkeeping hook invoked when funds bridged from `_chainId` are finalized here.
     /// @dev Decreases the net `bridgedOut` amount of tokens native to this chain; on L2 it
     /// additionally records the L1-originated interop counters.
-    function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual;
+    /// @dev An inbound amount exceeding the outstanding bridged-out amount is only possible if
+    /// bridged representations of the asset were forged somewhere upstream, so such a transfer
+    /// is blocked rather than recorded.
+    function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual {
+        if (originChainId[_assetId] == block.chainid) {
+            uint256 outstandingAmount = bridgedOut[_assetId];
+            if (outstandingAmount < _amount) {
+                revert InsufficientChainBalance(_chainId, _assetId, _amount);
+            }
+            bridgedOut[_assetId] = outstandingAmount - _amount;
+        }
+    }
 
     /*//////////////////////////////////////////////////////////////
                             TOKEN DEPLOYER FUNCTIONS
@@ -646,9 +670,9 @@ abstract contract NativeTokenVaultBase is
     }
 
     /// @dev Initializes the chain-local bookkeeping for a newly registered token.
-    /// @dev On L2 this records the token's total-supply snapshot / outbound accounting in the vault
-    /// itself. On L1 no per-token initialization is needed (`bridgedOut` starts at zero), so the
-    /// default implementation is a no-op.
+    /// @dev On L2 this marks the token as tracked so it is never treated as a legacy one. On L1 no
+    /// per-token initialization is needed (`bridgedOut` starts at zero), so the default
+    /// implementation is a no-op.
     // solhint-disable-next-line no-empty-blocks
     function _registerTokenForTracking(bytes32 _assetId, uint256 _originChainId) internal virtual {}
 

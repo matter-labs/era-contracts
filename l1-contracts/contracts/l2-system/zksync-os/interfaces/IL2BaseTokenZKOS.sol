@@ -10,20 +10,6 @@ import {IL2BaseTokenBase} from "../../interfaces/IL2BaseTokenBase.sol";
 /// @notice Interface for the L2 Base Token contract on ZK OS chains.
 /// @dev Extends IL2BaseTokenBase with ZKOS-specific functionality.
 interface IL2BaseTokenZKOS is IL2BaseTokenBase {
-    /// @notice Emitted when the pre-V31 total supply is set on the L2 side.
-    event ZKsyncOSPreV31TotalSupplySet(uint256 totalSupply);
-
-    /// @notice Sets the pre-V31 total supply for ZKOS chains during V31 upgrade.
-    /// @param _totalSupply The total supply that existed before the V31 upgrade.
-    function setZKsyncOSPreV31TotalSupply(uint256 _totalSupply) external;
-
-    /// @notice Initializes the local backfill state.
-    /// @param _needBackfill Whether this is an existing chain whose pre-v31 supply is not known yet.
-    function initializeTotalSupplyBackfill(bool _needBackfill) external;
-
-    /// @notice Whether the pre-V31 total supply of the base token still needs to be backfilled.
-    function needBaseTokenTotalSupplyBackfill() external view returns (bool);
-
-    /// @notice Whether the local backfill state has been initialized.
-    function totalSupplyBackfillStateInitialized() external view returns (bool);
+    /// @notice The total supply that existed before the V31 upgrade, backfilled on draft-v31.
+    function zkosPreV31TotalSupply() external view returns (uint256);
 }

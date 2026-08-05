@@ -43,22 +43,14 @@ error AssetRouterAllowanceNotZero();
 error BadTransferDataLength();
 // 0x6ef9a972
 error BaseTokenGasPriceDenominatorNotSet();
-// 0x829ccba4
-error BaseTokenBookkeepingAlreadyInitialized();
-// 0x22cc933f
-error BaseTokenBookkeepingNotInitialized();
 // 0x764c57db
 error BaseTokenHolderAlreadyInitialized();
 // 0xd3cd4bd2
 error BaseTokenHolderMintFailed();
 // 0x8361ff70
 error BaseTokenNativeToThisChain();
-// 0x7f9159de
-error BaseTokenPreV31TotalSupplyAlreadySet();
 // 0x00a6b592
 error BaseTokenPreV31TotalSupplyNotSet();
-// 0xca9bc458
-error BaseTokenTotalSupplyBackfillNotNeeded();
 // 0xe3ec2bc9
 error BaseTokenTransferFailed();
 // 0x55ad3fd3
@@ -212,8 +204,6 @@ error InvalidBatchNumber(uint256 provided, uint256 expected);
 error InvalidBlockRange(uint64 batchNumber, uint64 from, uint64 to);
 // 0xcbd9d2e0
 error InvalidCaller(address);
-// 0xeaa867a8
-error InvalidL1AssetRouter(address l1AssetRouter);
 // 0x7a47c9a2
 error InvalidChainId();
 // 0x92daded2
@@ -256,8 +246,6 @@ error InvalidThreshold(uint256 max, uint256 got);
 error InvalidTxCountInPriorityMode(uint256 l2TxCount, uint256 l1TxCount);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
-// 0xf63665c1
-error L1ChainIdNotSet();
 // 0xfb5c22e6
 error L2TimestampTooBig();
 // 0x97e1359e
