@@ -35,6 +35,8 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     IAssetRouterBase public immutable override L1_ASSET_ROUTER;
 
     /// @notice Checks that the message sender is the bridgehub.
+    /// @custom:deprecated Becomes `onlyInteropCenter`, authorizing `bridgehub.interopCenter()` and reverting with
+    /// `OnlyInteropCenter`; see {protocol-docs/l1-request-migration.md}.
     modifier onlyBridgehub() {
         if (msg.sender != address(BRIDGE_HUB)) {
             revert OnlyBridgehub(msg.sender, address(BRIDGE_HUB));
@@ -103,6 +105,9 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     /// @param _chainId the chainId of the chain
     /// @param _originalCaller the previous message sender
     /// @param _data the data of the transaction
+    /// @custom:deprecated Renamed to `initiateIndirectCall` and called by the `L1InteropCenter`; the two ways of
+    /// performing the L1->L2 transaction become direct and indirect `sendMessage` calls;
+    /// see {protocol-docs/l1-request-migration.md}.
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
         uint256 _chainId,
@@ -128,6 +133,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
 
     /// @notice The function called by the Bridgehub after the L2 transaction has been initiated.
     /// @dev Not used in this contract. In case the transaction fails, we can just re-try it.
+    /// @custom:deprecated Renamed to `confirmL2Transaction`; see {protocol-docs/l1-request-migration.md}.
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,

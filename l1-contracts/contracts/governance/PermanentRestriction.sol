@@ -287,6 +287,9 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// If the second item is `false`, the caller should ignore the first value.
     /// @dev If any other error is returned, it is assumed to be out of gas or some other unexpected
     /// error that should be bubbled up by the caller.
+    /// @custom:deprecated The recognized calldata shape is deprecated: a migration becomes an
+    /// `L1InteropCenter.sendMessage` call carrying the `indirectCall` attribute, with the asset router as the
+    /// ERC-7930 recipient; see {protocol-docs/l1-request-migration.md}.
     function _getNewAdminFromMigration(Call calldata _call) internal view returns (address, bool) {
         if (_call.target != address(BRIDGE_HUB)) {
             return (address(0), false);

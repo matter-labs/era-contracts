@@ -7,6 +7,8 @@ import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 
+/// @custom:deprecated Removed together with `requestL2TransactionDirect`: the direct flow is described by the
+/// `L1InteropCenter.sendMessage` arguments and its attributes; see {protocol-docs/l1-request-migration.md}.
 struct L2TransactionRequestDirect {
     uint256 chainId;
     uint256 mintValue;
@@ -19,6 +21,8 @@ struct L2TransactionRequestDirect {
     address refundRecipient;
 }
 
+/// @custom:deprecated Renamed to `L2TransactionRequestIndirect`; the per-request fields become
+/// `L1InteropCenter.sendMessage` attributes; see {protocol-docs/l1-request-migration.md}.
 struct L2TransactionRequestTwoBridgesOuter {
     uint256 chainId;
     uint256 mintValue;
@@ -31,6 +35,7 @@ struct L2TransactionRequestTwoBridgesOuter {
     bytes secondBridgeCalldata;
 }
 
+/// @custom:deprecated Renamed to `IndirectCallRequest`; see {protocol-docs/l1-request-migration.md}.
 struct L2TransactionRequestTwoBridgesInner {
     bytes32 magicValue;
     address l2Contract;

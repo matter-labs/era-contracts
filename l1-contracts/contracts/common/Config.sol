@@ -180,9 +180,12 @@ uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 address constant ETH_TOKEN_ADDRESS = address(1);
 
 /// @dev the value returned in bridgehubDeposit in the TwoBridges function.
+/// @custom:deprecated Renamed to `INDIRECT_CALL_MAGIC_VALUE` (with the preimage changed accordingly);
+/// see {protocol-docs/l1-request-migration.md}.
 bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
 
 /// @dev https://eips.ethereum.org/EIPS/eip-1352
+/// @custom:deprecated Renamed to `MIN_CROSS_CHAIN_SENDER_ADDRESS`; see {protocol-docs/l1-request-migration.md}.
 address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint16).max));
 
 /// @dev the maximum number of supported chains, this is an arbitrary limit.

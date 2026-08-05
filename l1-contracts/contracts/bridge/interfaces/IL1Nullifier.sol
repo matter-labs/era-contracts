@@ -66,6 +66,8 @@ interface IL1Nullifier {
     /// @param _chainId The chain ID of the ZK chain to which to confirm the deposit.
     /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
     /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
+    /// @custom:deprecated Renamed to `confirmL2TransactionForwarded`, forwarded as part of the `L1InteropCenter`
+    /// indirect-call flow; see {protocol-docs/l1-request-migration.md}.
     function bridgehubConfirmL2TransactionForwarded(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 
     function l1NativeTokenVault() external view returns (IL1NativeTokenVault);
