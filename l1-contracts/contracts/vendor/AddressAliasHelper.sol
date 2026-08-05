@@ -57,8 +57,9 @@ library AddressAliasHelper {
             // A caller without deployed code that is not the tx originator (i.e. a contract calling from its
             // constructor) is an L1 contract that only controls its aliased address on L2, but the
             // `code.length`-based check in `actualRefundRecipientMailbox` cannot recognize it as a contract
-            // and would leave it unaliased — so the alias is applied here. Callers with deployed code are
-            // left as is: `actualRefundRecipientMailbox` aliases them (unless they are EIP-7702 accounts,
+            // and would leave it unaliased — so the alias is applied here.
+            // IMPORTANT: callers with deployed code are left as is — the Mailbox is still expected to finish
+            // the aliasing: `actualRefundRecipientMailbox` aliases them (unless they are EIP-7702 accounts,
             // which it exempts).
             // solhint-disable avoid-tx-origin
             // slither-disable-next-line tx-origin
