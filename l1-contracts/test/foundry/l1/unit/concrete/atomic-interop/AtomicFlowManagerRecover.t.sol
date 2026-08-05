@@ -171,11 +171,9 @@ contract AtomicFlowManagerRecoverTest is Test {
     }
 
     function test_recoverBundle_succeedsWhenNothingRecoverable() public {
-        // No value and a non-asset-router sender: nothing the manager recovers (which does not imply
-        // nothing was burned — see test_recoverBundle_nonRouterIndirectStarterIsNotDispatched). The
-        // refund must still go through (flipping the leg to Reverted is meaningful on its own) and must
-        // not touch the asset router at all — both router entry points are set to revert, so any
-        // dispatch would fail the test.
+        // No value and a non-asset-router sender: nothing to reverse. The refund must still go through
+        // (flipping the leg to Reverted is meaningful on its own) and must not touch the asset router
+        // at all — both router entry points are set to revert, so any dispatch would fail the test.
         vm.mockCallRevert(
             L2_ASSET_ROUTER_ADDR,
             abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
@@ -190,11 +188,12 @@ contract AtomicFlowManagerRecoverTest is Test {
     }
 
     function test_recoverBundle_nonRouterIndirectStarterIsNotDispatched() public {
-        // Pins the accepted limitation in
-        // {protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}: recovery dispatch
-        // is pinned to the asset router, so a non-router indirect starter's burn is deliberately
-        // skipped. The starter's own recoverAtomicCall and both router entry points are set to revert,
-        // so any dispatch to any of them would fail the test; the claim still goes through.
+        // Defense-in-depth: send-time validation (`IndirectCallOnlyToAssetRouter`) makes the asset
+        // router the only possible indirect call sender, so a non-router `from` is always treated as a
+        // direct call. Even for a bundle shaped like a non-router indirect call, the manager must not
+        // probe the sender (a revert would block the whole claim): its recoverAtomicCall and both
+        // router entry points are set to revert, so any dispatch would fail the test; the claim still
+        // goes through.
         address starter = makeAddr("customIndirectStarter");
         bytes memory callData = abi.encodeWithSignature("finalizeDeposit(uint256,bytes32,bytes)");
         vm.mockCallRevert(

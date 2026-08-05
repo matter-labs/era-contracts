@@ -38,20 +38,20 @@ depositor. There are two disjoint mechanisms, selected per call by testing its l
   through the failed-transfer path of the asset handler registered for the asset — is documented in
   {protocol-docs/bridging.md#atomic-recovery-hook}.
   Indirect calls force `interopCallValue == 0`, so router-produced calls never also carry native value.
-- **Native base-token value on non-router calls (`from != L2_ASSET_ROUTER_ADDR` and `value != 0`).**
-  Only a direct call can carry base-token `value` (indirect calls force it to zero), and a direct call
-  moves no asset-router funds. That value is reversed through
+- **Native base-token value on direct calls (`from != L2_ASSET_ROUTER_ADDR` and `value != 0`).**
+  Only a direct call can carry base-token `value` (indirect calls force it to zero and are always
+  router-sent), and a direct call moves no asset-router funds. That value is reversed through
   `IAssetRouterShared.bridgehubRecoverBaseToken(destChainId, destBaseTokenAssetId, from, value)`,
   which reuses the same NTV failed-transfer recovery to re-credit the call's `from`.
 
 The manager is agnostic to call/encoding formats — it forwards `(destChainId, data)` and lets the
-sender own its reversal — but the dispatch itself is **address-pinned, not sender-agnostic**: the L2
-asset router is the only `IAtomicRecoverable` sender the manager ever invokes. A burn produced by any
-other `IL2CrossChainSender` indirect starter matches neither mechanism and is not recovered — an
-accepted limitation, see {protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}.
-Implementations **must**
-gate both hooks to the canonical `AtomicFlowManager` (`onlyAtomicFlowManager`) and **must** return
-`false` rather than revert for calls they do not recognize.
+sender own its reversal — but the dispatch is pinned to the L2 asset router, the only
+`IAtomicRecoverable` sender the manager ever invokes. The pin is exhaustive: send-time validation
+restricts every indirect call to the asset router (`IndirectCallOnlyToAssetRouter`, see
+{protocol-docs/interop.md#restrictions}), so the hook reaches every burn-producing call.
+Implementations **must** gate both hooks to the canonical `AtomicFlowManager`
+(`onlyAtomicFlowManager`) and **must** return `false` rather than revert for calls they do not
+recognize.
 
 ### The walk is all-or-nothing, not per-call isolated
 
@@ -67,10 +67,8 @@ more: it does **not** isolate a reverting recovery from the rest of the bundle.
 
 ### Nothing recoverable → no-op claim
 
-A bundle where no call is recoverable has nothing the manager can return (which does not imply no
-funds were burned — a non-router indirect starter's burn is skipped, see above): the claim then simply
-flips the leg to `Reverted` without moving anything. The state transition (releasing the leg from the
-flow) is
+A bundle where no call is recoverable has no source funds to return: the claim then simply flips the
+leg to `Reverted` without moving anything. The state transition (releasing the leg from the flow) is
 meaningful on its own and is deliberately not blocked, so `Reverted` means "the refund was claimed",
 not necessarily "funds were returned".
 
@@ -92,10 +90,8 @@ send time, not recovery time. The full accounting reason is in
 
 Recovery is best-effort, and the protocol is explicit about what it does **not** promise:
 
-- **Non-router calls get no reversal hook.** A direct call's `from` (possibly an EOA) need not
-  implement `IAtomicRecoverable` and moved no funds — there is nothing to reverse. A non-router
-  indirect starter's burn, however, is skipped even though there _was_ something to reverse (see
-  {protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}).
+- **Direct calls that moved no funds are skipped.** Their `from` (possibly an EOA) need not implement
+  `IAtomicRecoverable`; there is nothing to reverse.
 - **A claim needs zero reverts.** No attempted recovery may revert — a single reverting call rolls the
   whole claim back (see [above](#the-walk-is-all-or-nothing-not-per-call-isolated)). Not every call has
   to recover (a claim that recovers nothing still consumes the leg), but every call that is _attempted_
@@ -107,6 +103,6 @@ Recovery is best-effort, and the protocol is explicit about what it does **not**
   robust — is the **flow author's responsibility**.
 - **Indirect calls may not carry destination-side `interopCallValue`** (`IndirectCallCannotCarryValue`,
   rejected at send). Recovery refunds a call's `value` to its `InteropCall.from`, which for an indirect
-  call is the starter contract (the asset router for router-produced calls), not the payer — the funds
-  would be stranded. Direct calls _may_ carry value; that is exactly the second mechanism above. See
+  call is the sender contract (the asset router), not the payer — the funds would be stranded. Direct
+  calls _may_ carry value; that is exactly the second mechanism above. See
   {protocol-docs/atomicity/security.md#non-guarantees}.

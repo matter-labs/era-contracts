@@ -53,9 +53,7 @@ interface IAtomicFlowManager {
 
     /// @notice Claims a `Revertable` leg's refund: reverses the bundle's asset-router calls
     /// (re-minting each burned asset to its depositor) and refunds a direct call's base-token `value`.
-    /// Other burns are not reversed — see
-    /// {protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations}. Permissionless.
-    /// State `Revertable -> Reverted`.
+    /// Permissionless. State `Revertable -> Reverted`.
     /// @param _flowId The flow the leg belongs to.
     /// @param _bundle The ABI-encoded {InteropBundle} of the source leg (hashes to the committed leg).
     function claimRefund(bytes32 _flowId, bytes calldata _bundle) external;

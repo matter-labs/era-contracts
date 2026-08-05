@@ -48,6 +48,7 @@ import {
     DestinationChainNotRegistered,
     DirectCallToL1NotSupported,
     IndirectCallCannotCarryValue,
+    IndirectCallOnlyToAssetRouter,
     IndirectCallValueMismatch,
     InteropBundleSaltAlreadyUsed,
     InteropCallToL1NotToAssetRouter,
@@ -654,11 +655,20 @@ contract InteropCenter is
                     NonZeroValueToL1NotSupported(_callStarters[i].callAttributes.interopCallValue)
                 );
             }
-            // Indirect calls must not carry destination-side value (`interopCallValue`): on the atomic timeout
-            // recovery path the value is refunded to `InteropCall.from` (the indirect sender), not the payer,
-            // so it would strand funds. All L2->L2 bundles are atomic, so the ban is unconditional here.
-            // (`indirectCallMessageValue` — the source-side value passed to `initiateIndirectCall` — stays allowed.)
             if (_callStarters[i].callAttributes.indirectCall) {
+                // Indirect calls are restricted to the L2 asset router for this release: the atomic
+                // timeout-recovery hook is dispatched to the asset router only, so pinning the starter
+                // guarantees every indirect burn is reachable by recovery. See
+                // {protocol-docs/interop.md#restrictions}.
+                require(
+                    _callStarters[i].to == L2_ASSET_ROUTER_ADDR,
+                    IndirectCallOnlyToAssetRouter(_callStarters[i].to)
+                );
+                // Indirect calls must not carry destination-side value (`interopCallValue`): on the atomic
+                // timeout recovery path the value is refunded to `InteropCall.from` (the indirect sender),
+                // not the payer, so it would strand funds. All L2->L2 bundles are atomic, so the ban is
+                // unconditional here. (`indirectCallMessageValue` — the source-side value passed to
+                // `initiateIndirectCall` — stays allowed.)
                 require(
                     _callStarters[i].callAttributes.interopCallValue == 0,
                     IndirectCallCannotCarryValue(_callStarters[i].callAttributes.interopCallValue)
@@ -781,8 +791,9 @@ contract InteropCenter is
                     indirectCallAttributes.interopCallValue
                 )
             );
-            // The indirect call starter is an arbitrary user-chosen contract, so its returned recipient
-            // gets the same validation a user-supplied call starter's `to` gets in `_parseBundleInputs`:
+            // The indirect call starter is pinned to the asset router (`IndirectCallOnlyToAssetRouter`,
+            // checked in `_buildInteropBundle`), but its returned recipient still gets the same
+            // validation a user-supplied call starter's `to` gets in `_parseBundleInputs`:
             // the chain reference must be empty (the bundle-level destination chain is authoritative — a
             // starter must not smuggle a different chain id that would otherwise be silently ignored)
             // and the address must be non-zero (a zero recipient could never execute and has no refund
