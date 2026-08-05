@@ -21,8 +21,8 @@ runV31UpgradeScenario({
   // This release does not support upgrading gateway-settled chains, so no `gwSettled` chain is covered
   // here: their upgrade takes the `s.settlementLayer != address(0)` path, which routes through the gateway
   // and does not record the L2 upgrade transaction on L1. Chain 10 (L1-settled) and 11 (the gateway itself,
-  // which settles on L1) are the supported shapes. Chains 12 and 13 would be unusable anyway — the v31
-  // state generation left their L2 side uninitialized.
+  // which settles on L1) are the supported shapes; 12, 13 and 14 are all `gwSettled`. 12 and 13 would be
+  // unusable anyway — the v31 state generation left their L2 side uninitialized.
   targetRoles: ["directSettled", "gateway"],
 })
   .then(() => {

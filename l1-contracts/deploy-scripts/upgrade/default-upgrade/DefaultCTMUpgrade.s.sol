@@ -173,9 +173,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         // permanent-values entry is informational for this path.
         setAddressesBasedOnCTM();
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
-        // Must be non-zero: `InteropCenter.initL2` (invoked on the genesis path of `performForceDeployedContractsInit`) reverts
-        // on a zero asset ID, which would abort the L2 upgrade transaction. Catch the
-        // misconfiguration here so the preparation script fails loudly instead of on L2.
+        // Must be non-zero: `InteropCenter.initL2` reverts on a zero asset ID. It runs on the genesis path
+        // of `performForceDeployedContractsInit` only, so this aborts the genesis of chains created from the
+        // release rather than this upgrade — caught here so the misconfiguration surfaces during
+        // preparation instead of at a chain's creation.
         require(permanentConfig.zkTokenAssetId != bytes32(0), "zkTokenAssetId must be non-zero");
         config.zkTokenAssetId = permanentConfig.zkTokenAssetId;
         config.contracts.chainCreationParams = chainCreationParams;

@@ -23,18 +23,14 @@ import {Utils} from "deploy-scripts/utils/Utils.sol";
 /// script normally fills in from on-chain introspection.
 contract CoreUpgradeParityHarness is CoreUpgrade_v31 {
     function setDiscoveredAddresses(
-        address _bridgehub,
         address _l1Nullifier,
         address _l1AssetRouter,
         address _l1InteropHandler,
-        address _chainRegistrationSender,
         bool _deployedL1InteropHandler
     ) external {
-        coreAddresses.bridgehub.proxies.bridgehub = _bridgehub;
         coreAddresses.bridges.proxies.l1Nullifier = _l1Nullifier;
         coreAddresses.bridges.proxies.l1AssetRouter = _l1AssetRouter;
         coreAddresses.bridges.proxies.l1InteropHandler = _l1InteropHandler;
-        coreAddresses.bridgehub.proxies.chainRegistrationSender = _chainRegistrationSender;
         deployedL1InteropHandler = _deployedL1InteropHandler;
     }
 
@@ -115,8 +111,7 @@ contract PreV32ParityCallsTest is Test {
 
     function _executeAsOwners(Call[] memory _calls) internal {
         for (uint256 i = 0; i < _calls.length; ++i) {
-            // Governance owns the bridges; the interop handler's pending owner is governance too. The
-            // bridgehub call is mocked away, so it is executed against the mock.
+            // Governance owns the bridges, and the interop handler's pending owner is governance too.
             vm.prank(owner);
             (bool success, bytes memory returnData) = _calls[i].target.call{value: _calls[i].value}(_calls[i].data);
             if (!success) {
@@ -131,14 +126,7 @@ contract PreV32ParityCallsTest is Test {
         // Ownership of the freshly deployed handler is pending for governance, as the deploy step leaves it.
         interopHandler.transferOwnership(owner);
 
-        upgradeScript.setDiscoveredAddresses(
-            bridgehub,
-            address(l1Nullifier),
-            address(assetRouter),
-            address(interopHandler),
-            chainRegistrationSender,
-            true
-        );
+        upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(interopHandler), true);
 
         Call[] memory calls = upgradeScript.buildInteropHandlerWiringCalls();
         assertEq(calls.length, 3, "handler ownership + the two wirings");
@@ -154,15 +142,13 @@ contract PreV32ParityCallsTest is Test {
     }
 
     function test_emitsNothingForAnAlreadyUpgradedEcosystem() public {
-        // Re-running the upgrade on a v32 ecosystem: the handler already exists (so the script did not
-        // deploy one) and the bridgehub already knows the registration sender.
+        // Re-running the upgrade on a v32 ecosystem: the handler already exists, so the script did not
+        // deploy one and emits no wiring calls.
 
         upgradeScript.setDiscoveredAddresses(
-            bridgehub,
             address(l1Nullifier),
             address(assetRouter),
             address(interopHandler),
-            chainRegistrationSender,
             false
         );
 
@@ -172,14 +158,7 @@ contract PreV32ParityCallsTest is Test {
     function test_revertWhen_NoInteropHandlerAddress() public {
         // The handler must either be discovered or deployed by the upgrade; a zero address would silently
         // leave interop finalization dead.
-        upgradeScript.setDiscoveredAddresses(
-            bridgehub,
-            address(l1Nullifier),
-            address(assetRouter),
-            address(0),
-            chainRegistrationSender,
-            false
-        );
+        upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(0), false);
 
         vm.expectRevert("L1InteropHandler proxy not deployed");
         upgradeScript.buildInteropHandlerWiringCalls();
@@ -222,9 +201,10 @@ contract PreV32ParityCallsTest is Test {
     function test_discovery_v32PathNeedsTheInteropHandlerGetter() public {
         // The same discovery a v32 ecosystem uses cannot be applied to a v31 one: it reads a getter that
         // only exists from v32 on. This is what made the upgrade impossible to prepare.
+        _mockNativeTokenVaultForDiscovery();
         _makeNullifierLookPreV32();
 
-        vm.expectRevert();
+        vm.expectRevert("function does not exist");
         AddressIntrospector.getBridgesDeployedAddresses(address(assetRouter));
     }
 

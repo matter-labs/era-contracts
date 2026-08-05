@@ -247,7 +247,11 @@ library L2GenesisForceDeploymentsHelper {
         });
 
         if (_isGenesisUpgrade) {
-            _initAllContracts(fixedForceDeploymentsData, additionalForceDeploymentsData, wrappedBaseTokenAddress);
+            _initContractsBeforeWiring(
+                fixedForceDeploymentsData,
+                additionalForceDeploymentsData,
+                wrappedBaseTokenAddress
+            );
         } else {
             _updateAllContracts(fixedForceDeploymentsData, additionalForceDeploymentsData, wrappedBaseTokenAddress);
         }
@@ -277,7 +281,7 @@ library L2GenesisForceDeploymentsHelper {
 
     /// @notice Calls initL2() on the contracts that have to be initialized before the bridgehub wiring in
     /// `_finalizeDeployments`. Used during genesis only; see `_initPreV32Contracts` for the rest.
-    function _initAllContracts(
+    function _initContractsBeforeWiring(
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,
         ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
         address _wrappedBaseTokenAddress
@@ -384,10 +388,11 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     /// @notice Initializes the contracts that already existed in v31.
-    /// @dev Genesis only: these `initL2`s are unchanged since v31 and are one-shot, so a chain upgraded
-    /// from v31 has already run them. Kept at the position v31 called them from, after
-    /// `_finalizeDeployments`, so that the genesis sequence is unchanged by this release; none of them reads
-    /// the bridgehub wiring that step establishes.
+    /// @dev Genesis only: these contracts existed in v31 and their `initL2`s are one-shot, so a chain
+    /// upgraded from v31 has already run them — the storage each one writes at genesis is unchanged by this
+    /// release, even where the signature is not (`L2AssetTracker.initL2` lost its backfill argument). Kept
+    /// at the position v31 called them from, after `_finalizeDeployments`, so the genesis sequence is
+    /// unchanged; none of them reads the bridgehub wiring that step establishes.
     function _initPreV32Contracts(
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,
         ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData

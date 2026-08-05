@@ -24,4 +24,3 @@ create2_factory_salt = "0x000000000000000000000000000000000000000000000000000000
 # [legacy_gateway] intentionally omitted: the fixture's gateway (chain 11) is the current settlement
 # layer and stays one, so there is no legacy GW to retire. Emitting
 # `setSettlementLayerStatus(_, false)` for it would take the whole stage-2 multicall down with it.
-

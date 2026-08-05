@@ -15,7 +15,7 @@
  *
  * Unlike `run-v31-to-v32-upgrade-test.ts`, this does NOT load pre-generated chain states
  * and does NOT perform the synthetic-state setup steps (ownership transfer, ChainAdmin
- * deploy, v30 storage patches) — real forked state already has all of those.
+ * deploy, diamond storage patches) — real forked state already has all of those.
  *
  * Required env vars:
  *   L1_FORK_URL         — RPC of the L1 to fork (sepolia, mainnet, stage, local)
@@ -136,7 +136,7 @@ async function main(): Promise<void> {
 
   // Env-preset mode: drive everything from `permanent-values/<preset>.toml`
   // (multi-CTM, ownable_proxies registry, governance_kind = puh, ...) instead
-  // of the synthetic v30→v31 templating below. Set FORK_ENV_PRESET=stage (or
+  // of the synthetic templating below. Set FORK_ENV_PRESET=stage (or
   // testnet/mainnet) to enable.
   const envPreset = process.env.FORK_ENV_PRESET?.trim();
   // L1-only smoke mode: skip L2 fork creation + L2 relay. Useful when L2
@@ -288,7 +288,7 @@ async function main(): Promise<void> {
     console.log(`\n=== Step 6: Executing governance calls (${elapsed()}) ===\n`);
     // env-preset mode emits a merged `ecosystem.toml` at the canonical
     // tracked path (`<env-out>/ecosystem.toml`, one level above `prepare/`).
-    // The synthetic v30→v31 harness still writes `governance.toml` inside
+    // The synthetic harness still writes `governance.toml` inside
     // `prepare/`. Pick whichever exists.
     const envOutDir = path.dirname(prepareDir);
     const govTomlPath = [
@@ -354,7 +354,7 @@ async function main(): Promise<void> {
         : path.join(anvilInteropDir, "outputs", `fork-upgrade-${envPreset!}`, "chains");
       if (envPreset) {
         // Multi-CTM-aware path. Groups chains by on-chain CTM and looks up the
-        // SettlementLayerV31Upgrade addr per CTM from its prepare-output toml.
+        // per-chain upgrade contract addr per CTM from its prepare-output toml.
         await runChainUpgradesPerCtm({
           l1Provider,
           anvilManager,
@@ -373,7 +373,7 @@ async function main(): Promise<void> {
         const settlementLayerUpgradeAddr = readNestedString(
           ctmOutputToml,
           ["state_transition", "default_upgrade_addr"],
-          "SettlementLayerV31Upgrade address"
+          "per-chain upgrade contract address"
         );
         await runChainUpgradesAndRelayL2({
           l1Provider,

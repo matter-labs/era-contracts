@@ -132,11 +132,7 @@ A very common AI failure mode: the behavior of a new function `X` gets described
 
 ### Never explain the language
 
-Do not write comments that explain how Solidity works, or that pre-empt a misreading of a line that reads
-correctly on its own. Typical offenders: "this is a memory reference, so the write is visible to the
-caller", "this is a no-op when the value is already set", "note that this loop is bounded". Reviewers know
-the language; these comments only add bulk. Comment the protocol decision or the local gotcha, not the
-mechanics of the statement in front of you.
+Do not write comments that explain how Solidity works, or that pre-empt a misreading of a line that reads correctly on its own. Typical offenders: "this is a memory reference, so the write is visible to the caller", "this is a no-op when the value is already set", "note that this loop is bounded". Reviewers know the language; these comments only add bulk. Comment the protocol decision or the local gotcha, not the mechanics of the statement in front of you.
 
 ### SDKs, tests, scripts
 

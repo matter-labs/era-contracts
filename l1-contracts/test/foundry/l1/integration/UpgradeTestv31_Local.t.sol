@@ -165,12 +165,13 @@ contract UpgradeIntegrationTest_Local is
         ctmUpgrade.setNewProtocolVersion(newProtocolVersion);
     }
 
-    /// Substitute the batch history a live chain would have: a committed and executed batch (both at 1), so
-    /// the upgrade's `totalBatchesCommitted == totalBatchesExecuted` guard and
-    /// `saveV31UpgradeChainBatchNumber`'s `totalBatchesExecuted > 0` guard pass, plus the L1MessageRoot
-    /// per-chain placeholder that v31 set for this chain. Committing and executing a real batch needs a
-    /// prover and a sequencer, so there is no public API to reach this state in a foundry fixture; both are
-    /// only read by the guards. See the fork-only-violation note at the top of this file.
+    /// Substitute the batch history a live chain would have: a committed and executed batch (both at 1),
+    /// plus the L1MessageRoot per-chain placeholder that v31 set for this chain. This fixture runs the plain
+    /// `DefaultUpgrade` (see the override above), so it is the surrounding flow — the message root's
+    /// per-chain reads — that needs the state rather than a guard in the upgrade itself; a chain upgraded by
+    /// `DefaultUpgradeZKsyncOS` would additionally have to satisfy its outstanding-batches check.
+    /// Committing and executing a real batch needs a prover and a sequencer, so there is no public API to
+    /// reach this state in a foundry fixture. See the fork-only-violation note at the top of this file.
     function beforeChainUpgrade() internal override {
         address eraChainDiamond = addresses.bridgehub.getZKChain(eraZKChainId);
         vm.store(eraChainDiamond, bytes32(ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT), bytes32(uint256(1)));

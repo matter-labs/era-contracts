@@ -31,6 +31,7 @@ import {OriginChainIdNotFound, Unauthorized} from "contracts/common/L1ContractEr
 import {AssetNotNativeToL1, OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {InsufficientChainBalance} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {ILegacyL1AssetTracker} from "contracts/bridge/asset-tracker/ILegacyL1AssetTracker.sol";
+import {MockLegacyL1AssetTracker} from "../../_shared/MockLegacyL1AssetTracker.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/common/Config.sol";
 
 /// @dev Test helper contract that exposes internal functions
@@ -434,12 +435,11 @@ contract L1NativeTokenVaultTest is Test {
     }
 
     /// @dev The vault reads the chain list from the bridgehub when it falls back to its own legacy entries.
+    ///      The bridgehub lists ZK chains only — never L1 itself — which is why the sum needs no exclusion.
     function _mockRegisteredChains() internal {
-        uint256[] memory chainIds = new uint256[](3);
+        uint256[] memory chainIds = new uint256[](2);
         chainIds[0] = chainId;
         chainIds[1] = SECOND_CHAIN_ID;
-        // L1 itself is registered as a chain in some ecosystems; its entry must not be counted.
-        chainIds[2] = block.chainid;
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
@@ -571,16 +571,4 @@ contract L1NativeTokenVaultTest is Test {
 
     // add this to be excluded from coverage report
     function test() internal virtual {}
-}
-
-/// @dev Read-only stand-in for the v31 `L1AssetTracker`. The contract itself no longer exists in this
-/// repository, so its storage — which the population reads on an upgraded ecosystem — has to be mocked.
-contract MockLegacyL1AssetTracker is ILegacyL1AssetTracker {
-    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
-    mapping(bytes32 assetId => bool) public isAssetRegistered;
-
-    function setChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _balance) external {
-        chainBalance[_chainId][_assetId] = _balance;
-        isAssetRegistered[_assetId] = true;
-    }
 }

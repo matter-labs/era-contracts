@@ -11,10 +11,9 @@
 //!     after the upgrade. Idempotent per asset, so an interrupted run is resumed
 //!     by simply running the phase again.
 //!
-//! Sequencing: runs *before* the per-chain upgrades (Phase 4), so the tokens are
-//! in the NTV's `bridgedTokens` enumeration before each chain's diamond upgrade
-//! lands and its `v31UpgradeChainBatchNumber` gate opens — the two clear back to
-//! back instead of leaving an extra registration freeze afterwards.
+//! Sequencing: runs *before* the per-chain upgrades (Phase 4), so that by the time
+//! a chain's diamond upgrade lands, every L1-native asset it can withdraw is
+//! already in the NTV's `bridgedTokens` enumeration and populated.
 //!
 //! Any signer can run this — no governance privileges needed. The caller
 //! must pass `--sender <EOA>`. We deliberately do not fall back to the

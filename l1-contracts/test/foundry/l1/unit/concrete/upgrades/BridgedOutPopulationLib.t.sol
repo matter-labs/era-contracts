@@ -16,6 +16,7 @@ import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {ILegacyL1AssetTracker} from "contracts/bridge/asset-tracker/ILegacyL1AssetTracker.sol";
+import {MockLegacyL1AssetTracker} from "../_shared/MockLegacyL1AssetTracker.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/common/Config.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
@@ -66,17 +67,6 @@ contract BridgedOutPopulationRunner {
     function test() internal virtual {}
 }
 
-/// @dev Stand-in for the removed v31 `L1AssetTracker`. Only the two views the population reads are needed.
-contract LegacyL1AssetTrackerStub is ILegacyL1AssetTracker {
-    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
-    mapping(bytes32 assetId => bool) public isAssetRegistered;
-
-    function setChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _balance) external {
-        chainBalance[_chainId][_assetId] = _balance;
-        isAssetRegistered[_assetId] = true;
-    }
-}
-
 /// @notice Tests the stage3 driver of the `bridgedOut` population.
 /// @dev The bridgehub and its chain list are mocked: the driver only needs them to discover the vault and
 /// the registered chains, and a full ecosystem deployment cannot carry pre-upgrade legacy state anyway.
@@ -86,7 +76,7 @@ contract BridgedOutPopulationLibTest is Test {
     L1Nullifier internal l1Nullifier;
     TestnetERC20Token internal firstToken;
     TestnetERC20Token internal secondToken;
-    LegacyL1AssetTrackerStub internal legacyTracker;
+    MockLegacyL1AssetTracker internal legacyTracker;
     BridgedOutPopulationRunner internal runner;
 
     address internal owner;
@@ -190,7 +180,7 @@ contract BridgedOutPopulationLibTest is Test {
         firstAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(firstToken));
         secondAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(secondToken));
 
-        legacyTracker = new LegacyL1AssetTrackerStub();
+        legacyTracker = new MockLegacyL1AssetTracker();
         runner = new BridgedOutPopulationRunner();
     }
 
@@ -283,6 +273,11 @@ contract BridgedOutPopulationLibTest is Test {
             assertTrue(assetIds[i] != remoteAssetId, "non-L1-native asset must not be considered");
         }
         assertEq(ntv.bridgedOut(remoteAssetId), 0, "non-L1-native asset untouched");
+    }
+
+    function test_revertWhen_theBatchSizeIsZero() public {
+        vm.expectRevert("assets per call must be non-zero");
+        runner.runWithBatchSize(bridgehub, 0);
     }
 
     function test_batchesAssetsAcrossCalls() public {

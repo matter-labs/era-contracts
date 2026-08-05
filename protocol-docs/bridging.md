@@ -160,7 +160,8 @@ was bridged out before the upgrade. Every withdrawal of an L1-native asset would
 inbound amount exceeding the outstanding one and be rejected as forged. `populateBridgedOut(assetIds)` folds
 the pre-upgrade accounting into `bridgedOut`, once per asset, and `stage3` of the upgrade runs it for the
 L1-native assets in the vault's `bridgedTokens` enumeration that have a non-zero pre-upgrade amount, batched
-across transactions (see `deploy-scripts/upgrade/default-upgrade/BridgedOutPopulationLib.sol`; assets whose
+across transactions (see `l1-contracts/deploy-scripts/upgrade/default-upgrade/BridgedOutPopulationLib.sol`;
+assets whose
 amount is zero are left out of the batches entirely, so their `bridgedOutPopulated` flag stays unset — there
 is nothing to fold in for them, now or later).
 
@@ -325,9 +326,11 @@ mintData)` on the asset handler registered for the asset (`assetHandlerAddress[a
   `isWithdrawalFinalized`. Numerous
   `__DEPRECATED_*` storage slots remain across `L1AssetRouter`, `L2AssetRouter`, `L1Nullifier`,
   `L2NativeTokenVault`, `L1NativeTokenVault` and `L2AssetTracker` solely to preserve the upgradeable
-  storage layouts of already-deployed proxies; they must not be reused. The only one that is still read is
+  storage layouts of already-deployed proxies; they must not be reused. Three are still read:
   `L1NativeTokenVault.__DEPRECATED_l1AssetTracker`, which locates the legacy accounting for the
-  `bridgedOut` population.
+  `bridgedOut` population, and `L1Nullifier`'s `__DEPRECATED_l2BridgeAddress` (the sender check on the
+  legacy withdrawal path) and `__DEPRECATED_chainBalance` (its getter, and the nullification the NTV
+  triggers).
 - Legacy bridged tokens on L2 may predate the NTV: `BridgedStandardERC20.onlyNTV` lazily migrates them by
   setting `nativeTokenVault` to `L2_NATIVE_TOKEN_VAULT_ADDR` and deriving the asset ID on first use.
   `addLegacyTokenToBridgedTokensList` backfills such tokens into the vault's `bridgedTokens` enumeration,

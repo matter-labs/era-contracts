@@ -333,7 +333,9 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         vm.expectRevert(BaseTokenPreV31TotalSupplyNotSet.selector);
         IERC20(address(L2_BASE_TOKEN_SYSTEM_CONTRACT)).totalSupply();
 
-        // Register the base token the way the genesis path does, through the vault.
+        // Register the base token the way the genesis path does, through the vault. The vault's
+        // `BASE_TOKEN_ASSET_ID` is written by its one-shot `initL2`, which `setUp` already ran with a
+        // different id, so a storage write is the only way to point it at this test's asset.
         stdstore.target(L2_NATIVE_TOKEN_VAULT_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(
             uint256(baseTokenAssetId)
         );

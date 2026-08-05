@@ -547,7 +547,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // Default --upgrade-input-path to upgrade-envs/v0.31.0-interopB/<env>.toml
         // when running with `--env`. The CLI default is `local.toml` (for
         // local-anvil fixtures). On stage / mainnet / testnet the per-env
-        // file carries env-specific knobs the upgrade scripts rely on —
         // file carries env-specific knobs the upgrade scripts rely on, such as
         // the protocol versions and the bridgehub address. Only override when
         // the caller hasn't explicitly passed `--upgrade-input-path`.

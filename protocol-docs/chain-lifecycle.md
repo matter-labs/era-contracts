@@ -175,14 +175,16 @@ not follow from swapping implementations are:
   into `L1Nullifier` and `L1AssetRouter` with governance calls in stage 1. Without it every interop
   withdrawal finalization on L1 reverts, since the asset router only accepts calls from the configured
   handler. Both setters are one-shot, so the upgrade emits them only for an ecosystem that has no handler.
-- **`Bridgehub.chainRegistrationSender`** is only written by `setAddresses` on a fresh deployment; an
-  ecosystem that reached v31 through an upgrade still has it unset, and the upgrade sets it via
-  `setAddressesV31`.
+- **`Bridgehub.chainRegistrationSender`** is only written by `setAddresses` on a fresh deployment, so an
+  ecosystem that reached v31 through an upgrade may still have it unset. This release does not register it:
+  the upgrade reuses the sender the bridgehub already reports and only refreshes its implementation, and the
+  preparation reverts if the getter is zero. Registering it (`setAddressesV31`) is a governance step that
+  has to precede this upgrade.
 - **`L1NativeTokenVault.bridgedOut`** starts empty on an upgraded vault, which would reject every
   withdrawal of an L1-native asset. See
   {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}.
-- **Atomic-interop built-ins** are predeployed in the ZKsync OS genesis only; the upgrade force-deploys
-  them for pre-existing ZKsync OS chains (next section).
+- **Atomic-interop built-ins** exist on ZKsync OS chains only. New chains get them from genesis and
+  pre-existing ones from this upgrade's force deployments (next section).
 
 Scope of this release's upgrade: **ZKsync OS chains that settle on L1**. Era chains are not supported —
 `CTMUpgrade_v31.deployUsedUpgradeContract` refuses to produce a per-chain upgrade for them rather than

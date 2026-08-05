@@ -6,10 +6,14 @@ import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.
 import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 import {ETH_TOKEN_ADDRESS, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+import {UnexpectedUpgradeSelector} from "contracts/common/L1ContractErrors.sol";
+import {UnexpectedZKsyncOSFlag} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
@@ -31,6 +35,10 @@ contract DummyDefaultUpgradeZKsyncOS is DefaultUpgradeZKsyncOS, BaseUpgradeUtils
     function setBatchCounters(uint256 _committed, uint256 _executed) public {
         s.totalBatchesCommitted = _committed;
         s.totalBatchesExecuted = _executed;
+    }
+
+    function getL2SystemContractsUpgradeTxHash() public view returns (bytes32) {
+        return s.l2SystemContractsUpgradeTxHash;
     }
 }
 
@@ -84,6 +92,35 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         assertEq(upgradeContract.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
     }
 
+    /// @dev Includes the fresh-chain boundary (0/0), where a chain has committed nothing yet.
+    function testFuzz_outstandingBatchesGuard(uint256 _committed, uint256 _executed) public {
+        _committed = bound(_committed, 0, type(uint128).max);
+        _executed = bound(_executed, 0, _committed);
+        upgradeContract.setBatchCounters(_committed, _executed);
+
+        if (_committed != _executed) {
+            vm.expectRevert(NotAllBatchesExecuted.selector);
+            upgradeContract.upgrade(proposedUpgrade);
+        } else {
+            assertEq(upgradeContract.upgrade(proposedUpgrade), Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
+        }
+    }
+
+    /// @notice `upgrade()` must record the rewritten transaction, not the placeholder it was handed. This is
+    ///         the whole point of the contract, so it is asserted through `upgrade()` rather than through a
+    ///         direct `getL2UpgradeTxData` call.
+    function test_upgradeRecordsTheRewrittenTransaction() public {
+        L2CanonicalTransaction memory expectedTx = proposedUpgrade.l2ProtocolUpgradeTx;
+        bytes32 placeholderHash = keccak256(abi.encode(expectedTx));
+        expectedTx.data = upgradeContract.getL2UpgradeTxData(mockBridgehub, CHAIN_ID, true, expectedTx.data);
+
+        upgradeContract.upgrade(proposedUpgrade);
+
+        bytes32 recorded = upgradeContract.getL2SystemContractsUpgradeTxHash();
+        assertEq(recorded, keccak256(abi.encode(expectedTx)), "the placeholder tx was recorded");
+        assertTrue(recorded != placeholderHash, "rewrite produced the placeholder");
+    }
+
     /// @dev The generic upgrade installs the new protocol version's verifier, a freshly deployed contract in
     ///      this release, so batches still awaiting proof under the old one would stop being provable.
     function test_revertWhen_aCommittedBatchIsNotProcessed() public {
@@ -91,6 +128,51 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
 
         vm.expectRevert(NotAllBatchesExecuted.selector);
         upgradeContract.upgrade(proposedUpgrade);
+    }
+
+    function test_revertWhen_theOuterSelectorIsNotForceDeployAndUpgradeUniversal() public {
+        bytes memory wrongOuter = abi.encodeCall(IL2V32Upgrade.upgrade, (true, ctmDeployer, hex"", hex""));
+
+        vm.expectRevert(UnexpectedUpgradeSelector.selector);
+        upgradeContract.getL2UpgradeTxData(mockBridgehub, CHAIN_ID, true, wrongOuter);
+    }
+
+    function test_revertWhen_theWrappedCalldataIsNotTheL2Upgrade() public {
+        bytes memory wrongInner = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgradeUniversal,
+            (
+                new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
+                delegateTo,
+                abi.encodeCall(
+                    IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                    (new IComplexUpgrader.UniversalContractUpgradeInfo[](0), delegateTo, hex"")
+                )
+            )
+        );
+
+        vm.expectRevert(UnexpectedUpgradeSelector.selector);
+        upgradeContract.getL2UpgradeTxData(mockBridgehub, CHAIN_ID, true, wrongInner);
+    }
+
+    /// @dev This contract only serves ZKsync OS chains, so a caller claiming otherwise is rejected.
+    function test_revertWhen_theCallerSaysTheChainIsNotZKsyncOS() public {
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedZKsyncOSFlag.selector, true, false));
+        upgradeContract.getL2UpgradeTxData(mockBridgehub, CHAIN_ID, false, _placeholderUpgradeTxData());
+    }
+
+    /// @dev The flag encoded in the ecosystem-wide transaction must agree with the chain being upgraded.
+    function test_revertWhen_theWrappedFlagDisagreesWithTheChain() public {
+        bytes memory eraShapedInner = abi.encodeCall(
+            IL2V32Upgrade.upgrade,
+            (false, ctmDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, hex"00")
+        );
+        bytes memory placeholder = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgradeUniversal,
+            (new IComplexUpgrader.UniversalContractUpgradeInfo[](0), delegateTo, eraShapedInner)
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedZKsyncOSFlag.selector, true, false));
+        upgradeContract.getL2UpgradeTxData(mockBridgehub, CHAIN_ID, true, placeholder);
     }
 
     /// @notice The placeholder per-chain data is replaced with this chain's, and nothing else in the
@@ -135,6 +217,45 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         assertEq(data.baseTokenMetadata.decimals, 18, "wrong base token decimals");
     }
 
+    /// @notice For a chain whose base token is not ETH the metadata comes from the token's local bridged
+    ///         representation (`tokenAddress`), not from `originToken`, which may have no code on L1.
+    function test_readsBaseTokenMetadataFromTheLocalTokenForABridgedBaseToken() public {
+        address originToken = makeAddr("originTokenOnItsOwnChain");
+        address localToken = makeAddr("localBridgedToken");
+        uint256 originChainId = 271;
+
+        vm.mockCall(
+            mockNativeTokenVault,
+            abi.encodeWithSelector(INativeTokenVaultBase.originToken.selector, BASE_TOKEN_ASSET_ID),
+            abi.encode(originToken)
+        );
+        vm.mockCall(
+            mockNativeTokenVault,
+            abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, BASE_TOKEN_ASSET_ID),
+            abi.encode(originChainId)
+        );
+        vm.mockCall(
+            mockNativeTokenVault,
+            abi.encodeWithSelector(INativeTokenVaultBase.tokenAddress.selector, BASE_TOKEN_ASSET_ID),
+            abi.encode(localToken)
+        );
+        vm.mockCall(localToken, abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("Local Token"));
+        vm.mockCall(localToken, abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("LOC"));
+        vm.mockCall(localToken, abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(uint8(6)));
+
+        ZKChainSpecificForceDeploymentsData memory data = _decodePerChainData(
+            upgradeContract.getL2UpgradeTxData(mockBridgehub, CHAIN_ID, true, _placeholderUpgradeTxData())
+        );
+
+        assertEq(data.baseTokenMetadata.name, "Local Token", "metadata not read from the local token");
+        assertEq(data.baseTokenMetadata.symbol, "LOC", "wrong symbol");
+        assertEq(data.baseTokenMetadata.decimals, 6, "wrong decimals");
+        // The bridging data still describes the token on its origin chain.
+        assertEq(data.baseTokenL1Address, originToken, "wrong L1 base token address");
+        assertEq(data.baseTokenBridgingData.originToken, originToken, "wrong origin token");
+        assertEq(data.baseTokenBridgingData.originChainId, originChainId, "wrong origin chain");
+    }
+
     /// @dev The chain the transaction is rewritten for is read from diamond storage, so two chains of the
     ///      same ecosystem must not receive the same per-chain payload.
     function test_substitutionIsPerChain() public {
@@ -152,6 +273,17 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         bytes memory forOtherChain = upgradeContract.getL2UpgradeTxData(mockBridgehub, otherChainId, true, placeholder);
 
         assertTrue(keccak256(forThisChain) != keccak256(forOtherChain), "both chains got the same payload");
+    }
+
+    function _decodePerChainData(
+        bytes memory _rewritten
+    ) internal pure returns (ZKChainSpecificForceDeploymentsData memory) {
+        (, , bytes memory innerCalldata) = abi.decode(
+            _sliceSelector(_rewritten),
+            (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes)
+        );
+        (, , , bytes memory perChainData) = abi.decode(_sliceSelector(innerCalldata), (bool, address, bytes, bytes));
+        return abi.decode(perChainData, (ZKChainSpecificForceDeploymentsData));
     }
 
     function _placeholderUpgradeTxData() internal view returns (bytes memory) {

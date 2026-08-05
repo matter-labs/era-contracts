@@ -68,9 +68,11 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         // Deal ETH to the asset router (needed because bridgeBurn is called with msg.value)
         vm.deal(L2_ASSET_ROUTER_ADDR, depositAmount);
 
-        // The asset tracker is already initialized via L2UtilsBase.setUp, but with bytes32(0)
-        // as the base token asset id. Overwrite BASE_TOKEN_ASSET_ID to the actual local value
-        // and then register it via the upgrade path so the BaseTokenHolder accounting works.
+        // The asset tracker is already initialized via L2UtilsBase.setUp, but with bytes32(0) as the base
+        // token asset id. Overwrite BASE_TOKEN_ASSET_ID to the actual local value and register it through the
+        // vault — the genesis-path entry point, which is the only one left — so the BaseTokenHolder
+        // accounting works. The storage write is the only way to reach this state: `initL2` already ran with
+        // the wrong id in `setUp` and is one-shot.
         stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(baseTokenAssetIdLocal);
         if (!IL2AssetTracker(L2_ASSET_TRACKER_ADDR).isAssetRegistered(baseTokenAssetIdLocal)) {
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);

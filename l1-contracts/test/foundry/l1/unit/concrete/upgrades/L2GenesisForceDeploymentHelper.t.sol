@@ -223,6 +223,17 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
         );
         assertEq(etchedProxyAdmin.upgradeCallCount(), 0);
+
+        // The atomic-interop built-ins are ZKsync-OS-only and must be left untouched, even though
+        // `_etchAllDeferredContracts` gave them real code here: on a real Era chain those addresses are
+        // empty and initializing them would revert the whole upgrade transaction.
+        _assertAtomicInteropUninitialized();
+    }
+
+    /// @dev Neither built-in seeded: the tree has no leaves and the manager no L1 chain id.
+    function _assertAtomicInteropUninitialized() internal view {
+        assertEq(L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(), 0, "tree was seeded");
+        assertEq(AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID(), 0, "flow manager was seeded");
     }
 
     // Helper functions

@@ -249,9 +249,8 @@ async function transferL1Ownership(
   if (l1Addresses.l1NullifierProxy) {
     await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1NullifierProxy);
   }
-  // The pre-v31 chain states record the old L1ChainAssetHandler proxy (the v31 ecosystem
-  // upgrade reuses this proxy in place). Governance must own it to run the stage-0
-  // pauseMigration() governance call.
+  // The fixture leaves the ChainAssetHandler owned by its deployer, and this upgrade reuses that proxy
+  // in place. Governance must own it to run the stage-0 pauseMigration() governance call.
   if (scenario.transferL1ChainAssetHandlerOwnership && l1Addresses.l1ChainAssetHandler) {
     await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1ChainAssetHandler);
   }
@@ -271,8 +270,7 @@ async function normalizeProxyAdminOwnerToEoa(
   defaultSigner: ethers.Wallet,
   proxyAddress: string
 ): Promise<void> {
-  const adminSlot = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
-  const rawAdmin = await provider.getStorageAt(proxyAddress, adminSlot);
+  const rawAdmin = await provider.getStorageAt(proxyAddress, EIP1967_ADMIN_SLOT);
   const proxyAdmin = ethers.utils.getAddress(ethers.utils.hexDataSlice(rawAdmin, 12));
 
   const proxyAdminContract = new ethers.Contract(proxyAdmin, getAbi("ProxyAdmin"), provider);
@@ -419,7 +417,7 @@ async function executeSafeBundles(outDir: string, rpcUrl: string): Promise<void>
 /**
  * Env-preset variant of `runEcosystemUpgradeScripts` for fork-mode upgrades
  * against a real env (stage / mainnet / testnet). Skips the synthetic
- * permanent-values templating that the v30→v31 harness does — the env preset
+ * permanent-values templating the state-dump scenarios do — the env preset
  * already has the canonical bridgehub, ctm list, ownable_proxies, deployer,
  * etc. We override only the ones that change per fork run: `--out` (temp dir)
  * and `--l1-rpc-url` (the forked anvil instance).
@@ -581,9 +579,8 @@ export async function runEcosystemUpgradeScripts(params: {
   const prepareOutDir = path.join(params.upgradeHarnessInputs.protocolOpsOutDir, "prepare");
   fs.rmSync(prepareOutDir, { recursive: true, force: true });
 
-  // Pre-v31 ecosystems don't have `ctm.isZKsyncOS()` / bytecodes-supplier /
-  // rollup-DA-manager getters, so we pass the values from the snapshot config
-  // explicitly. On v31+ these would be auto-resolved.
+  // Passed explicitly rather than auto-resolved from the CTM: a fork run may target an ecosystem whose
+  // getters predate v31, and the snapshot config is authoritative for it.
   runProtocolOps(
     [
       "ecosystem",
@@ -759,7 +756,9 @@ export async function runChainUpgradesAndRelayL2(params: {
 /**
  * Multi-CTM aware variant of `runChainUpgradesAndRelayL2`. Used by env-preset
  * fork tests (e.g. stage) where the bridgehub has both an Era CTM and an
- * Atlas (zkOS) CTM, each with its own per-chain upgrade contract address.
+ * Atlas (zkOS) CTM, each with its own per-chain upgrade contract address. This release only produces one
+ * for the ZKsync OS CTM (`CTMUpgrade_v31.deployUsedUpgradeContract` refuses Era), so the Era half of the
+ * grouping stays empty here and is exercised only by fork runs against older ecosystems.
  *
  * Groups chains by their on-chain CTM, looks up the per-CTM
  * `script-out/v31-upgrade-ctm-<ctm>.toml` (written by
@@ -951,7 +950,7 @@ async function deployL2Contracts(
       // Era force deployments include the EmptyContract placeholder (0x0000), the EraVM
       // precompiles (0x0001..0x0008), and the system contracts at 0x800x (AccountCodeStorage,
       // NonceHolder, etc.). These are either not exercised by the anvil harness (precompiles)
-      // or are already present in the loaded v29/v30 chain state, so we do not need to deploy
+      // or are already present in the loaded chain state, so we do not need to deploy
       // their bytecode via anvil_setCode. Skip silently for entries we do not know about.
       if (entry.upgradeType === UPGRADE_TYPE_ERA_FORCE_DEPLOYMENT) {
         continue;
@@ -1027,7 +1026,7 @@ async function deployL2Contracts(
  * 4. Set the proxy admin (EIP-1967 admin slot) to SystemContractProxyAdmin
  * 5. Set the implementation (EIP-1967 implementation slot) to the derived address
  *
- * TODO: This proxy setup should ideally be done during the V30 chain state generation
+ * TODO: This proxy setup should ideally be done during the chain state generation
  * (setup-and-dump-state.ts) so that the pre-generated states already have proper
  * SystemContractProxy layout at 0x800x addresses, matching production ZKsyncOS genesis.
  */
@@ -1440,9 +1439,9 @@ export function prepareUpgradeHarnessInputs(
   fs.mkdirSync(tempDir, { recursive: true });
 
   const permanentValuesPath = path.join(tempDir, `${scenario.label}-permanent-values.toml`);
-  const upgradeInputPath = path.join(tempDir, `${scenario.label}-to-v31-upgrade.toml`);
-  const ecosystemOutputPath = path.join(tempDir, `${scenario.label}-v31-upgrade-ecosystem.toml`);
-  const governanceTomlPath = path.join(tempDir, `${scenario.label}-v31-governance.toml`);
+  const upgradeInputPath = path.join(tempDir, `${scenario.label}-upgrade-input.toml`);
+  const ecosystemOutputPath = path.join(tempDir, `${scenario.label}-upgrade-ecosystem.toml`);
+  const governanceTomlPath = path.join(tempDir, `${scenario.label}-governance.toml`);
   const protocolOpsOutDir = path.join(tempDir, "protocol-ops");
 
   const primaryChainId = state.chainAddresses[0]?.chainId;

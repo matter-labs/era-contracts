@@ -258,14 +258,13 @@ contract L1MessageRootV31UpgradeTest is Test {
             abi.encode(TOTAL_BATCHES_EXECUTED)
         );
 
-        // First call should succeed
-        vm.prank(zkChain);
-        newMessageRoot.saveV31UpgradeChainBatchNumber(CHAIN_ID);
+        // A chain that migrated back from a settlement layer already has its current batch number set,
+        // while its v31 marker is still the placeholder.
+        vm.prank(makeAddr("chainAssetHandler"));
+        newMessageRoot.setMigratingChainBatchNumber(CHAIN_ID, 5);
 
-        // Manually reset v31UpgradeChainBatchNumber to placeholder to simulate trying again
-        // This is to test the CurrentBatchNumberAlreadySet error
-        // Since we can't easily reset storage, we need a different approach:
-        // Create another messageRoot where currentChainBatchNumber is already set
-        // We test this scenario by using a slightly different chain ID
+        vm.prank(zkChain);
+        vm.expectRevert(CurrentBatchNumberAlreadySet.selector);
+        newMessageRoot.saveV31UpgradeChainBatchNumber(CHAIN_ID);
     }
 }

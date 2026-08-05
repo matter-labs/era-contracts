@@ -10,9 +10,10 @@ owner_address = "0x0000000000000000000000000000000000000000"
 # stating it keeps the scenario independent of how the states were generated.
 pre_v32_introspection = true
 
+# The sections below mirror the shape of a production upgrade input so the same scripts can read this file.
+# Of them, only `pre_v32_introspection` above and `contracts.new_protocol_version` below are consumed by
+# this scenario; the rest are placeholders.
 [chain]
-# The sample chain the CTM upgrade reads chain-creation parameters from. Must be a chain that exists in
-# the fixture (`config/anvil-config.json`).
 chain_id = 10
 
 [contracts]

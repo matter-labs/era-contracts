@@ -44,9 +44,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         bool isZKsyncOS;
         bool hasPreV32IntrospectionOverride;
         bool usePreV32IntrospectionOverride;
-        /// @dev Whether the ecosystem being upgraded still runs pre-v32 contracts, i.e. which discovery
-        ///      shape its L1 contracts expose.
-        bool isPreV32Ecosystem;
     }
     AdditionalConfigParams internal additionalConfig;
 
@@ -182,8 +179,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         } else {
             preV32Ecosystem = AddressIntrospector.shouldUsePreV32Introspection(bridgehubProxy);
         }
-
-        additionalConfig.isPreV32Ecosystem = preV32Ecosystem;
 
         if (preV32Ecosystem) {
             // v31 ecosystem: the nullifier has no `l1InteropHandler` getter yet, so the discovered
