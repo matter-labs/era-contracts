@@ -22,6 +22,7 @@ import {InvalidSettlementLayerForBatch} from "contracts/core/bridgehub/L1Bridgeh
 import {MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
+import {L1MessageRootDev} from "contracts/dev-contracts/L1MessageRootDev.sol";
 import {MerkleTreeNoSort} from "test/foundry/l1/unit/concrete/common/libraries/Merkle/MerkleTreeNoSort.sol";
 import {MessageHashing, ProofData} from "contracts/common/libraries/MessageHashing.sol";
 
@@ -69,9 +70,11 @@ contract MailboxL2LogsProve is MailboxTest {
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(address(bridgehub), LEGACY_GW_CHAIN_ID, address(realChainAssetHandler))),
+                    address(
+                        new L1MessageRootDev(address(bridgehub), LEGACY_GW_CHAIN_ID, address(realChainAssetHandler))
+                    ),
                     address(uint160(1)),
-                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                    abi.encodeCall(L1MessageRootDev.stampV31Placeholders, ())
                 )
             )
         );

@@ -456,10 +456,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridges.implementations.l1NativeTokenVault
         );
 
-        // L1MessageRoot: a plain upgrade, never `upgradeAndCall(initializeL1V31Upgrade())`. That is a v31
-        // reinitializer and every ecosystem this release upgrades has already consumed it — a v31 one during
-        // its own upgrade, a from-scratch v32 one through `initialize()`, which is the same reinitializer
-        // version.
+        // L1MessageRoot is a plain upgrade like the rest: v31's `initializeL1V31Upgrade` reinitializer was
+        // removed in this release, and every ecosystem it can upgrade had already consumed that version.
         calls[4] = _buildCallProxyUpgrade(
             coreAddresses.bridgehub.proxies.messageRoot,
             coreAddresses.bridgehub.implementations.messageRoot
@@ -487,25 +485,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             data: abi.encodeCall(
                 ProxyAdmin.upgrade,
                 (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress)
-            ),
-            value: 0
-        });
-    }
-
-    function _buildCallProxyUpgradeAndCall(
-        address proxyAddress,
-        address newImplementationAddress,
-        string memory contractName
-    ) internal virtual returns (Call memory call) {
-        require(coreAddresses.shared.transparentProxyAdmin != address(0), "transparentProxyAdmin not newConfigured");
-
-        bytes memory initializeCalldata = getInitializeCalldata(contractName, false);
-
-        call = Call({
-            target: coreAddresses.shared.transparentProxyAdmin,
-            data: abi.encodeCall(
-                ProxyAdmin.upgradeAndCall,
-                (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress, initializeCalldata)
             ),
             value: 0
         });

@@ -111,7 +111,7 @@ contract DeployL1CoreUtils is DeployUtils {
         } else if (
             compareStrings(contractName, "L1MessageRoot") ||
             compareStrings(contractName, "DummyL1MessageRoot") ||
-            compareStrings(contractName, "L1MessageRootStageSepolia")
+            compareStrings(contractName, "L1MessageRootDev")
         ) {
             return
                 abi.encode(

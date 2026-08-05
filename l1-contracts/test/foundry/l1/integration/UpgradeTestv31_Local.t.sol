@@ -111,14 +111,14 @@ contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
 // and bumps the protocol version in `setUp` after `setupUpgrade()`.
 
 // AGENTS.md mandates "NEVER override storage slots in tests" with no exceptions,
-// but this local-fork harness is the one place we can't avoid it: the v31 upgrade
-// flow depends on chain state (batches executed/committed > 0, MessageRoot's
-// per-chain placeholder, MessageRoot reinitializer version) that production
-// reaches via real batch commits and the real `initializeL1V31Upgrade` call.
-// In a freshly-deployed local fixture neither has happened yet, and there is no
-// public API to drive them. The overrides below substitute for that history;
-// they are scoped to this `setUp`/`beforeChainUpgrade` and never run against a
-// real chain.
+// but this local-fork harness is the one place we can't avoid it: the upgrade flow
+// depends on chain state (batches executed/committed > 0, MessageRoot's per-chain
+// placeholder) that production reaches via real batch commits and the v31 upgrade
+// this ecosystem is assumed to have been through. In a freshly-deployed local
+// fixture neither has happened yet, and there is no public API to drive them —
+// v32 has no writer for the placeholder at all. The overrides below substitute
+// for that history; they are scoped to this `setUp`/`beforeChainUpgrade` and
+// never run against a real chain.
 //
 // Slot indices below are taken from `forge inspect <Contract> storageLayout` on
 // the v31 contracts; if any of these contracts ever shift their storage layout

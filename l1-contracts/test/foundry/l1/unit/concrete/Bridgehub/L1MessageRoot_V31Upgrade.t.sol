@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
+import {L1MessageRootDev} from "contracts/dev-contracts/L1MessageRootDev.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
@@ -180,9 +181,9 @@ contract L1MessageRootV31UpgradeTest is Test {
         L1MessageRoot newMessageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(newBridgehub, 1, makeAddr("chainAssetHandler"))),
+                    address(new L1MessageRootDev(newBridgehub, 1, makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
-                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                    abi.encodeCall(L1MessageRootDev.stampV31Placeholders, ())
                 )
             )
         );
@@ -237,9 +238,9 @@ contract L1MessageRootV31UpgradeTest is Test {
         L1MessageRoot newMessageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(newBridgehub, 1, makeAddr("chainAssetHandler"))),
+                    address(new L1MessageRootDev(newBridgehub, 1, makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
-                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                    abi.encodeCall(L1MessageRootDev.stampV31Placeholders, ())
                 )
             )
         );
@@ -266,50 +267,5 @@ contract L1MessageRootV31UpgradeTest is Test {
         // Since we can't easily reset storage, we need a different approach:
         // Create another messageRoot where currentChainBatchNumber is already set
         // We test this scenario by using a slightly different chain ID
-    }
-
-    function test_v31InitializeInnerWithChains() public {
-        // Test constructor with chains
-        address newBridgehub = makeAddr("newBridgehub2");
-        uint256 chainId1 = 100;
-        uint256 chainId2 = 200;
-        uint256[] memory chainIds = new uint256[](2);
-        chainIds[0] = chainId1;
-        chainIds[1] = chainId2;
-
-        vm.mockCall(
-            newBridgehub,
-            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
-            abi.encode(chainIds)
-        );
-        vm.mockCall(
-            newBridgehub,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(makeAddr("chainAssetHandler"))
-        );
-        vm.mockCall(
-            newBridgehub,
-            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, chainId1),
-            abi.encode(block.chainid)
-        );
-        vm.mockCall(
-            newBridgehub,
-            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, chainId2),
-            abi.encode(block.chainid)
-        );
-
-        L1MessageRoot newMessageRoot = L1MessageRoot(
-            address(
-                new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(newBridgehub, 1, makeAddr("chainAssetHandler"))),
-                    address(uint160(1)),
-                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
-                )
-            )
-        );
-
-        // Both chains should have placeholder value
-        assertEq(newMessageRoot.v31UpgradeChainBatchNumber(chainId1), V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE);
-        assertEq(newMessageRoot.v31UpgradeChainBatchNumber(chainId2), V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE);
     }
 }
