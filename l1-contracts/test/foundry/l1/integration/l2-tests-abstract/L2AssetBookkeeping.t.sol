@@ -17,11 +17,14 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
 import {IL2AssetHandler} from "contracts/bridge/interfaces/IL2AssetHandler.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {L2AssetBookkeepingInfo} from "contracts/common/L2AssetBookkeeping.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
+import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {
     AssetIdNotRegistered,
@@ -66,10 +69,16 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
     }
 
     /// @dev Burns `_amount` of `_assetId` towards `_toChainId` through the real asset-router entry point.
-    function _bridgeBurnErc20(uint256 _toChainId, bytes32 _assetId, address _originalCaller, uint256 _amount) internal {
+    /// @return mintData The burn's actual bridge-mint payload, as a recovery would consume it.
+    function _bridgeBurnErc20(
+        uint256 _toChainId,
+        bytes32 _assetId,
+        address _originalCaller,
+        uint256 _amount
+    ) internal returns (bytes memory mintData) {
         bytes memory data = abi.encode(_amount, makeAddr("remoteReceiver"), address(0));
         vm.prank(L2_ASSET_ROUTER_ADDR);
-        IAssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeBurn(_toChainId, 0, _assetId, _originalCaller, data);
+        mintData = IAssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeBurn(_toChainId, 0, _assetId, _originalCaller, data);
     }
 
     /// @dev Finalizes an inbound `_amount` of `_assetId` from `_fromChainId` through the real
@@ -534,19 +543,20 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
 
         vm.prank(depositor);
         token.approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount);
-        _bridgeBurnErc20(otherL2ChainId, assetId, depositor, amount);
+        bytes memory mintData = _bridgeBurnErc20(otherL2ChainId, assetId, depositor, amount);
         assertEq(_ntv().bridgedOut(assetId), amount, "the burn must escrow the full amount");
         assertEq(token.balanceOf(depositor), 0, "the depositor's tokens must be escrowed");
 
-        bytes memory data = DataEncoding.encodeBridgeMintData({
-            _originalCaller: depositor,
-            _remoteReceiver: makeAddr("remoteReceiver"),
-            _originToken: address(token),
-            _amount: amount,
-            _erc20Metadata: ""
-        });
-        vm.prank(L2_ASSET_ROUTER_ADDR);
-        IL2AssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeRecoverFailedTransfer(otherL2ChainId, assetId, data);
+        // Recover through the router's real timeout-refund hook, feeding it the calldata shape the
+        // burn flow actually produces — the encoding recognition and the burn-time handler lookup
+        // both run for real.
+        bytes memory recoveredCall = abi.encodeCall(
+            AssetRouterBase.finalizeDeposit,
+            (block.chainid, assetId, mintData)
+        );
+        vm.prank(L2_ATOMIC_FLOW_MANAGER_ADDR);
+        bool recovered = IAtomicRecoverable(L2_ASSET_ROUTER_ADDR).recoverAtomicCall(otherL2ChainId, recoveredCall);
+        assertTrue(recovered, "the router must recognize and reverse its own burn encoding");
 
         assertEq(token.balanceOf(depositor), amount, "the depositor must be refunded in full");
         assertEq(token.balanceOf(L2_NATIVE_TOKEN_VAULT_ADDR), 0, "the vault escrow must be released");

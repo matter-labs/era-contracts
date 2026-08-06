@@ -265,7 +265,9 @@ leave both reserved addresses empty.
 - The base token's baseline is recorded by `trackBaseToken` (upgrader-only, idempotent), which the
   upgrade/genesis init helper calls on both paths: its `totalSupply()` at that moment — the pre-upgrade
   supply on an upgraded chain, zero at genesis — is the pre-tracking net inbound flow, and every later
-  flow is reported by the holder into the same struct's counters. Tracking it from any later moment would fold
+  holder-observed contract-level flow is reported into the same struct's counters (ZKsync OS
+  bootloader-minted deposits bypass the holder, so the deposit counter stays non-exhaustive there —
+  see the next paragraph). Tracking it from any later moment would fold
   already-recorded flows into the baseline, which is why `trackLegacyToken` cannot be used instead.
 
 ### `BaseTokenHolder` (base token)

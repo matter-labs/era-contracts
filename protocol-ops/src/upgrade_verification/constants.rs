@@ -257,6 +257,14 @@ mod tests {
             ("L2_INTEROP_CENTER_ADDR", L2_INTEROP_CENTER_ADDR),
             ("L2_INTEROP_HANDLER_ADDR", L2_INTEROP_HANDLER_ADDR),
             ("L2_BASE_TOKEN_HOLDER_ADDR", L2_BASE_TOKEN_HOLDER_ADDR),
+            (
+                "L2_REMOVED_ASSET_TRACKER_ADDR",
+                L2_REMOVED_ASSET_TRACKER_ADDR,
+            ),
+            (
+                "L2_REMOVED_GW_ASSET_TRACKER_ADDR",
+                L2_REMOVED_GW_ASSET_TRACKER_ADDR,
+            ),
             // SYSTEM_CONTRACTS_OFFSET range
             ("L2_BOOTLOADER_ADDRESS", L2_BOOTLOADER_ADDRESS),
             ("L2_ACCOUNT_CODE_STORAGE_ADDR", L2_ACCOUNT_CODE_STORAGE_ADDR),

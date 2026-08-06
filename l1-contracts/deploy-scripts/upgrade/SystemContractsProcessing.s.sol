@@ -448,10 +448,11 @@ library SystemContractsProcessing {
     /// ZKsync OS chain. v32 deletes both contracts, so the upgrade swaps their proxies'
     /// implementations for `EmptyContract` — otherwise the retired tracker code would stay callable.
     /// Chains created on v32 never run this list and leave the addresses empty.
-    /// @dev No funds are stranded by the swap: the ZK Gateway was never activated during v31 (see
-    /// {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}), so the
-    /// GWAssetTracker never accrued settlement fees, and the proxies stay upgradable should
-    /// recovery logic ever be needed.
+    /// @dev The v31 GWAssetTracker collects wrapped-ZK settlement fees on a live gateway (the stage
+    /// env brought one up), so any remaining fee balance must be drained through the v31 owner flow
+    /// before the gateway chain's upgrade executes — a rollout-runbook step, not enforceable here.
+    /// The swap destroys no state either way: the proxies stay upgradable, so a later governance
+    /// upgrade can always restore recovery logic.
     function getRemovedTrackerNeutralizations()
         internal
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
