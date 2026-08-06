@@ -72,8 +72,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         uint256 oldProtocolVersion;
         address ecosystemAdminAddress;
         uint256 governanceUpgradeTimerInitialDelay;
-        bool hasV29IntrospectionOverride;
-        bool useV29IntrospectionOverride;
+        bool hasPreV32IntrospectionOverride;
+        bool usePreV32IntrospectionOverride;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -169,12 +169,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         config.l1ChainId = block.chainid;
         newConfig.ctm = permanentConfig.ctmProxy;
 
-        // Pass bytecodesSupplier to introspection - will overwrite incorrect V29 value
-        setAddressesBasedOnCTM(permanentConfig.bytecodesSupplier);
+        // The supplier is read off the CTM's `L1_BYTECODES_SUPPLIER()` immutable during discovery, so the
+        // permanent-values entry is informational for this path.
+        setAddressesBasedOnCTM();
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
-        // Must be non-zero: `InteropCenter.initL2` (invoked via `_initializeV31Contracts`) reverts
-        // on a zero asset ID, which would abort the L2 upgrade transaction. Catch the
-        // misconfiguration here so the preparation script fails loudly instead of on L2.
+        // Must be non-zero: `InteropCenter.initL2` reverts on a zero asset ID. It runs on the genesis path
+        // of `performForceDeployedContractsInit` only, so this aborts the genesis of chains created from the
+        // release rather than this upgrade — caught here so the misconfiguration surfaces during
+        // preparation instead of at a chain's creation.
         require(permanentConfig.zkTokenAssetId != bytes32(0), "zkTokenAssetId must be non-zero");
         config.zkTokenAssetId = permanentConfig.zkTokenAssetId;
         config.contracts.chainCreationParams = chainCreationParams;
@@ -233,9 +235,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         );
 
         // Optional override for v29 introspection selection
-        if (toml.keyExists("$.use_v29_introspection")) {
-            newConfig.hasV29IntrospectionOverride = true;
-            newConfig.useV29IntrospectionOverride = toml.readBool("$.use_v29_introspection");
+        if (toml.keyExists("$.pre_v32_introspection")) {
+            newConfig.hasPreV32IntrospectionOverride = true;
+            newConfig.usePreV32IntrospectionOverride = toml.readBool("$.pre_v32_introspection");
         }
 
         initializeConfig(chainCreationParams, permanentConfig, governance);
@@ -374,7 +376,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         });
     }
 
-    function setAddressesBasedOnCTM(address _bytecodesSupplier) internal virtual {
+    function setAddressesBasedOnCTM() internal virtual {
         address ctm = newConfig.ctm;
 
         // Verify CTM contract exists
@@ -384,18 +386,20 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         address bridgehubAddr = ChainTypeManagerBase(ctm).BRIDGE_HUB();
         bridgehub = L1Bridgehub(bridgehubAddr);
 
-        // Determine which introspection method to use based on protocol version or override
-        bool useV29Introspection = newConfig.hasV29IntrospectionOverride
-            ? newConfig.useV29IntrospectionOverride
-            : AddressIntrospector.shouldUseV29Introspection(bridgehubAddr);
+        bool preV32Ecosystem;
+        if (newConfig.hasPreV32IntrospectionOverride) {
+            preV32Ecosystem = newConfig.usePreV32IntrospectionOverride;
+        } else if (!AddressIntrospector.hasRegisteredChains(bridgehubAddr)) {
+            // A chainless ecosystem has no protocol version to inspect. It cannot have been upgraded into
+            // existence either, so it was deployed from scratch with the current contracts.
+            preV32Ecosystem = false;
+        } else {
+            preV32Ecosystem = AddressIntrospector.shouldUsePreV32Introspection(bridgehubAddr);
+        }
 
-        // Use appropriate introspection based on version
-        if (useV29Introspection) {
-            ctmAddresses = AddressIntrospector.getCTMAddressesV29(ctm, config.isZKsyncOS);
-            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV29(bridgehubAddr);
-
-            // V29 introspection returns zero for bytecodesSupplier, overwrite with correct value
-            ctmAddresses.stateTransition.proxies.bytecodesSupplier = _bytecodesSupplier;
+        if (preV32Ecosystem) {
+            ctmAddresses = AddressIntrospector.getCTMAddressesV31(ctm, config.isZKsyncOS);
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubAddr);
         } else {
             ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
             coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
