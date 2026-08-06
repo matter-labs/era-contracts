@@ -260,6 +260,8 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.InteropCenter) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.InteropAttributeParser) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.L2InteropCommitmentTree) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.AtomicFlowManager) return ZKsyncOSUpgradeType.SystemProxy;
         revert UnknownCoreContract();
     }
 

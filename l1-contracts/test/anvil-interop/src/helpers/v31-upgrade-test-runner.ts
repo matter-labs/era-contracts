@@ -177,6 +177,20 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       console.log("\n── Clearing legacy genesis upgrade tx hashes ──");
       await clearGenesisUpgradeTxHash(l1Provider, upgradeChainAddresses);
     }
+    // ── Stage 3: post-governance migration ──
+    // Runs BEFORE the per-chain upgrades, matching production sequencing (see
+    // protocol-ops ecosystem stage3): every withdrawable L1-native asset must be registered and
+    // populated by the time a chain's diamond upgrade lands.
+    console.log("\n── Running stage3 post-governance migration ──");
+    await runForgeScript({
+      scriptPath: CORE_UPGRADE_TEST_SCRIPT,
+      envVars: upgradeHarnessInputs.envVars,
+      rpcUrl: l1Chain.rpcUrl,
+      senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
+      projectRoot: l1ContractsDir,
+      sig: "stage3()",
+    });
+
     // ── Run per-chain upgrades (L1) and relay to L2 ──
     // `default_upgrade_addr` lives in the per-CTM output TOML written by
     // `CTMUpgradeV31ForTests.saveOutput` directly to `script-out/` (forge
@@ -202,18 +216,7 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       isZKsyncOS: scenario.isZKsyncOS,
       protocolOpsOutDir: path.join(upgradeHarnessInputs.protocolOpsOutDir, "chains"),
     });
-
-    // ── Stage 3: post-governance migration ──
-    console.log("\n── Running stage3 post-governance migration ──");
-    await runForgeScript({
-      scriptPath: CORE_UPGRADE_TEST_SCRIPT,
-      envVars: upgradeHarnessInputs.envVars,
-      rpcUrl: l1Chain.rpcUrl,
-      senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
-      projectRoot: l1ContractsDir,
-      sig: "stage3()",
-    });
-    console.log("\n── Stage 3 complete, verifying final protocol versions ──");
+    console.log("\n── Chain upgrades complete, verifying final protocol versions ──");
     await verifyProtocolVersions(l1Provider, upgradeChainAddresses, scenario.expectedProtocolVersion);
     console.log("✅ All protocol versions verified successfully!\n");
   } finally {

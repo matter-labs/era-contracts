@@ -108,3 +108,12 @@ export function getCreationBytecode(name: ContractName): string {
 export const LEGACY_ADMIN_ABI: string[] = [
   "function upgradeChainFromVersion(uint256, tuple(tuple(address,uint8,bool,bytes4[])[],address,bytes))",
 ];
+
+/**
+ * v31 Admin facet entry point removed in v32 (the backfill service-transaction request). The
+ * harness calls it on forked v31 chains whose fixture never ran the backfill, so the current
+ * AdminFacet artifact no longer carries the selector.
+ */
+export const LEGACY_V31_ADMIN_BACKFILL_ABI: string[] = [
+  "function setZKsyncOSPreV31TotalSupply(uint256 _totalSupply) returns (bytes32)",
+];

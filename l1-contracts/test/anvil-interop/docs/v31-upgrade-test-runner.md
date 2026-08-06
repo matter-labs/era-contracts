@@ -14,31 +14,32 @@ In production, a v31 protocol upgrade proceeds as:
 
 1. **Deploy new L1 contracts**: `CoreUpgrade_v31` / `CTMUpgrade_v31` deploy new implementation contracts
    (Bridgehub, MessageRoot, Nullifier, AssetRouter, NTV, CTM, facets, etc.)
-   via Create2. Configures the new ChainRegistrationSender (transfers ownership
-   to governance).
+   via Create2. The ChainRegistrationSender proxy is reused; only a fresh implementation is deployed.
 
 2. **Governance stage 0**: Pause gateway migrations (`pauseMigration()` on ChainAssetHandler).
 
-3. **Governance stage 1**: Upgrade all proxy implementations via the TransparentProxyAdmin,
-   accept ChainRegistrationSender ownership, set the new version
+3. **Governance stage 1**: Upgrade all proxy implementations via the TransparentProxyAdmin
+   (including the ChainRegistrationSender implementation swap), set the new version
    upgrade contract.
 
 4. **Governance stage 2**: Unpause gateway migrations, version-specific post-upgrade calls.
 
-5. **Per-chain upgrade**: For each ZK chain, the chain admin calls
+5. **Stage 3**: Post-governance, pre-chain-upgrade. Registers legacy bridged tokens in the NTV
+   bridged-tokens list (`TokenMigrationUtils`) and populates the NTV's `bridgedOut` accounting
+   (`BridgedOutPopulationLib`). Must run before per-chain upgrades so L1-native withdrawals work
+   as soon as a chain is on v32.
+
+6. **Per-chain upgrade**: For each ZK chain, the chain admin calls
    `upgradeChainFromVersion()` on the diamond proxy. This records an L2 upgrade transaction
    that the server will include in the next batch.
 
-6. **L2 upgrade execution**: The bootloader includes the L2 upgrade tx as a system transaction.
+7. **L2 upgrade execution**: The bootloader includes the L2 upgrade tx as a system transaction.
    It calls `ComplexUpgrader.forceDeployAndUpgradeUniversal()` (the ZKsync OS entry point; the Era
    `forceDeployAndUpgrade()` shape is only reachable from fork runs against older ecosystems) which:
    - Force-deploys new L2 system contract bytecodes (via ContractDeployer on Era, or the
      bytecode deployer on ZKsyncOS)
    - Delegatecalls to `L2V32Upgrade.upgrade()` which initializes new contracts (NTV, Bridgehub,
      AssetRouter, ChainAssetHandler, InteropCenter, BaseToken, etc.)
-
-7. **Stage 3**: Post-governance migration. Registers bridged tokens in NTV and migrates token
-   legacy bridged tokens in the NTV (shared logic in `TokenMigrationUtils`).
 
 8. **Verification**: Protocol version on each chain is now `0x2000000000` (v32).
 
@@ -137,11 +138,11 @@ The test calls the **real** `CoreUpgrade_v31` / `CTMUpgrade_v31` scripts via For
 **Patch: Idempotent core upgrade** (`CoreUpgradeV31Idempotent`)
 
 - Production: `CoreUpgrade_v31.deployNewEcosystemContractsL1()` deploys contracts AND calls
-  `updateContractConnections()` (which runs the ownership transfers and
-  `transferOwnership(governance)`).
+  `updateContractConnections()` (which hands a freshly deployed L1InteropHandler proxy's
+  ownership to governance).
 - Test: step1 runs the full flow. step2 needs to re-populate `coreAddresses` (Create2 deploys
   are no-ops since contracts already exist) but must NOT re-run `updateContractConnections()`
-  because `setAddresses()` is `onlyOwner` and ownership was already transferred to governance
+  because `transferOwnership()` is `onlyOwner` and ownership was already handed to governance
   in step1.
 - Mechanism: `CoreUpgradeV31Idempotent` overrides `deployNewEcosystemContractsL1()` to call
   `deployNewEcosystemContractsL1NoConnections()` -- deploys only, no side effects.
@@ -177,7 +178,17 @@ functions.
 - Mechanism: `anvil_setStorageAt(diamondProxy, "0x22", HashZero)` -- directly clears storage
   slot 0x22 which holds `l2SystemContractsUpgradeTxHash`.
 
-### 6. Per-chain L1 upgrade + L2 relay
+### 6. Stage 3: post-governance registration
+
+Runs the production `stage3()` Forge script, which uses `TokenMigrationUtils` to register
+legacy bridged tokens in the NTV bridged-tokens list and then `BridgedOutPopulationLib` to
+populate the NTV's `bridgedOut` accounting for every L1-native asset. Runs before the
+per-chain upgrades, matching the production ordering. On a fixture with no legacy accounting
+left the population is a no-op, so step 8 does not assert its amounts — they are covered by
+the foundry tests instead.
+**No patches** -- this is pure L1 logic.
+
+### 7. Per-chain L1 upgrade + L2 relay
 
 The L1 side runs the **production** `ChainUpgrade_v31` Forge script -- no patches needed.
 
@@ -230,15 +241,6 @@ ZKsync VM (bytecode hashing, validation, etc.) and do not work. The test patches
 - Test: The real `SystemContractProxyAdmin` is deployed and its `_owner` slot is set to
   `L2_COMPLEX_UPGRADER_ADDR` via `anvil_setStorageAt`.
 
-### 7. Stage 3: post-governance migration
-
-Runs the production `stage3()` Forge script, which uses `TokenMigrationUtils` to register
-legacy bridged tokens in the NTV bridged-tokens list and then `BridgedOutPopulationLib` to
-populate the NTV's `bridgedOut` accounting for every L1-native asset. On a fixture with no
-legacy accounting left the population is a no-op, so step 8 does not assert its amounts —
-they are covered by the foundry tests instead.
-**No patches** -- this is pure L1 logic.
-
 ### 8. Verification
 
 No patches. Reads on-chain state to assert:
@@ -249,7 +251,7 @@ No patches. Reads on-chain state to assert:
   (`0x2000000000` for v32)
 - The recorded `getL2SystemContractsUpgradeTxHash()` equals the hash of the upgrade transaction the
   harness relayed to L2, i.e. the per-chain data really was substituted on L1. This one is asserted during
-  step 6, inside `runChainUpgradesAndRelayL2`, and only on the single-CTM path
+  step 7, inside `runChainUpgradesAndRelayL2`, and only on the single-CTM path
 
 ## Summary table
 

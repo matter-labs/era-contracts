@@ -33,7 +33,7 @@ import {BaseTokenHolderAlreadyInitialized, BaseTokenHolderMintFailed} from "../.
 contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
     /// @notice The pre-V31 total supply for ZKOS chains.
     /// @dev ZKsync OS chains did not track total supply on-chain before v31. Existing chains had
-    /// this slot backfilled by the draft-v31 service transaction, and the v31 upgrade is forbidden
+    /// this slot backfilled by the draft-v31 service transaction, and the v32 upgrade is forbidden
     /// on L1 until that happened (see `V32UpgradeZKsyncOS`), so the value here is
     /// always final. Fresh chains have no pre-v31 history and keep zero.
     // slither-disable-next-line uninitialized-state

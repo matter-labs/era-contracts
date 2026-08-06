@@ -234,7 +234,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             Utils.genesisConfigPath(isZKsyncOS)
         );
 
-        // Optional override for v29 introspection selection
+        // Optional override for pre-v32 introspection selection
         if (toml.keyExists("$.pre_v32_introspection")) {
             newConfig.hasPreV32IntrospectionOverride = true;
             newConfig.usePreV32IntrospectionOverride = toml.readBool("$.pre_v32_introspection");

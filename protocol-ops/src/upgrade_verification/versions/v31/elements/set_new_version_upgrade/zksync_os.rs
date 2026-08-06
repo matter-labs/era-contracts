@@ -1,10 +1,10 @@
 //! ZKsync OS `forceDeployAndUpgradeUniversal` payload verification.
 //!
-//! Owns the expected `UniversalContractUpgradeInfo[]` list (15 fixed-address
+//! Owns the expected `UniversalContractUpgradeInfo[]` list (16 fixed-address
 //! entries, all proxy-upgrade shapes; the only unsafe force deployment is the
-//! L2V31Upgrade delegate target, validated separately), the
+//! L2V32Upgrade delegate target, validated separately), the
 //! deployed-bytecode-info decoder (96-byte triple or 320-byte impl/proxy
-//! pair), the keccak-derived L2V31Upgrade delegate-address check, the ZKsync
+//! pair), the keccak-derived L2V32Upgrade delegate-address check, the ZKsync
 //! OS factory-dep bytecode list, and the ZKsync OS orchestrator wired from
 //! `ProposedUpgrade::verify_l2_protocol_upgrade_tx`.
 
@@ -19,7 +19,7 @@ use crate::upgrade_verification::{
         L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR, L2_MESSAGE_ROOT_ADDR,
         L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR,
         L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-        L2_V31_UPGRADE_CONTRACT,
+        L2_V32_UPGRADE_CONTRACT,
     },
     verifiers::{VerificationResult, Verifiers},
 };
@@ -40,7 +40,7 @@ struct ZksyncOSExpectedFd {
 }
 
 /// Expected v31 ZKsyncOS `UniversalContractUpgradeInfo[]` passed to
-/// `ComplexUpgrader.forceDeployAndUpgradeUniversal` — excludes the L2V31Upgrade delegate-target
+/// `ComplexUpgrader.forceDeployAndUpgradeUniversal` — excludes the L2V32Upgrade delegate-target
 /// entry, which is validated separately by `verify_zksync_os_l2_v31_deployment`.
 fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
     macro_rules! proxy {
@@ -53,10 +53,10 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
         };
     }
     // NOTE: every entry below is a SystemProxyUpgrade. v31 no longer performs any unsafe
-    // ZKsyncOS force deployment except the L2V31Upgrade delegate target (validated separately);
+    // ZKsyncOS force deployment except the L2V32Upgrade delegate target (validated separately);
     // verify_v31_zksync_os_force_deployments enforces that no other unsafe FD is present.
     vec![
-        // ── Fixed-address core contracts (getFixedAddressCoreContracts, 10 entries; L2WrappedBaseToken excluded) ──
+        // ── Fixed-address core contracts (getFixedAddressCoreContracts, 11 entries; L2WrappedBaseToken excluded) ──
         proxy!("l1-contracts/L2Bridgehub", L2_BRIDGEHUB_ADDR),
         proxy!("l1-contracts/L2AssetRouter", L2_ASSET_ROUTER_ADDR),
         proxy!(
@@ -111,7 +111,7 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
     ]
 }
 
-/// Validate all entries of `UniversalContractUpgradeInfo[]` except the L2V31Upgrade delegate-target
+/// Validate all entries of `UniversalContractUpgradeInfo[]` except the L2V32Upgrade delegate-target
 /// (which is already validated by `verify_zksync_os_l2_v31_deployment`).
 fn verify_v31_zksync_os_force_deployments(
     verifiers: &Verifiers,
@@ -124,7 +124,7 @@ fn verify_v31_zksync_os_force_deployments(
         expected.into_iter().map(|e| (e.address, e)).collect();
 
     for deployment in deployments {
-        // Skip the L2V31Upgrade delegate-target; already validated elsewhere. It is the ONLY
+        // Skip the L2V32Upgrade delegate-target; already validated elsewhere. It is the ONLY
         // ZKsyncOS force deployment allowed to be unsafe (it's the delegatecall implementation).
         if deployment.newAddress == delegate_to {
             continue;
@@ -138,7 +138,7 @@ fn verify_v31_zksync_os_force_deployments(
             == IComplexUpgrader::ContractUpgradeType::ZKsyncOSUnsafeForceDeployment
         {
             result.report_error(&format!(
-                "Unsafe ZKsyncOS force deployment at {} is not allowed (only the L2V31Upgrade \
+                "Unsafe ZKsyncOS force deployment at {} is not allowed (only the L2V32Upgrade \
                  delegate target may use ZKsyncOSUnsafeForceDeployment)",
                 deployment.newAddress
             ));
@@ -197,7 +197,7 @@ fn verify_v31_zksync_os_force_deployments(
 
     if missing.is_empty() {
         result.report_ok(
-            "All ZKsyncOS force deployments match the expected v31 list (excluding L2V31Upgrade delegate target)",
+            "All ZKsyncOS force deployments match the expected v31 list (excluding L2V32Upgrade delegate target)",
         );
     }
 }
@@ -207,7 +207,7 @@ fn verify_v31_zksync_os_force_deployments(
 /// `deployedBytecodeInfo` is `(bytes32 blakeHash, uint32 length, bytes32 observableKeccak)`
 /// per `IComplexUpgrader.sol:27`. ZKsync OS L2's `setBytecodeDetailsEVM` consumes all
 /// three — for fixed-address entries the `newAddress` is fixed and can't bind the tuple
-/// via address derivation (unlike the L2V31Upgrade delegate target), so PUVT must
+/// via address derivation (unlike the L2V32Upgrade delegate target), so PUVT must
 /// independently cross-check each component against `AllContractsHashes.json`.
 ///
 /// - `ZKsyncOSUnsafeForceDeployment`: 96-byte triple, fields at `[0..32]` / `[32..64]` / `[64..96]`.
@@ -330,7 +330,7 @@ fn verify_zksync_os_bytecode_info_triplet(
 }
 
 /// ZKsync OS L2 factory-dep bytecode set. Mirrors
-/// `CoreOnGatewayHelper.getFullListOfFactoryDependencies(true, [L2V31Upgrade])`.
+/// `CoreOnGatewayHelper.getFullListOfFactoryDependencies(true, [L2V32Upgrade])`.
 pub(super) const EXPECTED_V31_ZKSYNC_OS_BYTECODES: &[&str] = &[
     "l1-contracts/SystemContractProxy",
     "l1-contracts/SystemContractProxyAdmin",
@@ -355,15 +355,15 @@ pub(super) const EXPECTED_V31_ZKSYNC_OS_BYTECODES: &[&str] = &[
 ];
 
 /// ZKsync OS orchestrator: walks the `UniversalContractUpgradeInfo[]`, validates the
-/// L2V31Upgrade delegate-target entry (derived address + bytecode info), then decodes
-/// the inner `IL2V31Upgrade.upgrade` calldata.
+/// L2V32Upgrade delegate-target entry (derived address + bytecode info), then decodes
+/// the inner `IL2V32Upgrade.upgrade` calldata.
 pub(super) async fn verify_zksync_os_force_deploy_and_upgrade(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
     decoded: &IComplexUpgrader::forceDeployAndUpgradeUniversalCall,
     expected_fixed_force_deployments_data: &str,
 ) -> anyhow::Result<()> {
-    // Validate all expected force deployments (17 fixed entries; L2V31Upgrade delegate validated below).
+    // Validate all expected force deployments (16 fixed entries; L2V32Upgrade delegate validated below).
     verify_v31_zksync_os_force_deployments(
         verifiers,
         result,
@@ -371,7 +371,7 @@ pub(super) async fn verify_zksync_os_force_deploy_and_upgrade(
         decoded._delegateTo,
     );
 
-    // Validate the L2V31Upgrade delegate-target entry (1 unsafe force deployment at a derived address).
+    // Validate the L2V32Upgrade delegate-target entry (1 unsafe force deployment at a derived address).
     let mut matching_deployments = decoded
         ._forceDeployments
         .iter()
@@ -410,7 +410,7 @@ fn verify_zksync_os_l2_v31_deployment(
         != IComplexUpgrader::ContractUpgradeType::ZKsyncOSUnsafeForceDeployment
     {
         result.report_error(&format!(
-            "ZKsync OS L2V31Upgrade deployment must use ZKsyncOSUnsafeForceDeployment, got {:?}",
+            "ZKsync OS L2V32Upgrade deployment must use ZKsyncOSUnsafeForceDeployment, got {:?}",
             deployment.upgradeType
         ));
     }
@@ -428,18 +428,18 @@ fn verify_zksync_os_l2_v31_deployment(
             if evm_deployed_bytecode_hash_matches_file(
                 verifiers,
                 &observable_hash,
-                L2_V31_UPGRADE_CONTRACT,
+                L2_V32_UPGRADE_CONTRACT,
             ) {
-                result.report_ok("ZKsync OS delegate deployment uses L2V31Upgrade bytecode info");
+                result.report_ok("ZKsync OS delegate deployment uses L2V32Upgrade bytecode info");
             } else {
                 result.report_error(&format!(
                     "ZKsync OS delegate bytecode info does not map to {}: blake={}, observable={}",
-                    L2_V31_UPGRADE_CONTRACT, first_hash, observable_hash
+                    L2_V32_UPGRADE_CONTRACT, first_hash, observable_hash
                 ));
             }
         }
         None => result.report_error(&format!(
-            "ZKsync OS L2V31Upgrade bytecode info must be 96 bytes, got {}",
+            "ZKsync OS L2V32Upgrade bytecode info must be 96 bytes, got {}",
             deployment.deployedBytecodeInfo.len()
         )),
     }

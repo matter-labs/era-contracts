@@ -11,7 +11,7 @@ import {BaseTokenPreV31TotalSupplyNotSet, LowerBoundAlreadyRecorded} from "../co
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Pins, per chain, a priority-op count observed while the chain's pre-v31 base-token
 /// total supply was already backfilled (draft-v31 sets that flag when the backfill service
-/// transaction is *requested*). The v31 upgrade of a ZKsync OS chain then requires all priority
+/// transaction is *requested*). The v32 upgrade of a ZKsync OS chain then requires all priority
 /// ops below the pinned count to be processed, proving the backfill *executed* on L2 before the
 /// upgrade removes its L2 entry point — without demanding an empty (griefable) priority queue.
 /// @dev Specific to the v32 upgrade (`V32UpgradeZKsyncOS`) — no default or later upgrade should
