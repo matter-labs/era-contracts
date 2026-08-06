@@ -7,6 +7,7 @@ import {SystemContractsProcessing} from "deploy-scripts/upgrade/SystemContractsP
 import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
 
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
+import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ISystemContractProxy} from "contracts/l2-upgrades/ISystemContractProxy.sol";
 import {SystemContractProxyAdmin} from "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
@@ -43,20 +44,37 @@ contract FaithfulZKOSDeployer {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
 
     mapping(bytes32 observableHash => bytes bytecode) internal registered;
+    mapping(bytes32 observableHash => bytes32 blakeHash) internal registeredBlakeHash;
     bytes internal defaultBytecode;
 
-    function register(bytes calldata _bytecode) external {
+    /// @dev Records addresses that got the placeholder rather than a registered artifact — the
+    /// test asserts the entries under scrutiny never fell back, so a regression in how the
+    /// production code forwards the bytecode triple cannot be masked by the fallback.
+    mapping(address addr => bool usedFallback) public materializedFromFallback;
+
+    function register(bytes calldata _bytecode, bytes32 _blakeHash) external {
         registered[keccak256(_bytecode)] = _bytecode;
+        registeredBlakeHash[keccak256(_bytecode)] = _blakeHash;
     }
 
     function setDefaultBytecode(bytes calldata _bytecode) external {
         defaultBytecode = _bytecode;
     }
 
-    function setBytecodeDetailsEVM(address _addr, bytes32, uint32, bytes32 _observableHash) external {
+    function setBytecodeDetailsEVM(
+        address _addr,
+        bytes32 _blakeHash,
+        uint32 _length,
+        bytes32 _observableHash
+    ) external {
         bytes memory bytecode = registered[_observableHash];
         if (bytecode.length == 0) {
+            materializedFromFallback[_addr] = true;
             bytecode = defaultBytecode;
+        } else {
+            // A registered request must carry the artifact's full, self-consistent triple.
+            require(_blakeHash == registeredBlakeHash[_observableHash], "blake hash mismatch");
+            require(_length == bytecode.length, "bytecode length mismatch");
         }
         Vm(VM_ADDRESS).etch(_addr, bytecode);
     }
@@ -141,8 +159,19 @@ contract RemovedTrackerNeutralizationTest is Test {
         // proxies, EmptyContract wherever an entry's implementation info asks for it, and an inert
         // placeholder implementation for the other (never-called-here) core contracts.
         FaithfulZKOSDeployer deployer = FaithfulZKOSDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
-        deployer.register(emptyContractBytecode);
-        deployer.register(BytecodeUtils.readDeployedBytecodeL1(true, "SystemContractProxy.sol", "SystemContractProxy"));
+        {
+            (bytes memory implInfo, bytes memory proxyInfo) = abi.decode(
+                neutralizations[0].deployedBytecodeInfo,
+                (bytes, bytes)
+            );
+            (bytes32 implBlakeHash, , ) = ZKSyncOSBytecodeInfo.decodeZKSyncOSBytecodeInfo(implInfo);
+            (bytes32 proxyBlakeHash, , ) = ZKSyncOSBytecodeInfo.decodeZKSyncOSBytecodeInfo(proxyInfo);
+            deployer.register(emptyContractBytecode, implBlakeHash);
+            deployer.register(
+                BytecodeUtils.readDeployedBytecodeL1(true, "SystemContractProxy.sol", "SystemContractProxy"),
+                proxyBlakeHash
+            );
+        }
         deployer.setDefaultBytecode(emptyContractBytecode);
 
         // The derived EmptyContract implementation addresses start EMPTY: the dispatcher itself
@@ -164,6 +193,10 @@ contract RemovedTrackerNeutralizationTest is Test {
 
         for (uint256 i = 0; i < neutralizations.length; ++i) {
             address proxyAddr = neutralizations[i].newAddress;
+            assertFalse(
+                deployer.materializedFromFallback(derivedImpls[i]),
+                "the implementation must come from the registered artifact, not the fallback"
+            );
             assertEq(
                 keccak256(derivedImpls[i].code),
                 keccak256(emptyContractBytecode),
