@@ -17,7 +17,7 @@ pragma solidity 0.8.28;
 /// ZKsync OS genesis intentionally does not deploy this stub. The former address remains an
 /// unoccupied, reserved gap; the generator no longer needs a tracker artifact.
 ///
-/// TODO(EVM-1584): delete this stub when noone consumes it.
+/// TODO(EVM-1584): delete this stub when no one consumes it.
 contract L2AssetTracker {
     // solhint-disable-previous-line no-empty-blocks
 }

@@ -108,6 +108,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         assertEq(_countLogs(logs, FORCE_DEPLOYED_CONTRACTS_INITIALIZED_SIG), 1);
 
         _assertAtomicInteropInitialized();
+        _assertBaseTokenTracked();
 
         // Verify deployments occurred - use the etched contract at the system address
         MockZKOSContractDeployer etchedDeployer = MockZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
@@ -178,6 +179,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // The upgrade path initializes the atomic-interop built-ins, so an upgraded chain ends up with the
         // same state a fresh one gets from genesis.
         _assertAtomicInteropInitialized();
+        _assertBaseTokenTracked();
 
         // Note: no ZKsync OS chain can arrive here with the built-ins already seeded — neither they nor
         // their addresses existed in v31 — so the initialization is unconditional and one-shot.
@@ -226,6 +228,19 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // `_etchAllDeferredContracts` gave them real code here: on a real Era chain those addresses are
         // empty and initializing them would revert the whole upgrade transaction.
         _assertAtomicInteropUninitialized();
+
+        // The base token's baseline is recorded on the Era genesis path too.
+        _assertBaseTokenTracked();
+    }
+
+    /// @dev The helper must ask the vault to record the base token's baseline exactly once, on
+    /// every path (genesis and upgrade, both VMs).
+    function _assertBaseTokenTracked() internal view {
+        assertEq(
+            MockContract(payable(L2_NATIVE_TOKEN_VAULT_ADDR)).trackBaseTokenCalls(),
+            1,
+            "the vault must record the base token's baseline exactly once"
+        );
     }
 
     /// @dev Neither built-in seeded: the tree has no leaves and the manager no L1 chain id.
@@ -459,8 +474,14 @@ contract MockSystemContractProxyAdmin {
 }
 
 contract MockContract {
+    uint256 public trackBaseTokenCalls;
+
     // Generic mock contract that can handle various function calls
     function forceInitAdmin(address) external {}
+
+    function trackBaseToken() external {
+        trackBaseTokenCalls++;
+    }
 
     function initL2(uint256) external {}
 

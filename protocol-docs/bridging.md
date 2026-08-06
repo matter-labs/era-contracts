@@ -161,8 +161,8 @@ the pre-upgrade accounting into `bridgedOut`, once per asset, and `stage3` of th
 L1-native assets in the vault's `bridgedTokens` enumeration that have a non-zero pre-upgrade amount, batched
 across transactions (see `l1-contracts/deploy-scripts/upgrade/default-upgrade/BridgedOutPopulationLib.sol`;
 assets whose
-amount is zero are left out of the batches entirely, so their `bridgedOutPopulated` flag stays unset — there
-is nothing to fold in for them, now or later).
+amount is zero are left out of the batches entirely, so their `isAssetTracked` marker — which doubles on L1
+as the populate-once flag — stays unset; there is nothing to fold in for them, now or later).
 
 - For an asset the removed v31 `L1AssetTracker` registered, the amount is the complement of **L1's own
   bulkhead** there: L1 is the origin chain of these assets, so its bulkhead starts at `MAX_TOKEN_BALANCE`

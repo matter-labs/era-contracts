@@ -68,12 +68,11 @@ pub const L2_INTEROP_HANDLER_ADDR: Address = Address(FixedBytes::<20>(hex_litera
     "000000000000000000000000000000000001000e"
 )));
 
-// 0x1000f is intentionally absent. L2AssetTracker existed only in unreleased v31 code, so both
-// upgraded pre-v31 chains and newly generated chains leave its reserved address empty.
-
-/// Reserved — formerly the GWAssetTracker; an empty stub is deployed here so new chains' genesis
-/// matches upgraded chains, which retain the old bytecode. See {protocol-docs/bridging.md#l2-asset-bookkeeping}.
-pub const GW_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+// 0x1000f and 0x10010 are intentionally absent: the removed v31 trackers' reserved addresses.
+// v31 released with the trackers deployed there, so the v32 upgrade swaps their system proxies'
+// implementations for `EmptyContract` (see `getRemovedTrackerNeutralizations`), while chains
+// generated on v32 leave both addresses empty.
+pub const REMOVED_GW_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010010"
 )));
 
@@ -148,7 +147,7 @@ const L2_INTEROP_ATTRIBUTE_PARSER: Address = Address(FixedBytes::<20>(hex_litera
 /// - `L2_WRAPPED_BASE_TOKEN` – uses its own proxy mechanism.
 /// - `SYSTEM_CONTRACT_PROXY_ADMIN` – the proxy admin itself.
 /// - `DETERMINISTIC_CREATE2_ADDRESS` – standard Create2 factory, not a system contract.
-pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 24] = [
+pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 23] = [
     (
         L2_COMPLEX_UPGRADER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2ComplexUpgrader")),
@@ -190,13 +189,6 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 24] = [
     (
         L2_CHAIN_ASSET_HANDLER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2ChainAssetHandler")),
-    ),
-    // Empty stub at the reserved GWAssetTracker address; see GW_ASSET_TRACKER_ADDR. Kept so new
-    // chains' genesis matches upgraded chains, which retain their old bytecode at this address. The
-    // stub holds no state — do not rely on its storage.
-    (
-        GW_ASSET_TRACKER_ADDR,
-        ContractDeployment::SystemProxy(ContractSource::L1ContractName("GWAssetTracker")),
     ),
     (
         L2_INTEROP_CENTER_ADDR,
@@ -259,7 +251,7 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 24] = [
 mod tests {
     use alloy::primitives::{Address, FixedBytes};
 
-    use super::{GW_ASSET_TRACKER_ADDR, INITIAL_CONTRACTS};
+    use super::{INITIAL_CONTRACTS, REMOVED_GW_ASSET_TRACKER_ADDR};
 
     const REMOVED_L2_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
         "000000000000000000000000000000000001000f"
@@ -271,13 +263,13 @@ mod tests {
             !INITIAL_CONTRACTS
                 .iter()
                 .any(|(address, _)| *address == REMOVED_L2_ASSET_TRACKER_ADDR),
-            "L2AssetTracker was never deployed pre-v31 and must remain absent from new-chain genesis"
+            "L2AssetTracker was removed; chains generated on v32 leave its reserved address empty"
         );
         assert!(
-            INITIAL_CONTRACTS
+            !INITIAL_CONTRACTS
                 .iter()
-                .any(|(address, _)| *address == GW_ASSET_TRACKER_ADDR),
-            "the pre-v31 GWAssetTracker address must retain its compatibility stub"
+                .any(|(address, _)| *address == REMOVED_GW_ASSET_TRACKER_ADDR),
+            "GWAssetTracker was removed; chains generated on v32 leave its reserved address empty"
         );
     }
 }
