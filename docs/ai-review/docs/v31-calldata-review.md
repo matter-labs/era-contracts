@@ -761,7 +761,7 @@ At minimum, v31 provenance must cover:
   NativeTokenVault, AssetTracker, CTMDeploymentTracker, MessageRoot,
   ChainAssetHandler, GovernanceUpgradeTimer, and EIP7702Checker;
 - the `PriorityOpLowerBound` registry (no-arg deploy) and, bound to it, the
-  per-chain upgrade contract `DefaultUpgradeZKsyncOS`, which takes the registry
+  per-chain upgrade contract `V32UpgradeZKsyncOS`, which takes the registry
   address as its only constructor argument (immutable), so its constructor
   bytes must be the ABI-encoded registry address — not empty. A ZKsync OS
   chain's upgrade additionally requires a bound recorded through

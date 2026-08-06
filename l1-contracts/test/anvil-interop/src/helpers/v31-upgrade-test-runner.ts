@@ -680,7 +680,7 @@ export async function runChainUpgradesAndRelayL2(params: {
 
   const settlementLayerUpgrade = new ethers.Contract(
     settlementLayerUpgradeAddr,
-    getAbi("DefaultUpgradeZKsyncOS"),
+    getAbi("V32UpgradeZKsyncOS"),
     l1Provider
   );
   const l1Chain = anvilManager.getL1Chain()!;
@@ -1166,7 +1166,7 @@ function decodeLatestL2UpgradeTx(broadcastPath: string): {
   // Legacy ABI: v29/v30 states have upgradeChainFromVersion(uint256, DiamondCutData) (2 params).
   // Current ABI has upgradeChainFromVersion(address, uint256, DiamondCutData) (3 params).
   const legacyAdminIface = new ethers.utils.Interface(LEGACY_ADMIN_ABI);
-  const settlementLayerIface = new ethers.utils.Interface(getAbi("DefaultUpgradeZKsyncOS"));
+  const settlementLayerIface = new ethers.utils.Interface(getAbi("V32UpgradeZKsyncOS"));
 
   const errors: string[] = [];
 

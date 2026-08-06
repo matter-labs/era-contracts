@@ -265,7 +265,7 @@ balance directly, so the base token's `totalSuccessfulDepositsFromL1` counter is
 - The pre-v31 total supply of an upgraded ZKsync OS chain lives in `L2BaseTokenZKOS.zkosPreV31TotalSupply`,
   populated while the chain ran draft-v31 (via the since-removed backfill service transaction). This
   release has no backfill path: the v32 upgrade of a ZKsync OS chain is forbidden on L1
-  (`DefaultUpgradeZKsyncOS`) unless `baseTokenHasTotalSupply` was set by the draft-v31 backfill
+  (`V32UpgradeZKsyncOS`) unless `baseTokenHasTotalSupply` was set by the draft-v31 backfill
   _and_ the backfill's L2 execution is proven — a `PriorityOpLowerBound` registry permissionlessly pins a
   priority-op count observed after the flag was set, and the upgrade requires all ops below it to be
   processed. So `totalSupply()` is always available on upgraded chains; fresh chains have no pre-v31

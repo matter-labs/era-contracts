@@ -37,7 +37,7 @@ Common pitfalls: a contract added to genesis has not been added to the upgrade s
 The upgrade that is incoming is v32 (an in-place v31 → v32 upgrade; only ZKsync OS chains are
 supported). Its per-chain upgrade contract is:
 
-- DefaultUpgradeZKsyncOS.sol (no Era counterpart)
+- V32UpgradeZKsyncOS.sol (extends DefaultUpgradeZKsyncOS; no Era counterpart)
 
 And the corresponding L2 upgrade contract that should be used is:
 
@@ -47,7 +47,7 @@ The only assumptions that the upgrade logic can use is that the:
 
 - ComplexUpgrader contract is present and force deployment via a hook (ZKsync OS only) or via a call to the ContractDeployer system contract (EraVM only) works.
 
-Additionally, the v32 upgrade of a **ZKsync OS** chain (`DefaultUpgradeZKsyncOS`) assumes
+Additionally, the v32 upgrade of a **ZKsync OS** chain (`V32UpgradeZKsyncOS`) assumes
 the chain completed its base-token backfill on v31: on L1 the upgrade requires
 `s.baseTokenHasTotalSupply` plus a bound recorded in the `PriorityOpLowerBound` registry
 (with the chain processed past it), proving the backfill service transaction executed

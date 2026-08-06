@@ -14,8 +14,9 @@ import {BaseTokenPreV31TotalSupplyNotSet, LowerBoundAlreadyRecorded} from "../co
 /// transaction is *requested*). The v31 upgrade of a ZKsync OS chain then requires all priority
 /// ops below the pinned count to be processed, proving the backfill *executed* on L2 before the
 /// upgrade removes its L2 entry point — without demanding an empty (griefable) priority queue.
-/// @dev A standalone contract: the pin must be readable before the chain's facets are upgraded,
-/// so the upgrade references it as an immutable rather than using its own diamond storage.
+/// @dev Specific to the v32 upgrade (`V32UpgradeZKsyncOS`) — no default or later upgrade should
+/// reference it. A standalone contract: the pin must be readable before the chain's facets are
+/// upgraded, so the upgrade references it as an immutable rather than using its own diamond storage.
 contract PriorityOpLowerBound is IPriorityOpLowerBound {
     /// @inheritdoc IPriorityOpLowerBound
     mapping(address chain => uint256 bound) public override lowerBound;

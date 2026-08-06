@@ -6,13 +6,6 @@ import {DefaultUpgrade} from "./DefaultUpgrade.sol";
 import {ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {L2UpgradeTxLib} from "./L2UpgradeTxLib.sol";
 import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
-import {IPriorityOpLowerBound} from "./IPriorityOpLowerBound.sol";
-import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
-import {
-    BaseTokenPreV31TotalSupplyNotSet,
-    LowerBoundNotRecorded,
-    PriorityQueueNotReady
-} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -23,13 +16,6 @@ import {
 /// `IL2V32Upgrade.upgrade` calldata carries a placeholder for the chain-specific force-deployments data.
 /// Substituting the real data can only happen per chain, which is what this contract adds.
 contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
-    /// @notice Standalone registry of per-chain priority-op lower bounds; see `upgrade` below.
-    IPriorityOpLowerBound public immutable PRIORITY_OP_LOWER_BOUND;
-
-    constructor(IPriorityOpLowerBound _priorityOpLowerBound) {
-        PRIORITY_OP_LOWER_BOUND = _priorityOpLowerBound;
-    }
-
     /// @inheritdoc DefaultUpgrade
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public virtual override returns (bytes32) {
         // This is a generic upgrade implementation, so as good practice it requires every outstanding batch
@@ -38,20 +24,6 @@ contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
         // version's verifier is installed here (see `_setVerifier`), and this release deploys a fresh one, so
         // batches still awaiting proof under the old verifier would stop being provable.
         require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
-
-        // The pre-v32 base-token total supply must have been backfilled on v31, and — since the flag
-        // below is set eagerly when the backfill service transaction is *requested* while this release
-        // removes its L2 entry point — the transaction must also have *executed*.
-        // `PRIORITY_OP_LOWER_BOUND` pins (permissionlessly, while the flag is already set) a priority-op
-        // count that includes the backfill; requiring all ops below it to be processed proves execution
-        // without demanding an empty — and therefore griefable — priority queue.
-        require(s.baseTokenHasTotalSupply, BaseTokenPreV31TotalSupplyNotSet());
-        require(PRIORITY_OP_LOWER_BOUND.recorded(address(this)), LowerBoundNotRecorded());
-        require(
-            IGetters(address(this)).getFirstUnprocessedPriorityTx() >=
-                PRIORITY_OP_LOWER_BOUND.lowerBound(address(this)),
-            PriorityQueueNotReady()
-        );
 
         _proposedUpgrade.l2ProtocolUpgradeTx.data = getL2UpgradeTxData(
             s.bridgehub,

@@ -24,6 +24,7 @@ import {
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {IContractDeployer, L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
+import {MAX_TOKEN_BALANCE} from "../../common/Config.sol";
 
 import {SystemContractsCaller} from "../../common/l2-helpers/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -108,7 +109,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// withdrawals — accumulated before the upgrade introduced this bookkeeping.
     /// @dev For a bridged token that is its pre-tracking `totalSupply()`. Tokens native to this
     /// chain use the removed tracker's infinite-deposit convention, offsetting the same net flow
-    /// by `type(uint256).max`: `type(uint256).max - bridgedOut`.
+    /// by `MAX_TOKEN_BALANCE`: `MAX_TOKEN_BALANCE - bridgedOut`.
     mapping(bytes32 assetId => SavedTotalSupply snapshot) public preTrackingTotalSupply;
 
     /// @dev Only allows calls from the complex upgrader contract on L2.
@@ -233,7 +234,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
 
         // No flows predate the bookkeeping for a token registered after it: a bridged token starts
         // at zero, a native token at the infinite-deposit baseline (zero `bridgedOut`).
-        uint256 initialSupply = _originChainId == block.chainid ? type(uint256).max : 0;
+        uint256 initialSupply = _originChainId == block.chainid ? MAX_TOKEN_BALANCE : 0;
         preTrackingTotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: initialSupply});
     }
 
@@ -529,7 +530,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             bridgedOut[_assetId] = escrowedAmount;
             preTrackingTotalSupply[_assetId] = SavedTotalSupply({
                 isSaved: true,
-                amount: type(uint256).max - escrowedAmount
+                amount: MAX_TOKEN_BALANCE - escrowedAmount
             });
         } else {
             // A bridged token's totalSupply is exactly its pre-tracking net inbound flow.

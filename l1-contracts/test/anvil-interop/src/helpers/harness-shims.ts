@@ -140,7 +140,7 @@ export async function modelDraftV31BackfillPrerequisite(params: {
     });
   }
 
-  const settlementLayerUpgrade = new Contract(settlementLayerUpgradeAddr, getAbi("DefaultUpgradeZKsyncOS"), l1Provider);
+  const settlementLayerUpgrade = new Contract(settlementLayerUpgradeAddr, getAbi("V32UpgradeZKsyncOS"), l1Provider);
   const registryAddr: string = await settlementLayerUpgrade.PRIORITY_OP_LOWER_BOUND();
   const registry = new Contract(registryAddr, getAbi("PriorityOpLowerBound"), l1Provider);
   if (await registry.recorded(diamondProxyAddr)) {

@@ -64,6 +64,7 @@ const ARTIFACTS = {
   PriorityOpLowerBound: "PriorityOpLowerBound.sol/PriorityOpLowerBound.json",
   ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
   DefaultUpgradeZKsyncOS: "DefaultUpgradeZKsyncOS.sol/DefaultUpgradeZKsyncOS.json",
+  V32UpgradeZKsyncOS: "V32UpgradeZKsyncOS.sol/V32UpgradeZKsyncOS.json",
   SystemContractProxy: "SystemContractProxy.sol/SystemContractProxy.json",
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
