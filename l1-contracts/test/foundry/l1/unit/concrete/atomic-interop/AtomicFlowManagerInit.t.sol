@@ -10,7 +10,11 @@ import {
     ImtProof,
     ATOMIC_FLOW_PREIMAGE_VERSION
 } from "contracts/atomic-interop/IAtomicInterop.sol";
-import {ManagerAlreadyInitialized, ManagerSettlementLayerNotL1} from "contracts/atomic-interop/AtomicInteropErrors.sol";
+import {
+    ManagerAlreadyInitialized,
+    ManagerMissingLegIndexOutOfRange,
+    ManagerSettlementLayerNotL1
+} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {Unauthorized} from "contracts/l2-system/zksync-os/errors/ZKOSContractErrors.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -74,5 +78,13 @@ contract AtomicFlowManagerInitTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(ManagerSettlementLayerNotL1.selector, L1_CHAIN_ID, L1_CHAIN_ID + 1));
         manager.authorizeRefund(flow, 0, absence);
+    }
+
+    function test_RevertWhen_refundMissingLegIndexOutOfRange() public {
+        AtomicFlow memory flow = _flow(L1_CHAIN_ID);
+        ImtProof memory absence;
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerMissingLegIndexOutOfRange.selector, 1, 1));
+        manager.authorizeRefund(flow, 1, absence);
     }
 }
