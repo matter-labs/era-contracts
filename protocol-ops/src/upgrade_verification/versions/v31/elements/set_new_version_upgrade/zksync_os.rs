@@ -331,7 +331,7 @@ pub(super) const EXPECTED_V31_ZKSYNC_OS_BYTECODES: &[&str] = &[
     "l1-contracts/InteropCenter",
     "l1-contracts/InteropHandler",
     "l1-contracts/UpgradeableBeaconDeployer",
-    "l1-contracts/L2V31Upgrade",
+    "l1-contracts/L2V32Upgrade",
     "l1-contracts/L2BaseTokenZKOS",
     "l1-contracts/L1MessengerZKOS",
     "l1-contracts/SystemContext",

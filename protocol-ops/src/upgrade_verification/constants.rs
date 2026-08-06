@@ -114,7 +114,7 @@ pub const L2_UPGRADE_GAS_LIMIT: u64 = 72_000_000;
 pub const L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT: u64 = 800;
 
 /// AllContractsHashes file-name keys consulted by the bytecode verifier.
-pub const L2_V31_UPGRADE_CONTRACT: &str = "l1-contracts/L2V31Upgrade";
+pub const L2_V31_UPGRADE_CONTRACT: &str = "l1-contracts/L2V32Upgrade";
 pub const BOOTLOADER_CONTRACT: &str = "Bootloader";
 pub const DEFAULT_ACCOUNT_CONTRACT: &str = "system-contracts/DefaultAccount";
 pub const EVM_EMULATOR_CONTRACT: &str = "EvmEmulator";

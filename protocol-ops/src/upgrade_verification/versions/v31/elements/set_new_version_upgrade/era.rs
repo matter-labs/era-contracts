@@ -361,7 +361,7 @@ pub(super) const EXPECTED_V31_ERA_BYTECODES: &[&str] = &[
     "l1-contracts/BridgedStandardERC20",
     "l1-contracts/DiamondProxy",
     "l1-contracts/ProxyAdmin",
-    "l1-contracts/L2V31Upgrade",
+    "l1-contracts/L2V32Upgrade",
 ];
 
 /// Era orchestrator: validates the `_delegateTo`, walks the `ForceDeployment[]`,

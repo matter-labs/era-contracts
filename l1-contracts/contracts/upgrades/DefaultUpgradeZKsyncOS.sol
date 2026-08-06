@@ -46,9 +46,12 @@ contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
         // count that includes the backfill; requiring all ops below it to be processed proves execution
         // without demanding an empty — and therefore griefable — priority queue.
         require(s.baseTokenHasTotalSupply, BaseTokenPreV31TotalSupplyNotSet());
-        uint256 lowerBound = PRIORITY_OP_LOWER_BOUND.lowerBound(address(this));
-        require(lowerBound != 0, LowerBoundNotRecorded());
-        require(IGetters(address(this)).getFirstUnprocessedPriorityTx() >= lowerBound, PriorityQueueNotReady());
+        require(PRIORITY_OP_LOWER_BOUND.recorded(address(this)), LowerBoundNotRecorded());
+        require(
+            IGetters(address(this)).getFirstUnprocessedPriorityTx() >=
+                PRIORITY_OP_LOWER_BOUND.lowerBound(address(this)),
+            PriorityQueueNotReady()
+        );
 
         _proposedUpgrade.l2ProtocolUpgradeTx.data = getL2UpgradeTxData(
             s.bridgehub,

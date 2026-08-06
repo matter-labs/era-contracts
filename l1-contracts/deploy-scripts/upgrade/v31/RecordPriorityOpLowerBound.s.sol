@@ -19,9 +19,8 @@ contract RecordPriorityOpLowerBound is Script {
         require(chainDiamond != address(0), "chain not registered on the bridgehub");
 
         IPriorityOpLowerBound registry = IPriorityOpLowerBound(_priorityOpLowerBound);
-        uint256 existing = registry.lowerBound(chainDiamond);
-        if (existing != 0) {
-            console.log("Lower bound already recorded for", chainDiamond, ":", existing);
+        if (registry.recorded(chainDiamond)) {
+            console.log("Lower bound already recorded for", chainDiamond, ":", registry.lowerBound(chainDiamond));
             return;
         }
 

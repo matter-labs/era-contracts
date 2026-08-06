@@ -143,6 +143,16 @@ impl<'a> V31UpgradeInner<'a> {
 
         let mut ctm_tomls = Vec::with_capacity(inputs.ctms.len());
         for ctm in &inputs.ctms {
+            // Only ZKsync OS chains can be upgraded onto this release: `CTMUpgrade_v31`'s
+            // `deployUsedUpgradeContract` rejects Era CTMs outright, so skip the CTMs the config
+            // marks as Era instead of failing the whole mixed-CTM environment preparation.
+            if ctm.is_zk_sync_os == Some(false) {
+                println!(
+                    "skipping Era CTM {:#x}: only ZKsync OS chains can be upgraded onto this release",
+                    ctm.proxy
+                );
+                continue;
+            }
             let (path, is_zk_sync_os) = self
                 .prepare_ctm(runner, deployer, inputs, ctm)
                 .await
@@ -152,6 +162,9 @@ impl<'a> V31UpgradeInner<'a> {
                 toml: path,
                 is_zk_sync_os,
             });
+        }
+        if ctm_tomls.is_empty() {
+            anyhow::bail!("no ZKsync OS CTMs to prepare — every configured CTM is Era");
         }
 
         Ok(V31PrepareOutput {

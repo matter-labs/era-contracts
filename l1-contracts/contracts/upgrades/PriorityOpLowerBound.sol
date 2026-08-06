@@ -4,11 +4,7 @@ pragma solidity 0.8.28;
 
 import {IPriorityOpLowerBound} from "./IPriorityOpLowerBound.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
-import {
-    BaseTokenPreV31TotalSupplyNotSet,
-    LowerBoundAlreadyRecorded,
-    ZeroPriorityOpCount
-} from "../common/L1ContractErrors.sol";
+import {BaseTokenPreV31TotalSupplyNotSet, LowerBoundAlreadyRecorded} from "../common/L1ContractErrors.sol";
 
 /// @title PriorityOpLowerBound
 /// @author Matter Labs
@@ -25,22 +21,23 @@ contract PriorityOpLowerBound is IPriorityOpLowerBound {
     mapping(address chain => uint256 bound) public override lowerBound;
 
     /// @inheritdoc IPriorityOpLowerBound
+    /// @dev A separate flag rather than a zero sentinel: a chain created on v31 legitimately has
+    /// zero priority ops (its flag comes from DiamondInit, with no backfill to prove) and must
+    /// still be able to record and upgrade.
+    mapping(address chain => bool isRecorded) public override recorded;
+
+    /// @inheritdoc IPriorityOpLowerBound
     function lowerBoundPriorityOp(address _chain) external override {
         // First call wins: a later caller must not be able to raise the bound and delay the upgrade.
-        if (lowerBound[_chain] != 0) {
+        if (recorded[_chain]) {
             revert LowerBoundAlreadyRecorded();
         }
         if (!IGetters(_chain).baseTokenSupportsTotalSupply()) {
             revert BaseTokenPreV31TotalSupplyNotSet();
         }
 
-        // A backfilled chain has at least the backfill service transaction, so a zero count can
-        // only come from a chain that never needed one (e.g. created at v31 with the flag from
-        // DiamondInit). Rejecting it keeps zero an unambiguous "not recorded" sentinel.
         uint256 totalPriorityTxs = IGetters(_chain).getTotalPriorityTxs();
-        if (totalPriorityTxs == 0) {
-            revert ZeroPriorityOpCount();
-        }
+        recorded[_chain] = true;
         lowerBound[_chain] = totalPriorityTxs;
         emit LowerBoundRecorded(_chain, totalPriorityTxs);
     }

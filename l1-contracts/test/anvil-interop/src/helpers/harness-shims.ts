@@ -35,8 +35,10 @@ const ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT = 13;
 // Packed word holding `baseTokenHasTotalSupply` in its lowest byte (with `zksyncOSMaxTxGasLimit`
 // and `pubdataContent` above it).
 const ZK_CHAIN_BASE_TOKEN_HAS_TOTAL_SUPPLY_SLOT = 68;
-// `PriorityOpLowerBound.lowerBound` is the contract's first state variable (mapping slot 0).
+// `PriorityOpLowerBound.lowerBound` / `.recorded` are the contract's two state variables
+// (mapping slots 0 and 1).
 const PRIORITY_OP_LOWER_BOUND_MAPPING_SLOT = 0;
+const PRIORITY_OP_RECORDED_MAPPING_SLOT = 1;
 
 const systemContextAbi = getAbi("SystemContext") as ContractInterface;
 
@@ -141,7 +143,7 @@ export async function modelDraftV31BackfillPrerequisite(params: {
   const settlementLayerUpgrade = new Contract(settlementLayerUpgradeAddr, getAbi("DefaultUpgradeZKsyncOS"), l1Provider);
   const registryAddr: string = await settlementLayerUpgrade.PRIORITY_OP_LOWER_BOUND();
   const registry = new Contract(registryAddr, getAbi("PriorityOpLowerBound"), l1Provider);
-  if (!(await registry.lowerBound(diamondProxyAddr)).isZero()) {
+  if (await registry.recorded(diamondProxyAddr)) {
     return; // already modeled / recorded
   }
 
@@ -165,21 +167,23 @@ export async function modelDraftV31BackfillPrerequisite(params: {
     await l1Provider.send("anvil_setStorageAt", [diamondProxyAddr, slotHex, word.slice(0, 64) + "01"]);
   }
 
-  // Record a bound equal to the processed priority-op count directly in the registry mapping: the
+  // Record a bound equal to the processed priority-op count directly in the registry: the
   // production bound (taken from the total count after the backfill executes on L2) is unreachable
   // here because the harness cannot process priority ops.
   const firstUnprocessed = await getters.getFirstUnprocessedPriorityTx();
+  const abiCoder = ethers.utils.defaultAbiCoder;
   const boundSlot = ethers.utils.keccak256(
-    ethers.utils.defaultAbiCoder.encode(
-      ["address", "uint256"],
-      [diamondProxyAddr, PRIORITY_OP_LOWER_BOUND_MAPPING_SLOT]
-    )
+    abiCoder.encode(["address", "uint256"], [diamondProxyAddr, PRIORITY_OP_LOWER_BOUND_MAPPING_SLOT])
   );
   await l1Provider.send("anvil_setStorageAt", [
     registryAddr,
     boundSlot,
     ethers.utils.hexZeroPad(firstUnprocessed.toHexString(), 32),
   ]);
+  const recordedSlot = ethers.utils.keccak256(
+    abiCoder.encode(["address", "uint256"], [diamondProxyAddr, PRIORITY_OP_RECORDED_MAPPING_SLOT])
+  );
+  await l1Provider.send("anvil_setStorageAt", [registryAddr, recordedSlot, ethers.utils.hexZeroPad("0x01", 32)]);
 }
 
 /**

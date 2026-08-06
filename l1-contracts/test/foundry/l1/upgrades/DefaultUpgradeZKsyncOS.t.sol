@@ -17,8 +17,7 @@ import {
     LowerBoundAlreadyRecorded,
     LowerBoundNotRecorded,
     PriorityQueueNotReady,
-    UnexpectedUpgradeSelector,
-    ZeroPriorityOpCount
+    UnexpectedUpgradeSelector
 } from "contracts/common/L1ContractErrors.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IPriorityOpLowerBound} from "contracts/upgrades/IPriorityOpLowerBound.sol";
@@ -374,7 +373,16 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         bytes memory forThisChain = upgradeContract.getL2UpgradeTxData(mockBridgehub, CHAIN_ID, true, placeholder);
         bytes memory forOtherChain = upgradeContract.getL2UpgradeTxData(mockBridgehub, otherChainId, true, placeholder);
 
-        assertTrue(keccak256(forThisChain) != keccak256(forOtherChain), "both chains got the same payload");
+        assertEq(
+            _decodePerChainData(forThisChain).baseTokenBridgingData.assetId,
+            BASE_TOKEN_ASSET_ID,
+            "this chain's payload must carry its own base-token asset id"
+        );
+        assertEq(
+            _decodePerChainData(forOtherChain).baseTokenBridgingData.assetId,
+            otherAssetId,
+            "the other chain's payload must carry the other base-token asset id"
+        );
     }
 
     function _decodePerChainData(
@@ -463,6 +471,7 @@ contract PriorityOpLowerBoundTest is BaseUpgrade {
 
         registry.lowerBoundPriorityOp(chain);
 
+        assertTrue(registry.recorded(chain), "the recording must be marked");
         assertEq(registry.lowerBound(chain), TOTAL_PRIORITY_TXS, "the current priority-op count should be pinned");
     }
 
@@ -490,14 +499,18 @@ contract PriorityOpLowerBoundTest is BaseUpgrade {
         registry.lowerBoundPriorityOp(chain);
     }
 
-    /// @dev Zero must stay an unambiguous "not recorded" sentinel: a chain with no priority ops
-    /// (only possible when the flag came from DiamondInit, not from a backfill) cannot record.
-    function test_revertsWhenChainHasNoPriorityOps() public {
+    /// @dev A chain created on v31 legitimately has zero priority ops (its flag comes from
+    /// DiamondInit, with no backfill to prove): recording a zero bound must work and still be
+    /// protected by first-call-wins.
+    function test_recordsZeroForChainWithNoPriorityOps() public {
         vm.mockCall(chain, abi.encodeWithSelector(IGetters.getTotalPriorityTxs.selector), abi.encode(uint256(0)));
 
-        vm.expectRevert(ZeroPriorityOpCount.selector);
         registry.lowerBoundPriorityOp(chain);
 
-        assertEq(registry.lowerBound(chain), 0, "a rejected recording must leave the mapping unset");
+        assertTrue(registry.recorded(chain), "a zero bound must still count as recorded");
+        assertEq(registry.lowerBound(chain), 0);
+
+        vm.expectRevert(LowerBoundAlreadyRecorded.selector);
+        registry.lowerBoundPriorityOp(chain);
     }
 }
