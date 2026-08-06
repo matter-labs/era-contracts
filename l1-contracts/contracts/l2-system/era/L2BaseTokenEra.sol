@@ -87,8 +87,6 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// @param _account The address which to mint the funds to.
     /// @param _amount The amount of ETH in wei to be minted.
     function mint(address _account, uint256 _amount) external override onlyBootloader {
-        // Record the inbound flow BEFORE changing balances/totalSupply, so the bookkeeping
-        // observes the pre-mint state.
         L2_BASE_TOKEN_HOLDER.recordBaseTokenDeposit(L1_CHAIN_ID, _amount);
 
         // Transfer from BaseTokenHolder to the recipient

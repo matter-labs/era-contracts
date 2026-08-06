@@ -152,13 +152,46 @@ tokens) and rejects fee-on-transfer tokens (`TokensWithFeesNotSupported`).
   L2 it exists only for shared-code reasons and should not be used as an emergency mechanism — future L2
   logic should rely on the L1/Gateway freeze flow.
 
+### Populating `bridgedOut` during an in-place upgrade
+
+A vault that is upgraded in place starts with `bridgedOut == 0` while still holding all of the escrow that
+was bridged out before the upgrade. Every withdrawal of an L1-native asset would therefore look like an
+inbound amount exceeding the outstanding one and be rejected as forged. `populateBridgedOut(assetIds)` folds
+the pre-upgrade accounting into `bridgedOut`, once per asset, and `stage3` of the upgrade runs it for the
+L1-native assets in the vault's `bridgedTokens` enumeration that have a non-zero pre-upgrade amount, batched
+across transactions (see `l1-contracts/deploy-scripts/upgrade/default-upgrade/BridgedOutPopulationLib.sol`;
+assets whose
+amount is zero are left out of the batches entirely, so their `bridgedOutPopulated` flag stays unset — there
+is nothing to fold in for them, now or later).
+
+- For an asset the removed v31 `L1AssetTracker` registered, the amount is the complement of **L1's own
+  bulkhead** there: L1 is the origin chain of these assets, so its bulkhead starts at `MAX_TOKEN_BALANCE`
+  and moves by exactly the amount of every outflow from and inflow to L1. Reading that instead of summing
+  the tracker's per-chain entries makes the result immune to amounts being moved between chains, which the
+  tracker's own migration entry points can still do after the upgrade. The tracker is located through the
+  vault's retained `__DEPRECATED_l1AssetTracker` slot.
+- Otherwise — for an asset that never went through the tracker migration — the amount is the sum of the
+  vault's own `DEPRECATED_chainBalance` entries over the chains the bridgehub reports. The chain list is read
+  by the vault itself rather than supplied by the caller, so the caller cannot undercount it; the sum is exact
+  as long as the bridgehub still lists every chain that holds a non-zero entry, which holds because chains are
+  never removed from it.
+  On an ecosystem deployed after the trackers were removed both sources are empty and the population is a
+  no-op.
+- No privileges are required. Neither source can be influenced by the caller, and an asset can only be
+  folded in once. Amounts bridged in the window between the upgrade and the population are preserved, since
+  the population only ever adds to `bridgedOut`.
+- Until an asset is populated, only its pre-upgrade escrow is unwithdrawable — amounts bridged out after the
+  upgrade raise `bridgedOut` normally and can be withdrawn against. Legacy tokens that predate the
+  `bridgedTokens` enumeration have to be backfilled into it before they can be populated at all, which is why
+  `stage3` registers them first.
+
 ## Base-token handling
 
 - The chain's base token is escrowed off-vault in `BaseTokenHolder`, initialized with `2^127 - 1` base
   tokens; transfers from the holder replace minting (better EVM/Foundry compatibility). `give` (interop
   handler only) pays out inbound value; `burnAndStartBridging` (InteropCenter or NTV) receives outbound
-  value; both record the flow in the holder's own bookkeeping first. Its balance means "funds the chain
-  can still mint";
+  value; both report the flow to the `L2NativeTokenVault` bookkeeping first (the holder itself stores
+  nothing). Its balance means "funds the chain can still mint";
   force-sent funds (refund recipient, selfdestruct on ZK OS) only skew the `totalSupply()` view, never
   bridging accounting.
   - The operator must keep the base-token total supply below `2^127`, otherwise the holder's balance
@@ -182,59 +215,61 @@ tokens) and rejects fee-on-transfer tokens (`TokensWithFeesNotSupported`).
 
 ## L2 asset bookkeeping
 
-The chain keeps a small amount of local token bookkeeping in the two contracts the corresponding assets
-already flow through: ERC20 bookkeeping in `L2NativeTokenVault`, base-token bookkeeping in
-`BaseTokenHolder` (a separate write-only `L2AssetTracker` system contract existed in unreleased v31 code
-and was removed). Apart from `bridgedOut`, this is write-mostly data: correctness of transfers is
+The chain keeps a small amount of local token bookkeeping in the `L2NativeTokenVault`, the contract every
+asset already flows through (a separate write-only `L2AssetTracker` system contract existed in unreleased
+v31 code and was removed). Apart from `bridgedOut`, this is write-mostly data: correctness of transfers is
 guaranteed by ZK proofs (plus 2FA on ZKsync OS chains), not by these balances, and the mappings may be
 removed later (do not rely on them). The vault's own `DEPRECATED_chainBalance` and the removed
 `AssetTrackerBase` / `L1AssetTracker` / `GWAssetTracker` (cross-chain token-balance migration) are gone;
 the `0x1000f` (L2AssetTracker) and `0x10010` (GWAssetTracker) addresses stay reserved, the latter keeping
 its empty compatibility stub because pre-v31 chains did deploy code there.
 
-### `L2NativeTokenVault` (non-base tokens)
+### `L2NativeTokenVault`
 
 - `bridgedOut[assetId]` is the net amount of an **L2-native** token currently bridged away from this
   chain: `_handleBridgeToChain` increases it, `_handleBridgeFromChain` refuses an inbound amount that
   exceeds it (`InsufficientChainBalance`). This is the active safety property previously derived from
   `MAX_TOKEN_BALANCE - L2AssetTracker.chainBalance`; unlike the raw vault balance it is unaffected by
-  later direct token donations.
+  later direct token donations. The mapping and both handlers live in `NativeTokenVaultBase` (shared with
+  `L1NativeTokenVault`); the field takes a slot from the base storage gap, which no deployed vault ever
+  wrote, so already-deployed layouts are preserved.
 - `interopInfo[assetId]` (`totalWithdrawalsToL1`, `totalSuccessfulDepositsFromL1`) is the L2-side
   accounting used to compute the amount to keep on L1 during the L1 -> Gateway migration. A flow is only
   counted when the counterpart chain is L1 _and_ the chain currently settles on L1; `totalWithdrawalsToL1`
-  is consumed once during that migration and must stay append-only. For the base token, failed deposits
-  are refunded on L2 to the `refundRecipient` rather than claimed on L1, so the gap between initiated
-  deposits and this counter is not uniformly "claimable on L1" across asset types.
-- `preTrackingTotalSupply[assetId]` snapshots the token's supply immediately before its first tracked
-  bridge operation. Bridged tokens snapshot `totalSupply()`; native tokens preserve the removed tracker's
-  infinite-deposit convention and snapshot `2^256 - 1 - bridgedOut` (tokens already escrowed in the vault
-  count as bridged out, and indistinguishable direct donations are conservatively treated the same, since
-  they are effectively frozen). Newly registered bridged tokens start at a zero baseline; newly registered
-  native tokens start at `type(uint256).max` with a zero `bridgedOut`.
-- `isAssetTracked[assetId]` is the one-time initialization guard. Tokens registered before the upgrade are
-  initialized lazily on their first touch — before the operation changes any supply or escrow — or eagerly
-  by anyone via `trackLegacyToken`. Initialization is idempotent, and `trackLegacyToken` rejects the base
-  token, whose authoritative bookkeeping lives in `BaseTokenHolder`.
-- `bridgedOut` intentionally stays in the L2 implementation rather than moving into
-  `NativeTokenVaultBase`: `L1NativeTokenVault` already has a deployed `bridgedOut` mapping at its own slot,
-  so sharing the field would shift L1 storage.
+  is consumed once during that migration and must stay append-only. The base token's counters live here
+  too, under `BASE_TOKEN_ASSET_ID`, reported by the `BaseTokenHolder` (below). For the base token, failed
+  deposits are refunded on L2 to the `refundRecipient` rather than claimed on L1, so the gap between
+  initiated deposits and this counter is not uniformly "claimable on L1" across asset types.
+- `preTrackingTotalSupply[assetId]` records the token's net inbound flow — total successful deposits
+  minus total successful withdrawals — accumulated before this bookkeeping existed. For a bridged token
+  that is exactly its pre-tracking `totalSupply()`; native tokens offset the same net flow by
+  `type(uint256).max` (the removed tracker's infinite-deposit convention): `2^256 - 1 - bridgedOut`.
+  Newly registered tokens start at the zero-flow baseline (`0` bridged, `max` native).
+- `isAssetTracked[assetId]` guards the one-time initialization of the two fields above for a legacy
+  L2-native token: its outstanding amount is seeded from the vault's current escrow (indistinguishable
+  direct donations are conservatively treated as escrow, since they are effectively frozen). Seeding
+  happens lazily on the token's first touch — before the operation changes any supply or escrow — or
+  eagerly by anyone via `trackLegacyToken`; it is idempotent, newly registered tokens are marked tracked
+  immediately, and `trackLegacyToken` rejects the base token, which has no vault escrow to seed.
 
 ### `BaseTokenHolder` (base token)
 
-All base-token bridge flows converge here: `burnAndStartBridging` records outbound flows, `give` records
-inbound interop flows before the external transfer, and `L2BaseTokenEra.mint` calls `recordBaseTokenDeposit`
-before changing balances on the Era bootloader deposit path.
+The holder escrows the base token, so its contract-level bridge flows converge here; each one is reported
+to the vault, which records it under `BASE_TOKEN_ASSET_ID` in the same `interopInfo` used for every other
+asset (`recordBaseTokenBridgingToChain` / `recordBaseTokenBridgingFromChain`, holder-only).
+`burnAndStartBridging` reports outbound flows and `give` reports inbound interop flows before the external
+transfer. Bootloader-minted L1 deposits are reported through `recordBaseTokenDeposit` only where the mint
+is a contract call (`L2BaseTokenEra.mint`); on ZKsync OS the VM credits deposits by moving the holder's
+balance directly, so the base token's `totalSuccessfulDepositsFromL1` counter is **not exhaustive** there.
 
-- `baseTokenInteropInfo` is the base-token counterpart of the vault's `interopInfo`, with the same
-  settlement-layer-conditional rule.
-- `baseTokenPreTrackingTotalSupply` is the supply baseline captured before the holder began recording
-  flows, initialized exactly once by `ComplexUpgrader` through `initializeBookkeeping`: existing Era chains
-  snapshot their exact supply after `initL2` establishes the holder-balance invariant, while existing
-  ZKsync OS chains — where `totalSupply()` is unavailable until backfilled — start with a provisional zero
-  and keep `baseTokenPreTrackingTotalSupplyBackfillPending` set. Fresh chains of either VM start at zero.
-- The ZKsync OS backfill is the pre-existing service transaction: `L2BaseTokenZKOS.setZKsyncOSPreV31TotalSupply`
-  atomically sets `zkosPreV31TotalSupply` and calls `backfillBaseTokenPreTrackingTotalSupply`, clearing both
-  pending flags.
+- The pre-v31 total supply of an upgraded ZKsync OS chain lives in `L2BaseTokenZKOS.zkosPreV31TotalSupply`,
+  populated while the chain ran draft-v31 (via the since-removed backfill service transaction). This
+  release has no backfill path: the v32 upgrade of a ZKsync OS chain is forbidden on L1
+  (`V32UpgradeZKsyncOS`) unless `baseTokenHasTotalSupply` was set by the draft-v31 backfill
+  _and_ the backfill's L2 execution is proven — a `PriorityOpLowerBound` registry permissionlessly pins a
+  priority-op count observed after the flag was set, and the upgrade requires all ops below it to be
+  processed. So `totalSupply()` is always available on upgraded chains; fresh chains have no pre-v31
+  history and keep zero.
 - `recoverBaseToken` (NativeTokenVault only) returns the escrow of a failed/timed-out base-token bridge-out
   and asserts the two invariants that make the recovery accounting-neutral: the destination was not L1
   (`RecoverToL1NotSupported`, so `totalWithdrawalsToL1` stays append-only) and the base token is not native
@@ -317,7 +352,8 @@ mintData)` on the asset handler registered for the asset (`assetHandlerAddress[a
 - Legacy bridged tokens on L2 may predate the NTV: `BridgedStandardERC20.onlyNTV` lazily migrates them by
   setting `nativeTokenVault` to `L2_NATIVE_TOKEN_VAULT_ADDR` and deriving the asset ID on first use.
   `addLegacyTokenToBridgedTokensList` backfills such tokens into the vault's `bridgedTokens` enumeration,
-  and `L2NativeTokenVault.trackLegacyToken` backfills their pre-tracking supply snapshot.
+  and `L2NativeTokenVault.trackLegacyToken` seeds a legacy L2-native token's outstanding `bridgedOut`
+  amount from the vault escrow.
 - `L2NativeTokenVault.l2TokenAddress(l1Token)` is the legacy getter mapping an L1 token to its L2
   counterpart; the L1-origin CREATE2 salt (plain L1 address) keeps legacy token addresses stable.
 - `updateL2` on `L2AssetRouter`/`L2NativeTokenVault` resets the owner to the aliased L1 governance if it

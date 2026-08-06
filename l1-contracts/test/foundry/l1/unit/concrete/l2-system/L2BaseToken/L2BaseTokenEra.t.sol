@@ -8,8 +8,6 @@ import {L2BaseTokenEra} from "contracts/l2-system/era/L2BaseTokenEra.sol";
 import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.sol";
 import {IL2BaseTokenEra} from "contracts/l2-system/era/interfaces/IL2BaseTokenEra.sol";
 import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
-import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -26,6 +24,7 @@ import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailb
 import {
     BaseTokenHolderAlreadyInitialized,
     InsufficientFunds,
+    InvalidCaller,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
@@ -531,19 +530,13 @@ contract L2BaseTokenEraTest is Test {
         );
     }
 
-    function test_withdraw_recordsBookkeepingWithL1ChainId() public {
-        // Deploy the real holder so the full withdrawal bookkeeping path executes.
+    /// @dev Covers the holder->vault forwarding only: the vault is a recording mock, so the real
+    /// vault's settlement gating / `interopInfo` update is exercised in L2AssetBookkeeping.t.sol.
+    function test_withdraw_forwardsBookkeepingWithL1ChainIdToVault() public {
+        // Deploy the real holder so the withdrawal reporting path executes; the holder
+        // reports the flow to the vault, so a recording mock stands in for it.
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
-        vm.mockCall(
-            L2_NATIVE_TOKEN_VAULT_ADDR,
-            abi.encodeWithSelector(IL2NativeTokenVault.L1_CHAIN_ID.selector),
-            abi.encode(uint256(1))
-        );
-        vm.mockCall(
-            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(ISystemContext.currentSettlementLayerChainId.selector),
-            abi.encode(uint256(1))
-        );
+        vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, address(new MockRecordingVault()).code);
 
         // Deploy at system contract address so it passes onlyBridgingCaller check
         L2BaseTokenEra l2BaseTokenAtSystemAddr = new L2BaseTokenEra();
@@ -558,8 +551,10 @@ contract L2BaseTokenEraTest is Test {
         vm.prank(sender);
         L2BaseTokenEra(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
 
-        (uint256 withdrawals, ) = BaseTokenHolder(payable(L2_BASE_TOKEN_HOLDER_ADDR)).baseTokenInteropInfo();
-        assertEq(withdrawals, WITHDRAW_AMOUNT);
+        MockRecordingVault vault = MockRecordingVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        assertEq(vault.toChainCalls(), 1, "withdrawal should be reported to the vault");
+        assertEq(vault.recordedToChainId(), 1, "withdrawal destination should be the L1 chain id");
+        assertEq(vault.recordedToAmount(), WITHDRAW_AMOUNT, "withdrawal amount should be forwarded verbatim");
     }
 
     function test_withdraw_callsL1Messenger() public {
@@ -799,41 +794,6 @@ contract L2BaseTokenEraTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    ORDERING INVARIANT TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Verifies that recordBaseTokenDeposit is called BEFORE totalSupply changes, so the
-    /// bookkeeping observes the pre-mint state.
-    function test_mint_recordsDepositBeforeTotalSupplyChange() public {
-        _initL2();
-        uint256 mintAmount = 5 ether;
-
-        uint256 totalSupplyBefore = l2BaseToken.totalSupply();
-
-        // Deploy a recording holder — snapshots totalSupply when the deposit is recorded
-        TotalSupplyObservingHolder recorder = new TotalSupplyObservingHolder(address(l2BaseToken));
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(recorder).code);
-
-        vm.prank(L2_BOOTLOADER_ADDRESS);
-        l2BaseToken.mint(alice, mintAmount);
-
-        // Read recorded values from the etched address
-        TotalSupplyObservingHolder etched = TotalSupplyObservingHolder(payable(L2_BASE_TOKEN_HOLDER_ADDR));
-        assertTrue(etched.wasCalled(), "The holder's recording hook should have been called");
-        assertEq(
-            etched.recordedTotalSupply(),
-            totalSupplyBefore,
-            "recordBaseTokenDeposit must be called BEFORE totalSupply changes"
-        );
-
-        assertEq(
-            l2BaseToken.totalSupply(),
-            totalSupplyBefore + mintAmount,
-            "totalSupply should have increased after mint completes"
-        );
-    }
-
-    /*//////////////////////////////////////////////////////////////
                         INTERFACE COMPLIANCE
     //////////////////////////////////////////////////////////////*/
 
@@ -848,23 +808,27 @@ contract L2BaseTokenEraTest is Test {
     }
 }
 
-/// @notice Recording holder that snapshots the base token's totalSupply when the deposit is recorded.
-/// @dev Used to pin the "record before balance changes" ordering invariant of L2BaseTokenEra.mint.
-contract TotalSupplyObservingHolder {
-    address public immutable BASE_TOKEN;
-    bool public wasCalled;
-    uint256 public recordedTotalSupply;
+/// @dev Records the base-token flows the real BaseTokenHolder reports. The settlement-layer
+/// gating of these flows lives in the real L2NativeTokenVault and is covered by its own tests.
+contract MockRecordingVault {
+    uint256 public recordedToChainId;
+    uint256 public recordedToAmount;
+    uint256 public toChainCalls;
 
-    constructor(address _baseToken) {
-        BASE_TOKEN = _baseToken;
+    function recordBaseTokenBridgingToChain(uint256 _toChainId, uint256 _amount) external {
+        if (msg.sender != L2_BASE_TOKEN_HOLDER_ADDR) {
+            revert InvalidCaller(msg.sender);
+        }
+        recordedToChainId = _toChainId;
+        recordedToAmount = _amount;
+        toChainCalls++;
     }
 
-    function recordBaseTokenDeposit(uint256, uint256) external {
-        wasCalled = true;
-        recordedTotalSupply = L2BaseTokenEra(BASE_TOKEN).totalSupply();
+    function recordBaseTokenBridgingFromChain(uint256, uint256) external {
+        if (msg.sender != L2_BASE_TOKEN_HOLDER_ADDR) {
+            revert InvalidCaller(msg.sender);
+        }
     }
-
-    receive() external payable {}
 }
 
 /// @notice Helper contract that rejects burnAndStartBridging calls

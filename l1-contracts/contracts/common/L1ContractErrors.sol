@@ -43,22 +43,14 @@ error AssetRouterAllowanceNotZero();
 error BadTransferDataLength();
 // 0x6ef9a972
 error BaseTokenGasPriceDenominatorNotSet();
-// 0x829ccba4
-error BaseTokenBookkeepingAlreadyInitialized();
-// 0x22cc933f
-error BaseTokenBookkeepingNotInitialized();
 // 0x764c57db
 error BaseTokenHolderAlreadyInitialized();
 // 0xd3cd4bd2
 error BaseTokenHolderMintFailed();
 // 0x8361ff70
 error BaseTokenNativeToThisChain();
-// 0x7f9159de
-error BaseTokenPreV31TotalSupplyAlreadySet();
 // 0x00a6b592
 error BaseTokenPreV31TotalSupplyNotSet();
-// 0xca9bc458
-error BaseTokenTotalSupplyBackfillNotNeeded();
 // 0xe3ec2bc9
 error BaseTokenTransferFailed();
 // 0x55ad3fd3
@@ -212,16 +204,10 @@ error InvalidBatchNumber(uint256 provided, uint256 expected);
 error InvalidBlockRange(uint64 batchNumber, uint64 from, uint64 to);
 // 0xcbd9d2e0
 error InvalidCaller(address);
-// 0xeaa867a8
-error InvalidL1AssetRouter(address l1AssetRouter);
 // 0x7a47c9a2
 error InvalidChainId();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
-// 0xd95d4d82
-error PubdataContentLockedForPermanentRollup();
-// 0x3731bfa2
-error NonFullPubdataContentForPermanentRollup();
 // 0x4fbe5dba
 error InvalidDelay();
 // 0x3f98a77e
@@ -256,8 +242,6 @@ error InvalidThreshold(uint256 max, uint256 got);
 error InvalidTxCountInPriorityMode(uint256 l2TxCount, uint256 l1TxCount);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
-// 0xf63665c1
-error L1ChainIdNotSet();
 // 0xfb5c22e6
 error L2TimestampTooBig();
 // 0x97e1359e
@@ -274,6 +258,10 @@ error LegacyMethodForNonL1Token();
 error LengthIsNotDivisibleBy32(uint256 length);
 // 0x1b6825bb
 error LogAlreadyProcessed(uint8);
+// 0xe4623697
+error LowerBoundAlreadyRecorded();
+// 0x5c25a57b
+error LowerBoundNotRecorded();
 // 0x43e266b0
 error MalformedBytecode(BytecodeError);
 // 0xafbb7a4e
@@ -326,6 +314,8 @@ error NonCanonicalRepresentation();
 error NonEmptyCalldata();
 // 0x536ec84b
 error NonEmptyMsgValue();
+// 0x3731bfa2
+error NonFullPubdataContentForPermanentRollup();
 // 0xd018e08e
 error NonIncreasingTimestamp();
 // 0x0105f9c0
@@ -398,6 +388,8 @@ error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 error ProtocolIdMismatch(uint256 expectedProtocolVersion, uint256 providedProtocolId);
 // 0x64f94ec2
 error ProtocolIdNotGreater();
+// 0xd95d4d82
+error PubdataContentLockedForPermanentRollup();
 // 0x959f26fb
 error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 // 0x63c36549

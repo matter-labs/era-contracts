@@ -124,7 +124,7 @@ destination's `L2NativeTokenVault.updateL2` consumes to initialize the chain's b
 (per the L1 `MessageRoot`), its base token is registered in the L1 `NativeTokenVault`
 (`tokenAddress(baseAssetId) != address(0)`, otherwise L1->L2 base-token deposits would not work
 on the destination), and the base token supports `totalSupply()` (true for everything except
-pre-v31 ZKsync OS chains, where the value must first be backfilled).
+pre-v31 ZKsync OS chains, whose value is backfilled on draft-v31 before the v32 upgrade).
 
 ### v32: chain migrations are explicitly disabled
 
@@ -166,6 +166,44 @@ request as an L2 service transaction to the settlement layer's `L2ChainAssetHand
 asset handler is an authorized service-transaction sender there). This re-homes the cross-layer
 message that previously went through the removed asset tracker.
 
+## Upgrading an existing ecosystem onto this release
+
+An in-place upgrade has to reach the same state a from-scratch deployment produces. The pieces that do
+not follow from swapping implementations are:
+
+- **`L1InteropHandler`** is new in this release, so the upgrade deploys it (proxy included) and wires it
+  into `L1Nullifier` and `L1AssetRouter` with governance calls in stage 1. Without it every interop
+  withdrawal finalization on L1 reverts, since the asset router only accepts calls from the configured
+  handler. Both setters are one-shot, so the upgrade emits them only for an ecosystem that has no handler.
+- **`Bridgehub.chainRegistrationSender`** is only written by `setAddresses` on a fresh deployment, so an
+  ecosystem that reached v31 through an upgrade may still have it unset. This release does not register it:
+  the upgrade reuses the sender the bridgehub already reports and only refreshes its implementation, and the
+  preparation reverts if the getter is zero. Registering it (`setAddressesV31`) is a governance step that
+  has to precede this upgrade.
+- **`L1NativeTokenVault.bridgedOut`** starts empty on an upgraded vault, which would reject every
+  withdrawal of an L1-native asset. See
+  {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}.
+- **Atomic-interop built-ins** exist on ZKsync OS chains only. New chains get them from genesis and
+  pre-existing ones from this upgrade's force deployments (next section).
+
+Scope of this release's upgrade: **ZKsync OS chains that settle on L1**. Era chains are not supported —
+`CTMUpgrade_v31.deployUsedUpgradeContract` refuses to produce a per-chain upgrade for them rather than
+emitting one that redoes v31's one-time work — and neither are gateway-settled chains, whose upgrade takes
+the `s.settlementLayer != address(0)` path through their settlement layer instead of recording the L2
+upgrade transaction on L1.
+
+Each chain's upgrade requires every outstanding batch to have been processed first. This is good practice
+for a generic upgrade rather than an invariant, but it does catch the case that matters here: the upgrade
+installs the protocol version's verifier, and this release deploys a fresh one, so batches still awaiting
+proof under the old verifier would stop being provable.
+
+Address discovery has to match the ecosystem's version, because the getters it reads were introduced in
+different releases (`chainRegistrationSender` in v31, `l1InteropHandler` in v32): `AddressIntrospector`
+therefore exposes one entry point per era, and the upgrade scripts pick between them by protocol version.
+Autodetection reads the version of a registered chain, which lags the L1 contracts — an ecosystem whose
+core contracts are already upgraded while its chains are not (mid-upgrade, or a local fixture built from
+current code) states the answer explicitly with `pre_v32_introspection` in the upgrade input.
+
 ## ZKsync OS genesis force deployments: atomic-interop built-ins
 
 Two new L2 built-ins support atomic interop (protocol details in
@@ -179,8 +217,8 @@ Two new L2 built-ins support atomic interop (protocol details in
 
 They are predeployed **only** in the ZKsync OS genesis (registered in the genesis gen tool,
 `tools/zksync-os-genesis-gen`); they have no constructors, so one-time setup happens in `initL2`
-calls made by `L2GenesisForceDeploymentsHelper._initializeV31Contracts`, gated on
-`_isZKsyncOS && _isGenesisUpgrade`:
+calls made by `L2GenesisForceDeploymentsHelper._initializeV32Contracts` for every ZKsync OS chain, on both
+the genesis and the upgrade path:
 
 - `L2InteropCommitmentTree.initL2()` seeds the IMT with its `{0,0,0}` sentinel head leaf (reverts
   if already seeded).
@@ -192,6 +230,9 @@ manager's tree / interop center / interop handler references) uses canonical fix
 addresses, so there are no wiring parameters, and the manager never custodies funds (source burns
 flow through the normal interop path; destination mints go through the `InteropHandler`).
 
-The `_isGenesisUpgrade` gate matters: a pre-existing chain being upgraded to v31 has no code at
-`L2_INTEROP_COMMITMENT_TREE_ADDR`, so calling `initL2()` there would revert the whole upgrade
-transaction — such chains simply do not get atomic interop.
+Pre-existing ZKsync OS chains receive the same two built-ins through the upgrade's force deployments
+(`SystemContractsProcessing.getZKsyncOSOnlyContracts`), so they end up with atomic interop
+as well. Both `initL2`s therefore run on the upgrade path too, unconditionally: neither the built-ins
+nor their addresses existed in v31, so no chain can arrive at this upgrade with them already seeded,
+and the force deployments in the same transaction install their code before the `initL2`s run. Era
+chains never receive them — this release upgrades ZKsync OS chains only.

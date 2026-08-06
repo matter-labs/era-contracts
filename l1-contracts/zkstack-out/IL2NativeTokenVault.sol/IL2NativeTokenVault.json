@@ -300,6 +300,42 @@
   },
   {
     "type": "function",
+    "name": "recordBaseTokenBridgingFromChain",
+    "inputs": [
+      {
+        "name": "_fromChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "recordBaseTokenBridgingToChain",
+    "inputs": [
+      {
+        "name": "_toChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "registerToken",
     "inputs": [
       {

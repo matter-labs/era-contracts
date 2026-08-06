@@ -1,7 +1,7 @@
 //! Era-VM `forceDeployAndUpgrade` payload verification.
 //!
 //! Owns the expected `ForceDeployment[]` list (44 entries: 31 EraVM system
-//! contracts + 12 fixed-address core contracts + L2V31Upgrade), the per-entry
+//! contracts + 12 fixed-address core contracts + L2V32Upgrade), the per-entry
 //! shape walker, the special `L2ChainAssetHandler` constructor-input decoder,
 //! the Era factory-dep bytecode list, and the Era orchestrator wired from
 //! `ProposedUpgrade::verify_l2_protocol_upgrade_tx`.
@@ -25,7 +25,7 @@ use crate::upgrade_verification::{
         L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR,
         L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR,
         L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_V31_UPGRADE_CONTRACT,
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_V32_UPGRADE_CONTRACT,
         L2_VERSION_SPECIFIC_UPGRADER_ADDR, MODEXP_SYSTEM_CONTRACT, MSG_VALUE_SYSTEM_CONTRACT,
         SHA256_SYSTEM_CONTRACT, SLOAD_CONTRACT_ADDR,
     },
@@ -52,7 +52,7 @@ struct EraExpectedFd {
 /// Expected v31 Era `ForceDeployment[]` passed to `ComplexUpgrader.forceDeployAndUpgrade`.
 ///
 /// Order mirrors the deploy script: system contracts (EraVmSystemContract enum 0..30),
-/// then fixed-address core contracts (_fillFixedAddressCoreContracts), then L2V31Upgrade.
+/// then fixed-address core contracts (_fillFixedAddressCoreContracts), then L2V32Upgrade.
 fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
     macro_rules! simple {
         ($file:expr, $addr:literal) => {
@@ -165,8 +165,8 @@ fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
         simple!("l1-contracts/BaseTokenHolder", L2_BASE_TOKEN_HOLDER_ADDR),
         simple!("l1-contracts/InteropCenter", L2_INTEROP_CENTER_ADDR),
         simple!("l1-contracts/InteropHandler", L2_INTEROP_HANDLER_ADDR),
-        // ── Additional: L2V31Upgrade (the delegate target for this upgrade) ──
-        simple!(L2_V31_UPGRADE_CONTRACT, L2_VERSION_SPECIFIC_UPGRADER_ADDR),
+        // ── Additional: L2V32Upgrade (the delegate target for this upgrade) ──
+        simple!(L2_V32_UPGRADE_CONTRACT, L2_VERSION_SPECIFIC_UPGRADER_ADDR),
     ]
 }
 
@@ -310,7 +310,7 @@ async fn verify_l2_chain_asset_handler_input(
 }
 
 /// Era L2 factory-dep bytecode set. Mirrors
-/// `CoreOnGatewayHelper.getFullListOfFactoryDependencies(false, [L2V31Upgrade])`.
+/// `CoreOnGatewayHelper.getFullListOfFactoryDependencies(false, [L2V32Upgrade])`.
 pub(super) const EXPECTED_V31_ERA_BYTECODES: &[&str] = &[
     "Bootloader",
     "system-contracts/DefaultAccount",
@@ -361,11 +361,11 @@ pub(super) const EXPECTED_V31_ERA_BYTECODES: &[&str] = &[
     "l1-contracts/BridgedStandardERC20",
     "l1-contracts/DiamondProxy",
     "l1-contracts/ProxyAdmin",
-    "l1-contracts/L2V31Upgrade",
+    "l1-contracts/L2V32Upgrade",
 ];
 
 /// Era orchestrator: validates the `_delegateTo`, walks the `ForceDeployment[]`,
-/// and decodes the inner `IL2V31Upgrade.upgrade` calldata.
+/// and decodes the inner `IL2V32Upgrade.upgrade` calldata.
 pub(super) async fn verify_era_force_deploy_and_upgrade(
     verifiers: &Verifiers,
     result: &mut VerificationResult,

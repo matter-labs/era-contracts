@@ -31,7 +31,6 @@ const ARTIFACTS = {
   InteropCenter: "InteropCenter.sol/InteropCenter.json",
   InteropAttributeParser: "InteropAttributeParser.sol/InteropAttributeParser.json",
   L2InteropHandler: "L2InteropHandler.sol/L2InteropHandler.json",
-  IComplexUpgraderZKsyncOSV29: "IComplexUpgraderZKsyncOSV29.sol/IComplexUpgraderZKsyncOSV29.json",
   ITransparentUpgradeableProxy: "TransparentUpgradeableProxy.sol/ITransparentUpgradeableProxy.json",
   L1AssetRouter: "L1AssetRouter.sol/L1AssetRouter.json",
   L1MessengerZKOS: "L1MessengerZKOS.sol/L1MessengerZKOS.json",
@@ -62,8 +61,10 @@ const ARTIFACTS = {
   MockL2MessageVerification: "MockL2MessageVerification.sol/MockL2MessageVerification.json",
   MockMintBaseTokenHook: "MockMintBaseTokenHook.sol/MockMintBaseTokenHook.json",
   Ownable2Step: "Ownable2Step.sol/Ownable2Step.json",
-  EraSettlementLayerV31Upgrade: "EraSettlementLayerV31Upgrade.sol/EraSettlementLayerV31Upgrade.json",
-  ZKsyncOSSettlementLayerV31Upgrade: "ZKsyncOSSettlementLayerV31Upgrade.sol/ZKsyncOSSettlementLayerV31Upgrade.json",
+  PriorityOpLowerBound: "PriorityOpLowerBound.sol/PriorityOpLowerBound.json",
+  ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
+  DefaultUpgradeZKsyncOS: "DefaultUpgradeZKsyncOS.sol/DefaultUpgradeZKsyncOS.json",
+  V32UpgradeZKsyncOS: "V32UpgradeZKsyncOS.sol/V32UpgradeZKsyncOS.json",
   SystemContractProxy: "SystemContractProxy.sol/SystemContractProxy.json",
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
@@ -74,7 +75,7 @@ const ARTIFACTS = {
   IAtomicFlowManager: "IAtomicFlowManager.sol/IAtomicFlowManager.json",
   L2MessageVerification: "L2MessageVerification.sol/L2MessageVerification.json",
   L2InteropRootStorage: "L2InteropRootStorage.sol/L2InteropRootStorage.json",
-  L2V31Upgrade: "L2V31Upgrade.sol/L2V31Upgrade.json",
+  L2V32Upgrade: "L2V32Upgrade.sol/L2V32Upgrade.json",
   UpgradeableBeaconDeployer: "UpgradeableBeaconDeployer.sol/UpgradeableBeaconDeployer.json",
 } as const;
 
@@ -99,9 +100,20 @@ export function getCreationBytecode(name: ContractName): string {
 // Kept here (not inline) so every consumer imports from a single source of truth.
 
 /**
- * Legacy AdminFacet ABI from v29/v30: upgradeChainFromVersion(uint256, DiamondCutData) with 2 params.
- * The current AdminFacet has upgradeChainFromVersion(address, uint256, DiamondCutData) with 3 params.
+ * Legacy AdminFacet ABI: upgradeChainFromVersion(uint256, DiamondCutData) with 2 params. The current
+ * AdminFacet has upgradeChainFromVersion(address, uint256, DiamondCutData) with 3 params. Only reachable
+ * from fork runs against an ecosystem that predates the third parameter; the state-dump scenarios all
+ * start at v31, which already has it.
  */
 export const LEGACY_ADMIN_ABI: string[] = [
   "function upgradeChainFromVersion(uint256, tuple(tuple(address,uint8,bool,bytes4[])[],address,bytes))",
+];
+
+/**
+ * v31 Admin facet entry point removed in v32 (the backfill service-transaction request). The
+ * harness calls it on forked v31 chains whose fixture never ran the backfill, so the current
+ * AdminFacet artifact no longer carries the selector.
+ */
+export const LEGACY_V31_ADMIN_BACKFILL_ABI: string[] = [
+  "function setZKsyncOSPreV31TotalSupply(uint256 _totalSupply) returns (bytes32)",
 ];

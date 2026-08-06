@@ -130,6 +130,10 @@ A very common AI failure mode: the behavior of a new function `X` gets described
 - Describe what a function does **only** in its own doc comment. At call sites, rely on the reader following the call to the definition and reading the docs there.
 - A call-site comment is justified only for a genuine local gotcha (e.g., ordering constraints with surrounding code, a surprising argument choice) — not for what the callee does.
 
+### Never explain the language
+
+Do not write comments that explain how Solidity works, or that preempt a misreading of a line that reads correctly on its own. Typical offenders: "this is a memory reference, so the write is visible to the caller", "this is a no-op when the value is already set", "note that this loop is bounded". Reviewers know the language; these comments only add bulk. Comment the protocol decision or the local gotcha, not the mechanics of the statement in front of you.
+
 ### SDKs, tests, scripts
 
 - Test files, dev tooling, deploy scripts, and SDK code follow the same rules: point to `protocol-docs/` for protocol context instead of restating it in comments.

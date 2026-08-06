@@ -52,7 +52,7 @@ pub const ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR: Address =
     address!("0x4e59b44847b379578588920ca78fbf26c0b4956c");
 /// Alias of `L2_GENESIS_UPGRADE_ADDR` in Solidity — same on-chain address
 /// (`BUILT_IN_CONTRACTS_OFFSET + 0x01`), exposed under the version-specific
-/// name because v31 force-deploys `L2V31Upgrade` there.
+/// name because v31 force-deploys `L2V32Upgrade` there.
 pub const L2_VERSION_SPECIFIC_UPGRADER_ADDR: Address = l2_addr(0x01);
 pub const L2_BRIDGEHUB_ADDR: Address = l2_addr(0x02);
 pub const L2_ASSET_ROUTER_ADDR: Address = l2_addr(0x03);
@@ -69,6 +69,9 @@ pub const L2_CHAIN_ASSET_HANDLER_ADDR: Address = l2_addr(0x0a);
 pub const L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR: Address = l2_addr(0x0c);
 pub const L2_INTEROP_CENTER_ADDR: Address = l2_addr(0x0d);
 pub const L2_INTEROP_HANDLER_ADDR: Address = l2_addr(0x0e);
+pub const L2_INTEROP_ATTRIBUTE_PARSER_ADDR: Address = l2_addr(0x15);
+pub const L2_INTEROP_COMMITMENT_TREE_ADDR: Address = l2_addr(0x12);
+pub const L2_ATOMIC_FLOW_MANAGER_ADDR: Address = l2_addr(0x14);
 pub const L2_BASE_TOKEN_HOLDER_ADDR: Address = l2_addr(0x11);
 
 /// L2 system contract addresses (`SYSTEM_CONTRACTS_OFFSET + <offset>`).
@@ -114,7 +117,7 @@ pub const L2_UPGRADE_GAS_LIMIT: u64 = 72_000_000;
 pub const L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT: u64 = 800;
 
 /// AllContractsHashes file-name keys consulted by the bytecode verifier.
-pub const L2_V31_UPGRADE_CONTRACT: &str = "l1-contracts/L2V31Upgrade";
+pub const L2_V32_UPGRADE_CONTRACT: &str = "l1-contracts/L2V32Upgrade";
 pub const BOOTLOADER_CONTRACT: &str = "Bootloader";
 pub const DEFAULT_ACCOUNT_CONTRACT: &str = "system-contracts/DefaultAccount";
 pub const EVM_EMULATOR_CONTRACT: &str = "EvmEmulator";

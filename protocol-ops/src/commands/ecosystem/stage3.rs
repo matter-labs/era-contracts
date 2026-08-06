@@ -1,14 +1,19 @@
-//! `protocol-ops ecosystem stage3` — Phase 3: bridged-token registration.
+//! `protocol-ops ecosystem stage3` — Phase 3: bridged-token registration and
+//! `bridgedOut` population.
 //!
 //! Runs `CoreUpgrade_v31.stage3(bridgehubProxy)` on the env's bridgehub:
 //!   - registers ETH + every entry in the v31-bridged-tokens config in the
-//!     NTV's `bridgedTokens` list.
+//!     NTV's `bridgedTokens` list;
+//!   - populates the NTV's `bridgedOut` accounting from the pre-upgrade
+//!     accounting — the removed v31 asset tracker's L1 bulkhead where the asset
+//!     was registered there, the vault's own deprecated per-chain balances
+//!     otherwise — without which withdrawals of an L1-native asset with a
+//!     pre-upgrade legacy balance revert after the upgrade. Idempotent per
+//!     asset, so an interrupted run is resumed by simply running the phase again.
 //!
-//! Sequencing: runs *before* the per-chain upgrades (Phase 4), so the NTV
-//! `_requireRegistered(assetId)` gate is cleared before each chain's diamond
-//! upgrade lands and its `v31UpgradeChainBatchNumber` gate opens — the two
-//! gates clear back to back instead of leaving an extra registration freeze
-//! afterwards.
+//! Sequencing: runs *before* the per-chain upgrades (Phase 4), so that by the time
+//! a chain's diamond upgrade lands, every L1-native asset it can withdraw is
+//! already in the NTV's `bridgedTokens` enumeration and populated.
 //!
 //! Any signer can run this — no governance privileges needed. The caller
 //! must pass `--sender <EOA>`. We deliberately do not fall back to the
