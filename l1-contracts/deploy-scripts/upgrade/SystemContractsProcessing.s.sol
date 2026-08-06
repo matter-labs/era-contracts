@@ -447,7 +447,8 @@ library SystemContractsProcessing {
     /// @dev v31 deployed the L2AssetTracker and GWAssetTracker as system-proxied built-ins on every
     /// ZKsync OS chain. v32 deletes both contracts, so the upgrade swaps their proxies'
     /// implementations for `EmptyContract` — otherwise the retired tracker code would stay callable.
-    /// Chains created on v32 never run this list and leave the addresses empty.
+    /// Chains created on v32 get the same EmptyContract-backed proxies from genesis, so fresh and
+    /// upgraded chains match at the reserved addresses.
     /// @dev The v31 GWAssetTracker collects wrapped-ZK settlement fees on a live gateway (the stage
     /// env brought one up), so any remaining fee balance must be drained through the v31 owner flow
     /// before the gateway chain's upgrade executes — a rollout-runbook step, not enforceable here.

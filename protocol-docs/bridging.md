@@ -195,10 +195,10 @@ as the populate-once flag — stays unset; there is nothing to fold in for them,
   force-sent funds (refund recipient, selfdestruct on ZK OS) skew the `totalSupply()` view but never the
   flow counters; the base token's `preTrackingTotalSupply` baseline is a one-time `totalSupply()`
   snapshot taken at the upgrade/genesis (`trackBaseToken`), so it deliberately inherits whatever skew
-  the view carries at that moment — the same trade-off as reading `totalSupply()` directly. On ZKsync OS
-  the view saturates at zero when force-sent value pushes the holder's balance above everything it was
-  ever credited — a revert there would let one force-sent wei brick every `totalSupply()` consumer,
-  the v32 upgrade's mandatory baseline recording included.
+  the view carries at that moment — the same trade-off as reading `totalSupply()` directly. The subtraction inside
+  the ZKsync OS view cannot underflow: the holder can only receive balance that already exists outside
+  it, and the sum of all balances — the holder's included — never exceeds
+  `zkosPreV31TotalSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE`.
   - The operator must keep the base-token total supply below `2^127`, otherwise the holder's balance
     could underflow; overflow is impossible since users can only gain what the holder loses.
   - On ZKsync OS the holder's initial balance is minted by `L2BaseTokenZKOS.initL2()` via a raw call to
@@ -229,7 +229,8 @@ removed later (do not rely on them). The vault's own `DEPRECATED_chainBalance` a
 v31 released with the `L2AssetTracker` (`0x1000f`) and `GWAssetTracker` (`0x10010`) deployed as
 system-proxied built-ins on every ZKsync OS chain, so the v32 upgrade swaps both proxies'
 implementations for `EmptyContract` (see {protocol-docs/chain-lifecycle.md}); chains created on v32
-leave both reserved addresses empty.
+receive the same EmptyContract-backed proxies from genesis, keeping fresh and upgraded chains
+identical at the reserved addresses.
 
 ### `L2NativeTokenVault`
 

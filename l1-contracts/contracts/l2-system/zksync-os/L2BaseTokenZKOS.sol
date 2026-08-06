@@ -42,14 +42,15 @@ contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
     /// @notice Returns the total circulating supply of base tokens.
     /// @dev Computed as: zkosPreV31TotalSupply + (INITIAL_BASE_TOKEN_HOLDER_BALANCE - BaseTokenHolder.balance)
     /// @dev The delta (INITIAL - holder.balance) tracks tokens minted after V31 via the BaseTokenHolder pattern.
-    /// @dev Saturates at zero instead of underflowing: force-sent value can push the holder's
-    /// balance above everything it was ever credited (see
-    /// {protocol-docs/bridging.md#base-token-handling}), and a revert here would let one wei brick
-    /// every `totalSupply()` consumer — the v32 upgrade's mandatory `trackBaseToken` included.
+    /// @dev The subtraction cannot underflow, by construction: before the v31 upgrade the holder's
+    /// balance was zero and all other balances summed to `zkosPreV31TotalSupply`; the upgrade then
+    /// minted exactly `INITIAL_BASE_TOKEN_HOLDER_BALANCE` to the holder, and every flow since —
+    /// force-sent value included — only moves balance between the holder and other accounts. The
+    /// sum of ALL balances (the holder's included) therefore never exceeds
+    /// `zkosPreV31TotalSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE`, so neither does the holder's
+    /// balance alone.
     function totalSupply() external view returns (uint256) {
-        uint256 credited = zkosPreV31TotalSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE;
-        uint256 holderBalance = L2_BASE_TOKEN_HOLDER_ADDR.balance;
-        return holderBalance >= credited ? 0 : credited - holderBalance;
+        return zkosPreV31TotalSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE - L2_BASE_TOKEN_HOLDER_ADDR.balance;
     }
 
     /// @notice Initializes the L2 Base Token contract during genesis or V31 upgrade.

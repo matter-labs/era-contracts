@@ -77,7 +77,7 @@ address constant L2_INTEROP_HANDLER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x
 // `USER_CONTRACTS_OFFSET + 0x0f` and `+ 0x10` are intentionally unassigned: the removed v31
 // L2AssetTracker / GWAssetTracker addresses. v31 released with both trackers deployed as
 // system-proxied built-ins, so the v32 upgrade swaps their implementations for `EmptyContract`;
-// chains created on v32 leave both addresses empty.
+// chains created on v32 get the same EmptyContract-backed proxies from genesis.
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.

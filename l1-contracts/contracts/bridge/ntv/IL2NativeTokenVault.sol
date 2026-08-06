@@ -38,7 +38,7 @@ interface IL2NativeTokenVault is INativeTokenVaultBase {
 
     /// @notice Chain-local bookkeeping of the asset's L1 <-> L2 flows and its pre-tracking
     /// baseline; see {L2AssetBookkeepingInfo}.
-    function assetBookkeeping(bytes32 _assetId) external view returns (L2AssetBookkeepingInfo memory);
+    function getAssetBookkeeping(bytes32 _assetId) external view returns (L2AssetBookkeepingInfo memory);
 
     /// @notice Records an outbound base-token bridge flow under `BASE_TOKEN_ASSET_ID`.
     /// @dev Callable only by BaseTokenHolder, which escrows the base token and therefore observes

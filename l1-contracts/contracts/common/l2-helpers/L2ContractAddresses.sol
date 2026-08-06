@@ -137,8 +137,9 @@ address payable constant L2_INTEROP_HANDLER_ADDR = payable(address(BUILT_IN_CONT
 
 /// @dev The removed v31 L2AssetTracker's address, kept as a gap so the following addresses keep
 /// their positions. v31 released with the tracker deployed here, so the v32 upgrade swaps its
-/// system proxy's implementation for `EmptyContract`; chains that start on v32 from genesis leave
-/// the address empty. New recording happens in L2NativeTokenVault and BaseTokenHolder instead.
+/// system proxy's implementation for `EmptyContract`; chains created on v32 get the same
+/// EmptyContract-backed proxy from genesis, so fresh and upgraded chains match at this address.
+/// New recording happens in L2NativeTokenVault and BaseTokenHolder instead.
 address constant L2_REMOVED_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0f);
 
 /// @dev The removed v31 GWAssetTracker's address; a gap neutralized exactly like

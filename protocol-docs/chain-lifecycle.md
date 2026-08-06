@@ -241,4 +241,5 @@ The same upgrade list also neutralizes the two trackers this release removes
 (`SystemContractsProcessing.getRemovedTrackerNeutralizations`): v31 deployed the `L2AssetTracker` and
 `GWAssetTracker` as system-proxied built-ins on every ZKsync OS chain, so the upgrade swaps those
 proxies' implementations for `EmptyContract` — otherwise the retired tracker code would stay callable.
-Chains created on v32 deploy nothing at the reserved addresses.
+Chains created on v32 receive the same EmptyContract-backed proxies from genesis, so fresh and
+upgraded chains match at the reserved addresses.

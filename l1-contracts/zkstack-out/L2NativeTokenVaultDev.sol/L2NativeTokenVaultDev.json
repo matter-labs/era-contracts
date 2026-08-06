@@ -156,42 +156,6 @@
   },
   {
     "type": "function",
-    "name": "assetBookkeeping",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "internalType": "struct L2AssetBookkeepingInfo",
-        "components": [
-          {
-            "name": "preTrackingTotalSupply",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "totalWithdrawalsToL1",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "totalSuccessfulDepositsFromL1",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "assetId",
     "inputs": [
       {
@@ -413,6 +377,42 @@
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getAssetBookkeeping",
+    "inputs": [
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct L2AssetBookkeepingInfo",
+        "components": [
+          {
+            "name": "preTrackingTotalSupply",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "totalWithdrawalsToL1",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "totalSuccessfulDepositsFromL1",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",

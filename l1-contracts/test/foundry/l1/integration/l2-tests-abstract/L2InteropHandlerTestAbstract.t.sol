@@ -673,7 +673,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     function _readBaseTokenFlowCounters() internal view returns (uint256 withdrawals, uint256 deposits) {
         // The holder reports its flows to the vault, which keeps them under BASE_TOKEN_ASSET_ID.
         L2NativeTokenVault vault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        L2AssetBookkeepingInfo memory info = vault.assetBookkeeping(vault.BASE_TOKEN_ASSET_ID());
+        L2AssetBookkeepingInfo memory info = vault.getAssetBookkeeping(vault.BASE_TOKEN_ASSET_ID());
         (withdrawals, deposits) = (info.totalWithdrawalsToL1, info.totalSuccessfulDepositsFromL1);
     }
 

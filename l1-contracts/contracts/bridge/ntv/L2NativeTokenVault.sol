@@ -105,11 +105,11 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// is the token's pre-tracking `totalSupply()`. Tokens native to this chain use the removed
     /// tracker's infinite-deposit convention, offsetting the same net inbound flow by
     /// `MAX_TOKEN_BALANCE`: `MAX_TOKEN_BALANCE - bridgedOut`.
-    mapping(bytes32 assetId => L2AssetBookkeepingInfo info) internal storedAssetBookkeeping;
+    mapping(bytes32 assetId => L2AssetBookkeepingInfo info) internal assetBookkeeping;
 
     /// @inheritdoc IL2NativeTokenVault
-    function assetBookkeeping(bytes32 _assetId) external view returns (L2AssetBookkeepingInfo memory) {
-        return storedAssetBookkeeping[_assetId];
+    function getAssetBookkeeping(bytes32 _assetId) external view returns (L2AssetBookkeepingInfo memory) {
+        return assetBookkeeping[_assetId];
     }
 
     /// @dev Only allows calls from the complex upgrader contract on L2.
@@ -235,7 +235,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         // No flows predate the bookkeeping for a token registered after it: a bridged token starts
         // at zero, a native token at the infinite-deposit baseline (zero `bridgedOut`).
         uint256 initialSupply = _originChainId == block.chainid ? MAX_TOKEN_BALANCE : 0;
-        storedAssetBookkeeping[_assetId].preTrackingTotalSupply = initialSupply;
+        assetBookkeeping[_assetId].preTrackingTotalSupply = initialSupply;
     }
 
     function _registerTokenIfBridgedLegacy(address _tokenAddress) internal override returns (bytes32) {
@@ -500,7 +500,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             _toChainId == L1_CHAIN_ID &&
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == L1_CHAIN_ID
         ) {
-            storedAssetBookkeeping[_assetId].totalWithdrawalsToL1 += _amount;
+            assetBookkeeping[_assetId].totalWithdrawalsToL1 += _amount;
         }
     }
 
@@ -511,7 +511,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             _fromChainId == L1_CHAIN_ID &&
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == L1_CHAIN_ID
         ) {
-            storedAssetBookkeeping[_assetId].totalSuccessfulDepositsFromL1 += _amount;
+            assetBookkeeping[_assetId].totalSuccessfulDepositsFromL1 += _amount;
         }
     }
 
@@ -536,7 +536,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         // pre-tracking net inbound flow is exactly its current `totalSupply()`: the pre-upgrade
         // supply on an upgraded chain, zero at genesis (the holder's balance is minted in full
         // before this runs).
-        storedAssetBookkeeping[baseTokenAssetId].preTrackingTotalSupply = L2_BASE_TOKEN_SYSTEM_CONTRACT.totalSupply();
+        assetBookkeeping[baseTokenAssetId].preTrackingTotalSupply = L2_BASE_TOKEN_SYSTEM_CONTRACT.totalSupply();
     }
 
     /// @dev Seeds `bridgedOut` and the pre-tracking baseline for an asset registered before this
@@ -557,10 +557,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             // for indistinguishable direct donations, which are conservatively treated as escrow.
             uint256 escrowedAmount = IERC20(token).balanceOf(address(this));
             bridgedOut[_assetId] = escrowedAmount;
-            storedAssetBookkeeping[_assetId].preTrackingTotalSupply = MAX_TOKEN_BALANCE - escrowedAmount;
+            assetBookkeeping[_assetId].preTrackingTotalSupply = MAX_TOKEN_BALANCE - escrowedAmount;
         } else {
             // A bridged token's totalSupply is exactly its pre-tracking net inbound flow.
-            storedAssetBookkeeping[_assetId].preTrackingTotalSupply = IERC20(token).totalSupply();
+            assetBookkeeping[_assetId].preTrackingTotalSupply = IERC20(token).totalSupply();
         }
     }
 

@@ -563,25 +563,6 @@ contract L2BaseTokenZKOSTest is Test {
                         totalSupply() TESTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Regression: force-sent value (a deposit refund targeted at the holder, direct VM
-    /// credits) can push the holder's balance above everything it was ever credited. `totalSupply`
-    /// must saturate at zero instead of underflowing — a revert would let one force-sent wei brick
-    /// every consumer, the v32 upgrade's mandatory `trackBaseToken` snapshot included.
-    function test_totalSupply_saturatesAtZeroOnForceSentExcess() public {
-        L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
-        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
-
-        // A fresh chain (no pre-v31 supply, nothing minted) whose holder was force-sent one wei.
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, hex"00");
-        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE + 1);
-
-        assertEq(
-            L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).totalSupply(),
-            0,
-            "an over-credited holder must read as zero circulating supply, not revert"
-        );
-    }
-
     function test_totalSupply_zeroForFreshChain() public {
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);

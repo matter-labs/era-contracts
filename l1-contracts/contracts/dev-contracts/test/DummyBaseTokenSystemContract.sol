@@ -24,12 +24,10 @@ contract DummyBaseTokenSystemContract {
     }
 
     /// @notice Circulating supply, mirroring the ZKsync OS holder-delta formula with no pre-v31
-    /// history (`L2BaseTokenZKOS.totalSupply`): zero right after setup, growing with mints, and
-    /// saturating at zero like production when force-sent value over-credits the holder.
+    /// history (`L2BaseTokenZKOS.totalSupply`): zero right after setup, growing with mints. Like
+    /// production, no underflow guard: the holder can only receive balance that exists outside it.
     function totalSupply() external view returns (uint256) {
-        uint256 holderBalance = L2_BASE_TOKEN_HOLDER_ADDR.balance;
-        return
-            holderBalance >= INITIAL_BASE_TOKEN_HOLDER_BALANCE ? 0 : INITIAL_BASE_TOKEN_HOLDER_BALANCE - holderBalance;
+        return INITIAL_BASE_TOKEN_HOLDER_BALANCE - L2_BASE_TOKEN_HOLDER_ADDR.balance;
     }
 
     /// @notice Fallback to accept ETH

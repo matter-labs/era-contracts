@@ -496,11 +496,12 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     // ═══════════════════════════════════════════════════════════════════
 
     function _readTotalWithdrawalsToL1(bytes32 _assetId) internal view returns (uint256) {
-        return L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).assetBookkeeping(_assetId).totalWithdrawalsToL1;
+        return L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).getAssetBookkeeping(_assetId).totalWithdrawalsToL1;
     }
 
     function _readTotalSuccessfulDepositsFromL1(bytes32 _assetId) internal view returns (uint256) {
-        return L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).assetBookkeeping(_assetId).totalSuccessfulDepositsFromL1;
+        return
+            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).getAssetBookkeeping(_assetId).totalSuccessfulDepositsFromL1;
     }
 
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual;

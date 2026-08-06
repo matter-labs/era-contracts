@@ -68,10 +68,14 @@ pub const L2_INTEROP_HANDLER_ADDR: Address = Address(FixedBytes::<20>(hex_litera
     "000000000000000000000000000000000001000e"
 )));
 
-// 0x1000f and 0x10010 are intentionally absent: the removed v31 trackers' reserved addresses.
-// v31 released with the trackers deployed there, so the v32 upgrade swaps their system proxies'
-// implementations for `EmptyContract` (see `getRemovedTrackerNeutralizations`), while chains
-// generated on v32 leave both addresses empty.
+// The removed v31 trackers' reserved addresses. v31 released with the trackers deployed there as
+// system-proxied built-ins, so the v32 upgrade swaps their proxies' implementations for
+// `EmptyContract` (see `getRemovedTrackerNeutralizations`); genesis deploys the same
+// EmptyContract-backed proxies so fresh and upgraded chains match at these addresses.
+pub const REMOVED_L2_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "000000000000000000000000000000000001000f"
+)));
+
 pub const REMOVED_GW_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010010"
 )));
@@ -147,7 +151,7 @@ const L2_INTEROP_ATTRIBUTE_PARSER: Address = Address(FixedBytes::<20>(hex_litera
 /// - `L2_WRAPPED_BASE_TOKEN` – uses its own proxy mechanism.
 /// - `SYSTEM_CONTRACT_PROXY_ADMIN` – the proxy admin itself.
 /// - `DETERMINISTIC_CREATE2_ADDRESS` – standard Create2 factory, not a system contract.
-pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 23] = [
+pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 25] = [
     (
         L2_COMPLEX_UPGRADER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2ComplexUpgrader")),
@@ -197,6 +201,16 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 23] = [
     (
         L2_INTEROP_HANDLER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2InteropHandler")),
+    ),
+    // The removed v31 trackers' addresses hold EmptyContract-backed system proxies, matching what
+    // the v32 upgrade installs on pre-existing chains; see REMOVED_L2_ASSET_TRACKER_ADDR.
+    (
+        REMOVED_L2_ASSET_TRACKER_ADDR,
+        ContractDeployment::SystemProxy(ContractSource::L1ContractName("EmptyContract")),
+    ),
+    (
+        REMOVED_GW_ASSET_TRACKER_ADDR,
+        ContractDeployment::SystemProxy(ContractSource::L1ContractName("EmptyContract")),
     ),
     (
         L2_BASE_TOKEN_HOLDER_ADDR,
@@ -251,25 +265,32 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 23] = [
 mod tests {
     use alloy::primitives::{Address, FixedBytes};
 
-    use super::{INITIAL_CONTRACTS, REMOVED_GW_ASSET_TRACKER_ADDR};
-
-    const REMOVED_L2_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
-        "000000000000000000000000000000000001000f"
-    )));
+    use super::{
+        ContractDeployment, ContractSource, INITIAL_CONTRACTS, REMOVED_GW_ASSET_TRACKER_ADDR,
+        REMOVED_L2_ASSET_TRACKER_ADDR,
+    };
 
     #[test]
     fn keeps_removed_tracker_addresses_in_the_intended_genesis_state() {
-        assert!(
-            !INITIAL_CONTRACTS
+        for (name, addr) in [
+            ("L2AssetTracker", REMOVED_L2_ASSET_TRACKER_ADDR),
+            ("GWAssetTracker", REMOVED_GW_ASSET_TRACKER_ADDR),
+        ] {
+            let deployment = INITIAL_CONTRACTS
                 .iter()
-                .any(|(address, _)| *address == REMOVED_L2_ASSET_TRACKER_ADDR),
-            "L2AssetTracker was removed; chains generated on v32 leave its reserved address empty"
-        );
-        assert!(
-            !INITIAL_CONTRACTS
-                .iter()
-                .any(|(address, _)| *address == REMOVED_GW_ASSET_TRACKER_ADDR),
-            "GWAssetTracker was removed; chains generated on v32 leave its reserved address empty"
-        );
+                .find(|(address, _)| *address == addr)
+                .unwrap_or_else(|| {
+                    panic!("{name}: the reserved address must hold a neutralized proxy")
+                });
+            assert!(
+                matches!(
+                    deployment.1,
+                    ContractDeployment::SystemProxy(ContractSource::L1ContractName(
+                        "EmptyContract"
+                    ))
+                ),
+                "{name}: genesis must install the same EmptyContract proxy the v32 upgrade does"
+            );
+        }
     }
 }
