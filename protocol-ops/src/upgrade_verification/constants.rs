@@ -69,6 +69,7 @@ pub const L2_CHAIN_ASSET_HANDLER_ADDR: Address = l2_addr(0x0a);
 pub const L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR: Address = l2_addr(0x0c);
 pub const L2_INTEROP_CENTER_ADDR: Address = l2_addr(0x0d);
 pub const L2_INTEROP_HANDLER_ADDR: Address = l2_addr(0x0e);
+pub const L2_INTEROP_ATTRIBUTE_PARSER_ADDR: Address = l2_addr(0x15);
 pub const L2_INTEROP_COMMITMENT_TREE_ADDR: Address = l2_addr(0x12);
 pub const L2_ATOMIC_FLOW_MANAGER_ADDR: Address = l2_addr(0x14);
 pub const L2_BASE_TOKEN_HOLDER_ADDR: Address = l2_addr(0x11);

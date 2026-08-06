@@ -854,17 +854,10 @@ async fn verify_core_provenance(
         &["upgrade_addresses", "shared", "transparent_proxy_admin"],
     )?;
 
-    // L1MessageRoot has a stage-sepolia variant with the same constructor
-    // signature but different runtime bytecode. The choice is fixed by the
-    // env: stage expects `L1MessageRootStageSepolia` (it skips chain 270 in
-    // `_v31InitializeInner` because that chain is still settling on the
-    // legacy stage Gateway at v31 upgrade time); testnet and mainnet expect
-    // the canonical `L1MessageRoot`.
-    let message_root_file = if verifiers.env.is_stage() {
-        "l1-contracts/L1MessageRootStageSepolia"
-    } else {
-        "l1-contracts/L1MessageRoot"
-    };
+    // Every env deploys the canonical `L1MessageRoot`: the stage-sepolia variant (which skipped
+    // chain 270's settlement check during the v31 rollout) was removed together with the v31
+    // stage-1 initializer.
+    let message_root_file = "l1-contracts/L1MessageRoot";
 
     // ChainRegistrationSender impl args are reused for the TUPP impl check below.
     let crs_ctor_args =

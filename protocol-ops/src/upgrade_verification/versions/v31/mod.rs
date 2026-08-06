@@ -62,8 +62,8 @@ pub(crate) fn is_expected_old_protocol_version_for_ctm_flavor(
 
 pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static str {
     match flavor {
-        CtmFlavor::Era => "v0.29.4",
-        CtmFlavor::ZksyncOs => "v0.30.1",
+        CtmFlavor::Era => "v0.31.0",
+        CtmFlavor::ZksyncOs => "v0.31.0",
     }
 }
 
