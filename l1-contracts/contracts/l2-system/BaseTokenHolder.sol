@@ -12,7 +12,7 @@ import {
     L2_NATIVE_TOKEN_VAULT,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
-import {BaseTokenNativeToThisChain, RecoverToL1NotSupported, Unauthorized} from "../common/L1ContractErrors.sol";
+import {Unauthorized} from "../common/L1ContractErrors.sol";
 
 /**
  * @title BaseTokenHolder
@@ -39,9 +39,6 @@ contract BaseTokenHolder is IBaseTokenHolder {
     }
 
     /// @notice Modifier that restricts access to callers that can bridge base tokens.
-    /// @dev InteropCenter: burns base-token value when sending an interop bundle
-    /// @dev NativeTokenVault: burns base-token value during bridged base-token burns
-    /// @dev L2BaseToken: burns the withdrawn value during legacy `withdraw`/`withdrawWithMessage`
     modifier onlyBridgingCaller() {
         if (
             msg.sender != L2_INTEROP_CENTER_ADDR &&
@@ -78,8 +75,9 @@ contract BaseTokenHolder is IBaseTokenHolder {
             return;
         }
 
-        // Record before transferring so the recipient cannot interleave another operation from its
-        // receive hook before this operation is accounted for.
+        // The ETH transfer below hands control to `_to`, which can reenter the bridge before this
+        // call returns; record first so any reentrant flow observes counters that already include
+        // this operation.
         L2_NATIVE_TOKEN_VAULT.recordBaseTokenBridgingFromChain(_fromChainId, _amount);
         Address.sendValue(payable(_to), _amount);
         emit BaseTokenMintedInterop(_to, _amount);
@@ -91,14 +89,15 @@ contract BaseTokenHolder is IBaseTokenHolder {
             return;
         }
 
-        _assertBaseTokenRecoveryIsAccountingNeutral(_toChainId);
+        L2_NATIVE_TOKEN_VAULT.assertRecoveryIsAccountingNeutral(
+            L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID(),
+            _toChainId
+        );
         Address.sendValue(payable(_to), _amount);
         emit BaseTokenRecovered(_to, _amount);
     }
 
-    /// @notice Receives base tokens and records the outbound bridge flow.
-    /// @dev Called by InteropCenter, NativeTokenVault, and L2BaseToken (its `withdraw` path) during bridging operations.
-    /// @param _toChainId The chain ID which the funds are sent to.
+    /// @inheritdoc IBaseTokenHolder
     function burnAndStartBridging(uint256 _toChainId) external payable onlyBridgingCaller {
         if (msg.value != 0) {
             L2_NATIVE_TOKEN_VAULT.recordBaseTokenBridgingToChain(_toChainId, msg.value);
@@ -113,20 +112,6 @@ contract BaseTokenHolder is IBaseTokenHolder {
         }
 
         L2_NATIVE_TOKEN_VAULT.recordBaseTokenBridgingFromChain(_fromChainId, _amount);
-    }
-
-    /// @dev Asserts that returning a failed bridge-out's escrow needs no bookkeeping reversal:
-    /// `totalWithdrawalsToL1` is append-only because L2 -> L1 withdrawals are never revertable, and the
-    /// base token never originates from this chain, so `L2NativeTokenVault.bridgedOut` holds nothing to
-    /// re-credit for it.
-    /// @dev `L1_CHAIN_ID` needs no zero-check: the vault is initialized during genesis or the upgrade,
-    /// before any bridge-out (and hence any recovery) can exist.
-    function _assertBaseTokenRecoveryIsAccountingNeutral(uint256 _toChainId) internal view {
-        require(_toChainId != L2_NATIVE_TOKEN_VAULT.L1_CHAIN_ID(), RecoverToL1NotSupported());
-        require(
-            L2_NATIVE_TOKEN_VAULT.originChainId(L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID()) != block.chainid,
-            BaseTokenNativeToThisChain()
-        );
     }
 
     /// @notice Accepts the initial balance transfer from L2BaseToken during `initL2`.

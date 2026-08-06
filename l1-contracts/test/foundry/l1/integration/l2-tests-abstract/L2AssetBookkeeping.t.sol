@@ -9,21 +9,30 @@ import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
+import {IL2AssetHandler} from "contracts/bridge/interfaces/IL2AssetHandler.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {L2AssetBookkeepingInfo} from "contracts/common/L2AssetBookkeeping.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
+import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {
     AssetIdNotRegistered,
     AssetIdNotSupported,
+    BaseTokenNativeToThisChain,
     InsufficientChainBalance,
-    InvalidCaller
+    InvalidCaller,
+    RecoverToL1NotSupported
 } from "contracts/common/L1ContractErrors.sol";
 
 contract L2NativeTokenVaultBookkeepingHarness is L2NativeTokenVault {
@@ -32,10 +41,16 @@ contract L2NativeTokenVaultBookkeepingHarness is L2NativeTokenVault {
         assetId[_tokenAddress] = _assetId;
         originChainId[_assetId] = _originChainId;
     }
+
+    /// @dev Stands in for `updateL2` on a fresh instance, so `trackBaseToken` can be exercised
+    /// without the full init flow.
+    function setBaseTokenAssetId(bytes32 _assetId) external {
+        BASE_TOKEN_ASSET_ID = _assetId;
+    }
 }
 
 /// @notice Tests for the chain-local bookkeeping that replaced the removed
-/// L2AssetTracker: `bridgedOut` / `interopInfo` / `preTrackingTotalSupply` on the
+/// L2AssetTracker: `bridgedOut` and the per-asset `assetBookkeeping` struct on the
 /// L2NativeTokenVault, including the base-token flows reported by the BaseTokenHolder.
 abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
     function _ntv() internal pure returns (L2NativeTokenVault) {
@@ -54,10 +69,16 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
     }
 
     /// @dev Burns `_amount` of `_assetId` towards `_toChainId` through the real asset-router entry point.
-    function _bridgeBurnErc20(uint256 _toChainId, bytes32 _assetId, address _originalCaller, uint256 _amount) internal {
+    /// @return mintData The burn's actual bridge-mint payload, as a recovery would consume it.
+    function _bridgeBurnErc20(
+        uint256 _toChainId,
+        bytes32 _assetId,
+        address _originalCaller,
+        uint256 _amount
+    ) internal returns (bytes memory mintData) {
         bytes memory data = abi.encode(_amount, makeAddr("remoteReceiver"), address(0));
         vm.prank(L2_ASSET_ROUTER_ADDR);
-        IAssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeBurn(_toChainId, 0, _assetId, _originalCaller, data);
+        mintData = IAssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeBurn(_toChainId, 0, _assetId, _originalCaller, data);
     }
 
     /// @dev Finalizes an inbound `_amount` of `_assetId` from `_fromChainId` through the real
@@ -85,8 +106,8 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
 
         assertTrue(_ntv().isAssetTracked(assetId), "native token should be tracked on registration");
         assertEq(_ntv().bridgedOut(assetId), 0, "fresh native token has nothing bridged out");
-        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
-        assertTrue(isSaved, "native tokens should record their pre-tracking baseline");
+        L2AssetBookkeepingInfo memory snapshot = _ntv().getAssetBookkeeping(assetId);
+        uint256 savedAmount = snapshot.preTrackingTotalSupply;
         assertEq(savedAmount, type(uint256).max, "a fresh native token starts at the infinite-deposit baseline");
     }
 
@@ -118,8 +139,8 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
         address token = _ntv().tokenAddress(assetId);
         assertNotEq(token, address(0), "the bridged token should be deployed");
         assertTrue(_ntv().isAssetTracked(assetId), "the bridged token should be tracked during registration");
-        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
-        assertTrue(isSaved, "bridged tokens should record their pre-tracking baseline");
+        L2AssetBookkeepingInfo memory snapshot = _ntv().getAssetBookkeeping(assetId);
+        uint256 savedAmount = snapshot.preTrackingTotalSupply;
         assertEq(savedAmount, 0, "no flows predate a token registered by its first deposit");
         assertEq(IERC20(token).totalSupply(), amount, "the first deposit should mint the full amount");
         assertEq(IERC20(token).balanceOf(receiver), amount, "the receiver should receive the first deposit");
@@ -128,7 +149,7 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
 
     /// @notice L1-native tokens use the L1 flow counters but never the L2-native `bridgedOut`
     /// accounting. This covers both the first-deposit deployment path and the return withdrawal.
-    function test_l1NativeToken_roundTripRecordsInteropInfoOnly() public {
+    function test_l1NativeToken_roundTripRecordsFlowCountersOnly() public {
         _setCurrentSettlementLayer(L1_CHAIN_ID);
         address originToken = makeAddr("l1Token");
         address receiver = makeAddr("receiver");
@@ -320,8 +341,8 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
 
         assertTrue(_ntv().isAssetTracked(assetId), "legacy token should be tracked");
         assertEq(_ntv().bridgedOut(assetId), escrowed, "bridgedOut should be seeded with the escrow");
-        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
-        assertTrue(isSaved, "legacy native tokens should record their pre-tracking baseline");
+        L2AssetBookkeepingInfo memory snapshot = _ntv().getAssetBookkeeping(assetId);
+        uint256 savedAmount = snapshot.preTrackingTotalSupply;
         assertEq(
             savedAmount,
             type(uint256).max - escrowed,
@@ -347,8 +368,8 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
         _ntv().trackLegacyToken(assetId);
 
         assertTrue(_ntv().isAssetTracked(assetId), "legacy token should be tracked");
-        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
-        assertTrue(isSaved, "bridged tokens should record their pre-tracking baseline");
+        L2AssetBookkeepingInfo memory snapshot = _ntv().getAssetBookkeeping(assetId);
+        uint256 savedAmount = snapshot.preTrackingTotalSupply;
         assertEq(savedAmount, preTrackingSupply, "the baseline equals the pre-tracking net inbound flow");
         assertEq(_ntv().bridgedOut(assetId), 0, "bridged tokens carry no bridgedOut accounting");
     }
@@ -360,11 +381,68 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
         _ntv().trackLegacyToken(assetId);
     }
 
-    /// @notice The base token has no vault escrow to seed and is rejected outright.
+    /// @notice The base token has no vault escrow to seed and is rejected outright; its baseline
+    /// is recorded by `trackBaseToken` during the upgrade/genesis instead.
     function test_trackLegacyToken_revertBaseToken() public {
         bytes32 baseTokenAssetId = _ntv().BASE_TOKEN_ASSET_ID();
         vm.expectRevert(abi.encodeWithSelector(AssetIdNotSupported.selector, baseTokenAssetId));
         _ntv().trackLegacyToken(baseTokenAssetId);
+    }
+
+    /// @notice Genesis records the base token's baseline (the deployer mirrors
+    /// `L2GenesisForceDeploymentsHelper`): tracked, saved, and zero — a fresh chain has no
+    /// pre-tracking flows.
+    function test_trackBaseToken_recordedDuringGenesisSetup() public {
+        bytes32 baseTokenAssetId = _ntv().BASE_TOKEN_ASSET_ID();
+        assertTrue(_ntv().isAssetTracked(baseTokenAssetId), "the base token should be tracked from genesis");
+        L2AssetBookkeepingInfo memory snapshot = _ntv().getAssetBookkeeping(baseTokenAssetId);
+        // `isAssetTracked` (asserted above) doubles as the baseline-recorded marker.
+        assertEq(snapshot.preTrackingTotalSupply, 0, "a fresh chain has no pre-tracking base-token flows");
+    }
+
+    /// @notice A repeated `trackBaseToken` (e.g. a later upgrade re-running the init helper) must
+    /// not fold post-tracking supply into the baseline.
+    function test_trackBaseToken_idempotent() public {
+        bytes32 baseTokenAssetId = _ntv().BASE_TOKEN_ASSET_ID();
+
+        // Simulate post-genesis mints: the holder's balance drop raises the reported totalSupply.
+        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR.balance - 5 ether);
+
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        _ntv().trackBaseToken();
+
+        L2AssetBookkeepingInfo memory snapshot = _ntv().getAssetBookkeeping(baseTokenAssetId);
+        assertEq(snapshot.preTrackingTotalSupply, 0, "a re-run must keep the originally recorded baseline");
+    }
+
+    /// @notice Only the upgrader may record the base token's baseline: from any later moment the
+    /// current supply includes flows `assetBookkeeping` already records.
+    function test_trackBaseToken_revertNotUpgrader() public {
+        vm.expectRevert(abi.encodeWithSelector(InvalidCaller.selector, address(this)));
+        _ntv().trackBaseToken();
+    }
+
+    /// @notice An upgraded chain arrives with supply already in circulation; `trackBaseToken` must
+    /// record exactly that supply, not zero. Runs on the real vault implementation (a fresh
+    /// instance, since the deployer's genesis-like setup already tracked the base token at the
+    /// canonical address).
+    function test_trackBaseToken_recordsNonzeroPreUpgradeSupply() public {
+        L2NativeTokenVaultBookkeepingHarness freshVault = new L2NativeTokenVaultBookkeepingHarness();
+        bytes32 baseTokenAssetId = _ntv().BASE_TOKEN_ASSET_ID();
+        freshVault.setBaseTokenAssetId(baseTokenAssetId);
+
+        // The holder's deficit against INITIAL is the circulating supply the dummy base token reports.
+        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE - 7 ether);
+
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        freshVault.trackBaseToken();
+
+        assertTrue(freshVault.isAssetTracked(baseTokenAssetId), "the base token must be tracked");
+        assertEq(
+            freshVault.getAssetBookkeeping(baseTokenAssetId).preTrackingTotalSupply,
+            7 ether,
+            "the pre-upgrade supply must become the recorded baseline"
+        );
     }
 
     /// @notice The lazy tracking also fires inside the bridge hooks: the first outbound operation of
@@ -393,8 +471,8 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
             escrowed + amount,
             "escrow should stay in lockstep with bridgedOut"
         );
-        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
-        assertTrue(isSaved, "lazy tracking should record the pre-operation baseline");
+        L2AssetBookkeepingInfo memory snapshot = _ntv().getAssetBookkeeping(assetId);
+        uint256 savedAmount = snapshot.preTrackingTotalSupply;
         assertEq(
             savedAmount,
             type(uint256).max - escrowed,
@@ -421,13 +499,90 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
         assertTrue(_ntv().isAssetTracked(assetId), "the inbound first touch should track the token");
         assertEq(token.balanceOf(receiver), amount, "the outstanding amount should be released from escrow");
         assertEq(_ntv().bridgedOut(assetId), escrowed - amount, "bridgedOut = seeded escrow - released amount");
-        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
-        assertTrue(isSaved, "the inbound first touch should record the baseline");
+        L2AssetBookkeepingInfo memory snapshot = _ntv().getAssetBookkeeping(assetId);
+        uint256 savedAmount = snapshot.preTrackingTotalSupply;
         assertEq(
             savedAmount,
             type(uint256).max - escrowed,
             "the baseline must be captured from the pre-release escrow"
         );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Failed-transfer recovery gating
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice Recovery is gated for EVERY asset, not just the base token: an L1-destined
+    /// bridge-out can never legitimately be recovered on L2 (`totalWithdrawalsToL1` is append-only),
+    /// so the vault rejects it before touching any bookkeeping.
+    function test_bridgeRecoverFailedTransfer_revertsForL1Destination() public {
+        address depositor = makeAddr("depositor");
+        (TestnetERC20Token token, bytes32 assetId) = _deployAndRegisterNativeToken(depositor, 5 ether);
+
+        bytes memory data = DataEncoding.encodeBridgeMintData({
+            _originalCaller: depositor,
+            _remoteReceiver: makeAddr("remoteReceiver"),
+            _originToken: address(token),
+            _amount: 5 ether,
+            _erc20Metadata: ""
+        });
+        vm.prank(L2_ASSET_ROUTER_ADDR);
+        vm.expectRevert(RecoverToL1NotSupported.selector);
+        IL2AssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeRecoverFailedTransfer(L1_CHAIN_ID, assetId, data);
+    }
+
+    /// @notice The permitted recovery branch, end to end on the real vault: a failed L2 -> L2
+    /// bridge-out of an L2-native token returns the escrow to the depositor, re-credits
+    /// `bridgedOut`, and leaves the flow counters untouched.
+    function test_bridgeRecoverFailedTransfer_nativeToken_returnsEscrowAndRecreditsBridgedOut() public {
+        _setCurrentSettlementLayer(L1_CHAIN_ID);
+        address depositor = makeAddr("depositor");
+        uint256 amount = 5 ether;
+        uint256 otherL2ChainId = 505;
+        (TestnetERC20Token token, bytes32 assetId) = _deployAndRegisterNativeToken(depositor, amount);
+
+        vm.prank(depositor);
+        token.approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount);
+        bytes memory mintData = _bridgeBurnErc20(otherL2ChainId, assetId, depositor, amount);
+        assertEq(_ntv().bridgedOut(assetId), amount, "the burn must escrow the full amount");
+        assertEq(token.balanceOf(depositor), 0, "the depositor's tokens must be escrowed");
+
+        // Recover through the router's real timeout-refund hook, feeding it the calldata shape the
+        // burn flow actually produces — the encoding recognition and the burn-time handler lookup
+        // both run for real.
+        bytes memory recoveredCall = abi.encodeCall(
+            AssetRouterBase.finalizeDeposit,
+            (block.chainid, assetId, mintData)
+        );
+        vm.prank(L2_ATOMIC_FLOW_MANAGER_ADDR);
+        bool recovered = IAtomicRecoverable(L2_ASSET_ROUTER_ADDR).recoverAtomicCall(otherL2ChainId, recoveredCall);
+        assertTrue(recovered, "the router must recognize and reverse its own burn encoding");
+
+        assertEq(token.balanceOf(depositor), amount, "the depositor must be refunded in full");
+        assertEq(token.balanceOf(L2_NATIVE_TOKEN_VAULT_ADDR), 0, "the vault escrow must be released");
+        assertEq(_ntv().bridgedOut(assetId), 0, "the recovery must re-credit bridgedOut");
+        assertEq(_readTotalWithdrawalsToL1(assetId), 0, "an L2-destined round trip must not touch the L1 counters");
+        assertEq(_readTotalSuccessfulDepositsFromL1(assetId), 0, "no L1 deposit was involved");
+    }
+
+    /// @notice The chain-native check of the recovery gate must come from the REAL vault branch:
+    /// a base token whose origin is this chain has no `bridgedOut` escrow to re-credit, so its
+    /// recovery is rejected even for an L2 destination.
+    function test_bridgeRecoverFailedTransfer_revertsWhenBaseTokenIsChainNative() public {
+        bytes32 baseTokenAssetId = _ntv().BASE_TOKEN_ASSET_ID();
+        // Model the (unsupported) chain-native base token by overwriting its registered origin.
+        _writeLegacyVaultRegistration(baseTokenAssetId, _ntv().tokenAddress(baseTokenAssetId), block.chainid);
+
+        bytes memory data = DataEncoding.encodeBridgeMintData({
+            _originalCaller: makeAddr("depositor"),
+            _remoteReceiver: makeAddr("remoteReceiver"),
+            _originToken: _ntv().tokenAddress(baseTokenAssetId),
+            _amount: 1 ether,
+            _erc20Metadata: ""
+        });
+        vm.prank(L2_ASSET_ROUTER_ADDR);
+        vm.expectRevert(BaseTokenNativeToThisChain.selector);
+        IL2AssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeRecoverFailedTransfer(505, baseTokenAssetId, data);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -444,7 +599,7 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
         _ntv().recordBaseTokenBridgingFromChain(L1_CHAIN_ID, 1 ether);
     }
 
-    /// @notice L1-attributable base-token flows land in `interopInfo[BASE_TOKEN_ASSET_ID]`, the same
+    /// @notice L1-attributable base-token flows land in `assetBookkeeping[BASE_TOKEN_ASSET_ID]`, the same
     /// bookkeeping used for every other asset.
     function test_recordBaseTokenBridging_recordsUnderBaseTokenAssetId() public {
         _setCurrentSettlementLayer(L1_CHAIN_ID);

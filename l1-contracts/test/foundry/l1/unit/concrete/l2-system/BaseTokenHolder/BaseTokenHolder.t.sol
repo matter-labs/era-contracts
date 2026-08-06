@@ -70,6 +70,17 @@ contract MockRecordingNativeTokenVault {
         return baseTokenOriginChainId;
     }
 
+    /// @dev Mirrors `L2NativeTokenVault.assertRecoveryIsAccountingNeutral` so the holder's
+    /// delegation to the vault stays observable with the recording mock in place.
+    function assertRecoveryIsAccountingNeutral(bytes32 _assetId, uint256 _toChainId) external view {
+        if (_toChainId == MOCK_L1_CHAIN_ID) {
+            revert RecoverToL1NotSupported();
+        }
+        if (_assetId == MOCK_BASE_TOKEN_ASSET_ID && baseTokenOriginChainId == block.chainid) {
+            revert BaseTokenNativeToThisChain();
+        }
+    }
+
     function setBaseTokenOriginChainId(uint256 _originChainId) external {
         baseTokenOriginChainId = _originChainId;
     }

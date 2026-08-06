@@ -40,6 +40,24 @@
   },
   {
     "type": "function",
+    "name": "assertRecoveryIsAccountingNeutral",
+    "inputs": [
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_toChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "assetId",
     "inputs": [
       {
@@ -152,6 +170,42 @@
   },
   {
     "type": "function",
+    "name": "getAssetBookkeeping",
+    "inputs": [
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct L2AssetBookkeepingInfo",
+        "components": [
+          {
+            "name": "preTrackingTotalSupply",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "totalWithdrawalsToL1",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "totalSuccessfulDepositsFromL1",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getERC20Getters",
     "inputs": [
       {
@@ -170,30 +224,6 @@
         "name": "",
         "type": "bytes",
         "internalType": "bytes"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "interopInfo",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "totalWithdrawalsToL1",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "totalSuccessfulDepositsFromL1",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -270,30 +300,6 @@
         "name": "",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "preTrackingTotalSupply",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "isSaved",
-        "type": "bool",
-        "internalType": "bool"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -378,6 +384,13 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "trackBaseToken",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",

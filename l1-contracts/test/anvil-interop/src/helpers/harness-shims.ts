@@ -97,22 +97,22 @@ export async function forceBatchExecutedEqualsCommitted(
 }
 
 /**
- * Harness-only shim: model the draft-v31 base-token backfill prerequisite for a ZKsync OS chain.
+ * Harness-only shim: model the v31 base-token backfill prerequisite for a ZKsync OS chain.
  *
- * The v32 upgrade of a ZKsync OS chain requires (a) `s.baseTokenHasTotalSupply`, which draft-v31
+ * The v32 upgrade of a ZKsync OS chain requires (a) `s.baseTokenHasTotalSupply`, which v31
  * sets when the backfill service transaction is requested, and (b) a bound recorded in the
  * upgrade's `PriorityOpLowerBound` registry proving that transaction also executed on L2.
  *
- * On a forked draft-v31 chain that was really backfilled, (a) already holds and (b) goes through
- * the registry's real permissionless entry point. A forked v30 state predates draft-v31 entirely
+ * On a forked v31 chain that was really backfilled, (a) already holds and (b) goes through
+ * the registry's real permissionless entry point. A forked v30 state predates the v31 backfill entirely
  * (its facets lack `baseTokenSupportsTotalSupply`, so even the registry's guard cannot run).
  * A direct v30 -> v32 upgrade is intentionally NOT a supported production path — real chains
- * acquire this state by passing through draft-v31 and its backfill — but the v30 fixture is the
+ * acquire this state by passing through v31 and its backfill — but the v30 fixture is the
  * only ZKsync OS state available for exercising the upgrade machinery end to end, so we
  * substitute that unreachable history with direct writes, same rationale as
  * `forceBatchExecutedEqualsCommitted` above.
  */
-export async function modelDraftV31BackfillPrerequisite(params: {
+export async function modelV31BackfillPrerequisite(params: {
   l1Provider: providers.JsonRpcProvider;
   diamondProxyAddr: string;
   settlementLayerUpgradeAddr: string;

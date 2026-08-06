@@ -33,7 +33,7 @@ import {BaseTokenHolderAlreadyInitialized, BaseTokenHolderMintFailed} from "../.
 contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
     /// @notice The pre-V31 total supply for ZKOS chains.
     /// @dev ZKsync OS chains did not track total supply on-chain before v31. Existing chains had
-    /// this slot backfilled by the draft-v31 service transaction, and the v32 upgrade is forbidden
+    /// this slot backfilled by the v31 service transaction, and the v32 upgrade is forbidden
     /// on L1 until that happened (see `V32UpgradeZKsyncOS`), so the value here is
     /// always final. Fresh chains have no pre-v31 history and keep zero.
     // slither-disable-next-line uninitialized-state
@@ -42,6 +42,13 @@ contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
     /// @notice Returns the total circulating supply of base tokens.
     /// @dev Computed as: zkosPreV31TotalSupply + (INITIAL_BASE_TOKEN_HOLDER_BALANCE - BaseTokenHolder.balance)
     /// @dev The delta (INITIAL - holder.balance) tracks tokens minted after V31 via the BaseTokenHolder pattern.
+    /// @dev The subtraction cannot underflow, by construction: before the v31 upgrade the holder's
+    /// balance was zero and all other balances summed to `zkosPreV31TotalSupply`; the upgrade then
+    /// minted exactly `INITIAL_BASE_TOKEN_HOLDER_BALANCE` to the holder, and every flow since —
+    /// force-sent value included — only moves balance between the holder and other accounts. The
+    /// sum of ALL balances (the holder's included) therefore never exceeds
+    /// `zkosPreV31TotalSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE`, so neither does the holder's
+    /// balance alone.
     function totalSupply() external view returns (uint256) {
         return zkosPreV31TotalSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE - L2_BASE_TOKEN_HOLDER_ADDR.balance;
     }

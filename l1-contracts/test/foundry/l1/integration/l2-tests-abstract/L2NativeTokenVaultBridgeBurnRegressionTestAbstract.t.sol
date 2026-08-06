@@ -77,7 +77,9 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         // Record the BaseTokenHolder balance before
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
         uint256 bridgedOutBefore = l2NativeTokenVault.bridgedOut(baseTokenAssetIdLocal);
-        (uint256 totalWithdrawalsBefore, ) = l2NativeTokenVault.interopInfo(baseTokenAssetIdLocal);
+        uint256 totalWithdrawalsBefore = l2NativeTokenVault
+            .getAssetBookkeeping(baseTokenAssetIdLocal)
+            .totalWithdrawalsToL1;
 
         // Call bridgeBurn from the asset router (which is the only allowed caller)
         // Before the fix: This would revert because bridgeBurn would try to call
@@ -104,7 +106,9 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
             bridgedOutBefore,
             "bridgedOut should not change for bridged base token burns on L2"
         );
-        (uint256 totalWithdrawalsAfter, ) = l2NativeTokenVault.interopInfo(baseTokenAssetIdLocal);
+        uint256 totalWithdrawalsAfter = l2NativeTokenVault
+            .getAssetBookkeeping(baseTokenAssetIdLocal)
+            .totalWithdrawalsToL1;
         assertEq(
             totalWithdrawalsAfter - totalWithdrawalsBefore,
             depositAmount,

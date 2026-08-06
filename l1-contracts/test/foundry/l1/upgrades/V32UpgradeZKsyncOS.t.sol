@@ -168,6 +168,44 @@ contract V32UpgradeZKsyncOSTest is BaseUpgrade {
         upgradeContract.upgrade(proposedUpgrade);
     }
 
+    /// @notice A chain whose supply was backfilled but that never had a single priority op — a
+    /// chain created on v31 gets the flag from DiamondInit with no backfill service transaction to
+    /// prove — records a legitimate zero bound and upgrades with zero ops processed (0 >= 0).
+    function test_upgradesWithZeroLowerBoundAndNoPriorityOpsProcessed() public {
+        // Fresh registry + upgrade contract, so the zero bound is recorded from scratch.
+        priorityOpLowerBound = new PriorityOpLowerBound();
+        upgradeContract = new DummyV32UpgradeZKsyncOS(priorityOpLowerBound);
+
+        upgradeContract.setPriorityTxMaxGasLimit(1 ether);
+        upgradeContract.setPriorityTxMaxPubdata(1000000);
+        upgradeContract.setChainTypeManager(mockChainTypeManager);
+        upgradeContract.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
+        upgradeContract.setBridgehub(mockBridgehub);
+        upgradeContract.setChainId(CHAIN_ID);
+        upgradeContract.setZKsyncOS(true);
+        upgradeContract.setBatchCounters(7, 7);
+        upgradeContract.setBaseTokenHasTotalSupply(true);
+
+        vm.mockCall(
+            address(upgradeContract),
+            abi.encodeWithSelector(IGetters.baseTokenSupportsTotalSupply.selector),
+            abi.encode(true)
+        );
+        vm.mockCall(
+            address(upgradeContract),
+            abi.encodeWithSelector(IGetters.getTotalPriorityTxs.selector),
+            abi.encode(uint256(0))
+        );
+        priorityOpLowerBound.lowerBoundPriorityOp(address(upgradeContract));
+        assertTrue(priorityOpLowerBound.recorded(address(upgradeContract)), "the zero bound must count as recorded");
+        assertEq(priorityOpLowerBound.lowerBound(address(upgradeContract)), 0);
+
+        _mockFirstUnprocessedPriorityTx(0);
+
+        assertEq(upgradeContract.upgrade(proposedUpgrade), Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
+        assertEq(upgradeContract.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+    }
+
     /// @notice The anti-griefing property of the lower-bound design: priority ops enqueued AFTER
     /// the bound was recorded may stay pending without blocking the upgrade (an empty-queue
     /// requirement would let anyone stall it indefinitely).

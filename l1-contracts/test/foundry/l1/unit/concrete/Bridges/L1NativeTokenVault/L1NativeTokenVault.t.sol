@@ -461,7 +461,7 @@ contract L1NativeTokenVaultTest is Test {
         assertEq(populated.length, 1, "one amount per requested asset");
         assertEq(populated[0], 140, "amounts summed across the registered chains");
         assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 140, "legacy amount folded in");
-        assertTrue(nativeTokenVault.bridgedOutPopulated(tokenAssetId), "asset marked as populated");
+        assertTrue(nativeTokenVault.isAssetTracked(tokenAssetId), "asset marked as populated");
     }
 
     function test_populateBridgedOut_ReadsL1sBulkheadFromTheLegacyTracker() public {

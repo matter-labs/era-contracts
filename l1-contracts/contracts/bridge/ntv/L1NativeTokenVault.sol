@@ -70,11 +70,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     // slither-disable-next-line uninitialized-state
     address internal __DEPRECATED_l1AssetTracker;
 
-    /// @inheritdoc IL1NativeTokenVault
-    /// @dev `bridgedOut` itself lives in `NativeTokenVaultBase`; only the population marker is
-    /// L1-specific.
-    mapping(bytes32 assetId => bool populated) public bridgedOutPopulated;
-
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -163,10 +158,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
             // Repeated assets are skipped rather than reverted so that a partially mined batch can simply
             // be re-submitted.
-            if (bridgedOutPopulated[assetIdToPopulate]) {
+            if (isAssetTracked[assetIdToPopulate]) {
                 continue;
             }
-            bridgedOutPopulated[assetIdToPopulate] = true;
+            isAssetTracked[assetIdToPopulate] = true;
 
             // Reverts for anything that is not native to L1, which is a caller mistake rather than a no-op
             // worth tolerating.

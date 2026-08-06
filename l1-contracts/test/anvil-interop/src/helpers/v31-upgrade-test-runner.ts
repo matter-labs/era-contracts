@@ -27,6 +27,8 @@ import {
   L2_MESSAGE_ROOT_ADDR,
   L2_MESSAGE_VERIFICATION_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
+  L2_REMOVED_ASSET_TRACKER_ADDR,
+  L2_REMOVED_GW_ASSET_TRACKER_ADDR,
   L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
   L2_TO_L1_MESSENGER_ADDR,
   L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
@@ -37,11 +39,7 @@ import {
 } from "../core/const";
 import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
-import {
-  forceBatchExecutedEqualsCommitted,
-  modelDraftV31BackfillPrerequisite,
-  transferOwnable2Step,
-} from "./harness-shims";
+import { forceBatchExecutedEqualsCommitted, modelV31BackfillPrerequisite, transferOwnable2Step } from "./harness-shims";
 import { impersonateAndRun } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
@@ -699,10 +697,10 @@ export async function runChainUpgradesAndRelayL2(params: {
     // "all batches executed" prerequisite without running the executor.
     await forceBatchExecutedEqualsCommitted(l1Provider, chain.diamondProxy);
 
-    // ZKsync OS chains must additionally have the draft-v31 base-token backfill behind them
+    // ZKsync OS chains must additionally have the v31 base-token backfill behind them
     // (flag + executed-priority-op lower bound); model the missing history on the fork.
     if (isZKsyncOS) {
-      await modelDraftV31BackfillPrerequisite({
+      await modelV31BackfillPrerequisite({
         l1Provider,
         diamondProxyAddr: chain.diamondProxy,
         settlementLayerUpgradeAddr,
@@ -1542,7 +1540,10 @@ function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, Contra
       [L2_BASE_TOKEN_ADDR.toLowerCase(), "L2BaseTokenZKOS"],
       [L2_TO_L1_MESSENGER_ADDR.toLowerCase(), "L1MessengerZKOS"],
       [SYSTEM_CONTEXT_ADDR.toLowerCase(), "SystemContext"],
-      [L2_CONTRACT_DEPLOYER_ADDR.toLowerCase(), "ZKOSContractDeployer"]
+      [L2_CONTRACT_DEPLOYER_ADDR.toLowerCase(), "ZKOSContractDeployer"],
+      // Removed v31 trackers: the upgrade swaps their proxies' implementations for EmptyContract.
+      [L2_REMOVED_ASSET_TRACKER_ADDR.toLowerCase(), "EmptyContract"],
+      [L2_REMOVED_GW_ASSET_TRACKER_ADDR.toLowerCase(), "EmptyContract"]
     );
   }
   return new Map(entries);

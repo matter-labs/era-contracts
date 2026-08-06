@@ -54,7 +54,7 @@ contract MockRecordingVault {
     }
 }
 
-/// @dev Harness exposing a setter for the slot that draft-v31's backfill service transaction
+/// @dev Harness exposing a setter for the slot that v31's backfill service transaction
 /// (removed in this release) used to write, so an upgraded chain's pre-populated state can be
 /// simulated without storage cheatcodes.
 contract L2BaseTokenZKOSHarness is L2BaseTokenZKOS {
@@ -142,7 +142,7 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     /// @dev Covers the holder->vault forwarding only: the vault is a recording mock, so the real
-    /// vault's settlement gating / `interopInfo` update is exercised in L2AssetBookkeeping.t.sol.
+    /// vault's settlement gating / `assetBookkeeping` update is exercised in L2AssetBookkeeping.t.sol.
     function test_withdraw_forwardsBaseTokenBookkeepingToVault() public {
         // Use the actual holder to verify the forwarded withdrawal.
         BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
@@ -580,7 +580,7 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     /// @dev Simulates an upgraded chain whose `zkosPreV31TotalSupply` slot was backfilled while it
-    /// ran draft-v31, plus post-upgrade mints (a holder balance below the initial value means
+    /// ran v31, plus post-upgrade mints (a holder balance below the initial value means
     /// minted supply).
     function test_totalSupply_addsPreV31SupplyToMintedDelta() public {
         L2BaseTokenZKOSHarness harness = new L2BaseTokenZKOSHarness();
@@ -624,7 +624,7 @@ contract L2BaseTokenZKOSTest is Test {
         assertEq(token.totalSupply(), 50, "net-burn state should decrease totalSupply without reverting");
     }
 
-    /// @dev Simulates a draft-v31 chain (slot 50 already backfilled) going through this release's
+    /// @dev Simulates a v31 chain (slot 50 already backfilled) going through this release's
     /// initL2: the historical value must survive and feed totalSupply().
     function test_initL2_preservesBackfilledPreV31Supply() public {
         L2BaseTokenZKOSHarness harness = new L2BaseTokenZKOSHarness();
@@ -642,7 +642,7 @@ contract L2BaseTokenZKOSTest is Test {
         assertEq(token.totalSupply(), 200, "totalSupply must keep the pre-v31 baseline after initL2");
     }
 
-    /// @dev Pins `zkosPreV31TotalSupply` to storage slot 50: the value is written by draft-v31's
+    /// @dev Pins `zkosPreV31TotalSupply` to storage slot 50: the value is written by v31's
     /// backfill service transaction, and this release (which removes the backfill path) must keep
     /// reading the exact same slot. The write goes through a derived-contract setter, the read
     /// through the raw slot.
@@ -653,7 +653,7 @@ contract L2BaseTokenZKOSTest is Test {
         assertEq(
             uint256(vm.load(address(harness), bytes32(uint256(50)))),
             31337,
-            "zkosPreV31TotalSupply must stay at slot 50 (populated on draft-v31)"
+            "zkosPreV31TotalSupply must stay at slot 50 (populated on v31)"
         );
     }
 

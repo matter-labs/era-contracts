@@ -108,6 +108,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         assertEq(_countLogs(logs, FORCE_DEPLOYED_CONTRACTS_INITIALIZED_SIG), 1);
 
         _assertAtomicInteropInitialized();
+        _assertBaseTokenTracked(0);
 
         // Verify deployments occurred - use the etched contract at the system address
         MockZKOSContractDeployer etchedDeployer = MockZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
@@ -144,6 +145,9 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         _deployMockContract(L2_INTEROP_CENTER_ADDR);
         _deployMockContract(L2_INTEROP_HANDLER_ADDR);
         _deployMockContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        // An upgraded chain's base token is already initialized with supply in circulation; the
+        // helper must snapshot exactly this value (it never re-runs the base token's initL2).
+        MockContract(payable(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)).setMockBaseTokenState(true, 42 ether);
         // The atomic-interop built-ins arrive with the upgrade's force deployments on a pre-existing chain;
         // etch their real code so the helper initializing them is observable.
         _etchAtomicInteropBuiltIns();
@@ -178,6 +182,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // The upgrade path initializes the atomic-interop built-ins, so an upgraded chain ends up with the
         // same state a fresh one gets from genesis.
         _assertAtomicInteropInitialized();
+        _assertBaseTokenTracked(42 ether);
 
         // Note: no ZKsync OS chain can arrive here with the built-ins already seeded — neither they nor
         // their addresses existed in v31 — so the initialization is unconditional and one-shot.
@@ -226,6 +231,30 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // `_etchAllDeferredContracts` gave them real code here: on a real Era chain those addresses are
         // empty and initializing them would revert the whole upgrade transaction.
         _assertAtomicInteropUninitialized();
+
+        // The base token's baseline is recorded on the Era genesis path too.
+        _assertBaseTokenTracked(0);
+    }
+
+    /// @dev The helper must ask the vault to record the base token's baseline exactly once, on
+    /// every path (genesis and upgrade, both VMs), and only after the base token itself is live:
+    /// the recorded snapshot must be the post-init supply, never the pre-init placeholder.
+    function _assertBaseTokenTracked(uint256 _expectedBaseline) internal view {
+        assertEq(
+            MockContract(payable(L2_NATIVE_TOKEN_VAULT_ADDR)).trackBaseTokenCalls(),
+            1,
+            "the vault must record the base token's baseline exactly once"
+        );
+        assertEq(
+            MockContract(payable(L2_NATIVE_TOKEN_VAULT_ADDR)).recordedBaselineAtCall(),
+            _expectedBaseline,
+            "the baseline must be snapshotted after the base token is initialized"
+        );
+        assertEq(
+            MockContract(payable(L2_NATIVE_TOKEN_VAULT_ADDR)).recordedAssetIdAtCall(),
+            keccak256("baseTokenAsset"),
+            "the vault's base-token asset id must be initialized before the baseline is recorded"
+        );
     }
 
     /// @dev Neither built-in seeded: the tree has no leaves and the manager no L1 chain id.
@@ -459,10 +488,42 @@ contract MockSystemContractProxyAdmin {
 }
 
 contract MockContract {
+    uint256 public trackBaseTokenCalls;
+    uint256 public recordedBaselineAtCall;
+    bytes32 public recordedAssetIdAtCall;
+    bytes32 public baseTokenAssetIdStored;
+    bool public baseTokenInitialized;
+    uint256 internal mockSupply;
+
     // Generic mock contract that can handle various function calls
     function forceInitAdmin(address) external {}
 
-    function initL2(uint256) external {}
+    /// @dev Mirrors `L2NativeTokenVault.trackBaseToken`: snapshots the base token's totalSupply at
+    /// call time, so the tests can assert the helper's ordering (the snapshot is only meaningful
+    /// after the base token's own `initL2`).
+    /// @dev The real vault keys the snapshot by its stored `BASE_TOKEN_ASSET_ID`, so the recorded
+    /// asset id proves the vault's own init ran before the tracking call.
+    function trackBaseToken() external {
+        trackBaseTokenCalls++;
+        recordedBaselineAtCall = MockContract(payable(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)).totalSupply();
+        recordedAssetIdAtCall = baseTokenAssetIdStored;
+    }
+
+    /// @dev Pre-initialized supply reads as a huge placeholder (mirroring ZKsync OS, where
+    /// `totalSupply()` is meaningless before `initL2` mints the holder's reserve).
+    function totalSupply() external view returns (uint256) {
+        return baseTokenInitialized ? mockSupply : type(uint128).max;
+    }
+
+    /// @dev Models an upgraded chain, whose base token is already live with circulating supply.
+    function setMockBaseTokenState(bool _initialized, uint256 _supply) external {
+        baseTokenInitialized = _initialized;
+        mockSupply = _supply;
+    }
+
+    function initL2(uint256) external {
+        baseTokenInitialized = true;
+    }
 
     function initL2(uint256, address, uint256) external {}
 
@@ -483,9 +544,25 @@ contract MockContract {
         bytes32,
         address,
         address,
-        TokenBridgingData calldata,
+        TokenBridgingData calldata _baseTokenBridgingData,
         TokenMetadata calldata
-    ) external {}
+    ) external {
+        baseTokenAssetIdStored = _baseTokenBridgingData.assetId;
+    }
+
+    // L2NativeTokenVaultZKOS.initL2
+    function initL2(
+        uint256,
+        address,
+        bytes32,
+        address,
+        address,
+        address,
+        TokenBridgingData calldata _baseTokenBridgingData,
+        TokenMetadata calldata
+    ) external {
+        baseTokenAssetIdStored = _baseTokenBridgingData.assetId;
+    }
 
     // L2ChainAssetHandler.updateL2
     function updateL2(uint256, address) external {}

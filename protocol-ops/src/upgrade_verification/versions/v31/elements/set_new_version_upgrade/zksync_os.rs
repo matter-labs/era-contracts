@@ -1,6 +1,6 @@
 //! ZKsync OS `forceDeployAndUpgradeUniversal` payload verification.
 //!
-//! Owns the expected `UniversalContractUpgradeInfo[]` list (16 fixed-address
+//! Owns the expected `UniversalContractUpgradeInfo[]` list (18 fixed-address
 //! entries, all proxy-upgrade shapes; the only unsafe force deployment is the
 //! L2V32Upgrade delegate target, validated separately), the
 //! deployed-bytecode-info decoder (96-byte triple or 320-byte impl/proxy
@@ -17,9 +17,9 @@ use crate::upgrade_verification::{
         L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR,
         L2_INTEROP_ATTRIBUTE_PARSER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_COMMITMENT_TREE_ADDR,
         L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR, L2_MESSAGE_ROOT_ADDR,
-        L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR,
-        L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-        L2_V32_UPGRADE_CONTRACT,
+        L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_REMOVED_ASSET_TRACKER_ADDR,
+        L2_REMOVED_GW_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_V32_UPGRADE_CONTRACT,
     },
     verifiers::{VerificationResult, Verifiers},
 };
@@ -105,6 +105,13 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
         proxy!(
             "l1-contracts/SystemContext",
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR
+        ),
+        // ── Removed-tracker neutralizations (getRemovedTrackerNeutralizations, 2 entries):
+        //    the v31 trackers' proxies get their implementations swapped for EmptyContract. ──
+        proxy!("l1-contracts/EmptyContract", L2_REMOVED_ASSET_TRACKER_ADDR),
+        proxy!(
+            "l1-contracts/EmptyContract",
+            L2_REMOVED_GW_ASSET_TRACKER_ADDR
         ),
         // ── ProxyAdmin (0x1000c) is a direct-deployed contract present from genesis; v31 no longer
         //    force-deploys it (it would require an unsafe overwrite), so it is not in this list. ──
@@ -334,6 +341,7 @@ fn verify_zksync_os_bytecode_info_triplet(
 pub(super) const EXPECTED_V31_ZKSYNC_OS_BYTECODES: &[&str] = &[
     "l1-contracts/SystemContractProxy",
     "l1-contracts/SystemContractProxyAdmin",
+    "l1-contracts/EmptyContract",
     "l1-contracts/L2Bridgehub",
     "l1-contracts/L2AssetRouter",
     "l1-contracts/L2NativeTokenVaultZKOS",
@@ -363,7 +371,7 @@ pub(super) async fn verify_zksync_os_force_deploy_and_upgrade(
     decoded: &IComplexUpgrader::forceDeployAndUpgradeUniversalCall,
     expected_fixed_force_deployments_data: &str,
 ) -> anyhow::Result<()> {
-    // Validate all expected force deployments (16 fixed entries; L2V32Upgrade delegate validated below).
+    // Validate all expected force deployments (18 fixed entries; L2V32Upgrade delegate validated below).
     verify_v31_zksync_os_force_deployments(
         verifiers,
         result,

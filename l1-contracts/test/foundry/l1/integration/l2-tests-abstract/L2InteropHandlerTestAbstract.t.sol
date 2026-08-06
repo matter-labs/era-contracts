@@ -7,6 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {L2AssetBookkeepingInfo} from "contracts/common/L2AssetBookkeeping.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 
 import {
@@ -669,10 +670,11 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         );
     }
 
-    function _readBaseTokenInteropInfo() internal view returns (uint256 withdrawals, uint256 deposits) {
+    function _readBaseTokenFlowCounters() internal view returns (uint256 withdrawals, uint256 deposits) {
         // The holder reports its flows to the vault, which keeps them under BASE_TOKEN_ASSET_ID.
         L2NativeTokenVault vault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        (withdrawals, deposits) = vault.interopInfo(vault.BASE_TOKEN_ASSET_ID());
+        L2AssetBookkeepingInfo memory info = vault.getAssetBookkeeping(vault.BASE_TOKEN_ASSET_ID());
+        (withdrawals, deposits) = (info.totalWithdrawalsToL1, info.totalSuccessfulDepositsFromL1);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -681,7 +683,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
 
     /// @notice Verifies the full inbound interop flow through the base-token bookkeeping.
     /// @dev Executes a bundle with value > 0 through InteropHandler, which calls
-    /// BaseTokenHolder.give(), which reports the flow to the vault's `interopInfo`.
+    /// BaseTokenHolder.give(), which reports the flow to the vault's `assetBookkeeping`.
     function test_give_inboundFlow_recordsBookkeeping() public {
         BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
@@ -703,7 +705,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         );
 
         // Record deposits before
-        (, uint256 depositsBefore) = _readBaseTokenInteropInfo();
+        (, uint256 depositsBefore) = _readBaseTokenFlowCounters();
 
         // give() sends the value to L2InteropHandler, hence the event recipient.
         vm.expectEmit(true, false, false, true, L2_BASE_TOKEN_HOLDER_ADDR);
@@ -713,7 +715,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         L2_INTEROP_HANDLER.executeAtomicBundle(bundle, finality);
 
         // Interop source is ERA_CHAIN_ID (not L1), so totalSuccessfulDepositsFromL1 must NOT increase
-        (, uint256 depositsAfter) = _readBaseTokenInteropInfo();
+        (, uint256 depositsAfter) = _readBaseTokenFlowCounters();
         assertEq(depositsAfter, depositsBefore, "totalSuccessfulDepositsFromL1 should NOT increase for non-L1 source");
     }
 
@@ -733,7 +735,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         uint256 toChainId = L1_CHAIN_ID;
 
         // Record withdrawals before
-        (uint256 withdrawalsBefore, ) = _readBaseTokenInteropInfo();
+        (uint256 withdrawalsBefore, ) = _readBaseTokenFlowCounters();
 
         vm.expectEmit(true, false, false, true, L2_BASE_TOKEN_HOLDER_ADDR);
         emit IBaseTokenHolder.BaseTokenBurntInterop(L2_INTEROP_CENTER_ADDR, toChainId, burnAmount);
@@ -743,7 +745,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(toChainId);
 
         // Verify holder storage was actually updated.
-        (uint256 withdrawalsAfter, ) = _readBaseTokenInteropInfo();
+        (uint256 withdrawalsAfter, ) = _readBaseTokenFlowCounters();
         assertEq(
             withdrawalsAfter,
             withdrawalsBefore + burnAmount,

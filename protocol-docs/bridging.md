@@ -161,8 +161,8 @@ the pre-upgrade accounting into `bridgedOut`, once per asset, and `stage3` of th
 L1-native assets in the vault's `bridgedTokens` enumeration that have a non-zero pre-upgrade amount, batched
 across transactions (see `l1-contracts/deploy-scripts/upgrade/default-upgrade/BridgedOutPopulationLib.sol`;
 assets whose
-amount is zero are left out of the batches entirely, so their `bridgedOutPopulated` flag stays unset — there
-is nothing to fold in for them, now or later).
+amount is zero are left out of the batches entirely, so their `isAssetTracked` marker — which doubles on L1
+as the populate-once flag — stays unset; there is nothing to fold in for them, now or later).
 
 - For an asset the removed v31 `L1AssetTracker` registered, the amount is the complement of **L1's own
   bulkhead** there: L1 is the origin chain of these assets, so its bulkhead starts at `MAX_TOKEN_BALANCE`
@@ -192,8 +192,13 @@ is nothing to fold in for them, now or later).
   handler only) pays out inbound value; `burnAndStartBridging` (InteropCenter or NTV) receives outbound
   value; both report the flow to the `L2NativeTokenVault` bookkeeping first (the holder itself stores
   nothing). Its balance means "funds the chain can still mint";
-  force-sent funds (refund recipient, selfdestruct on ZK OS) only skew the `totalSupply()` view, never
-  bridging accounting.
+  force-sent funds (refund recipient, selfdestruct on ZK OS) skew the `totalSupply()` view but never the
+  flow counters; the base token's `preTrackingTotalSupply` baseline is a one-time `totalSupply()`
+  snapshot taken at the upgrade/genesis (`trackBaseToken`), so it deliberately inherits whatever skew
+  the view carries at that moment — the same trade-off as reading `totalSupply()` directly. The subtraction inside
+  the ZKsync OS view cannot underflow: the holder can only receive balance that already exists outside
+  it, and the sum of all balances — the holder's included — never exceeds
+  `zkosPreV31TotalSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE`.
   - The operator must keep the base-token total supply below `2^127`, otherwise the holder's balance
     could underflow; overflow is impossible since users can only gain what the holder loses.
   - On ZKsync OS the holder's initial balance is minted by `L2BaseTokenZKOS.initL2()` via a raw call to
@@ -216,13 +221,16 @@ is nothing to fold in for them, now or later).
 ## L2 asset bookkeeping
 
 The chain keeps a small amount of local token bookkeeping in the `L2NativeTokenVault`, the contract every
-asset already flows through (a separate write-only `L2AssetTracker` system contract existed in unreleased
-v31 code and was removed). Apart from `bridgedOut`, this is write-mostly data: correctness of transfers is
+asset already flows through (the separate write-only `L2AssetTracker` system contract that v31 shipped was
+removed). Apart from `bridgedOut`, this is write-mostly data: correctness of transfers is
 guaranteed by ZK proofs (plus 2FA on ZKsync OS chains), not by these balances, and the mappings may be
 removed later (do not rely on them). The vault's own `DEPRECATED_chainBalance` and the removed
-`AssetTrackerBase` / `L1AssetTracker` / `GWAssetTracker` (cross-chain token-balance migration) are gone;
-the `0x1000f` (L2AssetTracker) and `0x10010` (GWAssetTracker) addresses stay reserved, the latter keeping
-its empty compatibility stub because pre-v31 chains did deploy code there.
+`AssetTrackerBase` / `L1AssetTracker` / `GWAssetTracker` (cross-chain token-balance migration) are gone.
+v31 released with the `L2AssetTracker` (`0x1000f`) and `GWAssetTracker` (`0x10010`) deployed as
+system-proxied built-ins on every ZKsync OS chain, so the v32 upgrade swaps both proxies'
+implementations for `EmptyContract` (see {protocol-docs/chain-lifecycle.md}); chains created on v32
+receive the same EmptyContract-backed proxies from genesis, keeping fresh and upgraded chains
+identical at the reserved addresses.
 
 ### `L2NativeTokenVault`
 
@@ -232,30 +240,41 @@ its empty compatibility stub because pre-v31 chains did deploy code there.
   `MAX_TOKEN_BALANCE - L2AssetTracker.chainBalance`; unlike the raw vault balance it is unaffected by
   later direct token donations. The mapping and both handlers live in `NativeTokenVaultBase` (shared with
   `L1NativeTokenVault`); the field takes a slot from the base storage gap, which no deployed vault ever
-  wrote, so already-deployed layouts are preserved.
-- `interopInfo[assetId]` (`totalWithdrawalsToL1`, `totalSuccessfulDepositsFromL1`) is the L2-side
-  accounting used to compute the amount to keep on L1 during the L1 -> Gateway migration. A flow is only
-  counted when the counterpart chain is L1 _and_ the chain currently settles on L1; `totalWithdrawalsToL1`
-  is consumed once during that migration and must stay append-only. The base token's counters live here
-  too, under `BASE_TOKEN_ASSET_ID`, reported by the `BaseTokenHolder` (below). For the base token, failed
-  deposits are refunded on L2 to the `refundRecipient` rather than claimed on L1, so the gap between
-  initiated deposits and this counter is not uniformly "claimable on L1" across asset types.
-- `preTrackingTotalSupply[assetId]` records the token's net inbound flow — total successful deposits
-  minus total successful withdrawals — accumulated before this bookkeeping existed. For a bridged token
-  that is exactly its pre-tracking `totalSupply()`; native tokens offset the same net flow by
-  `type(uint256).max` (the removed tracker's infinite-deposit convention): `2^256 - 1 - bridgedOut`.
-  Newly registered tokens start at the zero-flow baseline (`0` bridged, `max` native).
-- `isAssetTracked[assetId]` guards the one-time initialization of the two fields above for a legacy
+  wrote, so already-deployed layouts are preserved. `isAssetTracked` lives there too, doubling on L1
+  as the `populateBridgedOut` once-marker.
+- `assetBookkeeping[assetId]` (one `L2AssetBookkeepingInfo` struct per asset) is the L2-side accounting
+  used to compute the amount to keep on L1 during the L1 -> Gateway migration:
+  - `totalWithdrawalsToL1` / `totalSuccessfulDepositsFromL1`: a flow is only counted when the counterpart
+    chain is L1 _and_ the chain currently settles on L1; `totalWithdrawalsToL1` is consumed once during
+    that migration and must stay append-only. The base token's counters live here too, under
+    `BASE_TOKEN_ASSET_ID`, reported by the `BaseTokenHolder` (below). For the base token, failed deposits
+    are refunded on L2 to the `refundRecipient` rather than claimed on L1, so the gap between initiated
+    deposits and this counter is not uniformly "claimable on L1" across asset types.
+  - `preTrackingTotalSupply` (meaningful once `isAssetTracked` is set — on L2 every tracking writer
+    records the baseline in the same call) is the same net inbound flow — total
+    successful deposits minus total successful withdrawals — accumulated before the tracking started,
+    which is why the fields share one struct. For a bridged token (the base token included) that is
+    exactly its pre-tracking `totalSupply()`; native tokens offset the same net flow by
+    `type(uint256).max` (the removed tracker's infinite-deposit convention): `2^256 - 1 - bridgedOut`.
+    Newly registered tokens start at the zero-flow baseline (`0` bridged, `max` native).
+- `isAssetTracked[assetId]` guards the one-time initialization of the fields above for a legacy
   L2-native token: its outstanding amount is seeded from the vault's current escrow (indistinguishable
   direct donations are conservatively treated as escrow, since they are effectively frozen). Seeding
   happens lazily on the token's first touch — before the operation changes any supply or escrow — or
   eagerly by anyone via `trackLegacyToken`; it is idempotent, newly registered tokens are marked tracked
-  immediately, and `trackLegacyToken` rejects the base token, which has no vault escrow to seed.
+  immediately, and `trackLegacyToken` rejects the base token.
+- The base token's baseline is recorded by `trackBaseToken` (upgrader-only, idempotent), which the
+  upgrade/genesis init helper calls on both paths: its `totalSupply()` at that moment — the pre-upgrade
+  supply on an upgraded chain, zero at genesis — is the pre-tracking net inbound flow, and every later
+  holder-observed contract-level flow is reported into the same struct's counters (ZKsync OS
+  bootloader-minted deposits bypass the holder, so the deposit counter stays non-exhaustive there —
+  see the next paragraph). Tracking it from any later moment would fold
+  already-recorded flows into the baseline, which is why `trackLegacyToken` cannot be used instead.
 
 ### `BaseTokenHolder` (base token)
 
 The holder escrows the base token, so its contract-level bridge flows converge here; each one is reported
-to the vault, which records it under `BASE_TOKEN_ASSET_ID` in the same `interopInfo` used for every other
+to the vault, which records it under `BASE_TOKEN_ASSET_ID` in the same `assetBookkeeping` used for every other
 asset (`recordBaseTokenBridgingToChain` / `recordBaseTokenBridgingFromChain`, holder-only).
 `burnAndStartBridging` reports outbound flows and `give` reports inbound interop flows before the external
 transfer. Bootloader-minted L1 deposits are reported through `recordBaseTokenDeposit` only where the mint
@@ -263,9 +282,9 @@ is a contract call (`L2BaseTokenEra.mint`); on ZKsync OS the VM credits deposits
 balance directly, so the base token's `totalSuccessfulDepositsFromL1` counter is **not exhaustive** there.
 
 - The pre-v31 total supply of an upgraded ZKsync OS chain lives in `L2BaseTokenZKOS.zkosPreV31TotalSupply`,
-  populated while the chain ran draft-v31 (via the since-removed backfill service transaction). This
+  populated while the chain ran v31 (via the since-removed backfill service transaction). This
   release has no backfill path: the v32 upgrade of a ZKsync OS chain is forbidden on L1
-  (`V32UpgradeZKsyncOS`) unless `baseTokenHasTotalSupply` was set by the draft-v31 backfill
+  (`V32UpgradeZKsyncOS`) unless `baseTokenHasTotalSupply` was set by the v31 backfill
   _and_ the backfill's L2 execution is proven — a `PriorityOpLowerBound` registry permissionlessly pins a
   priority-op count observed after the flag was set, and the upgrade requires all ops below it to be
   processed. So `totalSupply()` is always available on upgraded chains; fresh chains have no pre-v31
