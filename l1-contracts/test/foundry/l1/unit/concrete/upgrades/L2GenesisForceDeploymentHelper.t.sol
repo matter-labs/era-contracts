@@ -250,6 +250,11 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             _expectedBaseline,
             "the baseline must be snapshotted after the base token is initialized"
         );
+        assertEq(
+            MockContract(payable(L2_NATIVE_TOKEN_VAULT_ADDR)).recordedAssetIdAtCall(),
+            keccak256("baseTokenAsset"),
+            "the vault's base-token asset id must be initialized before the baseline is recorded"
+        );
     }
 
     /// @dev Neither built-in seeded: the tree has no leaves and the manager no L1 chain id.
@@ -485,6 +490,8 @@ contract MockSystemContractProxyAdmin {
 contract MockContract {
     uint256 public trackBaseTokenCalls;
     uint256 public recordedBaselineAtCall;
+    bytes32 public recordedAssetIdAtCall;
+    bytes32 public baseTokenAssetIdStored;
     bool public baseTokenInitialized;
     uint256 internal mockSupply;
 
@@ -494,9 +501,12 @@ contract MockContract {
     /// @dev Mirrors `L2NativeTokenVault.trackBaseToken`: snapshots the base token's totalSupply at
     /// call time, so the tests can assert the helper's ordering (the snapshot is only meaningful
     /// after the base token's own `initL2`).
+    /// @dev The real vault keys the snapshot by its stored `BASE_TOKEN_ASSET_ID`, so the recorded
+    /// asset id proves the vault's own init ran before the tracking call.
     function trackBaseToken() external {
         trackBaseTokenCalls++;
         recordedBaselineAtCall = MockContract(payable(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)).totalSupply();
+        recordedAssetIdAtCall = baseTokenAssetIdStored;
     }
 
     /// @dev Pre-initialized supply reads as a huge placeholder (mirroring ZKsync OS, where
@@ -534,9 +544,25 @@ contract MockContract {
         bytes32,
         address,
         address,
-        TokenBridgingData calldata,
+        TokenBridgingData calldata _baseTokenBridgingData,
         TokenMetadata calldata
-    ) external {}
+    ) external {
+        baseTokenAssetIdStored = _baseTokenBridgingData.assetId;
+    }
+
+    // L2NativeTokenVaultZKOS.initL2
+    function initL2(
+        uint256,
+        address,
+        bytes32,
+        address,
+        address,
+        address,
+        TokenBridgingData calldata _baseTokenBridgingData,
+        TokenMetadata calldata
+    ) external {
+        baseTokenAssetIdStored = _baseTokenBridgingData.assetId;
+    }
 
     // L2ChainAssetHandler.updateL2
     function updateL2(uint256, address) external {}

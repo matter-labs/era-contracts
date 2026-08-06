@@ -522,6 +522,39 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
         IL2AssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeRecoverFailedTransfer(L1_CHAIN_ID, assetId, data);
     }
 
+    /// @notice The permitted recovery branch, end to end on the real vault: a failed L2 -> L2
+    /// bridge-out of an L2-native token returns the escrow to the depositor, re-credits
+    /// `bridgedOut`, and leaves the flow counters untouched.
+    function test_bridgeRecoverFailedTransfer_nativeToken_returnsEscrowAndRecreditsBridgedOut() public {
+        _setCurrentSettlementLayer(L1_CHAIN_ID);
+        address depositor = makeAddr("depositor");
+        uint256 amount = 5 ether;
+        uint256 otherL2ChainId = 505;
+        (TestnetERC20Token token, bytes32 assetId) = _deployAndRegisterNativeToken(depositor, amount);
+
+        vm.prank(depositor);
+        token.approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount);
+        _bridgeBurnErc20(otherL2ChainId, assetId, depositor, amount);
+        assertEq(_ntv().bridgedOut(assetId), amount, "the burn must escrow the full amount");
+        assertEq(token.balanceOf(depositor), 0, "the depositor's tokens must be escrowed");
+
+        bytes memory data = DataEncoding.encodeBridgeMintData({
+            _originalCaller: depositor,
+            _remoteReceiver: makeAddr("remoteReceiver"),
+            _originToken: address(token),
+            _amount: amount,
+            _erc20Metadata: ""
+        });
+        vm.prank(L2_ASSET_ROUTER_ADDR);
+        IL2AssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeRecoverFailedTransfer(otherL2ChainId, assetId, data);
+
+        assertEq(token.balanceOf(depositor), amount, "the depositor must be refunded in full");
+        assertEq(token.balanceOf(L2_NATIVE_TOKEN_VAULT_ADDR), 0, "the vault escrow must be released");
+        assertEq(_ntv().bridgedOut(assetId), 0, "the recovery must re-credit bridgedOut");
+        assertEq(_readTotalWithdrawalsToL1(assetId), 0, "an L2-destined round trip must not touch the L1 counters");
+        assertEq(_readTotalSuccessfulDepositsFromL1(assetId), 0, "no L1 deposit was involved");
+    }
+
     /// @notice The chain-native check of the recovery gate must come from the REAL vault branch:
     /// a base token whose origin is this chain has no `bridgedOut` escrow to re-credit, so its
     /// recovery is rejected even for an L2 destination.

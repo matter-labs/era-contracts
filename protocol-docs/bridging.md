@@ -195,7 +195,10 @@ as the populate-once flag — stays unset; there is nothing to fold in for them,
   force-sent funds (refund recipient, selfdestruct on ZK OS) skew the `totalSupply()` view but never the
   flow counters; the base token's `preTrackingTotalSupply` baseline is a one-time `totalSupply()`
   snapshot taken at the upgrade/genesis (`trackBaseToken`), so it deliberately inherits whatever skew
-  the view carries at that moment — the same trade-off as reading `totalSupply()` directly.
+  the view carries at that moment — the same trade-off as reading `totalSupply()` directly. On ZKsync OS
+  the view saturates at zero when force-sent value pushes the holder's balance above everything it was
+  ever credited — a revert there would let one force-sent wei brick every `totalSupply()` consumer,
+  the v32 upgrade's mandatory baseline recording included.
   - The operator must keep the base-token total supply below `2^127`, otherwise the holder's balance
     could underflow; overflow is impossible since users can only gain what the holder loses.
   - On ZKsync OS the holder's initial balance is minted by `L2BaseTokenZKOS.initL2()` via a raw call to

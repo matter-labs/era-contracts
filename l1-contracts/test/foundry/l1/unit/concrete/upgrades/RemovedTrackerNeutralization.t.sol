@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 
 import {SystemContractsProcessing} from "deploy-scripts/upgrade/SystemContractsProcessing.s.sol";
 import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
@@ -14,6 +14,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
 import {
     L2_COMPLEX_UPGRADER_ADDR,
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR,
     L2_REMOVED_ASSET_TRACKER_ADDR,
     L2_REMOVED_GW_ASSET_TRACKER_ADDR,
@@ -34,6 +35,33 @@ contract NoopUpgradeDelegate {
     function noop() external {}
 }
 
+/// @dev Faithful stand-in for the ZKsync OS contract deployer: materializes the bytecode a force
+/// deployment actually requests (keyed by the entry's observable code hash), so the fresh
+/// implementation-deployment branch of `updateZKsyncOSContract` is exercised for real instead of
+/// being bypassed with pre-etched code.
+contract FaithfulZKOSDeployer {
+    address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+
+    mapping(bytes32 observableHash => bytes bytecode) internal registered;
+    bytes internal defaultBytecode;
+
+    function register(bytes calldata _bytecode) external {
+        registered[keccak256(_bytecode)] = _bytecode;
+    }
+
+    function setDefaultBytecode(bytes calldata _bytecode) external {
+        defaultBytecode = _bytecode;
+    }
+
+    function setBytecodeDetailsEVM(address _addr, bytes32, uint32, bytes32 _observableHash) external {
+        bytes memory bytecode = registered[_observableHash];
+        if (bytecode.length == 0) {
+            bytecode = defaultBytecode;
+        }
+        Vm(VM_ADDRESS).etch(_addr, bytecode);
+    }
+}
+
 /// @notice Exercises the actual proxy transition of the removed-tracker neutralizations: starting
 /// from a v31-like state (real `SystemContractProxy` at both reserved addresses, pointing at a
 /// live tracker implementation), the production force-deployment entries are executed through the
@@ -47,8 +75,10 @@ contract RemovedTrackerNeutralizationTest is Test {
 
     function setUp() public {
         // Real ComplexUpgrader and proxy admin, wired exactly like production: the upgrader owns
-        // the admin, so the dispatcher's proxy swaps run with the production caller.
+        // the admin, so the dispatcher's proxy swaps run with the production caller. The deployer
+        // materializes exactly the bytecode each entry requests.
         vm.etch(L2_COMPLEX_UPGRADER_ADDR, address(new L2ComplexUpgrader()).code);
+        vm.etch(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, address(new FaithfulZKOSDeployer()).code);
         vm.etch(
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
             BytecodeUtils.readDeployedBytecodeL1(true, "SystemContractProxyAdmin.sol", "SystemContractProxyAdmin")
@@ -85,38 +115,60 @@ contract RemovedTrackerNeutralizationTest is Test {
     }
 
     function test_neutralizationSwitchesLiveTrackerProxiesToEmptyContract() public {
+        // The COMPLETE production list, dispatched in production order: the neutralizations sit at
+        // the tail, so a dispatcher (or list builder) that stopped at the former entry count would
+        // fail the per-proxy assertions below.
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = SystemContractsProcessing
+            .getBaseZKsyncOSForceDeployments();
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory neutralizations = SystemContractsProcessing
             .getRemovedTrackerNeutralizations();
         assertEq(neutralizations.length, 2, "both removed trackers must be neutralized");
+        for (uint256 i = 0; i < neutralizations.length; ++i) {
+            assertEq(
+                deployments[deployments.length - neutralizations.length + i].newAddress,
+                neutralizations[i].newAddress,
+                "the neutralizations must sit at the tail of the production list"
+            );
+        }
 
-        // The upgrade ships the EmptyContract preimage as a factory dep; the sequencer materializes
-        // it at the derived implementation address. Model exactly that so `conductContractUpgrade`
-        // takes its verify-codehash branch (the etched code hash must match the entry's info).
         bytes memory emptyContractBytecode = BytecodeUtils.readDeployedBytecodeL1(
             true,
             "EmptyContract.sol",
             "EmptyContract"
         );
 
+        // The deployer materializes each entry's requested bytecode: the real proxy for fresh
+        // proxies, EmptyContract wherever an entry's implementation info asks for it, and an inert
+        // placeholder implementation for the other (never-called-here) core contracts.
+        FaithfulZKOSDeployer deployer = FaithfulZKOSDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
+        deployer.register(emptyContractBytecode);
+        deployer.register(BytecodeUtils.readDeployedBytecodeL1(true, "SystemContractProxy.sol", "SystemContractProxy"));
+        deployer.setDefaultBytecode(emptyContractBytecode);
+
+        // The derived EmptyContract implementation addresses start EMPTY: the dispatcher itself
+        // must ask the deployer to materialize them (the fresh-deployment branch).
         address[] memory derivedImpls = new address[](neutralizations.length);
         for (uint256 i = 0; i < neutralizations.length; ++i) {
             (bytes memory implInfo, ) = abi.decode(neutralizations[i].deployedBytecodeInfo, (bytes, bytes));
             derivedImpls[i] = L2GenesisForceDeploymentsHelper.generateRandomAddress(implInfo);
-            vm.etch(derivedImpls[i], emptyContractBytecode);
+            assertEq(derivedImpls[i].code.length, 0, "the implementation must not pre-exist");
         }
 
-        // The real production dispatcher applies every entry: a dispatcher that dropped the
-        // trailing neutralization entries would fail the per-proxy assertions below.
         NoopUpgradeDelegate delegate = new NoopUpgradeDelegate();
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
         L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).forceDeployAndUpgradeUniversal(
-            neutralizations,
+            deployments,
             address(delegate),
             abi.encodeCall(NoopUpgradeDelegate.noop, ())
         );
 
         for (uint256 i = 0; i < neutralizations.length; ++i) {
             address proxyAddr = neutralizations[i].newAddress;
+            assertEq(
+                keccak256(derivedImpls[i].code),
+                keccak256(emptyContractBytecode),
+                "the dispatcher must have materialized the EmptyContract implementation"
+            );
             assertEq(
                 address(uint160(uint256(vm.load(proxyAddr, IMPLEMENTATION_SLOT)))),
                 derivedImpls[i],

@@ -54,7 +54,7 @@ contract MockRecordingVault {
     }
 }
 
-/// @dev Harness exposing a setter for the slot that draft-v31's backfill service transaction
+/// @dev Harness exposing a setter for the slot that v31's backfill service transaction
 /// (removed in this release) used to write, so an upgraded chain's pre-populated state can be
 /// simulated without storage cheatcodes.
 contract L2BaseTokenZKOSHarness is L2BaseTokenZKOS {
@@ -563,6 +563,25 @@ contract L2BaseTokenZKOSTest is Test {
                         totalSupply() TESTS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Regression: force-sent value (a deposit refund targeted at the holder, direct VM
+    /// credits) can push the holder's balance above everything it was ever credited. `totalSupply`
+    /// must saturate at zero instead of underflowing — a revert would let one force-sent wei brick
+    /// every consumer, the v32 upgrade's mandatory `trackBaseToken` snapshot included.
+    function test_totalSupply_saturatesAtZeroOnForceSentExcess() public {
+        L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
+        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
+
+        // A fresh chain (no pre-v31 supply, nothing minted) whose holder was force-sent one wei.
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, hex"00");
+        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE + 1);
+
+        assertEq(
+            L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).totalSupply(),
+            0,
+            "an over-credited holder must read as zero circulating supply, not revert"
+        );
+    }
+
     function test_totalSupply_zeroForFreshChain() public {
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
@@ -580,7 +599,7 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     /// @dev Simulates an upgraded chain whose `zkosPreV31TotalSupply` slot was backfilled while it
-    /// ran draft-v31, plus post-upgrade mints (a holder balance below the initial value means
+    /// ran v31, plus post-upgrade mints (a holder balance below the initial value means
     /// minted supply).
     function test_totalSupply_addsPreV31SupplyToMintedDelta() public {
         L2BaseTokenZKOSHarness harness = new L2BaseTokenZKOSHarness();
@@ -624,7 +643,7 @@ contract L2BaseTokenZKOSTest is Test {
         assertEq(token.totalSupply(), 50, "net-burn state should decrease totalSupply without reverting");
     }
 
-    /// @dev Simulates a draft-v31 chain (slot 50 already backfilled) going through this release's
+    /// @dev Simulates a v31 chain (slot 50 already backfilled) going through this release's
     /// initL2: the historical value must survive and feed totalSupply().
     function test_initL2_preservesBackfilledPreV31Supply() public {
         L2BaseTokenZKOSHarness harness = new L2BaseTokenZKOSHarness();
@@ -642,7 +661,7 @@ contract L2BaseTokenZKOSTest is Test {
         assertEq(token.totalSupply(), 200, "totalSupply must keep the pre-v31 baseline after initL2");
     }
 
-    /// @dev Pins `zkosPreV31TotalSupply` to storage slot 50: the value is written by draft-v31's
+    /// @dev Pins `zkosPreV31TotalSupply` to storage slot 50: the value is written by v31's
     /// backfill service transaction, and this release (which removes the backfill path) must keep
     /// reading the exact same slot. The write goes through a derived-contract setter, the read
     /// through the raw slot.
@@ -653,7 +672,7 @@ contract L2BaseTokenZKOSTest is Test {
         assertEq(
             uint256(vm.load(address(harness), bytes32(uint256(50)))),
             31337,
-            "zkosPreV31TotalSupply must stay at slot 50 (populated on draft-v31)"
+            "zkosPreV31TotalSupply must stay at slot 50 (populated on v31)"
         );
     }
 
