@@ -216,13 +216,15 @@ as the populate-once flag — stays unset; there is nothing to fold in for them,
 ## L2 asset bookkeeping
 
 The chain keeps a small amount of local token bookkeeping in the `L2NativeTokenVault`, the contract every
-asset already flows through (a separate write-only `L2AssetTracker` system contract existed in unreleased
-v31 code and was removed). Apart from `bridgedOut`, this is write-mostly data: correctness of transfers is
+asset already flows through (the separate write-only `L2AssetTracker` system contract that v31 shipped was
+removed). Apart from `bridgedOut`, this is write-mostly data: correctness of transfers is
 guaranteed by ZK proofs (plus 2FA on ZKsync OS chains), not by these balances, and the mappings may be
 removed later (do not rely on them). The vault's own `DEPRECATED_chainBalance` and the removed
-`AssetTrackerBase` / `L1AssetTracker` / `GWAssetTracker` (cross-chain token-balance migration) are gone;
-the `0x1000f` (L2AssetTracker) and `0x10010` (GWAssetTracker) addresses stay reserved, the latter keeping
-its empty compatibility stub because pre-v31 chains did deploy code there.
+`AssetTrackerBase` / `L1AssetTracker` / `GWAssetTracker` (cross-chain token-balance migration) are gone.
+v31 released with the `L2AssetTracker` (`0x1000f`) and `GWAssetTracker` (`0x10010`) deployed as
+system-proxied built-ins on every ZKsync OS chain, so the v32 upgrade swaps both proxies'
+implementations for `EmptyContract` (see {protocol-docs/chain-lifecycle.md}); chains created on v32
+leave both reserved addresses empty.
 
 ### `L2NativeTokenVault`
 

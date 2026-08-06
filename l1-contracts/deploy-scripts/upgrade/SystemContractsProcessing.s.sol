@@ -411,9 +411,13 @@ library SystemContractsProcessing {
         // getFixedAddressCoreContracts.) The L2V32Upgrade delegate target remains the only legitimate
         // ZKsyncOS unsafe force deployment (added in CTMUpgrade_v31); the PUVT guards that no other
         // unsafe force deployment is present.
-        // +2: the removed v31 trackers' proxies get their implementations swapped for EmptyContract
-        // (see getRemovedTrackerNeutralizations).
-        uint256 totalBase = fixedAddressCoreContracts.length + zksyncOSOnlyContracts.length + sysContracts.length + 2;
+        // The removed v31 trackers' proxies get their implementations swapped for EmptyContract.
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory neutralizations = getRemovedTrackerNeutralizations();
+
+        uint256 totalBase = fixedAddressCoreContracts.length +
+            zksyncOSOnlyContracts.length +
+            sysContracts.length +
+            neutralizations.length;
 
         deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](totalBase);
 
@@ -434,7 +438,6 @@ library SystemContractsProcessing {
             deployments[index++] = _buildZKsyncOSEntryForSystemContract(sysContracts[i]);
         }
 
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory neutralizations = getRemovedTrackerNeutralizations();
         for (uint256 i = 0; i < neutralizations.length; i++) {
             deployments[index++] = neutralizations[i];
         }

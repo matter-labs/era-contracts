@@ -93,6 +93,11 @@ library L2Utils {
         forceDeployL2L1Messenger(_args);
         forceDeployBaseTokenContracts(_args);
 
+        // Mirror `L2GenesisForceDeploymentsHelper`: genesis records the base token's baseline only
+        // after the base token itself is live (its `totalSupply()` is meaningless before that).
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).trackBaseToken();
+
         initializeBridgehub(_args);
     }
 
@@ -242,10 +247,6 @@ library L2Utils {
             TokenBridgingData({assetId: ethAssetId, originChainId: _args.l1ChainId, originToken: ETH_TOKEN_ADDRESS}),
             TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
         );
-
-        // Mirror `L2GenesisForceDeploymentsHelper`: genesis records the base token's baseline.
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        nativeTokenVault.trackBaseToken();
     }
 
     function forceDeployWithoutConstructor(string memory _contractName, address _address) public {
