@@ -28,6 +28,7 @@ import {
     ChainIdMismatch,
     IncorrectBridgeHubAddress,
     MsgValueMismatch,
+    Unauthorized,
     WrongMagicValue,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
@@ -50,6 +51,20 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// @notice The total number of ZK chains can be created/connected to this CTM.
     /// This is a temporary security measure.
     uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
+
+    /// @notice The interop center allowed to request L1->L2 transactions on behalf of its own callers.
+    /// @dev It is fully trusted with the original caller it passes: it can request a transaction as any
+    /// address, spending that address' base-token and bridge allowances. See
+    /// {protocol-docs/l1-interop-center.md#trusted-forwarding}.
+    address public interopCenter;
+
+    /// @notice Checks that the message sender is the interop center.
+    modifier onlyInteropCenter() {
+        if (msg.sender != interopCenter) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
 
     /// @notice to avoid parity hack
     constructor(address _owner, uint256 _maxNumberOfZKChains) reentrancyGuardInitializer {
@@ -153,6 +168,23 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+        canonicalTxHash = _requestL2TransactionDirect(msg.sender, _request);
+    }
+
+    /// @inheritdoc IL1Bridgehub
+    function requestL2TransactionDirectFor(
+        address _originalCaller,
+        L2TransactionRequestDirect calldata _request
+    ) external payable override onlyInteropCenter nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+        canonicalTxHash = _requestL2TransactionDirect(_originalCaller, _request);
+    }
+
+    /// @param _originalCaller The account the request is made on behalf of: it provides the base token and
+    /// becomes the sender of the L1->L2 transaction.
+    function _requestL2TransactionDirect(
+        address _originalCaller,
+        L2TransactionRequestDirect calldata _request
+    ) internal returns (bytes32 canonicalTxHash) {
         // Note: If the ZK chain with corresponding `chainId` is not yet created,
         // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
         {
@@ -171,16 +203,17 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             IAssetRouterShared(address(assetRouter)).bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
                 tokenAssetId,
-                msg.sender,
+                _originalCaller,
                 _request.mintValue
             );
         }
 
         canonicalTxHash = _sendRequest(
             _request.chainId,
+            _originalCaller,
             _request.refundRecipient,
             BridgehubL2TransactionRequest({
-                sender: msg.sender,
+                sender: _originalCaller,
                 contractL2: _request.l2Contract,
                 mintValue: _request.mintValue,
                 l2Value: _request.l2Value,
@@ -207,6 +240,23 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable override nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+        canonicalTxHash = _requestL2TransactionTwoBridges(msg.sender, _request);
+    }
+
+    /// @inheritdoc IL1Bridgehub
+    function requestL2TransactionTwoBridgesFor(
+        address _originalCaller,
+        L2TransactionRequestTwoBridgesOuter calldata _request
+    ) external payable override onlyInteropCenter nonReentrant whenNotPaused returns (bytes32 canonicalTxHash) {
+        canonicalTxHash = _requestL2TransactionTwoBridges(_originalCaller, _request);
+    }
+
+    /// @param _originalCaller The account the request is made on behalf of: it provides the base token and is
+    /// passed to the second bridge as the depositor.
+    function _requestL2TransactionTwoBridges(
+        address _originalCaller,
+        L2TransactionRequestTwoBridgesOuter calldata _request
+    ) internal returns (bytes32 canonicalTxHash) {
         if (_request.secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
             revert SecondBridgeAddressTooLow(_request.secondBridgeAddress, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS);
         }
@@ -230,7 +280,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             IAssetRouterShared(address(assetRouter)).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
                 tokenAssetId,
-                msg.sender,
+                _originalCaller,
                 _request.mintValue
             );
         }
@@ -239,7 +289,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         L2TransactionRequestTwoBridgesInner memory outputRequest = IL1CrossChainSender(_request.secondBridgeAddress)
             .bridgehubDeposit{value: _request.secondBridgeValue}(
             _request.chainId,
-            msg.sender,
+            _originalCaller,
             _request.l2Value,
             _request.secondBridgeCalldata
         );
@@ -250,6 +300,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
 
         canonicalTxHash = _sendRequest(
             _request.chainId,
+            _originalCaller,
             _request.refundRecipient,
             BridgehubL2TransactionRequest({
                 sender: _request.secondBridgeAddress,
@@ -269,6 +320,15 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             outputRequest.txDataHash,
             canonicalTxHash
         );
+    }
+
+    /// @inheritdoc IL1Bridgehub
+    function setInteropCenter(address _interopCenter) external onlyOwnerOrUpgrader {
+        if (_interopCenter == address(0)) {
+            revert ZeroAddress();
+        }
+        interopCenter = _interopCenter;
+        emit InteropCenterSet(_interopCenter);
     }
 
     /// @notice Sets contract addresses

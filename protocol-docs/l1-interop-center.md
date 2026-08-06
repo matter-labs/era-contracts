@@ -11,10 +11,10 @@ keep working once the request flow itself moves into the interop center.
 
 ## Message shape
 
-| Message                       | Relayed to                                   |
-| ----------------------------- | -------------------------------------------- |
-| no `indirectCall` attribute   | `L1Bridgehub.requestL2TransactionDirect`     |
-| with `indirectCall` attribute | `L1Bridgehub.requestL2TransactionTwoBridges` |
+| Message                       | Relayed to                                      |
+| ----------------------------- | ----------------------------------------------- |
+| no `indirectCall` attribute   | `L1Bridgehub.requestL2TransactionDirectFor`     |
+| with `indirectCall` attribute | `L1Bridgehub.requestL2TransactionTwoBridgesFor` |
 
 The recipient is an ERC-7930 address: its chain reference selects the destination chain, and its address
 part is the contract called on the destination chain (direct calls) or the L1 cross-chain sender that
@@ -29,30 +29,32 @@ carry explicitly come from attributes instead:
 - `factoryDeps(deps)` — direct calls only; for indirect calls the cross-chain sender supplies them.
 
 `sendMessage` returns the canonical priority-transaction hash as its `sendId`, and the whole `msg.value` is
-forwarded to the Bridgehub, which enforces the base-token value rules. For a chain whose base token is an
-ERC20, the native token vault pulls `mintValue` from the Bridgehub's caller — the interop center — so the
-sender approves the interop center for `mintValue` and it forwards that allowance to the vault.
+forwarded to the Bridgehub, which enforces the base-token value rules.
 
-## The message sender on the destination chain
+## Trusted forwarding
 
-The Bridgehub records its own caller as the sender of the L1→L2 transaction, so a relayed request arrives
-on the destination chain from the interop center's alias rather than the alias of the account that called
-`sendMessage`. The fee refund is unaffected: the interop center resolves an omitted `refundRecipient` to
-its own caller before relaying, instead of letting the Bridgehub default it to the interop center itself.
+The Bridgehub would otherwise record its own caller — the interop center — as the account behind the
+request: the L1→L2 transaction would arrive from the interop center's alias, the base token would be taken
+from the interop center, and a cross-chain sender would attribute the deposit to it, leaving the depositor
+unable to recover a failed deposit.
 
-Callers that need the destination chain to see the original sender must keep using the Bridgehub entry
-points directly. Preserving the sender through the interop center requires the request to be issued by the
-interop center itself, which in turn requires the Mailbox and the cross-chain senders to authorize it —
-that is the migration this contract deliberately avoids.
+To avoid that, the Bridgehub keeps the address of one interop center (`interopCenter`, set by the owner or
+the upgrader) and exposes `requestL2TransactionDirectFor` / `requestL2TransactionTwoBridgesFor`, which take
+the account the request is made for and are callable only by it. The interop center passes its own
+`msg.sender` and nothing else, so a relayed request is indistinguishable from one the sender made directly:
+the base token comes from their allowance, they are the sender of the L1→L2 transaction, the fee refund
+defaults to them, and an indirect call reaches the cross-chain sender with them as the depositor.
+
+The interop center is therefore fully trusted with the identity it forwards: it could request a transaction
+as any address and spend that address' base-token and bridge allowances. That is why the address is a single
+governance-set slot rather than an open registration, and why the interop center itself holds no state,
+has no owner and no upgrade path — its only behavior is to forward its own caller. The existing entry
+points are unchanged and remain the way to request a transaction without involving the interop center at
+all; pausing the Bridgehub pauses both.
 
 ## Indirect calls
 
-A cross-chain sender is called by the Bridgehub with the Bridgehub's caller as the original caller, so a
-relayed indirect call is attributed to the interop center. For the asset router this would mean the
-interop center — not the user — is recorded as the depositor and would be the only account able to recover
-a failed deposit, so indirect calls whose recipient is the asset router are rejected
-(`IndirectCallToAssetRouterMustUseBridgehub`): asset deposits keep using the Bridgehub.
-
-Cross-chain senders that do not depend on the caller's identity (for example the chain-registration sender)
-work through the interop center. Senders that authorize the original caller (for example the CTM deployment
-tracker, which requires its owner) do not, for the same reason as above.
+Indirect calls behave exactly as they do when the Bridgehub is called directly, including asset-router
+deposits: the depositor recorded on L1 is the account that called `sendMessage`. Cross-chain senders that
+authorize their caller (for example the CTM deployment tracker, which requires its owner) keep working when
+that owner is the one sending the message.

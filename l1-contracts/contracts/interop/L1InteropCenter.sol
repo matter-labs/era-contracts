@@ -2,18 +2,11 @@
 
 pragma solidity 0.8.28;
 
-import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
-
-import {ETH_TOKEN_ADDRESS, SUPPORTED_L1_INTEROP_ATTRIBUTES} from "../common/Config.sol";
+import {SUPPORTED_L1_INTEROP_ATTRIBUTES} from "../common/Config.sol";
 import {ChainIdNotRegistered, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
-import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "../core/bridgehub/IBridgehubBase.sol";
 
@@ -24,7 +17,6 @@ import {IL1InteropCenter, L1MessageAttributes} from "./IL1InteropCenter.sol";
 import {
     AttributeAlreadySet,
     FactoryDepsNotAllowedForIndirectCall,
-    IndirectCallToAssetRouterMustUseBridgehub,
     L1ToL2TransactionParamsMissing
 } from "./InteropErrors.sol";
 
@@ -36,18 +28,12 @@ import {
 /// and unchanged; this contract is an additional, permissionless entry point in front of them.
 /// See {protocol-docs/l1-interop-center.md}.
 contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard {
-    using SafeERC20 for IERC20;
-
     /// @inheritdoc IL1InteropCenter
     IL1Bridgehub public immutable override BRIDGE_HUB;
-
-    /// @dev The asset id of ETH on this chain, used to tell base-token value from base-token allowance.
-    bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
     constructor(IL1Bridgehub _bridgehub) reentrancyGuardInitializer {
         require(address(_bridgehub) != address(0), ZeroAddress());
         BRIDGE_HUB = _bridgehub;
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -73,9 +59,6 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard {
         require(BRIDGE_HUB.getZKChain(destinationChainId) != address(0), ChainIdNotRegistered(destinationChainId));
 
         L1MessageAttributes memory attributes = parseL1Attributes(_attributes);
-
-        // The base token is pulled by the Bridgehub from its caller, i.e. from this contract.
-        _forwardBaseTokenAllowance(destinationChainId, attributes.mintValue);
 
         if (attributes.indirectCall) {
             sendId = _relayIndirectRequest(destinationChainId, recipientAddress, _payload, attributes);
@@ -107,14 +90,17 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard {
                             Relaying
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Relays a direct call, mapping the message onto the Bridgehub's direct request.
+    /// @dev Relays a direct call, mapping the message onto the Bridgehub's direct request. The Bridgehub is
+    /// told which account the request is made for, so the message sender provides the base token and becomes
+    /// the sender of the L1->L2 transaction.
     function _relayDirectRequest(
         uint256 _destinationChainId,
         address _l2Contract,
         bytes calldata _payload,
         L1MessageAttributes memory _attributes
     ) private returns (bytes32 canonicalTxHash) {
-        canonicalTxHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(
+        canonicalTxHash = BRIDGE_HUB.requestL2TransactionDirectFor{value: msg.value}(
+            msg.sender,
             L2TransactionRequestDirect({
                 chainId: _destinationChainId,
                 mintValue: _attributes.mintValue,
@@ -124,16 +110,13 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard {
                 l2GasLimit: _attributes.l2GasLimit,
                 l2GasPerPubdataByteLimit: _attributes.l2GasPerPubdataByteLimit,
                 factoryDeps: _attributes.factoryDeps,
-                refundRecipient: _resolvedRefundRecipient(_attributes.refundRecipient)
+                refundRecipient: _attributes.refundRecipient
             })
         );
     }
 
-    /// @dev Relays an indirect call, mapping the message onto the Bridgehub's two-bridges request.
-    /// @dev The cross-chain sender is called by the Bridgehub with this contract as the original caller, so it
-    /// attributes the deposit to this contract instead of the message sender. Deposits through the asset router
-    /// are therefore rejected: they must be initiated on the Bridgehub, so that the depositor stays the one who
-    /// can recover a failed deposit. See {protocol-docs/l1-interop-center.md#indirect-calls}.
+    /// @dev Relays an indirect call, mapping the message onto the Bridgehub's two-bridges request. The message
+    /// sender is passed on to the cross-chain sender as the depositor, so deposits stay recoverable by them.
     function _relayIndirectRequest(
         uint256 _destinationChainId,
         address _crossChainSender,
@@ -141,49 +124,21 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard {
         L1MessageAttributes memory _attributes
     ) private returns (bytes32 canonicalTxHash) {
         require(_attributes.factoryDeps.length == 0, FactoryDepsNotAllowedForIndirectCall());
-        require(
-            _crossChainSender != address(BRIDGE_HUB.assetRouter()),
-            IndirectCallToAssetRouterMustUseBridgehub(_crossChainSender)
-        );
 
-        canonicalTxHash = BRIDGE_HUB.requestL2TransactionTwoBridges{value: msg.value}(
+        canonicalTxHash = BRIDGE_HUB.requestL2TransactionTwoBridgesFor{value: msg.value}(
+            msg.sender,
             L2TransactionRequestTwoBridgesOuter({
                 chainId: _destinationChainId,
                 mintValue: _attributes.mintValue,
                 l2Value: _attributes.interopCallValue,
                 l2GasLimit: _attributes.l2GasLimit,
                 l2GasPerPubdataByteLimit: _attributes.l2GasPerPubdataByteLimit,
-                refundRecipient: _resolvedRefundRecipient(_attributes.refundRecipient),
+                refundRecipient: _attributes.refundRecipient,
                 secondBridgeAddress: _crossChainSender,
                 secondBridgeValue: _attributes.indirectCallMessageValue,
                 secondBridgeCalldata: _payload
             })
         );
-    }
-
-    /// @dev Resolves the refund recipient here rather than letting the Bridgehub default it: the Bridgehub would
-    /// default it to its caller, which is this contract, and the refund would be stranded on its L2 alias.
-    function _resolvedRefundRecipient(address _refundRecipient) private view returns (address) {
-        return AddressAliasHelper.actualRefundRecipient(_refundRecipient, msg.sender);
-    }
-
-    /// @dev For a chain with an ERC20 base token the native token vault pulls `mintValue` from the Bridgehub's
-    /// caller, i.e. from this contract, so the sender approves this contract and it forwards the allowance.
-    /// The allowance is fully consumed by the request, which reverts as a whole if it is not.
-    function _forwardBaseTokenAllowance(uint256 _chainId, uint256 _mintValue) private {
-        if (_mintValue == 0) {
-            return;
-        }
-
-        bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
-        if (baseTokenAssetId == ETH_TOKEN_ASSET_ID) {
-            return;
-        }
-
-        INativeTokenVaultBase nativeTokenVault = IL1AssetRouter(address(BRIDGE_HUB.assetRouter())).nativeTokenVault();
-        IERC20 baseToken = IERC20(nativeTokenVault.tokenAddress(baseTokenAssetId));
-        baseToken.safeTransferFrom(msg.sender, address(this), _mintValue);
-        baseToken.forceApprove(address(nativeTokenVault), _mintValue);
     }
 
     /*//////////////////////////////////////////////////////////////

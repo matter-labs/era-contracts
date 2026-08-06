@@ -21,7 +21,6 @@ import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol
 import {
     AttributeAlreadySet,
     FactoryDepsNotAllowedForIndirectCall,
-    IndirectCallToAssetRouterMustUseBridgehub,
     L1ToL2TransactionParamsMissing
 } from "contracts/interop/InteropErrors.sol";
 
@@ -31,8 +30,8 @@ import {
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     TWO_BRIDGES_MAGIC_VALUE
 } from "contracts/common/Config.sol";
-import {ChainIdNotRegistered, MsgValueMismatch, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {ChainIdNotRegistered, MsgValueMismatch, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
@@ -127,6 +126,9 @@ contract L1InteropCenterRelayTest is L1ContractDeployer, ZKChainDeployer, TokenD
         }
 
         interopCenter = new L1InteropCenter(IL1Bridgehub(address(addresses.bridgehub)));
+        vm.prank(addresses.bridgehubOwnerAddress);
+        IL1Bridgehub(address(addresses.bridgehub)).setInteropCenter(address(interopCenter));
+
         user = makeAddr("USER");
 
         vm.txGasPrice(GAS_PRICE);
@@ -153,7 +155,7 @@ contract L1InteropCenterRelayTest is L1ContractDeployer, ZKChainDeployer, TokenD
         });
 
         vm.recordLogs();
-        vm.prank(user);
+        vm.prank(user, user);
         bytes32 sendId = interopCenter.sendMessage{value: mintValue}(
             InteroperableAddress.formatEvmV1(ethChainId, l2Contract),
             payload,
@@ -173,15 +175,11 @@ contract L1InteropCenterRelayTest is L1ContractDeployer, ZKChainDeployer, TokenD
         assertEq(user.balance, 0, "the whole msg.value should be forwarded");
         assertEq(address(interopCenter).balance, 0, "no ETH should be left in the interop center");
 
-        // The Bridgehub records its own caller as the sender, so the message arrives from the interop
-        // center's alias. See {protocol-docs/l1-interop-center.md#the-message-sender-on-the-destination-chain}.
-        assertEq(
-            address(uint160(request.transaction.from)),
-            AddressAliasHelper.applyL1ToL2Alias(address(interopCenter)),
-            "sender should be the interop center alias"
-        );
+        // The Bridgehub is told which account the request is made for, so the message arrives from the
+        // message sender and not from the relay. See {protocol-docs/l1-interop-center.md#trusted-forwarding}.
+        assertEq(address(uint160(request.transaction.from)), user, "sender should be the message sender");
 
-        // An omitted refundRecipient is resolved to the caller instead of being defaulted to the relay.
+        // An omitted refundRecipient defaults to the message sender, as for a direct Bridgehub call.
         assertEq(
             address(uint160(request.transaction.reserved[1])),
             user,
@@ -199,13 +197,57 @@ contract L1InteropCenterRelayTest is L1ContractDeployer, ZKChainDeployer, TokenD
         assertEq(value, l2Value, "event value mismatch");
     }
 
+    function test_sendMessage_directCall_producesTheSameRequestAsTheBridgehub() public {
+        uint256 l2Value = 1 ether;
+        uint256 mintValue = l2Value + _baseCost(ethChainId);
+        bytes memory payload = abi.encode("PAYLOAD");
+
+        L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect({
+            _chainId: ethChainId,
+            _mintValue: mintValue,
+            _l2Value: l2Value,
+            _l2GasLimit: L2_GAS_LIMIT,
+            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            _l2CallData: payload
+        });
+        // The mocker fills in a refund recipient; the message carries the same one as an attribute.
+        vm.deal(user, mintValue);
+
+        uint256 snapshot = vm.snapshotState();
+        vm.prank(user, user);
+        bytes32 directHash = IL1Bridgehub(address(addresses.bridgehub)).requestL2TransactionDirect{value: mintValue}(
+            request
+        );
+        vm.revertToState(snapshot);
+
+        // The mocked request carries factory dependencies, so the message carries them as an attribute.
+        bytes[] memory attributes = new bytes[](3);
+        attributes[0] = abi.encodeCall(
+            IERC7786Attributes.l1ToL2TransactionParams,
+            (mintValue, L2_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, request.refundRecipient)
+        );
+        attributes[1] = abi.encodeCall(IERC7786Attributes.interopCallValue, (l2Value));
+        attributes[2] = abi.encodeCall(IERC7786Attributes.factoryDeps, (request.factoryDeps));
+
+        vm.prank(user, user);
+        bytes32 relayedHash = interopCenter.sendMessage{value: mintValue}(
+            InteroperableAddress.formatEvmV1(ethChainId, request.l2Contract),
+            payload,
+            attributes
+        );
+
+        // Equal canonical hashes mean every field of the priority transaction matched, the sender and the
+        // refund recipient included. See {protocol-docs/l1-interop-center.md#trusted-forwarding}.
+        assertEq(relayedHash, directHash, "the relayed request should hash like the direct one");
+    }
+
     function test_sendMessage_directCall_erc20BaseToken() public {
         uint256 mintValue = _baseCost(erc20ChainId);
         address l2Contract = chainContracts[erc20ChainId];
 
         baseToken.mint(user, mintValue);
         vm.prank(user);
-        baseToken.approve(address(interopCenter), mintValue);
+        baseToken.approve(address(addresses.sharedBridge), mintValue);
 
         bytes[] memory attributes = _attributes({
             _mintValue: mintValue,
@@ -227,15 +269,9 @@ contract L1InteropCenterRelayTest is L1ContractDeployer, ZKChainDeployer, TokenD
         assertEq(sendId, request.txHash, "sendId should be the canonical tx hash");
         assertEq(request.transaction.reserved[0], mintValue, "mintValue mismatch");
 
-        // The base token is pulled from the caller through the interop center and fully consumed by the
-        // request: the interop center keeps neither balance nor allowance.
-        assertEq(baseToken.balanceOf(user), 0, "the base token should be pulled from the caller");
-        assertEq(baseToken.balanceOf(address(interopCenter)), 0, "no base token should be left in the relay");
-        assertEq(
-            baseToken.allowance(address(interopCenter), address(addresses.l1NativeTokenVault)),
-            0,
-            "no allowance should be left over"
-        );
+        // The base token is taken from the caller's own allowance, so the relay never holds it.
+        assertEq(baseToken.balanceOf(user), 0, "the base token should be taken from the caller");
+        assertEq(baseToken.balanceOf(address(interopCenter)), 0, "no base token should be held by the relay");
     }
 
     function test_sendMessage_directCall_explicitRefundRecipientIsPreserved() public {
@@ -316,25 +352,28 @@ contract L1InteropCenterRelayTest is L1ContractDeployer, ZKChainDeployer, TokenD
         assertEq(crossChainSender.lastMsgValue(), crossChainSenderValue, "cross-chain sender value mismatch");
         assertEq(crossChainSender.lastValue(), 0, "destination-side call value mismatch");
 
-        // The cross-chain sender sees the interop center as the original caller, which is why deposits
-        // through the asset router are rejected. See {protocol-docs/l1-interop-center.md#indirect-calls}.
-        assertEq(
-            crossChainSender.lastOriginalCaller(),
-            address(interopCenter),
-            "original caller should be the interop center"
-        );
+        // The cross-chain sender is reached with the message sender as the original caller.
+        assertEq(crossChainSender.lastOriginalCaller(), user, "original caller should be the message sender");
     }
 
-    function test_sendMessage_indirectCall_RevertWhen_recipientIsAssetRouter() public {
-        address assetRouter = address(addresses.bridgehub.assetRouter());
+    function test_sendMessage_indirectCall_assetRouterDepositIsAttributedToTheSender() public {
+        uint256 depositAmount = 10 ether;
         uint256 mintValue = _baseCost(ethChainId);
-        vm.deal(user, mintValue);
+        address token = _erc20Token();
+        TestnetERC20Token depositToken = TestnetERC20Token(token);
 
+        vm.deal(user, mintValue);
+        depositToken.mint(user, depositAmount);
         vm.prank(user);
-        vm.expectRevert(abi.encodeWithSelector(IndirectCallToAssetRouterMustUseBridgehub.selector, assetRouter));
-        interopCenter.sendMessage{value: mintValue}(
-            InteroperableAddress.formatEvmV1(ethChainId, assetRouter),
-            abi.encode("PAYLOAD"),
+        depositToken.approve(address(addresses.sharedBridge), depositAmount);
+
+        bytes memory secondBridgeCalldata = abi.encode(token, depositAmount, chainContracts[ethChainId]);
+
+        vm.recordLogs();
+        vm.prank(user);
+        bytes32 sendId = interopCenter.sendMessage{value: mintValue}(
+            InteroperableAddress.formatEvmV1(ethChainId, address(addresses.sharedBridge)),
+            secondBridgeCalldata,
             _attributes({
                 _mintValue: mintValue,
                 _refundRecipient: address(0),
@@ -342,6 +381,20 @@ contract L1InteropCenterRelayTest is L1ContractDeployer, ZKChainDeployer, TokenD
                 _indirect: true,
                 _indirectCallMessageValue: 0
             })
+        );
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        assertEq(depositToken.balanceOf(user), 0, "the deposited token should be taken from the caller");
+        assertNotEq(sendId, bytes32(0), "sendId should not be zero");
+
+        // The depositor recorded on L1 is the account that sent the message, so a failed deposit stays
+        // recoverable by them. See {protocol-docs/l1-interop-center.md#trusted-forwarding}.
+        Vm.Log memory depositLog = logs.requireOne("BridgehubDepositInitiated(uint256,bytes32,address,bytes32,bytes)");
+        assertEq(address(uint160(uint256(depositLog.topics[3]))), user, "depositor should be the message sender");
+        assertEq(
+            addresses.l1Nullifier.depositHappened(ethChainId, sendId),
+            depositLog.topics[2],
+            "the deposit should be recorded against the relayed request"
         );
     }
 
@@ -454,6 +507,49 @@ contract L1InteropCenterRelayTest is L1ContractDeployer, ZKChainDeployer, TokenD
             abi.encode("PAYLOAD"),
             attributes
         );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Trusted forwarding
+    //////////////////////////////////////////////////////////////*/
+
+    function test_requestL2TransactionDirectFor_RevertWhen_callerIsNotTheInteropCenter() public {
+        L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect({
+            _chainId: ethChainId,
+            _mintValue: 0,
+            _l2Value: 0,
+            _l2GasLimit: L2_GAS_LIMIT,
+            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            _l2CallData: abi.encode("PAYLOAD")
+        });
+
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, user));
+        IL1Bridgehub(address(addresses.bridgehub)).requestL2TransactionDirectFor(makeAddr("VICTIM"), request);
+    }
+
+    function test_setInteropCenter_RevertWhen_callerIsNotOwnerOrUpgrader() public {
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, user));
+        IL1Bridgehub(address(addresses.bridgehub)).setInteropCenter(makeAddr("OTHER_INTEROP_CENTER"));
+    }
+
+    function test_setInteropCenter_RevertWhen_addressIsZero() public {
+        vm.prank(addresses.bridgehubOwnerAddress);
+        vm.expectRevert(ZeroAddress.selector);
+        IL1Bridgehub(address(addresses.bridgehub)).setInteropCenter(address(0));
+    }
+
+    function test_setInteropCenter() public {
+        address newInteropCenter = makeAddr("OTHER_INTEROP_CENTER");
+        IL1Bridgehub bridgehub = IL1Bridgehub(address(addresses.bridgehub));
+
+        vm.expectEmit(true, false, false, true, address(bridgehub));
+        emit IL1Bridgehub.InteropCenterSet(newInteropCenter);
+        vm.prank(addresses.bridgehubOwnerAddress);
+        bridgehub.setInteropCenter(newInteropCenter);
+
+        assertEq(bridgehub.interopCenter(), newInteropCenter, "interop center mismatch");
     }
 
     /*//////////////////////////////////////////////////////////////

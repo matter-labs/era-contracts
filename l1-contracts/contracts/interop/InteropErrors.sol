@@ -31,8 +31,6 @@ error FactoryDepsNotAllowedForIndirectCall();
 error FeeWithdrawalFailed();
 // 0x4afc3319
 error IndirectCallCannotCarryValue(uint256 value);
-// 0x7f56e970
-error IndirectCallToAssetRouterMustUseBridgehub(address crossChainSender);
 // 0x62d214aa
 error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 // 0xbfa9bcca

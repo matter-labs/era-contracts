@@ -361,17 +361,19 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
 
     /// @notice This function is used to send a request to the ZK chain.
     /// @param _chainId the chainId of the chain
+    /// @param _originalCaller the account the request is made on behalf of
     /// @param _refundRecipient the refund recipient
     /// @param _request the request
     /// @return canonicalTxHash the canonical transaction hash
     function _sendRequest(
         uint256 _chainId,
+        address _originalCaller,
         address _refundRecipient,
         BridgehubL2TransactionRequest memory _request
     ) internal returns (bytes32 canonicalTxHash) {
         // Although the aliasing might happen in the Mailbox, we still want to determine the refund recipient
-        // in the BH, as the Mailbox won't have msg.sender
-        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, msg.sender);
+        // in the BH, as the Mailbox won't have the original caller
+        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, _originalCaller);
         _request.refundRecipient = refundRecipient;
         address zkChain = zkChainMap.get(_chainId);
 
