@@ -191,7 +191,8 @@ contract L2V32UpgradeUnitTest is Test {
 
     /// @dev The contracts introduced in v31 are initialized on the genesis path only: their `initL2`s are
     /// unchanged since v31 and one-shot, so a chain that already went through v31 must not run them again.
-    /// This upgrade therefore leaves the base token alone; what it does run is covered by
+    /// The upgrade never re-runs the base token's `initL2`, but it MUST record the base token's
+    /// bookkeeping baseline exactly once (`trackBaseToken`); the helper-level ordering is covered by
     /// `L2GenesisForceDeploymentHelper.t.sol`.
     function test_UpgradeViaComplexUpgrader_DoesNotReinitializePreV32Contracts() public {
         bytes memory fixedData = abi.encode(_buildFixedForceDeploymentsData());

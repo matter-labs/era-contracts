@@ -5,9 +5,9 @@ import {Test, Vm} from "forge-std/Test.sol";
 
 import {SystemContractsProcessing} from "deploy-scripts/upgrade/SystemContractsProcessing.s.sol";
 import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
+import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
-import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ISystemContractProxy} from "contracts/l2-upgrades/ISystemContractProxy.sol";
 import {SystemContractProxyAdmin} from "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
@@ -160,17 +160,15 @@ contract RemovedTrackerNeutralizationTest is Test {
         // placeholder implementation for the other (never-called-here) core contracts.
         FaithfulZKOSDeployer deployer = FaithfulZKOSDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
         {
-            (bytes memory implInfo, bytes memory proxyInfo) = abi.decode(
-                neutralizations[0].deployedBytecodeInfo,
-                (bytes, bytes)
+            // The expected Blake hashes are derived independently from the raw artifacts (not from
+            // the entries under test), so a list builder emitting a wrong Blake hash fails here.
+            bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
+                true,
+                "SystemContractProxy.sol",
+                "SystemContractProxy"
             );
-            (bytes32 implBlakeHash, , ) = ZKSyncOSBytecodeInfo.decodeZKSyncOSBytecodeInfo(implInfo);
-            (bytes32 proxyBlakeHash, , ) = ZKSyncOSBytecodeInfo.decodeZKSyncOSBytecodeInfo(proxyInfo);
-            deployer.register(emptyContractBytecode, implBlakeHash);
-            deployer.register(
-                BytecodeUtils.readDeployedBytecodeL1(true, "SystemContractProxy.sol", "SystemContractProxy"),
-                proxyBlakeHash
-            );
+            deployer.register(emptyContractBytecode, Utils.blakeHashBytecode(emptyContractBytecode));
+            deployer.register(proxyBytecode, Utils.blakeHashBytecode(proxyBytecode));
         }
         deployer.setDefaultBytecode(emptyContractBytecode);
 
