@@ -192,8 +192,10 @@ as the populate-once flag — stays unset; there is nothing to fold in for them,
   handler only) pays out inbound value; `burnAndStartBridging` (InteropCenter or NTV) receives outbound
   value; both report the flow to the `L2NativeTokenVault` bookkeeping first (the holder itself stores
   nothing). Its balance means "funds the chain can still mint";
-  force-sent funds (refund recipient, selfdestruct on ZK OS) only skew the `totalSupply()` view, never
-  bridging accounting.
+  force-sent funds (refund recipient, selfdestruct on ZK OS) skew the `totalSupply()` view but never the
+  flow counters; the base token's `preTrackingTotalSupply` baseline is a one-time `totalSupply()`
+  snapshot taken at the upgrade/genesis (`trackBaseToken`), so it deliberately inherits whatever skew
+  the view carries at that moment — the same trade-off as reading `totalSupply()` directly.
   - The operator must keep the base-token total supply below `2^127`, otherwise the holder's balance
     could underflow; overflow is impossible since users can only gain what the holder loses.
   - On ZKsync OS the holder's initial balance is minted by `L2BaseTokenZKOS.initL2()` via a raw call to
@@ -274,9 +276,9 @@ is a contract call (`L2BaseTokenEra.mint`); on ZKsync OS the VM credits deposits
 balance directly, so the base token's `totalSuccessfulDepositsFromL1` counter is **not exhaustive** there.
 
 - The pre-v31 total supply of an upgraded ZKsync OS chain lives in `L2BaseTokenZKOS.zkosPreV31TotalSupply`,
-  populated while the chain ran draft-v31 (via the since-removed backfill service transaction). This
+  populated while the chain ran v31 (via the since-removed backfill service transaction). This
   release has no backfill path: the v32 upgrade of a ZKsync OS chain is forbidden on L1
-  (`V32UpgradeZKsyncOS`) unless `baseTokenHasTotalSupply` was set by the draft-v31 backfill
+  (`V32UpgradeZKsyncOS`) unless `baseTokenHasTotalSupply` was set by the v31 backfill
   _and_ the backfill's L2 execution is proven — a `PriorityOpLowerBound` registry permissionlessly pins a
   priority-op count observed after the flag was set, and the upgrade requires all ops below it to be
   processed. So `totalSupply()` is always available on upgraded chains; fresh chains have no pre-v31

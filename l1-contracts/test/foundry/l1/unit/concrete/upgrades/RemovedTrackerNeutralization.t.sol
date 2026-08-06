@@ -11,8 +11,10 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {ISystemContractProxy} from "contracts/l2-upgrades/ISystemContractProxy.sol";
 import {SystemContractProxyAdmin} from "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
 import {
     L2_COMPLEX_UPGRADER_ADDR,
+    L2_FORCE_DEPLOYER_ADDR,
     L2_REMOVED_ASSET_TRACKER_ADDR,
     L2_REMOVED_GW_ASSET_TRACKER_ADDR,
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
@@ -24,6 +26,12 @@ contract MockV31TrackerImpl {
     function trackerSelectorProbe() external pure returns (uint256) {
         return 1;
     }
+}
+
+/// @dev Inert delegate target for the dispatcher call: the upgrade payload itself is covered by
+/// the L2V32Upgrade tests, this suite only exercises the force-deployment loop before it.
+contract NoopUpgradeDelegate {
+    function noop() external {}
 }
 
 /// @notice Exercises the actual proxy transition of the removed-tracker neutralizations: starting
@@ -38,15 +46,15 @@ contract RemovedTrackerNeutralizationTest is Test {
     address internal trackerImplV31;
 
     function setUp() public {
-        // Real proxy admin, owned by this test contract (the library executes in our context, so
-        // `SystemContractProxyAdmin.upgrade` sees us as the caller — production runs the same code
-        // as the ComplexUpgrader delegate).
+        // Real ComplexUpgrader and proxy admin, wired exactly like production: the upgrader owns
+        // the admin, so the dispatcher's proxy swaps run with the production caller.
+        vm.etch(L2_COMPLEX_UPGRADER_ADDR, address(new L2ComplexUpgrader()).code);
         vm.etch(
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
             BytecodeUtils.readDeployedBytecodeL1(true, "SystemContractProxyAdmin.sol", "SystemContractProxyAdmin")
         );
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).forceSetOwner(address(this));
+        SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).forceSetOwner(L2_COMPLEX_UPGRADER_ADDR);
 
         trackerImplV31 = address(new MockV31TrackerImpl());
 
@@ -63,6 +71,7 @@ contract RemovedTrackerNeutralizationTest is Test {
         );
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         ISystemContractProxy(_proxyAddr).forceInitAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).upgrade(
             ITransparentUpgradeableProxy(_proxyAddr),
             trackerImplV31
@@ -89,22 +98,28 @@ contract RemovedTrackerNeutralizationTest is Test {
             "EmptyContract"
         );
 
+        address[] memory derivedImpls = new address[](neutralizations.length);
         for (uint256 i = 0; i < neutralizations.length; ++i) {
             (bytes memory implInfo, ) = abi.decode(neutralizations[i].deployedBytecodeInfo, (bytes, bytes));
-            address derivedImpl = L2GenesisForceDeploymentsHelper.generateRandomAddress(implInfo);
-            vm.etch(derivedImpl, emptyContractBytecode);
+            derivedImpls[i] = L2GenesisForceDeploymentsHelper.generateRandomAddress(implInfo);
+            vm.etch(derivedImpls[i], emptyContractBytecode);
+        }
 
-            // The real per-entry upgrade path the ComplexUpgrader loop runs.
-            L2GenesisForceDeploymentsHelper.conductContractUpgrade(
-                neutralizations[i].upgradeType,
-                neutralizations[i].deployedBytecodeInfo,
-                neutralizations[i].newAddress
-            );
+        // The real production dispatcher applies every entry: a dispatcher that dropped the
+        // trailing neutralization entries would fail the per-proxy assertions below.
+        NoopUpgradeDelegate delegate = new NoopUpgradeDelegate();
+        vm.prank(L2_FORCE_DEPLOYER_ADDR);
+        L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).forceDeployAndUpgradeUniversal(
+            neutralizations,
+            address(delegate),
+            abi.encodeCall(NoopUpgradeDelegate.noop, ())
+        );
 
+        for (uint256 i = 0; i < neutralizations.length; ++i) {
             address proxyAddr = neutralizations[i].newAddress;
             assertEq(
                 address(uint160(uint256(vm.load(proxyAddr, IMPLEMENTATION_SLOT)))),
-                derivedImpl,
+                derivedImpls[i],
                 "the proxy must point at the derived EmptyContract implementation"
             );
 

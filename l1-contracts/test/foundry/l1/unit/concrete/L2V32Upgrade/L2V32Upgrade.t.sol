@@ -193,7 +193,7 @@ contract L2V32UpgradeUnitTest is Test {
     /// unchanged since v31 and one-shot, so a chain that already went through v31 must not run them again.
     /// This upgrade therefore leaves the base token alone; what it does run is covered by
     /// `L2GenesisForceDeploymentHelper.t.sol`.
-    function test_UpgradeViaComplexUpgrader_LeavesPreV32ContractsAlone() public {
+    function test_UpgradeViaComplexUpgrader_DoesNotReinitializePreV32Contracts() public {
         bytes memory fixedData = abi.encode(_buildFixedForceDeploymentsData());
         bytes memory additionalData = abi.encode(_buildZKChainSpecificData());
 

@@ -18,6 +18,9 @@ interface INativeTokenVaultBase is IL2AssetHandler {
     function bridgedOut(bytes32 _assetId) external view returns (uint256);
 
     /// @notice Whether the chain-local bookkeeping for the asset has been initialized.
+    /// @dev The meanings differ per layer: on L2 every tracked asset carries a recorded baseline;
+    /// on L1 the marker only records that `populateBridgedOut` folded (or explicitly skipped) the
+    /// asset's legacy amount — assets with nothing to fold may legitimately stay unmarked.
     function isAssetTracked(bytes32 _assetId) external view returns (bool);
 
     /// @notice Returns the origin token for a given asset ID

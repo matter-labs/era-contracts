@@ -124,7 +124,7 @@ destination's `L2NativeTokenVault.updateL2` consumes to initialize the chain's b
 (per the L1 `MessageRoot`), its base token is registered in the L1 `NativeTokenVault`
 (`tokenAddress(baseAssetId) != address(0)`, otherwise L1->L2 base-token deposits would not work
 on the destination), and the base token supports `totalSupply()` (true for everything except
-pre-v31 ZKsync OS chains, whose value is backfilled on draft-v31 before the v32 upgrade).
+pre-v31 ZKsync OS chains, whose value is backfilled during v31 before the v32 upgrade).
 
 ### v32: chain migrations are explicitly disabled
 

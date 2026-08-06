@@ -39,11 +39,7 @@ import {
 } from "../core/const";
 import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
-import {
-  forceBatchExecutedEqualsCommitted,
-  modelDraftV31BackfillPrerequisite,
-  transferOwnable2Step,
-} from "./harness-shims";
+import { forceBatchExecutedEqualsCommitted, modelV31BackfillPrerequisite, transferOwnable2Step } from "./harness-shims";
 import { impersonateAndRun } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
@@ -701,10 +697,10 @@ export async function runChainUpgradesAndRelayL2(params: {
     // "all batches executed" prerequisite without running the executor.
     await forceBatchExecutedEqualsCommitted(l1Provider, chain.diamondProxy);
 
-    // ZKsync OS chains must additionally have the draft-v31 base-token backfill behind them
+    // ZKsync OS chains must additionally have the v31 base-token backfill behind them
     // (flag + executed-priority-op lower bound); model the missing history on the fork.
     if (isZKsyncOS) {
-      await modelDraftV31BackfillPrerequisite({
+      await modelV31BackfillPrerequisite({
         l1Provider,
         diamondProxyAddr: chain.diamondProxy,
         settlementLayerUpgradeAddr,
