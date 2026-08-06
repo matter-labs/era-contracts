@@ -259,6 +259,11 @@ library L2GenesisForceDeploymentsHelper {
             _initPreV32Contracts(fixedForceDeploymentsData);
         }
 
+        // Both paths: the baseline mapping is new in this release, so an upgraded chain records it
+        // here just like a new one. Must stay after `_initPreV32Contracts` — at genesis the base
+        // token's `totalSupply()` is meaningless until its own `initL2` has run.
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).trackBaseToken();
+
         // Contracts introduced in this release are initialized on both paths: they are uninitialized on a
         // new chain and on an upgraded one alike.
         _initializeV32Contracts(_isZKsyncOS, fixedForceDeploymentsData);

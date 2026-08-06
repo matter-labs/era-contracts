@@ -9,6 +9,7 @@ import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
@@ -16,6 +17,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {SavedTotalSupply} from "contracts/common/L2AssetBookkeeping.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
@@ -85,7 +87,8 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
 
         assertTrue(_ntv().isAssetTracked(assetId), "native token should be tracked on registration");
         assertEq(_ntv().bridgedOut(assetId), 0, "fresh native token has nothing bridged out");
-        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
+        SavedTotalSupply memory snapshot = _ntv().preTrackingTotalSupply(assetId);
+        (bool isSaved, uint256 savedAmount) = (snapshot.isSaved, snapshot.amount);
         assertTrue(isSaved, "native tokens should record their pre-tracking baseline");
         assertEq(savedAmount, type(uint256).max, "a fresh native token starts at the infinite-deposit baseline");
     }
@@ -118,7 +121,8 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
         address token = _ntv().tokenAddress(assetId);
         assertNotEq(token, address(0), "the bridged token should be deployed");
         assertTrue(_ntv().isAssetTracked(assetId), "the bridged token should be tracked during registration");
-        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
+        SavedTotalSupply memory snapshot = _ntv().preTrackingTotalSupply(assetId);
+        (bool isSaved, uint256 savedAmount) = (snapshot.isSaved, snapshot.amount);
         assertTrue(isSaved, "bridged tokens should record their pre-tracking baseline");
         assertEq(savedAmount, 0, "no flows predate a token registered by its first deposit");
         assertEq(IERC20(token).totalSupply(), amount, "the first deposit should mint the full amount");
@@ -320,7 +324,8 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
 
         assertTrue(_ntv().isAssetTracked(assetId), "legacy token should be tracked");
         assertEq(_ntv().bridgedOut(assetId), escrowed, "bridgedOut should be seeded with the escrow");
-        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
+        SavedTotalSupply memory snapshot = _ntv().preTrackingTotalSupply(assetId);
+        (bool isSaved, uint256 savedAmount) = (snapshot.isSaved, snapshot.amount);
         assertTrue(isSaved, "legacy native tokens should record their pre-tracking baseline");
         assertEq(
             savedAmount,
@@ -347,7 +352,8 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
         _ntv().trackLegacyToken(assetId);
 
         assertTrue(_ntv().isAssetTracked(assetId), "legacy token should be tracked");
-        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
+        SavedTotalSupply memory snapshot = _ntv().preTrackingTotalSupply(assetId);
+        (bool isSaved, uint256 savedAmount) = (snapshot.isSaved, snapshot.amount);
         assertTrue(isSaved, "bridged tokens should record their pre-tracking baseline");
         assertEq(savedAmount, preTrackingSupply, "the baseline equals the pre-tracking net inbound flow");
         assertEq(_ntv().bridgedOut(assetId), 0, "bridged tokens carry no bridgedOut accounting");
@@ -360,11 +366,45 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
         _ntv().trackLegacyToken(assetId);
     }
 
-    /// @notice The base token has no vault escrow to seed and is rejected outright.
+    /// @notice The base token has no vault escrow to seed and is rejected outright; its baseline
+    /// is recorded by `trackBaseToken` during the upgrade/genesis instead.
     function test_trackLegacyToken_revertBaseToken() public {
         bytes32 baseTokenAssetId = _ntv().BASE_TOKEN_ASSET_ID();
         vm.expectRevert(abi.encodeWithSelector(AssetIdNotSupported.selector, baseTokenAssetId));
         _ntv().trackLegacyToken(baseTokenAssetId);
+    }
+
+    /// @notice Genesis records the base token's baseline (the deployer mirrors
+    /// `L2GenesisForceDeploymentsHelper`): tracked, saved, and zero — a fresh chain has no
+    /// pre-tracking flows.
+    function test_trackBaseToken_recordedDuringGenesisSetup() public {
+        bytes32 baseTokenAssetId = _ntv().BASE_TOKEN_ASSET_ID();
+        assertTrue(_ntv().isAssetTracked(baseTokenAssetId), "the base token should be tracked from genesis");
+        SavedTotalSupply memory snapshot = _ntv().preTrackingTotalSupply(baseTokenAssetId);
+        assertTrue(snapshot.isSaved, "the base token should record its pre-tracking baseline");
+        assertEq(snapshot.amount, 0, "a fresh chain has no pre-tracking base-token flows");
+    }
+
+    /// @notice A repeated `trackBaseToken` (e.g. a later upgrade re-running the init helper) must
+    /// not fold post-tracking supply into the baseline.
+    function test_trackBaseToken_idempotent() public {
+        bytes32 baseTokenAssetId = _ntv().BASE_TOKEN_ASSET_ID();
+
+        // Simulate post-genesis mints: the holder's balance drop raises the reported totalSupply.
+        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR.balance - 5 ether);
+
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        _ntv().trackBaseToken();
+
+        SavedTotalSupply memory snapshot = _ntv().preTrackingTotalSupply(baseTokenAssetId);
+        assertEq(snapshot.amount, 0, "a re-run must keep the originally recorded baseline");
+    }
+
+    /// @notice Only the upgrader may record the base token's baseline: from any later moment the
+    /// current supply includes flows `interopInfo` already records.
+    function test_trackBaseToken_revertNotUpgrader() public {
+        vm.expectRevert(abi.encodeWithSelector(InvalidCaller.selector, address(this)));
+        _ntv().trackBaseToken();
     }
 
     /// @notice The lazy tracking also fires inside the bridge hooks: the first outbound operation of
@@ -393,7 +433,8 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
             escrowed + amount,
             "escrow should stay in lockstep with bridgedOut"
         );
-        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
+        SavedTotalSupply memory snapshot = _ntv().preTrackingTotalSupply(assetId);
+        (bool isSaved, uint256 savedAmount) = (snapshot.isSaved, snapshot.amount);
         assertTrue(isSaved, "lazy tracking should record the pre-operation baseline");
         assertEq(
             savedAmount,
@@ -421,7 +462,8 @@ abstract contract L2AssetBookkeepingTest is Test, SharedL2ContractDeployer {
         assertTrue(_ntv().isAssetTracked(assetId), "the inbound first touch should track the token");
         assertEq(token.balanceOf(receiver), amount, "the outstanding amount should be released from escrow");
         assertEq(_ntv().bridgedOut(assetId), escrowed - amount, "bridgedOut = seeded escrow - released amount");
-        (bool isSaved, uint256 savedAmount) = _ntv().preTrackingTotalSupply(assetId);
+        SavedTotalSupply memory snapshot = _ntv().preTrackingTotalSupply(assetId);
+        (bool isSaved, uint256 savedAmount) = (snapshot.isSaved, snapshot.amount);
         assertTrue(isSaved, "the inbound first touch should record the baseline");
         assertEq(
             savedAmount,

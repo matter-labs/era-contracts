@@ -186,14 +186,21 @@
     ],
     "outputs": [
       {
-        "name": "totalWithdrawalsToL1",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "totalSuccessfulDepositsFromL1",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct InteropL2Info",
+        "components": [
+          {
+            "name": "totalWithdrawalsToL1",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "totalSuccessfulDepositsFromL1",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -286,14 +293,21 @@
     ],
     "outputs": [
       {
-        "name": "isSaved",
-        "type": "bool",
-        "internalType": "bool"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct SavedTotalSupply",
+        "components": [
+          {
+            "name": "isSaved",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -378,6 +392,13 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "trackBaseToken",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",

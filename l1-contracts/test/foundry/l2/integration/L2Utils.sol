@@ -242,6 +242,10 @@ library L2Utils {
             TokenBridgingData({assetId: ethAssetId, originChainId: _args.l1ChainId, originToken: ETH_TOKEN_ADDRESS}),
             TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
         );
+
+        // Mirror `L2GenesisForceDeploymentsHelper`: genesis records the base token's baseline.
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        nativeTokenVault.trackBaseToken();
     }
 
     function forceDeployWithoutConstructor(string memory _contractName, address _address) public {

@@ -199,6 +199,11 @@ library L2UtilsBase {
                 TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
             );
 
+            // Mirror `L2GenesisForceDeploymentsHelper`: genesis records the base token's baseline
+            // right after the base token is initialized (here the holder already has its balance).
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).trackBaseToken();
+
             vm.store(
                 L2_NATIVE_TOKEN_VAULT_ADDR,
                 bytes32(uint256(251)),

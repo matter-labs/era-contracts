@@ -58,6 +58,7 @@ contract MockV32UpgradeNativeTokenVault {
 
     uint256 public lastOriginChainId;
     uint256 public updateCalls;
+    uint256 public trackBaseTokenCalls;
 
     mapping(bytes32 assetId => uint256 originChainIdValue) private _originChainId;
 
@@ -80,10 +81,6 @@ contract MockV32UpgradeNativeTokenVault {
             return BASE_TOKEN_ORIGIN_TOKEN;
         }
         return address(0);
-    }
-
-    function registerBaseTokenIfNeeded() external {
-        // No-op for mock
     }
 
     function updateL2(
@@ -112,6 +109,13 @@ contract MockV32UpgradeNativeTokenVault {
         _originChainId[_baseTokenBridgingData.assetId] = _baseTokenBridgingData.originChainId;
         lastOriginChainId = _baseTokenBridgingData.originChainId;
         updateCalls++;
+    }
+
+    function trackBaseToken() external {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        trackBaseTokenCalls++;
     }
 }
 
@@ -202,6 +206,11 @@ contract L2V32UpgradeUnitTest is Test {
         // Verify NTV: updateL2 called with correct data
         MockV32UpgradeNativeTokenVault nativeTokenVault = MockV32UpgradeNativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
         assertEq(nativeTokenVault.updateCalls(), 1, "native token vault should be updated exactly once");
+        assertEq(
+            nativeTokenVault.trackBaseTokenCalls(),
+            1,
+            "the base token's pre-tracking baseline must be recorded on the upgrade path"
+        );
         assertEq(nativeTokenVault.lastOriginChainId(), BASE_TOKEN_ORIGIN_CHAIN_ID, "origin chain id mismatch");
         assertEq(nativeTokenVault.BASE_TOKEN_ORIGIN_TOKEN(), BASE_TOKEN_ORIGIN_ADDRESS, "origin token mismatch");
 

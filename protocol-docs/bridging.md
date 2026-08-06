@@ -242,15 +242,21 @@ its empty compatibility stub because pre-v31 chains did deploy code there.
   initiated deposits and this counter is not uniformly "claimable on L1" across asset types.
 - `preTrackingTotalSupply[assetId]` records the token's net inbound flow — total successful deposits
   minus total successful withdrawals — accumulated before this bookkeeping existed. For a bridged token
-  that is exactly its pre-tracking `totalSupply()`; native tokens offset the same net flow by
-  `type(uint256).max` (the removed tracker's infinite-deposit convention): `2^256 - 1 - bridgedOut`.
-  Newly registered tokens start at the zero-flow baseline (`0` bridged, `max` native).
+  (the base token included) that is exactly its pre-tracking `totalSupply()`; native tokens offset the
+  same net flow by `type(uint256).max` (the removed tracker's infinite-deposit convention):
+  `2^256 - 1 - bridgedOut`. Newly registered tokens start at the zero-flow baseline (`0` bridged,
+  `max` native).
 - `isAssetTracked[assetId]` guards the one-time initialization of the two fields above for a legacy
   L2-native token: its outstanding amount is seeded from the vault's current escrow (indistinguishable
   direct donations are conservatively treated as escrow, since they are effectively frozen). Seeding
   happens lazily on the token's first touch — before the operation changes any supply or escrow — or
   eagerly by anyone via `trackLegacyToken`; it is idempotent, newly registered tokens are marked tracked
-  immediately, and `trackLegacyToken` rejects the base token, which has no vault escrow to seed.
+  immediately, and `trackLegacyToken` rejects the base token.
+- The base token's baseline is recorded by `trackBaseToken` (upgrader-only, idempotent), which the
+  upgrade/genesis init helper calls on both paths: its `totalSupply()` at that moment — the pre-upgrade
+  supply on an upgraded chain, zero at genesis — is the pre-tracking net inbound flow, and every later
+  flow is reported by the holder into `interopInfo`. Tracking it from any later moment would fold
+  already-recorded flows into the baseline, which is why `trackLegacyToken` cannot be used instead.
 
 ### `BaseTokenHolder` (base token)
 

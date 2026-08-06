@@ -7,6 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {InteropL2Info} from "contracts/common/L2AssetBookkeeping.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 
 import {
@@ -672,7 +673,8 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     function _readBaseTokenInteropInfo() internal view returns (uint256 withdrawals, uint256 deposits) {
         // The holder reports its flows to the vault, which keeps them under BASE_TOKEN_ASSET_ID.
         L2NativeTokenVault vault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        (withdrawals, deposits) = vault.interopInfo(vault.BASE_TOKEN_ASSET_ID());
+        InteropL2Info memory info = vault.interopInfo(vault.BASE_TOKEN_ASSET_ID());
+        (withdrawals, deposits) = (info.totalWithdrawalsToL1, info.totalSuccessfulDepositsFromL1);
     }
 
     // ═══════════════════════════════════════════════════════════════════

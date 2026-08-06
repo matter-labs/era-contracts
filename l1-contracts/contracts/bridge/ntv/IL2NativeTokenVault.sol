@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
+import {InteropL2Info, SavedTotalSupply} from "../../common/L2AssetBookkeeping.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -40,12 +41,10 @@ interface IL2NativeTokenVault is INativeTokenVaultBase {
 
     /// @notice The token's net inbound flow (successful deposits minus successful withdrawals)
     /// accumulated before this bookkeeping existed; native tokens offset it by `MAX_TOKEN_BALANCE`.
-    function preTrackingTotalSupply(bytes32 _assetId) external view returns (bool isSaved, uint256 amount);
+    function preTrackingTotalSupply(bytes32 _assetId) external view returns (SavedTotalSupply memory);
 
     /// @notice L2-side accounting of L1 <-> L2 flows while this chain settles on L1.
-    function interopInfo(
-        bytes32 _assetId
-    ) external view returns (uint256 totalWithdrawalsToL1, uint256 totalSuccessfulDepositsFromL1);
+    function interopInfo(bytes32 _assetId) external view returns (InteropL2Info memory);
 
     /// @notice Records an outbound base-token bridge flow under `BASE_TOKEN_ASSET_ID`.
     /// @dev Callable only by BaseTokenHolder, which escrows the base token and therefore observes
@@ -61,9 +60,14 @@ interface IL2NativeTokenVault is INativeTokenVaultBase {
     function recordBaseTokenBridgingFromChain(uint256 _fromChainId, uint256 _amount) external;
 
     /// @notice Eagerly initializes the chain-local bookkeeping for a legacy non-base token.
-    /// @dev The base token is rejected: it is escrowed in BaseTokenHolder and has no vault escrow
-    /// to seed.
+    /// @dev The base token is rejected: its baseline is recorded by `trackBaseToken` during the
+    /// upgrade/genesis, and it has no vault escrow to seed.
     function trackLegacyToken(bytes32 _assetId) external;
+
+    /// @notice Records the base token's pre-tracking baseline, once.
+    /// @dev Called during the upgrade/genesis (only the upgrader may call it), before any flow the
+    /// holder can report, so the baseline and the recorded flows never overlap.
+    function trackBaseToken() external;
 
     function setLegacyTokenAssetId(address _l2TokenAddress) external;
 }
