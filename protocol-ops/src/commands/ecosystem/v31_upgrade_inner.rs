@@ -144,13 +144,22 @@ impl<'a> V31UpgradeInner<'a> {
         let mut ctm_tomls = Vec::with_capacity(inputs.ctms.len());
         for ctm in &inputs.ctms {
             // Only ZKsync OS chains can be upgraded onto this release: `CTMUpgrade_v31`'s
-            // `deployUsedUpgradeContract` rejects Era CTMs outright, so skip the CTMs the config
-            // marks as Era instead of failing the whole mixed-CTM environment preparation.
-            if ctm.is_zk_sync_os == Some(false) {
-                println!(
+            // `deployUsedUpgradeContract` rejects Era CTMs outright. The config hint is optional
+            // (`list-ctms` deliberately leaves it unset), so resolve the flavor from L1 when
+            // missing and skip Era CTMs instead of failing the whole mixed-CTM preparation.
+            let ctm_is_zk_sync_os = match ctm.is_zk_sync_os {
+                Some(v) => v,
+                None => {
+                    crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm.proxy)
+                        .await
+                        .context("Failed to resolve isZKsyncOS from CTM")?
+                }
+            };
+            if !ctm_is_zk_sync_os {
+                logger::info(format!(
                     "skipping Era CTM {:#x}: only ZKsync OS chains can be upgraded onto this release",
                     ctm.proxy
-                );
+                ));
                 continue;
             }
             let (path, is_zk_sync_os) = self

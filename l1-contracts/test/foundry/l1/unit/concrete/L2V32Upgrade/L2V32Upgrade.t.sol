@@ -5,6 +5,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
+    L2_ATOMIC_FLOW_MANAGER_ADDR,
+    L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -20,6 +22,8 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
 import {L2V32Upgrade} from "contracts/l2-upgrades/L2V32Upgrade.sol";
+import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
+import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
@@ -202,6 +206,38 @@ contract L2V32UpgradeUnitTest is Test {
         assertEq(nativeTokenVault.BASE_TOKEN_ORIGIN_TOKEN(), BASE_TOKEN_ORIGIN_ADDRESS, "origin token mismatch");
 
         // BaseToken: its `initL2` is a genesis-path call as well.
+        MockV32UpgradeBaseToken baseToken = MockV32UpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        assertEq(baseToken.initCalls(), 0, "base token must not be re-initialized on an upgrade");
+    }
+
+    /// @dev The ZKsync OS path must forward `_isZKsyncOS == true` to the helper: the atomic-interop
+    /// built-ins arrive with the upgrade's force deployments and are initialized here for the first
+    /// time (the tree gets its sentinel leaf, the flow manager the L1 chain id).
+    function test_UpgradeViaComplexUpgrader_ZKOSInitializesAtomicInteropBuiltIns() public {
+        vm.etch(L2_INTEROP_COMMITMENT_TREE_ADDR, address(new L2InteropCommitmentTree()).code);
+        vm.etch(L2_ATOMIC_FLOW_MANAGER_ADDR, address(new AtomicFlowManager()).code);
+
+        bytes memory fixedData = abi.encode(_buildFixedForceDeploymentsData());
+        bytes memory additionalData = abi.encode(_buildZKChainSpecificData());
+
+        vm.prank(L2_FORCE_DEPLOYER_ADDR);
+        L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(
+            address(testUpgrade),
+            abi.encodeCall(IL2V32Upgrade.upgrade, (true, CTM_DEPLOYER, fixedData, additionalData))
+        );
+
+        assertEq(
+            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(),
+            1,
+            "the commitment tree must be seeded with its sentinel leaf"
+        );
+        assertEq(
+            AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID(),
+            L1_CHAIN_ID,
+            "the flow manager must receive the L1 chain id"
+        );
+
+        // Pre-v32 contracts stay untouched on the ZKsync OS path too.
         MockV32UpgradeBaseToken baseToken = MockV32UpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         assertEq(baseToken.initCalls(), 0, "base token must not be re-initialized on an upgrade");
     }
