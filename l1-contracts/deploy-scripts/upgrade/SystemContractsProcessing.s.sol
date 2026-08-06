@@ -17,7 +17,11 @@ import {
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_REMOVED_ASSET_TRACKER_ADDR,
+    L2_REMOVED_GW_ASSET_TRACKER_ADDR,
+    L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
@@ -349,14 +353,14 @@ library SystemContractsProcessing {
             // ZKsyncOS has no bootloader / DefaultAccount / EVM emulator — those
             // are Era-VM concepts.
             //
-            // Two additional baselines, neither in the CoreContract enum:
+            // Additional baselines, none in the CoreContract enum:
             //  - `SystemContractProxy`: every `updateZKsyncOSContract` call that needs
             //    to materialize a proxy at a previously-empty system address force-deploys
             //    this bytecode.
             //  - `SystemContractProxyAdmin` (at 0x1000c): a direct-deployed ProxyAdmin present from
             //    genesis. v31 no longer force-deploys it (see getBaseZKsyncOSForceDeployments), but its
             //    bytecode preimage is still published as a ZKsyncOS baseline.
-            factoryDeps = new bytes[](2);
+            factoryDeps = new bytes[](3);
             factoryDeps[0] = BytecodeUtils.readDeployedBytecodeL1(
                 true,
                 "SystemContractProxy.sol",
@@ -367,6 +371,9 @@ library SystemContractsProcessing {
                 "SystemContractProxyAdmin.sol",
                 "SystemContractProxyAdmin"
             );
+            // The implementation the upgrade installs behind the removed trackers' proxies (see
+            // getRemovedTrackerNeutralizations) — not a CoreContract, so published here.
+            factoryDeps[2] = BytecodeUtils.readDeployedBytecodeL1(true, "EmptyContract.sol", "EmptyContract");
             return factoryDeps;
         }
 
@@ -404,7 +411,9 @@ library SystemContractsProcessing {
         // getFixedAddressCoreContracts.) The L2V32Upgrade delegate target remains the only legitimate
         // ZKsyncOS unsafe force deployment (added in CTMUpgrade_v31); the PUVT guards that no other
         // unsafe force deployment is present.
-        uint256 totalBase = fixedAddressCoreContracts.length + zksyncOSOnlyContracts.length + sysContracts.length;
+        // +2: the removed v31 trackers' proxies get their implementations swapped for EmptyContract
+        // (see getRemovedTrackerNeutralizations).
+        uint256 totalBase = fixedAddressCoreContracts.length + zksyncOSOnlyContracts.length + sysContracts.length + 2;
 
         deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](totalBase);
 
@@ -424,6 +433,35 @@ library SystemContractsProcessing {
         for (uint256 i = 0; i < sysContracts.length; i++) {
             deployments[index++] = _buildZKsyncOSEntryForSystemContract(sysContracts[i]);
         }
+
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory neutralizations = getRemovedTrackerNeutralizations();
+        for (uint256 i = 0; i < neutralizations.length; i++) {
+            deployments[index++] = neutralizations[i];
+        }
+    }
+
+    /// @notice Proxy upgrades that neutralize the removed v31 trackers.
+    /// @dev v31 deployed the L2AssetTracker and GWAssetTracker as system-proxied built-ins on every
+    /// ZKsync OS chain. v32 deletes both contracts, so the upgrade swaps their proxies'
+    /// implementations for `EmptyContract` — otherwise the retired tracker code would stay callable.
+    /// Chains created on v32 never run this list and leave the addresses empty.
+    function getRemovedTrackerNeutralizations()
+        internal
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
+    {
+        bytes memory emptyContractInfo = Utils.getZKOSProxyUpgradeBytecodeInfo("EmptyContract.sol", "EmptyContract");
+
+        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](2);
+        deployments[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
+            deployedBytecodeInfo: emptyContractInfo,
+            newAddress: L2_REMOVED_ASSET_TRACKER_ADDR
+        });
+        deployments[1] = IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
+            deployedBytecodeInfo: emptyContractInfo,
+            newAddress: L2_REMOVED_GW_ASSET_TRACKER_ADDR
+        });
     }
 
     function mergeUniversalForceDeployments(

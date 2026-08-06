@@ -235,7 +235,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         // No flows predate the bookkeeping for a token registered after it: a bridged token starts
         // at zero, a native token at the infinite-deposit baseline (zero `bridgedOut`).
         uint256 initialSupply = _originChainId == block.chainid ? MAX_TOKEN_BALANCE : 0;
-        storedAssetBookkeeping[_assetId].isSaved = true;
         storedAssetBookkeeping[_assetId].preTrackingTotalSupply = initialSupply;
     }
 
@@ -537,7 +536,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         // pre-tracking net inbound flow is exactly its current `totalSupply()`: the pre-upgrade
         // supply on an upgraded chain, zero at genesis (the holder's balance is minted in full
         // before this runs).
-        storedAssetBookkeeping[baseTokenAssetId].isSaved = true;
         storedAssetBookkeeping[baseTokenAssetId].preTrackingTotalSupply = L2_BASE_TOKEN_SYSTEM_CONTRACT.totalSupply();
     }
 
@@ -559,11 +557,9 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             // for indistinguishable direct donations, which are conservatively treated as escrow.
             uint256 escrowedAmount = IERC20(token).balanceOf(address(this));
             bridgedOut[_assetId] = escrowedAmount;
-            storedAssetBookkeeping[_assetId].isSaved = true;
             storedAssetBookkeeping[_assetId].preTrackingTotalSupply = MAX_TOKEN_BALANCE - escrowedAmount;
         } else {
             // A bridged token's totalSupply is exactly its pre-tracking net inbound flow.
-            storedAssetBookkeeping[_assetId].isSaved = true;
             storedAssetBookkeeping[_assetId].preTrackingTotalSupply = IERC20(token).totalSupply();
         }
     }

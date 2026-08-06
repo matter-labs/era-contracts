@@ -171,11 +171,6 @@
         "internalType": "struct L2AssetBookkeepingInfo",
         "components": [
           {
-            "name": "isSaved",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
             "name": "preTrackingTotalSupply",
             "type": "uint256",
             "internalType": "uint256"

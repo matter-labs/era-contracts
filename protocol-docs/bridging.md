@@ -242,7 +242,8 @@ its empty compatibility stub because pre-v31 chains did deploy code there.
     `BASE_TOKEN_ASSET_ID`, reported by the `BaseTokenHolder` (below). For the base token, failed deposits
     are refunded on L2 to the `refundRecipient` rather than claimed on L1, so the gap between initiated
     deposits and this counter is not uniformly "claimable on L1" across asset types.
-  - `preTrackingTotalSupply` (with `isSaved` marking it recorded) is the same net inbound flow — total
+  - `preTrackingTotalSupply` (meaningful once `isAssetTracked` is set — on L2 every tracking writer
+    records the baseline in the same call) is the same net inbound flow — total
     successful deposits minus total successful withdrawals — accumulated before the tracking started,
     which is why the fields share one struct. For a bridged token (the base token included) that is
     exactly its pre-tracking `totalSupply()`; native tokens offset the same net flow by
