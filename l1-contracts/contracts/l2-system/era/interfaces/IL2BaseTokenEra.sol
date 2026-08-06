@@ -9,6 +9,8 @@ import {IL2BaseTokenBase} from "../../interfaces/IL2BaseTokenBase.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface for the L2 Base Token contract on Era chains.
 /// @dev Extends IL2BaseTokenBase with Era-specific functionality (balance management, mint, transferFromTo).
+/// @dev The v32 upgrade is intended to be used only for ZKsync OS chains, so the Era contracts in
+/// this folder won't be deployed by it.
 interface IL2BaseTokenEra is IL2BaseTokenBase {
     /// @notice Emitted when tokens are minted
     event Mint(address indexed account, uint256 amount);

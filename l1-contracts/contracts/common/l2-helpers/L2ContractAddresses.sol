@@ -136,10 +136,10 @@ address constant L2_INTEROP_CENTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x
 address payable constant L2_INTEROP_HANDLER_ADDR = payable(address(BUILT_IN_CONTRACTS_OFFSET + 0x0e));
 
 /// @dev `BUILT_IN_CONTRACTS_OFFSET + 0x0f` is intentionally unassigned: it belonged to the removed
-/// L2AssetTracker and is kept as a gap so the following addresses keep their positions. L2AssetTracker
-/// was introduced only in the unreleased v31 code, so canonical pre-v31 chains and new chains both
-/// leave this address empty. Any development chain that did deploy it retains its historic bytecode
-/// and storage; new recording happens in L2NativeTokenVault and BaseTokenHolder instead.
+/// L2AssetTracker and is kept as a gap so the following addresses keep their positions. v31 released
+/// with the tracker deployed here, so on upgraded chains the address holds its (unused) v31 bytecode
+/// until the upgrade replaces it with `EmptyContract`; chains that start on v32 from genesis leave it
+/// empty. New recording happens in L2NativeTokenVault and BaseTokenHolder instead.
 
 /// @dev `BUILT_IN_CONTRACTS_OFFSET + 0x10` is intentionally unassigned: it belonged to the removed
 /// GWAssetTracker and is kept as a gap so the following addresses keep their positions.

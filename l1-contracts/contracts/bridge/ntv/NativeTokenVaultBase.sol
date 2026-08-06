@@ -103,12 +103,20 @@ abstract contract NativeTokenVaultBase is
     /// their layout (the slot was never written before).
     mapping(bytes32 assetId => uint256 amount) public bridgedOut;
 
+    /// @notice Whether the chain-local bookkeeping for the asset has been initialized.
+    /// @dev On L1 it marks the asset's legacy amount as folded into `bridgedOut` (see
+    /// `L1NativeTokenVault.populateBridgedOut`); on L2 it guards the one-time seeding in
+    /// `_trackLegacyTokenIfNeeded` / `trackBaseToken`.
+    /// @dev Takes a slot from the pre-existing storage gap below, so already-deployed vaults keep
+    /// their layout (the slot was never written before).
+    mapping(bytes32 assetId => bool isTracked) public isAssetTracked;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[42] private __gap;
+    uint256[41] private __gap;
 
     /// @notice Checks that the message sender is the asset router.
     modifier onlyAssetRouter() {

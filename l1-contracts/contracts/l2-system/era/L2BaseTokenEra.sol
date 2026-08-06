@@ -22,6 +22,8 @@ import {BaseTokenHolderAlreadyInitialized, InsufficientFunds, Unauthorized} from
  * @dev It does NOT provide interfaces for personal interaction with tokens like `transfer`, `approve`, and `transferFrom`.
  * Instead, this contract is used by the bootloader and `MsgValueSimulator`/`ContractDeployer` system contracts
  * to perform the balance changes while simulating the `msg.value` Ethereum behavior.
+ * @dev The v32 upgrade is intended to be used only for ZKsync OS chains, so the Era contracts
+ * in this folder won't be deployed by it.
  */
 contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// @notice Modifier that makes sure that the method can only be called from the bootloader.

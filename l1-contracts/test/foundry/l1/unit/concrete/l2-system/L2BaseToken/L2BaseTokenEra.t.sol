@@ -531,7 +531,7 @@ contract L2BaseTokenEraTest is Test {
     }
 
     /// @dev Covers the holder->vault forwarding only: the vault is a recording mock, so the real
-    /// vault's settlement gating / `interopInfo` update is exercised in L2AssetBookkeeping.t.sol.
+    /// vault's settlement gating / `assetBookkeeping` update is exercised in L2AssetBookkeeping.t.sol.
     function test_withdraw_forwardsBookkeepingWithL1ChainIdToVault() public {
         // Deploy the real holder so the withdrawal reporting path executes; the holder
         // reports the flow to the vault, so a recording mock stands in for it.

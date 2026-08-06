@@ -214,8 +214,8 @@ contract BridgedOutPopulationLibTest is Test {
         assertEq(_populatedFor(assetIds, populated, secondAssetId), 7, "second asset reported per asset");
         assertEq(ntv.bridgedOut(firstAssetId), 120);
         assertEq(ntv.bridgedOut(secondAssetId), 7);
-        assertTrue(ntv.bridgedOutPopulated(firstAssetId));
-        assertTrue(ntv.bridgedOutPopulated(secondAssetId));
+        assertTrue(ntv.isAssetTracked(firstAssetId));
+        assertTrue(ntv.isAssetTracked(secondAssetId));
 
         // Re-running is a no-op, which is what makes an interrupted stage3 safe to resume.
         (assetIds, populated) = _populate();
@@ -252,7 +252,7 @@ contract BridgedOutPopulationLibTest is Test {
         // Freshly deployed ecosystems have nothing to populate, and no flags are written for them.
         (bytes32[] memory assetIds, uint256[] memory populated) = _populate();
         assertEq(_populatedFor(assetIds, populated, firstAssetId), 0);
-        assertFalse(ntv.bridgedOutPopulated(firstAssetId), "no gas spent on empty assets");
+        assertFalse(ntv.isAssetTracked(firstAssetId), "no gas spent on empty assets");
     }
 
     function test_skipsAssetsNotNativeToL1() public {

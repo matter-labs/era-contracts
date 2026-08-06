@@ -145,16 +145,6 @@
   },
   {
     "type": "error",
-    "name": "BaseTokenNativeToThisChain",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "RecoverToL1NotSupported",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "Unauthorized",
     "inputs": [
       {

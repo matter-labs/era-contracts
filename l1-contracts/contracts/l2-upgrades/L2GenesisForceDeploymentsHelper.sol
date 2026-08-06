@@ -393,9 +393,8 @@ library L2GenesisForceDeploymentsHelper {
     /// @notice Initializes the contracts that already existed in v31.
     /// @dev Genesis only: these contracts existed in v31 and their `initL2`s are one-shot, so a chain
     /// upgraded from v31 has already run them — the storage each one writes at genesis is unchanged by
-    /// this release (the removed L2AssetTracker is simply no longer deployed or initialized). Kept at
-    /// the position v31 called them from, after `_finalizeDeployments`, so the genesis sequence is
-    /// unchanged; none of them reads the bridgehub wiring that step establishes.
+    /// this release. Kept at the position v31 called them from, after `_finalizeDeployments`, so the
+    /// genesis sequence is unchanged; none of them reads the bridgehub wiring that step establishes.
     function _initPreV32Contracts(FixedForceDeploymentsData memory _fixedForceDeploymentsData) private {
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2();
 

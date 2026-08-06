@@ -17,6 +17,9 @@ interface INativeTokenVaultBase is IL2AssetHandler {
     /// @notice Net amount of the given asset native to this chain currently bridged away from it.
     function bridgedOut(bytes32 _assetId) external view returns (uint256);
 
+    /// @notice Whether the chain-local bookkeeping for the asset has been initialized.
+    function isAssetTracked(bytes32 _assetId) external view returns (bool);
+
     /// @notice Returns the origin token for a given asset ID
     function originToken(bytes32 assetId) external view returns (address);
 

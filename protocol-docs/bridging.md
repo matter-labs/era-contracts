@@ -232,21 +232,23 @@ its empty compatibility stub because pre-v31 chains did deploy code there.
   `MAX_TOKEN_BALANCE - L2AssetTracker.chainBalance`; unlike the raw vault balance it is unaffected by
   later direct token donations. The mapping and both handlers live in `NativeTokenVaultBase` (shared with
   `L1NativeTokenVault`); the field takes a slot from the base storage gap, which no deployed vault ever
-  wrote, so already-deployed layouts are preserved.
-- `interopInfo[assetId]` (`totalWithdrawalsToL1`, `totalSuccessfulDepositsFromL1`) is the L2-side
-  accounting used to compute the amount to keep on L1 during the L1 -> Gateway migration. A flow is only
-  counted when the counterpart chain is L1 _and_ the chain currently settles on L1; `totalWithdrawalsToL1`
-  is consumed once during that migration and must stay append-only. The base token's counters live here
-  too, under `BASE_TOKEN_ASSET_ID`, reported by the `BaseTokenHolder` (below). For the base token, failed
-  deposits are refunded on L2 to the `refundRecipient` rather than claimed on L1, so the gap between
-  initiated deposits and this counter is not uniformly "claimable on L1" across asset types.
-- `preTrackingTotalSupply[assetId]` records the token's net inbound flow — total successful deposits
-  minus total successful withdrawals — accumulated before this bookkeeping existed. For a bridged token
-  (the base token included) that is exactly its pre-tracking `totalSupply()`; native tokens offset the
-  same net flow by `type(uint256).max` (the removed tracker's infinite-deposit convention):
-  `2^256 - 1 - bridgedOut`. Newly registered tokens start at the zero-flow baseline (`0` bridged,
-  `max` native).
-- `isAssetTracked[assetId]` guards the one-time initialization of the two fields above for a legacy
+  wrote, so already-deployed layouts are preserved. `isAssetTracked` lives there too, doubling on L1
+  as the `populateBridgedOut` once-marker.
+- `assetBookkeeping[assetId]` (one `L2AssetBookkeepingInfo` struct per asset) is the L2-side accounting
+  used to compute the amount to keep on L1 during the L1 -> Gateway migration:
+  - `totalWithdrawalsToL1` / `totalSuccessfulDepositsFromL1`: a flow is only counted when the counterpart
+    chain is L1 _and_ the chain currently settles on L1; `totalWithdrawalsToL1` is consumed once during
+    that migration and must stay append-only. The base token's counters live here too, under
+    `BASE_TOKEN_ASSET_ID`, reported by the `BaseTokenHolder` (below). For the base token, failed deposits
+    are refunded on L2 to the `refundRecipient` rather than claimed on L1, so the gap between initiated
+    deposits and this counter is not uniformly "claimable on L1" across asset types.
+  - `preTrackingTotalSupply` (with `isSaved` marking it recorded) is the same net inbound flow — total
+    successful deposits minus total successful withdrawals — accumulated before the tracking started,
+    which is why the fields share one struct. For a bridged token (the base token included) that is
+    exactly its pre-tracking `totalSupply()`; native tokens offset the same net flow by
+    `type(uint256).max` (the removed tracker's infinite-deposit convention): `2^256 - 1 - bridgedOut`.
+    Newly registered tokens start at the zero-flow baseline (`0` bridged, `max` native).
+- `isAssetTracked[assetId]` guards the one-time initialization of the fields above for a legacy
   L2-native token: its outstanding amount is seeded from the vault's current escrow (indistinguishable
   direct donations are conservatively treated as escrow, since they are effectively frozen). Seeding
   happens lazily on the token's first touch — before the operation changes any supply or escrow — or
@@ -255,13 +257,13 @@ its empty compatibility stub because pre-v31 chains did deploy code there.
 - The base token's baseline is recorded by `trackBaseToken` (upgrader-only, idempotent), which the
   upgrade/genesis init helper calls on both paths: its `totalSupply()` at that moment — the pre-upgrade
   supply on an upgraded chain, zero at genesis — is the pre-tracking net inbound flow, and every later
-  flow is reported by the holder into `interopInfo`. Tracking it from any later moment would fold
+  flow is reported by the holder into the same struct's counters. Tracking it from any later moment would fold
   already-recorded flows into the baseline, which is why `trackLegacyToken` cannot be used instead.
 
 ### `BaseTokenHolder` (base token)
 
 The holder escrows the base token, so its contract-level bridge flows converge here; each one is reported
-to the vault, which records it under `BASE_TOKEN_ASSET_ID` in the same `interopInfo` used for every other
+to the vault, which records it under `BASE_TOKEN_ASSET_ID` in the same `assetBookkeeping` used for every other
 asset (`recordBaseTokenBridgingToChain` / `recordBaseTokenBridgingFromChain`, holder-only).
 `burnAndStartBridging` reports outbound flows and `give` reports inbound interop flows before the external
 transfer. Bootloader-minted L1 deposits are reported through `recordBaseTokenDeposit` only where the mint

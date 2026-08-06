@@ -7,7 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {InteropL2Info} from "contracts/common/L2AssetBookkeeping.sol";
+import {L2AssetBookkeepingInfo} from "contracts/common/L2AssetBookkeeping.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 
 import {
@@ -673,7 +673,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     function _readBaseTokenInteropInfo() internal view returns (uint256 withdrawals, uint256 deposits) {
         // The holder reports its flows to the vault, which keeps them under BASE_TOKEN_ASSET_ID.
         L2NativeTokenVault vault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        InteropL2Info memory info = vault.interopInfo(vault.BASE_TOKEN_ASSET_ID());
+        L2AssetBookkeepingInfo memory info = vault.assetBookkeeping(vault.BASE_TOKEN_ASSET_ID());
         (withdrawals, deposits) = (info.totalWithdrawalsToL1, info.totalSuccessfulDepositsFromL1);
     }
 
@@ -683,7 +683,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
 
     /// @notice Verifies the full inbound interop flow through the base-token bookkeeping.
     /// @dev Executes a bundle with value > 0 through InteropHandler, which calls
-    /// BaseTokenHolder.give(), which reports the flow to the vault's `interopInfo`.
+    /// BaseTokenHolder.give(), which reports the flow to the vault's `assetBookkeeping`.
     function test_give_inboundFlow_recordsBookkeeping() public {
         BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);

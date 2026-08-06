@@ -142,7 +142,7 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     /// @dev Covers the holder->vault forwarding only: the vault is a recording mock, so the real
-    /// vault's settlement gating / `interopInfo` update is exercised in L2AssetBookkeeping.t.sol.
+    /// vault's settlement gating / `assetBookkeeping` update is exercised in L2AssetBookkeeping.t.sol.
     function test_withdraw_forwardsBaseTokenBookkeepingToVault() public {
         // Use the actual holder to verify the forwarded withdrawal.
         BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
