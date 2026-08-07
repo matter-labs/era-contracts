@@ -44,7 +44,7 @@ binding in {protocol-docs/atomicity/recovery.md} and proofs.md).
 `ImtProof` carries two nested authentications: `settlementProof` proves the claimed `chainImtRoot` is a
 specific chain's batch begin/end IMT leaf inside an imported interop root, and `imtProof` proves the
 leaf under `chainImtRoot`. The batch's `l1Timestamp` is **not** a struct field — it would be spoofable;
-it is re-derived from `settlementProof` (it is folded into the chain batch leaf). `provesAgainstBeginRoot`
+it is read from the verified `settlementProof` words (it is folded into the chain batch leaf). `provesAgainstBeginRoot`
 is a bool (not a raw leaf index) selecting the timeout branch, so authentication can never be aimed at
 the logs/multichain leaves. Full mechanics in {protocol-docs/atomicity/proofs.md}.
 

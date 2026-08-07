@@ -253,7 +253,7 @@ contract InteropCenter is
 
         // Ensure the destination is valid: bundles are initiated only on an L2, never target this chain
         // itself, and an L2->L1 bundle (canonically a withdrawal) must be a single call.
-        require(L1_CHAIN_ID != block.chainid, CannotInitiateInteropOnL1(destinationChainId));
+        require(L1_CHAIN_ID != block.chainid, CannotInitiateInteropOnL1());
         require(destinationChainId != block.chainid, InteropToSelfNotSupported());
         if (destinationChainId == L1_CHAIN_ID) {
             require(_callStarters.length == 1, MultiCallToL1NotSupported(_callStarters.length));

@@ -203,7 +203,7 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
         calls[0] = _l1CallStarter(L2_ASSET_ROUTER_ADDR, true, 0);
         // Pretend the InteropCenter is running on L1.
         vm.chainId(L1_CHAIN_ID);
-        vm.expectRevert(abi.encodeWithSelector(CannotInitiateInteropOnL1.selector, L1_CHAIN_ID));
+        vm.expectRevert(CannotInitiateInteropOnL1.selector);
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(L1_CHAIN_ID), calls, _l1BundleAttributes());
     }
 
