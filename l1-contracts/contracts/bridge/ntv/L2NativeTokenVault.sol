@@ -496,22 +496,27 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @dev Records an outbound flow in `assetBookkeeping` when it targets L1 and this chain currently
     /// settles on L1.
     function _recordBridgingToChain(bytes32 _assetId, uint256 _toChainId, uint256 _amount) internal {
-        if (
-            _toChainId == L1_CHAIN_ID &&
-            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == L1_CHAIN_ID
-        ) {
-            assetBookkeeping[_assetId].totalWithdrawalsToL1 += _amount;
-        }
+        _recordL1Flow(_assetId, _toChainId, _amount, true);
     }
 
     /// @dev Records an inbound flow in `assetBookkeeping` when it originates from L1 and this chain
     /// currently settles on L1.
     function _recordBridgingFromChain(bytes32 _assetId, uint256 _fromChainId, uint256 _amount) internal {
+        _recordL1Flow(_assetId, _fromChainId, _amount, false);
+    }
+
+    /// @dev Shared body of the two recorders above; counts the flow only when the counterpart
+    /// chain is L1 and this chain currently settles on L1.
+    function _recordL1Flow(bytes32 _assetId, uint256 _counterpartChainId, uint256 _amount, bool _outbound) private {
         if (
-            _fromChainId == L1_CHAIN_ID &&
+            _counterpartChainId == L1_CHAIN_ID &&
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == L1_CHAIN_ID
         ) {
-            assetBookkeeping[_assetId].totalSuccessfulDepositsFromL1 += _amount;
+            if (_outbound) {
+                assetBookkeeping[_assetId].totalWithdrawalsToL1 += _amount;
+            } else {
+                assetBookkeeping[_assetId].totalSuccessfulDepositsFromL1 += _amount;
+            }
         }
     }
 

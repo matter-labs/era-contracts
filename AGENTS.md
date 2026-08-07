@@ -226,12 +226,19 @@ The tests require `foundry-zksync` (ZKSync's fork of Foundry) to be installed. D
 
 ```bash
 mkdir ./foundry-zksync
-curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.30/foundry_zksync_v0.0.30_linux_amd64.tar.gz
-tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
+curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.1.5/foundry_zksync_v0.1.5_linux_amd64.tar.gz
+tar zxf foundry_zksync_v0.1.5_linux_amd64.tar.gz -C ./foundry-zksync
 chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-rm foundry_zksync_v0.0.30_linux_amd64.tar.gz
+rm foundry_zksync_v0.1.5_linux_amd64.tar.gz
 export PATH="$PWD/foundry-zksync:$PATH"
 ```
+
+The version must match `.github/actions/install-zksync-foundry/action.yaml` (currently `v0.1.5`):
+committed generated artifacts (`AllContractsHashes.json`, `l1-contracts/zkstack-out`, `selectors`)
+are checked in CI against builds made with exactly that release, so regenerating them with any
+other version produces spurious diffs. The anvil-interop chain states are the exception — they are
+generated and checked with vanilla foundry `v1.5.1` under `FOUNDRY_PROFILE=anvil-interop` (see
+`.github/workflows/anvil-interop-ci.yaml`).
 
 ### Building Artifacts
 

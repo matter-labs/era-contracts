@@ -905,13 +905,7 @@
   {
     "type": "error",
     "name": "CannotInitiateInteropOnL1",
-    "inputs": [
-      {
-        "name": "destinationChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
+    "inputs": []
   },
   {
     "type": "error",
