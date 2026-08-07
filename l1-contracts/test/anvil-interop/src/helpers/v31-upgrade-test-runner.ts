@@ -35,6 +35,7 @@ import {
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
 import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
+import { getGenesisProtocolVersion } from "../core/genesis";
 import type { ContractName } from "../core/contracts";
 import { forceBatchExecutedEqualsCommitted, transferOwnable2Step } from "./harness-shims";
 import { impersonateAndRun } from "../core/utils";
@@ -208,7 +209,7 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       sig: "stage3()",
     });
     console.log("\n── Stage 3 complete, verifying final protocol versions ──");
-    await verifyProtocolVersions(l1Provider, upgradeChainAddresses);
+    await verifyProtocolVersions(l1Provider, upgradeChainAddresses, scenario.isZKsyncOS);
     console.log("✅ All protocol versions verified successfully!\n");
   } finally {
     if (cleanupUpgradeHarnessInputs) {
@@ -1212,9 +1213,13 @@ async function verifyL2UpgradeResult(l2Provider: ethers.providers.JsonRpcProvide
 
 export async function verifyProtocolVersions(
   provider: ethers.providers.JsonRpcProvider,
-  chains: Array<{ chainId: number; diamondProxy: string }>
+  chains: Array<{ chainId: number; diamondProxy: string }>,
+  isZKsyncOS: boolean
 ): Promise<void> {
-  const expectedVersion = ethers.BigNumber.from("0x1f00000000");
+  // The upgrade writes whatever the genesis config declares (see
+  // `DefaultCoreUpgrade.loadProtocolVersionFromGenesis()`), so read it from there rather
+  // than hardcoding a version that goes stale on every patch bump.
+  const expectedVersion = getGenesisProtocolVersion(isZKsyncOS);
   for (const chain of chains) {
     const diamond = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), provider);
     const version = await diamond.getProtocolVersion();

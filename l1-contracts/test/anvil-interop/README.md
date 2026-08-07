@@ -36,9 +36,11 @@ yarn test:hardhat:interop --keep-chains
 
 ## Pregenerated Chain States
 
-Tests load pregenerated Anvil snapshots from `chain-states/v0.31.0/` by default. This skips the full deployment and cuts test time from ~5 min to ~85s.
+Tests load pregenerated Anvil snapshots from `chain-states/<protocol-version>/` by default, where `<protocol-version>` is the `vMAJOR.MINOR.PATCH` declared by `configs/genesis/era/latest.json`. This skips the full deployment and cuts test time from ~5 min to ~85s.
 
 The runner auto-detects pregenerated state by checking for `chain-states/<protocol-version>/addresses.json`. If found, it decompresses the dumped state and starts each Anvil process with `--load-state`. If not found (or `FRESH_DEPLOY=1`), it runs the full 5-step deployment.
+
+Because the directory is keyed by protocol version, a genesis version bump makes the previous snapshots unreachable and tests silently fall back to the full deployment until they are regenerated (see below, or the "Regenerate Anvil Interop Chain States" workflow). The older `v0.29.0` / `v0.30.0` snapshots are kept deliberately — the fork-upgrade tests use them as the pre-upgrade source state.
 
 To regenerate pregenerated state after contract changes:
 
@@ -171,7 +173,7 @@ test/anvil-interop/
 │   ├── permanent-values.toml      # Immutable protocol values
 │   └── chain-{10,11,12,13}.toml   # Per-chain deployment params (generated)
 ├── chain-states/
-│   └── v0.31.0/                   # Pregenerated Anvil state snapshots
+│   └── v<major>.<minor>.<patch>/  # Pregenerated Anvil state snapshots, keyed by genesis protocol version
 │       ├── 31337.json             # L1 state dump
 │       ├── {10,11,12,13}.json     # L2 chain state dumps
 │       └── addresses.json         # All contract addresses + test tokens

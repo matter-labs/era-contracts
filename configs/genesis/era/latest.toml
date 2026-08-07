@@ -1,4 +1,4 @@
-protocol_semantic_version = 133143986176
+protocol_semantic_version = 137438953472
 genesis_root = "0x165530549ee8b02b6ab6c703c00dd4965065413c64ee7dd109a9988816148407"
 genesis_rollup_leaf_index = 102
 genesis_batch_commitment = "0x1aece7b49008c333ba094046be34d5858284ef6101cee1c30f1cecbfce75768f"
