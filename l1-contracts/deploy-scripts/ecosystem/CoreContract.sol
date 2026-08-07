@@ -70,6 +70,7 @@ enum CoreContract {
     InteropCenter,
     InteropAttributeParser,
     L2InteropHandler,
+    L2AssetTracker,
     L2WrappedBaseToken,
     L2MessageVerification,
     L2InteropRootStorage,

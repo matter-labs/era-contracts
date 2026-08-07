@@ -31,6 +31,7 @@ sol! {
         bytes chainAssetHandlerBytecodeInfo;
         bytes interopCenterBytecodeInfo;
         bytes interopHandlerBytecodeInfo;
+        bytes assetTrackerBytecodeInfo;
         bytes beaconDeployerInfo;
         bytes baseTokenHolderBytecodeInfo;
         address l2SharedBridgeLegacyImpl;
@@ -260,6 +261,13 @@ impl FixedForceDeploymentsData {
         expect_bytecode_info(
             result,
             verifiers,
+            &self.assetTrackerBytecodeInfo,
+            "l1-contracts/L2AssetTracker",
+            "l1-contracts/L2AssetTracker",
+        );
+        expect_bytecode_info(
+            result,
+            verifiers,
             &self.beaconDeployerInfo,
             "l1-contracts/UpgradeableBeaconDeployer",
             "l1-contracts/UpgradeableBeaconDeployer",
@@ -339,6 +347,7 @@ mod tests {
             bytes chainAssetHandlerBytecodeInfo;
             bytes interopCenterBytecodeInfo;
             bytes interopHandlerBytecodeInfo;
+            bytes assetTrackerBytecodeInfo;
             bytes beaconDeployerInfo;
             bytes baseTokenHolderBytecodeInfo;
             address l2SharedBridgeLegacyImpl;
@@ -382,6 +391,7 @@ mod tests {
                 "bytes chainAssetHandlerBytecodeInfo;",
                 "bytes interopCenterBytecodeInfo;",
                 "bytes interopHandlerBytecodeInfo;",
+                "bytes assetTrackerBytecodeInfo;",
                 "bytes beaconDeployerInfo;",
                 "bytes baseTokenHolderBytecodeInfo;",
                 "address l2SharedBridgeLegacyImpl;",
@@ -407,13 +417,14 @@ mod tests {
             chainAssetHandlerBytecodeInfo: Bytes::from(vec![11]),
             interopCenterBytecodeInfo: Bytes::from(vec![12]),
             interopHandlerBytecodeInfo: Bytes::from(vec![13]),
-            beaconDeployerInfo: Bytes::from(vec![14]),
-            baseTokenHolderBytecodeInfo: Bytes::from(vec![15]),
-            l2SharedBridgeLegacyImpl: Address::from([16; 20]),
-            l2BridgedStandardERC20Impl: Address::from([17; 20]),
-            aliasedChainRegistrationSender: Address::from([18; 20]),
-            dangerousTestOnlyForcedBeacon: Address::from([19; 20]),
-            zkTokenAssetId: FixedBytes::from([20; 32]),
+            assetTrackerBytecodeInfo: Bytes::from(vec![14]),
+            beaconDeployerInfo: Bytes::from(vec![15]),
+            baseTokenHolderBytecodeInfo: Bytes::from(vec![16]),
+            l2SharedBridgeLegacyImpl: Address::from([17; 20]),
+            l2BridgedStandardERC20Impl: Address::from([18; 20]),
+            aliasedChainRegistrationSender: Address::from([19; 20]),
+            dangerousTestOnlyForcedBeacon: Address::from([20; 20]),
+            zkTokenAssetId: FixedBytes::from([21; 32]),
         };
 
         let encoded = expected.abi_encode();
@@ -443,6 +454,7 @@ mod tests {
             chainAssetHandlerBytecodeInfo,
             interopCenterBytecodeInfo,
             interopHandlerBytecodeInfo,
+            assetTrackerBytecodeInfo,
             beaconDeployerInfo,
             baseTokenHolderBytecodeInfo,
             l2SharedBridgeLegacyImpl,

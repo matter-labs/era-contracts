@@ -53,11 +53,4 @@ interface IBaseTokenHolder {
     /// @notice Receives outbound base-token value and records the outbound flow (replaces burning).
     /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable;
-
-    /// @notice Records an inbound base-token bridge finalized outside this contract.
-    /// @dev Callable only by L2BaseToken; used where bootloader deposits mint through a contract
-    /// call (`L2BaseTokenEra.mint`). On ZKsync OS the VM credits deposits by moving the holder's
-    /// balance directly, without any contract call, so those flows are not recorded.
-    /// TODO(EVM-1581): remove once Era integrations have been removed from the codebase.
-    function recordBaseTokenDeposit(uint256 _fromChainId, uint256 _amount) external;
 }

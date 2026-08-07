@@ -14,7 +14,6 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {
     L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
-    L2_REMOVED_ASSET_TRACKER_ADDR,
     L2_REMOVED_GW_ASSET_TRACKER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -64,35 +63,32 @@ contract ZKsyncOSOnlyContractsTest is Test {
         assertEq(matches, 1, "expected exactly one deployment for the address");
     }
 
-    /// @notice The removed v31 trackers must be neutralized: exactly one system-proxy entry per
-    /// reserved address, each installing the EmptyContract implementation, and the EmptyContract
+    /// @notice The removed v31 GWAssetTracker must be neutralized: exactly one system-proxy entry
+    /// for its reserved address, installing the EmptyContract implementation, and the EmptyContract
     /// preimage must be published with the factory dependencies.
-    function test_forceDeploymentsNeutralizeTheRemovedTrackers() public {
+    function test_forceDeploymentsNeutralizeTheRemovedTracker() public {
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = SystemContractsProcessing
             .getBaseZKsyncOSForceDeployments();
         bytes memory emptyContractInfo = Utils.getZKOSProxyUpgradeBytecodeInfo("EmptyContract.sol", "EmptyContract");
 
-        address[2] memory trackerAddresses = [L2_REMOVED_ASSET_TRACKER_ADDR, L2_REMOVED_GW_ASSET_TRACKER_ADDR];
-        for (uint256 t = 0; t < trackerAddresses.length; ++t) {
-            uint256 matches;
-            for (uint256 i = 0; i < deployments.length; ++i) {
-                if (deployments[i].newAddress != trackerAddresses[t]) {
-                    continue;
-                }
-                ++matches;
-                assertEq(
-                    uint256(deployments[i].upgradeType),
-                    uint256(IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade),
-                    "neutralization must be a system-proxy implementation swap"
-                );
-                assertEq(
-                    keccak256(deployments[i].deployedBytecodeInfo),
-                    keccak256(emptyContractInfo),
-                    "the removed tracker's proxy must point at EmptyContract"
-                );
+        uint256 matches;
+        for (uint256 i = 0; i < deployments.length; ++i) {
+            if (deployments[i].newAddress != L2_REMOVED_GW_ASSET_TRACKER_ADDR) {
+                continue;
             }
-            assertEq(matches, 1, "expected exactly one neutralization per removed tracker");
+            ++matches;
+            assertEq(
+                uint256(deployments[i].upgradeType),
+                uint256(IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade),
+                "neutralization must be a system-proxy implementation swap"
+            );
+            assertEq(
+                keccak256(deployments[i].deployedBytecodeInfo),
+                keccak256(emptyContractInfo),
+                "the removed tracker's proxy must point at EmptyContract"
+            );
         }
+        assertEq(matches, 1, "expected exactly one neutralization for the removed tracker");
 
         bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(true, new CoreContract[](0));
         bytes32 emptyContractCodeHash = keccak256(

@@ -17,7 +17,6 @@ import {
     L2_COMPLEX_UPGRADER_ADDR,
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR,
-    L2_REMOVED_ASSET_TRACKER_ADDR,
     L2_REMOVED_GW_ASSET_TRACKER_ADDR,
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -80,10 +79,10 @@ contract FaithfulZKOSDeployer {
     }
 }
 
-/// @notice Exercises the actual proxy transition of the removed-tracker neutralizations: starting
-/// from a v31-like state (real `SystemContractProxy` at both reserved addresses, pointing at a
-/// live tracker implementation), the production force-deployment entries are executed through the
-/// real `conductContractUpgrade` path and must leave each proxy on the derived `EmptyContract`
+/// @notice Exercises the actual proxy transition of the removed-tracker neutralization: starting
+/// from a v31-like state (a real `SystemContractProxy` at the reserved address, pointing at a live
+/// tracker implementation), the production force-deployment entries are executed through the real
+/// `conductContractUpgrade` path and must leave the proxy on the derived `EmptyContract`
 /// implementation with the retired selectors unreachable.
 contract RemovedTrackerNeutralizationTest is Test {
     /// @dev EIP-1967 implementation slot.
@@ -106,9 +105,8 @@ contract RemovedTrackerNeutralizationTest is Test {
 
         trackerImplV31 = address(new MockV31TrackerImpl());
 
-        // v31 state at both reserved addresses: a real system proxy with a live tracker
+        // v31 state at the reserved address: a real system proxy with a live tracker
         // implementation behind it.
-        _installV31Tracker(L2_REMOVED_ASSET_TRACKER_ADDR);
         _installV31Tracker(L2_REMOVED_GW_ASSET_TRACKER_ADDR);
     }
 
@@ -132,7 +130,7 @@ contract RemovedTrackerNeutralizationTest is Test {
         );
     }
 
-    function test_neutralizationSwitchesLiveTrackerProxiesToEmptyContract() public {
+    function test_neutralizationSwitchesTheLiveTrackerProxyToEmptyContract() public {
         // The COMPLETE production list, dispatched in production order: the neutralizations sit at
         // the tail, so a dispatcher (or list builder) that stopped at the former entry count would
         // fail the per-proxy assertions below.
@@ -140,7 +138,7 @@ contract RemovedTrackerNeutralizationTest is Test {
             .getBaseZKsyncOSForceDeployments();
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory neutralizations = SystemContractsProcessing
             .getRemovedTrackerNeutralizations();
-        assertEq(neutralizations.length, 2, "both removed trackers must be neutralized");
+        assertEq(neutralizations.length, 1, "the removed GWAssetTracker must be neutralized");
         for (uint256 i = 0; i < neutralizations.length; ++i) {
             assertEq(
                 deployments[deployments.length - neutralizations.length + i].newAddress,

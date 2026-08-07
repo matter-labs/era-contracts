@@ -237,9 +237,9 @@ nor their addresses existed in v31, so no chain can arrive at this upgrade with 
 and the force deployments in the same transaction install their code before the `initL2`s run. Era
 chains never receive them — this release upgrades ZKsync OS chains only.
 
-The same upgrade list also neutralizes the two trackers this release removes
-(`SystemContractsProcessing.getRemovedTrackerNeutralizations`): v31 deployed the `L2AssetTracker` and
-`GWAssetTracker` as system-proxied built-ins on every ZKsync OS chain, so the upgrade swaps those
-proxies' implementations for `EmptyContract` — otherwise the retired tracker code would stay callable.
-Chains created on v32 receive the same EmptyContract-backed proxies from genesis, so fresh and
-upgraded chains match at the reserved addresses.
+The same upgrade list also neutralizes the tracker this release removes
+(`SystemContractsProcessing.getRemovedTrackerNeutralizations`): v31 deployed the `GWAssetTracker` as a
+system-proxied built-in on every ZKsync OS chain, so the upgrade swaps that proxy's implementation for
+`EmptyContract` — otherwise the retired tracker code would stay callable. Chains created on v32 receive
+the same EmptyContract-backed proxy from genesis, so fresh and upgraded chains match at the reserved
+address.

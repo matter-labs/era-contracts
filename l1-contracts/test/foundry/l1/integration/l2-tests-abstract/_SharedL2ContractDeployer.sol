@@ -11,7 +11,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
@@ -21,6 +21,7 @@ import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_ROUTER,
+    L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -492,16 +493,15 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Chain-local bookkeeping helpers (shared across test contracts)
+    //  L2AssetTracker bookkeeping helpers (shared across test contracts)
     // ═══════════════════════════════════════════════════════════════════
 
     function _readTotalWithdrawalsToL1(bytes32 _assetId) internal view returns (uint256) {
-        return L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).getAssetBookkeeping(_assetId).totalWithdrawalsToL1;
+        return L2AssetTracker(L2_ASSET_TRACKER_ADDR).getAssetBookkeeping(_assetId).totalWithdrawalsToL1;
     }
 
     function _readTotalSuccessfulDepositsFromL1(bytes32 _assetId) internal view returns (uint256) {
-        return
-            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).getAssetBookkeeping(_assetId).totalSuccessfulDepositsFromL1;
+        return L2AssetTracker(L2_ASSET_TRACKER_ADDR).getAssetBookkeeping(_assetId).totalSuccessfulDepositsFromL1;
     }
 
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual;

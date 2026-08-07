@@ -58,9 +58,8 @@ pub const L2_BRIDGEHUB_ADDR: Address = l2_addr(0x02);
 pub const L2_ASSET_ROUTER_ADDR: Address = l2_addr(0x03);
 pub const L2_NATIVE_TOKEN_VAULT_ADDR: Address = l2_addr(0x04);
 pub const L2_MESSAGE_ROOT_ADDR: Address = l2_addr(0x05);
-/// The removed v31 trackers' addresses: the v32 upgrade swaps their system proxies'
-/// implementations for `EmptyContract` (see `getRemovedTrackerNeutralizations`).
-pub const L2_REMOVED_ASSET_TRACKER_ADDR: Address = l2_addr(0x0f);
+/// The removed v31 GWAssetTracker's address: the v32 upgrade swaps its system proxy's
+/// implementation for `EmptyContract` (see `getRemovedTrackerNeutralizations`).
 pub const L2_REMOVED_GW_ASSET_TRACKER_ADDR: Address = l2_addr(0x10);
 pub const SLOAD_CONTRACT_ADDR: Address = l2_addr(0x06);
 // v31 no longer force-deploys the WrappedBaseToken, so this address is only referenced by the
@@ -73,6 +72,7 @@ pub const L2_CHAIN_ASSET_HANDLER_ADDR: Address = l2_addr(0x0a);
 pub const L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR: Address = l2_addr(0x0c);
 pub const L2_INTEROP_CENTER_ADDR: Address = l2_addr(0x0d);
 pub const L2_INTEROP_HANDLER_ADDR: Address = l2_addr(0x0e);
+pub const L2_ASSET_TRACKER_ADDR: Address = l2_addr(0x0f);
 pub const L2_INTEROP_ATTRIBUTE_PARSER_ADDR: Address = l2_addr(0x15);
 pub const L2_INTEROP_COMMITMENT_TREE_ADDR: Address = l2_addr(0x12);
 pub const L2_ATOMIC_FLOW_MANAGER_ADDR: Address = l2_addr(0x14);
@@ -256,11 +256,8 @@ mod tests {
             ),
             ("L2_INTEROP_CENTER_ADDR", L2_INTEROP_CENTER_ADDR),
             ("L2_INTEROP_HANDLER_ADDR", L2_INTEROP_HANDLER_ADDR),
+            ("L2_ASSET_TRACKER_ADDR", L2_ASSET_TRACKER_ADDR),
             ("L2_BASE_TOKEN_HOLDER_ADDR", L2_BASE_TOKEN_HOLDER_ADDR),
-            (
-                "L2_REMOVED_ASSET_TRACKER_ADDR",
-                L2_REMOVED_ASSET_TRACKER_ADDR,
-            ),
             (
                 "L2_REMOVED_GW_ASSET_TRACKER_ADDR",
                 L2_REMOVED_GW_ASSET_TRACKER_ADDR,

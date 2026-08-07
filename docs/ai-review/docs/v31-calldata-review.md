@@ -492,7 +492,7 @@ The raw bytes can be decoded with:
 
 ```bash
 cast decode-abi \
-  "f()((uint256,uint256,address,bytes32,address,uint256,bytes,bytes,bytes,bytes,bytes,bytes,bytes,bytes,bytes,address,address,address,address,bytes32))" \
+  "f()((uint256,uint256,address,bytes32,address,uint256,bytes,bytes,bytes,bytes,bytes,bytes,bytes,bytes,bytes,bytes,address,address,address,address,bytes32))" \
   <force_deployments_data_hex>
 ```
 
@@ -526,6 +526,7 @@ Expected `*BytecodeInfo` mappings:
 | `chainAssetHandlerBytecodeInfo` | `l1-contracts/L2ChainAssetHandler`                                                             |
 | `interopCenterBytecodeInfo`     | `l1-contracts/InteropCenter`                                                                   |
 | `interopHandlerBytecodeInfo`    | `l1-contracts/InteropHandler`                                                                  |
+| `assetTrackerBytecodeInfo`      | `l1-contracts/L2AssetTracker`                                                                  |
 | `beaconDeployerInfo`            | `l1-contracts/UpgradeableBeaconDeployer`                                                       |
 | `baseTokenHolderBytecodeInfo`   | `l1-contracts/BaseTokenHolder`                                                                 |
 

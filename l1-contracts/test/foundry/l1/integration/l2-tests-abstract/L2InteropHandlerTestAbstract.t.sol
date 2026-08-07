@@ -12,6 +12,8 @@ import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_TRACKER,
+    L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
@@ -33,7 +35,7 @@ import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
-import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
@@ -652,8 +654,8 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     //  Helper: set up base-token bookkeeping dependencies
     // ══════════════════════════════════════════════════════════════
 
-    /// @dev The holder forwards flows to the vault, which reads the L1 chain id and current
-    /// settlement layer when updating L1-attributable counters. The vault is initialized by the
+    /// @dev The holder forwards flows to the tracker, which reads the L1 chain id and current
+    /// settlement layer when updating L1-attributable counters. The tracker is initialized by the
     /// shared setup; only settlement and the migration-number dependency need explicit
     /// configuration here.
     function _setupBaseTokenBookkeeping() internal {
@@ -671,19 +673,21 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     }
 
     function _readBaseTokenFlowCounters() internal view returns (uint256 withdrawals, uint256 deposits) {
-        // The holder reports its flows to the vault, which keeps them under BASE_TOKEN_ASSET_ID.
-        L2NativeTokenVault vault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        L2AssetBookkeepingInfo memory info = vault.getAssetBookkeeping(vault.BASE_TOKEN_ASSET_ID());
+        // The holder reports its flows to the tracker, which keeps them under BASE_TOKEN_ASSET_ID.
+        L2AssetBookkeepingInfo memory info = L2_ASSET_TRACKER.getAssetBookkeeping(
+            L2_ASSET_TRACKER.BASE_TOKEN_ASSET_ID()
+        );
         (withdrawals, deposits) = (info.totalWithdrawalsToL1, info.totalSuccessfulDepositsFromL1);
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Inbound flow: InteropHandler → BaseTokenHolder.give() → bookkeeping
+    //  Inbound flow: InteropHandler → BaseTokenHolder.give() → L2AssetTracker
     // ═══════════════════════════════════════════════════════════════════
 
     /// @notice Verifies the full inbound interop flow through the base-token bookkeeping.
     /// @dev Executes a bundle with value > 0 through InteropHandler, which calls
-    /// BaseTokenHolder.give(), which reports the flow to the vault's `assetBookkeeping`.
+    /// BaseTokenHolder.give(), which reports the flow to the tracker's `assetBookkeeping`.
+    /// No mock on the tracker — exercises access control and storage updates.
     function test_give_inboundFlow_recordsBookkeeping() public {
         BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
@@ -707,6 +711,11 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         // Record deposits before
         (, uint256 depositsBefore) = _readBaseTokenFlowCounters();
 
+        vm.expectCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeCall(IL2AssetTracker.handleFinalizeBaseTokenBridgingOnL2, (ERA_CHAIN_ID, callValue))
+        );
+
         // give() sends the value to L2InteropHandler, hence the event recipient.
         vm.expectEmit(true, false, false, true, L2_BASE_TOKEN_HOLDER_ADDR);
         emit IBaseTokenHolder.BaseTokenMintedInterop(L2_INTEROP_HANDLER_ADDR, callValue);
@@ -720,7 +729,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Outbound flow: burnAndStartBridging() → bookkeeping
+    //  Outbound flow: burnAndStartBridging() → L2AssetTracker
     // ═══════════════════════════════════════════════════════════════════
 
     /// @notice Verifies the full outbound bridging flow through the base-token bookkeeping.
@@ -737,6 +746,11 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         // Record withdrawals before
         (uint256 withdrawalsBefore, ) = _readBaseTokenFlowCounters();
 
+        vm.expectCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeCall(IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2, (toChainId, burnAmount))
+        );
+
         vm.expectEmit(true, false, false, true, L2_BASE_TOKEN_HOLDER_ADDR);
         emit IBaseTokenHolder.BaseTokenBurntInterop(L2_INTEROP_CENTER_ADDR, toChainId, burnAmount);
 
@@ -744,7 +758,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         vm.prank(L2_INTEROP_CENTER_ADDR);
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(toChainId);
 
-        // Verify holder storage was actually updated.
+        // Verify the tracker's bookkeeping was actually updated.
         (uint256 withdrawalsAfter, ) = _readBaseTokenFlowCounters();
         assertEq(
             withdrawalsAfter,

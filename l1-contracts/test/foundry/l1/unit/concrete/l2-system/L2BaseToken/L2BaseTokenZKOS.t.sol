@@ -8,6 +8,7 @@ import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol
 import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.sol";
 import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
 import {
+    L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
@@ -22,37 +23,12 @@ import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailb
 import {
     BaseTokenHolderAlreadyInitialized,
     BaseTokenHolderMintFailed,
-    InvalidCaller,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
+import {DummyL2AssetTracker} from "contracts/dev-contracts/test/DummyL2AssetTracker.sol";
 import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 import {DummyL2BaseTokenHolder} from "contracts/dev-contracts/test/DummyL2BaseTokenHolder.sol";
-
-/// @dev Records the base-token flows the real BaseTokenHolder reports. The settlement-layer
-/// gating of these flows lives in the real L2NativeTokenVault and is covered by its own tests.
-contract MockRecordingVault {
-    uint256 public recordedToChainId;
-    uint256 public recordedToAmount;
-    uint256 public toChainCalls;
-    uint256 public fromChainCalls;
-
-    function recordBaseTokenBridgingToChain(uint256 _toChainId, uint256 _amount) external {
-        if (msg.sender != L2_BASE_TOKEN_HOLDER_ADDR) {
-            revert InvalidCaller(msg.sender);
-        }
-        recordedToChainId = _toChainId;
-        recordedToAmount = _amount;
-        toChainCalls++;
-    }
-
-    function recordBaseTokenBridgingFromChain(uint256, uint256) external {
-        if (msg.sender != L2_BASE_TOKEN_HOLDER_ADDR) {
-            revert InvalidCaller(msg.sender);
-        }
-        fromChainCalls++;
-    }
-}
 
 /// @dev Harness exposing a setter for the slot that v31's backfill service transaction
 /// (removed in this release) used to write, so an upgraded chain's pre-populated state can be
@@ -93,7 +69,10 @@ contract L2BaseTokenZKOSTest is Test {
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new DummyL2BaseTokenHolder()).code);
 
         // The real BaseTokenHolder reports bridge flows to the vault; a recording mock stands in.
-        vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, address(new MockRecordingVault()).code);
+        vm.etch(
+            L2_ASSET_TRACKER_ADDR,
+            address(new DummyL2AssetTracker(address(0), DummyL2AssetTracker.RecordMode.None)).code
+        );
     }
 
     /// @dev Helper to initialize l2BaseToken via initL2() — sets L1_CHAIN_ID and transfers to BaseTokenHolder.
@@ -143,7 +122,7 @@ contract L2BaseTokenZKOSTest is Test {
 
     /// @dev Covers the holder->vault forwarding only: the vault is a recording mock, so the real
     /// vault's settlement gating / `assetBookkeeping` update is exercised in L2AssetBookkeeping.t.sol.
-    function test_withdraw_forwardsBaseTokenBookkeepingToVault() public {
+    function test_withdraw_forwardsBaseTokenBookkeepingToTracker() public {
         // Use the actual holder to verify the forwarded withdrawal.
         BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
@@ -163,10 +142,10 @@ contract L2BaseTokenZKOSTest is Test {
         vm.prank(sender);
         L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
 
-        MockRecordingVault vault = MockRecordingVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        assertEq(vault.toChainCalls(), 1, "withdrawal should be reported to the vault");
-        assertEq(vault.recordedToChainId(), 1, "withdrawal destination should be the L1 chain id");
-        assertEq(vault.recordedToAmount(), WITHDRAW_AMOUNT, "withdrawal amount should be forwarded verbatim");
+        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(tracker.toChainCalls(), 1, "withdrawal should be reported to the tracker");
+        assertEq(tracker.recordedToChainId(), 1, "withdrawal destination should be the L1 chain id");
+        assertEq(tracker.recordedToAmount(), WITHDRAW_AMOUNT, "withdrawal amount should be forwarded verbatim");
     }
 
     function test_withdraw_callsL1Messenger() public {
@@ -261,7 +240,7 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     /// @dev Forwarding-only coverage, like `test_withdraw_forwardsBaseTokenBookkeepingToVault`.
-    function test_withdrawWithMessage_forwardsBaseTokenBookkeepingToVault() public {
+    function test_withdrawWithMessage_forwardsBaseTokenBookkeepingToTracker() public {
         // Use the actual holder to verify the forwarded withdrawal.
         BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
@@ -285,10 +264,10 @@ contract L2BaseTokenZKOSTest is Test {
             additionalData
         );
 
-        MockRecordingVault vault = MockRecordingVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        assertEq(vault.toChainCalls(), 1, "withdrawal should be reported to the vault");
-        assertEq(vault.recordedToChainId(), 1, "withdrawal destination should be the L1 chain id");
-        assertEq(vault.recordedToAmount(), WITHDRAW_AMOUNT, "withdrawal amount should be forwarded verbatim");
+        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(tracker.toChainCalls(), 1, "withdrawal should be reported to the tracker");
+        assertEq(tracker.recordedToChainId(), 1, "withdrawal destination should be the L1 chain id");
+        assertEq(tracker.recordedToAmount(), WITHDRAW_AMOUNT, "withdrawal amount should be forwarded verbatim");
     }
 
     function test_withdrawWithMessage_callsL1MessengerWithExtendedMessage() public {
@@ -479,8 +458,8 @@ contract L2BaseTokenZKOSTest is Test {
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: 1 ether}(0);
     }
 
-    /// @notice Verifies that BaseTokenHolder reports InteropCenter bridging burns to the vault.
-    function test_baseTokenHolder_reportsInteropCenterBurnToVault() public {
+    /// @notice Verifies that BaseTokenHolder reports InteropCenter bridging burns to the tracker.
+    function test_baseTokenHolder_reportsInteropCenterBurnToTracker() public {
         // Deploy real BaseTokenHolder for integration tests
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
         uint256 burnAmount = 1 ether;
@@ -490,15 +469,15 @@ contract L2BaseTokenZKOSTest is Test {
         vm.prank(L2_INTEROP_CENTER_ADDR);
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(1);
 
-        MockRecordingVault vault = MockRecordingVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        assertEq(vault.toChainCalls(), 1);
-        assertEq(vault.recordedToChainId(), 1);
-        assertEq(vault.recordedToAmount(), burnAmount);
+        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(tracker.toChainCalls(), 1);
+        assertEq(tracker.recordedToChainId(), 1);
+        assertEq(tracker.recordedToAmount(), burnAmount);
     }
 
     /// @notice Verifies that L2BaseToken can call burnAndStartBridging for withdrawals
     /// @dev This test ensures L2BaseToken is a valid bridging caller
-    function test_baseTokenHolder_reportsL2BaseTokenWithdrawalToVault() public {
+    function test_baseTokenHolder_reportsL2BaseTokenWithdrawalToTracker() public {
         // Deploy real BaseTokenHolder for integration tests
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
         uint256 burnAmount = 1 ether;
@@ -508,9 +487,9 @@ contract L2BaseTokenZKOSTest is Test {
         vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(1);
 
-        MockRecordingVault vault = MockRecordingVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        assertEq(vault.toChainCalls(), 1);
-        assertEq(vault.recordedToAmount(), burnAmount);
+        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(tracker.toChainCalls(), 1);
+        assertEq(tracker.recordedToAmount(), burnAmount);
     }
 
     /// @notice Verifies that BaseTokenHolder reports nothing on initialization receive().
@@ -526,9 +505,9 @@ contract L2BaseTokenZKOSTest is Test {
         (bool success, ) = L2_BASE_TOKEN_HOLDER_ADDR.call{value: initAmount}("");
         assertTrue(success, "Transfer should succeed");
 
-        MockRecordingVault vault = MockRecordingVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        assertEq(vault.toChainCalls(), 0, "initialization receive must not be reported as an outbound flow");
-        assertEq(vault.fromChainCalls(), 0, "initialization receive must not be reported as an inbound flow");
+        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(tracker.toChainCalls(), 0, "initialization receive must not be reported as an outbound flow");
+        assertEq(tracker.fromChainCalls(), 0, "initialization receive must not be reported as an inbound flow");
     }
 
     /// @notice Verifies that initL2 does not record a bridge operation: the initialization
@@ -554,9 +533,9 @@ contract L2BaseTokenZKOSTest is Test {
             INITIAL_BASE_TOKEN_HOLDER_BALANCE,
             "BaseTokenHolder should have received initial balance"
         );
-        MockRecordingVault vault = MockRecordingVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        assertEq(vault.toChainCalls(), 0, "initL2 must not be reported as an outbound flow");
-        assertEq(vault.fromChainCalls(), 0, "initL2 must not be reported as an inbound flow");
+        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(tracker.toChainCalls(), 0, "initL2 must not be reported as an outbound flow");
+        assertEq(tracker.fromChainCalls(), 0, "initL2 must not be reported as an inbound flow");
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -12,9 +12,11 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -65,7 +67,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         vm.deal(L2_ASSET_ROUTER_ADDR, depositAmount);
 
         // Replace the dummy holder with the real implementation so the regression test
-        // observes the full bookkeeping path (the holder reports base-token flows to the vault).
+        // observes the full bookkeeping path (the holder reports base-token flows to the tracker).
         BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
         vm.mockCall(
@@ -77,9 +79,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         // Record the BaseTokenHolder balance before
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
         uint256 bridgedOutBefore = l2NativeTokenVault.bridgedOut(baseTokenAssetIdLocal);
-        uint256 totalWithdrawalsBefore = l2NativeTokenVault
-            .getAssetBookkeeping(baseTokenAssetIdLocal)
-            .totalWithdrawalsToL1;
+        uint256 totalWithdrawalsBefore = _readTotalWithdrawalsToL1(baseTokenAssetIdLocal);
 
         // Call bridgeBurn from the asset router (which is the only allowed caller)
         // Before the fix: This would revert because bridgeBurn would try to call
@@ -106,11 +106,8 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
             bridgedOutBefore,
             "bridgedOut should not change for bridged base token burns on L2"
         );
-        uint256 totalWithdrawalsAfter = l2NativeTokenVault
-            .getAssetBookkeeping(baseTokenAssetIdLocal)
-            .totalWithdrawalsToL1;
         assertEq(
-            totalWithdrawalsAfter - totalWithdrawalsBefore,
+            _readTotalWithdrawalsToL1(baseTokenAssetIdLocal) - totalWithdrawalsBefore,
             depositAmount,
             "totalWithdrawalsToL1 should only increase once for bridged base token burn"
         );
@@ -182,8 +179,8 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20Metadata.symbol, ()), abi.encode("TT"));
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20Metadata.decimals, ()), abi.encode(uint8(18)));
 
-        // Mock totalSupply() — read by `_trackLegacyTokenIfNeeded` when it records a bridged
-        // token's pre-tracking baseline.
+        // Mock totalSupply() — read by `L2AssetTracker.trackLegacyTokenIfNeeded` when it records a
+        // bridged token's pre-tracking baseline.
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(uint256(0)));
 
         // Expect the bridgeBurn call on the bridged token

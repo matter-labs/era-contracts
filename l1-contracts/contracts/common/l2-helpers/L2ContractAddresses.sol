@@ -135,15 +135,13 @@ address constant L2_INTEROP_CENTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x
 /// @dev the address of the L2 interop handler
 address payable constant L2_INTEROP_HANDLER_ADDR = payable(address(BUILT_IN_CONTRACTS_OFFSET + 0x0e));
 
-/// @dev The removed v31 L2AssetTracker's address, kept as a gap so the following addresses keep
+/// @dev the address of the L2 asset tracker
+address constant L2_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0f);
+
+/// @dev The removed v31 GWAssetTracker's address, kept as a gap so the following addresses keep
 /// their positions. v31 released with the tracker deployed here, so the v32 upgrade swaps its
 /// system proxy's implementation for `EmptyContract`; chains created on v32 get the same
 /// EmptyContract-backed proxy from genesis, so fresh and upgraded chains match at this address.
-/// New recording happens in L2NativeTokenVault and BaseTokenHolder instead.
-address constant L2_REMOVED_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0f);
-
-/// @dev The removed v31 GWAssetTracker's address; a gap neutralized exactly like
-/// `L2_REMOVED_ASSET_TRACKER_ADDR`.
 address constant L2_REMOVED_GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x10);
 
 /// @dev The address of the base token holder contract that holds chain's base token reserves.

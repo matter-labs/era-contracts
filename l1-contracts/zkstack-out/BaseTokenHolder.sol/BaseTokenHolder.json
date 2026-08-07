@@ -41,24 +41,6 @@
   },
   {
     "type": "function",
-    "name": "recordBaseTokenDeposit",
-    "inputs": [
-      {
-        "name": "_fromChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "recoverBaseToken",
     "inputs": [
       {

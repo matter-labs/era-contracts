@@ -9,13 +9,12 @@ import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.
 import {IL2BaseTokenEra} from "contracts/l2-system/era/interfaces/IL2BaseTokenEra.sol";
 import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
 import {
+    L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BOOTLOADER_ADDRESS,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-    L2_NATIVE_TOKEN_VAULT_ADDR,
-    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     MSG_VALUE_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -24,10 +23,10 @@ import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailb
 import {
     BaseTokenHolderAlreadyInitialized,
     InsufficientFunds,
-    InvalidCaller,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
+import {DummyL2AssetTracker} from "contracts/dev-contracts/test/DummyL2AssetTracker.sol";
 import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 import {DummyL2BaseTokenHolder} from "contracts/dev-contracts/test/DummyL2BaseTokenHolder.sol";
 
@@ -59,6 +58,10 @@ contract L2BaseTokenEraTest is Test {
         bob = makeAddr("bob");
 
         // Deploy dummy dependencies at system addresses (replaces broad vm.mockCall)
+        vm.etch(
+            L2_ASSET_TRACKER_ADDR,
+            address(new DummyL2AssetTracker(address(0), DummyL2AssetTracker.RecordMode.None)).code
+        );
         vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(new DummyL2L1Messenger()).code);
 
         // Deploy dummy BaseTokenHolder that accepts ETH from any sender.
@@ -353,13 +356,13 @@ contract L2BaseTokenEraTest is Test {
         );
     }
 
-    function test_mint_recordsDepositOnBaseTokenHolder() public {
+    function test_mint_callsAssetTracker() public {
         _initL2();
         uint256 mintAmount = 1 ether;
 
         vm.expectCall(
-            L2_BASE_TOKEN_HOLDER_ADDR,
-            abi.encodeWithSignature("recordBaseTokenDeposit(uint256,uint256)", 1, mintAmount)
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSignature("handleFinalizeBaseTokenBridgingOnL2(uint256,uint256)", 1, mintAmount)
         );
 
         vm.prank(L2_BOOTLOADER_ADDRESS);
@@ -530,13 +533,13 @@ contract L2BaseTokenEraTest is Test {
         );
     }
 
-    /// @dev Covers the holder->vault forwarding only: the vault is a recording mock, so the real
-    /// vault's settlement gating / `assetBookkeeping` update is exercised in L2AssetBookkeeping.t.sol.
-    function test_withdraw_forwardsBookkeepingWithL1ChainIdToVault() public {
-        // Deploy the real holder so the withdrawal reporting path executes; the holder
-        // reports the flow to the vault, so a recording mock stands in for it.
+    /// @dev Covers the holder->tracker forwarding only: the tracker is a recording dummy, so the
+    /// real tracker's settlement gating / `assetBookkeeping` update is exercised in
+    /// L2AssetBookkeeping.t.sol.
+    function test_withdraw_forwardsBookkeepingWithL1ChainIdToTracker() public {
+        // Deploy the real holder so the withdrawal reporting path executes; the holder reports the
+        // flow to the tracker, whose recording dummy is already etched by `setUp`.
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
-        vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, address(new MockRecordingVault()).code);
 
         // Deploy at system contract address so it passes onlyBridgingCaller check
         L2BaseTokenEra l2BaseTokenAtSystemAddr = new L2BaseTokenEra();
@@ -551,10 +554,10 @@ contract L2BaseTokenEraTest is Test {
         vm.prank(sender);
         L2BaseTokenEra(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
 
-        MockRecordingVault vault = MockRecordingVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        assertEq(vault.toChainCalls(), 1, "withdrawal should be reported to the vault");
-        assertEq(vault.recordedToChainId(), 1, "withdrawal destination should be the L1 chain id");
-        assertEq(vault.recordedToAmount(), WITHDRAW_AMOUNT, "withdrawal amount should be forwarded verbatim");
+        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(tracker.toChainCalls(), 1, "withdrawal should be reported to the tracker");
+        assertEq(tracker.recordedToChainId(), 1, "withdrawal destination should be the L1 chain id");
+        assertEq(tracker.recordedToAmount(), WITHDRAW_AMOUNT, "withdrawal amount should be forwarded verbatim");
     }
 
     function test_withdraw_callsL1Messenger() public {
@@ -794,6 +797,43 @@ contract L2BaseTokenEraTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
+                    ORDERING INVARIANT TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice The tracker hook must run BEFORE totalSupply changes: a legacy token's baseline is
+    /// derived from the pre-operation supply, so the very first deposit must still observe it.
+    function test_mint_callsAssetTrackerBeforeTotalSupplyChange() public {
+        _initL2();
+        uint256 mintAmount = 5 ether;
+
+        uint256 totalSupplyBefore = l2BaseToken.totalSupply();
+
+        // Deploy DummyL2AssetTracker in recording mode — snapshots totalSupply when called
+        DummyL2AssetTracker recorder = new DummyL2AssetTracker(
+            address(l2BaseToken),
+            DummyL2AssetTracker.RecordMode.TotalSupply
+        );
+        vm.etch(L2_ASSET_TRACKER_ADDR, address(recorder).code);
+
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        l2BaseToken.mint(alice, mintAmount);
+
+        DummyL2AssetTracker etched = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertTrue(etched.wasCalled(), "Asset tracker should have been called");
+        assertEq(
+            etched.recordedValue(),
+            totalSupplyBefore,
+            "handleFinalizeBaseTokenBridgingOnL2 must be called BEFORE totalSupply changes"
+        );
+
+        assertEq(
+            l2BaseToken.totalSupply(),
+            totalSupplyBefore + mintAmount,
+            "totalSupply should have increased after mint completes"
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
                         INTERFACE COMPLIANCE
     //////////////////////////////////////////////////////////////*/
 
@@ -805,29 +845,6 @@ contract L2BaseTokenEraTest is Test {
     function test_implementsIL2BaseTokenEra() public view {
         IL2BaseTokenEra token = IL2BaseTokenEra(address(l2BaseToken));
         assert(address(token) == address(l2BaseToken));
-    }
-}
-
-/// @dev Records the base-token flows the real BaseTokenHolder reports. The settlement-layer
-/// gating of these flows lives in the real L2NativeTokenVault and is covered by its own tests.
-contract MockRecordingVault {
-    uint256 public recordedToChainId;
-    uint256 public recordedToAmount;
-    uint256 public toChainCalls;
-
-    function recordBaseTokenBridgingToChain(uint256 _toChainId, uint256 _amount) external {
-        if (msg.sender != L2_BASE_TOKEN_HOLDER_ADDR) {
-            revert InvalidCaller(msg.sender);
-        }
-        recordedToChainId = _toChainId;
-        recordedToAmount = _amount;
-        toChainCalls++;
-    }
-
-    function recordBaseTokenBridgingFromChain(uint256, uint256) external {
-        if (msg.sender != L2_BASE_TOKEN_HOLDER_ADDR) {
-            revert InvalidCaller(msg.sender);
-        }
     }
 }
 

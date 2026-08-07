@@ -138,24 +138,6 @@
   },
   {
     "type": "function",
-    "name": "assertRecoveryIsAccountingNeutral",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_toChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "assetId",
     "inputs": [
       {
@@ -377,42 +359,6 @@
       }
     ],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "getAssetBookkeeping",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "internalType": "struct L2AssetBookkeepingInfo",
-        "components": [
-          {
-            "name": "preTrackingTotalSupply",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "totalWithdrawalsToL1",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "totalSuccessfulDepositsFromL1",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -644,42 +590,6 @@
   },
   {
     "type": "function",
-    "name": "recordBaseTokenBridgingFromChain",
-    "inputs": [
-      {
-        "name": "_fromChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "recordBaseTokenBridgingToChain",
-    "inputs": [
-      {
-        "name": "_toChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "registerToken",
     "inputs": [
       {
@@ -774,13 +684,6 @@
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "trackBaseToken",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1233,11 +1136,6 @@
   },
   {
     "type": "error",
-    "name": "BaseTokenNativeToThisChain",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "BurningNativeWETHNotSupported",
     "inputs": []
   },
@@ -1321,11 +1219,6 @@
   {
     "type": "error",
     "name": "NonEmptyMsgValue",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "RecoverToL1NotSupported",
     "inputs": []
   },
   {

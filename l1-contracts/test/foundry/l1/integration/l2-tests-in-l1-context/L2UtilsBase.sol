@@ -5,6 +5,7 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
 
+import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -12,6 +13,7 @@ import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentT
 
 import {
     L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -134,6 +136,13 @@ library L2UtilsBase {
             vm.etch(L2_INTEROP_HANDLER_ADDR, interopHandler.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
             L2InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2();
+
+            address l2AssetTrackerAddress = address(new L2AssetTracker());
+            vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            // Use the same base token asset id the NTV below is initialized with, so tests can
+            // exercise base-token paths against properly initialized state.
+            L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(_args.l1ChainId, baseTokenAssetId);
         }
         {
             address l2InteropAccount = address(new DummyL2InteropAccount());
@@ -202,7 +211,7 @@ library L2UtilsBase {
             // Mirror `L2GenesisForceDeploymentsHelper`: genesis records the base token's baseline
             // right after the base token is initialized (here the holder already has its balance).
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).trackBaseToken();
+            L2AssetTracker(L2_ASSET_TRACKER_ADDR).trackBaseToken();
 
             vm.store(
                 L2_NATIVE_TOKEN_VAULT_ADDR,

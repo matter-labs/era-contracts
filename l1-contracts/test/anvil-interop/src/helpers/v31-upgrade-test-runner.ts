@@ -13,6 +13,7 @@ import {
   INTEROP_ATTRIBUTE_PARSER_ADDR,
   INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
+  L2_ASSET_TRACKER_ADDR,
   L2_BASE_TOKEN_ADDR,
   L2_BASE_TOKEN_HOLDER_ADDR,
   L2_BRIDGEHUB_ADDR,
@@ -27,7 +28,6 @@ import {
   L2_MESSAGE_ROOT_ADDR,
   L2_MESSAGE_VERIFICATION_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
-  L2_REMOVED_ASSET_TRACKER_ADDR,
   L2_REMOVED_GW_ASSET_TRACKER_ADDR,
   L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
   L2_TO_L1_MESSENGER_ADDR,
@@ -1316,18 +1316,16 @@ function extractTxInput(transaction: Record<string, unknown>): string | undefine
 // ── Verification ─────────────────────────────────────────────────────
 
 async function verifyL2UpgradeResult(l2Provider: ethers.providers.JsonRpcProvider, chainId: number): Promise<void> {
-  const nativeTokenVault = new ethers.Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), l2Provider);
+  const assetTracker = new ethers.Contract(L2_ASSET_TRACKER_ADDR, getAbi("L2AssetTracker"), l2Provider);
 
-  const l1ChainId = await nativeTokenVault.L1_CHAIN_ID();
+  const l1ChainId = await assetTracker.L1_CHAIN_ID();
   if (!l1ChainId.eq(runtimeConfig.l1ChainId)) {
-    throw new Error(
-      `Chain ${chainId}: L2NativeTokenVault.L1_CHAIN_ID = ${l1ChainId}, expected ${runtimeConfig.l1ChainId}`
-    );
+    throw new Error(`Chain ${chainId}: L2AssetTracker.L1_CHAIN_ID = ${l1ChainId}, expected ${runtimeConfig.l1ChainId}`);
   }
 
-  const baseTokenAssetId = await nativeTokenVault.BASE_TOKEN_ASSET_ID();
-  if (baseTokenAssetId === ethers.constants.HashZero) {
-    throw new Error(`Chain ${chainId}: base token asset id not initialized after L2 upgrade`);
+  const baseTokenAssetId = await assetTracker.BASE_TOKEN_ASSET_ID();
+  if (!(await assetTracker.isAssetTracked(baseTokenAssetId))) {
+    throw new Error(`Chain ${chainId}: base token bookkeeping not initialized after L2 upgrade`);
   }
 }
 
@@ -1524,6 +1522,7 @@ function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, Contra
     [L2_ASSET_ROUTER_ADDR.toLowerCase(), "L2AssetRouter"],
     [L2_NATIVE_TOKEN_VAULT_ADDR.toLowerCase(), isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault"],
     [L2_CHAIN_ASSET_HANDLER_ADDR.toLowerCase(), "L2ChainAssetHandler"],
+    [L2_ASSET_TRACKER_ADDR.toLowerCase(), "L2AssetTracker"],
     [INTEROP_CENTER_ADDR.toLowerCase(), "InteropCenter"],
     [INTEROP_ATTRIBUTE_PARSER_ADDR.toLowerCase(), "InteropAttributeParser"],
     [L2_INTEROP_HANDLER_ADDR.toLowerCase(), "L2InteropHandler"],
@@ -1541,8 +1540,7 @@ function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, Contra
       [L2_TO_L1_MESSENGER_ADDR.toLowerCase(), "L1MessengerZKOS"],
       [SYSTEM_CONTEXT_ADDR.toLowerCase(), "SystemContext"],
       [L2_CONTRACT_DEPLOYER_ADDR.toLowerCase(), "ZKOSContractDeployer"],
-      // Removed v31 trackers: the upgrade swaps their proxies' implementations for EmptyContract.
-      [L2_REMOVED_ASSET_TRACKER_ADDR.toLowerCase(), "EmptyContract"],
+      // The removed v31 GWAssetTracker: the upgrade swaps its proxy's implementation for EmptyContract.
       [L2_REMOVED_GW_ASSET_TRACKER_ADDR.toLowerCase(), "EmptyContract"]
     );
   }

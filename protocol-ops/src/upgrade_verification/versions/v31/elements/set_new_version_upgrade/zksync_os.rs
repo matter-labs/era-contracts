@@ -13,11 +13,11 @@ use std::collections::HashMap;
 
 use crate::upgrade_verification::{
     constants::{
-        L2_ASSET_ROUTER_ADDR, L2_ATOMIC_FLOW_MANAGER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR,
-        L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR,
-        L2_INTEROP_ATTRIBUTE_PARSER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_COMMITMENT_TREE_ADDR,
-        L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR, L2_MESSAGE_ROOT_ADDR,
-        L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_REMOVED_ASSET_TRACKER_ADDR,
+        L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_ATOMIC_FLOW_MANAGER_ADDR,
+        L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR,
+        L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_ATTRIBUTE_PARSER_ADDR, L2_INTEROP_CENTER_ADDR,
+        L2_INTEROP_COMMITMENT_TREE_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR,
+        L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR,
         L2_REMOVED_GW_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_V32_UPGRADE_CONTRACT,
     },
@@ -56,7 +56,7 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
     // ZKsyncOS force deployment except the L2V32Upgrade delegate target (validated separately);
     // verify_v31_zksync_os_force_deployments enforces that no other unsafe FD is present.
     vec![
-        // ── Fixed-address core contracts (getFixedAddressCoreContracts, 11 entries; L2WrappedBaseToken excluded) ──
+        // ── Fixed-address core contracts (getFixedAddressCoreContracts, 12 entries; L2WrappedBaseToken excluded) ──
         proxy!("l1-contracts/L2Bridgehub", L2_BRIDGEHUB_ADDR),
         proxy!("l1-contracts/L2AssetRouter", L2_ASSET_ROUTER_ADDR),
         proxy!(
@@ -78,6 +78,7 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
             L2_INTEROP_ROOT_STORAGE_ADDR
         ),
         proxy!("l1-contracts/BaseTokenHolder", L2_BASE_TOKEN_HOLDER_ADDR),
+        proxy!("l1-contracts/L2AssetTracker", L2_ASSET_TRACKER_ADDR),
         proxy!("l1-contracts/InteropCenter", L2_INTEROP_CENTER_ADDR),
         proxy!("l1-contracts/L2InteropHandler", L2_INTEROP_HANDLER_ADDR),
         proxy!(
@@ -106,9 +107,8 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
             "l1-contracts/SystemContext",
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR
         ),
-        // ── Removed-tracker neutralizations (getRemovedTrackerNeutralizations, 2 entries):
-        //    the v31 trackers' proxies get their implementations swapped for EmptyContract. ──
-        proxy!("l1-contracts/EmptyContract", L2_REMOVED_ASSET_TRACKER_ADDR),
+        // ── Removed-tracker neutralizations (getRemovedTrackerNeutralizations, 1 entry):
+        //    the v31 GWAssetTracker's proxy gets its implementation swapped for EmptyContract. ──
         proxy!(
             "l1-contracts/EmptyContract",
             L2_REMOVED_GW_ASSET_TRACKER_ADDR
@@ -350,6 +350,7 @@ pub(super) const EXPECTED_V31_ZKSYNC_OS_BYTECODES: &[&str] = &[
     "l1-contracts/L2ChainAssetHandler",
     "l1-contracts/L2InteropRootStorage",
     "l1-contracts/BaseTokenHolder",
+    "l1-contracts/L2AssetTracker",
     "l1-contracts/InteropCenter",
     "l1-contracts/L2InteropHandler",
     "l1-contracts/InteropAttributeParser",

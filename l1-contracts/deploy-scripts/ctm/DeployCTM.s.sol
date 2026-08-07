@@ -481,7 +481,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     /// @dev Precompute blake2s hashes for all unique bytecodes in a single FFI call.
     function _precomputeBlakeHashes() private {
-        CoreContract[9] memory contracts = [
+        CoreContract[10] memory contracts = [
             CoreContract.L2Bridgehub,
             CoreContract.L2AssetRouter,
             CoreContract.L2NativeTokenVault,
@@ -490,6 +490,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             CoreContract.L2ChainAssetHandler,
             CoreContract.InteropCenter,
             CoreContract.L2InteropHandler,
+            CoreContract.L2AssetTracker,
             CoreContract.BaseTokenHolder
         ];
 
@@ -498,7 +499,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             : string.concat(vm.projectRoot(), "/script-out/tmp-blake-batch.txt");
         vm.writeFile(tmpFile, "");
 
-        bytes[9] memory bytecodes;
+        bytes[10] memory bytecodes;
         for (uint256 i = 0; i < contracts.length; i++) {
             (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, contracts[i]);
             bytecodes[i] = BytecodeUtils.readDeployedBytecodeL1(true, fileName, contractName);
@@ -603,6 +604,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             chainAssetHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2ChainAssetHandler),
             interopCenterBytecodeInfo: _getBytecodeInfo(CoreContract.InteropCenter),
             interopHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2InteropHandler),
+            assetTrackerBytecodeInfo: _getBytecodeInfo(CoreContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(

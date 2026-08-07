@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {
+    L2_ASSET_TRACKER_ADDR,
     L2_ASSET_ROUTER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -35,6 +36,7 @@ import {L2NativeTokenVault} from "../bridge/ntv/L2NativeTokenVault.sol";
 import {L2MessageRoot} from "../core/message-root/L2MessageRoot.sol";
 import {L2Bridgehub} from "../core/bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
+import {L2AssetTracker} from "../bridge/asset-tracker/L2AssetTracker.sol";
 import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {L2InteropHandler} from "../interop/interop-handler/L2InteropHandler.sol";
 import {L2InteropCommitmentTree} from "../atomic-interop/L2InteropCommitmentTree.sol";
@@ -256,13 +258,13 @@ library L2GenesisForceDeploymentsHelper {
         _finalizeDeployments(_ctmDeployer, fixedForceDeploymentsData);
 
         if (_isGenesisUpgrade) {
-            _initPreV32Contracts(fixedForceDeploymentsData);
+            _initPreV32Contracts(fixedForceDeploymentsData, additionalForceDeploymentsData);
         }
 
         // Both paths: the baseline mapping is new in this release, so an upgraded chain records it
-        // here just like a new one. Must stay after `_initPreV32Contracts` — at genesis the base
-        // token's `totalSupply()` is meaningless until its own `initL2` has run.
-        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).trackBaseToken();
+        // here just like a new one. Must stay after `_initPreV32Contracts` — at genesis neither the
+        // tracker's base-token asset id nor the base token's `totalSupply()` is set before it.
+        L2AssetTracker(L2_ASSET_TRACKER_ADDR).trackBaseToken();
 
         // Contracts introduced in this release are initialized on both paths: they are uninitialized on a
         // new chain and on an upgraded one alike.
@@ -395,7 +397,15 @@ library L2GenesisForceDeploymentsHelper {
     /// upgraded from v31 has already run them — the storage each one writes at genesis is unchanged by
     /// this release. Kept at the position v31 called them from, after `_finalizeDeployments`, so the
     /// genesis sequence is unchanged; none of them reads the bridgehub wiring that step establishes.
-    function _initPreV32Contracts(FixedForceDeploymentsData memory _fixedForceDeploymentsData) private {
+    function _initPreV32Contracts(
+        FixedForceDeploymentsData memory _fixedForceDeploymentsData,
+        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
+    ) private {
+        L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _additionalForceDeploymentsData.baseTokenBridgingData.assetId
+        );
+
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2();
 
         InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(

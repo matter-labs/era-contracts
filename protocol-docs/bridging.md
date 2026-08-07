@@ -10,12 +10,13 @@ narrative. For the atomic interop flow itself, see {protocol-docs/atomicity/READ
 | ------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `AssetRouterBase` / `L1AssetRouter` / `L2AssetRouter`                                             | L1 + every ZK chain        | Routes asset transfers (L1 <-> ZK chain bridging and L2 <-> L2 interop) to per-asset handlers.                                                               |
 | `NativeTokenVaultBase` / `L1NativeTokenVault` / `L2NativeTokenVault` (+ `L2NativeTokenVaultZKOS`) | L1 + every ZK chain        | The default asset handler for ETH and ERC20 tokens: escrows native tokens, mints/burns bridged representations.                                              |
+| `L2AssetTracker`                                                                                  | every ZK chain             | Chain-local asset bookkeeping: pre-tracking baselines and the L1-deposit/withdrawal counters used by the L1 -> Gateway migration.                            |
 | `L1Nullifier`                                                                                     | L1                         | Tracks initiated L1 -> L2 deposits (`depositHappened`) and verifies/clears them when a failed deposit is claimed back on L1.                                 |
 | `BaseTokenHolder` (`l2-system/`)                                                                  | every ZK chain             | Escrow of the chain's base-token reserves; replaces mint/burn with transfers for EVM compatibility.                                                          |
 | `BridgedStandardERC20`                                                                            | ZK chains (beacon-proxied) | The standard bridged-token implementation, deployed per token behind the NTV's beacon.                                                                       |
 | `L2WrappedBaseToken`                                                                              | ZK chains                  | The canonical wrapped-base-token (WETH-style) implementation. An `ERC20PermitUpgradeable`, deployed behind its own proxy — **not** the bridged-token beacon. |
 
-The `L2AssetRouter`, `L2NativeTokenVault`, `BaseTokenHolder`, interop center/handler and
+The `L2AssetRouter`, `L2NativeTokenVault`, `L2AssetTracker`, `BaseTokenHolder`, interop center/handler and
 atomic-flow manager are genesis-deployed built-ins at fixed, identical addresses on every ZK chain
 (`L2ContractAddresses.sol`). L2 contracts must not have constructors or immutables (ZKsync OS
 compatibility); they are initialized via `initL2`/`updateL2` called by the complex upgrader, and
@@ -190,8 +191,8 @@ as the populate-once flag — stays unset; there is nothing to fold in for them,
 - The chain's base token is escrowed off-vault in `BaseTokenHolder`, initialized with `2^127 - 1` base
   tokens; transfers from the holder replace minting (better EVM/Foundry compatibility). `give` (interop
   handler only) pays out inbound value; `burnAndStartBridging` (InteropCenter or NTV) receives outbound
-  value; both report the flow to the `L2NativeTokenVault` bookkeeping first (the holder itself stores
-  nothing). Its balance means "funds the chain can still mint";
+  value; both report the flow to the `L2AssetTracker` first (the holder itself stores nothing). Its
+  balance means "funds the chain can still mint";
   force-sent funds (refund recipient, selfdestruct on ZK OS) skew the `totalSupply()` view but never the
   flow counters; the base token's `preTrackingTotalSupply` baseline is a one-time `totalSupply()`
   snapshot taken at the upgrade/genesis (`trackBaseToken`), so it deliberately inherits whatever skew
@@ -220,17 +221,17 @@ as the populate-once flag — stays unset; there is nothing to fold in for them,
 
 ## L2 asset bookkeeping
 
-The chain keeps a small amount of local token bookkeeping in the `L2NativeTokenVault`, the contract every
-asset already flows through (the separate write-only `L2AssetTracker` system contract that v31 shipped was
-removed). Apart from `bridgedOut`, this is write-mostly data: correctness of transfers is
+The chain keeps a small amount of local token bookkeeping, split across the two contracts that own the
+respective state: the escrow-integrity accounting lives in the `L2NativeTokenVault` that holds the escrow,
+and everything else in the `L2AssetTracker`, a dedicated write-only system contract that keeps the vault
+free of bookkeeping bulk. Apart from `bridgedOut`, this is write-mostly data: correctness of transfers is
 guaranteed by ZK proofs (plus 2FA on ZKsync OS chains), not by these balances, and the mappings may be
 removed later (do not rely on them). The vault's own `DEPRECATED_chainBalance` and the removed
-`AssetTrackerBase` / `L1AssetTracker` / `GWAssetTracker` (cross-chain token-balance migration) are gone.
-v31 released with the `L2AssetTracker` (`0x1000f`) and `GWAssetTracker` (`0x10010`) deployed as
-system-proxied built-ins on every ZKsync OS chain, so the v32 upgrade swaps both proxies'
-implementations for `EmptyContract` (see {protocol-docs/chain-lifecycle.md}); chains created on v32
-receive the same EmptyContract-backed proxies from genesis, keeping fresh and upgraded chains
-identical at the reserved addresses.
+`AssetTrackerBase` / `L1AssetTracker` / `GWAssetTracker` (cross-chain token-balance migration) are gone;
+v31 released with the `GWAssetTracker` (`0x10010`) deployed as a system-proxied built-in on every ZKsync OS
+chain, so the v32 upgrade swaps that proxy's implementation for `EmptyContract` (see
+{protocol-docs/chain-lifecycle.md}); chains created on v32 receive the same EmptyContract-backed proxy from
+genesis, keeping fresh and upgraded chains identical at the reserved address.
 
 ### `L2NativeTokenVault`
 
@@ -242,27 +243,39 @@ identical at the reserved addresses.
   `L1NativeTokenVault`); the field takes a slot from the base storage gap, which no deployed vault ever
   wrote, so already-deployed layouts are preserved. `isAssetTracked` lives there too, doubling on L1
   as the `populateBridgedOut` once-marker.
-- `assetBookkeeping[assetId]` (one `L2AssetBookkeepingInfo` struct per asset) is the L2-side accounting
-  used to compute the amount to keep on L1 during the L1 -> Gateway migration:
-  - `totalWithdrawalsToL1` / `totalSuccessfulDepositsFromL1`: a flow is only counted when the counterpart
-    chain is L1 _and_ the chain currently settles on L1; `totalWithdrawalsToL1` is consumed once during
-    that migration and must stay append-only. The base token's counters live here too, under
-    `BASE_TOKEN_ASSET_ID`, reported by the `BaseTokenHolder` (below). For the base token, failed deposits
-    are refunded on L2 to the `refundRecipient` rather than claimed on L1, so the gap between initiated
-    deposits and this counter is not uniformly "claimable on L1" across asset types.
-  - `preTrackingTotalSupply` (meaningful once `isAssetTracked` is set — on L2 every tracking writer
-    records the baseline in the same call) is the same net inbound flow — total
-    successful deposits minus total successful withdrawals — accumulated before the tracking started,
-    which is why the fields share one struct. For a bridged token (the base token included) that is
-    exactly its pre-tracking `totalSupply()`; native tokens offset the same net flow by
-    `type(uint256).max` (the removed tracker's infinite-deposit convention): `2^256 - 1 - bridgedOut`.
-    Newly registered tokens start at the zero-flow baseline (`0` bridged, `max` native).
-- `isAssetTracked[assetId]` guards the one-time initialization of the fields above for a legacy
-  L2-native token: its outstanding amount is seeded from the vault's current escrow (indistinguishable
-  direct donations are conservatively treated as escrow, since they are effectively frozen). Seeding
-  happens lazily on the token's first touch — before the operation changes any supply or escrow — or
-  eagerly by anyone via `trackLegacyToken`; it is idempotent, newly registered tokens are marked tracked
-  immediately, and `trackLegacyToken` rejects the base token.
+- `isAssetTracked[assetId]` guards the one-time seeding of `bridgedOut` for a legacy L2-native token —
+  one registered in the vault before this release: its outstanding amount is seeded from the vault's
+  current escrow (indistinguishable direct donations are conservatively treated as escrow, since they are
+  effectively frozen). Seeding happens lazily on the token's first touch — before the operation changes
+  any supply or escrow — or eagerly by anyone via `trackLegacyToken`; it is idempotent, newly registered
+  tokens are marked tracked immediately, and `trackLegacyToken` rejects the base token. The same call
+  hands the tracker its own baseline, so the two are always derived from the same escrow.
+
+### `L2AssetTracker`
+
+The tracker stores one `L2AssetBookkeepingInfo` struct per asset (`assetBookkeeping[assetId]`), the L2-side
+accounting used to compute the amount to keep on L1 during the L1 -> Gateway migration. Only the vault, the
+`BaseTokenHolder`, the base token and the complex upgrader may write it; the tracker itself calls nothing.
+It keeps `Ownable2StepUpgradeable`/`PausableUpgradeable` (unused on L2) plus deprecated slots purely to
+preserve the storage layout deployed in v31 — the abandoned v31 values are never read, every baseline
+below is derived afresh.
+
+- `totalWithdrawalsToL1` / `totalSuccessfulDepositsFromL1`: a flow is only counted when the counterpart
+  chain is L1 _and_ the chain currently settles on L1; `totalWithdrawalsToL1` is consumed once during that
+  migration and must stay append-only. The vault reports every asset's flows
+  (`handleInitiateBridgingOnL2` / `handleFinalizeBridgingOnL2`); the base token's counters live under
+  `BASE_TOKEN_ASSET_ID` and are reported by the `BaseTokenHolder` (below). For the base token, failed
+  deposits are refunded on L2 to the `refundRecipient` rather than claimed on L1, so the gap between
+  initiated deposits and this counter is not uniformly "claimable on L1" across asset types.
+- `preTrackingTotalSupply` (meaningful once the tracker's own `isAssetTracked` is set — every writer that
+  marks an asset tracked records the baseline in the same call) is the same net inbound flow — total
+  successful deposits minus total successful withdrawals — accumulated before the tracking started, which
+  is why the fields share one struct. For a bridged token (the base token included) that is exactly its
+  pre-tracking `totalSupply()`; native tokens offset the same net flow by `type(uint256).max` (the v31
+  tracker's infinite-deposit convention): `2^256 - 1 - bridgedOut`. Newly registered tokens start at the
+  zero-flow baseline (`0` bridged, `max` native, via `registerNewTokenIfNeeded`); legacy ones are seeded
+  by `trackLegacyTokenIfNeeded`, which only the vault may call so that the baseline and the vault's
+  `bridgedOut` seed are always captured at the same moment.
 - The base token's baseline is recorded by `trackBaseToken` (upgrader-only, idempotent), which the
   upgrade/genesis init helper calls on both paths: its `totalSupply()` at that moment — the pre-upgrade
   supply on an upgraded chain, zero at genesis — is the pre-tracking net inbound flow, and every later
@@ -274,12 +287,12 @@ identical at the reserved addresses.
 ### `BaseTokenHolder` (base token)
 
 The holder escrows the base token, so its contract-level bridge flows converge here; each one is reported
-to the vault, which records it under `BASE_TOKEN_ASSET_ID` in the same `assetBookkeeping` used for every other
-asset (`recordBaseTokenBridgingToChain` / `recordBaseTokenBridgingFromChain`, holder-only).
+to the tracker, which records it under `BASE_TOKEN_ASSET_ID` in the same `assetBookkeeping` used for every
+other asset (`handleInitiateBaseTokenBridgingOnL2` / `handleFinalizeBaseTokenBridgingOnL2`, holder-only).
 `burnAndStartBridging` reports outbound flows and `give` reports inbound interop flows before the external
-transfer. Bootloader-minted L1 deposits are reported through `recordBaseTokenDeposit` only where the mint
-is a contract call (`L2BaseTokenEra.mint`); on ZKsync OS the VM credits deposits by moving the holder's
-balance directly, so the base token's `totalSuccessfulDepositsFromL1` counter is **not exhaustive** there.
+transfer. Bootloader-minted L1 deposits reach the tracker directly, and only where the mint is a contract
+call (`L2BaseTokenEra.mint`); on ZKsync OS the VM credits deposits by moving the holder's balance directly,
+so the base token's `totalSuccessfulDepositsFromL1` counter is **not exhaustive** there.
 
 - The pre-v31 total supply of an upgraded ZKsync OS chain lives in `L2BaseTokenZKOS.zkosPreV31TotalSupply`,
   populated while the chain ran v31 (via the since-removed backfill service transaction). This
@@ -290,9 +303,11 @@ balance directly, so the base token's `totalSuccessfulDepositsFromL1` counter is
   processed. So `totalSupply()` is always available on upgraded chains; fresh chains have no pre-v31
   history and keep zero.
 - `recoverBaseToken` (NativeTokenVault only) returns the escrow of a failed/timed-out base-token bridge-out
-  and asserts the two invariants that make the recovery accounting-neutral: the destination was not L1
-  (`RecoverToL1NotSupported`, so `totalWithdrawalsToL1` stays append-only) and the base token is not native
-  to this chain (`BaseTokenNativeToThisChain`, so the vault's `bridgedOut` holds nothing to re-credit).
+  and asks the tracker to assert the two invariants that make the recovery accounting-neutral
+  (`assertBaseTokenRecoveryIsAccountingNeutral`): the destination was not L1 (`RecoverToL1NotSupported`, so
+  `totalWithdrawalsToL1` stays append-only) and the base token is not native to this chain
+  (`BaseTokenNativeToThisChain`, so the vault's `bridgedOut` holds nothing to re-credit). The vault applies
+  the same gate to every other asset's recovery (`assertRecoveryIsAccountingNeutral`).
 
 ## L1Nullifier and failed-deposit recovery
 
@@ -346,8 +361,8 @@ mintData)` on the asset handler registered for the asset (`assetHandlerAddress[a
 ## Security notes
 
 - **L2 -> L1 withdrawals are never revertable.** The `InteropCenter` rejects L1-destined atomic bundles at
-  send time, and both `L2AssetRouter.recoverAtomicCall` and `BaseTokenHolder.recoverBaseToken` assert
-  `destChainId != L1_CHAIN_ID`. The reason is
+  send time, and both `L2AssetRouter.recoverAtomicCall` and, at the accounting layer itself,
+  `L2AssetTracker.assertRecoveryIsAccountingNeutral` assert `destChainId != L1_CHAIN_ID`. The reason is
   accounting: `totalWithdrawalsToL1` is consumed exactly once during the L1 -> Gateway migration and must
   stay append-only; a revertable withdrawal would corrupt the migrated balance.
 - **Message forgery**: finalization is only reachable through the interop handler with a proven message,
@@ -366,13 +381,13 @@ mintData)` on the asset handler registered for the asset (`assetHandlerAddress[a
   `L1Nullifier.finalizeWithdrawal` parses the old message format and nullifies via
   `isWithdrawalFinalized`. Numerous
   `__DEPRECATED_*` storage slots remain across `L1AssetRouter`, `L2AssetRouter`, `L1Nullifier`,
-  `L2NativeTokenVault` and `L1NativeTokenVault` solely to preserve the upgradeable
+  `L2NativeTokenVault`, `L1NativeTokenVault` and `L2AssetTracker` solely to preserve the upgradeable
   storage layouts of already-deployed proxies; they are never read or written and must not be reused.
 - Legacy bridged tokens on L2 may predate the NTV: `BridgedStandardERC20.onlyNTV` lazily migrates them by
   setting `nativeTokenVault` to `L2_NATIVE_TOKEN_VAULT_ADDR` and deriving the asset ID on first use.
   `addLegacyTokenToBridgedTokensList` backfills such tokens into the vault's `bridgedTokens` enumeration,
   and `L2NativeTokenVault.trackLegacyToken` seeds a legacy L2-native token's outstanding `bridgedOut`
-  amount from the vault escrow.
+  amount from the vault escrow (and the tracker's matching baseline).
 - `L2NativeTokenVault.l2TokenAddress(l1Token)` is the legacy getter mapping an L1 token to its L2
   counterpart; the L1-origin CREATE2 salt (plain L1 address) keeps legacy token addresses stable.
 - `updateL2` on `L2AssetRouter`/`L2NativeTokenVault` resets the owner to the aliased L1 governance if it

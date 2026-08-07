@@ -6,10 +6,10 @@ import {Address} from "@openzeppelin/contracts-v4/utils/Address.sol";
 
 import {IBaseTokenHolder} from "./interfaces/IBaseTokenHolder.sol";
 import {
+    L2_ASSET_TRACKER,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
-    L2_NATIVE_TOKEN_VAULT,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {Unauthorized} from "../common/L1ContractErrors.sol";
@@ -24,7 +24,7 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  * @dev Initialized with 2^127 - 1 tokens. No balance can overflow (users only gain what the holder
  * loses); the operator must keep the base token's total supply below 2^127 to avoid underflow.
  * @dev The base token is escrowed here, so its contract-level bridge flows converge in this
- * contract; each one is reported to `L2NativeTokenVault`, which keeps the interop bookkeeping for
+ * contract; each one is reported to `L2AssetTracker`, which keeps the chain-local bookkeeping for
  * every asset (the base token included) in one place. Flows performed by the VM directly (see the
  * note on `give`) bypass this reporting.
  */
@@ -78,7 +78,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
         // The ETH transfer below hands control to `_to`, which can reenter the bridge before this
         // call returns; record first so any reentrant flow observes counters that already include
         // this operation.
-        L2_NATIVE_TOKEN_VAULT.recordBaseTokenBridgingFromChain(_fromChainId, _amount);
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_fromChainId, _amount);
         Address.sendValue(payable(_to), _amount);
         emit BaseTokenMintedInterop(_to, _amount);
     }
@@ -89,10 +89,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
             return;
         }
 
-        L2_NATIVE_TOKEN_VAULT.assertRecoveryIsAccountingNeutral(
-            L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID(),
-            _toChainId
-        );
+        L2_ASSET_TRACKER.assertBaseTokenRecoveryIsAccountingNeutral(_toChainId);
         Address.sendValue(payable(_to), _amount);
         emit BaseTokenRecovered(_to, _amount);
     }
@@ -100,18 +97,9 @@ contract BaseTokenHolder is IBaseTokenHolder {
     /// @inheritdoc IBaseTokenHolder
     function burnAndStartBridging(uint256 _toChainId) external payable onlyBridgingCaller {
         if (msg.value != 0) {
-            L2_NATIVE_TOKEN_VAULT.recordBaseTokenBridgingToChain(_toChainId, msg.value);
+            L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2(_toChainId, msg.value);
         }
         emit BaseTokenBurntInterop(msg.sender, _toChainId, msg.value);
-    }
-
-    /// @inheritdoc IBaseTokenHolder
-    function recordBaseTokenDeposit(uint256 _fromChainId, uint256 _amount) external onlyL2BaseToken {
-        if (_amount == 0) {
-            return;
-        }
-
-        L2_NATIVE_TOKEN_VAULT.recordBaseTokenBridgingFromChain(_fromChainId, _amount);
     }
 
     /// @notice Accepts the initial balance transfer from L2BaseToken during `initL2`.

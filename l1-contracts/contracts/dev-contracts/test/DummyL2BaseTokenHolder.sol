@@ -25,18 +25,13 @@ contract DummyL2BaseTokenHolder {
     }
 
     /// @notice Burns ETH by accepting it into this contract.
-    /// @dev In production, this would also report the outbound flow to the NativeTokenVault.
+    /// @dev In production, this would also report the outbound flow to the L2AssetTracker.
     /// For testing, we just accept the ETH.
     /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable {
         // Just accept the ETH - in tests this simulates the burn
         // The ETH stays in this contract, effectively "burning" it from circulation
         (_toChainId);
-    }
-
-    /// @notice No-op stand-in for the production bookkeeping entry point used by L2BaseToken.mint.
-    function recordBaseTokenDeposit(uint256 _fromChainId, uint256 _amount) external {
-        (_fromChainId, _amount);
     }
 
     /// @notice Fallback to accept base token transfers.

@@ -120,6 +120,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         assertEq(etchedDeployer.deploymentCount(L2_NTV_BEACON_DEPLOYER_ADDR), 0);
         assertEq(etchedDeployer.deploymentCount(L2_INTEROP_CENTER_ADDR), 0);
         assertEq(etchedDeployer.deploymentCount(L2_INTEROP_HANDLER_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_ASSET_TRACKER_ADDR), 0);
 
         // Verify proxy upgrades were called - use the etched contract at the system address
         MockSystemContractProxyAdmin etchedProxyAdmin = MockSystemContractProxyAdmin(
@@ -144,6 +145,10 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         _deployMockContract(L2_CHAIN_ASSET_HANDLER_ADDR);
         _deployMockContract(L2_INTEROP_CENTER_ADDR);
         _deployMockContract(L2_INTEROP_HANDLER_ADDR);
+        _deployMockContract(L2_ASSET_TRACKER_ADDR);
+        // An upgraded chain's tracker was initialized back in v31, so it already knows the base
+        // token's asset id — the helper must not re-run its one-shot `initL2`.
+        MockContract(payable(L2_ASSET_TRACKER_ADDR)).setMockTrackerState(keccak256("baseTokenAsset"));
         _deployMockContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         // An upgraded chain's base token is already initialized with supply in circulation; the
         // helper must snapshot exactly this value (it never re-runs the base token's initL2).
@@ -236,24 +241,21 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         _assertBaseTokenTracked(0);
     }
 
-    /// @dev The helper must ask the vault to record the base token's baseline exactly once, on
+    /// @dev The helper must ask the tracker to record the base token's baseline exactly once, on
     /// every path (genesis and upgrade, both VMs), and only after the base token itself is live:
     /// the recorded snapshot must be the post-init supply, never the pre-init placeholder.
     function _assertBaseTokenTracked(uint256 _expectedBaseline) internal view {
+        MockContract tracker = MockContract(payable(L2_ASSET_TRACKER_ADDR));
+        assertEq(tracker.trackBaseTokenCalls(), 1, "the tracker must record the base token's baseline exactly once");
         assertEq(
-            MockContract(payable(L2_NATIVE_TOKEN_VAULT_ADDR)).trackBaseTokenCalls(),
-            1,
-            "the vault must record the base token's baseline exactly once"
-        );
-        assertEq(
-            MockContract(payable(L2_NATIVE_TOKEN_VAULT_ADDR)).recordedBaselineAtCall(),
+            tracker.recordedBaselineAtCall(),
             _expectedBaseline,
             "the baseline must be snapshotted after the base token is initialized"
         );
         assertEq(
-            MockContract(payable(L2_NATIVE_TOKEN_VAULT_ADDR)).recordedAssetIdAtCall(),
+            tracker.recordedAssetIdAtCall(),
             keccak256("baseTokenAsset"),
-            "the vault's base-token asset id must be initialized before the baseline is recorded"
+            "the tracker's base-token asset id must be initialized before the baseline is recorded"
         );
     }
 
@@ -376,7 +378,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
     function _etchAllDeferredContracts() internal {
         // Etch contracts to addresses that need function calls to work
-        address[] memory addressesToEtch = new address[](9);
+        address[] memory addressesToEtch = new address[](10);
         addressesToEtch[0] = L2_MESSAGE_ROOT_ADDR;
         addressesToEtch[1] = L2_BRIDGEHUB_ADDR;
         addressesToEtch[2] = L2_ASSET_ROUTER_ADDR;
@@ -385,7 +387,8 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         addressesToEtch[5] = L2_NTV_BEACON_DEPLOYER_ADDR;
         addressesToEtch[6] = L2_INTEROP_CENTER_ADDR;
         addressesToEtch[7] = L2_INTEROP_HANDLER_ADDR;
-        addressesToEtch[8] = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
+        addressesToEtch[8] = L2_ASSET_TRACKER_ADDR;
+        addressesToEtch[9] = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
 
         for (uint256 i = 0; i < addressesToEtch.length; i++) {
             if (addressesToEtch[i].code.length == 0) {
@@ -498,11 +501,11 @@ contract MockContract {
     // Generic mock contract that can handle various function calls
     function forceInitAdmin(address) external {}
 
-    /// @dev Mirrors `L2NativeTokenVault.trackBaseToken`: snapshots the base token's totalSupply at
+    /// @dev Mirrors `L2AssetTracker.trackBaseToken`: snapshots the base token's totalSupply at
     /// call time, so the tests can assert the helper's ordering (the snapshot is only meaningful
     /// after the base token's own `initL2`).
-    /// @dev The real vault keys the snapshot by its stored `BASE_TOKEN_ASSET_ID`, so the recorded
-    /// asset id proves the vault's own init ran before the tracking call.
+    /// @dev The real tracker keys the snapshot by its stored `BASE_TOKEN_ASSET_ID`, so the recorded
+    /// asset id proves the tracker's own init ran before the tracking call.
     function trackBaseToken() external {
         trackBaseTokenCalls++;
         recordedBaselineAtCall = MockContract(payable(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)).totalSupply();
@@ -519,6 +522,16 @@ contract MockContract {
     function setMockBaseTokenState(bool _initialized, uint256 _supply) external {
         baseTokenInitialized = _initialized;
         mockSupply = _supply;
+    }
+
+    /// @dev Models a chain upgraded from v31, whose tracker already ran its one-shot `initL2`.
+    function setMockTrackerState(bytes32 _baseTokenAssetId) external {
+        baseTokenAssetIdStored = _baseTokenAssetId;
+    }
+
+    // L2AssetTracker.initL2
+    function initL2(uint256, bytes32 _baseTokenAssetId) external {
+        baseTokenAssetIdStored = _baseTokenAssetId;
     }
 
     function initL2(uint256) external {

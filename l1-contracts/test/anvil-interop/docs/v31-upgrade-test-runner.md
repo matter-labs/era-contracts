@@ -39,7 +39,7 @@ In production, a v31 protocol upgrade proceeds as:
    - Force-deploys new L2 system contract bytecodes (via ContractDeployer on Era, or the
      bytecode deployer on ZKsyncOS)
    - Delegatecalls to `L2V32Upgrade.upgrade()` which initializes new contracts (NTV, Bridgehub,
-     AssetRouter, ChainAssetHandler, InteropCenter, BaseToken, etc.)
+     AssetRouter, L2AssetTracker, ChainAssetHandler, InteropCenter, BaseToken, etc.)
 
 8. **Verification**: Protocol version on each chain is now `0x2000000000` (v32).
 
@@ -245,8 +245,8 @@ ZKsync VM (bytecode hashing, validation, etc.) and do not work. The test patches
 
 No patches. Reads on-chain state to assert:
 
-- `L2NativeTokenVault.L1_CHAIN_ID` is set correctly on each L2 chain
-- The base token asset id is initialized on the NTV of each L2 chain
+- `L2AssetTracker.L1_CHAIN_ID` is set correctly on each L2 chain
+- The base token's bookkeeping is initialized in the L2AssetTracker of each L2 chain
 - `getProtocolVersion()` on each diamond proxy returns the scenario's `expectedProtocolVersion`
   (`0x2000000000` for v32)
 - The recorded `getL2SystemContractsUpgradeTxHash()` equals the hash of the upgrade transaction the

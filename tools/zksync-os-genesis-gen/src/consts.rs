@@ -68,14 +68,14 @@ pub const L2_INTEROP_HANDLER_ADDR: Address = Address(FixedBytes::<20>(hex_litera
     "000000000000000000000000000000000001000e"
 )));
 
-// The removed v31 trackers' reserved addresses. v31 released with the trackers deployed there as
-// system-proxied built-ins, so the v32 upgrade swaps their proxies' implementations for
-// `EmptyContract` (see `getRemovedTrackerNeutralizations`); genesis deploys the same
-// EmptyContract-backed proxies so fresh and upgraded chains match at these addresses.
-pub const REMOVED_L2_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+pub const L2_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "000000000000000000000000000000000001000f"
 )));
 
+/// The removed v31 GWAssetTracker's reserved address. v31 released with the tracker deployed there
+/// as a system-proxied built-in, so the v32 upgrade swaps its proxy's implementation for
+/// `EmptyContract` (see `getRemovedTrackerNeutralizations`); genesis deploys the same
+/// EmptyContract-backed proxy so fresh and upgraded chains match at this address.
 pub const REMOVED_GW_ASSET_TRACKER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010010"
 )));
@@ -195,6 +195,10 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 25] = [
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2ChainAssetHandler")),
     ),
     (
+        L2_ASSET_TRACKER_ADDR,
+        ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2AssetTracker")),
+    ),
+    (
         L2_INTEROP_CENTER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("InteropCenter")),
     ),
@@ -202,12 +206,8 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 25] = [
         L2_INTEROP_HANDLER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2InteropHandler")),
     ),
-    // The removed v31 trackers' addresses hold EmptyContract-backed system proxies, matching what
-    // the v32 upgrade installs on pre-existing chains; see REMOVED_L2_ASSET_TRACKER_ADDR.
-    (
-        REMOVED_L2_ASSET_TRACKER_ADDR,
-        ContractDeployment::SystemProxy(ContractSource::L1ContractName("EmptyContract")),
-    ),
+    // The removed v31 GWAssetTracker's address holds an EmptyContract-backed system proxy, matching
+    // what the v32 upgrade installs on pre-existing chains; see REMOVED_GW_ASSET_TRACKER_ADDR.
     (
         REMOVED_GW_ASSET_TRACKER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("EmptyContract")),
@@ -263,34 +263,40 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 25] = [
 
 #[cfg(test)]
 mod tests {
-    use alloy::primitives::{Address, FixedBytes};
+    use alloy::primitives::Address;
 
     use super::{
-        ContractDeployment, ContractSource, INITIAL_CONTRACTS, REMOVED_GW_ASSET_TRACKER_ADDR,
-        REMOVED_L2_ASSET_TRACKER_ADDR,
+        ContractDeployment, ContractSource, INITIAL_CONTRACTS, L2_ASSET_TRACKER_ADDR,
+        REMOVED_GW_ASSET_TRACKER_ADDR,
     };
 
+    fn deployment_at(name: &str, addr: Address) -> &'static ContractDeployment {
+        &INITIAL_CONTRACTS
+            .iter()
+            .find(|(address, _)| *address == addr)
+            .unwrap_or_else(|| panic!("{name}: the reserved address must hold a deployment"))
+            .1
+    }
+
     #[test]
-    fn keeps_removed_tracker_addresses_in_the_intended_genesis_state() {
-        for (name, addr) in [
-            ("L2AssetTracker", REMOVED_L2_ASSET_TRACKER_ADDR),
-            ("GWAssetTracker", REMOVED_GW_ASSET_TRACKER_ADDR),
-        ] {
-            let deployment = INITIAL_CONTRACTS
-                .iter()
-                .find(|(address, _)| *address == addr)
-                .unwrap_or_else(|| {
-                    panic!("{name}: the reserved address must hold a neutralized proxy")
-                });
-            assert!(
-                matches!(
-                    deployment.1,
-                    ContractDeployment::SystemProxy(ContractSource::L1ContractName(
-                        "EmptyContract"
-                    ))
-                ),
-                "{name}: genesis must install the same EmptyContract proxy the v32 upgrade does"
-            );
-        }
+    fn keeps_the_asset_tracker_deployed_at_its_reserved_address() {
+        assert!(
+            matches!(
+                deployment_at("L2AssetTracker", L2_ASSET_TRACKER_ADDR),
+                ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2AssetTracker"))
+            ),
+            "L2AssetTracker: genesis must deploy the tracker upgraded chains keep at this address"
+        );
+    }
+
+    #[test]
+    fn keeps_the_removed_gw_tracker_address_neutralized() {
+        assert!(
+            matches!(
+                deployment_at("GWAssetTracker", REMOVED_GW_ASSET_TRACKER_ADDR),
+                ContractDeployment::SystemProxy(ContractSource::L1ContractName("EmptyContract"))
+            ),
+            "GWAssetTracker: genesis must install the same EmptyContract proxy the v32 upgrade does"
+        );
     }
 }

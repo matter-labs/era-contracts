@@ -24,6 +24,7 @@ struct BytecodeInfo {
     bytes baseTokenHolderBytecodeInfo;
     bytes interopCenterBytecodeInfo;
     bytes interopHandlerBytecodeInfo;
+    bytes assetTrackerBytecodeInfo;
 }
 
 struct ContractName {
@@ -42,6 +43,7 @@ struct BytecodeNames {
     ContractName baseTokenHolder;
     ContractName interopCenter;
     ContractName interopHandler;
+    ContractName assetTracker;
     // For setUp etching
     ContractName complexUpgrader;
     ContractName genesisUpgrade;
@@ -62,6 +64,7 @@ contract L2GenesisUpgradeTestHelper {
         names.baseTokenHolder = ContractName("BaseTokenHolder.sol", "BaseTokenHolder");
         names.interopCenter = ContractName("InteropCenter.sol", "InteropCenter");
         names.interopHandler = ContractName("L2InteropHandler.sol", "L2InteropHandler");
+        names.assetTracker = ContractName("L2AssetTracker.sol", "L2AssetTracker");
         // For setUp etching
         names.complexUpgrader = ContractName("L2ComplexUpgrader.sol", "L2ComplexUpgrader");
         names.genesisUpgrade = ContractName("L2GenesisUpgrade.sol", "L2GenesisUpgrade");
@@ -71,9 +74,9 @@ contract L2GenesisUpgradeTestHelper {
     }
 
     /// @notice Builds BytecodeInfo from an array of encoded bytecode hashes
-    /// @param bytecodeHashes Array of 9 elements in order: messageRoot, l2Ntv, l2AssetRouter, bridgehub,
-    ///        chainAssetHandler, beaconDeployer, baseTokenHolder, interopCenter, interopHandler
-    function buildBytecodeInfo(bytes[9] memory bytecodeHashes) public pure returns (BytecodeInfo memory info) {
+    /// @param bytecodeHashes Array of 10 elements in order: messageRoot, l2Ntv, l2AssetRouter, bridgehub,
+    ///        chainAssetHandler, beaconDeployer, baseTokenHolder, interopCenter, interopHandler, assetTracker
+    function buildBytecodeInfo(bytes[10] memory bytecodeHashes) public pure returns (BytecodeInfo memory info) {
         info.messageRootBytecodeInfo = bytecodeHashes[0];
         info.l2NtvBytecodeInfo = bytecodeHashes[1];
         info.l2AssetRouterBytecodeInfo = bytecodeHashes[2];
@@ -83,6 +86,7 @@ contract L2GenesisUpgradeTestHelper {
         info.baseTokenHolderBytecodeInfo = bytecodeHashes[6];
         info.interopCenterBytecodeInfo = bytecodeHashes[7];
         info.interopHandlerBytecodeInfo = bytecodeHashes[8];
+        info.assetTrackerBytecodeInfo = bytecodeHashes[9];
     }
 
     function getAdditionalForceDeploymentsData() public pure returns (bytes memory) {
@@ -124,6 +128,7 @@ contract L2GenesisUpgradeTestHelper {
                     chainAssetHandlerBytecodeInfo: _bytecodeInfo.chainAssetHandlerBytecodeInfo,
                     interopCenterBytecodeInfo: _bytecodeInfo.interopCenterBytecodeInfo,
                     interopHandlerBytecodeInfo: _bytecodeInfo.interopHandlerBytecodeInfo,
+                    assetTrackerBytecodeInfo: _bytecodeInfo.assetTrackerBytecodeInfo,
                     beaconDeployerInfo: _bytecodeInfo.beaconDeployerBytecodeInfo,
                     baseTokenHolderBytecodeInfo: _bytecodeInfo.baseTokenHolderBytecodeInfo,
                     l2SharedBridgeLegacyImpl: address(0),

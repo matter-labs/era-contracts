@@ -6,6 +6,7 @@ import {Utils} from "../utils/Utils.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
@@ -18,7 +19,6 @@ import {
     L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {
-    L2_REMOVED_ASSET_TRACKER_ADDR,
     L2_REMOVED_GW_ASSET_TRACKER_ADDR,
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -52,7 +52,7 @@ struct SystemContract {
 uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
 /// @dev Fixed-address CoreContract entries backed by l1-contracts bytecodes.
 ///      Era deploys them directly; ZKsyncOS upgrades them via universal force deployments.
-uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 11;
+uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 12;
 /// @dev Era runtime creation bytecodes published as factory deps but not force-deployed.
 uint256 constant RUNTIME_ONLY_FACTORY_DEPS_COUNT = 2;
 /// @dev Era factory deps: fixed-address core contracts plus runtime-only proxy creation bytecodes.
@@ -203,6 +203,7 @@ library SystemContractsProcessing {
         ids[i++] = CoreContract.L2ChainAssetHandler;
         ids[i++] = CoreContract.L2InteropRootStorage;
         ids[i++] = CoreContract.BaseTokenHolder;
+        ids[i++] = CoreContract.L2AssetTracker;
         ids[i++] = CoreContract.InteropCenter;
         // Stateless parser called by the InteropCenter on every send; must be co-deployed with it.
         ids[i++] = CoreContract.InteropAttributeParser;
@@ -411,7 +412,7 @@ library SystemContractsProcessing {
         // getFixedAddressCoreContracts.) The L2V32Upgrade delegate target remains the only legitimate
         // ZKsyncOS unsafe force deployment (added in CTMUpgrade_v31); the PUVT guards that no other
         // unsafe force deployment is present.
-        // The removed v31 trackers' proxies get their implementations swapped for EmptyContract.
+        // The removed v31 GWAssetTracker's proxy gets its implementation swapped for EmptyContract.
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory neutralizations = getRemovedTrackerNeutralizations();
 
         uint256 totalBase = fixedAddressCoreContracts.length +
@@ -443,12 +444,12 @@ library SystemContractsProcessing {
         }
     }
 
-    /// @notice Proxy upgrades that neutralize the removed v31 trackers.
-    /// @dev v31 deployed the L2AssetTracker and GWAssetTracker as system-proxied built-ins on every
-    /// ZKsync OS chain. v32 deletes both contracts, so the upgrade swaps their proxies'
-    /// implementations for `EmptyContract` — otherwise the retired tracker code would stay callable.
-    /// Chains created on v32 get the same EmptyContract-backed proxies from genesis, so fresh and
-    /// upgraded chains match at the reserved addresses.
+    /// @notice Proxy upgrades that neutralize the removed v31 GWAssetTracker.
+    /// @dev v31 deployed the GWAssetTracker as a system-proxied built-in on every ZKsync OS chain.
+    /// v32 deletes the contract, so the upgrade swaps its proxy's implementation for `EmptyContract`
+    /// — otherwise the retired tracker code would stay callable. Chains created on v32 get the same
+    /// EmptyContract-backed proxy from genesis, so fresh and upgraded chains match at the reserved
+    /// address.
     /// @dev The v31 GWAssetTracker collects wrapped-ZK settlement fees on a live gateway (the stage
     /// env brought one up), so any remaining fee balance must be drained through the v31 owner flow
     /// before the gateway chain's upgrade executes — a rollout-runbook step, not enforceable here.
@@ -460,13 +461,8 @@ library SystemContractsProcessing {
     {
         bytes memory emptyContractInfo = Utils.getZKOSProxyUpgradeBytecodeInfo("EmptyContract.sol", "EmptyContract");
 
-        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](2);
+        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
         deployments[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
-            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
-            deployedBytecodeInfo: emptyContractInfo,
-            newAddress: L2_REMOVED_ASSET_TRACKER_ADDR
-        });
-        deployments[1] = IComplexUpgrader.UniversalContractUpgradeInfo({
             upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
             deployedBytecodeInfo: emptyContractInfo,
             newAddress: L2_REMOVED_GW_ASSET_TRACKER_ADDR

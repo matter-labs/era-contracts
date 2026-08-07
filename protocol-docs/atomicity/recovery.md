@@ -74,11 +74,11 @@ was recoverable at all.
 
 `_recoverBundle` asserts `destChainId != L1_CHAIN_ID` (`RecoverToL1NotSupported`), as do
 `L2AssetRouter.recoverAtomicCall`, `L2AssetRouter.bridgehubRecoverBaseToken` and, at the accounting
-layer itself, `BaseTokenHolder.recoverBaseToken`. Atomic L2->L1 bundles are already
+layer itself, `L2AssetTracker.assertRecoveryIsAccountingNeutral`. Atomic L2->L1 bundles are already
 rejected at send time (`AtomicBundleToL1NotSupported`), so this is belt-and-suspenders — but a
 load-bearing one: it keeps recovery from ever reaching the append-only L1 deposit/withdrawal counters
-in `BaseTokenHolder` and `L2NativeTokenVault`, whose settlement-layer-conditional updates are only
-correct when evaluated at send time, not recovery time. The full accounting reason is in
+in `L2AssetTracker`, whose settlement-layer-conditional updates are only correct when evaluated at
+send time, not recovery time. The full accounting reason is in
 {protocol-docs/bridging.md#security-notes} ("L2 -> L1 withdrawals are never revertable").
 
 ## Non-guarantees

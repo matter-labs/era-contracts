@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
     L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
@@ -58,7 +59,6 @@ contract MockV32UpgradeNativeTokenVault {
 
     uint256 public lastOriginChainId;
     uint256 public updateCalls;
-    uint256 public trackBaseTokenCalls;
 
     mapping(bytes32 assetId => uint256 originChainIdValue) private _originChainId;
 
@@ -109,6 +109,25 @@ contract MockV32UpgradeNativeTokenVault {
         _originChainId[_baseTokenBridgingData.assetId] = _baseTokenBridgingData.originChainId;
         lastOriginChainId = _baseTokenBridgingData.originChainId;
         updateCalls++;
+    }
+}
+
+/// @dev Mock AssetTracker that records `initL2` and `trackBaseToken` calls.
+contract MockV32UpgradeAssetTracker {
+    uint256 public L1_CHAIN_ID;
+    bytes32 public BASE_TOKEN_ASSET_ID;
+
+    uint256 public initCalls;
+    uint256 public trackBaseTokenCalls;
+
+    function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+
+        L1_CHAIN_ID = _l1ChainId;
+        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
+        initCalls++;
     }
 
     function trackBaseToken() external {
@@ -184,6 +203,7 @@ contract L2V32UpgradeUnitTest is Test {
                 )
             )
         );
+        _etchCode(L2_ASSET_TRACKER_ADDR, address(new MockV32UpgradeAssetTracker()));
         _etchCode(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(new MockV32UpgradeBaseToken()));
 
         testUpgrade = new L2V32Upgrade();
@@ -191,9 +211,9 @@ contract L2V32UpgradeUnitTest is Test {
 
     /// @dev The contracts introduced in v31 are initialized on the genesis path only: their `initL2`s are
     /// unchanged since v31 and one-shot, so a chain that already went through v31 must not run them again.
-    /// The upgrade never re-runs the base token's `initL2`, but it MUST record the base token's
-    /// bookkeeping baseline exactly once (`trackBaseToken`); the helper-level ordering is covered by
-    /// `L2GenesisForceDeploymentHelper.t.sol`.
+    /// The upgrade never re-runs the tracker's or the base token's `initL2`, but it MUST record the
+    /// base token's bookkeeping baseline exactly once (`trackBaseToken`); the helper-level ordering
+    /// is covered by `L2GenesisForceDeploymentHelper.t.sol`.
     function test_UpgradeViaComplexUpgrader_DoesNotReinitializePreV32Contracts() public {
         bytes memory fixedData = abi.encode(_buildFixedForceDeploymentsData());
         bytes memory additionalData = abi.encode(_buildZKChainSpecificData());
@@ -204,14 +224,18 @@ contract L2V32UpgradeUnitTest is Test {
             abi.encodeCall(IL2V32Upgrade.upgrade, (false, CTM_DEPLOYER, fixedData, additionalData))
         );
 
-        // Verify NTV: updateL2 called with correct data
-        MockV32UpgradeNativeTokenVault nativeTokenVault = MockV32UpgradeNativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        assertEq(nativeTokenVault.updateCalls(), 1, "native token vault should be updated exactly once");
+        // AssetTracker: not re-initialized, but asked to record the base token's baseline.
+        MockV32UpgradeAssetTracker assetTracker = MockV32UpgradeAssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(assetTracker.initCalls(), 0, "asset tracker must not be re-initialized on an upgrade");
         assertEq(
-            nativeTokenVault.trackBaseTokenCalls(),
+            assetTracker.trackBaseTokenCalls(),
             1,
             "the base token's pre-tracking baseline must be recorded on the upgrade path"
         );
+
+        // Verify NTV: updateL2 called with correct data
+        MockV32UpgradeNativeTokenVault nativeTokenVault = MockV32UpgradeNativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        assertEq(nativeTokenVault.updateCalls(), 1, "native token vault should be updated exactly once");
         assertEq(nativeTokenVault.lastOriginChainId(), BASE_TOKEN_ORIGIN_CHAIN_ID, "origin chain id mismatch");
         assertEq(nativeTokenVault.BASE_TOKEN_ORIGIN_TOKEN(), BASE_TOKEN_ORIGIN_ADDRESS, "origin token mismatch");
 
@@ -270,6 +294,7 @@ contract L2V32UpgradeUnitTest is Test {
                 chainAssetHandlerBytecodeInfo: dummyBytecodeInfo,
                 interopCenterBytecodeInfo: dummyBytecodeInfo,
                 interopHandlerBytecodeInfo: dummyBytecodeInfo,
+                assetTrackerBytecodeInfo: dummyBytecodeInfo,
                 beaconDeployerInfo: dummyBytecodeInfo,
                 baseTokenHolderBytecodeInfo: dummyBytecodeInfo,
                 l2SharedBridgeLegacyImpl: address(0),

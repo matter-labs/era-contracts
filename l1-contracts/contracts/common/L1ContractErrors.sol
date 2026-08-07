@@ -284,6 +284,8 @@ error MerkleWrongLength(uint256 newLeavesLength, uint256 leafNumber);
 error MigrationPaused();
 // 0x4e98b356
 error MigrationsNotPaused();
+// 0x7e472272
+error MissingBaseTokenAssetId();
 // 0xfa44b527
 error MissingSystemLogs(uint256 expected, uint256 actual);
 // 0x1508fb47
