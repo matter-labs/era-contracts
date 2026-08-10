@@ -15,9 +15,9 @@
  * all 10 specs in one serial process dominated the coverage job.
  *
  * Modes:
- *   default            shard specs across workers (see MAX_PARALLEL_WORKERS)
- *   --spec <path>      run only the given spec(s) in this process (no sharding)
- *   --serial           run every spec in this process, one Anvil set (old behavior)
+ *   default            shard every spec across workers (see MAX_PARALLEL_WORKERS)
+ *   --spec <path>...   restrict to the given specs; still sharded when more than one
+ *   --serial           run the selected specs in this process, one Anvil set
  *
  * Usage:
  *   ts-node run-coverage.ts [--html] [--l1-only] [--fresh-deploy] [--serial]
@@ -341,10 +341,11 @@ async function main(): Promise<void> {
 
   const specs = requestedSpecs.length > 0 ? requestedSpecs : discoverSpecFiles();
 
-  // A fresh deployment per shard would multiply the deploy cost, so `--fresh-deploy`
-  // stays serial. Explicit `--spec` selection and worker processes are single-process
-  // by definition.
-  const shouldShard = !workerMode && !serial && !freshDeploy && requestedSpecs.length === 0;
+  // A fresh deployment per shard would multiply the deploy cost, so `--fresh-deploy` stays
+  // serial. Worker processes are single-process by definition, and so is a single spec —
+  // sharding one spec would just add a child process. An explicit multi-spec `--spec` list
+  // does shard, which is how the CI matrix runs a group of specs on one runner.
+  const shouldShard = !workerMode && !serial && !freshDeploy && specs.length > 1;
 
   try {
     if (shouldShard) {

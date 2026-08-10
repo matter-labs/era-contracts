@@ -412,45 +412,52 @@ jobs:
           path: l1-contracts/lcov.info
           if-no-files-found: error
 
-  # Enumerates the interop specs so `coverage-anvil` can fan out one job per spec without
-  # the list being duplicated (and going stale) in this file. Needs no build artifacts, so
-  # it runs alongside `build` and adds nothing to the critical path.
-  coverage-anvil-specs:
+  # Packs the interop specs into balanced groups for the `coverage-anvil` matrix, so the spec
+  # list is never duplicated in this file. Needs no build artifacts, so it runs alongside
+  # `build` and adds nothing to the critical path. See plan-coverage-groups.ts for why the
+  # fan-out is a couple of groups rather than one job per spec.
+  coverage-anvil-groups:
     runs-on: ubuntu-latest
     outputs:
-      specs: ${{ steps.list.outputs.specs }}
+      groups: ${{ steps.plan.outputs.groups }}
 
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
 
-      - name: List interop specs
-        id: list
-        working-directory: l1-contracts/test/anvil-interop/test/hardhat
-        run: |
-          specs=$(ls | grep -E '^[0-9]+-.*\.spec\.ts$' | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "Discovered specs: $specs"
-          if [ "$specs" = "[]" ]; then
-            echo "::error::No interop spec files found"
-            exit 1
-          fi
-          echo "specs=$specs" >> $GITHUB_OUTPUT
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
 
-  # One spec per runner. In-process sharding (run-coverage.ts with no --spec) put all ten
-  # shards on a single 4-core box, which made the leg throughput-bound: ~1900s of shard work
-  # over 4 cores. A job per spec gives each one its own runner, so the leg costs about the
-  # longest single spec instead of total-work/4. The trade is runner minutes — this fans out
-  # to ten jobs. Collapse it by grouping specs in `coverage-anvil-specs` if that becomes a
-  # problem; the local `yarn coverage` path still shards in-process.
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      # Fails if the plan drops, duplicates or invents a spec.
+      - name: Unit-test the group planner
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn test:plan-groups
+
+      - name: Plan coverage groups
+        id: plan
+        working-directory: l1-contracts/test/anvil-interop
+        run: echo "groups=$(yarn --silent plan:groups)" >> $GITHUB_OUTPUT
+
+  # A group of specs per runner, sharded in-process within the job. A runner costs the same
+  # whether it uses one core or four, so the parallelism inside a job is free while extra jobs
+  # are not: measured, one-spec-per-runner spent ~43 runner-minutes to reach ~7.0m wall clock,
+  # while two groups reach ~7.5m for ~14. plan-coverage-groups.ts has the numbers and the knob.
   coverage-anvil:
-    needs: [build, coverage-anvil-specs]
+    needs: [build, coverage-anvil-groups]
     runs-on: ubuntu-latest
     strategy:
-      # One flaky spec should not cancel the other nine; the reporting job refuses to
-      # publish a partial merge anyway, since it requires every shard to report.
+      # One flaky group should not cancel the others; the reporting job refuses to publish a
+      # partial merge anyway, since it requires every group to report.
       fail-fast: false
       matrix:
-        spec: ${{ fromJSON(needs.coverage-anvil-specs.outputs.specs) }}
+        group: ${{ fromJSON(needs.coverage-anvil-groups.outputs.groups) }}
 
     steps:
       - name: Checkout the repository
@@ -495,23 +502,38 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn install
 
-      # `--spec` runs a single spec in this process against one set of Anvil chains, and
-      # writes the report to coverage/anvil/anvil-lcov.info.
-      - name: Run Anvil interop coverage for ${{ matrix.spec }}
+      # A multi-spec --spec list still shards in-process, so this group's specs run
+      # concurrently on this runner and their reports are unioned into
+      # coverage/anvil/anvil-lcov.info. Same cap and reasoning as the integration-test job in
+      # anvil-interop-ci.yaml: a worker is 6 Anvil chains plus a hardhat process, so more than
+      # four at once oversubscribes the runner and causes load-dependent RPC flakes. Coverage
+      # mode adds --steps-tracing on top, so if this job starts flaking, lower the cap first.
+      - name: Run Anvil interop coverage (${{ matrix.group.name }})
         working-directory: l1-contracts/test/anvil-interop
+        env:
+          ANVIL_INTEROP_MAX_PARALLEL_WORKERS: "4"
         run: |
-          ANVIL_COVERAGE_MODE=1 yarn ts-node run-coverage.ts \
-            --spec test/anvil-interop/test/hardhat/${{ matrix.spec }}
+          args=""
+          for spec in ${{ matrix.group.specs }}; do
+            args="$args --spec test/anvil-interop/test/hardhat/$spec"
+          done
+          echo "Running${args}"
+          ANVIL_COVERAGE_MODE=1 yarn ts-node run-coverage.ts $args
 
+      # cleanup.sh is scoped to one port offset, so a cancelled run would otherwise leave the
+      # in-process shard workers' chains behind. Sweep every offset a shard can use.
       - name: Cleanup Anvil
         if: always()
         working-directory: l1-contracts/test/anvil-interop
-        run: yarn cleanup
+        run: |
+          for offset in 0 100 200 300 400 500 600 700 800 900; do
+            ANVIL_INTEROP_PORT_OFFSET=$offset ANVIL_INTEROP_RUN_SUFFIX="-p$offset" yarn cleanup
+          done
 
-      - name: Upload shard coverage
+      - name: Upload group coverage
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-anvil-shard-${{ matrix.spec }}
+          name: coverage-anvil-${{ matrix.group.name }}
           path: l1-contracts/coverage/anvil/anvil-lcov.info
           if-no-files-found: error
 
@@ -553,15 +575,15 @@ jobs:
           name: coverage-foundry-lcov
           path: l1-contracts
 
-      - name: Download shard coverage
+      - name: Download group coverage
         uses: actions/download-artifact@v4
         with:
-          pattern: coverage-anvil-shard-*
+          pattern: coverage-anvil-group-*
           path: l1-contracts/coverage/anvil/shards
 
-      # Fails if any shard contributed nothing, so a broken shard cannot pass as
-      # "this spec added no coverage".
-      - name: Union shard coverage
+      # Fails if no group contributed a report, so a broken group cannot pass as
+      # "these specs added no coverage".
+      - name: Union group coverage
         working-directory: l1-contracts/test/anvil-interop
         run: yarn merge:shards ../../coverage/anvil/shards
 

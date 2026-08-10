@@ -11,6 +11,8 @@
     "setup-and-dump": "ts-node setup-and-dump-state.ts",
     "test:v31-to-v32": "ts-node run-v31-to-v32-upgrade-test.ts",
     "test:lcov-merge": "ts-node test/unit/lcov-merge.test.ts",
+    "test:plan-groups": "ts-node test/unit/plan-coverage-groups.test.ts",
+    "plan:groups": "ts-node plan-coverage-groups.ts",
     "coverage": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts",
     "coverage:serial": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts --serial",
     "merge:shards": "ts-node merge-shard-lcov.ts",

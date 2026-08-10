@@ -160,12 +160,18 @@ Tracing multiplies Anvil's memory and CPU cost, so cap the concurrency on small 
 `ANVIL_INTEROP_MAX_PARALLEL_WORKERS`. If coverage runs start failing with RPC errors mid-spec,
 lower it before looking anywhere else.
 
-CI does not use in-process sharding: `l1-contracts-ci.yaml` fans out a `coverage-anvil` matrix
-job per spec (`run-coverage.ts --spec <file>`), each on its own runner, and each uploads its
-`anvil-lcov.info` as an artifact. The `coverage-report` job downloads them and unions them with
+CI splits the specs across a small number of runners and shards in-process within each. A
+runner costs the same whether it uses one core or four, so parallelism inside a job is free
+while extra jobs are not — measured, one-spec-per-runner spent ~43 runner-minutes to reach
+~7.0m wall clock, two groups reach ~7.5m for ~14. `plan-coverage-groups.ts` packs the specs
+into balanced groups (`yarn plan:groups`) and holds both the group count and the per-spec cost
+table; the costs are a scheduling hint, so a stale entry costs balance, never coverage.
+
+`l1-contracts-ci.yaml` then runs a `coverage-anvil` matrix job per group, each uploading its
+`anvil-lcov.info`. The `coverage-report` job downloads them and unions them with
 `yarn merge:shards <dir>` (`merge-shard-lcov.ts`), which walks the directory for
-`anvil-lcov.info` files and fails if it finds none — a shard that produced nothing must not
-pass as "this spec added no coverage". The union is the same `lcov-merge.ts` used locally.
+`anvil-lcov.info` files and fails if it finds none — a group that produced nothing must not
+pass as "these specs added no coverage". Both union paths use the same `lcov-merge.ts`.
 
 ## Environment Variables
 
