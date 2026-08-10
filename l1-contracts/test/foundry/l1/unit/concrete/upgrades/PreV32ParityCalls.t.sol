@@ -64,16 +64,14 @@ contract PreV32ParityCallsTest is Test {
         // storage only exists from v32 on.
         L1NullifierDev nullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
-            _messageRoot: IMessageRootBase(messageRoot),
-            _eraChainId: eraChainId,
-            _eraDiamondProxy: eraDiamondProxy
+            _messageRoot: IMessageRootBase(messageRoot)
         });
         l1Nullifier = L1Nullifier(
             payable(
                 new TransparentUpgradeableProxy(
                     address(nullifierImpl),
                     proxyAdmin,
-                    abi.encodeCall(L1Nullifier.initialize, (owner, 1, 1, 1, 0))
+                    abi.encodeCall(L1Nullifier.initialize, (owner))
                 )
             )
         );
