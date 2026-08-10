@@ -569,7 +569,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             // If the refund recipient is not specified, the refund will be sent to the sender of the transaction.
             // Otherwise, the refund will be sent to the specified address.
             // If the recipient is a contract on L1, the address alias will be applied.
-            address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, _originalCaller);
+            (address refundRecipient, ) = AddressAliasHelper.actualRefundRecipient(_refundRecipient, _originalCaller);
 
             L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
                 chainId: ERA_CHAIN_ID,

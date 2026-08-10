@@ -437,20 +437,24 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
             revert MsgValueTooLow(baseCost, request.mintValue);
         }
 
+        (address refundRecipient, bool refundAliasingFinalized) = AddressAliasHelper.actualRefundRecipient(
+            request.refundRecipient,
+            request.sender
+        );
+
         bool is7702AccountRefundRecipient = false;
         bool is7702AccountSender = false;
 
         if (block.chainid == L1_CHAIN_ID) {
-            is7702AccountRefundRecipient = EIP_7702_CHECKER.isEIP7702Account(request.refundRecipient);
+            if (!refundAliasingFinalized) {
+                is7702AccountRefundRecipient = EIP_7702_CHECKER.isEIP7702Account(refundRecipient);
+            }
             is7702AccountSender = EIP_7702_CHECKER.isEIP7702Account(request.sender); // This is not the same as refundRecipient, as it appears to be the AR during TwoBridges.
         }
 
-        request.refundRecipient = AddressAliasHelper.actualRefundRecipientMailbox(
-            request.refundRecipient,
-            request.sender,
-            is7702AccountRefundRecipient,
-            is7702AccountSender
-        );
+        request.refundRecipient = refundAliasingFinalized
+            ? refundRecipient
+            : AddressAliasHelper.applyRefundRecipientAlias(refundRecipient, is7702AccountRefundRecipient);
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently ZKsync address derivation is different from Ethereum one, but it may be changed in the future.
         // solhint-disable avoid-tx-origin
