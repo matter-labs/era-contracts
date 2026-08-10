@@ -40,6 +40,12 @@ uint256 constant ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE = 126;
 /// We are allowed to jump at most 100 minor versions at a time. The major version is always expected to be 0.
 uint256 constant MAX_ALLOWED_MINOR_VERSION_DELTA = 100;
 
+/// @dev By convention, tokens native to a chain are treated as if an infinite amount was deposited at the
+/// chain's inception, so their tracked balances start at this value and decrease as tokens are bridged out.
+/// Load-bearing on L1 as well: the removed pre-v32 asset tracker's L1 entry is read as the complement of
+/// this value (see {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}).
+uint256 constant MAX_TOKEN_BALANCE = type(uint256).max;
+
 /// @dev Maximum time a priority transaction may remain unprocessed before Priority Mode (escape hatch) can be activated.
 /// Note: This is not the full user exit window. The effective exit window is`UPGRADE_NOTICE_PERIOD` - `PRIORITY_EXPIRATION`.
 uint256 constant PRIORITY_EXPIRATION = 4 days;

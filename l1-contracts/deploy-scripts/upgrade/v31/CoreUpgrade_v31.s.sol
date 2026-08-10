@@ -14,6 +14,8 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
@@ -34,19 +36,24 @@ import {ICoreUpgradeV31} from "contracts/script-interfaces/IUpgradeV31.sol";
 import {UpgradeUtils} from "../default-upgrade/UpgradeUtils.sol";
 import {CoreUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
 import {TokenMigrationUtils} from "./TokenMigrationUtils.s.sol";
+import {BridgedOutPopulationLib} from "../default-upgrade/BridgedOutPopulationLib.sol";
 
 /// FIXME currently we accept ownership as part of stage1, but in fact we should do it as part of stage0.
 /// @notice Script used for v31 upgrade flow.
 /// @dev Owns all v31-specific core-side ecosystem behavior:
-///      - stage 1: ChainRegistrationSender.acceptOwnership, ChainAssetHandler.setAddresses
+///      - stage 1: ChainRegistrationSender implementation upgrade, ChainAssetHandler.setAddresses
 ///      - stage 2: legacy-GW historical migration intervals + old-GW blacklist (read from upgrade input TOML)
-///      - stage3 (post-governance): bridged-token registration in the NTV
+///      - stage3 (post-governance): bridged-token registration in the NTV + `bridgedOut` population
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     using stdToml for string;
 
     /// @notice Path to the upgrade input TOML, captured from `initializeWithArgs`
     ///         so that stage-2 helpers can re-read the optional `[legacy_gateway]` section.
     string internal v31UpgradeInputRelPath;
+
+    /// @notice Whether this run deployed the `L1InteropHandler` proxy, i.e. the ecosystem was pre-v32.
+    ///         Its ownership then has to be handed to governance and its address wired into the bridges.
+    bool internal deployedL1InteropHandler;
 
     /// @notice Single-call entry point invoked by the protocol-ops CLI.
     ///         Runs the ecosystem-wide core deploys; CTM deploys are handled by `CTMUpgrade_v31`.
@@ -85,7 +92,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     /// @dev Used by the test harness for idempotent re-runs where connections are already set up.
     function deployNewEcosystemContractsL1NoConnections() public virtual {
         coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
-        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract(_messageRootContractName(), false);
+        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
         coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
         coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter", false);
         coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault", false);
@@ -94,35 +101,41 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
             false
         );
         coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler", false);
-        (
-            coreAddresses.bridgehub.implementations.chainRegistrationSender,
-            coreAddresses.bridgehub.proxies.chainRegistrationSender
-        ) = deployTuppWithContract("ChainRegistrationSender", false);
+
+        // The sender exists since v31, and its proxy is kept: it holds the registration history, and the
+        // bridgehub authorizes service transactions by that address. Only the implementation is refreshed
+        // (its validation changed in this release), through the proxy upgrade in stage 1.
+        require(
+            coreAddresses.bridgehub.proxies.chainRegistrationSender != address(0),
+            "Bridgehub has no ChainRegistrationSender registered; register it before this upgrade"
+        );
+        coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
+            "ChainRegistrationSender",
+            false
+        );
+
+        // The interop handler is new in v32: a pre-v32 ecosystem has no proxy for it, so deploy one and let
+        // stage 1 wire it into the bridges. An ecosystem already on v32 only gets a fresh implementation.
+        if (coreAddresses.bridges.proxies.l1InteropHandler == address(0)) {
+            (
+                coreAddresses.bridges.implementations.l1InteropHandler,
+                coreAddresses.bridges.proxies.l1InteropHandler
+            ) = deployTuppWithContract("L1InteropHandler", false);
+            deployedL1InteropHandler = true;
+        } else {
+            coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler", false);
+        }
     }
 
     /// @notice Configure contract connections after deployment
-    /// @dev ChainRegistrationSender is new in v31, we initialize it with deployer as owner, then transfer ownership
     function updateContractConnections() internal {
         address properOwner = getOwnerAddress();
 
-        /////// ChainRegistrationSender
-        console.log("Configuring ChainRegistrationSender connections...");
-
-        address chainRegistrationSenderProxy = coreAddresses.bridgehub.proxies.chainRegistrationSender;
-        require(chainRegistrationSenderProxy != address(0), "ChainRegistrationSender proxy not deployed");
-
-        console.log("ChainRegistrationSender proxy:", chainRegistrationSenderProxy);
-        console.log(
-            "Current ChainRegistrationSender owner:",
-            Ownable2StepUpgradeable(chainRegistrationSenderProxy).owner()
-        );
-        console.log("Deployer (msg.sender):", msg.sender);
-
-        // Transfer ownership to the proper owner (governance)
-        console.log("Transferring ChainRegistrationSender ownership from deployer to governance:", properOwner);
-        vm.broadcast(getBroadcasterAddress());
-        Ownable2StepUpgradeable(chainRegistrationSenderProxy).transferOwnership(properOwner);
-        console.log("ChainRegistrationSender ownership transfer initiated (pending acceptance by governance)");
+        if (deployedL1InteropHandler) {
+            console.log("Transferring L1InteropHandler ownership to governance:", properOwner);
+            vm.broadcast(getBroadcasterAddress());
+            Ownable2StepUpgradeable(coreAddresses.bridges.proxies.l1InteropHandler).transferOwnership(properOwner);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -152,16 +165,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         console.log("  config.deployerAddress:", config.deployerAddress);
     }
 
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZkBytecode
-    ) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "L1MessageRoot") || compareStrings(contractName, _messageRootContractName())) {
-            return abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ());
-        }
-        return super.getInitializeCalldata(contractName, isZkBytecode);
-    }
-
     /// @notice Override to add version-specific governance calls for stage 1
     /// @dev Stage 1 runs after proxy upgrades, so the new `L1ChainAssetHandler`
     ///      implementation is already in place when these calls execute.
@@ -171,33 +174,64 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         console.log("Preparing v31-specific stage1 governance calls...");
 
-        address chainRegistrationSenderProxy = coreAddresses.bridgehub.proxies.chainRegistrationSender;
         address chainAssetHandlerProxy = coreAddresses.bridgehub.proxies.chainAssetHandler;
-
-        require(chainRegistrationSenderProxy != address(0), "ChainRegistrationSender proxy address not found");
         require(chainAssetHandlerProxy != address(0), "ChainAssetHandler proxy address not found");
-
-        console.log("ChainRegistrationSender address:", chainRegistrationSenderProxy);
         console.log("ChainAssetHandler address:", chainAssetHandlerProxy);
 
-        calls = new Call[](2);
+        Call[][] memory allCalls = new Call[][](2);
 
-        // First, accept ownership of ChainRegistrationSender (completes the two-step transfer)
-        calls[0] = Call({
-            target: chainRegistrationSenderProxy,
-            value: 0,
-            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
-        });
+        allCalls[0] = new Call[](2);
+
+        // Point the inherited ChainRegistrationSender proxy at the refreshed implementation.
+        allCalls[0][0] = _buildCallProxyUpgrade(
+            coreAddresses.bridgehub.proxies.chainRegistrationSender,
+            coreAddresses.bridgehub.implementations.chainRegistrationSender
+        );
 
         // Cache messageRoot/assetRouter inside the new ChainAssetHandler implementation
         // so its facets don't re-query bridgehub on every call.
-        calls[1] = Call({
+        allCalls[0][1] = Call({
             target: chainAssetHandlerProxy,
             value: 0,
             data: abi.encodeCall(L1ChainAssetHandler.setAddresses, ())
         });
 
-        return calls;
+        allCalls[1] = _buildL1InteropHandlerWiringCalls();
+
+        return UpgradeUtils.mergeCallsArray(allCalls);
+    }
+
+    /// @notice Stage-1 calls that wire a freshly deployed `L1InteropHandler` into the bridges.
+    /// @dev Empty on an ecosystem that already runs v32, so the same script serves an upgrade and a re-run.
+    ///      Both setters are one-shot and only exist on the new implementations, hence stage 1 rather than
+    ///      the deploy step.
+    function _buildL1InteropHandlerWiringCalls() internal virtual returns (Call[] memory calls) {
+        // Checked before the early return below: a zero address here means discovery failed to report the
+        // handler, which is a broken run whether or not this script deployed it.
+        address l1InteropHandlerProxy = coreAddresses.bridges.proxies.l1InteropHandler;
+        require(l1InteropHandlerProxy != address(0), "L1InteropHandler proxy not deployed");
+
+        if (!deployedL1InteropHandler) {
+            return calls;
+        }
+
+        console.log("Wiring the freshly deployed L1InteropHandler:", l1InteropHandlerProxy);
+        calls = new Call[](3);
+        calls[0] = Call({
+            target: l1InteropHandlerProxy,
+            value: 0,
+            data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())
+        });
+        calls[1] = Call({
+            target: coreAddresses.bridges.proxies.l1Nullifier,
+            value: 0,
+            data: abi.encodeCall(IL1Nullifier.setL1InteropHandler, (l1InteropHandlerProxy))
+        });
+        calls[2] = Call({
+            target: coreAddresses.bridges.proxies.l1AssetRouter,
+            value: 0,
+            data: abi.encodeCall(IL1AssetRouter.setL1InteropHandler, (l1InteropHandlerProxy))
+        });
     }
 
     /// @notice Stage 2 governance calls (post-upgrade-contracts):
@@ -216,39 +250,21 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         return _buildLegacyGatewayDecommissionCalls();
     }
 
-    /// @notice Post-governance step: register legacy bridged tokens in the NTV bridged-tokens list.
+    /// @notice Post-governance step: register legacy bridged tokens in the NTV bridged-tokens list, then
+    ///         populate the vault's `bridgedOut` accounting from the legacy per-chain balances.
     /// @dev Caller signs as any EOA — no governance privileges required.
+    /// @dev The registration has to come first: the population only sees assets that are present in the
+    ///      vault's `bridgedTokens` enumeration.
     function stage3(address bridgehubProxy) public {
         console.log("Starting v31 stage3 post-governance registration...");
         console.log("Bridgehub proxy:", bridgehubProxy);
 
         vm.startBroadcast();
         TokenMigrationUtils.registerBridgedTokensInNTV(bridgehubProxy);
+        BridgedOutPopulationLib.populateBridgedOutForAllAssets(bridgehubProxy);
         vm.stopBroadcast();
 
         console.log("v31 stage3 registration complete!");
-    }
-
-    /// @notice Pick the L1 MessageRoot impl to deploy.
-    /// @dev Defaults to the canonical `L1MessageRoot`. Stage Sepolia opts into
-    ///      `L1MessageRootStageSepolia` (skips chain 270 in `_v31InitializeInner`)
-    ///      via `message_root_stage_sepolia_variant = true` at the top level of
-    ///      the upgrade input TOML — chain 270 is still settling on the stage
-    ///      Gateway (chain 123) at v31 upgrade time, so the canonical impl
-    ///      would revert with `NotAllChainsOnL1`.
-    function _messageRootContractName() internal view returns (string memory) {
-        if (bytes(v31UpgradeInputRelPath).length == 0) {
-            return "L1MessageRoot";
-        }
-        string memory root = vm.projectRoot();
-        string memory upgradeToml = vm.readFile(string.concat(root, v31UpgradeInputRelPath));
-        if (
-            upgradeToml.keyExists("$.message_root_stage_sepolia_variant") &&
-            upgradeToml.readBool("$.message_root_stage_sepolia_variant")
-        ) {
-            return "L1MessageRootStageSepolia";
-        }
-        return "L1MessageRoot";
     }
 
     /// @notice Build the legacy-GW decommission calls (historical intervals + blacklist).

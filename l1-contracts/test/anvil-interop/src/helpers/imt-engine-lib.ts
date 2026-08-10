@@ -314,8 +314,9 @@ export const DEFAULT_SL_CHAIN_ID = 31337;
 export const CHAIN_BATCH_ROOT_TREE_DEPTH = 3;
 
 /**
- * Builds minimal format-valid proof bytes that {MessageHashing._getProofData} parses into a chosen
- * `l1Timestamp`, SL chain id and SL snapshot block. On the harness {MockL2MessageVerification}
+ * Builds minimal format-valid proof bytes that the on-chain parsers ({MessageHashing._getProofData}
+ * / {MessageHashing.readSettlementLayerReference}) parse into a chosen `l1Timestamp`, SL chain id
+ * and SL snapshot block. On the harness {MockL2MessageVerification}
  * accepts any leaf/root, so the siblings are placeholders — only the parsed fields matter.
  *
  * Byte layout (logLeafProofLen=3, the top-tree depth {AtomicInteropProof} enforces):
