@@ -9,12 +9,6 @@ import type { providers, Wallet } from "ethers";
 import { BigNumber, Contract, utils } from "ethers";
 import { getAbi } from "../core/contracts";
 
-/**
- * Max forward hops of the low-leaf search when the caller-supplied low-nullifier index is stale —
- * mirrors MAX_LOW_INDEX_SEARCH_ATTEMPTS in contracts/common/Config.sol.
- */
-export const MAX_LOW_INDEX_SEARCH_ATTEMPTS = 5;
-
 /** Domain tag for commit values: bytes4(keccak256("AtomicInterop.commit.v1")). */
 export const ATOMIC_COMMIT_LEAF_TAG: string = utils
   .keccak256(utils.toUtf8Bytes("AtomicInterop.commit.v1"))

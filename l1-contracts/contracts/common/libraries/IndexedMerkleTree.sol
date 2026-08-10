@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {IMT_EMPTY_LEAF_HASH, MAX_LOW_INDEX_SEARCH_ATTEMPTS} from "../Config.sol";
+import {IMT_EMPTY_LEAF_HASH} from "../Config.sol";
 import {
     IMTAlreadyInitialized,
     IMTLowLeafIndexOutOfBounds,
@@ -56,8 +56,10 @@ library IndexedMerkleTree {
     /// @notice Insert a new value in the tree.
     /// @param _value The value to be inserted.
     /// @param _lowLeafIndex The index of a leaf expected to precede `_value`.
-    /// @dev If `_lowLeafIndex` is incorrect, the function will attempt to find the correct low leaf by traversing the linked list
-    /// up to `MAX_LOW_INDEX_SEARCH_ATTEMPTS` times.
+    /// @dev If `_lowLeafIndex` is stale, the function traverses the linked list forward until it reaches
+    /// the correct low leaf. The walk is deliberately unbounded — see
+    /// {protocol-docs/message-root.md#indexed-merkle-tree-indexedmerkletree} for why bounding it would
+    /// make inserts grievable.
     /// @return newIndex The index of the inserted leaf.
     /// @return newRoot The root after insertion.
     function insert(
@@ -85,11 +87,7 @@ library IndexedMerkleTree {
             revert IMTLowLeafValueTooLarge(lowLeaf.value, _value);
         }
 
-        for (uint256 attempts = 0; lowLeaf.nextValue != 0 && lowLeaf.nextValue < _value; ++attempts) {
-            if (attempts == MAX_LOW_INDEX_SEARCH_ATTEMPTS) {
-                revert IMTLowLeafNextTooSmall(lowLeaf.nextValue, _value);
-            }
-
+        while (lowLeaf.nextValue != 0 && lowLeaf.nextValue < _value) {
             lowLeafIndex = lowLeaf.nextIndex;
             lowLeaf = self.leaves[lowLeafIndex];
         }

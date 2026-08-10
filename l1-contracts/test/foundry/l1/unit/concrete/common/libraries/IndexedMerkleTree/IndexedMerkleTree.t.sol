@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {IMT_EMPTY_LEAF_HASH, MAX_LOW_INDEX_SEARCH_ATTEMPTS} from "contracts/common/Config.sol";
+import {IMT_EMPTY_LEAF_HASH} from "contracts/common/Config.sol";
 import {
     IMTAlreadyInitialized,
     IMTLeafValueMismatch,
@@ -165,15 +165,27 @@ contract IndexedMerkleTreeTest is Test {
         _assertLeaf(tree.leaf(thirdIndex), 15, secondIndex, 20);
     }
 
-    function test_RevertWhen_StaleLowLeafSearchLimitIsExceeded() public {
+    /// @notice Regression (audit): a stale-but-once-valid hint must never make `insert` revert with a
+    /// hint-validity error, no matter how many later inserts land between the hinted low leaf and the
+    /// new value — otherwise front-running inserts into that gap could grief the insert. See
+    /// {protocol-docs/message-root.md#indexed-merkle-tree-indexedmerkletree}.
+    function test_regression_insertSucceedsWithArbitrarilyStaleLowLeafHint() public {
+        // The hint (index 0, the sentinel) is computed against an empty tree; many inserts then land
+        // between the hinted low leaf and the new value before it is used.
+        uint256 intermediateInserts = 50;
         uint256 lowLeafIndex = 0;
-        for (uint256 i = 0; i <= MAX_LOW_INDEX_SEARCH_ATTEMPTS; ++i) {
-            uint256 value = (i + 1) * 10;
-            (lowLeafIndex, ) = tree.insert(value, lowLeafIndex);
+        for (uint256 i = 0; i < intermediateInserts; ++i) {
+            (lowLeafIndex, ) = tree.insert((i + 1) * 10, lowLeafIndex);
         }
 
-        vm.expectRevert(abi.encodeWithSelector(IMTLowLeafNextTooSmall.selector, 60, 70));
-        tree.insert(70, 0);
+        uint256 newValue = (intermediateInserts + 1) * 10;
+        (uint256 newIndex, bytes32 newRoot) = tree.insert(newValue, 0);
+
+        // The walk found the true low leaf (the highest inserted value) and linked the new tail leaf.
+        assertEq(tree.root(), newRoot);
+        assertEq(tree.valueToIndex(newValue), newIndex);
+        _assertLeaf(tree.leaf(lowLeafIndex), intermediateInserts * 10, newIndex, newValue);
+        _assertLeaf(tree.leaf(newIndex), newValue, 0, 0);
     }
 
     function test_VerifyInclusion() public {
