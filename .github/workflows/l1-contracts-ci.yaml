@@ -156,7 +156,7 @@ jobs:
         run: yarn
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
@@ -201,7 +201,7 @@ jobs:
         run: yarn
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
@@ -243,7 +243,7 @@ jobs:
         run: yarn
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
@@ -286,7 +286,7 @@ jobs:
         run: yarn
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
@@ -340,7 +340,7 @@ jobs:
         run: yarn sc build:foundry
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
           key: artifacts-l1-${{ github.sha }}
