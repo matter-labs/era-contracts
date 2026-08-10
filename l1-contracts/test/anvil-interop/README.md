@@ -138,7 +138,7 @@ replays the collected traces through the Forge source maps to produce an LCOV re
 yarn coverage
 
 # Single process, one set of chains, all specs (the pre-sharding behavior)
-yarn ts-node run-coverage.ts --serial
+yarn coverage:serial
 
 # One spec only (implies single process)
 yarn ts-node run-coverage.ts --spec test/anvil-interop/test/hardhat/07-interop-bundles.spec.ts
@@ -152,7 +152,9 @@ reports into `l1-contracts/coverage/anvil/anvil-lcov.info`, which is what
 
 Shards resolve only the contracts their own specs touched, so their file and line sets differ;
 the union takes the max hit count per line and per function. Denominators do not matter here —
-`scripts/merge-coverage.ts` rebases everything onto the Foundry LCOV.
+`scripts/merge-coverage.ts` rebases everything onto the Foundry LCOV. The union itself is
+covered by `yarn test:lcov-merge` (`test/unit/lcov-merge.test.ts`), which CI runs before the
+coverage pipeline.
 
 Tracing multiplies Anvil's memory and CPU cost, so cap the concurrency on small machines with
 `ANVIL_INTEROP_MAX_PARALLEL_WORKERS` (CI uses 4). If coverage runs start failing with RPC

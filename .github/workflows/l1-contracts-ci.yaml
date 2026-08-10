@@ -416,6 +416,12 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn install
 
+      # Guards the union that combines the per-shard LCOV reports below. Pure string/map
+      # logic, no chains involved, runs in seconds.
+      - name: Unit-test the shard LCOV merge
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn test:lcov-merge
+
       # run-coverage.ts shards the specs across workers, each with its own 6 Anvil chains,
       # and unions the per-shard LCOV afterwards. Same cap and reasoning as the
       # integration-test job in anvil-interop-ci.yaml: a worker is 6 Anvil chains plus a

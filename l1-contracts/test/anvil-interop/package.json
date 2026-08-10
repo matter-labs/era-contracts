@@ -10,7 +10,9 @@
     "deploy:test-token": "ts-node src/helpers/deploy-test-token.ts",
     "setup-and-dump": "ts-node setup-and-dump-state.ts",
     "test:v31-to-v32": "ts-node run-v31-to-v32-upgrade-test.ts",
+    "test:lcov-merge": "ts-node test/unit/lcov-merge.test.ts",
     "coverage": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts",
+    "coverage:serial": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts --serial",
     "coverage:html": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts --html",
     "coverage:collect": "ts-node collect-coverage.ts",
     "coverage:collect:html": "ts-node collect-coverage.ts --html"
