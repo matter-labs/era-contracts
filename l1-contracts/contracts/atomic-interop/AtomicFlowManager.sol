@@ -41,6 +41,7 @@ import {
     ManagerLegSourceChainNotRegistered,
     ManagerTooManyLegs,
     ManagerLegSourceChainIdsLengthMismatch,
+    ManagerMissingLegIndexOutOfRange,
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
     ManagerSettlementLayerNotL1,
@@ -218,6 +219,9 @@ contract AtomicFlowManager is IAtomicFlowManager {
         // absent from any OTHER chain's tree, so an unbound proof would allow a double-mint refund of a
         // finalized flow. See {protocol-docs/atomicity/proofs.md#timeout}.
         AtomicFlowPreimage calldata preimage = _flow.preimage;
+        if (_missingLegIndex >= preimage.legBundleHashes.length) {
+            revert ManagerMissingLegIndexOutOfRange(preimage.legBundleHashes.length, _missingLegIndex);
+        }
         uint256 missingLegChainId = preimage.legSourceChainIds[_missingLegIndex];
         if (_absence.sourceChainId != missingLegChainId) {
             revert ProofSourceChainMismatch(missingLegChainId, _absence.sourceChainId);

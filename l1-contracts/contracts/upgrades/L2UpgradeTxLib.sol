@@ -7,7 +7,8 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
-import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
+import {IL2V32Upgrade} from "./IL2V32Upgrade.sol";
+import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {UnexpectedUpgradeSelector} from "../common/L1ContractErrors.sol";
 import {UnexpectedZKsyncOSFlag} from "./ZkSyncUpgradeErrors.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
@@ -26,13 +27,13 @@ library L2UpgradeTxLib {
     using Bytes for bytes;
 
     /// @notice Replace the placeholder inner calldata with real per-chain data.
-    /// @dev The inner calldata is IL2V31Upgrade.upgrade() — we decode the placeholder to
+    /// @dev The inner calldata is IL2V32Upgrade.upgrade() — we decode the placeholder to
     /// extract ecosystem-wide fields, then re-encode with per-chain additionalForceDeploymentsData.
     /// @param _bridgehub The address of the bridgehub.
     /// @param _chainId The chain ID to build the upgrade data for.
     /// @param _zksyncOS Whether the chain is a ZKsyncOS chain, passed from diamond storage.
-    /// @param _existingUpgradeCalldata The placeholder L2V31Upgrade.upgrade() calldata.
-    function buildL2V31UpgradeCalldata(
+    /// @param _existingUpgradeCalldata The placeholder L2V32Upgrade.upgrade() calldata.
+    function buildL2V32UpgradeCalldata(
         address _bridgehub,
         uint256 _chainId,
         bool _zksyncOS,
@@ -56,8 +57,46 @@ library L2UpgradeTxLib {
 
         return
             abi.encodeCall(
-                IL2V31Upgrade.upgrade,
+                IL2V32Upgrade.upgrade,
                 (isZKsyncOS, ctmDeployer, fixedForceDeploymentsData, additionalForceDeploymentsData)
+            );
+    }
+
+    /// @notice Rewrite a ZKsync OS chain's L2 upgrade transaction data with its per-chain data.
+    /// @dev The ecosystem-wide transaction wraps `IL2V32Upgrade.upgrade` in
+    /// `IComplexUpgrader.forceDeployAndUpgradeUniversal`; only the innermost per-chain field changes, so the
+    /// wrapper is unwrapped, `buildL2V32UpgradeCalldata` substitutes the data, and the wrapper is rebuilt.
+    /// @param _bridgehub The address of the bridgehub.
+    /// @param _chainId The chain ID to build the upgrade data for.
+    /// @param _zksyncOS Whether the chain is a ZKsyncOS chain, passed from diamond storage.
+    /// @param _existingTxData The L2 upgrade tx data the CTM upgrade produced.
+    function rewriteZKsyncOSUpgradeTxData(
+        address _bridgehub,
+        uint256 _chainId,
+        bool _zksyncOS,
+        bytes memory _existingTxData
+    ) internal view returns (bytes memory) {
+        validateZKsyncOSFlag(_zksyncOS, true);
+        validateUpgradeSelector(_existingTxData, IComplexUpgrader.forceDeployAndUpgradeUniversal.selector);
+
+        (
+            IComplexUpgrader.UniversalContractUpgradeInfo[] memory forceDeployments,
+            address delegateTo,
+            bytes memory existingUpgradeCalldata
+        ) = abi.decode(_existingTxData.slice(4), (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes));
+
+        validateWrappedUpgrade(existingUpgradeCalldata);
+        bytes memory l2UpgradeCalldata = buildL2V32UpgradeCalldata(
+            _bridgehub,
+            _chainId,
+            _zksyncOS,
+            existingUpgradeCalldata
+        );
+
+        return
+            abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (forceDeployments, delegateTo, l2UpgradeCalldata)
             );
     }
 
@@ -111,9 +150,9 @@ library L2UpgradeTxLib {
             );
     }
 
-    /// @notice Validate that the inner calldata targets L2V31Upgrade.
+    /// @notice Validate that the inner calldata targets L2V32Upgrade.
     function validateWrappedUpgrade(bytes memory _existingUpgradeCalldata) internal pure {
-        if (bytes4(_existingUpgradeCalldata) != IL2V31Upgrade.upgrade.selector) {
+        if (bytes4(_existingUpgradeCalldata) != IL2V32Upgrade.upgrade.selector) {
             revert UnexpectedUpgradeSelector();
         }
     }

@@ -17,7 +17,6 @@ import {
 import {RecoverToL1NotSupported, Unauthorized} from "../../common/L1ContractErrors.sol";
 
 import {
-    AssetAlreadyRegistered,
     AssetIdNotRegistered,
     BaseTokenNativeToThisChain,
     BaseTokenTotalSupplyBackfillNotNeeded,
@@ -28,7 +27,8 @@ import {
     TotalPreV31SupplyShouldBeZero
 } from "./AssetTrackerErrors.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
-import {IL2AssetTracker, SavedTotalSupply, MAX_TOKEN_BALANCE} from "./IL2AssetTracker.sol";
+import {IL2AssetTracker, SavedTotalSupply} from "./IL2AssetTracker.sol";
+import {MAX_TOKEN_BALANCE} from "../../common/Config.sol";
 
 /// @notice Chain-local, write-mostly token bookkeeping; correctness of transfers is guaranteed by ZK
 /// proofs, not by these balances. See {protocol-docs/bridging.md#l2-asset-tracker}.
@@ -124,14 +124,9 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
     }
 
     /// @inheritdoc IL2AssetTracker
-    function initL2(
-        uint256 _l1ChainId,
-        bytes32 _baseTokenAssetId,
-        bool _needBaseTokenTotalSupplyBackfill
-    ) external reentrancyGuardInitializer onlyUpgrader {
+    function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external reentrancyGuardInitializer onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
-        needBaseTokenTotalSupplyBackfill = _needBaseTokenTotalSupplyBackfill;
     }
 
     /// @inheritdoc IL2AssetTracker
@@ -151,18 +146,6 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
             // has never been bridged before v31, so its pre-v31 supply is zero.
             totalPreV31TotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: 0});
         }
-    }
-
-    /// @inheritdoc IL2AssetTracker
-    /// @dev The base token originates on L1 (non-native to this chain). Reverts on double registration,
-    /// which would indicate a broken upgrade invariant (this is called first during the upgrade).
-    function registerBaseTokenDuringUpgrade() external onlyUpgrader {
-        bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
-        require(!isAssetRegistered[baseTokenAssetId], AssetAlreadyRegistered(baseTokenAssetId));
-        isAssetRegistered[baseTokenAssetId] = true;
-        totalPreV31TotalSupply[baseTokenAssetId] = SavedTotalSupply({isSaved: true, amount: 0});
-
-        emit BaseTokenRegisteredDuringUpgrade(baseTokenAssetId);
     }
 
     /// @inheritdoc IL2AssetTracker

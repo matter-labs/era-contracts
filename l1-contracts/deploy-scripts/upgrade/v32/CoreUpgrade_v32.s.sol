@@ -67,17 +67,6 @@ contract CoreUpgrade_v32 is Script, DefaultCoreUpgrade {
         );
     }
 
-    /// @notice v32 storage is compatible as-is, so L1MessageRoot needs no reinitializer: swap the
-    ///         implementation with a plain `upgrade` rather than the base's `upgradeAndCall`
-    ///         (which would re-run the genesis-only `initialize()` and revert once chains exist).
-    function _buildMessageRootUpgradeCall() internal override returns (Call memory call) {
-        return
-            _buildCallProxyUpgrade(
-                coreAddresses.bridgehub.proxies.messageRoot,
-                coreAddresses.bridgehub.implementations.messageRoot
-            );
-    }
-
     /// @notice Override to properly set deployerAddress in upgrade context.
     /// @dev In Forge scripts with vm.broadcast(), msg.sender is the script address, but the
     ///      actual deployer is the broadcast key — same fix as every upgrade script needs.

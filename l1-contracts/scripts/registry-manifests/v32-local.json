@@ -5,10 +5,10 @@
   "core": {
     "contracts": {
       "L1MessageRoot": {
-        "proxy": "0x8B2E2769D4815c206b8CD7c5dfC6FcC45a9bEb0F",
-        "expectedOldImpl": "0xEDeF4F1cab54D48Dbe0f19c82D728de5ABb01992",
+        "proxy": "0x1969F6bA05b769F507C7Fe15b1bae7d7B4FBf50D",
+        "expectedOldImpl": "0xD282d6f075F9108358895d0c4A7861F913778436",
         "implNew": "0x5133BBdfCCa3Eb4F739D599ee4eC45cBCD0E16c5",
-        "implNewCodehash": "0x243ee484a68fd358d247c8b480e71399db16c419a69ba167de4b6c73b0fdc5f3"
+        "implNewCodehash": "0x3d46f603e06d608584b5de79ee03a9ea717eacf7507495ff547ebb3fa487e4cd"
       }
     }
   },
@@ -16,7 +16,7 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0xD9979dE0d8CcE2d83564BdA783eff02315A71c3F",
+      "ctmProxy": "0x3C96F2539a88749E2DF3E357664a12D71a6BCe63",
       "release": {
         "diamondInit": {
           "address": "0x821f3361D454cc98b7555221A06Be563a7E2E0A6",
@@ -122,7 +122,11 @@
             "address": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
             "codehash": "0xb296438cbeb82e3b679e9b08a4f060dc53de6e7eeaca8c39f9dfd193e6938508",
             "isFreezable": true,
-            "selectors": ["0xa085344d", "0x9271e450", "0x7ca4eff7"]
+            "selectors": [
+              "0xa085344d",
+              "0x9271e450",
+              "0x7ca4eff7"
+            ]
           },
           {
             "name": "MigratorFacet",
@@ -144,7 +148,10 @@
             "address": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
             "codehash": "0x395bb8514ef1e5929f5d0116b53947f6416efb30ad2a94b7714c7835714ebefb",
             "isFreezable": true,
-            "selectors": ["0x0db9eb87", "0x0b6db820"]
+            "selectors": [
+              "0x0db9eb87",
+              "0x0b6db820"
+            ]
           },
           {
             "name": "MailboxFacet",
@@ -190,8 +197,8 @@
         }
       },
       "transition": {
-        "releaseFactory": "0x1812C493b72CDBDe62E4470DA539A1B3300Fa5f5",
-        "fromRelease": "0xF548F3Ea2E03D8eC528Bf16e6E2F212e0f191d0e",
+        "releaseFactory": "0xF136E38B78B25C1B7e5a7CD42Adb36027d4C0755",
+        "fromRelease": "0xB36fc4eA664B763de9e1200F2C635A35f110213A",
         "verifier": {
           "address": "0x1780bCf4103D3F501463AD3414c7f4b654bb7aFd",
           "codehash": "0x36e5d09f9182f3a618ad6c81d41b05a4a7b13f1c02004bd909729fec1c31e9e2"

@@ -24,12 +24,16 @@ enum L2EcosystemContract {
     L2MessageVerification,
     L2InteropRootStorage,
     BeaconProxy,
-    L2V31Upgrade,
+    L2V32Upgrade,
     L2SharedBridgeLegacy,
     BridgedStandardERC20,
     DiamondProxy,
     ProxyAdmin,
-    TransparentUpgradeableProxy
+    TransparentUpgradeableProxy,
+    // Atomic-interop built-ins, part of `getZKsyncOSOnlyContracts`: the commitment tree's storage is read
+    // by the ZKsync OS bootloader, and Era chains have no atomic interop.
+    L2InteropCommitmentTree,
+    AtomicFlowManager
 }
 
 /// @notice Canonical identifier for CTM / state-transition contracts.

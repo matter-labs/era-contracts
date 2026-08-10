@@ -24,7 +24,6 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ILegacyChainTypeManager} from "contracts/state-transition/ILegacyChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
@@ -78,8 +77,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         uint256 oldProtocolVersion;
         address ecosystemAdminAddress;
         uint256 governanceUpgradeTimerInitialDelay;
-        bool hasV29IntrospectionOverride;
-        bool useV29IntrospectionOverride;
+        bool hasPreV32IntrospectionOverride;
+        bool usePreV32IntrospectionOverride;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -175,12 +174,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         config.l1ChainId = block.chainid;
         newConfig.ctm = permanentConfig.ctmProxy;
 
-        // Pass bytecodesSupplier to introspection - will overwrite incorrect V29 value
-        setAddressesBasedOnCTM(permanentConfig.bytecodesSupplier);
+        // The supplier is read off the CTM's `L1_BYTECODES_SUPPLIER()` immutable during discovery, so the
+        // permanent-values entry is informational for this path.
+        setAddressesBasedOnCTM();
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
-        // Must be non-zero: `InteropCenter.initL2` (invoked via `_initializeV31Contracts`) reverts
-        // on a zero asset ID, which would abort the L2 upgrade transaction. Catch the
-        // misconfiguration here so the preparation script fails loudly instead of on L2.
+        // Must be non-zero: `InteropCenter.initL2` reverts on a zero asset ID. It runs on the genesis path
+        // of `performForceDeployedContractsInit` only, so this aborts the genesis of chains created from the
+        // release rather than this upgrade — caught here so the misconfiguration surfaces during
+        // preparation instead of at a chain's creation.
         require(permanentConfig.zkTokenAssetId != bytes32(0), "zkTokenAssetId must be non-zero");
         config.zkTokenAssetId = permanentConfig.zkTokenAssetId;
         config.contracts.chainCreationParams = chainCreationParams;
@@ -247,9 +248,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         }
 
         // Optional override for v29 introspection selection
-        if (toml.keyExists("$.use_v29_introspection")) {
-            newConfig.hasV29IntrospectionOverride = true;
-            newConfig.useV29IntrospectionOverride = toml.readBool("$.use_v29_introspection");
+        if (toml.keyExists("$.pre_v32_introspection")) {
+            newConfig.hasPreV32IntrospectionOverride = true;
+            newConfig.usePreV32IntrospectionOverride = toml.readBool("$.pre_v32_introspection");
         }
 
         initializeConfig(chainCreationParams, permanentConfig, governance);
@@ -380,7 +381,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         });
     }
 
-    function setAddressesBasedOnCTM(address _bytecodesSupplier) internal virtual {
+    function setAddressesBasedOnCTM() internal virtual {
         address ctm = newConfig.ctm;
 
         // Verify CTM contract exists
@@ -390,18 +391,20 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         address bridgehubAddr = ChainTypeManagerBase(ctm).BRIDGE_HUB();
         bridgehub = L1Bridgehub(bridgehubAddr);
 
-        // Determine which introspection method to use based on protocol version or override
-        bool useV29Introspection = newConfig.hasV29IntrospectionOverride
-            ? newConfig.useV29IntrospectionOverride
-            : AddressIntrospector.shouldUseV29Introspection(bridgehubAddr);
+        bool preV32Ecosystem;
+        if (newConfig.hasPreV32IntrospectionOverride) {
+            preV32Ecosystem = newConfig.usePreV32IntrospectionOverride;
+        } else if (!AddressIntrospector.hasRegisteredChains(bridgehubAddr)) {
+            // A chainless ecosystem has no protocol version to inspect. It cannot have been upgraded into
+            // existence either, so it was deployed from scratch with the current contracts.
+            preV32Ecosystem = false;
+        } else {
+            preV32Ecosystem = AddressIntrospector.shouldUsePreV32Introspection(bridgehubAddr);
+        }
 
-        // Use appropriate introspection based on version
-        if (useV29Introspection) {
-            ctmAddresses = AddressIntrospector.getCTMAddressesV29(ctm, config.isZKsyncOS);
-            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV29(bridgehubAddr);
-
-            // V29 introspection returns zero for bytecodesSupplier, overwrite with correct value
-            ctmAddresses.stateTransition.proxies.bytecodesSupplier = _bytecodesSupplier;
+        if (preV32Ecosystem) {
+            ctmAddresses = AddressIntrospector.getCTMAddressesV31(ctm, config.isZKsyncOS);
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubAddr);
         } else {
             ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
             coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
@@ -663,8 +666,27 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             value: 0
         });
 
-        calls = new Call[](1);
+        // Pin the release right after the version bump: `setReleaseFactory` first (a CTM migrated
+        // from a pre-registry version has no factory in storage, and release provenance cannot be
+        // checked against a zero one), then `setCurrentRelease`.
+        address ctmProxy = ctmAddresses.stateTransition.proxies.chainTypeManager;
+        address release = ctmAddresses.stateTransition.currentRelease;
+        address releaseFactory = ctmAddresses.stateTransition.releaseFactory;
+        require(release != address(0), "current release not deployed");
+        require(releaseFactory != address(0), "release factory not deployed");
+
+        calls = new Call[](3);
         calls[0] = ctmCall;
+        calls[1] = Call({
+            target: ctmProxy,
+            data: abi.encodeCall(IChainTypeManager.setReleaseFactory, (releaseFactory)),
+            value: 0
+        });
+        calls[2] = Call({
+            target: ctmProxy,
+            data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (release)),
+            value: 0
+        });
     }
 
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
@@ -706,21 +728,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         });
     }
 
+    /// @notice Stage-1 slot for pinning new-chain genesis data. Empty from v32 on: the CTM this
+    ///         repo upgrades to reads all genesis data from its pinned release and no longer
+    ///         implements the legacy `setChainCreationParams`.
+    /// @dev `setCurrentRelease` validates `genesisParams` at the CTM's CURRENT protocol version,
+    ///      which only becomes the new version once `setNewVersionUpgrade` runs — so the release
+    ///      is pinned right AFTER the version bump, in `provideSetNewVersionUpgradeCall`.
     function prepareNewChainCreationParamsCall() public virtual returns (Call[] memory calls) {
-        require(
-            ctmAddresses.stateTransition.proxies.chainTypeManager != address(0),
-            "stateTransitionManagerAddress is zero in newConfig"
-        );
-        calls = new Call[](1);
-
-        calls[0] = Call({
-            target: ctmAddresses.stateTransition.proxies.chainTypeManager,
-            data: abi.encodeCall(
-                ILegacyChainTypeManager.setChainCreationParams,
-                (getChainCreationParams(ctmAddresses.stateTransition))
-            ),
-            value: 0
-        });
+        return new Call[](0);
     }
 
     /// @notice Checks to make sure that migrations are paused

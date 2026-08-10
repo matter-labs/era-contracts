@@ -141,7 +141,7 @@ library L2UtilsBase {
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
             // Use the same base token asset id the NTV below is initialized with, so tests can
             // exercise base-token paths against properly initialized state.
-            L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(_args.l1ChainId, baseTokenAssetId, false);
+            L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(_args.l1ChainId, baseTokenAssetId);
         }
         {
             address l2InteropAccount = address(new DummyL2InteropAccount());

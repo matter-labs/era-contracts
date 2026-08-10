@@ -140,48 +140,6 @@ contract CTMUpgrade_v32 is Script, DefaultCTMUpgrade {
         });
     }
 
-    /// @notice v32 governance call: pin the (freshly deployed) genesis `CTMRegistry` on the
-    ///         upgraded CTM. This replaces the legacy `setChainCreationParams` emission from
-    ///         `DefaultCTMUpgrade` — the v32 CTM reads all genesis data from the registry instead.
-    /// @dev `setCurrentRelease` validates `genesisParams` at the CTM's CURRENT protocol version,
-    ///      which only becomes the new (v32) version once `setNewVersionUpgrade` runs. So this
-    ///      stage-1 slot emits nothing; the `setCurrentRelease` call is appended right AFTER the
-    ///      version bump in `provideSetNewVersionUpgradeCall` below.
-    function prepareNewChainCreationParamsCall() public virtual override returns (Call[] memory calls) {
-        return new Call[](0);
-    }
-
-    /// @notice Emit `setNewVersionUpgrade` (bumps the CTM to v32) immediately followed by
-    ///         `setReleaseFactory` (migrated CTM storage predates the field, and release
-    ///         provenance cannot be checked against a zero factory) and `setCurrentRelease`
-    ///         (pins the v32 genesis release, whose `genesisParams` the CTM now validates at
-    ///         the just-set v32 version).
-    function provideSetNewVersionUpgradeCall() public virtual override returns (Call[] memory calls) {
-        Call[] memory setVersionCalls = super.provideSetNewVersionUpgradeCall();
-
-        address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
-        address release = ctmAddresses.stateTransition.currentRelease;
-        address releaseFactory = ctmAddresses.stateTransition.releaseFactory;
-        require(ctm != address(0), "v32: chainTypeManager proxy is zero");
-        require(release != address(0), "v32: current release not deployed");
-        require(releaseFactory != address(0), "v32: release factory not deployed");
-
-        calls = new Call[](setVersionCalls.length + 2);
-        for (uint256 i = 0; i < setVersionCalls.length; ++i) {
-            calls[i] = setVersionCalls[i];
-        }
-        calls[setVersionCalls.length] = Call({
-            target: ctm,
-            data: abi.encodeCall(IChainTypeManager.setReleaseFactory, (releaseFactory)),
-            value: 0
-        });
-        calls[setVersionCalls.length + 1] = Call({
-            target: ctm,
-            data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (release)),
-            value: 0
-        });
-    }
-
     /// @notice Deploy the v32 upgrade contract: one contract serves both VMs (both use the
     ///         universal ComplexUpgrader path from v32 onwards).
     function deployUsedUpgradeContract() internal virtual override returns (address) {

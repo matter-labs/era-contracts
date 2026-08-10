@@ -38,7 +38,9 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
     L2_VERSION_SPECIFIC_UPGRADER_ADDR,
-    L2_INTEROP_ATTRIBUTE_PARSER_ADDR
+    L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
+    L2_INTEROP_COMMITMENT_TREE_ADDR,
+    L2_ATOMIC_FLOW_MANAGER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title CoreOnGatewayHelper
@@ -157,11 +159,20 @@ library CoreOnGatewayHelper {
             // which is not one of the fixed-address core contracts.
             L2EcosystemContract[] memory fixedAddressCoreContracts = SystemContractsProcessing
                 .getFixedAddressCoreContracts();
-            dependencyContracts = new L2EcosystemContract[](fixedAddressCoreContracts.length + 1);
+            // The ZKsync-OS-only contracts are force-deployed by `getBaseZKsyncOSForceDeployments` from a
+            // separate list, so their preimages have to be merged in here as well.
+            L2EcosystemContract[] memory zksyncOSOnlyContracts = SystemContractsProcessing.getZKsyncOSOnlyContracts();
+            dependencyContracts = new L2EcosystemContract[](
+                fixedAddressCoreContracts.length + zksyncOSOnlyContracts.length + 1
+            );
+            uint256 index;
             for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
-                dependencyContracts[i] = fixedAddressCoreContracts[i];
+                dependencyContracts[index++] = fixedAddressCoreContracts[i];
             }
-            dependencyContracts[fixedAddressCoreContracts.length] = L2EcosystemContract.UpgradeableBeaconDeployer;
+            for (uint256 i = 0; i < zksyncOSOnlyContracts.length; i++) {
+                dependencyContracts[index++] = zksyncOSOnlyContracts[i];
+            }
+            dependencyContracts[index] = L2EcosystemContract.UpgradeableBeaconDeployer;
             return dependencyContracts;
         }
 
@@ -215,13 +226,15 @@ library CoreOnGatewayHelper {
         if (_c == L2EcosystemContract.L2ChainAssetHandler) return "L2ChainAssetHandler";
         if (_c == L2EcosystemContract.InteropCenter) return "InteropCenter";
         if (_c == L2EcosystemContract.InteropAttributeParser) return "InteropAttributeParser";
+        if (_c == L2EcosystemContract.L2InteropCommitmentTree) return "L2InteropCommitmentTree";
+        if (_c == L2EcosystemContract.AtomicFlowManager) return "AtomicFlowManager";
         if (_c == L2EcosystemContract.L2InteropHandler) return "L2InteropHandler";
         if (_c == L2EcosystemContract.L2AssetTracker) return "L2AssetTracker";
         if (_c == L2EcosystemContract.L2WrappedBaseToken) return "L2WrappedBaseToken";
         if (_c == L2EcosystemContract.L2MessageVerification) return "L2MessageVerification";
         if (_c == L2EcosystemContract.L2InteropRootStorage) return "L2InteropRootStorage";
         if (_c == L2EcosystemContract.BeaconProxy) return "BeaconProxy";
-        if (_c == L2EcosystemContract.L2V31Upgrade) return "L2V31Upgrade";
+        if (_c == L2EcosystemContract.L2V32Upgrade) return "L2V32Upgrade";
         if (_c == L2EcosystemContract.L2SharedBridgeLegacy) return "L2SharedBridgeLegacy";
         if (_c == L2EcosystemContract.BridgedStandardERC20) return "BridgedStandardERC20";
         if (_c == L2EcosystemContract.DiamondProxy) return "DiamondProxy";
@@ -256,7 +269,7 @@ library CoreOnGatewayHelper {
     /// @notice Resolve a L2EcosystemContract enum to its canonical L2 address.
     /// @dev Only covers contracts with well-known constant addresses.
     function _resolveAddress(L2EcosystemContract _c) internal pure returns (address) {
-        if (_c == L2EcosystemContract.L2V31Upgrade) {
+        if (_c == L2EcosystemContract.L2V32Upgrade) {
             return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
         }
         if (_c == L2EcosystemContract.L2Bridgehub) return L2_BRIDGEHUB_ADDR;
@@ -273,6 +286,8 @@ library CoreOnGatewayHelper {
         if (_c == L2EcosystemContract.InteropAttributeParser) return L2_INTEROP_ATTRIBUTE_PARSER_ADDR;
         if (_c == L2EcosystemContract.L2InteropHandler) return L2_INTEROP_HANDLER_ADDR;
         if (_c == L2EcosystemContract.UpgradeableBeaconDeployer) return L2_NTV_BEACON_DEPLOYER_ADDR;
+        if (_c == L2EcosystemContract.L2InteropCommitmentTree) return L2_INTEROP_COMMITMENT_TREE_ADDR;
+        if (_c == L2EcosystemContract.AtomicFlowManager) return L2_ATOMIC_FLOW_MANAGER_ADDR;
         revert UnknownCoreContract();
     }
 

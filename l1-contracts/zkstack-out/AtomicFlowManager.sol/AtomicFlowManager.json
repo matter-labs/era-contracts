@@ -476,11 +476,6 @@
   },
   {
     "type": "error",
-    "name": "HashedLogIsDefault",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "IMTLeafValueMismatch",
     "inputs": [
       {
@@ -719,6 +714,22 @@
   },
   {
     "type": "error",
+    "name": "ManagerMissingLegIndexOutOfRange",
+    "inputs": [
+      {
+        "name": "legs",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "missingLegIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ManagerNotInteropCenter",
     "inputs": [
       {
@@ -790,11 +801,6 @@
   {
     "type": "error",
     "name": "MerkleIndexOutOfBounds",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "MerklePathEmpty",
     "inputs": []
   },
   {

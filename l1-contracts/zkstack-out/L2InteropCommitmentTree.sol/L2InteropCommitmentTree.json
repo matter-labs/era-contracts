@@ -186,22 +186,6 @@
   },
   {
     "type": "error",
-    "name": "IMTLowLeafNextTooSmall",
-    "inputs": [
-      {
-        "name": "lowNextValue",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "newValue",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "IMTLowLeafValueTooLarge",
     "inputs": [
       {

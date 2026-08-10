@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {BATCH_LEAF_PADDING, CHAIN_ID_LEAF_PADDING, MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
-import {L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
+import {L2Log, L2Message, ProofData, TxStatus} from "contracts/common/Messaging.sol";
 import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_BOOTLOADER_ADDRESS
@@ -257,5 +257,155 @@ contract MessageHashingTest is Test {
         uint256 _start
     ) external pure returns (bytes32[] memory) {
         return MessageHashing.extractSliceUntilEnd(_proof, _start);
+    }
+
+    // ============ readSettlementLayerReference / readAggregationHopPath Tests ============
+
+    /// @dev Builds a well-formed *non-final* multi-hop proof in the exact word layout `_getProofData`
+    /// consumes: [metadata][logLeafProofLen siblings][l1Timestamp][batchLeafProofMask]
+    /// [batchLeafProofLen siblings][(slBlock << 128) | slRootMask][slChainId].
+    function _buildMultiHopProof(
+        uint256 _logLeafProofLen,
+        uint256 _batchLeafProofLen,
+        uint256 _l1Timestamp,
+        uint256 _batchLeafProofMask,
+        uint128 _slBlock,
+        uint128 _slRootMask,
+        uint256 _slChainId
+    ) internal pure returns (bytes32[] memory proof) {
+        proof = new bytes32[](5 + _logLeafProofLen + _batchLeafProofLen);
+        proof[0] = bytes32(
+            (uint256(SUPPORTED_PROOF_METADATA_VERSION) << 248) | (_logLeafProofLen << 240) | (_batchLeafProofLen << 232)
+        );
+        for (uint256 i = 0; i < _logLeafProofLen; i++) {
+            proof[1 + i] = keccak256(abi.encode("log-sibling", i));
+        }
+        proof[1 + _logLeafProofLen] = bytes32(_l1Timestamp);
+        proof[2 + _logLeafProofLen] = bytes32(_batchLeafProofMask);
+        for (uint256 i = 0; i < _batchLeafProofLen; i++) {
+            proof[3 + _logLeafProofLen + i] = keccak256(abi.encode("batch-sibling", i));
+        }
+        proof[3 + _logLeafProofLen + _batchLeafProofLen] = bytes32((uint256(_slBlock) << 128) | uint256(_slRootMask));
+        proof[4 + _logLeafProofLen + _batchLeafProofLen] = bytes32(_slChainId);
+    }
+
+    /// @dev Pins `readSettlementLayerReference`'s positional offsets to `_getProofData`'s pointer
+    /// walk: both parsers must recover the same settlement-layer words from the same proof bytes,
+    /// for any metadata-declared section lengths. This is the drift guard for the word layout being
+    /// implemented in two places.
+    function testFuzz_readSettlementLayerReference_matchesGetProofData(
+        uint8 _logLeafProofLenSeed,
+        uint8 _batchLeafProofLenSeed,
+        uint256 _l1Timestamp,
+        uint256 _batchLeafProofMask,
+        uint128 _slBlock,
+        uint128 _slRootMask,
+        uint256 _slChainId
+    ) public {
+        uint256 logLeafProofLen = bound(_logLeafProofLenSeed, 1, 32);
+        uint256 batchLeafProofLen = bound(_batchLeafProofLenSeed, 0, 16);
+        // `_getProofData` runs a real Merkle climb over the batch-leaf section, so the mask must
+        // address a leaf inside a tree of that depth.
+        uint256 batchLeafProofMask = bound(_batchLeafProofMask, 0, (1 << batchLeafProofLen) - 1);
+        bytes32[] memory proof = _buildMultiHopProof(
+            logLeafProofLen,
+            batchLeafProofLen,
+            _l1Timestamp,
+            batchLeafProofMask,
+            _slBlock,
+            _slRootMask,
+            _slChainId
+        );
+
+        ProofData memory proofData = this.externalGetProofData(1, 1, 0, keccak256("leaf"), proof);
+        MessageHashing.SettlementLayerReference memory slReference = this.externalReadSettlementLayerReference(proof);
+
+        assertEq(slReference.l1BatchTimestamp, proofData.l1BatchTimestamp);
+        assertEq(slReference.settlementLayerBatchNumber, proofData.settlementLayerBatchNumber);
+        assertEq(slReference.settlementLayerChainId, proofData.settlementLayerChainId);
+        // Sanity: both parsers recovered the values actually written into the proof.
+        assertEq(slReference.l1BatchTimestamp, _l1Timestamp);
+        assertEq(slReference.settlementLayerBatchNumber, uint256(_slBlock));
+        assertEq(slReference.settlementLayerChainId, _slChainId);
+    }
+
+    /// @dev The batch-leaf path accessor must agree with the words written into the proof (mask +
+    /// siblings), for any section lengths.
+    function testFuzz_readAggregationHopPath_matchesProofWords(
+        uint8 _logLeafProofLenSeed,
+        uint8 _batchLeafProofLenSeed,
+        uint256 _batchLeafProofMask
+    ) public {
+        uint256 logLeafProofLen = bound(_logLeafProofLenSeed, 1, 32);
+        uint256 batchLeafProofLen = bound(_batchLeafProofLenSeed, 0, 16);
+        bytes32[] memory proof = _buildMultiHopProof(
+            logLeafProofLen,
+            batchLeafProofLen,
+            0,
+            _batchLeafProofMask,
+            0,
+            0,
+            0
+        );
+
+        MessageHashing.AggregationHopPath memory path = this.externalReadAggregationHopPath(proof);
+
+        assertEq(path.batchLeafProofMask, _batchLeafProofMask);
+        assertEq(path.batchLeafSiblings.length, batchLeafProofLen);
+        for (uint256 i = 0; i < batchLeafProofLen; i++) {
+            assertEq(path.batchLeafSiblings[i], keccak256(abi.encode("batch-sibling", i)));
+        }
+    }
+
+    /// @dev A final-node proof carries no settlement-layer batch reference; the accessor must
+    /// fail closed even when trailing padding words would make the positional reads in-bounds.
+    function test_readSettlementLayerReference_revertsOnFinalProofNode() public {
+        bytes32[] memory proof = _paddedFinalProof();
+
+        vm.expectRevert(InvalidProofLengthForFinalNode.selector);
+        this.externalReadSettlementLayerReference(proof);
+    }
+
+    /// @dev Same fail-closed behavior for the batch-leaf path accessor.
+    function test_readAggregationHopPath_revertsOnFinalProofNode() public {
+        bytes32[] memory proof = _paddedFinalProof();
+
+        vm.expectRevert(InvalidProofLengthForFinalNode.selector);
+        this.externalReadAggregationHopPath(proof);
+    }
+
+    /// @dev A final-node proof (2 log-leaf siblings) padded with attacker-chosen trailing words at
+    /// the offsets the accessors would otherwise read.
+    function _paddedFinalProof() internal pure returns (bytes32[] memory proof) {
+        proof = new bytes32[](8);
+        proof[0] = bytes32(
+            (uint256(SUPPORTED_PROOF_METADATA_VERSION) << 248) | (uint256(2) << 240) | (uint256(1) << 224)
+        );
+        for (uint256 i = 1; i < 8; i++) {
+            proof[i] = keccak256(abi.encode("padding", i));
+        }
+    }
+
+    // External wrappers for calldata conversion
+    function externalGetProofData(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) external pure returns (ProofData memory) {
+        return MessageHashing._getProofData(_chainId, _batchNumber, _leafProofMask, _leaf, _proof);
+    }
+
+    function externalReadSettlementLayerReference(
+        bytes32[] calldata _proof
+    ) external pure returns (MessageHashing.SettlementLayerReference memory) {
+        return MessageHashing.readSettlementLayerReference(_proof);
+    }
+
+    function externalReadAggregationHopPath(
+        bytes32[] calldata _proof
+    ) external pure returns (MessageHashing.AggregationHopPath memory) {
+        return MessageHashing.readAggregationHopPath(_proof);
     }
 }
