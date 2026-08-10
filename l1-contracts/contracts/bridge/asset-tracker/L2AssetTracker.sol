@@ -22,46 +22,53 @@ import {
 } from "../../common/L1ContractErrors.sol";
 
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
-import {IL2AssetTracker} from "./IL2AssetTracker.sol";
-import {L2AssetBookkeepingInfo} from "../../common/L2AssetBookkeeping.sol";
+import {IL2AssetTracker, SavedTotalSupply} from "./IL2AssetTracker.sol";
 import {MAX_TOKEN_BALANCE} from "../../common/Config.sol";
 
-/// @notice Chain-local, write-mostly asset bookkeeping; correctness of transfers is guaranteed by ZK
+/// @notice Chain-local, write-only asset bookkeeping; correctness of transfers is guaranteed by ZK
 /// proofs, not by these amounts. See {protocol-docs/bridging.md#l2-asset-bookkeeping}.
 /// @dev Inherits Ownable2StepUpgradeable and PausableUpgradeable (unused on L2) purely to preserve the
 /// storage layout of the already-deployed L2AssetTracker: they occupy slots 0-200 via the former shared
 /// AssetTrackerBase, so the tracker state below must stay at slots 201+.
 contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpgradeable, ReentrancyGuard {
-    /// @dev Slots 201-203, holding the v31 tracker's `chainBalance`, the `assetMigrationNumber` of the
-    /// even earlier Token Balance Migration, and `isAssetRegistered`. The escrow-integrity accounting
-    /// `chainBalance` served now lives in the vault that owns the escrow
-    /// (`NativeTokenVaultBase.bridgedOut`), and `assetBookkeeping` below replaces the rest, seeded from
-    /// scratch — so the values left here are abandoned rather than migrated.
+    /// @dev Slot previously holding `chainBalance`. The outstanding-amount accounting it carried moved
+    /// to the vault that owns the escrow and can therefore enforce it
+    /// (`NativeTokenVaultBase.bridgedOut`), so the tracker is write-only again: no bridging decision
+    /// reads it. Retained to preserve the deployed storage layout.
     // slither-disable-next-line unused-state
-    uint256[3] private __DEPRECATED_v31TokenAccounting;
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) private __DEPRECATED_chainBalance;
+
+    /// @dev Slot previously holding `assetMigrationNumber` from the removed Token Balance Migration.
+    /// Retained to preserve the deployed storage layout across the in-place upgrade.
+    // slither-disable-next-line unused-state
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber))
+        private __DEPRECATED_assetMigrationNumber;
 
     /// @inheritdoc IL2AssetTracker
+    /// @dev May be removed once all legacy tokens are registered — don't rely on it.
+    mapping(bytes32 assetId => bool isAssetRegistered) public override isAssetRegistered;
+
     uint256 public L1_CHAIN_ID;
 
-    /// @inheritdoc IL2AssetTracker
     bytes32 public BASE_TOKEN_ASSET_ID;
 
-    /// @dev Slots 206-208, holding the v31 tracker's `interopInfo`, `totalPreV31TotalSupply` and
-    /// `needBaseTokenTotalSupplyBackfill`. The first two are superseded by `assetBookkeeping`, which
-    /// merges them; the ZKsync OS base-token backfill they gated is complete on every chain that can
-    /// take this upgrade (see {V32UpgradeZKsyncOS}), so its flag is gone.
-    // slither-disable-next-line unused-state
-    uint256[3] private __DEPRECATED_v31Bookkeeping;
-
-    /// @notice Chain-local bookkeeping of each asset's L1 <-> L2 flows; see {L2AssetBookkeepingInfo}.
-    /// @dev `preTrackingTotalSupply` conventions: for a bridged token (the base token included) it is
-    /// the token's pre-tracking `totalSupply()`. Tokens native to this chain instead use the
-    /// infinite-deposit convention, offsetting the same net inbound flow by `MAX_TOKEN_BALANCE`:
-    /// `MAX_TOKEN_BALANCE - bridgedOut`.
-    mapping(bytes32 assetId => L2AssetBookkeepingInfo info) internal assetBookkeeping;
+    /// @inheritdoc IL2AssetTracker
+    /// @dev L2-side accounting used to compute the amount to keep on L1 during L1 -> Gateway migration.
+    mapping(bytes32 assetId => InteropL2Info info) public override interopInfo;
 
     /// @inheritdoc IL2AssetTracker
-    mapping(bytes32 assetId => bool isTracked) public isAssetTracked;
+    /// @dev Conventions: for a bridged token (the base token included) the snapshot is the token's
+    /// `totalSupply()` at registration time. Tokens native to this chain use the infinite-deposit
+    /// convention, offsetting the same net inbound flow by `MAX_TOKEN_BALANCE`: a token that was never
+    /// bridged out starts at `MAX_TOKEN_BALANCE`, one already bridged out at
+    /// `MAX_TOKEN_BALANCE - vault escrow`.
+    mapping(bytes32 assetId => SavedTotalSupply snapshot) public override totalPreV31TotalSupply;
+
+    /// @dev Slot previously holding `needBaseTokenTotalSupplyBackfill`. The ZKsync OS base-token
+    /// backfill it gated is complete on every chain that can take this upgrade, which is enforced on
+    /// L1 (see {V32UpgradeZKsyncOS}), so this release has no backfill entry point left.
+    // slither-disable-next-line unused-state
+    bool private __DEPRECATED_needBaseTokenTotalSupplyBackfill;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -97,41 +104,33 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
     }
 
-    /// @inheritdoc IL2AssetTracker
-    function getAssetBookkeeping(bytes32 _assetId) external view returns (L2AssetBookkeepingInfo memory) {
-        return assetBookkeeping[_assetId];
-    }
-
     /*//////////////////////////////////////////////////////////////
-                            BOOKKEEPING INITIALIZATION
+                            Token registration
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IL2AssetTracker
+    /// @dev A chain upgraded from v31 registered its base token there (and, on ZKsync OS, backfilled
+    /// the snapshot), so this is a no-op for it; at genesis the supply is zero.
     function trackBaseToken() external onlyUpgrader {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
-        if (isAssetTracked[baseTokenAssetId]) {
+        if (isAssetRegistered[baseTokenAssetId]) {
             return;
         }
-        isAssetTracked[baseTokenAssetId] = true;
 
         // The base token never originates from this chain, so like any bridged token its pre-tracking
-        // net inbound flow is exactly its current `totalSupply()`: the pre-upgrade supply on an
-        // upgraded chain, zero at genesis (the holder's balance is minted in full before this runs).
-        assetBookkeeping[baseTokenAssetId].preTrackingTotalSupply = L2_BASE_TOKEN_SYSTEM_CONTRACT.totalSupply();
+        // net inbound flow is exactly its current `totalSupply()`.
+        _register(baseTokenAssetId, L2_BASE_TOKEN_SYSTEM_CONTRACT.totalSupply());
     }
 
     /// @inheritdoc IL2AssetTracker
     function registerNewTokenIfNeeded(bytes32 _assetId, uint256 _originChainId) external onlyL2NativeTokenVault {
-        if (isAssetTracked[_assetId]) {
+        if (isAssetRegistered[_assetId]) {
             return;
         }
-        isAssetTracked[_assetId] = true;
 
-        if (_originChainId == block.chainid) {
-            // A bridged token's baseline is zero, which the slot already holds; a native one starts at
-            // the infinite-deposit baseline, matching a zero `bridgedOut`.
-            assetBookkeeping[_assetId].preTrackingTotalSupply = MAX_TOKEN_BALANCE;
-        }
+        // No flows predate the registration of a token the vault only learned about now: a bridged
+        // token starts at a zero snapshot, a native one at the infinite-deposit convention.
+        _register(_assetId, _originChainId == block.chainid ? MAX_TOKEN_BALANCE : 0);
     }
 
     /// @inheritdoc IL2AssetTracker
@@ -140,20 +139,19 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
         uint256 _originChainId,
         address _tokenAddress
     ) external onlyL2NativeTokenVault {
-        if (isAssetTracked[_assetId]) {
+        if (isAssetRegistered[_assetId]) {
             return;
         }
-        isAssetTracked[_assetId] = true;
 
+        uint256 snapshot;
         if (_originChainId == block.chainid) {
-            // Before this bookkeeping existed, the vault escrow was the exact outstanding amount except
-            // for indistinguishable direct donations, which are conservatively treated as escrow.
-            assetBookkeeping[_assetId].preTrackingTotalSupply =
-                MAX_TOKEN_BALANCE - IERC20(_tokenAddress).balanceOf(L2_NATIVE_TOKEN_VAULT_ADDR);
+            // Tokens already escrowed in the vault count as bridged out; tokens sent directly to it
+            // are treated the same, since they are effectively frozen.
+            snapshot = MAX_TOKEN_BALANCE - IERC20(_tokenAddress).balanceOf(L2_NATIVE_TOKEN_VAULT_ADDR);
         } else {
-            // A bridged token's totalSupply is exactly its pre-tracking net inbound flow.
-            assetBookkeeping[_assetId].preTrackingTotalSupply = IERC20(_tokenAddress).totalSupply();
+            snapshot = IERC20(_tokenAddress).totalSupply();
         }
+        _register(_assetId, snapshot);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -195,7 +193,7 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
     }
 
     /// @inheritdoc IL2AssetTracker
-    function assertRecoveryIsAccountingNeutral(bytes32 _assetId, uint256 _toChainId) public view {
+    function assertRecoveryIsAccountingNeutral(bytes32 _assetId, uint256 _toChainId) public view override {
         // `totalWithdrawalsToL1` must stay append-only: L2 -> L1 withdrawals are never revertable, so a
         // recovery of an L1-destined transfer cannot legitimately exist.
         require(_toChainId != L1_CHAIN_ID, RecoverToL1NotSupported());
@@ -215,13 +213,20 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Marks the asset registered and stores its pre-tracking supply snapshot. Callers check that
+    /// the asset is not registered yet, so a recorded snapshot is never overwritten.
+    function _register(bytes32 _assetId, uint256 _snapshot) internal {
+        isAssetRegistered[_assetId] = true;
+        totalPreV31TotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: _snapshot});
+    }
+
     /// @dev Records an outbound flow when it targets L1 and this chain currently settles on L1.
     function _recordBridgingToChain(bytes32 _assetId, uint256 _toChainId, uint256 _amount) internal {
         if (
             _toChainId == L1_CHAIN_ID &&
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == L1_CHAIN_ID
         ) {
-            assetBookkeeping[_assetId].totalWithdrawalsToL1 += _amount;
+            interopInfo[_assetId].totalWithdrawalsToL1 += _amount;
         }
     }
 
@@ -231,7 +236,7 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
             _fromChainId == L1_CHAIN_ID &&
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() == L1_CHAIN_ID
         ) {
-            assetBookkeeping[_assetId].totalSuccessfulDepositsFromL1 += _amount;
+            interopInfo[_assetId].totalSuccessfulDepositsFromL1 += _amount;
         }
     }
 

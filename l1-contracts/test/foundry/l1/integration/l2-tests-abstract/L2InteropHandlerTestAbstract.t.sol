@@ -7,7 +7,6 @@ import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {L2AssetBookkeepingInfo} from "contracts/common/L2AssetBookkeeping.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 
 import {
@@ -674,10 +673,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
 
     function _readBaseTokenFlowCounters() internal view returns (uint256 withdrawals, uint256 deposits) {
         // The holder reports its flows to the tracker, which keeps them under BASE_TOKEN_ASSET_ID.
-        L2AssetBookkeepingInfo memory info = L2_ASSET_TRACKER.getAssetBookkeeping(
-            L2_ASSET_TRACKER.BASE_TOKEN_ASSET_ID()
-        );
-        (withdrawals, deposits) = (info.totalWithdrawalsToL1, info.totalSuccessfulDepositsFromL1);
+        (withdrawals, deposits) = L2_ASSET_TRACKER.interopInfo(L2_ASSET_TRACKER.BASE_TOKEN_ASSET_ID());
     }
 
     // ═══════════════════════════════════════════════════════════════════

@@ -2,7 +2,11 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L2AssetBookkeepingInfo} from "../../common/L2AssetBookkeeping.sol";
+/// @dev A token's total-supply snapshot; `isSaved` distinguishes "not captured yet" from a zero amount.
+struct SavedTotalSupply {
+    bool isSaved;
+    uint256 amount;
+}
 
 /// @title L2 Asset Tracker interface
 /// @author Matter Labs
@@ -10,7 +14,16 @@ import {L2AssetBookkeepingInfo} from "../../common/L2AssetBookkeeping.sol";
 /// @notice Chain-local asset bookkeeping hooks called by the NTV, BaseTokenHolder and L2BaseToken.
 /// See {protocol-docs/bridging.md#l2-asset-bookkeeping}.
 interface IL2AssetTracker {
-    /// @notice The chain ID of L1, set during genesis or the v31 upgrade.
+    struct InteropL2Info {
+        // Amount withdrawn to L1 while the chain settled on L1.
+        uint256 totalWithdrawalsToL1;
+        // Amount successfully finalized from L1 while the chain settled on L1.
+        // For base token, failed deposits are refunded on L2 to the refundRecipient rather than
+        // later claimed on L1, so the gap between initiated deposits and this counter should not
+        // be interpreted as uniformly "claimable on L1" across all asset types.
+        uint256 totalSuccessfulDepositsFromL1;
+    }
+
     // solhint-disable-next-line func-name-mixedcase
     function L1_CHAIN_ID() external view returns (uint256);
 
@@ -18,34 +31,38 @@ interface IL2AssetTracker {
     // solhint-disable-next-line func-name-mixedcase
     function BASE_TOKEN_ASSET_ID() external view returns (bytes32);
 
-    /// @notice Whether the asset's bookkeeping has been initialized, i.e. its baseline is recorded.
-    function isAssetTracked(bytes32 _assetId) external view returns (bool);
+    /// @notice Whether the token's pre-tracking supply snapshot is initialized.
+    function isAssetRegistered(bytes32 _assetId) external view returns (bool);
 
-    /// @notice The asset's recorded L1 <-> L2 flows and its pre-tracking baseline;
-    /// see {L2AssetBookkeepingInfo}.
-    function getAssetBookkeeping(bytes32 _assetId) external view returns (L2AssetBookkeepingInfo memory);
+    /// @notice The asset's L1 deposit/withdrawal counters; see {InteropL2Info}.
+    function interopInfo(
+        bytes32 _assetId
+    ) external view returns (uint256 totalWithdrawalsToL1, uint256 totalSuccessfulDepositsFromL1);
+
+    /// @notice The asset's total-supply snapshot, captured before its first tracked bridge operation.
+    function totalPreV31TotalSupply(bytes32 _assetId) external view returns (bool isSaved, uint256 amount);
 
     /// @notice Initializes the tracker at genesis.
     /// @param _l1ChainId The chain ID of the L1 network.
     /// @param _baseTokenAssetId The asset ID of the chain's base token.
     function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external;
 
-    /// @notice Records the base token's pre-tracking baseline, once.
+    /// @notice Registers the base token, snapshotting its current supply. No-op if already registered.
     /// @dev Called during the upgrade/genesis (only the upgrader may call it), before any flow the
-    /// BaseTokenHolder can report, so the baseline and the recorded flows never overlap.
+    /// BaseTokenHolder can report, so the snapshot and the recorded flows never overlap.
     function trackBaseToken() external;
 
-    /// @notice Initializes the bookkeeping of a token registered on the vault after this release,
-    /// which by construction has no pre-tracking flows. No-op if already initialized.
+    /// @notice Registers a token registered on the vault after the tracker, which by construction has
+    /// no pre-tracking flows. No-op if already registered.
     /// @param _assetId The asset ID of the token.
     /// @param _originChainId The chain ID the token is native to.
     function registerNewTokenIfNeeded(bytes32 _assetId, uint256 _originChainId) external;
 
-    /// @notice Initializes the bookkeeping of a token registered on the vault before this release,
-    /// capturing its pre-tracking baseline. No-op if already initialized.
+    /// @notice Registers a token that predates the tracker, capturing its pre-tracking supply
+    /// snapshot. No-op if already registered.
     /// @dev Must be called before the triggering operation changes the token's supply or the
-    /// vault's escrow, both of which the baseline is derived from. The vault drives this (rather
-    /// than the tracker exposing it directly) so that the baseline and the vault's `bridgedOut`
+    /// vault's escrow, both of which the snapshot is derived from. The vault drives this (rather
+    /// than the tracker exposing it directly) so that the snapshot and the vault's `bridgedOut`
     /// seeding — derived from the same escrow — are always captured at the same moment.
     /// @param _assetId The asset ID of the token.
     /// @param _originChainId The chain ID the token is native to.

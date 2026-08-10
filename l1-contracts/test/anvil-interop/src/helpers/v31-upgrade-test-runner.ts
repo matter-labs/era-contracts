@@ -1324,7 +1324,7 @@ async function verifyL2UpgradeResult(l2Provider: ethers.providers.JsonRpcProvide
   }
 
   const baseTokenAssetId = await assetTracker.BASE_TOKEN_ASSET_ID();
-  if (!(await assetTracker.isAssetTracked(baseTokenAssetId))) {
+  if (!(await assetTracker.isAssetRegistered(baseTokenAssetId))) {
     throw new Error(`Chain ${chainId}: base token bookkeeping not initialized after L2 upgrade`);
   }
 }

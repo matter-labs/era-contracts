@@ -65,42 +65,6 @@
   },
   {
     "type": "function",
-    "name": "getAssetBookkeeping",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "internalType": "struct L2AssetBookkeepingInfo",
-        "components": [
-          {
-            "name": "preTrackingTotalSupply",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "totalWithdrawalsToL1",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "totalSuccessfulDepositsFromL1",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "handleFinalizeBaseTokenBridgingOnL2",
     "inputs": [
       {
@@ -201,7 +165,7 @@
   },
   {
     "type": "function",
-    "name": "isAssetTracked",
+    "name": "interopInfo",
     "inputs": [
       {
         "name": "assetId",
@@ -211,7 +175,31 @@
     ],
     "outputs": [
       {
-        "name": "isTracked",
+        "name": "totalWithdrawalsToL1",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "totalSuccessfulDepositsFromL1",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isAssetRegistered",
+    "inputs": [
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "isAssetRegistered",
         "type": "bool",
         "internalType": "bool"
       }
@@ -281,6 +269,30 @@
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "totalPreV31TotalSupply",
+    "inputs": [
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "isSaved",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
