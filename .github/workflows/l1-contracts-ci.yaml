@@ -364,8 +364,10 @@ jobs:
 
       # --- 1. Foundry coverage (unchanged) ---
 
+      # `forge coverage` runs the suite itself, and the `test-foundry` job already gates
+      # on the full (unfiltered) `yarn test:foundry`, so there is no separate test run here.
       - name: Run Foundry coverage
-        run: yarn test:foundry --no-match-path 'test/foundry/l1/unit/concrete/Executor/*' && yarn coverage:foundry --report summary --report lcov
+        run: yarn coverage:foundry --report summary --report lcov
 
       # Installing the specific version of `lcov` because of
       # the `genhtml: ERROR: line ... of ... has branchcov but no linecov data` error.
@@ -414,14 +416,27 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn install
 
+      # run-coverage.ts shards the specs across workers, each with its own 6 Anvil chains,
+      # and unions the per-shard LCOV afterwards. Same cap and reasoning as the
+      # integration-test job in anvil-interop-ci.yaml: a worker is 6 Anvil chains plus a
+      # hardhat process, so running all 10 shards at once oversubscribes the 4-core runner
+      # and causes load-dependent RPC flakes. Coverage mode adds --steps-tracing on top,
+      # so if this job starts flaking, lower the cap before anything else.
       - name: Run Anvil interop coverage
         working-directory: l1-contracts/test/anvil-interop
+        env:
+          ANVIL_INTEROP_MAX_PARALLEL_WORKERS: "4"
         run: ANVIL_COVERAGE_MODE=1 yarn ts-node run-coverage.ts
 
+      # cleanup.sh is scoped to one port offset, so a cancelled run would otherwise leave
+      # the shard workers' chains behind. Sweep every offset a shard can use.
       - name: Cleanup Anvil
         if: always()
         working-directory: l1-contracts/test/anvil-interop
-        run: yarn cleanup
+        run: |
+          for offset in 0 100 200 300 400 500 600 700 800 900; do
+            ANVIL_INTEROP_PORT_OFFSET=$offset ANVIL_INTEROP_RUN_SUFFIX="-p$offset" yarn cleanup
+          done
 
       # Merge produces two outputs:
       #   coverage/merged-lcov.info        — Foundry hits + Anvil hits
@@ -480,6 +495,7 @@ jobs:
             l1-contracts/lcov.info
             l1-contracts/coverage/anvil/anvil-lcov.info
             l1-contracts/coverage/anvil/anvil-coverage-summary.txt
+            l1-contracts/coverage/anvil/shards/*/anvil-lcov.info
             l1-contracts/coverage/anvil-rebased-lcov.info
             l1-contracts/coverage/ANVIL_UNTESTED_LINES_REPORT.md
             l1-contracts/coverage/merged-lcov.info
