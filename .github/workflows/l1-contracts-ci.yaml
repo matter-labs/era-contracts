@@ -450,6 +450,10 @@ jobs:
   # are not: measured, one-spec-per-runner spent ~43 runner-minutes to reach ~7.0m wall clock,
   # while two groups reach ~7.5m for ~14. plan-coverage-groups.ts has the numbers and the knob.
   coverage-anvil:
+    # Without an explicit name, GitHub builds the job name from every matrix value, so the
+    # spec list would end up in the check name and required-check names would shift whenever
+    # the grouping changed. Name it from the stable group label only.
+    name: coverage-anvil (${{ matrix.group.name }})
     needs: [build, coverage-anvil-groups]
     runs-on: ubuntu-latest
     strategy:
