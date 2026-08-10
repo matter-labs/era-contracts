@@ -15,7 +15,8 @@ interface IAtomicFlowManager {
     /// @notice Emitted per source leg marked `Revertable` by a timeout proof.
     event FlowRefundAuthorized(bytes32 indexed flowId, bytes32 indexed bundleHash);
     /// @notice Emitted when a `Revertable` leg's refund claim is consumed. Funds move only for the
-    /// bundle's recoverable calls — possibly none (see {protocol-docs/atomicity/recovery.md}).
+    /// bundle's recoverable calls — possibly none (see
+    /// {protocol-docs/atomicity/recovery.md#nothing-recoverable--no-op-claim}).
     event FlowRefunded(bytes32 indexed flowId, bytes32 indexed bundleHash);
 
     /// @notice Records an atomic source leg: recomputes `flowId` from the supplied preimage, verifies

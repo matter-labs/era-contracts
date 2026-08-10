@@ -122,7 +122,8 @@ asset router recognises the manager via `_atomicFlowManagerAddr()`. For recovery
 when that sender is the canonical L2 asset router (`from == L2_ASSET_ROUTER_ADDR`) — the interface is not
 dispatched generically, and not to the call's target. Send-time validation makes the asset router the
 only possible indirect call sender (`IndirectCallOnlyToAssetRouter`, see
-{protocol-docs/interop.md#restrictions}), so the pinned dispatch reaches every indirect burn.
+{protocol-docs/interop.md#restrictions}), so the pinned dispatch reaches every indirect burn — see
+[recovery.md](./recovery.md) for the recovery mechanisms.
 
 ## Off-chain tooling
 

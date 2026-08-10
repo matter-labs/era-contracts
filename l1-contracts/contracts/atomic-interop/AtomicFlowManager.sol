@@ -295,9 +295,10 @@ contract AtomicFlowManager is IAtomicFlowManager {
         for (uint256 i = 0; i < callsLen; ++i) {
             InteropCall memory c = _bundle.calls[i];
             // Indirect calls are restricted to the asset router at send (`IndirectCallOnlyToAssetRouter`),
-            // so `from == L2_ASSET_ROUTER_ADDR` selects exactly the burn-producing indirect calls, and
-            // any other `from` is a direct call's sender (possibly an EOA, which must not be probed —
-            // the revert would take down the whole claim); its `value`, if any, is handled below. The
+            // so `from == L2_ASSET_ROUTER_ADDR` selects the burn-producing indirect calls (assuming the
+            // router never itself initiates a direct send — true today), and any other `from` is a
+            // direct call's sender (possibly an EOA, which must not be probed — the revert would take
+            // down the whole claim); its `value`, if any, is handled below. The
             // sender reports via the return value whether it recognised (and reversed) the call; nothing
             // is done with the answer — an unrecognised call simply has nothing to recover (see known
             // issue 1 in {protocol-docs/atomicity/security.md#known-issues-to-be-fixed-in-this-release}).

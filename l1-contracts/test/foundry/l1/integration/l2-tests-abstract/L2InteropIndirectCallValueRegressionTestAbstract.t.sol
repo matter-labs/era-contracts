@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
-// solhint-disable gas-custom-errors
 
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
@@ -25,11 +24,10 @@ import {IL2CrossChainSender} from "contracts/bridge/interfaces/IL2CrossChainSend
 
 /// @title L2InteropIndirectCallValueRegressionTestAbstract
 /// @notice Regression tests for the indirect call value handling in InteropCenter.
-/// @dev Stateless by design: the router's `initiateIndirectCall` is stubbed per exact
-/// `(msg.value, calldata)` tuple via `vm.mockCall` and asserted via `vm.expectCall` — no mock contract,
-/// no storage. A deviation in the forwarded value or calldata misses the stub and falls through to the
-/// real asset router, which reverts on the garbage payload, so a successful send is itself proof of
-/// per-call value attribution.
+/// @dev Stateless by design: the router's `initiateIndirectCall` is stubbed with `vm.mockCall` and
+/// pinned with exact-count `vm.expectCall`s, both keyed on the full encoded calldata and the exact
+/// msg.value — no mock contract, no storage. A send that forwards a wrong value misses the stub and
+/// falls through to the real asset router, which reverts on the garbage payload.
 abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropTestUtils {
     address internal finalRecipient;
 
@@ -56,7 +54,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
     }
 
     /// @dev Stubs the router starter for one exact `(msg.value, calldata)` invocation and, via
-    /// `vm.expectCall`, requires the send to make it.
+    /// `vm.expectCall`, requires the send to make it exactly once.
     function _stubRouterStarter(uint256 _msgValue, bytes memory _data) internal {
         bytes memory callData = _starterCalldata(_data);
         vm.mockCall(
@@ -65,7 +63,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             callData,
             abi.encode(_returnedStarter(InteroperableAddress.formatEvmV1(finalRecipient), _data))
         );
-        vm.expectCall(L2_ASSET_ROUTER_ADDR, _msgValue, callData);
+        vm.expectCall(L2_ASSET_ROUTER_ADDR, _msgValue, callData, 1);
     }
 
     /// @dev One indirect call starter targeting the asset router.
@@ -119,7 +117,8 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         uint256 indirectCallMessageValue = 50;
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = _indirectCall(0, indirectCallMessageValue, hex"");
-        // Stub without expectCall: the too-little branch never reaches the starter.
+        // Stub without expectCall: both branches revert after the starter ran (bundle assembly precedes
+        // the explicit msg.value check, and a mocked call is intercepted before any value transfer).
         vm.mockCall(
             L2_ASSET_ROUTER_ADDR,
             indirectCallMessageValue,
@@ -127,11 +126,10 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             abi.encode(_returnedStarter(InteroperableAddress.formatEvmV1(finalRecipient), hex""))
         );
 
-        // Too little value: the send fails while forwarding indirectCallMessageValue to the starter
-        // (bundle assembly precedes the explicit msg.value check), as a plain out-of-funds revert.
+        // Too little value.
         uint256 tooLittle = indirectCallMessageValue - 10;
         vm.deal(address(this), tooLittle);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, indirectCallMessageValue, tooLittle));
         _send(calls, tooLittle);
 
         // Too much value.
@@ -209,6 +207,8 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
     /// @notice The recipient RETURNED by an indirect call starter gets the same validation as a
     /// user-supplied one: a chain-carrying ERC-7930 form is rejected — the bundle-level destination
     /// chain is authoritative, and a smuggled chain reference would otherwise be silently ignored.
+    /// @dev The real router always returns a well-formed recipient, so this branch is defence-in-depth
+    /// reachable only via the stub — hence the mock.
     function test_indirectStarterReturnedRecipientWithChainReferenceReverts() public {
         bytes memory chainCarryingTo = InteroperableAddress.formatEvmV1(destinationChainId + 1, finalRecipient);
         uint256 indirectCallMessageValue = 50;
@@ -230,6 +230,8 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
     /// @notice A zero recipient returned by an indirect call starter is rejected, mirroring the
     /// user-supplied starter check: a call to address(0) could never execute and the collected value
     /// would have no refund path.
+    /// @dev The real router always returns a well-formed recipient, so this branch is defence-in-depth
+    /// reachable only via the stub — hence the mock.
     function test_indirectStarterReturnedRecipientZeroAddressReverts() public {
         uint256 indirectCallMessageValue = 50;
 

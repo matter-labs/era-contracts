@@ -659,7 +659,8 @@ contract InteropCenter is
                 // Indirect calls are restricted to the L2 asset router for this release: the atomic
                 // timeout-recovery hook is dispatched to the asset router only, so pinning the starter
                 // guarantees every indirect burn is reachable by recovery. See
-                // {protocol-docs/interop.md#restrictions}.
+                // {protocol-docs/interop.md#restrictions}. (For L1 destinations the more specific
+                // `InteropCallToL1NotToAssetRouter` above fires first — keep that ordering.)
                 require(
                     _callStarters[i].to == L2_ASSET_ROUTER_ADDR,
                     IndirectCallOnlyToAssetRouter(_callStarters[i].to)
