@@ -212,7 +212,7 @@ library L2Utils {
         forceDeployWithoutConstructor("L2AssetTracker", L2_ASSET_TRACKER_ADDR);
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(_args.l1ChainId, ethAssetId, false);
+        L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(_args.l1ChainId, ethAssetId);
     }
 
     /// @notice Deploys the L2AssetRouter contract.

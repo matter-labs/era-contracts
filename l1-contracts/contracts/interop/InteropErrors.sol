@@ -13,8 +13,8 @@ error BundleAlreadyProcessed(bytes32 bundleHash);
 error CallAlreadyExecuted(bytes32 bundleHash, uint256 callIndex);
 // 0xc087b727
 error CallNotExecutable(bytes32 bundleHash, uint256 callIndex);
-// 0xa8ab28c8
-error CannotInitiateInteropOnL1(uint256 destinationChainId);
+// 0xe9380b27
+error CannotInitiateInteropOnL1();
 // 0xf729f26d
 error CanNotUnbundle(bytes32 bundleHash);
 // 0x2d159f39

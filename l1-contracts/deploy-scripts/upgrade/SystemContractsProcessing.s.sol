@@ -58,6 +58,9 @@ uint256 constant ERA_FACTORY_DEPENDENCY_CONTRACTS_COUNT = FIXED_ADDRESS_CORE_CON
 /// @dev System contracts (0x800x) with l1-contracts EVM bytecodes for ZKsyncOS proxy upgrades.
 uint256 constant ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT = 3;
 
+/// @dev Core contracts that only exist on ZKsync OS chains.
+uint256 constant ZKOS_ONLY_CONTRACTS_COUNT = 2;
+
 /// @notice A fixed-address core contract's identity plus its Era bytecode.
 struct FixedAddressCoreContractDeployInfo {
     CoreContract id;
@@ -205,6 +208,20 @@ library SystemContractsProcessing {
         // Under-filling would silently leave `CoreContract(0)` entries; over-filling
         // already reverts with an out-of-bounds access on the fixed-length array.
         require(i == FIXED_ADDRESS_CORE_CONTRACTS_COUNT, "fixed-address core contract count mismatch");
+    }
+
+    /// @notice Core contracts that a ZKsync OS chain has and an Era chain does not, on top of the
+    /// fixed-address core contracts. Currently the atomic-interop built-ins, see
+    /// {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}.
+    /// @dev Kept out of `getFixedAddressCoreContracts` because that list also drives the Era force
+    ///      deployments and Era factory deps; anything here must never be deployed onto an Era chain.
+    function getZKsyncOSOnlyContracts() internal pure returns (CoreContract[] memory ids) {
+        ids = new CoreContract[](ZKOS_ONLY_CONTRACTS_COUNT);
+        uint256 i;
+        ids[i++] = CoreContract.L2InteropCommitmentTree;
+        ids[i++] = CoreContract.AtomicFlowManager;
+        // Same guard as `getFixedAddressCoreContracts`: under-filling would leave `CoreContract(0)` entries.
+        require(i == ZKOS_ONLY_CONTRACTS_COUNT, "ZKsync-OS-only contract count mismatch");
     }
 
     /// @notice System contracts that have l1-contracts EVM bytecodes and need ZKsyncOS proxy upgrades.
@@ -379,26 +396,35 @@ library SystemContractsProcessing {
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
     {
         CoreContract[] memory fixedAddressCoreContracts = getFixedAddressCoreContracts();
+        CoreContract[] memory zksyncOSOnlyContracts = getZKsyncOSOnlyContracts();
         ZkSyncOsSystemContract[] memory sysContracts = getZKsyncOSExtraSystemContracts();
 
         // SystemContractProxyAdmin is intentionally NOT force-deployed here: it's a direct-deployed
         // ProxyAdmin already present from genesis (owned by the ComplexUpgrader), so re-deploying it
         // would require an unsafe overwrite. _setupProxyAdmin only reads its owner(), which is already
         // correct. (L2WrappedBaseToken is likewise excluded — it is no longer in
-        // getFixedAddressCoreContracts.) The L2V31Upgrade delegate target remains the only legitimate
+        // getFixedAddressCoreContracts.) The L2V32Upgrade delegate target remains the only legitimate
         // ZKsyncOS unsafe force deployment (added in CTMUpgrade_v31); the PUVT guards that no other
         // unsafe force deployment is present.
-        uint256 totalBase = fixedAddressCoreContracts.length + sysContracts.length;
+        uint256 totalBase = fixedAddressCoreContracts.length + zksyncOSOnlyContracts.length + sysContracts.length;
 
         deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](totalBase);
 
+        uint256 index;
         // Fixed-address core contracts (0x10000+)
         for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
-            deployments[i] = _buildZKsyncOSEntry(fixedAddressCoreContracts[i]);
+            deployments[index++] = _buildZKsyncOSEntry(fixedAddressCoreContracts[i]);
+        }
+        // ZKsync-OS-only contracts (currently the atomic-interop built-ins at 0x10012 / 0x10014).
+        // Predeployed in the ZKsync OS genesis, so a from-scratch chain already has them; a chain that
+        // predates the release gets them here, which is what lets `_initializeV32Contracts` initialize
+        // them on the upgrade path too.
+        for (uint256 i = 0; i < zksyncOSOnlyContracts.length; i++) {
+            deployments[index++] = _buildZKsyncOSEntry(zksyncOSOnlyContracts[i]);
         }
         // System contracts with l1-contracts EVM bytecodes (0x800x)
         for (uint256 i = 0; i < sysContracts.length; i++) {
-            deployments[fixedAddressCoreContracts.length + i] = _buildZKsyncOSEntryForSystemContract(sysContracts[i]);
+            deployments[index++] = _buildZKsyncOSEntryForSystemContract(sysContracts[i]);
         }
     }
 
