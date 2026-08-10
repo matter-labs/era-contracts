@@ -98,10 +98,13 @@ with any gas refund). Resolution is split between two helpers in `AddressAliasHe
 
 The legacy `Mailbox.requestL2Transaction` path composes both helpers in one place, so the
 `aliasingFinalized` flag fully protects it from double aliasing. On the Bridgehub / L1AssetRouter paths
-the default is resolved early (the Mailbox never sees the original caller) and the flag cannot travel
-with the request, so the theoretical double-alias caveat — a contract deployed at exactly the alias of a
-constructor caller would be aliased a second time by the Mailbox — applies to those paths only; reaching
-it requires controlling both addresses.
+the default is resolved early (the Mailbox never sees the original caller) and the flag is deliberately
+dropped — carrying it would require extending `BridgehubL2TransactionRequest` and the Bridgehub <-> chain
+interface. The theoretical double-alias caveat — a contract deployed at exactly the alias of a
+constructor caller would be aliased a second time by the Mailbox — therefore applies to those paths
+only. Triggering it requires any contract to exist at exactly the alias of the constructor caller (a
+~2^160 grind unless one party deliberately deploys both); stealing the refund additionally requires
+controlling the doubly-aliased address on L2.
 
 ### Finalization (destination side)
 

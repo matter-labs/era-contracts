@@ -446,10 +446,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
         bool is7702AccountSender = false;
 
         if (block.chainid == L1_CHAIN_ID) {
-            if (!refundAliasingFinalized) {
-                is7702AccountRefundRecipient = EIP_7702_CHECKER.isEIP7702Account(refundRecipient);
-            }
             is7702AccountSender = EIP_7702_CHECKER.isEIP7702Account(request.sender); // This is not the same as refundRecipient, as it appears to be the AR during TwoBridges.
+            if (!refundAliasingFinalized) {
+                // The recipient resolves to the sender when the recipient was unset — reuse the sender check.
+                is7702AccountRefundRecipient = refundRecipient == request.sender
+                    ? is7702AccountSender
+                    : EIP_7702_CHECKER.isEIP7702Account(refundRecipient);
+            }
         }
 
         request.refundRecipient = refundAliasingFinalized

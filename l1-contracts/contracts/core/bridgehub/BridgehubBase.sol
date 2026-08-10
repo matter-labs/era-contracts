@@ -370,7 +370,9 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         BridgehubL2TransactionRequest memory _request
     ) internal returns (bytes32 canonicalTxHash) {
         // Although the aliasing might happen in the Mailbox, we still want to determine the refund recipient
-        // in the BH, as the Mailbox won't have msg.sender
+        // in the BH, as the Mailbox won't have msg.sender. Dropping the finality flag here is a deliberate
+        // trade-off: the request struct cannot carry it, see {protocol-docs/bridging.md} for the
+        // double-alias caveat this leaves open.
         (address refundRecipient, ) = AddressAliasHelper.actualRefundRecipient(_refundRecipient, msg.sender);
         _request.refundRecipient = refundRecipient;
         address zkChain = zkChainMap.get(_chainId);
