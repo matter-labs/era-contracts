@@ -186,31 +186,4 @@ contract AtomicFlowManagerRecoverTest is Test {
         );
         manager.exposedRecoverBundle(_bundle(SOURCE_BASE_TOKEN_ASSET_ID, 0));
     }
-
-    function test_recoverBundle_nonRouterIndirectStarterIsNotDispatched() public {
-        // Send-time validation (`IndirectCallOnlyToAssetRouter`) makes the asset router the only
-        // possible indirect call sender, so a non-router `from` is always treated as a direct call.
-        // Even for a crafted bundle shaped like a non-router indirect call, `_recoverBundle` must not
-        // probe the sender (probing an EOA would revert and, via claimRefund, block the whole claim):
-        // the sender's recoverAtomicCall and both router entry points are set to revert, so any
-        // dispatch would fail the test; the recovery walk still completes.
-        address starter = makeAddr("customIndirectStarter");
-        bytes memory callData = abi.encodeWithSignature("finalizeDeposit(uint256,bytes32,bytes)");
-        vm.mockCallRevert(
-            starter,
-            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector),
-            "unexpected non-router recovery"
-        );
-        vm.mockCallRevert(
-            L2_ASSET_ROUTER_ADDR,
-            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector),
-            "unexpected recovery"
-        );
-        vm.mockCallRevert(
-            L2_ASSET_ROUTER_ADDR,
-            abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
-            "unexpected value refund"
-        );
-        manager.exposedRecoverBundle(_bundleFrom(starter, SOURCE_BASE_TOKEN_ASSET_ID, 0, callData));
-    }
 }

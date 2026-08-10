@@ -13,10 +13,6 @@ interface IL2CrossChainSender {
     ///         We call initiateIndirectCall on contract A on source chain. It returns an interopCallStarter which will be used to pass the call
     ///         to the destination chain. In this second call the sender is contract A on source chain. This "indirect" call mechanism could be used for complex
     ///         Interop scenarios, such as bridging.
-    /// @dev For this release the InteropCenter accepts only the L2 asset router as an indirect call
-    /// target (`IndirectCallOnlyToAssetRouter`); the interface is kept for future extensibility, but
-    /// lifting the restriction requires first making the AtomicFlowManager's recovery dispatch generic —
-    /// it only reverses asset-router burns. See {protocol-docs/interop.md#restrictions}.
     /// @param _chainId Destination chain ID.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _value The `msg.value` to be deposited on the target chain.
