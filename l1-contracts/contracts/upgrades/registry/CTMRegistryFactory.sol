@@ -52,8 +52,12 @@ contract CTMReleaseFactory {
             return existing;
         }
         CTMRelease release = new CTMRelease{salt: manifestHash}();
-        release.initialize(_manifest);
+        // Attest BEFORE initializing: the CREATE2 address is already fixed by the manifest salt, so
+        // recording it first is checks-effects-interactions — the attestation is never written after
+        // an external call. A revert inside `initialize` reverts the whole transaction, so an
+        // uninitialized instance can never stay attested.
         deployedFor[manifestHash] = address(release);
+        release.initialize(_manifest);
         emit ReleaseDeployed(address(release), manifestHash);
         return address(release);
     }
@@ -77,8 +81,9 @@ contract CTMTransitionFactory {
             return existing;
         }
         CTMTransition transition = new CTMTransition{salt: manifestHash}();
-        transition.initialize(_manifest);
+        // Attested before initialization; see the note in `deployOrGetRelease`.
         deployedFor[manifestHash] = address(transition);
+        transition.initialize(_manifest);
         emit TransitionDeployed(address(transition), manifestHash);
         return address(transition);
     }
@@ -102,8 +107,9 @@ contract CoreRegistryFactory {
             return existing;
         }
         CoreRegistry coreRegistry = new CoreRegistry{salt: manifestHash}();
-        coreRegistry.initialize(_manifest);
+        // Attested before initialization; see the note in `deployOrGetRelease`.
         deployedFor[manifestHash] = address(coreRegistry);
+        coreRegistry.initialize(_manifest);
         emit CoreRegistryDeployed(address(coreRegistry), manifestHash);
         return address(coreRegistry);
     }

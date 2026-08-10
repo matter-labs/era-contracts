@@ -24,8 +24,6 @@ error DepositsNotPaused();
 error DepositsPaused();
 // 0xedae13f3
 error ExecutedIsNotConsistentWithVerified(uint256 batchesExecuted, uint256 batchesVerified);
-// 0xc866ff2c
-error InitialForceDeploymentMismatch(bytes32 forceDeploymentHash, bytes32 initialForceDeploymentHash);
 // 0xeaeeb154
 error InitializeNotAvailable();
 // 0xfbd630b8

@@ -276,12 +276,14 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @notice The L1 genesis upgrade contract new chains run at creation, read from the genesis
     ///         registry (used to set chainId + force-deploy the L2 system contracts).
     function l1GenesisUpgrade() public view returns (address genesisUpgrade) {
+        // slither-disable-next-line unused-return
         (genesisUpgrade, , , ) = ICTMRelease(currentRelease).genesisParams();
     }
 
     /// @notice The genesis (batch zero) stored-batch hash new chains start from — derived from
     ///         the genesis params the registry pins, so it stays consistent with the registry.
     function storedBatchZero() public view returns (bytes32) {
+        // slither-disable-next-line unused-return
         (
             ,
             bytes32 genesisBatchHash,

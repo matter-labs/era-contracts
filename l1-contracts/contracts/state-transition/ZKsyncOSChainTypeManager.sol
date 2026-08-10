@@ -44,6 +44,7 @@ contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
         // No version check here: a release is version-INDEPENDENT. The release <-> protocol-version
         // binding is established atomically by the transition (which calls `setNewVersionUpgrade`
         // and `setCurrentRelease` from the same pinned object), not re-derived from the release.
+        // slither-disable-next-line unused-return
         (address genesisUpgrade, bytes32 genesisBatchHash, bytes32 genesisBatchCommitment, ) = release.genesisParams();
 
         if (genesisUpgrade == address(0)) {

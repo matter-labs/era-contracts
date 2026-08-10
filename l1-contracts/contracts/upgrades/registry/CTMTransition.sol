@@ -108,7 +108,10 @@ contract CTMTransition is ICTMTransition {
         // A SemVer patch bump changes no chain state by definition, so it must reuse the
         // departing release.
         {
+            // Patch component deliberately ignored: this check is about the major.minor edge.
+            // slither-disable-next-line unused-return
             (uint32 oldMajor, uint32 oldMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_manifest.oldProtocolVersion));
+            // slither-disable-next-line unused-return
             (uint32 newMajor, uint32 newMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_manifest.newProtocolVersion));
             if (oldMajor == newMajor && oldMinor == newMinor && _manifest.fromRelease != _manifest.newRelease) {
                 revert PatchMustReuseRelease(_manifest.fromRelease, _manifest.newRelease);

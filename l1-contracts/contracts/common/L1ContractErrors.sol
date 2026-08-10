@@ -117,6 +117,8 @@ error DepositExists();
 error DiamondAlreadyFrozen();
 // 0xa7151b9a
 error DiamondNotFrozen();
+// 0x60d92061
+error EcosystemImplMismatch(address proxy, address expectedOldImpl, address actualImpl);
 // 0x7138356f
 error EmptyAddress();
 // 0x2d4d012f
@@ -196,10 +198,6 @@ error InvalidCaller(address);
 error InvalidChainId();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
-// 0xd95d4d82
-error PubdataContentLockedForPermanentRollup();
-// 0x3731bfa2
-error NonFullPubdataContentForPermanentRollup();
 // 0x4fbe5dba
 error InvalidDelay();
 // 0x3f98a77e
@@ -244,6 +242,8 @@ error LengthIsNotDivisibleBy32(uint256 length);
 error LogAlreadyProcessed(uint8);
 // 0x43e266b0
 error MalformedBytecode(BytecodeError);
+// 0x88b43745
+error MalformedL2UpgradePlan();
 // 0xafbb7a4e
 error MerkleIndexOrHeightMismatch();
 // 0x9bb54c35
@@ -292,6 +292,8 @@ error NonCanonicalRepresentation();
 error NonEmptyCalldata();
 // 0x536ec84b
 error NonEmptyMsgValue();
+// 0x3731bfa2
+error NonFullPubdataContentForPermanentRollup();
 // 0xd018e08e
 error NonIncreasingTimestamp();
 // 0x0105f9c0
@@ -316,6 +318,8 @@ error NotCurrentSettlementLayer();
 error NotDangerousContract(address);
 // 0x230f9d11
 error NotEnoughSigners(uint256 provided, uint256 expected);
+// 0x8464be6c
+error NotFactoryDeployed(address instance);
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
 // 0xecb34449
@@ -340,6 +344,8 @@ error OperationMustBePending();
 error OperationMustBeReady();
 // 0xb926450e
 error OriginChainIdNotFound();
+// 0x352cb44f
+error PatchMustReuseRelease(address fromRelease, address newRelease);
 // 0x97da9c1c
 error PayloadTooShort();
 // 0x688c63e5
@@ -364,6 +370,8 @@ error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 error ProtocolIdMismatch(uint256 expectedProtocolVersion, uint256 providedProtocolId);
 // 0x64f94ec2
 error ProtocolIdNotGreater();
+// 0xd95d4d82
+error PubdataContentLockedForPermanentRollup();
 // 0x959f26fb
 error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 // 0x63c36549
@@ -374,31 +382,18 @@ error RecoverToL1NotSupported();
 error Reentrancy();
 // 0xe45872b6
 error RegistryAlreadyInitialized();
-// 0x1f20dafa
-error RegistryUnknownKey();
 // 0xfc83be31
 error RegistryCodehashMismatch(address target, bytes32 expected, bytes32 actual);
-// 0x6d094179
-error RegistryWrongCTM(address expected, address actual);
-error TransitionReleaseMismatch(address expected, address actual);
-error SameReleaseTransitionHasPayload();
-error PatchMustReuseRelease(address fromRelease, address newRelease);
-// @dev A release facet row with an empty selector list — releases carry explicit routing.
-error RegistryEmptySelectors(address facet);
-// @dev A selector routed twice within one release's facet rows.
-error RegistryDuplicateSelector(bytes4 selector);
-// @dev An L2 plan committing data the composed transaction would never execute.
-error MalformedL2UpgradePlan();
-// @dev The old-version deadline falls before chains are even allowed to upgrade.
-error TransitionDeadlineBeforeUpgrade(uint256 deadline, uint256 upgradeTimestamp);
-// @dev An ecosystem row's live implementation matches neither its source nor its target —
-//      rejects replaying a stale registry to downgrade a proxy.
-error NotFactoryDeployed(address instance);
-error RegistryPinTargetHasNoCode(address target);
+// 0x3e28bae4
 error RegistryDuplicateProxyRow(address proxy);
-error EcosystemImplMismatch(address proxy, address expectedOldImpl, address actualImpl);
-// @dev The permissionless (post-deadline) execution window has not opened yet.
-error UpgradeNotPermissionlessYet(uint256 deadline);
+// 0x22345d26
+error RegistryDuplicateSelector(bytes4 selector);
+// 0xba5f0dd8
+error RegistryEmptySelectors(address facet);
+// 0xa0c88a92
+error RegistryPinTargetHasNoCode(address target);
+// 0x1f20dafa
+error RegistryUnknownKey();
 // 0x3ea1345a
 error RegistryWrongVM(bool expected, bool actual);
 // 0x667d17de
@@ -417,6 +412,8 @@ error RestrictionWasNotPresent(address restriction);
 error RevertedBatchNotAfterNewLastBatch();
 // 0xfe0aa4f2
 error RoleAccessDenied(address chainAddress, bytes32 role, address account);
+// 0xec81deed
+error SameReleaseTransitionHasPayload();
 // 0xd3b6535b
 error SelectorsMustAllHaveSameFreezability();
 // 0x02181a13
@@ -461,6 +458,10 @@ error TooManyFactoryDeps();
 error TooMuchGas();
 // 0x00c5a6a9
 error TransactionNotAllowed();
+// 0x1b7def5a
+error TransitionDeadlineBeforeUpgrade(uint256 deadline, uint256 upgradeTimestamp);
+// 0x01a7d6aa
+error TransitionReleaseMismatch(address expected, address actual);
 // 0x4c991078
 error TxHashMismatch();
 // 0x2e311df8
@@ -489,6 +490,8 @@ error UnsupportedProofBatchEncoding(uint8 version);
 error UnsupportedUpgradeType();
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
+// 0xd7f878f7
+error UpgradeNotPermissionlessYet(uint256 deadline);
 // 0x04d91f9d
 error UpgradeTimestampNotReached(uint256 upgradeTimestamp, uint256 currentTimestamp);
 // 0x47b3b145
@@ -525,6 +528,7 @@ error ZKsyncOSNotForceDeployForExistingContract(address);
 error ZKsyncOSNotForceDeployToPrecompileAddress(address);
 // 0x3d9d4821
 error ZKsyncOSPrecommitsNotSupported();
+// @dev An ecosystem row's live implementation matches neither its source nor its target —
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
