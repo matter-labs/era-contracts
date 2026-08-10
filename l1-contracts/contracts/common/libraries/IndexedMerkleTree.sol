@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {MAX_LOW_INDEX_SEARCH_ATTEMPTS} from "../Config.sol";
+import {IMT_EMPTY_LEAF_HASH, MAX_LOW_INDEX_SEARCH_ATTEMPTS} from "../Config.sol";
 import {
     IMTAlreadyInitialized,
     IMTLowLeafIndexOutOfBounds,
@@ -35,18 +35,21 @@ struct IMT {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @notice Append-only indexed Merkle tree supporting both membership and non-membership proofs
+/// via the low-nullifier technique. See {protocol-docs/message-root.md#indexed-merkle-tree-indexedmerkletree}.
 library IndexedMerkleTree {
     using FullMerkle for FullMerkle.FullTree;
 
     /// @notice Initialize an {IMT} and reserve index 0 for the sentinel zero leaf.
+    /// @dev Empty positions are padded with {IMT_EMPTY_LEAF_HASH} (not `hashLeaf({0,0,0})`), so a padded index
+    /// can't be used as a `{0,0,0}` low leaf to forge non-inclusion; index 0 is still the real `{0,0,0}` leaf.
     function setup(IMT storage self) internal {
         if (self.tree._leafNumber != 0) {
             revert IMTAlreadyInitialized();
         }
 
-        bytes32 zeroLeafHash = hashLeaf(IMTLeaf({value: 0, nextIndex: 0, nextValue: 0}));
-        self.tree.setup(zeroLeafHash);
-        self.tree.pushNewLeaf(zeroLeafHash);
+        self.tree.setup(IMT_EMPTY_LEAF_HASH);
+        self.tree.pushNewLeaf(hashLeaf(IMTLeaf({value: 0, nextIndex: 0, nextValue: 0})));
         self.leaves[0] = IMTLeaf({value: 0, nextIndex: 0, nextValue: 0});
     }
 

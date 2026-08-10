@@ -35,7 +35,7 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
-import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
+import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -460,11 +460,7 @@ contract GatewayPreparation is Script {
         bytes memory l2Calldata;
 
         {
-            // Route the CTM asset withdrawal from the gateway back to L1 through the InteropCenter as a
-            // single-call bundle to the L1 asset router (the unified path that replaced
-            // L2AssetRouter.withdraw). The gateway-side ChainAdmin multicall invokes the InteropCenter.
-            // Each (sender, salt) pair may be used only once by the InteropCenter; derive the salt from the
-            // migration content so distinct migrations get distinct salts deterministically.
+            // Content-derived salt: distinct migrations get distinct salts deterministically.
             bytes memory data = InteropLibrary.encodeWithdrawalSendBundleCalldata(
                 l1ChainId,
                 ctmAssetId,
@@ -509,7 +505,7 @@ contract GatewayPreparation is Script {
         L1Nullifier l1Nullifier = L1Nullifier(config.l1NullifierProxy);
         address l1InteropHandlerAddr = l1Nullifier.l1InteropHandler();
         vm.broadcast();
-        IInteropHandlerBase(l1InteropHandlerAddr).executeBundle(
+        L1InteropHandler(l1InteropHandlerAddr).executeBundle(
             UnsafeBytes.readRemainingBytes(message, 1),
             MessageInclusionProof({
                 chainId: gatewayChainId,

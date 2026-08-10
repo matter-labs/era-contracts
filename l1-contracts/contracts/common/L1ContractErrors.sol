@@ -23,6 +23,8 @@ error AlreadyPermanentRollup();
 error AlreadyWhitelisted(address);
 // 0x5e85ae73
 error AmountMustBeGreaterThanZero();
+// 0x76fc80ad
+error AssetDeploymentTrackerNotSet(bytes32 assetId);
 // 0xfde974f4
 error AssetHandlerDoesNotExist(bytes32 assetId);
 // 0x64107968
@@ -83,6 +85,8 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
+// 0x41888953
+error ChainMigrationsDisabled();
 // 0x5e361ef9
 error ChainRequiresValidatorsSignaturesForCommit();
 // 0x8746f42f
@@ -192,6 +196,10 @@ error InvalidCaller(address);
 error InvalidChainId();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
+// 0xd95d4d82
+error PubdataContentLockedForPermanentRollup();
+// 0x3731bfa2
+error NonFullPubdataContentForPermanentRollup();
 // 0x4fbe5dba
 error InvalidDelay();
 // 0x3f98a77e
@@ -360,6 +368,8 @@ error ProtocolIdNotGreater();
 error PubdataGreaterThanLimit(uint256 limit, uint256 length);
 // 0x63c36549
 error QueueIsEmpty();
+// 0x881fba9f
+error RecoverToL1NotSupported();
 // 0xab143c06
 error Reentrancy();
 // 0xe45872b6
@@ -503,6 +513,12 @@ error ZeroChainId();
 error ZeroUpgradeTimestamp();
 // 0x601b6882
 error ZKChainLimitReached();
+// 0xb2cabab5
+error ZKsyncOSChainConfigUpdateWithUnverifiedBatches(uint256 batchesVerified, uint256 batchesCommitted);
+// 0x1df14b10
+error ZKsyncOSMaxTxGasLimitTooHigh();
+// 0x7e34baaf
+error ZKsyncOSMaxTxGasLimitTooLow();
 // 0x646ac57e
 error ZKsyncOSNotForceDeployForExistingContract(address);
 // 0xb24b1ccb

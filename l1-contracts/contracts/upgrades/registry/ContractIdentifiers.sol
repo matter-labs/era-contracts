@@ -17,6 +17,7 @@ enum L2EcosystemContract {
     BaseTokenHolder,
     L2ChainAssetHandler,
     InteropCenter,
+    InteropAttributeParser,
     L2InteropHandler,
     L2AssetTracker,
     L2WrappedBaseToken,

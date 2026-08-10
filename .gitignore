@@ -13,7 +13,8 @@ contracts-preprocessed/
 era_test_node.log*
 foundry.lock
 node_modules/
-# also match node_modules symlinks (worktrees link them to the main checkout)
+# also match node_modules symlinks (worktrees link them to the main checkout; the
+# trailing-slash pattern only matches real directories)
 node_modules
 out/
 target/

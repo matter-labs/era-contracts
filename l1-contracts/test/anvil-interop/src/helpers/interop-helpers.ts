@@ -12,23 +12,93 @@ import { Contract, ethers, Wallet } from "ethers";
 import { getAbi, getCreationBytecode } from "../core/contracts";
 import { getInteropSourcePrivateKey, isLiveInteropMode } from "../core/accounts";
 import {
+  ATOMIC_SEND_BUNDLE_GAS_LIMIT,
   DEFAULT_TX_GAS_LIMIT,
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
-  INTEROP_SEND_BUNDLE_GAS_LIMIT,
   L2_BOOTLOADER_ADDR,
   L2_ASSET_ROUTER_ADDR,
+  L2_INTEROP_COMMITMENT_TREE_ADDR,
   L2_INTEROP_HANDLER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
-import { buildMockInteropProof, impersonateAndRun } from "../core/utils";
+import { impersonateAndRun } from "../core/utils";
 import { encodeEvmChain, encodeEvmAddress } from "./erc7930";
-import { waitForLiveInteropProof } from "./temp-sdk";
+import {
+  atomicFinalityProofTuple,
+  buildInclusionProof,
+  commitValue,
+  commitmentTree,
+  computeFlowId,
+  flowPreimageTuple,
+  lowNullifierIndexFor,
+  DEFAULT_SL_CHAIN_ID,
+  ATOMIC_FLOW_PREIMAGE_VERSION,
+} from "./imt-engine-lib";
+import type { AtomicFlowPreimage } from "./imt-engine-lib";
+export type { AtomicFlowPreimage } from "./imt-engine-lib";
 import { approveTokenForNtv, expectBalanceDelta, getTokenAddressForAsset, getTokenBalance } from "./balance-helpers";
 
 const abiCoder = ethers.utils.defaultAbiCoder;
 const sendResultsByBundleData = new Map<string, InteropSendResult>();
+
+/**
+ * Far-future settlement-layer deadline used for the single-leg atomic flows these helpers build. The
+ * anvil harness mocks root-message authentication and fabricates each proof's `l1Timestamp` (see
+ * imt-engine-lib), so the only real check is `l1Timestamp <= deadline`; a large fixed deadline satisfies
+ * it without any wall-clock coupling. Kept identical between the send (attribute) and the execute
+ * (finality proof) so the derived `flowId` matches.
+ */
+const ATOMIC_INTEROP_DEADLINE = 4_000_000_000;
+
+/**
+ * Derives the single-leg atomic-flow metadata for a predicted `bundleHash`: computes the `flowId` (which
+ * commits to the hash), finds the IMT low-nullifier index for the commit value, and returns the
+ * `atomicBundle` attribute to attach to the send plus the flow fields needed later to build the
+ * {AtomicFinalityProof} at execute time.
+ */
+async function buildSingleLegAtomicSend(
+  sourceProvider: providers.JsonRpcProvider,
+  bundleHash: string
+): Promise<{ attribute: string; flowId: string; preimage: AtomicFlowPreimage; sourceChainId: number }> {
+  const sourceChainId = (await sourceProvider.getNetwork()).chainId;
+  // Single-leg flow preimage: this bundle is the only leg, sourced from this chain. `flowId` is
+  // recomputed on-chain from this exact preimage, so it must match byte-for-byte at execute time.
+  const preimage: AtomicFlowPreimage = {
+    version: ATOMIC_FLOW_PREIMAGE_VERSION,
+    deadline: ATOMIC_INTEROP_DEADLINE,
+    settlementLayerChainId: DEFAULT_SL_CHAIN_ID,
+    legBundleHashes: [bundleHash],
+    legSourceChainIds: [sourceChainId],
+  };
+  const flowId = computeFlowId(preimage);
+  const value = commitValue(flowId, bundleHash);
+  const tree = commitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR, sourceProvider);
+  const lowNull = await lowNullifierIndexFor(tree, value);
+  return { attribute: atomicBundleAttr(preimage, lowNull), flowId, preimage, sourceChainId };
+}
+
+/**
+ * Builds the single-leg {AtomicFinalityProof} tuple for a previously-sent bundle, proving its commit leaf
+ * is present in the source chain's {L2InteropCommitmentTree}. Root-message authentication is mocked to
+ * `true` on the anvil harness, so the exercised checks are IMT membership and `l1Timestamp <= deadline`.
+ */
+async function buildSingleLegFinality(sendResult: InteropSendResult): Promise<unknown> {
+  const value = commitValue(sendResult.flowId, sendResult.bundleHash);
+  const tree = commitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR, sendResult.sourceProvider);
+  const proof = await buildInclusionProof({
+    l2Tree: tree,
+    chainId: sendResult.legSourceChainId,
+    value,
+    l1Timestamp: sendResult.preimage.deadline,
+  });
+  return atomicFinalityProofTuple({
+    flowId: sendResult.flowId,
+    preimage: sendResult.preimage,
+    proofs: [proof],
+  });
+}
 
 /** IERC7786Attributes interface — used for attribute encoding via encodeFunctionData. */
 const erc7786Iface = new ethers.utils.Interface(getAbi("IERC7786Attributes"));
@@ -67,28 +137,60 @@ export function useFixedFeeAttr(useFixedFee: boolean): string {
   return erc7786Iface.encodeFunctionData("useFixedFee", [useFixedFee]);
 }
 
+/**
+ * Encode the ERC-7786 `atomicBundle(AtomicFlowPreimage flowPreimage, uint256 lowNullifierIndex)`
+ * bundle attribute. All L2->L2 interop is atomic (public L1 publication was removed).
+ * See {protocol-docs/atomicity/README.md#key-values}.
+ */
+export function atomicBundleAttr(flowPreimage: AtomicFlowPreimage, lowNullifierIndex: number): string {
+  return erc7786Iface.encodeFunctionData("atomicBundle", [flowPreimageTuple(flowPreimage), lowNullifierIndex]);
+}
+
 /** Encode an interopBundleSalt bundle attribute. */
 export function interopBundleSaltAttr(salt: string): string {
   return erc7786Iface.encodeFunctionData("interopBundleSalt", [salt]);
+}
+
+/** Selector of the mandatory `atomicBundle` bundle attribute. */
+const ATOMIC_BUNDLE_SELECTOR = erc7786Iface.getSighash("atomicBundle").toLowerCase();
+
+/**
+ * True if `attrs` already carries an `atomicBundle` attribute. When it does, the caller manages the atomic
+ * flow itself (e.g. a multi-leg swap that shares one `flowId` across legs — see 13-imt-atomic-swap), so the
+ * send helpers must NOT derive and attach their own single-leg flow.
+ */
+function hasAtomicBundleAttribute(attrs: string[]): boolean {
+  return attrs.some((a) => a.slice(0, 10).toLowerCase() === ATOMIC_BUNDLE_SELECTOR);
+}
+
+/** Decode `(flowId, preimage)` from a caller-provided `atomicBundle` attribute (which carries the full
+ * `AtomicFlowPreimage`; `flowId` is recomputed from it, matching the on-chain derivation). */
+function decodeAtomicBundleAttribute(attrs: string[]): { flowId: string; preimage: AtomicFlowPreimage } {
+  const attr = attrs.find((a) => a.slice(0, 10).toLowerCase() === ATOMIC_BUNDLE_SELECTOR);
+  if (!attr) {
+    throw new Error("atomicBundle attribute not present");
+  }
+  const decoded = erc7786Iface.decodeFunctionData("atomicBundle", attr);
+  const raw = decoded[0];
+  const preimage: AtomicFlowPreimage = {
+    version: raw[0] as string,
+    deadline: Number(raw[1]),
+    settlementLayerChainId: raw[2],
+    legBundleHashes: raw[3] as string[],
+    legSourceChainIds: raw[4] as BigNumber[],
+  };
+  return { flowId: computeFlowId(preimage), preimage };
 }
 
 /** Selector of the interopBundleSalt bundle attribute, used to detect whether a salt was already supplied. */
 const INTEROP_BUNDLE_SALT_SELECTOR = erc7786Iface.getSighash("interopBundleSalt");
 
 /**
- * Ensure the bundle attributes carry an `interopBundleSalt` attribute.
- *
- * The InteropCenter derives the bundle hash from `keccak256(msg.sender, salt)` and rejects a (sender, salt)
- * pair that has already been used (`InteropBundleSaltAlreadyUsed`). Since the test harness sends many bundles
- * from the same source wallet, we attach a fresh salt whenever the caller did not provide one, so that each
- * bundle gets a unique hash (mirroring the previously auto-incremented interop nonce). If the caller already
- * supplied a salt attribute, it is left untouched.
- *
- * The salt is derived deterministically from `(sender, account nonce)` rather than random bytes: the nonce is
- * consumed by the send so every bundle still gets a fresh salt, but re-runs of the harness reproduce identical
- * salts. That keeps the pre-generated chain-state snapshots byte-deterministic (random salts change both the
- * salt-keyed storage slots and the calldata gas cost run-to-run), and later test runs against a loaded snapshot
- * cannot collide with salts already used during state generation because the account nonce has advanced.
+ * Attach a fresh `interopBundleSalt` attribute when the caller did not supply one, so every harness
+ * bundle gets a unique (sender, salt) pair. The salt is derived from `(sender, account nonce)`, not
+ * random bytes: re-runs reproduce identical salts, keeping the pre-generated chain-state snapshots
+ * byte-deterministic, while runs against a loaded snapshot cannot collide with salts already used
+ * during state generation (the account nonce has advanced).
  */
 async function ensureUniqueBundleSalt(attributes: string[], wallet: Wallet): Promise<string[]> {
   const hasSalt = attributes.some((attr) => attr.slice(0, 10).toLowerCase() === INTEROP_BUNDLE_SALT_SELECTOR);
@@ -100,6 +202,75 @@ async function ensureUniqueBundleSalt(attributes: string[], wallet: Wallet): Pro
     ethers.utils.defaultAbiCoder.encode(["address", "uint256"], [wallet.address, nonce])
   );
   return [...attributes, interopBundleSaltAttr(salt)];
+}
+
+/**
+ * Pull the ABI-encoded revert data (`0x<selector><args>`) out of an ethers v5 `eth_call` rejection.
+ * Different providers nest it differently, so probe the common shapes.
+ */
+function extractRevertData(_err: unknown): string | undefined {
+  const err = _err as { error?: { data?: unknown }; data?: unknown; body?: string };
+  const candidates: unknown[] = [err?.error && (err.error as { data?: unknown }).data, err?.data];
+  if (typeof err?.body === "string") {
+    try {
+      candidates.push((JSON.parse(err.body) as { error?: { data?: unknown } })?.error?.data);
+    } catch {
+      // body was not JSON
+    }
+  }
+  for (const c of candidates) {
+    if (typeof c === "string" && c.startsWith("0x") && c.length >= 10) return c;
+    if (c && typeof c === "object") {
+      const nested = (c as { data?: unknown }).data;
+      if (typeof nested === "string" && nested.startsWith("0x") && nested.length >= 10) return nested;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Statically evaluate `previewBundleHash` / `previewMessageHash` (the two functions that predict a bundle's
+ * hash before the real send) and return the predicted bundle hash.
+ *
+ * Both preview functions follow the quoter pattern: they run the identical bundle assembly as the real send
+ * (including, for an INDIRECT leg, the value-burning `L2AssetRouter.initiateIndirectCall{value: ...}`) and
+ * then ALWAYS revert with `InteropPreviewHash(bundleHash)` rather than returning it — so the burn can never
+ * be committed on-chain regardless of caller/context. We therefore invoke them via `eth_call` (expecting the
+ * revert) and decode the hash out of the `InteropPreviewHash` reason.
+ *
+ * Two `eth_call` details make the assembly faithful:
+ *  - The InteropCenter's balance is overridden to a large value so it can fund the forwarded
+ *    `indirectCallMessageValue` of a cross-base-token indirect leg (msg.value is not forwarded to a preview);
+ *    the forwarded amount is fixed by the call, so the predicted hash is identical to the real send's.
+ *  - `_from` MUST be the address that will submit the real send: the preview derives the bundle salt and each
+ *    call's `from` from `msg.sender`, so a mismatch would predict a different hash.
+ * The state override and the reverted assembly are both discarded with the call; nothing persists.
+ */
+// ~3.4e38 wei — far larger than any interop value leg, so the InteropCenter can always fund the
+// forwarded `indirectCallMessageValue` during the read-only preview.
+const PREVIEW_INTEROP_CENTER_BALANCE_OVERRIDE = "0xffffffffffffffffffffffffffffffff";
+export async function staticPreviewHash(
+  _interopCenter: Contract,
+  _provider: providers.JsonRpcProvider,
+  _from: string,
+  _fnName: "previewBundleHash" | "previewMessageHash",
+  _args: unknown[]
+): Promise<string> {
+  const data = _interopCenter.interface.encodeFunctionData(_fnName, _args);
+  let revertData: string | undefined;
+  try {
+    await _provider.send("eth_call", [
+      { to: INTEROP_CENTER_ADDR, from: _from, data },
+      "latest",
+      { [INTEROP_CENTER_ADDR]: { balance: PREVIEW_INTEROP_CENTER_BALANCE_OVERRIDE } },
+    ]);
+    throw new Error(`${_fnName} was expected to revert with InteropPreviewHash (quoter pattern) but returned`);
+  } catch (e) {
+    revertData = extractRevertData(e);
+    if (!revertData) throw e;
+  }
+  // The revert reason is `InteropPreviewHash(bytes32 bundleHash)`; decode via the imported InteropCenter ABI.
+  return _interopCenter.interface.decodeErrorResult("InteropPreviewHash", revertData)[0] as string;
 }
 
 // ── Token transfer data encoding ───────────────────────────────
@@ -127,10 +298,8 @@ export interface SendAndExecuteTokenInteropParams {
 
 export async function sendAndExecuteTokenInterop(params: SendAndExecuteTokenInteropParams): Promise<string> {
   await approveTokenForNtv(params.sendProvider, params.sourceTokenAddress, params.amount);
-  // Ensure the source token is registered in the NTV so the asset router can bridge-burn it.
-  // Under the new trust model interop eligibility only requires NTV registration; no on-chain
-  // balance migration to the Gateway is needed. A token bridged in from another chain is already
-  // registered (during its bridgeMint), so this is a no-op for those.
+  // Interop eligibility only requires NTV registration; a token bridged in from another chain is
+  // already registered during its bridgeMint, so this is a no-op for those.
   await registerL2NativeTokenIfNeeded(params.sendProvider, params.sourceTokenAddress);
   const fee = await getInteropProtocolFee(params.sendProvider);
 
@@ -189,6 +358,12 @@ export interface SendBundleOptions {
   bundleAttributes?: string[];
   value?: BigNumber;
   gasLimit?: number;
+  /**
+   * Set to `false` for an L2->L1 withdrawal: the bundle is published to L1 and finalized there via a
+   * message-inclusion proof, so there is no atomic flow to predict — skip the `previewBundleHash` /
+   * `atomicBundle` attribute path (which is L2<->L2 only). Defaults to atomic (L2<->L2).
+   */
+  atomic?: boolean;
 }
 
 export interface InteropSendResult {
@@ -202,6 +377,13 @@ export interface InteropSendResult {
   /** ABI-encoded bundle data, ready for executeBundle / verifyBundle / unbundleBundle. */
   bundleData: string;
   bundleHash: string;
+  /** Atomic-flow id this bundle was committed under (single-leg flow: `[bundleHash]`). */
+  flowId: string;
+  /** The full flow preimage this bundle committed under; used to rebuild the AtomicFinalityProof at
+   * execute time so the on-chain `flowId` recomputation matches. Empty legs for a non-atomic withdrawal. */
+  preimage: AtomicFlowPreimage;
+  /** Source chain id of the (single) leg — used to build the AtomicFinalityProof at execute time. */
+  legSourceChainId: number;
 }
 
 /**
@@ -213,15 +395,61 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
   const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
-  const tx = await interopCenter.sendBundle(
-    destinationChainIdBytes,
-    options.callStarters,
-    await ensureUniqueBundleSalt(options.bundleAttributes || [], wallet),
-    {
-      gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
-      value: options.value || 0,
-    }
-  );
+  // Attributes carry a stable salt used for BOTH the hash prediction and the real send.
+  const baseAttributes = await ensureUniqueBundleSalt(options.bundleAttributes || [], wallet);
+
+  // Interop is atomic. Two cases:
+  //  - caller-managed (a multi-leg swap already supplied its shared `atomicBundle` attribute): send the
+  //    attributes as-is; the caller owns the flow and builds its own AtomicFinalityProof at execute time.
+  //  - single-leg (the common case): predict the bundleHash the send will emit — via a static preview that
+  //    runs the real assembly, including the burning indirect-call, but persists nothing — then derive the
+  //    single-leg atomic flow that commits to it and attach the `atomicBundle` attribute.
+  let attributes: string[];
+  let flowId: string;
+  let preimage: AtomicFlowPreimage;
+  let legSourceChainId: number;
+  let predictedBundleHash: string | undefined;
+  // Empty preimage for the non-atomic withdrawal path (unused on the L1 finalization path).
+  const emptyPreimage: AtomicFlowPreimage = {
+    version: ATOMIC_FLOW_PREIMAGE_VERSION,
+    deadline: 0,
+    settlementLayerChainId: 0,
+    legBundleHashes: [],
+    legSourceChainIds: [],
+  };
+  if (options.atomic === false) {
+    // L2->L1 withdrawal: non-atomic. The bundle is published to L1 and finalized there via a
+    // message-inclusion proof, so there is no atomic flow to predict — send the attributes as-is and
+    // leave the atomic flow fields empty (they are unused on the withdrawal finalization path).
+    attributes = baseAttributes;
+    flowId = ethers.constants.HashZero;
+    preimage = emptyPreimage;
+    legSourceChainId = (await options.sourceProvider.getNetwork()).chainId;
+  } else if (hasAtomicBundleAttribute(baseAttributes)) {
+    attributes = baseAttributes;
+    ({ flowId, preimage } = decodeAtomicBundleAttribute(baseAttributes));
+    legSourceChainId = (await options.sourceProvider.getNetwork()).chainId;
+  } else {
+    const predicted: string = await staticPreviewHash(
+      interopCenter,
+      options.sourceProvider,
+      wallet.address,
+      "previewBundleHash",
+      [destinationChainIdBytes, options.callStarters, baseAttributes]
+    );
+    predictedBundleHash = predicted;
+    const atomic = await buildSingleLegAtomicSend(options.sourceProvider, predicted);
+    attributes = [...baseAttributes, atomic.attribute];
+    flowId = atomic.flowId;
+    preimage = atomic.preimage;
+    legSourceChainId = atomic.sourceChainId;
+  }
+
+  const tx = await interopCenter.sendBundle(destinationChainIdBytes, options.callStarters, attributes, {
+    // Atomic sends append to the IMT (~1.1M-gas insert) on top of the calls; needs the larger cap.
+    gasLimit: options.gasLimit || ATOMIC_SEND_BUNDLE_GAS_LIMIT,
+    value: options.value || 0,
+  });
   const receipt = await tx.wait();
 
   // Extract InteropBundleSent event
@@ -243,6 +471,12 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
     throw new Error("InteropBundleSent event not found in source transaction receipt");
   }
 
+  // For the auto single-leg path the predicted hash feeds the atomic flowId; a mismatch would make the
+  // finality proof unverifiable. (Caller-managed flows do their own cross-check.)
+  if (predictedBundleHash !== undefined && bundleHash.toLowerCase() !== predictedBundleHash.toLowerCase()) {
+    throw new Error(`predicted bundleHash ${predictedBundleHash} != emitted ${bundleHash}`);
+  }
+
   const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
 
   const result = {
@@ -254,6 +488,9 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
     interopBundle,
     bundleData,
     bundleHash,
+    flowId,
+    preimage,
+    legSourceChainId,
   };
   sendResultsByBundleData.set(bundleData, result);
   return result;
@@ -267,15 +504,29 @@ export async function simulateInteropBundle(options: SendBundleOptions): Promise
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
   const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
-  await interopCenter.callStatic.sendBundle(
-    destinationChainIdBytes,
-    options.callStarters,
-    await ensureUniqueBundleSalt(options.bundleAttributes || [], wallet),
-    {
-      gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
-      value: options.value || 0,
-    }
-  );
+  const baseAttributes = await ensureUniqueBundleSalt(options.bundleAttributes || [], wallet);
+  // Mirror `sendInteropBundle`'s attribute construction so the callStatic exercises the full path (value
+  // collection included — the preview alone skips it, so reverts like MsgValueMismatch only surface on the
+  // real `sendBundle`). An L2->L1 withdrawal (`atomic === false`) is non-atomic: it carries no `atomicBundle`
+  // attribute, and `previewBundleHash` (which enforces `_ensureL2ToL2`) must NOT be called for an L1 dest.
+  let attributes: string[];
+  if (options.atomic === false) {
+    attributes = baseAttributes;
+  } else {
+    const predictedBundleHash: string = await staticPreviewHash(
+      interopCenter,
+      options.sourceProvider,
+      wallet.address,
+      "previewBundleHash",
+      [destinationChainIdBytes, options.callStarters, baseAttributes]
+    );
+    const atomic = await buildSingleLegAtomicSend(options.sourceProvider, predictedBundleHash);
+    attributes = [...baseAttributes, atomic.attribute];
+  }
+  await interopCenter.callStatic.sendBundle(destinationChainIdBytes, options.callStarters, attributes, {
+    gasLimit: options.gasLimit || ATOMIC_SEND_BUNDLE_GAS_LIMIT,
+    value: options.value || 0,
+  });
 }
 
 // ── InteropCenter.sendMessage wrapper ──────────────────────────
@@ -297,12 +548,24 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
   const wallet = new Wallet(getInteropSourcePrivateKey(), options.sourceProvider);
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
+  const baseAttributes = await ensureUniqueBundleSalt(options.attributes, wallet);
+  // Single-call sends are single-leg atomic flows too: predict the bundleHash (of the wrapping bundle)
+  // and attach the atomic flow that commits to it.
+  const predictedBundleHash: string = await staticPreviewHash(
+    interopCenter,
+    options.sourceProvider,
+    wallet.address,
+    "previewMessageHash",
+    [options.recipient, options.payload, baseAttributes]
+  );
+  const atomic = await buildSingleLegAtomicSend(options.sourceProvider, predictedBundleHash);
+
   const tx = await interopCenter.sendMessage(
     options.recipient,
     options.payload,
-    await ensureUniqueBundleSalt(options.attributes, wallet),
+    [...baseAttributes, atomic.attribute],
     {
-      gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
+      gasLimit: options.gasLimit || ATOMIC_SEND_BUNDLE_GAS_LIMIT,
       value: options.value || 0,
     }
   );
@@ -327,6 +590,10 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
     throw new Error("InteropBundleSent event not found in sendMessage receipt");
   }
 
+  if (bundleHash.toLowerCase() !== predictedBundleHash.toLowerCase()) {
+    throw new Error(`predicted message bundleHash ${predictedBundleHash} != emitted ${bundleHash}`);
+  }
+
   const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
 
   const result = {
@@ -338,6 +605,9 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
     interopBundle,
     bundleData,
     bundleHash,
+    flowId: atomic.flowId,
+    preimage: atomic.preimage,
+    legSourceChainId: atomic.sourceChainId,
   };
   sendResultsByBundleData.set(bundleData, result);
   return result;
@@ -353,37 +623,31 @@ export interface InteropExecutionData {
 }
 
 export async function getInteropExecutionData(
-  destProvider: providers.JsonRpcProvider,
+  _destProvider: providers.JsonRpcProvider,
   bundleInput: BundleExecutionInput,
-  sourceChainId: number
+  _sourceChainId: number
 ): Promise<InteropExecutionData> {
-  if (!isLiveInteropMode()) {
-    return {
-      bundleData: getBundleData(bundleInput),
-      proof: buildMockInteropProof(sourceChainId),
-    };
+  // Atomic interop: the proof is a per-leg IMT inclusion proof ({AtomicFinalityProof}) built from the
+  // source chain's commitment tree, not a live gateway message-inclusion proof. The flow metadata
+  // (flowId/deadline/source chain) was recorded when the bundle was sent. `_destProvider` and
+  // `_sourceChainId` are therefore unused here; they are kept for signature parity with `executeBundle`.
+  void _destProvider;
+  void _sourceChainId;
+  const sendResult = getSendResult(bundleInput);
+  if (isLiveInteropMode()) {
+    throw new Error("Atomic live-mode interop proof generation is not yet implemented");
   }
-
-  const sendResult = getLiveSendResult(bundleInput);
-  const liveData = await waitForLiveInteropProof(
-    sendResult.sourceProvider,
-    destProvider,
-    sendResult.sourceTxHash,
-    sourceChainId,
-    sendResult.proofIndex
-  );
-  if (!liveData.rawData || !liveData.proofDecoded) {
-    throw new Error(`Live interop proof was not available for ${sendResult.sourceTxHash}`);
-  }
+  const proof = await buildSingleLegFinality(sendResult);
   return {
-    bundleData: liveData.rawData,
-    proof: liveData.proofDecoded,
+    bundleData: sendResult.bundleData,
+    proof,
   };
 }
 
 /**
  * Execute an interop bundle on the destination chain via InteropHandler.executeBundle.
- * Uses a mock proof in Anvil and a proof-based gateway proof in live mode.
+ * Builds the atomic {AtomicFinalityProof} (single-leg IMT inclusion) from the source chain's commitment
+ * tree; the bundle must have been sent via `sendInteropBundle`/`sendInteropMessage` in this process.
  */
 export async function executeBundle(
   destProvider: providers.JsonRpcProvider,
@@ -395,7 +659,7 @@ export async function executeBundle(
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
-  const tx = await interopHandler.executeBundle(bundleData, proof, {
+  const tx = await interopHandler.executeAtomicBundle(bundleData, proof, {
     gasLimit: gasLimit || DEFAULT_TX_GAS_LIMIT,
   });
   return tx.wait();
@@ -414,14 +678,15 @@ export async function simulateExecuteBundle(
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
-  await interopHandler.callStatic.executeBundle(bundleData, proof, {
+  await interopHandler.callStatic.executeAtomicBundle(bundleData, proof, {
     gasLimit: gasLimit || DEFAULT_TX_GAS_LIMIT,
   });
 }
 
 /**
  * Verify a bundle on the destination chain via InteropHandler.verifyBundle.
- * Uses a mock proof.
+ * Uses the same atomic {AtomicFinalityProof} as {executeBundle}; marks the bundle Verified so it can
+ * later be unbundled.
  */
 export async function verifyBundle(
   destProvider: providers.JsonRpcProvider,
@@ -433,22 +698,24 @@ export async function verifyBundle(
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("L2InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
-  const tx = await interopHandler.verifyBundle(bundleData, proof, { gasLimit: DEFAULT_TX_GAS_LIMIT });
+  const tx = await interopHandler.verifyAtomicBundle(bundleData, proof, { gasLimit: DEFAULT_TX_GAS_LIMIT });
   return tx.wait();
 }
 
-function getBundleData(bundleInput: BundleExecutionInput): string {
-  return typeof bundleInput === "string" ? bundleInput : bundleInput.bundleData;
-}
-
-function getLiveSendResult(bundleInput: BundleExecutionInput): InteropSendResult {
+/**
+ * Resolves the {InteropSendResult} for a bundle. Atomic execution needs the flow metadata
+ * (flowId/deadline/source chain) recorded at send time, so a bare `bundleData` string is only usable if
+ * its bundle was sent via `sendInteropBundle`/`sendInteropMessage` in this process.
+ */
+function getSendResult(bundleInput: BundleExecutionInput): InteropSendResult {
   if (typeof bundleInput !== "string") {
     return bundleInput;
   }
   const sendResult = sendResultsByBundleData.get(bundleInput);
   if (!sendResult) {
     throw new Error(
-      "Live interop execution requires an InteropSendResult or bundleData returned by sendInteropBundle/sendInteropMessage in this process"
+      "Atomic interop execution requires an InteropSendResult (or bundleData) returned by " +
+        "sendInteropBundle/sendInteropMessage in this process, so the atomic flow metadata is known"
     );
   }
   return sendResult;

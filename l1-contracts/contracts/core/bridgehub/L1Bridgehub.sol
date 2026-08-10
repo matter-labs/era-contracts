@@ -132,6 +132,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
 
         _registerNewZKChain(_chainId, chainAddress, true);
         messageRoot.addNewChain(_chainId, 0);
+        messageRoot.seedGenesisRoot(_chainId);
 
         emit NewChain(_chainId, _chainTypeManager, _admin);
         return _chainId;

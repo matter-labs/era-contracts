@@ -71,8 +71,15 @@ library MessageHashing {
     /// @dev Returns the leaf hash for a chain with batch number and batch root.
     /// @param batchRoot The root hash of the batch.
     /// @param batchNumber The number of the batch.
-    function batchLeafHash(bytes32 batchRoot, uint256 batchNumber) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber));
+    /// @param l1Timestamp The settlement-layer block timestamp at which the batch root was aggregated.
+    /// Bound into the leaf so the timestamp is provable via the same inclusion proof; see
+    /// {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+    function batchLeafHash(
+        bytes32 batchRoot,
+        uint256 batchNumber,
+        uint256 l1Timestamp
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber, l1Timestamp));
     }
 
     /// @dev Returns the leaf hash for a chain with chain root and chain id.
@@ -163,6 +170,7 @@ library MessageHashing {
         ProofMetadata memory proofMetadata = MessageHashing.parseProofMetadata(_proof);
         result.ptr = proofMetadata.proofStartIndex;
 
+        uint256 l1BatchTimestamp;
         {
             bytes32 batchSettlementRoot = Merkle.calculateRootMemory(
                 extractSlice(_proof, result.ptr, result.ptr + proofMetadata.logLeafProofLen),
@@ -176,8 +184,17 @@ library MessageHashing {
             if (proofMetadata.finalProofNode) {
                 return result;
             }
+            // Bound into the batch leaf below, so a wrong timestamp makes the reconstructed leaf
+            // mismatch the tree — that is what authenticates the proof-supplied value.
+            l1BatchTimestamp = uint256(_proof[result.ptr]);
+            ++result.ptr;
+
             // Now, we'll have to check that the Gateway included the message.
-            bytes32 localBatchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, _batchNumber);
+            bytes32 localBatchLeafHash = MessageHashing.batchLeafHash(
+                batchSettlementRoot,
+                _batchNumber,
+                l1BatchTimestamp
+            );
 
             uint256 batchLeafProofMask = uint256(bytes32(_proof[result.ptr]));
             ++result.ptr;
@@ -213,9 +230,33 @@ library MessageHashing {
             batchLeafProofLen: proofMetadata.batchLeafProofLen,
             batchSettlementRoot: result.batchSettlementRoot,
             chainIdLeaf: result.chainIdLeaf,
+            l1BatchTimestamp: l1BatchTimestamp,
             ptr: result.ptr,
             finalProofNode: proofMetadata.finalProofNode
         });
+    }
+
+    /// @dev The batch-leaf Merkle path (mask + siblings) of a multi-hop proof's aggregation-hop
+    /// section, read positionally by {readAggregationHopPath}.
+    struct AggregationHopPath {
+        /// @dev The Merkle mask of the batch leaf inside the chain's batch tree.
+        uint256 batchLeafProofMask;
+        /// @dev The batch leaf's sibling path inside the chain's batch tree.
+        bytes32[] batchLeafSiblings;
+    }
+
+    /// @notice Reads the aggregation-hop batch-leaf Merkle path from a proof — the single accessor
+    /// for this section's word layout; external libraries must use it instead of parsing themselves.
+    /// @dev The returned words can be trusted ONLY after the same proof bytes passed the leaf
+    /// verifier (`proveL2LeafInclusionShared` / {_getProofData}), which also must have rejected
+    /// `finalProofNode` proofs.
+    function readAggregationHopPath(bytes32[] calldata _proof) internal pure returns (AggregationHopPath memory path) {
+        ProofMetadata memory metadata = parseProofMetadata(_proof);
+        // Word layout after the leaf-to-batch-root section (see {_getProofData}):
+        // [l1Timestamp][batchLeafProofMask][batchLeafProofLen siblings]...
+        uint256 ptr = metadata.proofStartIndex + metadata.logLeafProofLen;
+        path.batchLeafProofMask = uint256(_proof[ptr + 1]);
+        path.batchLeafSiblings = extractSlice(_proof, ptr + 2, ptr + 2 + metadata.batchLeafProofLen);
     }
 
     /// @notice Extracts slice from the proof.

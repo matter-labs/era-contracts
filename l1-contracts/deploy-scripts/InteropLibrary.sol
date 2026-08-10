@@ -15,6 +15,7 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 // import {IInteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
+import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {AmountMustBeGreaterThanZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -53,9 +54,7 @@ library InteropLibrary {
     }
 
     /// @notice Build a single InteropCallStarter with provided attributes for sending a call.
-    /// @param salt Salt mixed into the bundle's `interopBundleSalt`. Provide a random value: it keeps the bundle hash
-    ///             unpredictable and thus preserves the bundle's privacy. `bytes32(0)` is allowed but discouraged —
-    ///             since each salt must be unique per sender (enforced by InteropCenter), a sender can use it at most once.
+    /// @param salt User salt for `interopBundleSalt`; see {buildBundleAttributes}.
     function buildCall(
         uint256 destinationChainId,
         address target,
@@ -123,22 +122,16 @@ library InteropLibrary {
     /// @param executionAddress     Optional executor (EOA/contract) on destination chain
     /// @param unbundlerAddress     Unbundler address on destination chain
     /// @param useFixedFee          Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
-    /// @param salt                 Salt mixed into the bundle's `interopBundleSalt`. It must be supplied explicitly, as
-    ///                             there is intentionally no salt-less overload — callers cannot create a bundle without
-    ///                             consciously choosing a salt. Provide a random value: it keeps the bundle hash
-    ///                             unpredictable and thus preserves the bundle's privacy. Each salt must be unique per
-    ///                             sender (enforced by InteropCenter): a sender must pass a distinct salt for every
-    ///                             bundle it sends, regardless of whether the bundle contents differ — reusing a salt
-    ///                             reverts. `bytes32(0)` is allowed but discouraged: because used salts must be unique
-    ///                             per sender, a sender can use `bytes32(0)` at most once (when passed, the salt
-    ///                             attribute is simply omitted).
+    /// @param salt                 User salt for `interopBundleSalt`: must be unique per sender, random recommended;
+    ///                             see {protocol-docs/interop.md#replay-protection-and-bundle-uniqueness}. `bytes32(0)` omits the attribute (usable at most
+    ///                             once per sender). Deliberately no salt-less overload — callers must choose a salt.
     function buildBundleAttributes(
         address executionAddress,
         address unbundlerAddress,
         bool useFixedFee,
         bytes32 salt
     ) internal pure returns (bytes[] memory) {
-        uint256 length = 1; // Always include useFixedFee
+        uint256 length = 2; // Always include useFixedFee and the atomicBundle attribute (all interop is atomic).
         if (executionAddress != address(0)) ++length;
         if (unbundlerAddress != address(0)) ++length;
         if (salt != bytes32(0)) ++length;
@@ -157,6 +150,29 @@ library InteropLibrary {
             );
         }
         attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.useFixedFee, (useFixedFee));
+        // L2->L2 interop is atomic, so an `atomicBundle` attribute is mandatory or `InteropCenter` reverts
+        // `NonAtomicSendUnsupported`. The flow metadata below (flowId=1, deadline=max, lowNullifierIndex=0)
+        // is a PLACEHOLDER that is only valid when the `AtomicFlowManager.append`/`requireFlowFinalized`
+        // gate is mocked — which it is in the Foundry tests that use this helper. It is NOT usable for a real
+        // send: a real `flowId` commits to the `bundleHash`, which is not known until the bundle is assembled
+        // during the send, so a valid single-leg flow cannot be built on-chain ahead of time. Production
+        // atomic L2->L2 sends must therefore derive the flow off-chain (predict the hash via the static
+        // `previewBundleHash` quoter, compute `flowId`, and find the IMT `lowNullifierIndex`) — see the
+        // anvil-interop `buildSingleLegAtomicSend` helper. Callers that need a real flow should pass the
+        // resulting `atomicBundle` attribute themselves rather than relying on this placeholder.
+        attributes[attributesPointer++] = abi.encodeCall(
+            IERC7786Attributes.atomicBundle,
+            (
+                AtomicFlowPreimage({
+                    version: ATOMIC_FLOW_PREIMAGE_VERSION,
+                    deadline: type(uint64).max,
+                    settlementLayerChainId: 0,
+                    legBundleHashes: new bytes32[](0),
+                    legSourceChainIds: new uint256[](0)
+                }),
+                uint256(0)
+            )
+        );
         if (salt != bytes32(0)) {
             attributes[attributesPointer++] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (salt));
         }
@@ -164,9 +180,8 @@ library InteropLibrary {
     }
 
     /// @notice Appends an `interopBundleSalt` attribute to an existing bundle attributes array.
-    /// @dev Prefer passing the salt directly to {buildBundleAttributes}/the senders. This helper remains useful when a
-    ///      single base attributes array is reused to send several bundles, each needing a distinct salt so that every
-    ///      bundle hash is unique (enforced by InteropCenter).
+    /// @dev Prefer passing the salt directly to {buildBundleAttributes}/the senders; useful when one base
+    ///      attributes array is reused for several bundles, each needing a distinct salt.
     function withInteropBundleSalt(
         bytes[] memory _attributes,
         bytes32 _salt
@@ -201,11 +216,13 @@ library InteropLibrary {
     /// @param  recipient           Recipient on destination chain
     /// @param  unbundlerAddress     Address authorized to unbundle and execute the bundle on the  destination chain.
     /// @param  useFixedFee         Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
-    /// @param  salt                Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep the
-    ///                             bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is allowed
-    ///                             but discouraged — each salt must be unique per sender (enforced by InteropCenter), so
-    ///                             a sender can use `bytes32(0)` at most once.
+    /// @param  salt                User salt for `interopBundleSalt`; see {buildBundleAttributes}.
     /// @return bundleHash Hash of the sent bundle
+    /// @dev TEST/SIMULATION HELPER (deploy-scripts + Foundry only). It attaches the PLACEHOLDER `atomicBundle`
+    /// attribute from {buildBundleAttributes}, which only finalizes while the `AtomicFlowManager` gate is
+    /// mocked. It is NOT a production send path: a real atomic L2->L2 send must derive its flow off-chain
+    /// (predict the bundle hash via the `previewBundleHash` quoter, compute `flowId`, find the IMT
+    /// `lowNullifierIndex`) and attach its own `atomicBundle` attribute — see the anvil `buildSingleLegAtomicSend`.
     function sendToken(
         uint256 destinationChainId,
         address l2TokenAddress,
@@ -236,7 +253,13 @@ library InteropLibrary {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = buildSecondBridgeCall(secondBridgeCalldata, L2_ASSET_ROUTER_ADDR); // Using the default address as second bridge.
 
-        bytes[] memory bundleAttrs = buildBundleAttributes(address(0), unbundlerAddress, useFixedFee, salt);
+        // An L1 destination is an L2->L1 withdrawal: it must be NON-atomic (L1 has no atomic execution and
+        // withdrawals are never revertable), so it carries only the salt attribute — never the `atomicBundle`
+        // attribute, which `InteropCenter` rejects for L1 with `AtomicBundleToL1NotSupported`. Any other
+        // (L2) destination is atomic interop and carries the full attribute set.
+        bytes[] memory bundleAttrs = destinationChainId == L2_INTEROP_CENTER.L1_CHAIN_ID()
+            ? buildWithdrawalBundleAttributes(salt)
+            : buildBundleAttributes(address(0), unbundlerAddress, useFixedFee, salt);
 
         return L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(destinationChainId), calls, bundleAttrs);
     }
@@ -261,7 +284,7 @@ library InteropLibrary {
     /// @param _l1ChainId Destination L1 chain id.
     /// @param _assetId The withdrawn asset id (an ERC20 or the CTM/ZK asset — NOT a base-token asset).
     /// @param _transferData Bridgehub-burn transfer data for the asset.
-    /// @param _salt Salt mixed into the bundle's `interopBundleSalt` (must be unique per sender).
+    /// @param _salt User salt for `interopBundleSalt`; see {buildBundleAttributes}.
     function encodeWithdrawalSendBundleCalldata(
         uint256 _l1ChainId,
         bytes32 _assetId,
@@ -284,7 +307,7 @@ library InteropLibrary {
     /// @param _l1ChainId Destination L1 chain id.
     /// @param _assetId The withdrawn asset id (an ERC20 or the CTM/ZK asset — NOT a base-token asset).
     /// @param _transferData Bridgehub-burn transfer data for the asset.
-    /// @param _salt Salt mixed into the bundle's `interopBundleSalt` (must be unique per sender).
+    /// @param _salt User salt for `interopBundleSalt`; see {buildBundleAttributes}.
     /// @return bundleHash Hash of the sent bundle.
     function sendWithdrawal(
         uint256 _l1ChainId,
@@ -311,11 +334,11 @@ library InteropLibrary {
     /// @param executionAddress     Default executor used whenever a corresponding entry in `executionAddresses` is address(0).
     /// @param unbundlerAddress     Address authorized to unbundle and execute the bundle on the  destination chain.
     /// @param useFixedFee          Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
-    /// @param salt                 Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep the
-    ///                             bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is allowed
-    ///                             but discouraged — each salt must be unique per sender (enforced by InteropCenter), so
-    ///                             a sender can use `bytes32(0)` at most once.
+    /// @param salt                 User salt for `interopBundleSalt`; see {buildBundleAttributes}.
     /// @return bundleHash Hash of the sent bundle
+    /// @dev TEST/SIMULATION HELPER (deploy-scripts + Foundry only): attaches the PLACEHOLDER `atomicBundle`
+    /// attribute from {buildBundleAttributes}, finalizable only while the `AtomicFlowManager` gate is mocked.
+    /// Not a production send path — see {sendToken} and {buildBundleAttributes} for the real-flow requirement.
     function sendDirectCallBundle(
         uint256 destination,
         address[] memory targets,
@@ -344,14 +367,11 @@ library InteropLibrary {
     }
 
     /// @notice Build and send a call in one go.
-    /// @param  destination       Interoperable chain identifier (e.g., InteroperableAddress.formatEvmV1(271))
+    /// @param  destination       Destination chain id, wrapped via InteroperableAddress.formatEvmV1 internally
     /// @param  target            Address that will be called on destination chain
     /// @param  executionAddress  If necessary, custom execution address can be specified. If 0 address is passed, then default executor will be used
     /// @param  data              Data which will be passed to the target
-    /// @param  salt              Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep the
-    ///                           bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is allowed
-    ///                           but discouraged — each salt must be unique per sender (enforced by InteropCenter), so
-    ///                           a sender can use `bytes32(0)` at most once.
+    /// @param  salt              User salt for `interopBundleSalt`; see {buildBundleAttributes}.
     /// @return sendId Hash of the sent bundle containing a single call
     function sendDirectCall(
         uint256 destination,
@@ -388,11 +408,11 @@ library InteropLibrary {
     /// @param  unbundlerAddress        Address authorized to unbundle and execute the bundle on the  destination chain.
     /// @param  amount                  Amount to transfer
     /// @param  useFixedFee             Whether to use fixed ZK token fees (true) or dynamic base token fees (false)
-    /// @param  salt                    Salt mixed into the bundle's `interopBundleSalt`. Provide a random value to keep
-    ///                                 the bundle hash unpredictable and preserve the bundle's privacy. `bytes32(0)` is
-    ///                                 allowed but discouraged — each salt must be unique per sender (enforced by
-    ///                                 InteropCenter), so a sender can use `bytes32(0)` at most once.
+    /// @param  salt                    User salt for `interopBundleSalt`; see {buildBundleAttributes}.
     /// @return bundleHash Hash of the sent bundle
+    /// @dev TEST/SIMULATION HELPER (deploy-scripts + Foundry only): attaches the PLACEHOLDER `atomicBundle`
+    /// attribute from {buildBundleAttributes}, finalizable only while the `AtomicFlowManager` gate is mocked.
+    /// Not a production send path — see {sendToken} and {buildBundleAttributes} for the real-flow requirement.
     function sendNative(
         uint256 destinationChainId,
         address recipient,

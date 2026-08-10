@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
-import {L2DACommitmentScheme, PubdataPricingMode} from "../../common/Config.sol";
+import {L2DACommitmentScheme, PubdataContent, PubdataPricingMode} from "../../common/Config.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
@@ -261,4 +261,16 @@ struct ZKChainStorage {
     /// except for ZKsync OS chains that have existed before the v31 upgrade.
     /// @dev STORAGE SLOT: 68
     bool baseTokenHasTotalSupply;
+    /// @dev The ZKsync OS single-transaction gas limit (EIP-7825), committed into each batch proof
+    /// public input. A chain may raise the cap above the Ethereum limit but must not set it below.
+    /// `0` means the default (`ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`) for chains that existed before
+    /// this field was introduced.
+    /// @dev STORAGE SLOT: 68
+    uint64 zksyncOSMaxTxGasLimit;
+    /// @dev The pubdata content: whether the batch commits the full pubdata (`FULL_PUBDATA`) or only the mandatory
+    /// L2->L1 log region (`LOGS_ONLY`). Orthogonal to `l2DACommitmentScheme` (the mechanism). Committed
+    /// into the ZKsync OS batch public input via the chain config hash (see `Executor`). ZKsync OS only.
+    /// Permanent-rollup chains are locked to `FULL_PUBDATA` (see `Admin.setPubdataContent` / `makePermanentRollup`).
+    /// @dev STORAGE SLOT: 68 (packed with baseTokenHasTotalSupply + zksyncOSMaxTxGasLimit)
+    PubdataContent pubdataContent;
 }

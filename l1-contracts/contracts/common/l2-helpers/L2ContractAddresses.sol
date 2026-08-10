@@ -21,6 +21,11 @@ address constant L1_MESSENGER_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x01);
 /// @dev The address of the system hook responsible for setting bytecode on address. Can only be called from L2_COMPLEX_UPGRADER address
 address constant SET_BYTECODE_ON_ADDRESS_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x02);
 
+/// @dev The address of the system hook responsible for recording interop commitment tree (IMT) leaves
+/// as L2->L1 logs, so the leaves are always committed to DA. Can only be called from the
+/// L2_INTEROP_COMMITMENT_TREE_ADDR contract. The calldata is exactly the 32-byte inserted value.
+address constant INTEROP_COMMITMENT_LEAF_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x04);
+
 /// @dev The address of the system hook responsible for minting base tokens on ZK OS chains.
 /// This hook can only be called from the L2_BASE_TOKEN_SYSTEM_CONTRACT (address 0x800A).
 address constant MINT_BASE_TOKEN_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x100);
@@ -138,6 +143,20 @@ address constant L2_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0
 
 /// @dev The address of the base token holder contract that holds chain's base token reserves.
 address constant L2_BASE_TOKEN_HOLDER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x11);
+
+/// @dev The address of the per-chain atomic-interop commitment tree (Indexed Merkle Tree).
+address constant L2_INTEROP_COMMITMENT_TREE_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x12);
+
+/// @dev `BUILT_IN_CONTRACTS_OFFSET + 0x13` is intentionally unassigned: it belonged to the removed
+/// atomic-interop global-root importer and is kept as a gap to avoid address reuse.
+
+/// @dev The address of the atomic-interop flow manager.
+address constant L2_ATOMIC_FLOW_MANAGER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x14);
+
+/// @dev The address of the stateless interop attribute parser. Its ERC-7786 attribute-parsing logic was split
+/// out of the InteropCenter to keep the latter under the EIP-170 runtime code-size limit; the InteropCenter
+/// calls it at this fixed address. Holds no state and has no initializer.
+address constant L2_INTEROP_ATTRIBUTE_PARSER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x15);
 
 ////////////////////////////////////////////////////////////
 // ZKsync OS genesis contracts

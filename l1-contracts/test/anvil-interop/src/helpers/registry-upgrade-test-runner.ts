@@ -674,7 +674,7 @@ async function deployUpgradeMachinery(
     // original deployment config knows (a real upgrade-prepare pipeline has it; this harness
     // pins Mailbox old == new instead).
     newGettersFacet: await deployPinned("GettersFacet", []),
-    newExecutorFacet: await deployPinned("ExecutorFacet", [params.l1ChainId]),
+    newExecutorFacet: await deployPinned("ExecutorFacet", []),
     newMigratorFacet: await deployPinned("MigratorFacet", [params.l1ChainId, true /* _isTestnet */]),
     newCommitterFacet: await deployPinned("CommitterFacet", [params.l1ChainId]),
     newDefaultUpgrade: await deployPinned("DefaultUpgrade", []),

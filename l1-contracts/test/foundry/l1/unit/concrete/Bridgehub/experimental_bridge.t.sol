@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
@@ -845,6 +846,10 @@ contract ExperimentalBridgeTest is Test {
             abi.encodeWithSelector(mockCTM.createNewChain.selector, chainId, admin),
             abi.encode(newChainAddress)
         );
+        // The Bridgehub seeds the fresh chain's genesis root right after registration by pulling
+        // from the chain's getters; `newChainAddress` is a fuzzed address, so mock the VM flag to
+        // the EraVM no-op branch.
+        vm.mockCall(newChainAddress, abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(false));
 
         vm.expectEmit(true, true, true, true, address(bridgehub));
         emit NewChain(chainId, address(mockCTM), admin);

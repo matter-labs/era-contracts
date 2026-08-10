@@ -131,10 +131,11 @@ pub struct L1BridgehubOutput {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct L1BridgesOutput {
-    pub erc20_bridge_implementation_addr: Address,
-    pub erc20_bridge_proxy_addr: Address,
+    // Mirrors the deploy script's [deployed_addresses.bridges] output block exactly.
     pub shared_bridge_implementation_addr: Address,
     pub shared_bridge_proxy_addr: Address,
     pub l1_nullifier_implementation_addr: Address,
     pub l1_nullifier_proxy_addr: Address,
+    pub l1_interop_handler_implementation_addr: Address,
+    pub l1_interop_handler_proxy_addr: Address,
 }

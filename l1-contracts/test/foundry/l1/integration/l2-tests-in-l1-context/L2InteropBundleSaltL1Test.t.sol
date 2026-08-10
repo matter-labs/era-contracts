@@ -16,10 +16,6 @@ import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s
 contract L2InteropBundleSaltL1Test is Test, SharedL2ContractL1Deployer, L2InteropBundleSaltTestAbstract {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
 
-    function setUp() public virtual override(SharedL2ContractDeployer) {
-        SharedL2ContractDeployer.setUp();
-    }
-
     function initSystemContracts(
         SystemContractsArgs memory _args
     ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {

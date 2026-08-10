@@ -49,7 +49,7 @@ struct SystemContract {
 uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
 /// @dev Fixed-address L2EcosystemContract entries backed by l1-contracts bytecodes.
 ///      Era deploys them directly; ZKsyncOS upgrades them via universal force deployments.
-uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 11;
+uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 12;
 /// @dev Era runtime creation bytecodes published as factory deps but not force-deployed.
 uint256 constant RUNTIME_ONLY_FACTORY_DEPS_COUNT = 2;
 /// @dev Era factory deps: fixed-address core contracts plus runtime-only proxy creation bytecodes.
@@ -199,6 +199,8 @@ library SystemContractsProcessing {
         ids[i++] = L2EcosystemContract.BaseTokenHolder;
         ids[i++] = L2EcosystemContract.L2AssetTracker;
         ids[i++] = L2EcosystemContract.InteropCenter;
+        // Stateless parser called by the InteropCenter on every send; must be co-deployed with it.
+        ids[i++] = L2EcosystemContract.InteropAttributeParser;
         ids[i++] = L2EcosystemContract.L2InteropHandler;
         // Under-filling would silently leave `L2EcosystemContract(0)` entries; over-filling
         // already reverts with an out-of-bounds access on the fixed-length array.

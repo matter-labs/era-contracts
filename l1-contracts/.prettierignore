@@ -9,3 +9,5 @@ broadcast
 # Prettier tries to parse it as JSON because of the .json extension and chokes
 # on the second URL.
 test/anvil-interop/config/fork-l2-rpcs.json
+# Generated ABI artifacts, written newline-free by copy-to-zkstack-out.ts.
+zkstack-out

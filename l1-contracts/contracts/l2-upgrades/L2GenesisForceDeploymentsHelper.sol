@@ -15,7 +15,9 @@ import {
     L2_NTV_BEACON_DEPLOYER_ADDR,
     L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
-    L2_INTEROP_CENTER_ADDR
+    L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_COMMITMENT_TREE_ADDR,
+    L2_ATOMIC_FLOW_MANAGER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
@@ -38,6 +40,8 @@ import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
 import {L2AssetTracker} from "../bridge/asset-tracker/L2AssetTracker.sol";
 import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {L2InteropHandler} from "../interop/interop-handler/L2InteropHandler.sol";
+import {L2InteropCommitmentTree} from "../atomic-interop/L2InteropCommitmentTree.sol";
+import {IAtomicFlowManager} from "../atomic-interop/IAtomicFlowManager.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {
     DeployFailed,
@@ -211,7 +215,6 @@ library L2GenesisForceDeploymentsHelper {
         bytes memory _additionalForceDeploymentsData,
         bool _isGenesisUpgrade
     ) internal {
-        // Decode the fixed and additional force deployments data.
         FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
             _fixedForceDeploymentsData,
             (FixedForceDeploymentsData)
@@ -221,16 +224,14 @@ library L2GenesisForceDeploymentsHelper {
             (ZKChainSpecificForceDeploymentsData)
         );
 
-        // Initialize SystemContractProxyAdmin on both chain types; see _setupProxyAdmin for the per-VM rationale.
         _setupProxyAdmin();
 
         // The aliased L1 governance address is used as the owner for all L2 contracts.
         // Validate it once here rather than at every individual initL2/updateL2 call site.
         require(fixedForceDeploymentsData.aliasedL1Governance != address(0), ZeroAddress());
 
-        // Ensure WETH token exists. During genesis NTV.WETH_TOKEN() returns address(0)
-        // (uninitialized storage), so _ensureWethToken deploys a new proxy.
-        // During upgrades it returns the existing address and _ensureWethToken is a no-op.
+        // During genesis NTV.WETH_TOKEN() is zero (uninitialized storage), so a new proxy is deployed;
+        // during upgrades the existing address is returned and this is a no-op.
         address wrappedBaseTokenAddress = _ensureWethToken({
             _predeployedWethToken: L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN(),
             _aliasedL1Governance: fixedForceDeploymentsData.aliasedL1Governance,
@@ -258,17 +259,11 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function _setupProxyAdmin() private {
-        // Run on both Era and ZKsyncOS so post-upgrade state is symmetric across chain types.
-        //
-        // On ZKsyncOS the proxy admin is on the upgrade critical path: system contracts are
-        // upgraded via SystemContractProxy instances it manages, and ComplexUpgrader (this
-        // contract during the delegate-call) must own it while the upgrade runs.
-        //
-        // On Era system contracts are force-deployed directly to fixed addresses, so the
-        // proxy admin is not used during the upgrade itself. We still populate it here for
-        // consistency. The Era v31 upgrade force-deploys SystemContractProxyAdmin as part of
-        // its system-contracts list (see SYSTEM_CONTRACTS_COUNT in SystemContractsProcessing),
-        // so the address has code by the time we reach the .owner() call below.
+        // Run on both Era and ZKsyncOS so post-upgrade state is symmetric across chain types. On
+        // ZKsyncOS the proxy admin drives SystemContractProxy upgrades and must be owned by
+        // ComplexUpgrader (this contract during the delegate-call) while the upgrade runs. On Era it
+        // is unused during the upgrade itself, but the v31 upgrade force-deploys it earlier in its
+        // system-contracts list, so the `.owner()` call below never hits empty code.
         if (SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).owner() != address(this)) {
             SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).forceSetOwner(address(this));
         }
@@ -401,10 +396,7 @@ library L2GenesisForceDeploymentsHelper {
         );
     }
 
-    /// @notice Initializes contracts introduced in v31: L2AssetTracker,
-    /// L2InteropHandler, L2BaseToken, and base token registration.
-    /// @dev Called after `_finalizeDeployments` as part of `performForceDeployedContractsInit()`.
-    /// Keeping this in the library ensures a single source of truth for v31-specific initialization.
+    /// @notice Initializes the contracts introduced in v31 and registers the base token.
     function _initializeV31Contracts(
         bool _isZKsyncOS,
         bool _isGenesisUpgrade,
@@ -427,19 +419,22 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.zkTokenAssetId
         );
 
-        // Register the base token in the AssetTracker.
-        // During genesis, NTV.registerBaseTokenIfNeeded() handles it.
-        // During upgrades, AssetTracker.registerBaseTokenDuringUpgrade() handles it.
         if (_isGenesisUpgrade) {
             L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
         } else {
             IL2AssetTracker(L2_ASSET_TRACKER_ADDR).registerBaseTokenDuringUpgrade();
         }
 
-        // Initialize L2BaseToken: sets L1_CHAIN_ID and initializes the BaseTokenHolder balance.
-        // For Era: initializes holder balance, with __DEPRECATED_totalSupply kept in totalSupply().
-        // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder.
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
+
+        // The atomic-interop built-ins are predeployed only in the ZKsync OS genesis; a pre-existing
+        // chain upgraded to v31 has no code at these addresses and calling `initL2()` there would
+        // revert the whole upgrade.
+        // See {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}.
+        if (_isZKsyncOS && _isGenesisUpgrade) {
+            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
+            IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
+        }
     }
 
     /// @notice Constructs the initialization calldata for the L2WrappedBaseToken.

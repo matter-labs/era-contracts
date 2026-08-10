@@ -15,7 +15,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
-import {L2DACommitmentScheme} from "../../../common/Config.sol";
+import {L2DACommitmentScheme, PubdataContent} from "../../../common/Config.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -216,6 +216,11 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
     }
 
     /// @inheritdoc IGetters
+    function getZKsyncOSMaxTxGasLimit() external view returns (uint64) {
+        return _getZKsyncOSMaxTxGasLimit();
+    }
+
+    /// @inheritdoc IGetters
     function isFunctionFreezable(bytes4 _selector) external view returns (bool) {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
         if (ds.selectorToFacet[_selector].facetAddress == address(0)) {
@@ -243,6 +248,11 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
     /// @inheritdoc IGetters
     function getDAValidatorPair() external view returns (address, L2DACommitmentScheme) {
         return (s.l1DAValidator, s.l2DACommitmentScheme);
+    }
+
+    /// @inheritdoc IGetters
+    function getPubdataContent() external view returns (PubdataContent) {
+        return s.pubdataContent;
     }
 
     /// @inheritdoc IGetters
@@ -377,7 +387,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
     ///      0x74f4d30d storedBlockHash(uint256)
     function selectors() public pure returns (bytes4[] memory result) {
         bytes
-            memory packed = hex"1de72e34ea6c029c44518012cdffacc652ef6b2cadfca15e7a0ed6276e9960c398acd7a6960dcf243591c1a03408e470946ebad15a59033579823c9ad86970d8fd791f3cdd655bb0e5355c759d1b5a817b30c8dad0468156631f4bac39d7d4aaf4ff5e2e0ec6b0b733ce93fe06d49e5bf5c1182c6a27e8b5db1f0bf9b8c2f66fef3f0baefe26699e39607382af6a2dcda1954fc522c5cf2346657fe918e3a941c81838b729b98c67bd7c5412c3bbd2d7e81e0ba18708474efacd743b9cd939e4b22dd78e74f4d30d";
+            memory packed = hex"06d49e5b0ec6b0b7fe26699e18e3a9411de72e3422c5cf2329b98c6733ce93fe3408e4703591c1a03960738239d7d4aa4451801246657fe952ef6b2c5a590335631f4bac6a27e8b5fd791f3c6e9960c370e7ef4f74f4d30d79823c9a7a0ed6277b30c8da8708474e946ebad1960dcf2498acd7a69cd939e49d1b5a81a1954fc5adfca15eaf6a2dcdb22dd78eb8c2f66fbd7c5412c3bbd2d7c81838b7cdffacc6d0468156d86970d8db1f0bf9dc2f223add655bb0e5355c75e81e0ba1ea6c029cef3f0baef4ff5e2ef5c1182cfacd743b";
         uint256 count = packed.length / 4;
         result = new bytes4[](count);
         for (uint256 i = 0; i < count; ++i) {

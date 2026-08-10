@@ -2,7 +2,10 @@
 // probes the upstream chain). Read it via `runtimeConfig.l1ChainId` from
 // `./runtime-config` instead of importing a constant from here.
 
+import { utils } from "ethers";
+
 export const ETH_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000001";
+export const LEGACY_SHARED_BRIDGE_PLACEHOLDER = "0x0000000000000000000000000000000000000002";
 
 export const SYSTEM_CONTEXT_ADDR = "0x000000000000000000000000000000000000800b";
 export const L2_TO_L1_MESSENGER_ADDR = "0x0000000000000000000000000000000000008008";
@@ -23,9 +26,17 @@ export const L2_CHAIN_ASSET_HANDLER_ADDR = "0x0000000000000000000000000000000000
 export const L2_NTV_BEACON_DEPLOYER_ADDR = "0x000000000000000000000000000000000001000b";
 export const L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR = "0x000000000000000000000000000000000001000c";
 export const INTEROP_CENTER_ADDR = "0x000000000000000000000000000000000001000d";
+export const INTEROP_ATTRIBUTE_PARSER_ADDR = "0x0000000000000000000000000000000000010015";
 export const L2_INTEROP_HANDLER_ADDR = "0x000000000000000000000000000000000001000e";
 export const L2_ASSET_TRACKER_ADDR = "0x000000000000000000000000000000000001000f";
 export const L2_BASE_TOKEN_HOLDER_ADDR = "0x0000000000000000000000000000000000010011";
+
+// Atomic interop (bundle model) canonical built-in addresses. Mirrors
+// L2_INTEROP_COMMITMENT_TREE_ADDR / L2_ATOMIC_FLOW_MANAGER_ADDR in
+// contracts/common/l2-helpers/L2ContractAddresses.sol. Slot 0x10013 is intentionally
+// skipped: it previously hosted the removed L2GlobalInteropRootImporter.
+export const L2_INTEROP_COMMITMENT_TREE_ADDR = "0x0000000000000000000000000000000000010012";
+export const L2_ATOMIC_FLOW_MANAGER_ADDR = "0x0000000000000000000000000000000000010014";
 
 // ZK-VM system hook addresses: SYSTEM_HOOKS_OFFSET (0x7000) + offset
 export const L1_MESSENGER_HOOK_ADDR = "0x0000000000000000000000000000000000007001";
@@ -44,8 +55,13 @@ export const ANVIL_RECIPIENT_ADDR = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
 // 100 ETH in hex — used to fund impersonated accounts
 export const ANVIL_FUND_BALANCE = "0x56BC75E2D63100000";
 
-// Default gas limits for test transactions
-export const INTEROP_SEND_BUNDLE_GAS_LIMIT = 500_000;
+export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
+
+// Default gas limits for test transactions.
+// Every interop send is atomic: it appends the leg's commit value to the chain's {L2InteropCommitmentTree}
+// via {AtomicFlowManager.append}. The dynamic-height IndexedMerkleTree (#2235, FullMerkle-backed) insert
+// grows the tree and rehashes the populated path, so `sendBundle` needs a generous gas cap.
+export const ATOMIC_SEND_BUNDLE_GAS_LIMIT = 3_000_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
 // 7 gwei, used by Anvil interop specs to exercise the non-zero dynamic fee path.
 export const ANVIL_INTEROP_PROTOCOL_FEE_WEI = "7000000000";
@@ -63,8 +79,21 @@ export const ANVIL_INTEROP_TWO_BRIDGES_PRIORITY_REQUEST_COUNT = 2;
 export const TEST_TOKEN_DECIMALS = 18;
 export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
 
+// Mirrors the InteropBundle struct in contracts/common/Messaging.sol; the trailing tuple is
+// BundleAttributes (executionAddress, unbundlerAddress, useFixedFee, salt). Atomic-send params do
+// NOT live in the bundle (see {protocol-docs/atomicity/README.md#key-values}), so they never affect bundleHash.
 export const INTEROP_BUNDLE_TUPLE_TYPE =
   "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool,bytes32))";
+// Canonical signature of `InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle)`,
+// built from INTEROP_BUNDLE_TUPLE_TYPE so it stays in sync if the InteropBundle struct changes. Solidity
+// `tuple(...)` is spelled `(...)` in an event signature, hence the `tuple` -> `` strip.
+export const INTEROP_BUNDLE_SENT_SIGNATURE = `InteropBundleSent(bytes32,bytes32,${INTEROP_BUNDLE_TUPLE_TYPE.replace(
+  /tuple/g,
+  ""
+)})`;
+// keccak256 of the event signature == the log's topic0. Derived (not hardcoded) so it can't silently
+// drift from the struct above.
+export const INTEROP_BUNDLE_SENT_TOPIC = utils.id(INTEROP_BUNDLE_SENT_SIGNATURE);
 
 // AddressAliasHelper offset: uint160(0x1111000000000000000000000000000000001111)
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
@@ -100,6 +129,13 @@ export const NEW_PRIORITY_REQUEST_EVENT_SIG =
   "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])";
 export const L1_MESSAGE_SENT_EVENT_SIG = "L1MessageSent(address,bytes32,bytes)";
 export const FINALIZE_DEPOSIT_SIG = "finalizeDeposit(uint256,bytes32,bytes)";
+
+export const ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE =
+  "tuple(address l2LegacySharedBridge, address predeployedL2WethAddress, address baseTokenL1Address, tuple(string name, string symbol, uint256 decimals) baseTokenMetadata, tuple(bytes32 assetId, uint256 originChainId, address originToken) baseTokenBridgingData)";
+
+// WritePriorityOpParams ABI tuple type for raw decoding NewPriorityRequest events
+export const WRITE_PRIORITY_OP_PARAMS_ABI_TYPE =
+  "tuple(uint256,uint256,uint256,uint256,uint256,uint256,uint256,bytes,bytes,uint256[],bytes,bytes)";
 
 // Anvil account #2 — used as a secondary distinct recipient
 export const ANVIL_ACCOUNT2_ADDR = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";

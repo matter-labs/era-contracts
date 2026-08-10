@@ -304,53 +304,18 @@ library Utils {
         IExecutor.StoredBatchInfo[] memory _batchesData,
         PriorityOpsBatchInfo[] memory _priorityOpsData
     ) internal pure returns (uint256, uint256, bytes memory) {
-        return encodeExecuteBatchesData(_batchesData, _priorityOpsData, address(0));
-    }
-
-    function encodeExecuteBatchesData(
-        IExecutor.StoredBatchInfo[] memory _batchesData,
-        PriorityOpsBatchInfo[] memory _priorityOpsData,
-        address _settlementFeePayer
-    ) internal pure returns (uint256, uint256, bytes memory) {
-        uint256 len = _batchesData.length;
-        return _encodeExecuteBatchesDataInner(_batchesData, _priorityOpsData, _settlementFeePayer, len);
-    }
-
-    function encodeExecuteBatchesDataZeroLogs(
-        IExecutor.StoredBatchInfo[] memory _batchesData,
-        PriorityOpsBatchInfo[] memory _priorityOpsData
-    ) internal pure returns (uint256, uint256, bytes memory) {
-        return encodeExecuteBatchesDataZeroLogs(_batchesData, _priorityOpsData, address(0));
-    }
-
-    function encodeExecuteBatchesDataZeroLogs(
-        IExecutor.StoredBatchInfo[] memory _batchesData,
-        PriorityOpsBatchInfo[] memory _priorityOpsData,
-        address _settlementFeePayer
-    ) internal pure returns (uint256, uint256, bytes memory) {
-        return _encodeExecuteBatchesDataInner(_batchesData, _priorityOpsData, _settlementFeePayer, 0);
-    }
-
-    function _encodeExecuteBatchesDataInner(
-        IExecutor.StoredBatchInfo[] memory _batchesData,
-        PriorityOpsBatchInfo[] memory _priorityOpsData,
-        address _settlementFeePayer,
-        uint256 _logsLen
-    ) private pure returns (uint256, uint256, bytes memory) {
         uint256 len = _batchesData.length;
         bytes memory encoded = abi.encode(
-            _batchesData,
-            _priorityOpsData,
-            new InteropRoot[][](len),
-            new L2Log[](_logsLen),
-            new bytes[](_logsLen),
-            new bytes32[](_logsLen),
-            _settlementFeePayer
+            BatchDecoder.DecodedExecuteData({
+                batchesData: _batchesData,
+                priorityOpsData: _priorityOpsData,
+                dependencyRoots: new InteropRoot[][](len)
+            })
         );
         return (
             _batchesData[0].batchNumber,
             _batchesData[len - 1].batchNumber,
-            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION), encoded)
+            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_EXECUTE), encoded)
         );
     }
 
@@ -409,7 +374,7 @@ library Utils {
     }
 
     function getGettersSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](34);
+        bytes4[] memory selectors = new bytes4[](35);
         uint256 i = 0;
         selectors[i++] = GettersFacet.getVerifier.selector;
         selectors[i++] = GettersFacet.getAdmin.selector;
@@ -445,6 +410,7 @@ library Utils {
         selectors[i++] = GettersFacet.getChainId.selector;
         selectors[i++] = GettersFacet.baseTokenGasPriceMultiplierDenominator.selector;
         selectors[i++] = GettersFacet.baseTokenGasPriceMultiplierNominator.selector;
+        selectors[i++] = GettersFacet.getZKsyncOS.selector;
 
         return selectors;
     }
@@ -467,7 +433,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](72);
+        bytes4[] memory selectors = new bytes4[](75);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -541,7 +507,10 @@ library Utils {
         selectors[i++] = UtilsFacet.util_setPriorityTreeNextLeafIndex.selector;
         selectors[i++] = UtilsFacet.util_setPriorityOpsRequestTimestamp.selector;
         selectors[i++] = UtilsFacet.util_setZksyncOS.selector;
+        selectors[i++] = UtilsFacet.util_setZKsyncOSMaxTxGasLimit.selector;
+        selectors[i++] = UtilsFacet.util_getZKsyncOSMaxTxGasLimit.selector;
         selectors[i++] = UtilsFacet.util_setBaseTokenHasTotalSupply.selector;
+        selectors[i++] = UtilsFacet.util_getPubdataContent.selector;
 
         return selectors;
     }

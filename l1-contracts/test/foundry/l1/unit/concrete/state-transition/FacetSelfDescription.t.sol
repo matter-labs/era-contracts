@@ -68,7 +68,7 @@ contract FacetSelfDescriptionTest is Test {
     }
 
     function test_executorFacetSelfDescription() public {
-        _assertSelfDescription(new ExecutorFacet(block.chainid), "ExecutorFacet");
+        _assertSelfDescription(new ExecutorFacet(), "ExecutorFacet");
     }
 
     function test_migratorFacetSelfDescription() public {

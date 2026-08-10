@@ -8,13 +8,16 @@ import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {
     L2DACommitmentScheme,
+    PubdataContent,
     MAX_GAS_PER_TRANSACTION,
     MAX_PRICE_CHANGE_DENOMINATOR,
     MAX_PRICE_CHANGE_NUMERATOR,
     PRICE_REFERENCE_L1_GAS,
     PRICE_UPDATE_INTERVAL,
     PRIORITY_EXPIRATION,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
+    ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT
 } from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
@@ -32,6 +35,7 @@ import {
 import {
     AlreadyPermanentRollup,
     BaseTokenPreV31TotalSupplyAlreadySet,
+    PubdataContentLockedForPermanentRollup,
     DenominatorIsZero,
     DiamondAlreadyFrozen,
     DiamondNotFrozen,
@@ -40,6 +44,7 @@ import {
     InvalidDAForPermanentRollup,
     InvalidL2DACommitmentScheme,
     InvalidPubdataPricingMode,
+    NonFullPubdataContentForPermanentRollup,
     PriorityModeActivationTooEarly,
     PriorityModeIsNotAllowed,
     PriorityModeRequiresPermanentRollup,
@@ -51,7 +56,10 @@ import {
     TooMuchGas,
     Unauthorized,
     UpgradeTimestampNotReached,
-    NotCompatibleWithPriorityMode
+    NotCompatibleWithPriorityMode,
+    ZKsyncOSChainConfigUpdateWithUnverifiedBatches,
+    ZKsyncOSMaxTxGasLimitTooHigh,
+    ZKsyncOSMaxTxGasLimitTooLow
 } from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
@@ -169,6 +177,32 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
         uint256 oldPriorityTxMaxGasLimit = s.priorityTxMaxGasLimit;
         s.priorityTxMaxGasLimit = _newPriorityTxMaxGasLimit;
         emit NewPriorityTxMaxGasLimit(oldPriorityTxMaxGasLimit, _newPriorityTxMaxGasLimit);
+    }
+
+    /// @inheritdoc IAdmin
+    function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external onlyAdmin onlySettlementLayer onlyZKsyncOS {
+        // The cap may only be raised above Ethereum's EIP-7825 single-tx gas limit, never below.
+        if (_newMaxTxGasLimit < ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT) {
+            revert ZKsyncOSMaxTxGasLimitTooLow();
+        }
+        // The cap must not exceed the ZKsync OS block gas limit: a higher value will halt the block production.
+        if (_newMaxTxGasLimit > ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT) {
+            revert ZKsyncOSMaxTxGasLimitTooHigh();
+        }
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+
+        uint64 oldMaxTxGasLimit = _getZKsyncOSMaxTxGasLimit();
+        s.zksyncOSMaxTxGasLimit = _newMaxTxGasLimit;
+        emit NewZKsyncOSMaxTxGasLimit(oldMaxTxGasLimit, _newMaxTxGasLimit);
+    }
+
+    /// @dev The runtime chain config is read from storage when the batch proof public input is
+    /// computed, so it must not change while committed-but-unverified batches exist: those batches
+    /// were executed by ZKsync OS under the old config and would become unprovable.
+    function _enforceNoUnverifiedBatchesForChainConfigUpdate() internal view {
+        if (s.totalBatchesCommitted != s.totalBatchesVerified) {
+            revert ZKsyncOSChainConfigUpdateWithUnverifiedBatches(s.totalBatchesVerified, s.totalBatchesCommitted);
+        }
     }
 
     /// @inheritdoc IAdmin
@@ -350,13 +384,10 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
             revert InvalidL2DACommitmentScheme(_l2DACommitmentScheme);
         }
 
-        // `BLOBS_ZKSYNC_OS` and `L2_TO_L1_ONLY` are only supported on ZKsync OS, where the STF interprets the
-        // scheme. They have no commitment implementation on the Era VM (`L2DAValidator.makeDACommitment`
-        // reverts for them), so reject them here to avoid configuring an unusable DA pair.
-        if (
-            (_l2DACommitmentScheme == L2DACommitmentScheme.BLOBS_ZKSYNC_OS ||
-                _l2DACommitmentScheme == L2DACommitmentScheme.L2_TO_L1_ONLY) && !s.zksyncOS
-        ) {
+        // `BLOBS_ZKSYNC_OS` is only supported on ZKsync OS, where the STF interprets the scheme. It has
+        // no commitment implementation on the Era VM (`L2DAValidator.makeDACommitment` reverts for it),
+        // so reject it here to avoid configuring an unusable DA pair.
+        if (_l2DACommitmentScheme == L2DACommitmentScheme.BLOBS_ZKSYNC_OS && !s.zksyncOS) {
             revert NotZKsyncOS();
         }
 
@@ -368,9 +399,26 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     }
 
     /// @inheritdoc IAdmin
+    function setPubdataContent(PubdataContent _pubdataContent) external onlyAdmin onlyZKsyncOS {
+        // A permanent rollup is locked to `FULL_PUBDATA` — its pubdata content can never be changed (in particular it
+        // can never be relaxed to `LOGS_ONLY`), mirroring how the permanent-rollup flag itself is one-way.
+        if (s.isPermanentRollup) {
+            revert PubdataContentLockedForPermanentRollup();
+        }
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+        emit NewPubdataContent(s.pubdataContent, _pubdataContent);
+        s.pubdataContent = _pubdataContent;
+    }
+
+    /// @inheritdoc IAdmin
     function makePermanentRollup() external onlyAdmin onlySettlementLayer {
         if (s.isPermanentRollup) {
             revert AlreadyPermanentRollup();
+        }
+
+        // A permanent rollup must publish the full pubdata, so the chain must already be in `FULL_PUBDATA` mode.
+        if (s.pubdataContent != PubdataContent.FULL_PUBDATA) {
+            revert NonFullPubdataContentForPermanentRollup();
         }
 
         if (!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DACommitmentScheme)) {
@@ -610,7 +658,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     ///      0x3b6d7534 upgradeChainFromVersion(address,uint256,((address,uint8,bool,bytes4[])[],address,bytes))
     function selectors() public pure returns (bytes4[] memory result) {
         bytes
-            memory packed = hex"f9afb97e0e18b68160eae0e75b89874864bf8d6623b31192a9f6d94127ae4c162878fe74b4fcb5776e762e981b48b94a2765d0794dd18bf51cc5d103c5f1f1f5be6f11cfe76db865235d9eb521f603d74623c91d054e80a3173389453b6d7534";
+            memory packed = hex"054e80a30e18b68117338945f9afb97e1b48b94a1cc5d10321f603d7235d9eb523b311922765d07927ae4c162878fe742f257a5c3b6d75344623c91d4dd18bf55b89874860eae0e764bf8d66e76db8656e762e98a9f6d941b4fcb577be6f11cfc5f1f1f5e51935f5";
         uint256 count = packed.length / 4;
         result = new bytes4[](count);
         for (uint256 i = 0; i < count; ++i) {

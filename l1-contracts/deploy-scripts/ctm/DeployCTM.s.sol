@@ -323,7 +323,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             config.isZKsyncOS
         );
 
-        IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
         vm.stopBroadcast();
         console.log("Owners updated");
     }
@@ -626,7 +625,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             IEIP7702Checker(address(1)),
             false
         );
-        ExecutorFacet executorFacet = new ExecutorFacet(block.chainid);
+        ExecutorFacet executorFacet = new ExecutorFacet();
         MigratorFacet migratorFacet = new MigratorFacet(1, false);
         CommitterFacet committerFacet = new CommitterFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);

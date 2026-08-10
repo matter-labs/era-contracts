@@ -13,6 +13,8 @@ Instead, use the `cleanup.sh` script in the anvil-interop directory, which targe
 1. Avoid using magic numbers. Most constant numbers especially for system params / well known chain ids must be represented as a constant.
 2. All constants should be placed in the dedicated file (e.g. `common/Config.sol` in `l1-contracts`, `Constants.sol` in `system-contracts`, etc). if you do not know where to put the constant to, please closely analyze the corresponding project. If this file can not be found, please create one.
 3. Function parameters must be prefixed with `_` (e.g. `_value`, `_owner`). This convention applies to all functions across all contracts.
+4. Always use `{ }` for `if` blocks — never inline the body (`if (cond) revert X();` is forbidden; write `if (cond) { revert X(); }`). The same applies to `for`/`while` bodies.
+5. Never write doc comments (`///` natspec) for custom errors — error files contain only the `// 0x<selector>` lines maintained by the errors lint. Put any rationale at the revert site instead. When a new file with errors is added, it MUST be registered in the errors lint (`CONTRACTS_DIRECTORIES` in `l1-contracts/scripts/errors-lint.ts`) and `yarn errors-lint --fix` must be run.
 
 ## ⚠️ CRITICAL SOLIDITY CODE RULES ⚠️
 
@@ -104,6 +106,33 @@ const contract = new Contract(addr, someAbi, provider);
 - ONLY contracts deployed on L1 should have immutables. Contracts on L2 are deployed within zksync os environment and so and so DO NOT SUPPORT CONSTRUCTORS ALL (and so no immutable can be set). It is important that the `*Base` contracts that the L2 contracts inherit from dont have immutables or constructors too.
 - If you want to add an immutable for L1, always double check whether it is possible to deterministically obtain from other contracts.
 - If there is variable that can be an immutable on L1, but we need a similar field on L2, a common pattern is to create a method in the base contract that can be inherited by both. On L2 it can be either a constant (esp if it is an L2 built-in contract address) or a storage variable that must be initialized within during the genesis. For example, look how `initL2` functions are used.
+
+## Documentation and Comments
+
+AI-generated code tends to over-explain: huge doc comments that restate the protocol, repeat themselves, and carry a high noise-to-signal ratio. The rules below exist to keep every piece of information described **exactly once**, in the right place.
+
+### Single source of truth: `protocol-docs/`
+
+- The protocol (flows, motivations, security arguments, design trade-offs) is described in markdown files under `protocol-docs/`.
+- Every piece of information must be described once if possible. If the motivation for a function's behavior is already described in the protocol docs, reference it as `{protocol-docs/<path>.md}` instead of restating it.
+- When adding a feature whose design/motivation is not yet in `protocol-docs/`, add it there — do not write it into contract comments instead.
+
+### Doc comments (natspec)
+
+- Contract and function doc comments consist of a `@notice` with a high-level summary plus `@param` descriptions (and `@return` where useful). That's it.
+- Anything inherited from an interface **MUST** use `/// @inheritdoc` — never copy the interface docs into the implementation.
+- `@dev` comments and inline comments are allowed, but they must only describe implementation or UX gotchas (things a reader of _this code_ would trip over) — never protocol motivation or behavior descriptions that belong in `protocol-docs/` or in the function's own `@notice`.
+
+### Never re-describe a function at its call sites
+
+A very common AI failure mode: the behavior of a new function `X` gets described not only in `X`'s own doc comment, but again in the doc comments of every function that calls `X`, and again inline right where the call happens.
+
+- Describe what a function does **only** in its own doc comment. At call sites, rely on the reader following the call to the definition and reading the docs there.
+- A call-site comment is justified only for a genuine local gotcha (e.g., ordering constraints with surrounding code, a surprising argument choice) — not for what the callee does.
+
+### SDKs, tests, scripts
+
+- Test files, dev tooling, deploy scripts, and SDK code follow the same rules: point to `protocol-docs/` for protocol context instead of restating it in comments.
 
 ## Testing Guidelines
 

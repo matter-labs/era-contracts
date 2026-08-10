@@ -93,16 +93,33 @@ contract MessageHashingTest is Test {
         bytes32 batchRoot = keccak256("batchRoot");
         uint256 batchNumber = 100;
 
-        bytes32 leafHash = MessageHashing.batchLeafHash(batchRoot, batchNumber);
+        bytes32 leafHash = MessageHashing.batchLeafHash(batchRoot, batchNumber, 0);
 
-        bytes32 expected = keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber));
+        bytes32 expected = keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber, uint256(0)));
         assertEq(leafHash, expected);
     }
 
-    function testFuzz_batchLeafHash_deterministicOutput(bytes32 batchRoot, uint256 batchNumber) public pure {
-        bytes32 leafHash1 = MessageHashing.batchLeafHash(batchRoot, batchNumber);
-        bytes32 leafHash2 = MessageHashing.batchLeafHash(batchRoot, batchNumber);
-        assertEq(leafHash1, leafHash2);
+    /// @dev `l1Timestamp` must be part of the leaf preimage. See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+    function test_batchLeafHash_bindsL1Timestamp() public pure {
+        bytes32 batchRoot = keccak256("batchRoot");
+        uint256 batchNumber = 100;
+        uint256 l1Timestamp = 1_700_000_000;
+
+        bytes32 leafHash = MessageHashing.batchLeafHash(batchRoot, batchNumber, l1Timestamp);
+
+        assertEq(leafHash, keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber, l1Timestamp)));
+        assertTrue(leafHash != MessageHashing.batchLeafHash(batchRoot, batchNumber, 0));
+    }
+
+    function testFuzz_batchLeafHash_matchesSpecWithTimestamp(
+        bytes32 batchRoot,
+        uint256 batchNumber,
+        uint256 l1Timestamp
+    ) public pure {
+        assertEq(
+            MessageHashing.batchLeafHash(batchRoot, batchNumber, l1Timestamp),
+            keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber, l1Timestamp))
+        );
     }
 
     // ============ chainIdLeafHash Tests ============
