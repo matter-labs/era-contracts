@@ -322,7 +322,9 @@ jobs:
       - name: Compare ZKsyncOSVerifierPlonk.sol
         run: diff tools/verifier-gen/data/ZKsyncOSVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
 
-  coverage:
+  # Foundry coverage and the minimum-coverage gate. Independent of the Anvil interop legs
+  # below, which only add hits on top of this report and are not gated.
+  coverage-foundry:
     defaults:
       run:
         working-directory: l1-contracts
@@ -361,8 +363,6 @@ jobs:
             l2-contracts/cache-forge
             l2-contracts/zkout
             system-contracts/zkout
-
-      # --- 1. Foundry coverage (unchanged) ---
 
       # `forge coverage` runs the suite itself, and the `test-foundry` job already gates
       # on the full (unfiltered) `yarn test:foundry`, so there is no separate test run here.
@@ -404,7 +404,86 @@ jobs:
           working-directory: l1-contracts
           minimum-coverage: 75 # TODO(EVM-944): increase threshold to 85
 
-      # --- 2. Anvil interop coverage + merged report ---
+      # The reporting job rebases Anvil hits onto this file, so it must be the filtered one.
+      - name: Upload Foundry coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-foundry-lcov
+          path: l1-contracts/lcov.info
+          if-no-files-found: error
+
+  # Enumerates the interop specs so `coverage-anvil` can fan out one job per spec without
+  # the list being duplicated (and going stale) in this file. Needs no build artifacts, so
+  # it runs alongside `build` and adds nothing to the critical path.
+  coverage-anvil-specs:
+    runs-on: ubuntu-latest
+    outputs:
+      specs: ${{ steps.list.outputs.specs }}
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: List interop specs
+        id: list
+        working-directory: l1-contracts/test/anvil-interop/test/hardhat
+        run: |
+          specs=$(ls | grep -E '^[0-9]+-.*\.spec\.ts$' | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "Discovered specs: $specs"
+          if [ "$specs" = "[]" ]; then
+            echo "::error::No interop spec files found"
+            exit 1
+          fi
+          echo "specs=$specs" >> $GITHUB_OUTPUT
+
+  # One spec per runner. In-process sharding (run-coverage.ts with no --spec) put all ten
+  # shards on a single 4-core box, which made the leg throughput-bound: ~1900s of shard work
+  # over 4 cores. A job per spec gives each one its own runner, so the leg costs about the
+  # longest single spec instead of total-work/4. The trade is runner minutes — this fans out
+  # to ten jobs. Collapse it by grouping specs in `coverage-anvil-specs` if that becomes a
+  # problem; the local `yarn coverage` path still shards in-process.
+  coverage-anvil:
+    needs: [build, coverage-anvil-specs]
+    runs-on: ubuntu-latest
+    strategy:
+      # One flaky spec should not cancel the other nine; the reporting job refuses to
+      # publish a partial merge anyway, since it requires every shard to report.
+      fail-fast: false
+      matrix:
+        spec: ${{ fromJSON(needs.coverage-anvil-specs.outputs.specs) }}
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - name: Install foundry-zksync
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            da-contracts/cache-forge
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
 
       # install-zksync-foundry only provides forge/cast; we need regular anvil for interop tests
       - name: Install Foundry (for Anvil)
@@ -416,49 +495,96 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn install
 
-      # Guards the union that combines the per-shard LCOV reports below. Pure string/map
-      # logic, no chains involved, runs in seconds.
+      # `--spec` runs a single spec in this process against one set of Anvil chains, and
+      # writes the report to coverage/anvil/anvil-lcov.info.
+      - name: Run Anvil interop coverage for ${{ matrix.spec }}
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          ANVIL_COVERAGE_MODE=1 yarn ts-node run-coverage.ts \
+            --spec test/anvil-interop/test/hardhat/${{ matrix.spec }}
+
+      - name: Cleanup Anvil
+        if: always()
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn cleanup
+
+      - name: Upload shard coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-anvil-shard-${{ matrix.spec }}
+          path: l1-contracts/coverage/anvil/anvil-lcov.info
+          if-no-files-found: error
+
+  # Unions the shard reports, merges them onto the Foundry baseline, and publishes the
+  # summaries. Needs neither the build artifacts nor forge — only the LCOV files, node for
+  # the merge scripts, and lcov for filtering and summaries.
+  coverage-report:
+    needs: [coverage-foundry, coverage-anvil]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: l1-contracts
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      # Guards the union below. Pure string/map logic, no chains involved, runs in seconds.
       - name: Unit-test the shard LCOV merge
         working-directory: l1-contracts/test/anvil-interop
         run: yarn test:lcov-merge
 
-      # run-coverage.ts shards the specs across workers, each with its own 6 Anvil chains,
-      # and unions the per-shard LCOV afterwards. Same cap and reasoning as the
-      # integration-test job in anvil-interop-ci.yaml: a worker is 6 Anvil chains plus a
-      # hardhat process, so running all 10 shards at once oversubscribes the 4-core runner
-      # and causes load-dependent RPC flakes. Coverage mode adds --steps-tracing on top,
-      # so if this job starts flaking, lower the cap before anything else.
-      - name: Run Anvil interop coverage
-        working-directory: l1-contracts/test/anvil-interop
-        env:
-          ANVIL_INTEROP_MAX_PARALLEL_WORKERS: "4"
-        run: ANVIL_COVERAGE_MODE=1 yarn ts-node run-coverage.ts
+      - name: Download Foundry coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-foundry-lcov
+          path: l1-contracts
 
-      # cleanup.sh is scoped to one port offset, so a cancelled run would otherwise leave
-      # the shard workers' chains behind. Sweep every offset a shard can use.
-      - name: Cleanup Anvil
-        if: always()
+      - name: Download shard coverage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-anvil-shard-*
+          path: l1-contracts/coverage/anvil/shards
+
+      # Fails if any shard contributed nothing, so a broken shard cannot pass as
+      # "this spec added no coverage".
+      - name: Union shard coverage
         working-directory: l1-contracts/test/anvil-interop
-        run: |
-          for offset in 0 100 200 300 400 500 600 700 800 900; do
-            ANVIL_INTEROP_PORT_OFFSET=$offset ANVIL_INTEROP_RUN_SUFFIX="-p$offset" yarn cleanup
-          done
+        run: yarn merge:shards ../../coverage/anvil/shards
+
+      # Installing the specific version of `lcov` because of
+      # the `genhtml: ERROR: line ... of ... has branchcov but no linecov data` error.
+      # https://github.com/zgosalvez/github-actions-report-lcov/issues/282
+      - name: Install LCOV
+        uses: hrishikesh-kadam/setup-lcov@6c1aa0cc9e1c02f9f58f01ac599f1064ccc83470 # v1.1.0
+        with:
+          ref: v1.16
 
       # Merge produces two outputs:
       #   coverage/merged-lcov.info        — Foundry hits + Anvil hits
       #   coverage/anvil-rebased-lcov.info — Foundry's files/lines/functions, Anvil hits only
       # Both use Foundry as the baseline so all three reports share the same denominator.
       - name: Merge Foundry + Anvil coverage
-        if: success()
         run: yarn coverage:merge
 
       - name: Filter Anvil rebased coverage
-        if: success()
         run: |
           lcov --ignore-errors unused --remove coverage/anvil-rebased-lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file coverage/anvil-rebased-lcov.info --rc branch_coverage=1
 
       - name: Post Anvil interop coverage report
-        if: success()
         run: |
           {
             echo "## Anvil Interop Coverage Report"
@@ -469,16 +595,13 @@ jobs:
           } >> $GITHUB_STEP_SUMMARY
 
       - name: Generate Anvil untested lines report
-        if: success()
         run: npx ts-node scripts/generate-untested-lines-report.ts coverage/anvil-rebased-lcov.info coverage/ANVIL_UNTESTED_LINES_REPORT.md
 
       - name: Filter merged coverage
-        if: success()
         run: |
           lcov --ignore-errors unused --remove coverage/merged-lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file coverage/merged-lcov.info --rc branch_coverage=1
 
       - name: Post merged coverage report
-        if: success()
         run: |
           {
             echo "## Merged Coverage Report (Foundry + Anvil Interop)"
@@ -489,7 +612,6 @@ jobs:
           } >> $GITHUB_STEP_SUMMARY
 
       - name: Generate merged untested lines report
-        if: success()
         run: npx ts-node scripts/generate-untested-lines-report.ts coverage/merged-lcov.info coverage/MERGED_UNTESTED_LINES_REPORT.md
 
       - name: Upload coverage artifacts
@@ -501,7 +623,7 @@ jobs:
             l1-contracts/lcov.info
             l1-contracts/coverage/anvil/anvil-lcov.info
             l1-contracts/coverage/anvil/anvil-coverage-summary.txt
-            l1-contracts/coverage/anvil/shards/*/anvil-lcov.info
+            l1-contracts/coverage/anvil/shards/*/*.info
             l1-contracts/coverage/anvil-rebased-lcov.info
             l1-contracts/coverage/ANVIL_UNTESTED_LINES_REPORT.md
             l1-contracts/coverage/merged-lcov.info

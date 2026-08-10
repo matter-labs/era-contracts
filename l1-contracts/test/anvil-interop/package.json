@@ -13,6 +13,7 @@
     "test:lcov-merge": "ts-node test/unit/lcov-merge.test.ts",
     "coverage": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts",
     "coverage:serial": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts --serial",
+    "merge:shards": "ts-node merge-shard-lcov.ts",
     "coverage:html": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts --html",
     "coverage:collect": "ts-node collect-coverage.ts",
     "coverage:collect:html": "ts-node collect-coverage.ts --html"

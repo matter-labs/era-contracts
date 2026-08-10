@@ -157,8 +157,15 @@ covered by `yarn test:lcov-merge` (`test/unit/lcov-merge.test.ts`), which CI run
 coverage pipeline.
 
 Tracing multiplies Anvil's memory and CPU cost, so cap the concurrency on small machines with
-`ANVIL_INTEROP_MAX_PARALLEL_WORKERS` (CI uses 4). If coverage runs start failing with RPC
-errors mid-spec, lower it before looking anywhere else.
+`ANVIL_INTEROP_MAX_PARALLEL_WORKERS`. If coverage runs start failing with RPC errors mid-spec,
+lower it before looking anywhere else.
+
+CI does not use in-process sharding: `l1-contracts-ci.yaml` fans out a `coverage-anvil` matrix
+job per spec (`run-coverage.ts --spec <file>`), each on its own runner, and each uploads its
+`anvil-lcov.info` as an artifact. The `coverage-report` job downloads them and unions them with
+`yarn merge:shards <dir>` (`merge-shard-lcov.ts`), which walks the directory for
+`anvil-lcov.info` files and fails if it finds none — a shard that produced nothing must not
+pass as "this spec added no coverage". The union is the same `lcov-merge.ts` used locally.
 
 ## Environment Variables
 
