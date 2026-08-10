@@ -39,21 +39,25 @@ jobs:
       # branch — the common case while iterating — and on the base branch's cache where one
       # exists. Extending it to the first run of a fresh PR would need this workflow (or a
       # dedicated one) to run on pushes to the release branches, which this does not add.
-      - name: Restore build cache from a previous commit
+      # Solc artifacts only, and deliberately so: zksolc output is not reproducible across
+      # builds, so reusing a `zkout` from another commit changes zkBytecodeHash and fails
+      # check-hashes — the same trap the TODO in test-foundry-zksync's restore list describes.
+      # Every zkout is therefore rebuilt from scratch here; only the solc side is incremental.
+      #
+      # The prefix must stay narrower than `artifacts-l1-`, which also matches
+      # l1-contracts-foundry-ci.yaml's `artifacts-l1-contracts-foudry-` key: restoring that
+      # workflow's artifacts is what broke check-hashes and test-foundry-zksync the first time.
+      - name: Restore solc build cache from a previous commit
         uses: actions/cache/restore@v4
         with:
-          key: artifacts-l1-${{ github.sha }}
+          key: artifacts-l1-ci-solc-${{ github.sha }}
           restore-keys: |
-            artifacts-l1-
+            artifacts-l1-ci-solc-
           path: |
             da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
-            l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout
 
       # Forge recompiles changed sources but never prunes artifacts for sources that are gone,
       # and calculate-hashes enumerates the artifact directories — so a cache from a commit
@@ -102,10 +106,22 @@ jobs:
           yarn install
           yarn build:foundry
 
+      # Cross-commit cache for the next push's incremental solc build; the full per-sha cache
+      # below is the handoff to this run's downstream jobs.
+      - name: Save solc build cache
+        uses: actions/cache/save@v4
+        with:
+          key: artifacts-l1-ci-solc-${{ github.sha }}
+          path: |
+            da-contracts/cache-forge
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+
       - name: Create cache
         uses: actions/cache/save@v4
         with:
-          key: artifacts-l1-${{ github.sha }}
+          key: artifacts-l1-ci-${{ github.sha }}
           path: |
             da-contracts/cache-forge
             da-contracts/out
@@ -159,7 +175,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
-          key: artifacts-l1-${{ github.sha }}
+          key: artifacts-l1-ci-${{ github.sha }}
           path: |
             da-contracts/cache-forge
             da-contracts/out
@@ -204,7 +220,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
-          key: artifacts-l1-${{ github.sha }}
+          key: artifacts-l1-ci-${{ github.sha }}
           path: |
             da-contracts/cache-forge
             da-contracts/out
@@ -246,7 +262,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
-          key: artifacts-l1-${{ github.sha }}
+          key: artifacts-l1-ci-${{ github.sha }}
           path: |
             da-contracts/cache-forge
             da-contracts/out
@@ -289,7 +305,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
-          key: artifacts-l1-${{ github.sha }}
+          key: artifacts-l1-ci-${{ github.sha }}
           path: |
             da-contracts/cache-forge
             da-contracts/out
@@ -343,7 +359,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
-          key: artifacts-l1-${{ github.sha }}
+          key: artifacts-l1-ci-${{ github.sha }}
           path: |
             da-contracts/out
             l1-contracts/cache-forge
@@ -427,7 +443,7 @@ jobs:
         uses: actions/cache/restore@v3
         with:
           fail-on-cache-miss: true
-          key: artifacts-l1-${{ github.sha }}
+          key: artifacts-l1-ci-${{ github.sha }}
           path: |
             da-contracts/cache-forge
             da-contracts/out
@@ -589,7 +605,7 @@ jobs:
   #       uses: actions/cache/restore@v3
   #       with:
   #         fail-on-cache-miss: true
-  #         key: artifacts-l1-${{ github.sha }}
+  #         key: artifacts-l1-ci-${{ github.sha }}
   #         path: |
   #           da-contracts/cache-forge
   #           da-contracts/out
