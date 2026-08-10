@@ -334,7 +334,14 @@ library Utils {
         // even when this function is called from a contract created via `new` during the script.
         vm.broadcast(getBroadcasterAddress());
         (bool success, bytes memory data) = _factory.call(getDeterministicCreate2FactoryCalldata(_salt, _bytecode));
-        contractAddress = bytesToAddress(data);
+
+        // The EVM deterministic factory returns the raw 20-byte address; the ZKsync shim at the
+        // same address ABI-encodes it into 32 bytes. Parse whichever shape came back.
+        if (data.length == 32) {
+            contractAddress = abi.decode(data, (address));
+        } else {
+            contractAddress = bytesToAddress(data);
+        }
 
         if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
             revert("Failed to deploy contract via create2");

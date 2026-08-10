@@ -220,7 +220,21 @@ contract GatewayCTMDeployerTest is Test {
 
         GatewayCTMDeployerTester tester = new GatewayCTMDeployerTester();
 
-        // The bootstrap release FACTORY is the direct deployment; the release itself is deployed
+        // Perform every DIRECT deployment the real Gateway flow performs before the deployers run.
+        // The facets in particular must exist: the CTM deployer builds the genesis release manifest
+        // by asking each facet for its own `selectors()`, so calculated-but-undeployed addresses
+        // would make that read return nothing.
+        tester.deployDirect(directCalldata.adminFacetCalldata);
+        tester.deployDirect(directCalldata.mailboxFacetCalldata);
+        tester.deployDirect(directCalldata.executorFacetCalldata);
+        tester.deployDirect(directCalldata.gettersFacetCalldata);
+        tester.deployDirect(directCalldata.migratorFacetCalldata);
+        tester.deployDirect(directCalldata.committerFacetCalldata);
+        tester.deployDirect(directCalldata.diamondInitCalldata);
+        tester.deployDirect(directCalldata.genesisUpgradeCalldata);
+        tester.deployDirect(directCalldata.multicall3Calldata);
+
+        // The bootstrap release FACTORY is a direct deployment too; the release itself is deployed
         // (and initialized) by the CTM deployer through it, landing at the factory's first
         // CREATE — asserted against the helper's prediction after the deployers run.
         address bootstrapReleaseFactory = tester.deployDirect(directCalldata.bootstrapReleaseFactoryCalldata);
@@ -277,6 +291,12 @@ contract GatewayCTMDeployerTest is Test {
             isZKsyncOS: deployerConfig.isZKsyncOS
         });
         new GatewayCTMDeployerVerifiers(verifiersConfig);
+
+        // The bootstrap release factory is deployed straight through the L2 CREATE2 factory (by
+        // bytecode HASH) before any deployer runs, so its bytecode has to be known to the
+        // ContractDeployer by then — otherwise `create2` reverts with `UnknownCodeHash`. The
+        // CTM-deployer publish step also instantiates one, but that happens too late.
+        new CTMReleaseFactory();
     }
 
     function _deployAllDeployers(
