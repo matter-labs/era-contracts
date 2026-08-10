@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
+import {L1MessageRootDev} from "contracts/dev-contracts/L1MessageRootDev.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
@@ -50,9 +51,9 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
         L1MessageRoot messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1, makeAddr("chainAssetHandler"))),
+                    address(new L1MessageRootDev(bridgeHub, 1, makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
-                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                    abi.encodeCall(L1MessageRootDev.stampV31Placeholders, ())
                 )
             )
         );
@@ -168,9 +169,9 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
         L1MessageRoot messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1, makeAddr("chainAssetHandler"))),
+                    address(new L1MessageRootDev(bridgeHub, 1, makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
-                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                    abi.encodeCall(L1MessageRootDev.stampV31Placeholders, ())
                 )
             )
         );
@@ -249,9 +250,9 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
         L1MessageRoot messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1, makeAddr("chainAssetHandler"))),
+                    address(new L1MessageRootDev(bridgeHub, 1, makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
-                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                    abi.encodeCall(L1MessageRootDev.stampV31Placeholders, ())
                 )
             )
         );

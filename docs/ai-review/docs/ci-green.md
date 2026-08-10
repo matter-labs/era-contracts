@@ -114,12 +114,11 @@ Commit the regenerated `chain-states/` files alongside the contract change. CI c
 
 ### 1c. Upgrade tests (v29→v31, v30→v31)
 
-These exercise the full v31 upgrade flow against captured v29 / v30 chain states. They use protocol-ops's split flow: `ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, then `chain upgrade` per chain.
+This exercises the full upgrade flow against the captured v31 chain states. It uses protocol-ops's split flow: `ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, then `chain upgrade` per chain.
 
 ```bash
 cd l1-contracts/test/anvil-interop
-npx ts-node run-v29-to-v31-upgrade-test.ts
-npx ts-node run-v30-to-v31-upgrade-test.ts
+npx ts-node run-v31-to-v32-upgrade-test.ts
 ```
 
 Prerequisites: same as anvil-interop tests (all foundry builds done). Plus:

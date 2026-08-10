@@ -18,7 +18,7 @@ to it, and both are as trustworthy as the root they ride with — neither is a c
 
 - **`t` (`l1BatchTimestamp`)** — when the batch root was aggregated into the settlement layer's shared
   root. It is folded into the chain batch leaf, so it is proven by the _same_ inclusion proof that
-  authenticates the IMT root, and re-parsed from `settlementProof`
+  authenticates the IMT root, and read positionally from the verified `settlementProof` words
   (see {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}).
 - **`T`** — the imported aggregation root's own creation time, stored alongside the root in
   `L2InteropRootStorage.interopRoots(slChainId, slBlock)` and double-checked on the settlement layer at
@@ -46,8 +46,9 @@ begin/end IMT snapshot, and hands back the settlement metadata:
   exact-depth check is load-bearing: without it a longer path could descend _into_ the IMT (whose
   internal nodes hash the same way) and pass off an IMT-internal node as "the root," against which a
   crafted low-nullifier leaf could fake non-inclusion of a value that is actually committed.
-- The same proof bytes (same leaf, same mask) are re-parsed for the settlement-layer metadata
-  (`slBlock`, `slChainId`, `l1BatchTimestamp` = `t`), so the parse is bound to the verified root. A
+- The settlement-layer metadata (`slBlock`, `slChainId`, `l1BatchTimestamp` = `t`) is read
+  positionally from the same proof bytes (`MessageHashing.readSettlementLayerReference`) only after
+  the verifier has authenticated them, so the words are bound to the verified root. A
   single-level "final node" proof carries no settlement-layer batch reference (neither `t` nor the
   deadline could be checked), so it is rejected (`ProofMissingSettlementLayerBatch`).
 

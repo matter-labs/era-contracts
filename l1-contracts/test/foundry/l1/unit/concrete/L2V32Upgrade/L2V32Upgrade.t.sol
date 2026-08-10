@@ -20,9 +20,8 @@ import {
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
-import {AcrossInfo, LensSpokePoolConstructorParams} from "contracts/l2-upgrades/V31AcrossRecovery.sol";
-import {L2V31Upgrade} from "contracts/l2-upgrades/L2V31Upgrade.sol";
-import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
+import {L2V32Upgrade} from "contracts/l2-upgrades/L2V32Upgrade.sol";
+import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 import {
@@ -42,7 +41,7 @@ contract MockAcceptAll {
 }
 
 /// @dev Mock NTV that records updateL2 calls for verification.
-contract MockV31UpgradeNativeTokenVault {
+contract MockV32UpgradeNativeTokenVault {
     bytes32 public immutable BASE_TOKEN_ASSET_ID;
     uint256 public immutable L1_CHAIN_ID;
     bytes32 public immutable L2_TOKEN_PROXY_BYTECODE_HASH;
@@ -110,16 +109,14 @@ contract MockV31UpgradeNativeTokenVault {
     }
 }
 
-/// @dev Mock AssetTracker that records initL2 and registerBaseTokenDuringUpgrade calls.
-contract MockV31UpgradeAssetTracker {
+/// @dev Mock AssetTracker that records initL2 calls.
+contract MockV32UpgradeAssetTracker {
     uint256 public L1_CHAIN_ID;
     bytes32 public BASE_TOKEN_ASSET_ID;
 
-    uint256 public registerCalls;
-    bytes32 public lastRegisteredAssetId;
     uint256 public initCalls;
 
-    function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId, bool /* _backfillBaseTokenSupply */) external {
+    function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
         }
@@ -128,24 +125,14 @@ contract MockV31UpgradeAssetTracker {
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         initCalls++;
     }
-
-    function registerBaseTokenDuringUpgrade() external {
-        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
-
-        registerCalls++;
-        lastRegisteredAssetId = BASE_TOKEN_ASSET_ID;
-    }
 }
 
 /// @dev Mock BaseToken that records initL2 calls and checks ordering vs AssetTracker.
-contract MockV31UpgradeBaseToken {
+contract MockV32UpgradeBaseToken {
     address private immutable _assetTracker;
 
     uint256 public initCalls;
     uint256 public lastInitializedL1ChainId;
-    bool public sawRegisteredBaseToken;
 
     constructor(address _assetTrackerAddr) {
         _assetTracker = _assetTrackerAddr;
@@ -158,30 +145,10 @@ contract MockV31UpgradeBaseToken {
 
         initCalls++;
         lastInitializedL1ChainId = _l1ChainId;
-        sawRegisteredBaseToken = MockV31UpgradeAssetTracker(_assetTracker).registerCalls() > 0;
     }
 }
 
-contract TestL2V31Upgrade is L2V31Upgrade {
-    function getAcrossInfo() internal pure override returns (AcrossInfo memory) {
-        return
-            AcrossInfo({
-                proxy: address(0),
-                evmImplementation: address(0),
-                zkevmRecoveryImplementation: address(0),
-                zkevmRecoveryImplConstructorParams: LensSpokePoolConstructorParams({
-                    wrappedNativeTokenAddress: address(0),
-                    circleUSDC: address(0),
-                    zkUSDCBridge: address(0),
-                    cctpTokenMessenger: address(0),
-                    depositQuoteTimeBuffer: 0,
-                    fillDeadlineBuffer: 0
-                })
-            });
-    }
-}
-
-contract L2V31UpgradeUnitTest is Test {
+contract L2V32UpgradeUnitTest is Test {
     bytes32 internal constant BASE_TOKEN_ASSET_ID = keccak256("base-token");
     uint256 internal constant L1_CHAIN_ID = 9;
     uint256 internal constant ERA_CHAIN_ID = 270;
@@ -197,7 +164,7 @@ contract L2V31UpgradeUnitTest is Test {
     address internal constant PREDEPLOYED_WETH = address(0xdead);
     bytes32 internal constant L2_TOKEN_PROXY_BYTECODE_HASH = keccak256("proxy");
 
-    TestL2V31Upgrade internal testUpgrade;
+    L2V32Upgrade internal testUpgrade;
 
     function setUp() public {
         // Deploy ComplexUpgrader
@@ -223,7 +190,7 @@ contract L2V31UpgradeUnitTest is Test {
         _etchCode(
             L2_NATIVE_TOKEN_VAULT_ADDR,
             address(
-                new MockV31UpgradeNativeTokenVault(
+                new MockV32UpgradeNativeTokenVault(
                     BASE_TOKEN_ASSET_ID,
                     L1_CHAIN_ID,
                     L2_TOKEN_PROXY_BYTECODE_HASH,
@@ -231,40 +198,39 @@ contract L2V31UpgradeUnitTest is Test {
                 )
             )
         );
-        _etchCode(L2_ASSET_TRACKER_ADDR, address(new MockV31UpgradeAssetTracker()));
-        _etchCode(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(new MockV31UpgradeBaseToken(L2_ASSET_TRACKER_ADDR)));
+        _etchCode(L2_ASSET_TRACKER_ADDR, address(new MockV32UpgradeAssetTracker()));
+        _etchCode(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(new MockV32UpgradeBaseToken(L2_ASSET_TRACKER_ADDR)));
 
-        testUpgrade = new TestL2V31Upgrade();
+        testUpgrade = new L2V32Upgrade();
     }
 
-    function test_UpgradeViaComplexUpgrader_RegistersBaseTokenAndInitializesBaseToken() public {
+    /// @dev The contracts introduced in v31 are initialized on the genesis path only: their `initL2`s are
+    /// unchanged since v31 and one-shot, so a chain that already went through v31 must not run them again.
+    /// This upgrade therefore leaves the asset tracker and the base token alone; what it does run for them is
+    /// covered by `L2GenesisForceDeploymentHelper.t.sol`.
+    function test_UpgradeViaComplexUpgrader_LeavesPreV32ContractsAlone() public {
         bytes memory fixedData = abi.encode(_buildFixedForceDeploymentsData());
         bytes memory additionalData = abi.encode(_buildZKChainSpecificData());
 
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
         L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(
             address(testUpgrade),
-            abi.encodeCall(IL2V31Upgrade.upgrade, (false, CTM_DEPLOYER, fixedData, additionalData))
+            abi.encodeCall(IL2V32Upgrade.upgrade, (false, CTM_DEPLOYER, fixedData, additionalData))
         );
 
-        // Verify AssetTracker: initL2 + registerBaseTokenDuringUpgrade
-        MockV31UpgradeAssetTracker assetTracker = MockV31UpgradeAssetTracker(L2_ASSET_TRACKER_ADDR);
-        assertEq(assetTracker.initCalls(), 1, "asset tracker should be initialized exactly once");
-        assertEq(assetTracker.L1_CHAIN_ID(), L1_CHAIN_ID, "asset tracker L1 chain id mismatch");
-        assertEq(assetTracker.registerCalls(), 1, "base token should be registered exactly once");
-        assertEq(assetTracker.lastRegisteredAssetId(), BASE_TOKEN_ASSET_ID, "registered asset id mismatch");
+        // AssetTracker: not re-initialized.
+        MockV32UpgradeAssetTracker assetTracker = MockV32UpgradeAssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(assetTracker.initCalls(), 0, "asset tracker must not be re-initialized on an upgrade");
 
         // Verify NTV: updateL2 called with correct data
-        MockV31UpgradeNativeTokenVault nativeTokenVault = MockV31UpgradeNativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        MockV32UpgradeNativeTokenVault nativeTokenVault = MockV32UpgradeNativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
         assertEq(nativeTokenVault.updateCalls(), 1, "native token vault should be updated exactly once");
         assertEq(nativeTokenVault.lastOriginChainId(), BASE_TOKEN_ORIGIN_CHAIN_ID, "origin chain id mismatch");
         assertEq(nativeTokenVault.BASE_TOKEN_ORIGIN_TOKEN(), BASE_TOKEN_ORIGIN_ADDRESS, "origin token mismatch");
 
-        // Verify BaseToken: initL2 called, and it ran AFTER registerBaseTokenDuringUpgrade
-        MockV31UpgradeBaseToken baseToken = MockV31UpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
-        assertEq(baseToken.initCalls(), 1, "base token should be initialized exactly once");
-        assertEq(baseToken.lastInitializedL1ChainId(), L1_CHAIN_ID, "base token L1 chain id mismatch");
-        assertTrue(baseToken.sawRegisteredBaseToken(), "base token should be initialized after registration");
+        // BaseToken: its `initL2` is a genesis-path call as well.
+        MockV32UpgradeBaseToken baseToken = MockV32UpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        assertEq(baseToken.initCalls(), 0, "base token must not be re-initialized on an upgrade");
     }
 
     function _buildFixedForceDeploymentsData() private pure returns (FixedForceDeploymentsData memory) {

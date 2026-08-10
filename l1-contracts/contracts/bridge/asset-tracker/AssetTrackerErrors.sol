@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-// 0x7a734a36
-error AssetAlreadyRegistered(bytes32 assetId);
 // 0xda72d995
 error AssetIdNotRegistered(bytes32 _assetId);
 // 0x8361ff70

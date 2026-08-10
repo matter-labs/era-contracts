@@ -2,6 +2,11 @@
 # Since genesis config deploys chains at v31.0.0, we need to upgrade to v32.0.0
 
 old_protocol_version = 0x1f00000000  # v31.0.0 (current genesis)
+
+# The fixture deploys the current (v32) core contracts and only labels its chains v31, so the
+# protocol-version autodetection would wrongly classify the ecosystem as pre-v32 and try to deploy and
+# wire a second interop handler. A real v31 ecosystem omits this key and lets autodetection decide.
+pre_v32_introspection = false
 v28_protocol_version = 0x1c00000000  # v28.0.0 (for reference)
 
 [contracts]

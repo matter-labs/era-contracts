@@ -356,8 +356,6 @@ error PriorityModeRequiresPermanentRollup();
 error PriorityOperationsRollingHashMismatch();
 // 0xbeda0935
 error PriorityOpsRequestTimestampMissing(uint256 requestId);
-// 0xa840274f
-error PriorityQueueNotReady();
 // 0x1a4d284a
 error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 // 0xa461f651
