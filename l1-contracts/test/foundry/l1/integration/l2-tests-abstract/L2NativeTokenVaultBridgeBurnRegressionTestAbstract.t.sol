@@ -8,18 +8,20 @@ import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
+import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
+import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
@@ -66,19 +68,33 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         // Deal ETH to the asset router (needed because bridgeBurn is called with msg.value)
         vm.deal(L2_ASSET_ROUTER_ADDR, depositAmount);
 
-        // Replace the dummy holder with the real implementation so the regression test
-        // observes the full bookkeeping path (the holder reports base-token flows to the tracker).
-        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
+        // The asset tracker is already initialized via L2UtilsBase.setUp, but with bytes32(0) as the base
+        // token asset id. Overwrite BASE_TOKEN_ASSET_ID to the actual local value and register it through the
+        // vault — the genesis-path entry point, which is the only one left — so the BaseTokenHolder
+        // accounting works. The storage write is the only way to reach this state: `initL2` already ran with
+        // the wrong id in `setUp` and is one-shot.
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(baseTokenAssetIdLocal);
+        if (!IL2AssetTracker(L2_ASSET_TRACKER_ADDR).isAssetRegistered(baseTokenAssetIdLocal)) {
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            l2NativeTokenVault.registerBaseTokenIfNeeded();
+        }
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
             abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
             abi.encode(L1_CHAIN_ID)
         );
 
+        // Replace the dummy holder with the real implementation so the regression test
+        // observes the full tracker-accounting path.
+        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
+
         // Record the BaseTokenHolder balance before
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
-        uint256 bridgedOutBefore = l2NativeTokenVault.bridgedOut(baseTokenAssetIdLocal);
+        uint256 chainBalanceBefore = IL2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(
+            block.chainid,
+            baseTokenAssetIdLocal
+        );
         uint256 totalWithdrawalsBefore = _readTotalWithdrawalsToL1(baseTokenAssetIdLocal);
 
         // Call bridgeBurn from the asset router (which is the only allowed caller)
@@ -102,9 +118,9 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
             "BaseTokenHolder should receive the deposit amount"
         );
         assertEq(
-            l2NativeTokenVault.bridgedOut(baseTokenAssetIdLocal),
-            bridgedOutBefore,
-            "bridgedOut should not change for bridged base token burns on L2"
+            IL2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, baseTokenAssetIdLocal),
+            chainBalanceBefore,
+            "chainBalance should not change for bridged base token burns on L2"
         );
         assertEq(
             _readTotalWithdrawalsToL1(baseTokenAssetIdLocal) - totalWithdrawalsBefore,
@@ -179,8 +195,8 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20Metadata.symbol, ()), abi.encode("TT"));
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20Metadata.decimals, ()), abi.encode(uint8(18)));
 
-        // Mock totalSupply() — read by `L2AssetTracker.trackLegacyTokenIfNeeded` when it records a
-        // bridged token's pre-tracking baseline.
+        // Mock totalSupply() - called by L2AssetTracker._registerLegacyToken for bridged tokens
+        // (originChainId != block.chainid) during _registerLegacyTokenIfNeeded
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(uint256(0)));
 
         // Expect the bridgeBurn call on the bridged token

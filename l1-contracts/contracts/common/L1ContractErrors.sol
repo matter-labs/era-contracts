@@ -89,6 +89,8 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
+// 0xd054a77e
+error ChainBalanceMustBeZeroBeforeMigration(uint256 chainId, bytes32 assetId, uint256 chainBalance);
 // 0x41888953
 error ChainMigrationsDisabled();
 // 0x5e361ef9

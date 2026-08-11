@@ -693,7 +693,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       name: "Live Interop Chain A Native Token",
       symbol: "LIA",
     });
-    // Interop requires no on-chain balance migration ({protocol-docs/bridging.md#l2-asset-bookkeeping}),
+    // Interop requires no on-chain balance migration ({protocol-docs/bridging.md#l2-asset-tracker}),
     // so the assetId is derived locally.
     const chainAAssetId = encodeNtvAssetId(sourceChainId, chainAToken);
 

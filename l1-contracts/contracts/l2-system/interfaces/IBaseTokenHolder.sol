@@ -12,16 +12,15 @@ pragma solidity ^0.8.20;
 /// only accepts calls from the L2BaseToken address — and is then transferred here.
 interface IBaseTokenHolder {
     /// @notice Emitted when base tokens are given out from the holder via interop bridging.
-    /// @dev Only emitted for inbound bridging through `give`; bootloader-minted L1 deposits do not
-    /// pass through it, so summing it may undercount total inbound volume.
+    /// @dev Only emitted for inbound bridging through `give`. On Era, L1 deposits mint through
+    /// `L2BaseTokenEra.mint()` without this event, so summing it may undercount total inbound volume.
     /// @param to The address that received the base tokens.
     /// @param amount The amount of base tokens given out.
     event BaseTokenMintedInterop(address indexed to, uint256 amount);
 
     /// @notice Emitted when base tokens are received and outbound bridging is initiated.
-    /// @dev Emitted on the unified outbound path (`burnAndStartBridging`): withdrawals initiated
-    /// through L2BaseToken and cross-chain sends initiated through InteropCenter or
-    /// NativeTokenVault all converge there.
+    /// @dev Emitted on the unified outbound path (`burnAndStartBridging`) on both Era and ZK OS —
+    /// including base-token withdrawals, which no longer have a dedicated L2BaseToken entrypoint.
     /// @param from The address that sent the base tokens.
     /// @param toChainId The destination chain ID for the bridging operation.
     /// @param amount The amount of base tokens burnt.
@@ -46,11 +45,10 @@ interface IBaseTokenHolder {
     /// `_to` rejects it — recovery targets the original depositor by design.
     /// @param _to The original depositor to refund.
     /// @param _amount The amount of base tokens to return.
-    /// @param _toChainId The original bridge-out destination chain id (used to assert the recovery
-    /// needs no accounting reversal).
+    /// @param _toChainId The original bridge-out destination chain id (to reverse the matching accounting).
     function recoverBaseToken(address _to, uint256 _amount, uint256 _toChainId) external;
 
-    /// @notice Receives outbound base-token value and records the outbound flow (replaces burning).
+    /// @notice Receives outbound base-token value and notifies the L2AssetTracker (replaces burning).
     /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable;
 }

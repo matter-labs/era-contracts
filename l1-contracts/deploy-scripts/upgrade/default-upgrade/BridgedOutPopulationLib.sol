@@ -90,7 +90,7 @@ library BridgedOutPopulationLib {
 
         for (uint256 i = 0; i < _assetIds.length; ++i) {
             bytes32 assetId = _assetIds[i];
-            if (_ntv.isAssetTracked(assetId)) {
+            if (_ntv.bridgedOutPopulated(assetId)) {
                 continue;
             }
             if (_ntv.legacyBridgedOut(assetId) == 0) {

@@ -31,7 +31,6 @@ import {
     BurningNativeWETHNotSupported,
     DeployingBridgedTokenForNativeToken,
     EmptyDeposit,
-    InsufficientChainBalance,
     NonEmptyMsgValue,
     TokenNotLegacy,
     TokenNotSupported,
@@ -95,28 +94,12 @@ abstract contract NativeTokenVaultBase is
     /// @dev Used to record the index of the bridged token in the bridgedTokens array.
     mapping(bytes32 assetId => uint256 tokenIndex) public tokenIndex;
 
-    /// @notice Net amount of each token native to this chain currently bridged away from it.
-    /// @dev Outgoing transfers increase it and incoming transfers may not exceed it. Unlike the
-    /// vault's raw token balance, it is not affected by donations.
-    /// See {protocol-docs/bridging.md#native-token-vault}.
-    /// @dev Takes a slot from the pre-existing storage gap below, so already-deployed vaults keep
-    /// their layout (the slot was never written before).
-    mapping(bytes32 assetId => uint256 amount) public bridgedOut;
-
-    /// @notice Whether the chain-local bookkeeping for the asset has been initialized.
-    /// @dev On L1 it marks the asset's legacy amount as folded into `bridgedOut` (see
-    /// `L1NativeTokenVault.populateBridgedOut`); on L2 it guards the one-time seeding in
-    /// `_trackLegacyTokenIfNeeded` / `trackBaseToken`.
-    /// @dev Takes a slot from the pre-existing storage gap below, so already-deployed vaults keep
-    /// their layout (the slot was never written before).
-    mapping(bytes32 assetId => bool isTracked) public isAssetTracked;
-
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[41] private __gap;
+    uint256[43] private __gap;
 
     /// @notice Checks that the message sender is the asset router.
     modifier onlyAssetRouter() {
@@ -516,8 +499,8 @@ abstract contract NativeTokenVaultBase is
         bytes32 _assetId,
         address _originalCaller
     ) internal {
-        // Note, that in order to seed the legacy-token escrow (`bridgedOut`) correctly, we have to
-        // call _handleBridgeToChain before any balance changes will be performed.
+        // Note, that in order to track `totalPreV31TotalSupply` correctly in L2AssetTracker,
+        // we have to call _handleBridgeToChain before any balance changes will be performed.
         if (_assetId == _baseTokenAssetId()) {
             require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
             if (_isBridgedToken) {
@@ -591,29 +574,14 @@ abstract contract NativeTokenVaultBase is
     }
 
     /// @dev Chain-local bookkeeping hook invoked when funds are bridged out towards `_chainId`.
-    /// @dev Increases the net `bridgedOut` amount of tokens native to this chain; on L2 it
-    /// additionally records the L1-destined interop counters.
-    function _handleBridgeToChain(uint256, bytes32 _assetId, uint256 _amount) internal virtual {
-        if (originChainId[_assetId] == block.chainid) {
-            bridgedOut[_assetId] += _amount;
-        }
-    }
+    /// @dev On L2 this records outbound amounts in the L2AssetTracker; on L1 it increases the
+    /// net `bridgedOut` amount of L1-native tokens.
+    function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual;
 
     /// @dev Chain-local bookkeeping hook invoked when funds bridged from `_chainId` are finalized here.
-    /// @dev Decreases the net `bridgedOut` amount of tokens native to this chain; on L2 it
-    /// additionally records the L1-originated interop counters.
-    /// @dev An inbound amount exceeding the outstanding bridged-out amount is only possible if
-    /// bridged representations of the asset were forged somewhere upstream, so such a transfer
-    /// is blocked rather than recorded.
-    function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual {
-        if (originChainId[_assetId] == block.chainid) {
-            uint256 outstandingAmount = bridgedOut[_assetId];
-            if (outstandingAmount < _amount) {
-                revert InsufficientChainBalance(_chainId, _assetId, _amount);
-            }
-            bridgedOut[_assetId] = outstandingAmount - _amount;
-        }
-    }
+    /// @dev On L2 this records inbound amounts in the L2AssetTracker; on L1 it decreases the
+    /// net `bridgedOut` amount of L1-native tokens.
+    function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual;
 
     /*//////////////////////////////////////////////////////////////
                             TOKEN DEPLOYER FUNCTIONS
@@ -674,15 +642,18 @@ abstract contract NativeTokenVaultBase is
         assetId[_tokenAddress] = _assetId;
         originChainId[_assetId] = _originChainId;
         _addTokenToTokensList(_assetId);
-        _registerTokenForTracking(_assetId, _originChainId);
+        // Note, that it might be possible that the token is registered on the asset tracker, but not on the
+        // native token vault. An example is when a token is automatically registered for a token that is native to L2
+        // (i.e. registration got triggered, but the native token vault was never called since there was no actual
+        // withdrawal of the asset).
+        _registerTokenInAssetTracker(_assetId, _originChainId);
     }
 
-    /// @dev Initializes the chain-local bookkeeping for a newly registered token.
-    /// @dev On L2 this marks the token as tracked so it is never treated as a legacy one. On L1 no
-    /// per-token initialization is needed (`bridgedOut` starts at zero), so the default
-    /// implementation is a no-op.
+    /// @dev Registers the token in the chain-local asset tracker, if one exists.
+    /// @dev On L2 this records the token in the L2AssetTracker (total-supply / outbound bookkeeping).
+    /// On L1 there is no asset tracker, so the default implementation is a no-op.
     // solhint-disable-next-line no-empty-blocks
-    function _registerTokenForTracking(bytes32 _assetId, uint256 _originChainId) internal virtual {}
+    function _registerTokenInAssetTracker(bytes32 _assetId, uint256 _originChainId) internal virtual {}
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
     /// @param _tokenOriginChainId The chain id of the origin token.

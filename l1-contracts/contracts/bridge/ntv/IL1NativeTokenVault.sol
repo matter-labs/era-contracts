@@ -25,6 +25,12 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     /// ETH token is expected to have been already initialized in production.
     function registerEthToken() external;
 
+    /// @notice Net amount of the given L1-native asset currently bridged out of L1.
+    function bridgedOut(bytes32 _assetId) external view returns (uint256);
+
+    /// @notice Whether the pre-upgrade amount of `_assetId` has already been folded into `bridgedOut`.
+    function bridgedOutPopulated(bytes32 _assetId) external view returns (bool);
+
     /// @notice The removed V31 `L1AssetTracker`, which holds the legacy per-chain accounting that
     /// `populateBridgedOut` reads. Zero on ecosystems deployed after the tracker was removed.
     function legacyL1AssetTracker() external view returns (address);

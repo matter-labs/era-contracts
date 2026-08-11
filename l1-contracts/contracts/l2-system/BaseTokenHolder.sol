@@ -23,10 +23,8 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  * See {protocol-docs/bridging.md#base-token-handling}.
  * @dev Initialized with 2^127 - 1 tokens. No balance can overflow (users only gain what the holder
  * loses); the operator must keep the base token's total supply below 2^127 to avoid underflow.
- * @dev The base token is escrowed here, so its contract-level bridge flows converge in this
- * contract; each one is reported to `L2AssetTracker`, which keeps the chain-local bookkeeping for
- * every asset (the base token included) in one place. Flows performed by the VM directly (see the
- * note on `give`) bypass this reporting.
+ * @dev On Era every ETH transfer routes through MsgValueSimulator (which emits Transfer events), so the
+ * same implementation behaves consistently on Era and ZK OS.
  */
 // slither-disable-next-line locked-ether
 contract BaseTokenHolder is IBaseTokenHolder {
@@ -39,6 +37,9 @@ contract BaseTokenHolder is IBaseTokenHolder {
     }
 
     /// @notice Modifier that restricts access to callers that can bridge base tokens.
+    /// @dev InteropCenter: burns base-token value when sending an interop bundle
+    /// @dev NativeTokenVault: burns base-token value during bridged base-token burns
+    /// @dev L2BaseToken: burns the withdrawn value during legacy `withdraw`/`withdrawWithMessage`
     modifier onlyBridgingCaller() {
         if (
             msg.sender != L2_INTEROP_CENTER_ADDR &&
@@ -75,9 +76,8 @@ contract BaseTokenHolder is IBaseTokenHolder {
             return;
         }
 
-        // The ETH transfer below hands control to `_to`, which can reenter the bridge before this
-        // call returns; record first so any reentrant flow observes counters that already include
-        // this operation.
+        // Notify the asset tracker BEFORE transferring: its lazy registration snapshots the base
+        // token's supply, which the transfer below changes.
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_fromChainId, _amount);
         Address.sendValue(payable(_to), _amount);
         emit BaseTokenMintedInterop(_to, _amount);
@@ -94,11 +94,12 @@ contract BaseTokenHolder is IBaseTokenHolder {
         emit BaseTokenRecovered(_to, _amount);
     }
 
-    /// @inheritdoc IBaseTokenHolder
+    /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
+    /// @dev Called by InteropCenter, NativeTokenVault, and L2BaseToken (its `withdraw` path) during bridging operations.
+    /// @dev This function notifies L2AssetTracker to track the bridging operation.
+    /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable onlyBridgingCaller {
-        if (msg.value != 0) {
-            L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2(_toChainId, msg.value);
-        }
+        L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2(_toChainId, msg.value);
         emit BaseTokenBurntInterop(msg.sender, _toChainId, msg.value);
     }
 

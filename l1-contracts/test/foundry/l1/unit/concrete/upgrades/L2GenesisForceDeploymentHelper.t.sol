@@ -108,7 +108,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         assertEq(_countLogs(logs, FORCE_DEPLOYED_CONTRACTS_INITIALIZED_SIG), 1);
 
         _assertAtomicInteropInitialized();
-        _assertBaseTokenTracked(0);
 
         // Verify deployments occurred - use the etched contract at the system address
         MockZKOSContractDeployer etchedDeployer = MockZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
@@ -143,16 +142,10 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         _deployMockContract(L2_ASSET_ROUTER_ADDR);
         _deployMockContract(L2_NATIVE_TOKEN_VAULT_ADDR);
         _deployMockContract(L2_CHAIN_ASSET_HANDLER_ADDR);
+        _deployMockContract(L2_ASSET_TRACKER_ADDR);
         _deployMockContract(L2_INTEROP_CENTER_ADDR);
         _deployMockContract(L2_INTEROP_HANDLER_ADDR);
-        _deployMockContract(L2_ASSET_TRACKER_ADDR);
-        // An upgraded chain's tracker was initialized back in v31, so it already knows the base
-        // token's asset id — the helper must not re-run its one-shot `initL2`.
-        MockContract(payable(L2_ASSET_TRACKER_ADDR)).setMockTrackerState(keccak256("baseTokenAsset"));
         _deployMockContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
-        // An upgraded chain's base token is already initialized with supply in circulation; the
-        // helper must snapshot exactly this value (it never re-runs the base token's initL2).
-        MockContract(payable(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)).setMockBaseTokenState(true, 42 ether);
         // The atomic-interop built-ins arrive with the upgrade's force deployments on a pre-existing chain;
         // etch their real code so the helper initializing them is observable.
         _etchAtomicInteropBuiltIns();
@@ -187,7 +180,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // The upgrade path initializes the atomic-interop built-ins, so an upgraded chain ends up with the
         // same state a fresh one gets from genesis.
         _assertAtomicInteropInitialized();
-        _assertBaseTokenTracked(42 ether);
 
         // Note: no ZKsync OS chain can arrive here with the built-ins already seeded — neither they nor
         // their addresses existed in v31 — so the initialization is unconditional and one-shot.
@@ -236,27 +228,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // `_etchAllDeferredContracts` gave them real code here: on a real Era chain those addresses are
         // empty and initializing them would revert the whole upgrade transaction.
         _assertAtomicInteropUninitialized();
-
-        // The base token's baseline is recorded on the Era genesis path too.
-        _assertBaseTokenTracked(0);
-    }
-
-    /// @dev The helper must ask the tracker to record the base token's baseline exactly once, on
-    /// every path (genesis and upgrade, both VMs), and only after the base token itself is live:
-    /// the recorded snapshot must be the post-init supply, never the pre-init placeholder.
-    function _assertBaseTokenTracked(uint256 _expectedBaseline) internal view {
-        MockContract tracker = MockContract(payable(L2_ASSET_TRACKER_ADDR));
-        assertEq(tracker.trackBaseTokenCalls(), 1, "the tracker must record the base token's baseline exactly once");
-        assertEq(
-            tracker.recordedBaselineAtCall(),
-            _expectedBaseline,
-            "the baseline must be snapshotted after the base token is initialized"
-        );
-        assertEq(
-            tracker.recordedAssetIdAtCall(),
-            keccak256("baseTokenAsset"),
-            "the tracker's base-token asset id must be initialized before the baseline is recorded"
-        );
     }
 
     /// @dev Neither built-in seeded: the tree has no leaves and the manager no L1 chain id.
@@ -312,6 +283,10 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             abi.encode(keccak256("interopHandler_impl"), uint32(0), bytes32(0)),
             abi.encode(keccak256("interopHandler_proxy"), uint32(0), bytes32(0))
         );
+        data.assetTrackerBytecodeInfo = abi.encode(
+            abi.encode(keccak256("assetTracker_impl"), uint32(0), bytes32(0)),
+            abi.encode(keccak256("assetTracker_proxy"), uint32(0), bytes32(0))
+        );
 
         data.baseTokenHolderBytecodeInfo = abi.encode(
             abi.encode(keccak256("baseTokenHolder_impl"), uint32(0), bytes32(0)),
@@ -348,6 +323,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         data.chainAssetHandlerBytecodeInfo = abi.encode(keccak256("chainHandler"));
         data.interopCenterBytecodeInfo = abi.encode(keccak256("interopCenter"));
         data.interopHandlerBytecodeInfo = abi.encode(keccak256("interopHandler"));
+        data.assetTrackerBytecodeInfo = abi.encode(keccak256("assetTracker"));
         data.beaconDeployerInfo = abi.encode(keccak256("beaconDeployer"));
         data.baseTokenHolderBytecodeInfo = abi.encode(keccak256("baseTokenHolder"));
         data.zkTokenAssetId = DataEncoding.encodeNTVAssetId(ERA_CHAIN_ID, makeAddr("zkToken"));
@@ -491,52 +467,10 @@ contract MockSystemContractProxyAdmin {
 }
 
 contract MockContract {
-    uint256 public trackBaseTokenCalls;
-    uint256 public recordedBaselineAtCall;
-    bytes32 public recordedAssetIdAtCall;
-    bytes32 public baseTokenAssetIdStored;
-    bool public baseTokenInitialized;
-    uint256 internal mockSupply;
-
     // Generic mock contract that can handle various function calls
     function forceInitAdmin(address) external {}
 
-    /// @dev Mirrors `L2AssetTracker.trackBaseToken`: snapshots the base token's totalSupply at
-    /// call time, so the tests can assert the helper's ordering (the snapshot is only meaningful
-    /// after the base token's own `initL2`).
-    /// @dev The real tracker keys the snapshot by its stored `BASE_TOKEN_ASSET_ID`, so the recorded
-    /// asset id proves the tracker's own init ran before the tracking call.
-    function trackBaseToken() external {
-        trackBaseTokenCalls++;
-        recordedBaselineAtCall = MockContract(payable(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)).totalSupply();
-        recordedAssetIdAtCall = baseTokenAssetIdStored;
-    }
-
-    /// @dev Pre-initialized supply reads as a huge placeholder (mirroring ZKsync OS, where
-    /// `totalSupply()` is meaningless before `initL2` mints the holder's reserve).
-    function totalSupply() external view returns (uint256) {
-        return baseTokenInitialized ? mockSupply : type(uint128).max;
-    }
-
-    /// @dev Models an upgraded chain, whose base token is already live with circulating supply.
-    function setMockBaseTokenState(bool _initialized, uint256 _supply) external {
-        baseTokenInitialized = _initialized;
-        mockSupply = _supply;
-    }
-
-    /// @dev Models a chain upgraded from v31, whose tracker already ran its one-shot `initL2`.
-    function setMockTrackerState(bytes32 _baseTokenAssetId) external {
-        baseTokenAssetIdStored = _baseTokenAssetId;
-    }
-
-    // L2AssetTracker.initL2
-    function initL2(uint256, bytes32 _baseTokenAssetId) external {
-        baseTokenAssetIdStored = _baseTokenAssetId;
-    }
-
-    function initL2(uint256) external {
-        baseTokenInitialized = true;
-    }
+    function initL2(uint256) external {}
 
     function initL2(uint256, address, uint256) external {}
 
@@ -557,25 +491,9 @@ contract MockContract {
         bytes32,
         address,
         address,
-        TokenBridgingData calldata _baseTokenBridgingData,
+        TokenBridgingData calldata,
         TokenMetadata calldata
-    ) external {
-        baseTokenAssetIdStored = _baseTokenBridgingData.assetId;
-    }
-
-    // L2NativeTokenVaultZKOS.initL2
-    function initL2(
-        uint256,
-        address,
-        bytes32,
-        address,
-        address,
-        address,
-        TokenBridgingData calldata _baseTokenBridgingData,
-        TokenMetadata calldata
-    ) external {
-        baseTokenAssetIdStored = _baseTokenBridgingData.assetId;
-    }
+    ) external {}
 
     // L2ChainAssetHandler.updateL2
     function updateL2(uint256, address) external {}

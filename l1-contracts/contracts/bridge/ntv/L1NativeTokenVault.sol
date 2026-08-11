@@ -25,6 +25,7 @@ import {TxStatus} from "../../common/Messaging.sol";
 
 import {
     AssetIdAlreadyRegistered,
+    InsufficientChainBalance,
     NoFundsTransferred,
     OriginChainIdNotFound,
     WithdrawFailed,
@@ -69,6 +70,12 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     ///      `populateBridgedOut` to locate the legacy per-chain accounting.
     // slither-disable-next-line uninitialized-state
     address internal __DEPRECATED_l1AssetTracker;
+
+    /// @inheritdoc IL1NativeTokenVault
+    mapping(bytes32 assetId => uint256 amount) public bridgedOut;
+
+    /// @inheritdoc IL1NativeTokenVault
+    mapping(bytes32 assetId => bool populated) public bridgedOutPopulated;
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
@@ -158,10 +165,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
             // Repeated assets are skipped rather than reverted so that a partially mined batch can simply
             // be re-submitted.
-            if (isAssetTracked[assetIdToPopulate]) {
+            if (bridgedOutPopulated[assetIdToPopulate]) {
                 continue;
             }
-            isAssetTracked[assetIdToPopulate] = true;
+            bridgedOutPopulated[assetIdToPopulate] = true;
 
             // Reverts for anything that is not native to L1, which is a caller mistake rather than a no-op
             // worth tolerating.
@@ -352,5 +359,25 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, ""))
         );
         return BeaconProxy(payable(proxyAddress));
+    }
+
+    /// @dev Records the outbound flow of L1-native tokens; see `bridgedOut`.
+    function _handleBridgeToChain(uint256, bytes32 _assetId, uint256 _amount) internal override {
+        if (originChainId[_assetId] == block.chainid) {
+            bridgedOut[_assetId] += _amount;
+        }
+    }
+
+    /// @dev Records the inbound flow of L1-native tokens; see `bridgedOut`.
+    /// @dev An inbound amount exceeding the outstanding bridged-out amount is only possible if
+    /// bridged representations of the asset were forged somewhere upstream, so such a transfer
+    /// is blocked rather than recorded.
+    function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
+        if (originChainId[_assetId] == block.chainid) {
+            if (bridgedOut[_assetId] < _amount) {
+                revert InsufficientChainBalance(_chainId, _assetId, _amount);
+            }
+            bridgedOut[_assetId] -= _amount;
+        }
     }
 }

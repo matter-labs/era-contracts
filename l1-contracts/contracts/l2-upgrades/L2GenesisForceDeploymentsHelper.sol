@@ -261,11 +261,6 @@ library L2GenesisForceDeploymentsHelper {
             _initPreV32Contracts(fixedForceDeploymentsData, additionalForceDeploymentsData);
         }
 
-        // Both paths: the baseline mapping is new in this release, so an upgraded chain records it
-        // here just like a new one. Must stay after `_initPreV32Contracts` — at genesis neither the
-        // tracker's base-token asset id nor the base token's `totalSupply()` is set before it.
-        L2AssetTracker(L2_ASSET_TRACKER_ADDR).trackBaseToken();
-
         // Contracts introduced in this release are initialized on both paths: they are uninitialized on a
         // new chain and on an upgraded one alike.
         _initializeV32Contracts(_isZKsyncOS, fixedForceDeploymentsData);
@@ -394,9 +389,10 @@ library L2GenesisForceDeploymentsHelper {
 
     /// @notice Initializes the contracts that already existed in v31.
     /// @dev Genesis only: these contracts existed in v31 and their `initL2`s are one-shot, so a chain
-    /// upgraded from v31 has already run them — the storage each one writes at genesis is unchanged by
-    /// this release. Kept at the position v31 called them from, after `_finalizeDeployments`, so the
-    /// genesis sequence is unchanged; none of them reads the bridgehub wiring that step establishes.
+    /// upgraded from v31 has already run them — the storage each one writes at genesis is unchanged by this
+    /// release, even where the signature is not (`L2AssetTracker.initL2` lost its backfill argument). Kept
+    /// at the position v31 called them from, after `_finalizeDeployments`, so the genesis sequence is
+    /// unchanged; none of them reads the bridgehub wiring that step establishes.
     function _initPreV32Contracts(
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,
         ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
@@ -413,6 +409,8 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.aliasedL1Governance,
             _fixedForceDeploymentsData.zkTokenAssetId
         );
+
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
 
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
     }

@@ -371,11 +371,14 @@ contract BaseTokenHolderTest is Test {
         assertEq(tracker.recordedToAmount(), amount, "amount should be forwarded verbatim");
     }
 
-    function test_burnAndStartBridging_zeroValueIsNotReported() public {
+    /// @dev A zero-value burn is still reported: the tracker's lazy registration is a side effect of
+    /// the report, so skipping it would defer registration to the first non-zero flow.
+    function test_burnAndStartBridging_zeroValueIsStillReported() public {
         vm.prank(L2_INTEROP_CENTER_ADDR);
         baseTokenHolder.burnAndStartBridging{value: 0}(L1_CHAIN_ID);
 
-        assertEq(tracker.toChainCalls(), 0, "zero-value burn must not be reported to the tracker");
+        assertEq(tracker.toChainCalls(), 1, "the outbound report happens regardless of the amount");
+        assertEq(tracker.recordedToAmount(), 0, "the reported amount is the burnt value");
     }
 
     /*//////////////////////////////////////////////////////////////

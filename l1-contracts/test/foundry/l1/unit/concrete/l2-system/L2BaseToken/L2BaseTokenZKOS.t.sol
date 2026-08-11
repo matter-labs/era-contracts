@@ -41,7 +41,7 @@ contract L2BaseTokenZKOSHarness is L2BaseTokenZKOS {
 
 /// @title L2BaseTokenZKOSTest
 /// @notice Unit tests for L2BaseTokenZKOS (init, totalSupply).
-/// See {protocol-docs/bridging.md#l2-asset-bookkeeping}.
+/// See {protocol-docs/bridging.md#l2-asset-tracker}.
 contract L2BaseTokenZKOSTest is Test {
     L2BaseTokenZKOS internal l2BaseToken;
 

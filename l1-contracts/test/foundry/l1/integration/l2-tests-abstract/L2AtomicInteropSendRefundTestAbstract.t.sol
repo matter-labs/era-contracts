@@ -452,7 +452,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         // `NTV.originChainId(baseTokenAssetId)` to `block.chainid`, which would make the asset tracker
         // treat the base token as NATIVE to this chain and hit the chain-balance accounting. The real NTV
         // storage holds L1_CHAIN_ID (a base token is never native to its own L2, an invariant
-        // `handleRecoverBaseTokenBridgingOnL2` asserts) — re-mock it back to the real value so the
+        // `assertBaseTokenRecoveryIsAccountingNeutral` asserts) — re-mock it back to the real value so the
         // tracker takes the production non-native branches.
         vm.mockCall(
             address(L2_NATIVE_TOKEN_VAULT),

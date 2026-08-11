@@ -83,6 +83,10 @@ contract MockV32UpgradeNativeTokenVault {
         return address(0);
     }
 
+    function registerBaseTokenIfNeeded() external {
+        // No-op for mock
+    }
+
     function updateL2(
         uint256 _l1ChainId,
         address /* _aliasedOwner */,
@@ -112,13 +116,12 @@ contract MockV32UpgradeNativeTokenVault {
     }
 }
 
-/// @dev Mock AssetTracker that records `initL2` and `trackBaseToken` calls.
+/// @dev Mock AssetTracker that records initL2 calls.
 contract MockV32UpgradeAssetTracker {
     uint256 public L1_CHAIN_ID;
     bytes32 public BASE_TOKEN_ASSET_ID;
 
     uint256 public initCalls;
-    uint256 public trackBaseTokenCalls;
 
     function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -128,13 +131,6 @@ contract MockV32UpgradeAssetTracker {
         L1_CHAIN_ID = _l1ChainId;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         initCalls++;
-    }
-
-    function trackBaseToken() external {
-        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
-        trackBaseTokenCalls++;
     }
 }
 
@@ -211,10 +207,9 @@ contract L2V32UpgradeUnitTest is Test {
 
     /// @dev The contracts introduced in v31 are initialized on the genesis path only: their `initL2`s are
     /// unchanged since v31 and one-shot, so a chain that already went through v31 must not run them again.
-    /// The upgrade never re-runs the tracker's or the base token's `initL2`, but it MUST record the
-    /// base token's bookkeeping baseline exactly once (`trackBaseToken`); the helper-level ordering
+    /// This upgrade therefore leaves the asset tracker and the base token alone; what it does run for them
     /// is covered by `L2GenesisForceDeploymentHelper.t.sol`.
-    function test_UpgradeViaComplexUpgrader_DoesNotReinitializePreV32Contracts() public {
+    function test_UpgradeViaComplexUpgrader_LeavesPreV32ContractsAlone() public {
         bytes memory fixedData = abi.encode(_buildFixedForceDeploymentsData());
         bytes memory additionalData = abi.encode(_buildZKChainSpecificData());
 
@@ -224,14 +219,9 @@ contract L2V32UpgradeUnitTest is Test {
             abi.encodeCall(IL2V32Upgrade.upgrade, (false, CTM_DEPLOYER, fixedData, additionalData))
         );
 
-        // AssetTracker: not re-initialized, but asked to record the base token's baseline.
+        // AssetTracker: not re-initialized.
         MockV32UpgradeAssetTracker assetTracker = MockV32UpgradeAssetTracker(L2_ASSET_TRACKER_ADDR);
         assertEq(assetTracker.initCalls(), 0, "asset tracker must not be re-initialized on an upgrade");
-        assertEq(
-            assetTracker.trackBaseTokenCalls(),
-            1,
-            "the base token's pre-tracking baseline must be recorded on the upgrade path"
-        );
 
         // Verify NTV: updateL2 called with correct data
         MockV32UpgradeNativeTokenVault nativeTokenVault = MockV32UpgradeNativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);

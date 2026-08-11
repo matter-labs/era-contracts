@@ -31,14 +31,5 @@ interface IL2NativeTokenVault is INativeTokenVaultBase {
     /// @notice The wrapped base token (WETH) address
     function WETH_TOKEN() external view returns (address);
 
-    /// @notice The chain ID of L1, set during genesis or upgrade.
-    // solhint-disable-next-line func-name-mixedcase
-    function L1_CHAIN_ID() external view returns (uint256);
-
-    /// @notice Eagerly initializes the chain-local bookkeeping for a legacy non-base token.
-    /// @dev The base token is rejected: its baseline is recorded by `L2AssetTracker.trackBaseToken`
-    /// during the upgrade/genesis, and it has no vault escrow to seed.
-    function trackLegacyToken(bytes32 _assetId) external;
-
     function setLegacyTokenAssetId(address _l2TokenAddress) external;
 }

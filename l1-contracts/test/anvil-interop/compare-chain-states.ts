@@ -88,10 +88,9 @@ const BLOCK_NUMBER_STORAGE_SLOTS = new Set([
 // Slots holding a gas-cost-dependent ETH amount (the harness bridges a gas-dependent mintValue on
 // L1->L2 deposits): compared with BALANCE_TOLERANCE_WEI slack rather than skipped, so large (real)
 // drift is still caught. Currently the L1NativeTokenVault's `bridgedOut[ETH]` entry:
-//   slot = keccak256(abi.encode(ethAssetId, 208)), 208 = `bridgedOut` mapping storage index
-//   (in NativeTokenVaultBase, taken from the base storage gap).
-//   Recompute with `cast index bytes32 <ethAssetId> 208` if the NTV layout changes.
-const GAS_DEPENDENT_VALUE_SLOTS = new Set(["0x80f3e2725fd7fa6d070f44bef74b22e264b19f41c5c0807061a63828cd8a7e66"]);
+//   slot = keccak256(abi.encode(ethAssetId, 253)), 253 = `bridgedOut` mapping storage index.
+//   Recompute with `cast index bytes32 <ethAssetId> 253` if the NTV layout changes.
+const GAS_DEPENDENT_VALUE_SLOTS = new Set(["0xa779570f23bf75d0370baade00c3f15fe23265e729cfb55c61a10ccf98dc7093"]);
 
 // True when two raw storage words differ by no more than the native-balance
 // tolerance (used only for slots known to hold a gas-dependent ETH amount).

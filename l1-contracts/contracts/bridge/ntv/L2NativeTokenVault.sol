@@ -31,7 +31,6 @@ import {
     AddressMismatch,
     AssetIdAlreadyRegistered,
     AssetIdMismatch,
-    AssetIdNotRegistered,
     AssetIdNotSupported,
     ChainIdMismatch,
     DeployFailed,
@@ -138,6 +137,14 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
     }
 
+    /// @notice Registers the base token in the L2AssetTracker during genesis deployment, if needed.
+    function registerBaseTokenIfNeeded() external onlyUpgrader {
+        if (L2_ASSET_TRACKER.isAssetRegistered(BASE_TOKEN_ASSET_ID)) {
+            return;
+        }
+        L2_ASSET_TRACKER.registerNewTokenIfNeeded(BASE_TOKEN_ASSET_ID, originChainId[BASE_TOKEN_ASSET_ID]);
+    }
+
     /// @notice Updates the contract.
     /// @dev This function is used to initialize the new implementation of L2NativeTokenVault on existing chains during
     /// the upgrade.
@@ -198,11 +205,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         }
     }
 
-    /// @dev Marks a newly registered token as tracked so that its (empty) escrow is never
-    /// mistaken for a legacy pre-tracking escrow by `_trackLegacyTokenIfNeeded`, and has the
-    /// tracker record the corresponding zero-flow baseline.
-    function _registerTokenForTracking(bytes32 _assetId, uint256 _originChainId) internal override {
-        isAssetTracked[_assetId] = true;
+    /// @dev Records the token in the L2AssetTracker (total-supply / outbound bookkeeping).
+    function _registerTokenInAssetTracker(bytes32 _assetId, uint256 _originChainId) internal override {
         L2_ASSET_TRACKER.registerNewTokenIfNeeded(_assetId, _originChainId);
     }
 
@@ -299,7 +303,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         assetId[_expectedToken] = _assetId;
         originChainId[_assetId] = L1_CHAIN_ID;
         _addTokenToTokensList(_assetId);
-        _trackLegacyTokenIfNeeded(_assetId);
+        // Note, that here we assume that `L2_ASSET_TRACKER.registerLegacyToken` can only succeed
+        // if the token has been registered on L2NTV before, so it is not possible that someone
+        // front-runs and registers the token before we call the function here.
+        L2_ASSET_TRACKER.registerLegacyToken(_assetId);
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
@@ -425,49 +432,20 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             : keccak256(abi.encode(_tokenOriginChainId, _l1Token));
     }
 
-    function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual override {
+    function _handleBridgeToChain(uint256 _chainid, bytes32 _assetId, uint256 _amount) internal virtual override {
         // GW->L2 txs are not allowed and GW-bound transactions go through L1, so no GW-specific
         // handling is needed here (same for `_handleBridgeFromChain` below).
-        _trackLegacyTokenIfNeeded(_assetId);
-        super._handleBridgeToChain(_chainId, _assetId, _amount);
-        L2_ASSET_TRACKER.handleInitiateBridgingOnL2(_chainId, _assetId, _amount);
+        L2_ASSET_TRACKER.handleInitiateBridgingOnL2(_chainid, _assetId, _amount, originChainId[_assetId]);
     }
 
     function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual override {
-        _trackLegacyTokenIfNeeded(_assetId);
-        super._handleBridgeFromChain(_chainId, _assetId, _amount);
-        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(_chainId, _assetId, _amount);
-    }
-
-    /// @inheritdoc IL2NativeTokenVault
-    function trackLegacyToken(bytes32 _assetId) external {
-        // The base token has no vault escrow to seed and its baseline is already recorded during
-        // the upgrade/genesis (`L2AssetTracker.trackBaseToken`); tracking it from an arbitrary later
-        // moment would fold post-upgrade flows — which the tracker already records — into the baseline.
-        require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));
-        _trackLegacyTokenIfNeeded(_assetId);
-    }
-
-    /// @dev Seeds `bridgedOut` for an asset registered before this implementation and has the tracker
-    /// capture its pre-tracking baseline from the same escrow. Called before the bridge operation
-    /// changes token supply or escrow.
-    function _trackLegacyTokenIfNeeded(bytes32 _assetId) internal {
-        if (isAssetTracked[_assetId]) {
-            return;
-        }
-
-        uint256 tokenOriginChainId = originChainId[_assetId];
-        require(tokenOriginChainId != 0, AssetIdNotRegistered(_assetId));
-        address token = tokenAddress[_assetId];
-        require(token != address(0), AssetIdNotRegistered(_assetId));
-        isAssetTracked[_assetId] = true;
-
-        if (tokenOriginChainId == block.chainid) {
-            // Before this mapping existed, the vault escrow was the exact outstanding amount except
-            // for indistinguishable direct donations, which are conservatively treated as escrow.
-            bridgedOut[_assetId] = IERC20(token).balanceOf(address(this));
-        }
-        L2_ASSET_TRACKER.trackLegacyTokenIfNeeded(_assetId, tokenOriginChainId, token);
+        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2({
+            _fromChainId: _chainId,
+            _assetId: _assetId,
+            _amount: _amount,
+            _tokenOriginChainId: originChainId[_assetId],
+            _tokenAddress: tokenAddress[_assetId]
+        });
     }
 
     function _registerToken(address _nativeToken) internal override returns (bytes32) {
