@@ -311,9 +311,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode(ctmAddresses.daAddresses.availBridge);
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
-        } else if (
-            compareStrings(contractName, "EraVerifierFflonk") || compareStrings(contractName, "ZKsyncOSVerifierFflonk")
-        ) {
+        } else if (compareStrings(contractName, "EraVerifierFflonk")) {
             return abi.encode();
         } else if (
             compareStrings(contractName, "EraVerifierPlonk") || compareStrings(contractName, "ZKsyncOSVerifierPlonk")
@@ -379,10 +377,6 @@ abstract contract DeployCTMUtils is DeployUtils {
                 eip7702Checker: ctmAddresses.admin.eip7702Checker,
                 verifierFflonk: ctmAddresses.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: ctmAddresses.stateTransition.verifiers.verifierPlonk,
-                // For L1 deployment we need to use the deployer as the owner of the verifier,
-                // because we set the dual verifier later. Use getBroadcasterAddress() to get
-                // the actual EOA when this is called from a contract created via `new` during the script.
-                verifierOwner: getBroadcasterAddress(),
                 permissionlessValidator: ctmAddresses.stateTransition.proxies.permissionlessValidator
             });
     }
