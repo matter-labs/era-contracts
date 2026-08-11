@@ -182,6 +182,8 @@ error IncorrectBatchBounds(
 error IncorrectBatchChainId(uint256, uint256);
 // 0xdd381a4c
 error IncorrectBridgeHubAddress(address bridgehub);
+// 0x07859b3b
+error InsufficientChainBalance(uint256 chainId, bytes32 assetId, uint256 amount);
 // 0x03eb8b54
 error InsufficientFunds(uint256 required, uint256 actual);
 // 0xd70c44f6

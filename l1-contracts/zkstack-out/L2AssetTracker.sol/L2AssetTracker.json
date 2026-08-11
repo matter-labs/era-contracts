@@ -34,16 +34,34 @@
   },
   {
     "type": "function",
-    "name": "backFillZKSyncOSBaseTokenV31MigrationData",
+    "name": "assertBaseTokenRecoveryIsAccountingNeutral",
     "inputs": [
       {
-        "name": "_amount",
+        "name": "_toChainId",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "assertRecoveryIsAccountingNeutral",
+    "inputs": [
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_toChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -168,24 +186,6 @@
   },
   {
     "type": "function",
-    "name": "handleRecoverBaseTokenBridgingOnL2",
-    "inputs": [
-      {
-        "name": "_toChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "initL2",
     "inputs": [
       {
@@ -239,19 +239,6 @@
     "outputs": [
       {
         "name": "isAssetRegistered",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "needBaseTokenTotalSupplyBackfill",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
         "type": "bool",
         "internalType": "bool"
       }
@@ -454,7 +441,7 @@
     "name": "AssetIdNotRegistered",
     "inputs": [
       {
-        "name": "_assetId",
+        "name": "assetId",
         "type": "bytes32",
         "internalType": "bytes32"
       }
@@ -467,25 +454,20 @@
   },
   {
     "type": "error",
-    "name": "BaseTokenTotalSupplyBackfillNotNeeded",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "ChainBalanceMustBeZeroBeforeMigration",
     "inputs": [
       {
-        "name": "_chainId",
+        "name": "chainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "_assetId",
+        "name": "assetId",
         "type": "bytes32",
         "internalType": "bytes32"
       },
       {
-        "name": "_chainBalance",
+        "name": "chainBalance",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -496,17 +478,17 @@
     "name": "InsufficientChainBalance",
     "inputs": [
       {
-        "name": "_chainId",
+        "name": "chainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "_assetId",
+        "name": "assetId",
         "type": "bytes32",
         "internalType": "bytes32"
       },
       {
-        "name": "_amount",
+        "name": "amount",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -526,33 +508,6 @@
     "type": "error",
     "name": "SlotOccupied",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "TotalPreV31SupplyNotSaved",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "TotalPreV31SupplyShouldBeZero",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_totalSupply",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
   },
   {
     "type": "error",

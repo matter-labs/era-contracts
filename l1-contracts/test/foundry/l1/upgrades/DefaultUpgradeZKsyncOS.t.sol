@@ -272,7 +272,16 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         bytes memory forThisChain = upgradeContract.getL2UpgradeTxData(mockBridgehub, CHAIN_ID, true, placeholder);
         bytes memory forOtherChain = upgradeContract.getL2UpgradeTxData(mockBridgehub, otherChainId, true, placeholder);
 
-        assertTrue(keccak256(forThisChain) != keccak256(forOtherChain), "both chains got the same payload");
+        assertEq(
+            _decodePerChainData(forThisChain).baseTokenBridgingData.assetId,
+            BASE_TOKEN_ASSET_ID,
+            "this chain's payload must carry its own base-token asset id"
+        );
+        assertEq(
+            _decodePerChainData(forOtherChain).baseTokenBridgingData.assetId,
+            otherAssetId,
+            "the other chain's payload must carry the other base-token asset id"
+        );
     }
 
     function _decodePerChainData(

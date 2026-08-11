@@ -24,13 +24,13 @@ import {TxStatus} from "../../common/Messaging.sol";
 
 import {
     AssetIdAlreadyRegistered,
+    InsufficientChainBalance,
     NoFundsTransferred,
     OriginChainIdNotFound,
     WithdrawFailed,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
 import {AssetNotNativeToL1, OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
-import {InsufficientChainBalance} from "../asset-tracker/AssetTrackerErrors.sol";
 import {ILegacyL1AssetTracker} from "../asset-tracker/ILegacyL1AssetTracker.sol";
 
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
