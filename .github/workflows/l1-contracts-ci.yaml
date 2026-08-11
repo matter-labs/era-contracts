@@ -361,13 +361,24 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-ci-${{ github.sha }}
           path: |
+            da-contracts/cache-forge
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
-            # TODO: cached `zkout` and the one for tests produce different hashes and so it causes the tests to fail
+            l1-contracts/zkout
             l2-contracts/cache-forge
             l2-contracts/zkout
             system-contracts/zkout
+
+      # The path list above must match `build`'s save list exactly: cache entries are versioned
+      # by their paths, so a shortened list here silently stops matching the saved entry (with
+      # fail-on-cache-miss, that is a hard failure). The old list dropped `l1-contracts/zkout`
+      # to express "these tests need a freshly built zkout, not a cached one" — and carried the
+      # note as a stray line inside the path block, where YAML treats it as another path rather
+      # than a comment. Express the intent by deleting the directory after restoring instead;
+      # forge rebuilds it during the test run.
+      - name: Drop the cached zkout so the tests rebuild it
+        run: rm -rf l1-contracts/zkout
 
       - name: Run tests
         working-directory: ./l1-contracts
