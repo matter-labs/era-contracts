@@ -28,7 +28,6 @@ import {InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol"
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
-    L2_ASSET_TRACKER_ADDR,
     L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -38,7 +37,6 @@ import {
 import {L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
@@ -454,7 +452,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         // `NTV.originChainId(baseTokenAssetId)` to `block.chainid`, which would make the asset tracker
         // treat the base token as NATIVE to this chain and hit the chain-balance accounting. The real NTV
         // storage holds L1_CHAIN_ID (a base token is never native to its own L2, an invariant
-        // `handleRecoverBaseTokenBridgingOnL2` asserts) — re-mock it back to the real value so the
+        // `assertBaseTokenRecoveryIsAccountingNeutral` asserts) — re-mock it back to the real value so the
         // tracker takes the production non-native branches.
         vm.mockCall(
             address(L2_NATIVE_TOKEN_VAULT),
@@ -487,14 +485,12 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         vm.deal(_depositor, NATIVE_VALUE_LEG_AMOUNT);
         uint256 holderBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
 
-        // The escrow leg: the collected value must reach the BaseTokenHolder, and the asset tracker must
-        // be notified of the outbound bridging with the original (destination, amount).
+        // The escrow leg: the collected value must reach the BaseTokenHolder through the outbound
+        // bookkeeping entry point, with the original (destination, amount).
         vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeCall(
-                IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2,
-                (destinationChainId, NATIVE_VALUE_LEG_AMOUNT)
-            )
+            L2_BASE_TOKEN_HOLDER_ADDR,
+            NATIVE_VALUE_LEG_AMOUNT,
+            abi.encodeCall(IBaseTokenHolder.burnAndStartBridging, (destinationChainId))
         );
         vm.recordLogs();
         vm.expectEmit(true, true, true, true, address(manager));
@@ -541,12 +537,13 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
         uint256 holderBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
 
-        // The recovery hook must reverse the send-time accounting with the original (destination, amount).
+        // The recovery must go through the holder with the original (destination, amount), so its
+        // accounting-neutrality invariants gate the release of the escrow.
         vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
+            L2_BASE_TOKEN_HOLDER_ADDR,
             abi.encodeCall(
-                IL2AssetTracker.handleRecoverBaseTokenBridgingOnL2,
-                (destinationChainId, NATIVE_VALUE_LEG_AMOUNT)
+                IBaseTokenHolder.recoverBaseToken,
+                (address(depositor), NATIVE_VALUE_LEG_AMOUNT, destinationChainId)
             )
         );
         vm.expectEmit(true, false, false, true, L2_BASE_TOKEN_HOLDER_ADDR);

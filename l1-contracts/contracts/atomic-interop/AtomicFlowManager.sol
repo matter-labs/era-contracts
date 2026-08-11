@@ -299,7 +299,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         // recovered bundle never targets L1. Assert it explicitly: this keeps recovery from ever reaching the
         // append-only L1 deposit/withdrawal counters in {L2AssetTracker}, whose settlement-layer-conditional
         // updates are only correct when evaluated at send time, not at recovery time. Mirrors the same guard on
-        // the base-token recovery path ({L2AssetTracker.handleRecoverBaseTokenBridgingOnL2}).
+        // the base-token recovery path ({L2AssetTracker.assertRecoveryIsAccountingNeutral}).
         require(destChainId != L1_CHAIN_ID, RecoverToL1NotSupported());
         bytes32 destBaseTokenAssetId = _bundle.destinationBaseTokenAssetId;
         uint256 callsLen = _bundle.calls.length;

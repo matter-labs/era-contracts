@@ -1,5 +1,5 @@
 use structopt::StructOpt;
-use zksync_os_genesis_gen::{build_genesis_root_hash, Genesis, InitialGenesisInput};
+use zksync_os_genesis_gen::{Genesis, InitialGenesisInput, build_genesis_root_hash};
 
 const PATH_TO_LOCAL_GENESIS: &str = "../../configs/genesis/zksync-os/latest.json";
 

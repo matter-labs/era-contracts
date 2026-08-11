@@ -6,7 +6,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
-import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {
     L2_ASSET_TRACKER_ADDR,
     L2_BOOTLOADER_ADDRESS,
@@ -16,16 +15,93 @@ import {
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {DummyL2AssetTracker} from "contracts/dev-contracts/test/DummyL2AssetTracker.sol";
+import {BaseTokenNativeToThisChain, RecoverToL1NotSupported, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+
+/// @dev Mock L2AssetTracker that records the base-token bridge flows the holder reports.
+/// The settlement-layer gating of these flows lives in the real tracker and is covered by the
+/// L2AssetTracker tests; here we only verify what the holder forwards.
+contract MockRecordingAssetTracker {
+    uint256 internal constant MOCK_L1_CHAIN_ID = 9;
+    bytes32 internal constant MOCK_BASE_TOKEN_ASSET_ID = bytes32(uint256(0xba5e));
+
+    uint256 public recordedToChainId;
+    uint256 public recordedToAmount;
+    uint256 public toChainCalls;
+
+    uint256 public recordedFromChainId;
+    uint256 public recordedFromAmount;
+    uint256 public fromChainCalls;
+
+    uint256 internal baseTokenOriginChainId = MOCK_L1_CHAIN_ID;
+
+    function handleInitiateBaseTokenBridgingOnL2(uint256 _toChainId, uint256 _amount) external {
+        if (msg.sender != _holder()) {
+            revert Unauthorized(msg.sender);
+        }
+        recordedToChainId = _toChainId;
+        recordedToAmount = _amount;
+        toChainCalls++;
+    }
+
+    function handleFinalizeBaseTokenBridgingOnL2(uint256 _fromChainId, uint256 _amount) external {
+        if (msg.sender != _holder()) {
+            revert Unauthorized(msg.sender);
+        }
+        recordedFromChainId = _fromChainId;
+        recordedFromAmount = _amount;
+        fromChainCalls++;
+    }
+
+    // solhint-disable-next-line func-name-mixedcase
+    function L1_CHAIN_ID() external pure returns (uint256) {
+        return MOCK_L1_CHAIN_ID;
+    }
+
+    // solhint-disable-next-line func-name-mixedcase
+    function BASE_TOKEN_ASSET_ID() external pure returns (bytes32) {
+        return MOCK_BASE_TOKEN_ASSET_ID;
+    }
+
+    function originChainId(bytes32) external view returns (uint256) {
+        return baseTokenOriginChainId;
+    }
+
+    /// @dev Mirrors `L2AssetTracker.assertBaseTokenRecoveryIsAccountingNeutral` so the holder's
+    /// delegation to the tracker stays observable with the recording mock in place.
+    function assertBaseTokenRecoveryIsAccountingNeutral(uint256 _toChainId) external view {
+        if (_toChainId == MOCK_L1_CHAIN_ID) {
+            revert RecoverToL1NotSupported();
+        }
+        if (baseTokenOriginChainId == block.chainid) {
+            revert BaseTokenNativeToThisChain();
+        }
+    }
+
+    function setBaseTokenOriginChainId(uint256 _originChainId) external {
+        baseTokenOriginChainId = _originChainId;
+    }
+
+    /// @dev The holder under test is stored by the test contract right after deployment.
+    address internal holderAddress;
+
+    function setHolder(address _holderAddress) external {
+        holderAddress = _holderAddress;
+    }
+
+    function _holder() internal view returns (address) {
+        return holderAddress;
+    }
+}
 
 /// @title BaseTokenHolderTest
 /// @notice Unit tests for BaseTokenHolder contract
 contract BaseTokenHolderTest is Test {
     BaseTokenHolder internal baseTokenHolder;
+    MockRecordingAssetTracker internal tracker;
 
     address internal recipient;
     uint256 internal constant INITIAL_BALANCE = 100 ether;
+    uint256 internal constant L1_CHAIN_ID = 9;
     uint256 internal constant ERA_CHAIN_ID = 271;
     uint256 internal constant GATEWAY_CHAIN_ID = 505;
 
@@ -33,11 +109,11 @@ contract BaseTokenHolderTest is Test {
         baseTokenHolder = new BaseTokenHolder();
         recipient = makeAddr("recipient");
 
-        // Deploy dummy L2AssetTracker at system address (replaces per-test vm.mockCall)
-        vm.etch(
-            L2_ASSET_TRACKER_ADDR,
-            address(new DummyL2AssetTracker(address(0), DummyL2AssetTracker.RecordMode.None)).code
-        );
+        // The holder reports every bridge flow to the tracker; a recording mock stands in for it.
+        MockRecordingAssetTracker trackerImpl = new MockRecordingAssetTracker();
+        vm.etch(L2_ASSET_TRACKER_ADDR, address(trackerImpl).code);
+        tracker = MockRecordingAssetTracker(L2_ASSET_TRACKER_ADDR);
+        tracker.setHolder(address(baseTokenHolder));
 
         // Fund the BaseTokenHolder contract
         vm.deal(address(baseTokenHolder), INITIAL_BALANCE);
@@ -71,18 +147,18 @@ contract BaseTokenHolderTest is Test {
 
         assertEq(recipient.balance, recipientBalanceBefore, "Recipient balance should not change");
         assertEq(address(baseTokenHolder).balance, holderBalanceBefore, "Holder balance should not change");
+        assertEq(tracker.fromChainCalls(), 0, "zero-amount give must not be reported to the tracker");
     }
 
-    function test_give_notifiesAssetTracker() public {
+    function test_give_reportsInboundFlowToTracker() public {
         uint256 amount = 1 ether;
 
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(IL2AssetTracker.handleFinalizeBaseTokenBridgingOnL2.selector, ERA_CHAIN_ID, amount)
-        );
-
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        baseTokenHolder.give(recipient, amount, ERA_CHAIN_ID);
+        baseTokenHolder.give(recipient, amount, L1_CHAIN_ID);
+
+        assertEq(tracker.fromChainCalls(), 1, "inbound flow should be reported exactly once");
+        assertEq(tracker.recordedFromChainId(), L1_CHAIN_ID, "source chain id should be forwarded verbatim");
+        assertEq(tracker.recordedFromAmount(), amount, "amount should be forwarded verbatim");
     }
 
     function test_give_revertWhenRecipientRejectsETH() public {
@@ -93,7 +169,9 @@ contract BaseTokenHolderTest is Test {
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         vm.expectRevert("Address: unable to send value, recipient may have reverted");
-        baseTokenHolder.give(address(rejecting), amount, ERA_CHAIN_ID);
+        baseTokenHolder.give(address(rejecting), amount, L1_CHAIN_ID);
+
+        assertEq(tracker.fromChainCalls(), 0, "reverted transfer must revert bookkeeping");
     }
 
     function test_give_revertWhenCalledByNonInteropHandler() public {
@@ -218,11 +296,6 @@ contract BaseTokenHolderTest is Test {
 
         uint256 holderBalanceBefore = address(baseTokenHolder).balance;
 
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector, _toChainId, amount)
-        );
-
         vm.expectEmit(true, false, false, true, address(baseTokenHolder));
         emit IBaseTokenHolder.BaseTokenBurntInterop(_caller, _toChainId, amount);
 
@@ -285,55 +358,43 @@ contract BaseTokenHolderTest is Test {
         baseTokenHolder.burnAndStartBridging{value: 1 ether}(ERA_CHAIN_ID);
     }
 
-    function test_burnAndStartBridging_callsAssetTrackerWithCorrectParams() public {
+    function test_burnAndStartBridging_reportsOutboundFlowToTracker() public {
         uint256 amount = 2 ether;
 
         vm.deal(L2_INTEROP_CENTER_ADDR, amount);
 
-        // Verify exact parameters passed to asset tracker
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(
-                IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector,
-                GATEWAY_CHAIN_ID,
-                amount
-            )
-        );
-
         vm.prank(L2_INTEROP_CENTER_ADDR);
-        baseTokenHolder.burnAndStartBridging{value: amount}(GATEWAY_CHAIN_ID);
+        baseTokenHolder.burnAndStartBridging{value: amount}(L1_CHAIN_ID);
+
+        assertEq(tracker.toChainCalls(), 1, "outbound flow should be reported exactly once");
+        assertEq(tracker.recordedToChainId(), L1_CHAIN_ID, "destination chain id should be forwarded verbatim");
+        assertEq(tracker.recordedToAmount(), amount, "amount should be forwarded verbatim");
+    }
+
+    /// @dev A zero-value burn is still reported: the tracker's lazy registration is a side effect of
+    /// the report, so skipping it would defer registration to the first non-zero flow.
+    function test_burnAndStartBridging_zeroValueIsStillReported() public {
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        baseTokenHolder.burnAndStartBridging{value: 0}(L1_CHAIN_ID);
+
+        assertEq(tracker.toChainCalls(), 1, "the outbound report happens regardless of the amount");
+        assertEq(tracker.recordedToAmount(), 0, "the reported amount is the burnt value");
     }
 
     /*//////////////////////////////////////////////////////////////
                     ORDERING INVARIANT TESTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Verifies that handleFinalizeBaseTokenBridgingOnL2 is called BEFORE the ETH transfer.
-    /// @dev This ordering is critical: _needToForceSetAssetMigrationOnL2 reads totalSupply() to decide
-    /// whether to force-set the migration number. If the transfer happens first, totalSupply changes
-    /// before the tracker is notified, giving wrong results. The same ordering must be enforced in zksync-os.
-    function test_give_callsAssetTrackerBeforeTransfer() public {
+    /// @notice Verifies that inbound bookkeeping is updated before control reaches the recipient.
+    function test_give_recordsDepositBeforeTransfer() public {
         uint256 amount = 1 ether;
-        uint256 recipientBalanceBefore = recipient.balance;
-
-        // Deploy DummyL2AssetTracker in recording mode — snapshots recipient balance when called
-        DummyL2AssetTracker recorder = new DummyL2AssetTracker(recipient, DummyL2AssetTracker.RecordMode.Balance);
-        vm.etch(L2_ASSET_TRACKER_ADDR, address(recorder).code);
+        BookkeepingObservingRecipient observer = new BookkeepingObservingRecipient(tracker);
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        baseTokenHolder.give(recipient, amount, ERA_CHAIN_ID);
+        baseTokenHolder.give(address(observer), amount, L1_CHAIN_ID);
 
-        // Read recorded values from the etched address
-        DummyL2AssetTracker etched = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
-        assertTrue(etched.wasCalled(), "Asset tracker should have been called");
-        assertEq(
-            etched.recordedValue(),
-            recipientBalanceBefore,
-            "handleFinalizeBaseTokenBridgingOnL2 must be called BEFORE ETH transfer"
-        );
-
-        // Confirm transfer actually happened
-        assertEq(recipient.balance, recipientBalanceBefore + amount, "Recipient should have received ETH after call");
+        assertEq(observer.observedDeposits(), amount, "recipient should observe the completed bookkeeping");
+        assertEq(address(observer).balance, amount, "recipient should receive ETH after bookkeeping");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -374,22 +435,22 @@ contract BaseTokenHolderTest is Test {
         assertEq(address(baseTokenHolder).balance, holderBalanceBefore - amount, "holder balance must decrease");
     }
 
-    /// @dev The tracker hook asserts the bridge-out is recoverable (L2->L2 only); the holder must stay
-    /// wired to it so those invariants gate every recovery.
-    function test_recoverBaseToken_notifiesAssetTracker() public {
-        uint256 amount = 1 ether;
+    /// @dev Recovery is only accounting-neutral for L2->L2 bridge-outs: `totalWithdrawalsToL1` is
+    /// append-only, so an L1-destined recovery must be rejected outright.
+    function test_recoverBaseToken_revertsForL1Destination() public {
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        vm.expectRevert(RecoverToL1NotSupported.selector);
+        baseTokenHolder.recoverBaseToken(recipient, 1 ether, L1_CHAIN_ID);
+    }
 
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(
-                IL2AssetTracker.handleRecoverBaseTokenBridgingOnL2.selector,
-                GATEWAY_CHAIN_ID,
-                amount
-            )
-        );
+    /// @dev The base token never originates from this chain, so `NativeTokenVaultBase.bridgedOut`
+    /// holds nothing to re-credit; a chain-native base token would invalidate that assumption.
+    function test_recoverBaseToken_revertsWhenBaseTokenIsNativeToThisChain() public {
+        tracker.setBaseTokenOriginChainId(block.chainid);
 
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
-        baseTokenHolder.recoverBaseToken(recipient, amount, GATEWAY_CHAIN_ID);
+        vm.expectRevert(BaseTokenNativeToThisChain.selector);
+        baseTokenHolder.recoverBaseToken(recipient, 1 ether, GATEWAY_CHAIN_ID);
     }
 
     function test_recoverBaseToken_zeroAmountIsNoop() public {
@@ -421,5 +482,18 @@ contract BaseTokenHolderTest is Test {
 contract RejectingETHContract {
     receive() external payable {
         revert("Rejected");
+    }
+}
+
+contract BookkeepingObservingRecipient {
+    MockRecordingAssetTracker internal immutable TRACKER;
+    uint256 public observedDeposits;
+
+    constructor(MockRecordingAssetTracker _tracker) {
+        TRACKER = _tracker;
+    }
+
+    receive() external payable {
+        observedDeposits = TRACKER.recordedFromAmount();
     }
 }

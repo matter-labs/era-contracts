@@ -129,7 +129,7 @@ contract AtomicFlowManagerRecoverTest is Test {
 
     function test_recoverBundle_revertsWhenDestinationIsL1() public {
         // L2->L1 atomic bundles are rejected at send, so recovery must never process an L1-destined bundle:
-        // that keeps it away from the append-only L1 counters in L2AssetTracker (whose settlement-layer
+        // that keeps it away from the append-only L1 counters in BaseTokenHolder (whose settlement-layer
         // updates are only correct at send time). Set L1_CHAIN_ID == the builder's DEST_CHAIN_ID so the bundle
         // is L1-destined, and assert the guard reverts before any refund dispatch.
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);

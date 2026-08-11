@@ -533,8 +533,12 @@ contract L2BaseTokenEraTest is Test {
         );
     }
 
-    function test_withdraw_callsAssetTrackerWithL1ChainId() public {
-        // Deploy real BaseTokenHolder so the full call chain reaches L2AssetTracker
+    /// @dev Covers the holder->tracker forwarding only: the tracker is a recording dummy, so the
+    /// real tracker's settlement gating and `interopInfo` update are exercised in
+    /// L2AssetTracker.t.sol.
+    function test_withdraw_forwardsBookkeepingWithL1ChainIdToTracker() public {
+        // Deploy the real holder so the withdrawal reporting path executes; the holder reports the
+        // flow to the tracker, whose recording dummy is already etched by `setUp`.
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
 
         // Deploy at system contract address so it passes onlyBridgingCaller check
@@ -547,14 +551,13 @@ contract L2BaseTokenEraTest is Test {
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
-        // L1_CHAIN_ID = 1, so expect toChainId = 1
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 1, WITHDRAW_AMOUNT)
-        );
-
         vm.prank(sender);
         L2BaseTokenEra(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
+
+        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(tracker.toChainCalls(), 1, "withdrawal should be reported to the tracker");
+        assertEq(tracker.recordedToChainId(), 1, "withdrawal destination should be the L1 chain id");
+        assertEq(tracker.recordedToAmount(), WITHDRAW_AMOUNT, "withdrawal amount should be forwarded verbatim");
     }
 
     function test_withdraw_callsL1Messenger() public {
@@ -797,8 +800,8 @@ contract L2BaseTokenEraTest is Test {
                     ORDERING INVARIANT TESTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice The tracker hook must run BEFORE totalSupply changes: _needToForceSetAssetMigrationOnL2
-    /// reads totalSupply(), so the very first deposit must still observe the pre-mint supply.
+    /// @notice The tracker hook must run BEFORE totalSupply changes: a legacy token's baseline is
+    /// derived from the pre-operation supply, so the very first deposit must still observe it.
     function test_mint_callsAssetTrackerBeforeTotalSupplyChange() public {
         _initL2();
         uint256 mintAmount = 5 ether;

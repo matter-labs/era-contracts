@@ -268,7 +268,6 @@ function computeCreate2Address(txData: string): string | null {
  * - 0x5d03f19d = CurrentBatchNumberAlreadySet()
  * - 0x7d769244 = MemberAlreadyExists(address)
  * - 0x24591d89 = ChainIdAlreadyExists()
- * - 0x7f9159de = BaseTokenPreV31TotalSupplyAlreadySet()
  */
 const IDEMPOTENT_ERROR_SELECTORS: Record<string, string> = {
   "0x0dfb42bf": "AddressAlreadySet",
@@ -278,7 +277,6 @@ const IDEMPOTENT_ERROR_SELECTORS: Record<string, string> = {
   "0x5d03f19d": "CurrentBatchNumberAlreadySet",
   "0x7d769244": "MemberAlreadyExists",
   "0x24591d89": "ChainIdAlreadyExists",
-  "0x7f9159de": "BaseTokenPreV31TotalSupplyAlreadySet",
 };
 
 /**

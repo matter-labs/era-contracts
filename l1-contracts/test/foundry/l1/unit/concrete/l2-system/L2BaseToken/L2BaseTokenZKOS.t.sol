@@ -6,7 +6,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol";
 import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.sol";
-import {IL2BaseTokenZKOS} from "contracts/l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
 import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
 import {
     L2_ASSET_TRACKER_ADDR,
@@ -19,23 +18,29 @@ import {
     MINT_BASE_TOKEN_HOOK
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_BASE_TOKEN_HOLDER} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {INITIAL_BASE_TOKEN_HOLDER_BALANCE, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
+import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {
     BaseTokenHolderAlreadyInitialized,
     BaseTokenHolderMintFailed,
-    BaseTokenPreV31TotalSupplyAlreadySet,
-    BaseTokenPreV31TotalSupplyNotSet,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
-import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {DummyL2AssetTracker} from "contracts/dev-contracts/test/DummyL2AssetTracker.sol";
 import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 import {DummyL2BaseTokenHolder} from "contracts/dev-contracts/test/DummyL2BaseTokenHolder.sol";
 
+/// @dev Harness exposing a setter for the slot that v31's backfill service transaction
+/// (removed in this release) used to write, so an upgraded chain's pre-populated state can be
+/// simulated without storage cheatcodes.
+contract L2BaseTokenZKOSHarness is L2BaseTokenZKOS {
+    function harnessSetZkosPreV31TotalSupply(uint256 _totalSupply) external {
+        zkosPreV31TotalSupply = _totalSupply;
+    }
+}
+
 /// @title L2BaseTokenZKOSTest
-/// @notice Unit tests for L2BaseTokenZKOS (init, pre-V31 total-supply backfill, totalSupply).
+/// @notice Unit tests for L2BaseTokenZKOS (init, totalSupply).
 /// See {protocol-docs/bridging.md#l2-asset-tracker}.
 contract L2BaseTokenZKOSTest is Test {
     L2BaseTokenZKOS internal l2BaseToken;
@@ -57,15 +62,17 @@ contract L2BaseTokenZKOSTest is Test {
         l1Receiver = makeAddr("l1Receiver");
 
         // Deploy dummy dependencies at system addresses (replaces broad vm.mockCall)
-        vm.etch(
-            L2_ASSET_TRACKER_ADDR,
-            address(new DummyL2AssetTracker(address(0), DummyL2AssetTracker.RecordMode.None)).code
-        );
         vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(new DummyL2L1Messenger()).code);
 
         // Deploy dummy BaseTokenHolder that accepts ETH from any sender.
         // Tests that need real access-control checks etch the real BaseTokenHolder instead.
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new DummyL2BaseTokenHolder()).code);
+
+        // The real BaseTokenHolder reports bridge flows to the vault; a recording mock stands in.
+        vm.etch(
+            L2_ASSET_TRACKER_ADDR,
+            address(new DummyL2AssetTracker(address(0), DummyL2AssetTracker.RecordMode.None)).code
+        );
     }
 
     /// @dev Helper to initialize l2BaseToken via initL2() — sets L1_CHAIN_ID and transfers to BaseTokenHolder.
@@ -113,8 +120,10 @@ contract L2BaseTokenZKOSTest is Test {
         );
     }
 
-    function test_withdraw_callsAssetTracker() public {
-        // Use actual BaseTokenHolder to verify AssetTracker is called
+    /// @dev Covers the holder->vault forwarding only: the vault is a recording mock, so the real
+    /// tracker's settlement gating and `interopInfo` update are exercised in L2AssetTracker.t.sol.
+    function test_withdraw_forwardsBaseTokenBookkeepingToTracker() public {
+        // Use the actual holder to verify the forwarded withdrawal.
         BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
 
@@ -130,14 +139,13 @@ contract L2BaseTokenZKOSTest is Test {
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
-        // Expect the AssetTracker call with L1_CHAIN_ID = 1
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 1, WITHDRAW_AMOUNT)
-        );
-
         vm.prank(sender);
         L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
+
+        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(tracker.toChainCalls(), 1, "withdrawal should be reported to the tracker");
+        assertEq(tracker.recordedToChainId(), 1, "withdrawal destination should be the L1 chain id");
+        assertEq(tracker.recordedToAmount(), WITHDRAW_AMOUNT, "withdrawal amount should be forwarded verbatim");
     }
 
     function test_withdraw_callsL1Messenger() public {
@@ -231,8 +239,9 @@ contract L2BaseTokenZKOSTest is Test {
         );
     }
 
-    function test_withdrawWithMessage_callsAssetTracker() public {
-        // Use actual BaseTokenHolder to verify AssetTracker is called
+    /// @dev Forwarding-only coverage, like the withdrawal test above.
+    function test_withdrawWithMessage_forwardsBaseTokenBookkeepingToTracker() public {
+        // Use the actual holder to verify the forwarded withdrawal.
         BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
 
@@ -249,17 +258,16 @@ contract L2BaseTokenZKOSTest is Test {
         vm.deal(sender, WITHDRAW_AMOUNT);
         bytes memory additionalData = "test message";
 
-        // Expect the AssetTracker call with L1_CHAIN_ID = 1
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 1, WITHDRAW_AMOUNT)
-        );
-
         vm.prank(sender);
         L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).withdrawWithMessage{value: WITHDRAW_AMOUNT}(
             l1Receiver,
             additionalData
         );
+
+        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(tracker.toChainCalls(), 1, "withdrawal should be reported to the tracker");
+        assertEq(tracker.recordedToChainId(), 1, "withdrawal destination should be the L1 chain id");
+        assertEq(tracker.recordedToAmount(), WITHDRAW_AMOUNT, "withdrawal amount should be forwarded verbatim");
     }
 
     function test_withdrawWithMessage_callsL1MessengerWithExtendedMessage() public {
@@ -450,95 +458,73 @@ contract L2BaseTokenZKOSTest is Test {
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: 1 ether}(0);
     }
 
-    /// @notice burnAndStartBridging from the InteropCenter notifies the L2AssetTracker.
-    function test_baseTokenHolder_notifiesAssetTrackerOnBridging() public {
+    /// @notice Verifies that BaseTokenHolder reports InteropCenter bridging burns to the tracker.
+    function test_baseTokenHolder_reportsInteropCenterBurnToTracker() public {
         // Deploy real BaseTokenHolder for integration tests
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
         uint256 burnAmount = 1 ether;
 
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, burnAmount)
-        );
-
+        // InteropCenter calls burnAndStartBridging (simulating a bridging burn).
         vm.deal(L2_INTEROP_CENTER_ADDR, burnAmount);
         vm.prank(L2_INTEROP_CENTER_ADDR);
-        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(0);
-    }
+        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(1);
 
-    /// @notice burnAndStartBridging from the NativeTokenVault notifies the L2AssetTracker.
-    function test_baseTokenHolder_notifiesAssetTrackerFromNTV() public {
-        // Deploy real BaseTokenHolder for integration tests
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
-        uint256 burnAmount = 2 ether;
-
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, burnAmount)
-        );
-
-        vm.deal(L2_NATIVE_TOKEN_VAULT_ADDR, burnAmount);
-        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
-        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(0);
+        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(tracker.toChainCalls(), 1);
+        assertEq(tracker.recordedToChainId(), 1);
+        assertEq(tracker.recordedToAmount(), burnAmount);
     }
 
     /// @notice Verifies that L2BaseToken can call burnAndStartBridging for withdrawals
     /// @dev This test ensures L2BaseToken is a valid bridging caller
-    function test_baseTokenHolder_notifiesAssetTrackerFromL2BaseToken_burnAndStartBridging() public {
+    function test_baseTokenHolder_reportsL2BaseTokenWithdrawalToTracker() public {
         // Deploy real BaseTokenHolder for integration tests
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
         uint256 burnAmount = 1 ether;
 
-        // Expect the AssetTracker call when L2BaseToken calls burnAndStartBridging
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, burnAmount)
-        );
-
         // L2BaseToken calls burnAndStartBridging (simulating a withdrawal)
         vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, burnAmount);
         vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
-        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(0);
+        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(1);
+
+        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(tracker.toChainCalls(), 1);
+        assertEq(tracker.recordedToAmount(), burnAmount);
     }
 
-    /// @notice receive() from L2BaseToken (the init path, not a bridging operation) must NOT notify
-    /// the L2AssetTracker.
-    function test_baseTokenHolder_doesNotNotifyAssetTrackerFromL2BaseToken() public {
+    /// @notice Verifies that BaseTokenHolder reports nothing on initialization receive().
+    /// @dev L2BaseToken sends via receive() during initialization, which is not a bridging operation
+    function test_baseTokenHolder_doesNotReportReceiveFromL2BaseToken() public {
         // Deploy real BaseTokenHolder for integration tests
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
         uint256 initAmount = 1 ether;
 
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, initAmount),
-            0 // count = 0 means we expect it NOT to be called
-        );
-
+        // L2BaseToken sends ETH to BaseTokenHolder via receive() (during initialization)
         vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, initAmount);
         vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         (bool success, ) = L2_BASE_TOKEN_HOLDER_ADDR.call{value: initAmount}("");
         assertTrue(success, "Transfer should succeed");
+
+        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(tracker.toChainCalls(), 0, "initialization receive must not be reported as an outbound flow");
+        assertEq(tracker.fromChainCalls(), 0, "initialization receive must not be reported as an inbound flow");
     }
 
-    /// @notice The full initL2 flow must NOT notify the L2AssetTracker.
-    function test_initL2_doesNotTriggerAssetTracker() public {
+    /// @notice Verifies that initL2 does not record a bridge operation: the initialization
+    /// transfer goes through the real holder's neutral receive() path, so the recording vault
+    /// must observe no flow in either direction.
+    function test_initL2_doesNotRecordBridgeOperation() public {
+        // Deploy L2BaseTokenZKOS at the expected system contract address and the REAL holder,
+        // so a regression routing the initialization through a bookkeeping entry point is caught.
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
 
         vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
 
         vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature(
-                "handleInitiateBaseTokenBridgingOnL2(uint256,uint256)",
-                0,
-                INITIAL_BASE_TOKEN_HOLDER_BALANCE
-            ),
-            0 // count = 0 means we expect it NOT to be called
-        );
-
+        // Call initL2
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(1);
 
@@ -547,106 +533,16 @@ contract L2BaseTokenZKOSTest is Test {
             INITIAL_BASE_TOKEN_HOLDER_BALANCE,
             "BaseTokenHolder should have received initial balance"
         );
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                setZKsyncOSPreV31TotalSupply() TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_setZkosPreV31TotalSupply_success() public {
-        uint256 preV31Supply = 42 ether;
-
-        vm.expectEmit(false, false, false, true);
-        emit IL2BaseTokenZKOS.ZKsyncOSPreV31TotalSupplySet(preV31Supply);
-
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2BaseToken.setZKsyncOSPreV31TotalSupply(preV31Supply);
-
-        assertEq(l2BaseToken.zkosPreV31TotalSupply(), preV31Supply, "zkosPreV31TotalSupply should be set");
-    }
-
-    function test_setZkosPreV31TotalSupply_emitsEvent() public {
-        uint256 totalSupply = 42 ether;
-
-        vm.expectEmit(false, false, false, true);
-        emit IL2BaseTokenZKOS.ZKsyncOSPreV31TotalSupplySet(totalSupply);
-
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
-    }
-
-    function test_setZkosPreV31TotalSupply_revertIfNotServiceTransactionSender() public {
-        address nonServiceSender = makeAddr("nonServiceSender");
-
-        vm.prank(nonServiceSender);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonServiceSender));
-        l2BaseToken.setZKsyncOSPreV31TotalSupply(42 ether);
-    }
-
-    function test_setZkosPreV31TotalSupply_affectsTotalSupply() public {
-        uint256 preV31Supply = 10 ether;
-
-        // Deploy at system address so we can check totalSupply
-        L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
-        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
-
-        // Deploy BaseTokenHolder so holder balance is known
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, hex"00");
-        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
-
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).setZKsyncOSPreV31TotalSupply(preV31Supply);
-
-        // totalSupply = preV31Supply + (INITIAL - holder.balance) = preV31Supply + 0 = preV31Supply
-        assertEq(
-            L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).totalSupply(),
-            preV31Supply,
-            "totalSupply should equal preV31Supply when holder balance equals initial"
-        );
-    }
-
-    function test_setZkosPreV31TotalSupply_callsBackfill() public {
-        uint256 totalSupply = 42 ether;
-
-        vm.expectCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(IL2AssetTracker.backFillZKSyncOSBaseTokenV31MigrationData.selector, totalSupply)
-        );
-
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
-    }
-
-    function test_setZkosPreV31TotalSupply_revertsOnSecondCall() public {
-        uint256 totalSupply = 42 ether;
-
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
-
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        vm.expectRevert(BaseTokenPreV31TotalSupplyAlreadySet.selector);
-        l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
+        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertEq(tracker.toChainCalls(), 0, "initL2 must not be reported as an outbound flow");
+        assertEq(tracker.fromChainCalls(), 0, "initL2 must not be reported as an inbound flow");
     }
 
     /*//////////////////////////////////////////////////////////////
                         totalSupply() TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_totalSupply_revertsWhenBackfillNeeded() public {
-        L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
-        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
-
-        vm.mockCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(IL2AssetTracker.needBaseTokenTotalSupplyBackfill.selector),
-            abi.encode(true)
-        );
-
-        vm.expectRevert(BaseTokenPreV31TotalSupplyNotSet.selector);
-        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).totalSupply();
-    }
-
-    function test_totalSupply_worksWhenBackfillNotNeeded() public {
+    function test_totalSupply_zeroForFreshChain() public {
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
 
@@ -654,7 +550,7 @@ contract L2BaseTokenZKOSTest is Test {
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, hex"00");
         vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        // Without setting preV31Supply, totalSupply = 0 + (INITIAL - INITIAL) = 0
+        // On a fresh chain zkosPreV31TotalSupply is zero: totalSupply = 0 + (INITIAL - INITIAL) = 0
         assertEq(
             L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).totalSupply(),
             0,
@@ -662,22 +558,81 @@ contract L2BaseTokenZKOSTest is Test {
         );
     }
 
-    function test_totalSupply_worksWhenBaseTokenHolderBalanceGreaterThanInitial() public {
-        L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
-        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
+    /// @dev Simulates an upgraded chain whose `zkosPreV31TotalSupply` slot was backfilled while it
+    /// ran v31, plus post-upgrade mints (a holder balance below the initial value means
+    /// minted supply).
+    function test_totalSupply_addsPreV31SupplyToMintedDelta() public {
+        L2BaseTokenZKOSHarness harness = new L2BaseTokenZKOSHarness();
+        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(harness).code);
+        L2BaseTokenZKOSHarness token = L2BaseTokenZKOSHarness(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        token.harnessSetZkosPreV31TotalSupply(200);
 
-        // Deploy BaseTokenHolder so holder balance is known
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, hex"00");
-        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE + 100);
+        // 100 wei were minted after the upgrade: the holder balance is below the initial value.
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new DummyL2BaseTokenHolder()).code);
+        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE - 100);
 
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).setZKsyncOSPreV31TotalSupply(200);
+        // totalSupply = preV31Supply + INITIAL - holder.balance = 200 + 100 = 300
+        assertEq(token.totalSupply(), 300, "totalSupply returns wrong value");
+    }
 
-        // totalSupply = preV31Supply + INITIAL - holder.balance = 200 + INITIAL - (INITIAL + 100) = 100
+    /// @dev An upgraded chain can be in a net-burn state: withdrawals move value INTO the holder,
+    /// so its balance can exceed the initial value by up to the pre-v31 circulating supply.
+    /// totalSupply() must not revert there. The burn goes through a real withdrawal.
+    function test_totalSupply_supportsNetBurnOfPreV31Supply() public {
+        L2BaseTokenZKOSHarness harness = new L2BaseTokenZKOSHarness();
+        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(harness).code);
+        L2BaseTokenZKOSHarness token = L2BaseTokenZKOSHarness(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        token.harnessSetZkosPreV31TotalSupply(200);
+
+        // Post-upgrade steady state: the holder holds exactly the initial balance.
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new DummyL2BaseTokenHolder()).code);
+        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
+
+        // A holder of pre-v31 supply withdraws 150 wei to L1: the value flows into the holder.
+        address preV31Holder = makeAddr("preV31Holder");
+        vm.deal(preV31Holder, 150);
+        vm.prank(preV31Holder);
+        token.withdraw{value: 150}(l1Receiver);
+
         assertEq(
-            L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).totalSupply(),
-            100,
-            "totalSupply returns wrong value"
+            L2_BASE_TOKEN_HOLDER_ADDR.balance,
+            INITIAL_BASE_TOKEN_HOLDER_BALANCE + 150,
+            "the withdrawal must flow into the holder"
+        );
+        // totalSupply = preV31Supply + INITIAL - holder.balance = 200 - 150 = 50
+        assertEq(token.totalSupply(), 50, "net-burn state should decrease totalSupply without reverting");
+    }
+
+    /// @dev Simulates a v31 chain (slot 50 already backfilled) going through this release's
+    /// initL2: the historical value must survive and feed totalSupply().
+    function test_initL2_preservesBackfilledPreV31Supply() public {
+        L2BaseTokenZKOSHarness harness = new L2BaseTokenZKOSHarness();
+        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(harness).code);
+        L2BaseTokenZKOSHarness token = L2BaseTokenZKOSHarness(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        token.harnessSetZkosPreV31TotalSupply(200);
+
+        vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
+        vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        token.initL2(1);
+
+        assertEq(token.zkosPreV31TotalSupply(), 200, "initL2 must not touch the backfilled slot");
+        // Holder now holds exactly the initial balance, so totalSupply() equals the pre-v31 value.
+        assertEq(token.totalSupply(), 200, "totalSupply must keep the pre-v31 baseline after initL2");
+    }
+
+    /// @dev Pins `zkosPreV31TotalSupply` to storage slot 50: the value is written by v31's
+    /// backfill service transaction, and this release (which removes the backfill path) must keep
+    /// reading the exact same slot. The write goes through a derived-contract setter, the read
+    /// through the raw slot.
+    function test_zkosPreV31TotalSupply_stableStorageSlot() public {
+        L2BaseTokenZKOSHarness harness = new L2BaseTokenZKOSHarness();
+        harness.harnessSetZkosPreV31TotalSupply(31337);
+
+        assertEq(
+            uint256(vm.load(address(harness), bytes32(uint256(50)))),
+            31337,
+            "zkosPreV31TotalSupply must stay at slot 50 (populated on v31)"
         );
     }
 
