@@ -1,19 +1,6 @@
 [
   {
     "type": "function",
-    "name": "BASE_TOKEN_ASSET_ID",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "L1_CHAIN_ID",
     "inputs": [],
     "outputs": [
@@ -58,6 +45,30 @@
   },
   {
     "type": "function",
+    "name": "chainBalance",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "handleFinalizeBaseTokenBridgingOnL2",
     "inputs": [
       {
@@ -92,6 +103,16 @@
         "name": "_amount",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "_tokenOriginChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_tokenAddress",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -102,7 +123,7 @@
     "name": "handleInitiateBaseTokenBridgingOnL2",
     "inputs": [
       {
-        "name": "_toChainId",
+        "name": "_maybeToBlockChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -133,6 +154,11 @@
         "name": "_amount",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "_tokenOriginChainId",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -158,30 +184,6 @@
   },
   {
     "type": "function",
-    "name": "interopInfo",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "totalWithdrawalsToL1",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "totalSuccessfulDepositsFromL1",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "isAssetRegistered",
     "inputs": [
       {
@@ -201,6 +203,19 @@
   },
   {
     "type": "function",
+    "name": "registerLegacyToken",
+    "inputs": [
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "registerNewTokenIfNeeded",
     "inputs": [
       {
@@ -212,60 +227,6 @@
         "name": "_originChainId",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "totalPreV31TotalSupply",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "isSaved",
-        "type": "bool",
-        "internalType": "bool"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "trackBaseToken",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "trackLegacyTokenIfNeeded",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_originChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_tokenAddress",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "outputs": [],

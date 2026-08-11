@@ -75,10 +75,6 @@ address constant L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDRESS = address(USER_CONTRACTS
 address constant L2_INTEROP_CENTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0d);
 address constant L2_INTEROP_HANDLER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0e);
 address constant L2_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0f);
-// `USER_CONTRACTS_OFFSET + 0x10` is intentionally unassigned: the removed v31 GWAssetTracker
-// address. v31 released with that tracker deployed as a system-proxied built-in, so the v32 upgrade
-// swaps its implementation for `EmptyContract`; chains created on v32 get the same
-// EmptyContract-backed proxy from genesis.
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.

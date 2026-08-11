@@ -24,9 +24,8 @@ contract DummyL2BaseTokenHolder {
         }
     }
 
-    /// @notice Burns ETH by accepting it into this contract.
-    /// @dev In production, this would also report the outbound flow to the L2AssetTracker.
-    /// For testing, we just accept the ETH.
+    /// @notice Burns ETH by accepting it into this contract and notifies the asset tracker.
+    /// @dev In production, this would also notify L2AssetTracker. For testing, we just accept the ETH.
     /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable {
         // Just accept the ETH - in tests this simulates the burn

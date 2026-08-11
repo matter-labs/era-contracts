@@ -76,8 +76,8 @@ contract BaseTokenHolder is IBaseTokenHolder {
             return;
         }
 
-        // Notify the asset tracker BEFORE transferring: its lazy registration snapshots the base
-        // token's supply, which the transfer below changes.
+        // Notify the asset tracker BEFORE transferring, so that
+        // _needToForceSetAssetMigrationOnL2 can use totalSupply() == 0 consistently.
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_fromChainId, _amount);
         Address.sendValue(payable(_to), _amount);
         emit BaseTokenMintedInterop(_to, _amount);

@@ -77,13 +77,13 @@ abstract contract L2BaseTokenBase is IL2BaseTokenBase {
         emit WithdrawalWithMessage(msg.sender, _l1Receiver, amount, _additionalData);
     }
 
-    /// @dev Burns the sent `msg.value` by sending it to BaseTokenHolder, which records the bridge flow.
+    /// @dev Burns the sent `msg.value` by sending it to BaseTokenHolder and notifying the AssetTracker.
     /// @param _toChainId The chain ID which the funds are sent to.
     /// @return amount The amount of ETH that was burned.
     function _burnMsgValue(uint256 _toChainId) internal virtual returns (uint256 amount) {
         amount = msg.value;
 
-        // Transfer the ether to BaseTokenHolder and record the bridge flow.
+        // Transfer the ether to BaseTokenHolder and notify L2AssetTracker
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: amount}(_toChainId);
     }
 

@@ -43,6 +43,8 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     /// @dev The fact that `chainBatchRoots` is populated only after the v31UpgradeChainBatchNumber batch is implicitly enforced:
     /// as during the v31 upgrade all chains settle on L1, so before they start submitting batches on GW to L2MessageRoot implementation,
     /// the `currentChainBatchNumber` will be properly migrated.
+    /// @notice Also, as a consequence of the above, the MessageRoot on a settlement layer will require that all messages after this batch go through the asset tracker
+    /// to ensure balance consistency.
     /// @dev A completely malicious chain (i.e. with malicious DiamondProxy implementation) could provide a wrongful value for this variable, e.g. it could be too low or too high.
     /// The system should be ready to handle such cases as long as no settlement layer (except for L1) is allowed. Before a settlement layer is added, it is the responsibility of the governance to double check that
     /// no malicious activity has happened before the transition of the ownership of the CTMs within the ecosystem.

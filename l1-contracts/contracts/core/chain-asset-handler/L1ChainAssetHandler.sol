@@ -189,8 +189,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
             // deposits (which the destination NTV relies on) would not work.
             nativeTokenVault.tokenAddress(baseAssetId) != address(0) &&
             // The chain's base token must support `totalSupply()`, which is the case
-            // for all chains except for pre-v31 ZKsync OS ones (their value is backfilled
-            // after the v31 upgrade). Otherwise token balance migration may not work.
+            // for all chains except for pre-v31 ZKsync OS ones. For them, this value
+            // has to be backfilled. Otherwise token balance migration may not work.
             IZKChain(zkChain).baseTokenSupportsTotalSupply();
     }
 

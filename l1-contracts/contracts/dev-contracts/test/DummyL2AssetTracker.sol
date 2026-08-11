@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-/// @notice Lightweight dummy for L2AssetTracker used in L2BaseToken and BaseTokenHolder unit tests.
+/// @notice Lightweight dummy for L2AssetTracker used in L2BaseToken unit tests.
 /// @dev Replaces broad vm.mockCall with real function dispatch so wrong selectors revert naturally.
 /// Values must be immutable or constant so vm.etch copies them in bytecode.
 /// State variables are NOT copied by vm.etch (only code, not storage).
@@ -29,17 +29,16 @@ contract DummyL2AssetTracker {
     }
     RecordMode public immutable recordMode;
 
-    /// @dev Snapshot taken during handleFinalizeBaseTokenBridgingOnL2.
+    /// @dev Storage slot 0 — snapshot taken during handleFinalizeBaseTokenBridgingOnL2.
     uint256 public recordedValue;
-    /// @dev Set to true when handleFinalizeBaseTokenBridgingOnL2 is called.
+    /// @dev Storage slot 1 — set to true when handleFinalizeBaseTokenBridgingOnL2 is called.
     bool public wasCalled;
 
-    /// @dev The flows reported by the caller, so tests can assert what was forwarded.
+    /// @dev The outbound flow reported by the caller, so tests can assert what was forwarded, and a
+    /// per-direction call count so they can assert that nothing was reported.
     uint256 public recordedToChainId;
     uint256 public recordedToAmount;
     uint256 public toChainCalls;
-    uint256 public recordedFromChainId;
-    uint256 public recordedFromAmount;
     uint256 public fromChainCalls;
 
     constructor(address _recordTarget, RecordMode _recordMode) {
@@ -55,9 +54,7 @@ contract DummyL2AssetTracker {
 
     function assertBaseTokenRecoveryIsAccountingNeutral(uint256) external {}
 
-    function handleFinalizeBaseTokenBridgingOnL2(uint256 _fromChainId, uint256 _amount) external {
-        recordedFromChainId = _fromChainId;
-        recordedFromAmount = _amount;
+    function handleFinalizeBaseTokenBridgingOnL2(uint256, uint256) external {
         fromChainCalls++;
 
         if (recordTarget != address(0)) {
