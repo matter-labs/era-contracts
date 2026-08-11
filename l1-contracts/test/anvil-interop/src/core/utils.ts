@@ -42,7 +42,7 @@ export function isLocalRpcUrl(rpcUrl: string): boolean {
     const { hostname } = new URL(rpcUrl);
     return LOCAL_HOSTNAMES.has(hostname) || hostname.endsWith(".localhost");
   } catch {
-    // Not a parseable URL: treat it as remote, the conservative choice.
+    // Not a valid URL: treat it as remote, the conservative choice.
     return false;
   }
 }

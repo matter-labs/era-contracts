@@ -96,7 +96,7 @@ test("rejects a nonsensical override instead of degrading quietly", () => {
   }
 });
 
-test("treats an unparseable URL as remote", () => {
+test("treats a URL it cannot parse as remote", () => {
   assert.equal(isLocalRpcUrl("not a url"), false);
   withOverride(undefined, () => assert.equal(pollingIntervalFor("not a url"), REMOTE_POLLING_INTERVAL_MS));
 });
