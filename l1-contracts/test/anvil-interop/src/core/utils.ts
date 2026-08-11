@@ -17,20 +17,53 @@ import { getAbi } from "./contracts";
 
 /**
  * ethers v5 polls for transaction receipts every `pollingInterval` ms, defaulting to 4000 — so
- * every `tx.wait()` costs up to four seconds of waiting no matter how fast blocks are produced,
- * and the interop relay loops in temp-sdk.ts sleep `provider.pollingInterval` per iteration on
- * top of that. That is what paces this suite: dropping the anvil block time from 1s to 0.2s moved
- * the wall clock by ~5%, because the specs were never waiting on block production.
+ * every `tx.wait()` costs up to four seconds no matter how fast blocks are produced, and the
+ * interop relay loops in temp-sdk.ts sleep `provider.pollingInterval` per iteration on top of
+ * that. That is what paces this suite against Anvil: dropping the block time from 1s to 0.2s moved
+ * the wall clock by ~5%, while polling at 100ms took `09-interop-unbundle` from 158s to 48s.
  *
- * Build every provider through this helper so the interval is set in one place. Override with
- * ANVIL_INTEROP_POLLING_INTERVAL_MS.
+ * Aggressive polling is only safe against a local node. Live mode (`ANVIL_INTEROP_LIVE=1`) points
+ * the same helpers at real `LIVE_*_RPC` endpoints via `setupLiveState()` and `getGatewayProvider()`,
+ * where a proof or finalization wait can run for minutes: at 100ms that is ten requests per second
+ * per waiter, and those loops do not handle rate limiting, so one 429 would abort the run. Remote
+ * URLs therefore keep ethers' 4000ms default — unchanged from before this helper existed.
+ *
+ * Build every provider through this helper so the choice is made in one place.
+ * `ANVIL_INTEROP_POLLING_INTERVAL_MS` overrides both cases when you know what you want.
  */
-export const PROVIDER_POLLING_INTERVAL_MS = Number(process.env.ANVIL_INTEROP_POLLING_INTERVAL_MS ?? 100);
+export const LOCAL_POLLING_INTERVAL_MS = 100;
+export const REMOTE_POLLING_INTERVAL_MS = 4000;
+
+const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"]);
+
+/** True for an RPC served from this machine, where fast polling costs nothing but CPU. */
+export function isLocalRpcUrl(rpcUrl: string): boolean {
+  try {
+    const { hostname } = new URL(rpcUrl);
+    return LOCAL_HOSTNAMES.has(hostname) || hostname.endsWith(".localhost");
+  } catch {
+    // Not a parseable URL: treat it as remote, the conservative choice.
+    return false;
+  }
+}
+
+/** Polling interval this helper would use for `rpcUrl`, honouring the env override. */
+export function pollingIntervalFor(rpcUrl: string): number {
+  const override = process.env.ANVIL_INTEROP_POLLING_INTERVAL_MS;
+  if (override !== undefined && override !== "") {
+    const parsed = Number(override);
+    if (Number.isNaN(parsed) || parsed <= 0) {
+      throw new Error(`ANVIL_INTEROP_POLLING_INTERVAL_MS must be a positive number, got "${override}"`);
+    }
+    return parsed;
+  }
+  return isLocalRpcUrl(rpcUrl) ? LOCAL_POLLING_INTERVAL_MS : REMOTE_POLLING_INTERVAL_MS;
+}
 
 export function createProvider(rpcUrl: string): providers.JsonRpcProvider {
   // eslint-disable-next-line no-restricted-syntax -- the one place that may construct a provider
   const provider = new providers.JsonRpcProvider(rpcUrl);
-  provider.pollingInterval = PROVIDER_POLLING_INTERVAL_MS;
+  provider.pollingInterval = pollingIntervalFor(rpcUrl);
   return provider;
 }
 

@@ -30,6 +30,14 @@
 const fs = require("fs");
 const path = require("path");
 
+function isFile(candidate) {
+  try {
+    return fs.statSync(candidate).isFile();
+  } catch {
+    return false;
+  }
+}
+
 /** Reads the compilation target source path out of an artifact, or null if it has none. */
 function sourcePathOf(artifactPath) {
   let artifact;
@@ -65,7 +73,10 @@ function prune(projectDir, artifactsDir) {
   const sourceExists = new Map();
   const exists = (sourcePath) => {
     if (!sourceExists.has(sourcePath)) {
-      sourceExists.set(sourcePath, fs.existsSync(path.resolve(projectDir, sourcePath)));
+      // Must be a *file*: this repo commits generated artifact directories named after their
+      // source (zkstack-out/L2MessageRoot.sol/ and friends), so an existence check alone would
+      // accept a directory as proof that a deleted source is still present.
+      sourceExists.set(sourcePath, isFile(path.resolve(projectDir, sourcePath)));
     }
     return sourceExists.get(sourcePath);
   };

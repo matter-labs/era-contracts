@@ -78,6 +78,12 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn tsc --noEmit
 
+      # Pins which RPCs get the fast 100ms polling. Getting this wrong is invisible against Anvil
+      # and only bites in live mode, where 100ms is ten requests per second per waiter.
+      - name: Unit-test the provider polling interval
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn test:create-provider
+
       - name: Run interop tests (preloaded state)
         working-directory: l1-contracts/test/anvil-interop
         env:
@@ -128,20 +134,16 @@ jobs:
         run: yarn
 
       # 431s of this job's 17.4m was a cold `forge build` of artifacts that l1-contracts-ci's
-      # `build` job already produced for this very commit. Warm the solc side from that cache;
-      # a miss just falls back to the full build, and zksolc output is deliberately excluded
-      # because it is not reproducible across builds.
-      - name: Restore solc build cache
-        uses: actions/cache/restore@v4
-        with:
-          key: artifacts-l1-ci-solc-${{ github.sha }}
-          restore-keys: |
-            artifacts-l1-ci-solc-
-          path: |
-            da-contracts/cache-forge
-            da-contracts/out
-            l1-contracts/cache-forge
-            l1-contracts/out
+      # `build` job already produced for this very commit.
+      #
+      # This must go through the action rather than restoring the cache directly: the workflows
+      # run independently, so on a first run the current-SHA entry does not exist yet and the
+      # prefix key lands a *previous* commit's `out`. Without the action's pruning, artifacts for
+      # sources this commit deleted survive, and copy-to-zkstack-out and the upgrade harness would
+      # then consume stale ABIs — letting the upgrade test pass against a contract no longer built
+      # from the current tree.
+      - name: Warm solc build cache
+        uses: ./.github/actions/warm-solc-cache
 
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
