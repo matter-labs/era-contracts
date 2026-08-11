@@ -241,8 +241,8 @@
   "genesis_root": "0x1a4ce8f15e4e9bc1041715f42560b85b3b84cb43f3471d8f98d4b84b49045147",
   "protocol_semantic_version": {
     "major": 0,
-    "minor": 32,
-    "patch": 0
+    "minor": 31,
+    "patch": 2
   },
   "prover": {
     "fflonk_snark_wrapper_vk_hash": "0x49eae0bf5c7ea580f4979b366e52b386adc5f42e2ce50fc1d3c4de9a86052bff",
