@@ -11,10 +11,28 @@ description: >
   cached `zkout` changes zkBytecodeHash and fails check-hashes. Only the solc side is reused;
   every zkout is rebuilt.
 
+  On trusting a cache: GitHub scopes cache entries per ref, and a fork PR can only write to its
+  own PR scope — it cannot write into the base or default-branch scope that other runs read. With
+  no push-triggered writer in this repo, reuse is effectively within a single branch. A stale
+  entry also fails loudly rather than passing quietly, because check-hashes compares against the
+  committed hashes. Even so, keep this out of any job whose output is committed or released, and
+  pass enabled: false where a from-scratch build is the point.
+
+inputs:
+  enabled:
+    description: >
+      Set to "false" to skip the restore and compile from scratch. Verification runs — anything
+      whose output gets committed or released — should build clean rather than trust a cache.
+      The dispatch workflows that commit AllContractsHashes.json, selectors, zkstack-out and the
+      chain-state snapshots deliberately do not use this action at all.
+    required: false
+    default: "true"
+
 runs:
   using: composite
   steps:
     - name: Restore solc build cache from a previous commit
+      if: inputs.enabled == 'true'
       uses: actions/cache/restore@v4
       with:
         key: artifacts-l1-ci-solc-${{ github.sha }}
@@ -31,6 +49,7 @@ runs:
     # cache from a commit that still had a contract would misreport on the commit that deleted it.
     # Over-pruning is harmless: forge just recompiles.
     - name: Prune artifacts with no source
+      if: inputs.enabled == 'true'
       shell: bash
       run: |
         set -euo pipefail
