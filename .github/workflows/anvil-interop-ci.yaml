@@ -149,8 +149,16 @@ jobs:
       - name: Build system-contracts artifacts
         run: yarn sc build:foundry
 
-      - name: Build l1-contracts artifacts
-        run: yarn l1 build:foundry
+      # `build:foundry` is `forge build` + a full zksolc pass + copy-to-zkstack-out, and the
+      # zksolc half is dead weight here: the test variant of the upgrade script states it
+      # outright — "Skip loading zkout bytecodes — they are already on L2 via anvil_setCode" —
+      # and it skips factory-deps validation for the same reason. So run solc and refresh
+      # zkstack-out (which protocol-ops reads, and which is generated from out/, not zkout),
+      # and skip the zksolc pass. That is also the half the solc cache above cannot warm,
+      # since zkout is excluded from it deliberately.
+      - name: Build l1-contracts artifacts (solc only — zkout is unused here)
+        working-directory: l1-contracts
+        run: forge build && yarn copy-to-zkstack-out
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
