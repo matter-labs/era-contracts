@@ -85,6 +85,10 @@ jobs:
           # once oversubscribes the 4-core runner and causes load-dependent RPC flakes (worker
           # failures mid-spec). Cap concurrency; locally the suite stays fully parallel.
           ANVIL_INTEROP_MAX_PARALLEL_WORKERS: "4"
+          # The suite is paced by interval mining, not by CPU: every `.wait()` costs up to one
+          # block time. Five blocks a second instead of one. State generation stays at 1s —
+          # setup-and-dump-state.ts pins it explicitly for determinism.
+          ANVIL_INTEROP_BLOCK_TIME: "0.2"
         run: |
           echo "Running interop tests with preloaded chain states..."
           yarn ts-node run-hardhat-interop-test.ts

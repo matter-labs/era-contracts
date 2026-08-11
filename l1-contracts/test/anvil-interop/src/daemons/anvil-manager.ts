@@ -97,7 +97,20 @@ export class AnvilManager {
     const foundryBinPath = homeDir ? path.join(homeDir, ".foundry/bin") : "";
     const enrichedPath = foundryBinPath ? `${foundryBinPath}:${process.env.PATH || ""}` : process.env.PATH;
 
-    const effectiveBlockTime = blockTime ?? 1;
+    // Interval mining paces the whole interop suite: the specs are full of `.wait()`, so each
+    // transaction costs up to one block time of pure waiting, and that — not CPU — is what the
+    // suite spends its wall clock on (a spec that takes 272s alone takes 311s with four of them
+    // sharing a 4-core runner, i.e. 1.14x for 4x the concurrency). anvil takes a fractional
+    // --block-time, so the cadence is tunable: ANVIL_INTEROP_BLOCK_TIME=0.2 mines five blocks a
+    // second instead of one.
+    //
+    // Callers that pass blockTime explicitly win, which keeps setup-and-dump-state.ts pinned to 1
+    // for state-generation determinism.
+    const envBlockTime = process.env.ANVIL_INTEROP_BLOCK_TIME;
+    const effectiveBlockTime = blockTime ?? (envBlockTime !== undefined ? Number(envBlockTime) : 1);
+    if (Number.isNaN(effectiveBlockTime)) {
+      throw new Error(`ANVIL_INTEROP_BLOCK_TIME must be a number, got "${envBlockTime}"`);
+    }
     const args = [
       "--port",
       port.toString(),
