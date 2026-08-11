@@ -1,0 +1,12 @@
+name: Install zksolc
+description: >-
+  Pre-installs every zksolc version pinned by the repository's foundry.toml files,
+  so that `forge build --zksync` never has to reach for the retired
+  matter-labs/zksolc-bin mirror. See scripts/install-zksolc.sh.
+
+runs:
+  using: composite
+  steps:
+    - name: Install pinned zksolc versions
+      shell: bash
+      run: ./scripts/install-zksolc.sh

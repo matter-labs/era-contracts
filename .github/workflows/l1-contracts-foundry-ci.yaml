@@ -24,6 +24,9 @@ jobs:
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
+      - name: Install zksolc
+        uses: ./.github/actions/install-zksolc
+
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:

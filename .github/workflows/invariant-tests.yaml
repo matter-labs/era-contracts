@@ -40,6 +40,13 @@ jobs:
         with:
           version: nightly-27360d4c8d12beddbb730dae07ad33a206b38f4b
 
+      # Called directly rather than through ./.github/actions/install-zksolc: this job
+      # checks out an arbitrary branch, which need not carry either file. Branches that
+      # predate the script pin zksolc versions the old mirror can still serve.
+      - name: Install zksolc
+        shell: bash
+        run: "[ -x ./scripts/install-zksolc.sh ] && ./scripts/install-zksolc.sh || true"
+
       - name: Show forge version
         shell: bash
         run: forge --version

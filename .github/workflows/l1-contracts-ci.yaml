@@ -26,6 +26,9 @@ jobs:
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
+      - name: Install zksolc
+        uses: ./.github/actions/install-zksolc
+
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
@@ -154,6 +157,9 @@ jobs:
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
+      - name: Install zksolc
+        uses: ./.github/actions/install-zksolc
+
       - name: Install dependencies
         run: yarn
 
@@ -203,6 +209,9 @@ jobs:
           tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+
+      - name: Install zksolc
+        uses: ./.github/actions/install-zksolc
 
       - name: Install dependencies
         run: yarn
@@ -310,6 +319,9 @@ jobs:
           tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+
+      - name: Install zksolc
+        uses: ./.github/actions/install-zksolc
 
       - name: Install dependencies
         run: yarn

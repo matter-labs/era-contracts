@@ -32,6 +32,9 @@ WORKDIR /contracts
 COPY . /contracts
 RUN yarn install --frozen-lockfile
 
+# zksolc versions pinned by the foundry.toml files (see the script for why)
+RUN ./scripts/install-zksolc.sh
+
 # Clean
 RUN forge clean --root da-contracts
 RUN yarn --cwd l1-contracts clean
