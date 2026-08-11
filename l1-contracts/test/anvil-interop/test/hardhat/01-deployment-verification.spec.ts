@@ -1,7 +1,9 @@
 import { expect } from "chai";
-import { Contract, providers } from "ethers";
+import type { providers } from "ethers";
+import { Contract } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { getAbi } from "../../src/core/contracts";
+import { createProvider } from "../../src/core/utils";
 import {
   L2_BRIDGEHUB_ADDR,
   L2_ASSET_ROUTER_ADDR,
@@ -31,7 +33,7 @@ describe("01 - Deployment Verification", function () {
     let l1Provider: providers.JsonRpcProvider;
 
     before(() => {
-      l1Provider = new providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
+      l1Provider = createProvider(state.chains!.l1!.rpcUrl);
     });
 
     it("has Bridgehub deployed with code", async () => {
@@ -62,7 +64,7 @@ describe("01 - Deployment Verification", function () {
     let l1Provider: providers.JsonRpcProvider;
 
     before(() => {
-      l1Provider = new providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
+      l1Provider = createProvider(state.chains!.l1!.rpcUrl);
     });
 
     for (const chainConfig of runner.getConfig().chains.filter((c) => c.role !== "l1")) {
@@ -98,7 +100,7 @@ describe("01 - Deployment Verification", function () {
           if (!chain) {
             throw new Error(`L2 chain ${chainConfig.chainId} not found`);
           }
-          l2Provider = new providers.JsonRpcProvider(chain.rpcUrl);
+          l2Provider = createProvider(chain.rpcUrl);
         });
 
         for (const contract of expectedContracts) {
@@ -130,7 +132,7 @@ describe("01 - Deployment Verification", function () {
           return; // Skip if token wasn't deployed (will be caught by prior test)
         }
         const chain = state.chains!.l2.find((c) => c.chainId === chainConfig.chainId);
-        const provider = new providers.JsonRpcProvider(chain!.rpcUrl);
+        const provider = createProvider(chain!.rpcUrl);
         const code = await provider.getCode(tokenAddr);
         expect(code).to.not.equal("0x");
       });

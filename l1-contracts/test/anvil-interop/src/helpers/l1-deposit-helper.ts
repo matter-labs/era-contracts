@@ -1,7 +1,7 @@
 import type { BigNumber } from "ethers";
-import { Contract, providers, Wallet, ethers } from "ethers";
+import { Contract, Wallet, ethers } from "ethers";
 import type { CoreDeployedAddresses } from "../core/types";
-import { extractAndRelayNewPriorityRequests } from "../core/utils";
+import { extractAndRelayNewPriorityRequests, createProvider } from "../core/utils";
 import { getAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
@@ -64,7 +64,7 @@ export async function depositETHToL2(params: DepositETHParams): Promise<DepositE
   const { l1RpcUrl, l2RpcUrl, chainId, l1Addresses, amount } = params;
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
-  const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
+  const l1Provider = createProvider(l1RpcUrl);
   const l1Wallet = new Wallet(privateKey, l1Provider);
   const recipient = params.recipient || l1Wallet.address;
 
@@ -133,7 +133,7 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
   const { l1RpcUrl, l2RpcUrl, chainId, l1Addresses, tokenAddress, amount } = params;
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
-  const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
+  const l1Provider = createProvider(l1RpcUrl);
   const l1Wallet = new Wallet(privateKey, l1Provider);
   const recipient = params.recipient || l1Wallet.address;
 

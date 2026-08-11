@@ -1,9 +1,9 @@
 import { spawn, execSync } from "child_process";
-import { providers } from "ethers";
+import type { providers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
 import type { AnvilChain } from "../core/types";
-import { waitForChainReady, formatChainInfo } from "../core/utils";
+import { waitForChainReady, formatChainInfo, createProvider } from "../core/utils";
 
 export class AnvilManager {
   private chains: Map<number, AnvilChain> = new Map();
@@ -290,7 +290,7 @@ export class AnvilManager {
     if (!chain) {
       throw new Error(`Chain ${chainId} not found`);
     }
-    return new providers.JsonRpcProvider(chain.rpcUrl);
+    return createProvider(chain.rpcUrl);
   }
 
   getL1Chain(): AnvilChain | undefined {

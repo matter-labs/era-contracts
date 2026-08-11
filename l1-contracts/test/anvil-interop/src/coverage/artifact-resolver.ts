@@ -16,9 +16,10 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { providers } from "ethers";
+import type { providers } from "ethers";
 import type { ContractSourceMap } from "./source-map-decoder";
 import { loadContractSourceMap } from "./source-map-decoder";
+import { createProvider } from "../core/utils";
 
 export interface ResolvedContract {
   address: string;
@@ -201,7 +202,7 @@ export async function resolveContracts(
 
   // Get L1 provider for proxy resolution
   const l1RpcUrl = rpcUrls.get("L1");
-  const l1Provider = l1RpcUrl ? new providers.JsonRpcProvider(l1RpcUrl) : null;
+  const l1Provider = l1RpcUrl ? createProvider(l1RpcUrl) : null;
 
   // Resolve each known address
   for (const { address, fieldName } of knownAddresses) {
