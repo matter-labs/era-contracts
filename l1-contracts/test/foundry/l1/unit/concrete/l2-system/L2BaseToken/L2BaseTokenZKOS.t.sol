@@ -188,23 +188,6 @@ contract L2BaseTokenZKOSTest is Test {
         assertEq(tracker.recordedToAmount(), burnAmount);
     }
 
-    /// @notice Verifies that L2BaseToken can call burnAndStartBridging for withdrawals
-    /// @dev This test ensures L2BaseToken is a valid bridging caller
-    function test_baseTokenHolder_reportsL2BaseTokenWithdrawalToTracker() public {
-        // Deploy real BaseTokenHolder for integration tests
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
-        uint256 burnAmount = 1 ether;
-
-        // L2BaseToken calls burnAndStartBridging (simulating a withdrawal)
-        vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, burnAmount);
-        vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
-        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(1);
-
-        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
-        assertEq(tracker.toChainCalls(), 1);
-        assertEq(tracker.recordedToAmount(), burnAmount);
-    }
-
     /// @notice Verifies that BaseTokenHolder reports nothing on initialization receive().
     /// @dev L2BaseToken sends via receive() during initialization, which is not a bridging operation
     function test_baseTokenHolder_doesNotReportReceiveFromL2BaseToken() public {

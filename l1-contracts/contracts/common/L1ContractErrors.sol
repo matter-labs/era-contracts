@@ -33,6 +33,8 @@ error AssetHandlerNotRegistered(bytes32 assetId);
 error AssetIdAlreadyRegistered();
 // 0x1294e9e1
 error AssetIdMismatch(bytes32 expected, bytes32 supplied);
+// 0xda72d995
+error AssetIdNotRegistered(bytes32 assetId);
 // 0x04a0b7e9
 error AssetIdNotSupported(bytes32 assetId);
 // 0x9b821ed7
@@ -43,6 +45,8 @@ error BaseTokenGasPriceDenominatorNotSet();
 error BaseTokenHolderAlreadyInitialized();
 // 0xd3cd4bd2
 error BaseTokenHolderMintFailed();
+// 0x8361ff70
+error BaseTokenNativeToThisChain();
 // 0x7f9159de
 error BaseTokenPreV31TotalSupplyAlreadySet();
 // 0x00a6b592
@@ -73,6 +77,8 @@ error CantExecuteUnprovenBatches();
 error CantRevertExecutedBatch();
 // 0x78d2ed02
 error ChainAlreadyLive();
+// 0xd054a77e
+error ChainBalanceMustBeZeroBeforeMigration(uint256 chainId, bytes32 assetId, uint256 chainBalance);
 // 0x24591d89
 error ChainIdAlreadyExists();
 // 0x717a1656
@@ -198,6 +204,8 @@ error InvalidCaller(address);
 error InvalidChainId();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
+// 0xa840274f
+error PriorityQueueNotReady();
 // 0xd95d4d82
 error PubdataContentLockedForPermanentRollup();
 // 0x3731bfa2
@@ -240,6 +248,10 @@ error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 error L2TimestampTooBig();
 // 0xe37d2c02
 error LengthIsNotDivisibleBy32(uint256 length);
+// 0xe4623697
+error LowerBoundAlreadyRecorded();
+// 0x5c25a57b
+error LowerBoundNotRecorded();
 // 0x1b6825bb
 error LogAlreadyProcessed(uint8);
 // 0x43e266b0
@@ -286,6 +298,8 @@ error NoCTMForAssetId(bytes32 assetId);
 error NoFunctionsForDiamondCut();
 // 0xcab098d8
 error NoFundsTransferred();
+// 0x7e472272
+error MissingBaseTokenAssetId();
 // 0xc4dc2673
 error NonCanonicalRepresentation();
 // 0xc21b1ab7
