@@ -144,7 +144,7 @@ contract UpgradeIntegrationTest_Local is
     address private _serverNotifierProxyAdmin;
     address private _expectedServerNotifierProxyAdminOwner;
 
-    /// @notice Override to inject the mocked Core upgrade (skips setAssetTracker call).
+    /// @notice Override to inject the mocked Core upgrade (keeps only the interop-handler wiring in stage 1).
     function createCoreUpgrade() internal override returns (CoreUpgrade_v31) {
         return new CoreUpgrade_v31_Test();
     }

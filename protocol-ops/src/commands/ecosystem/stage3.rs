@@ -7,9 +7,9 @@
 //!   - populates the NTV's `bridgedOut` accounting from the pre-upgrade
 //!     accounting — the removed v31 asset tracker's L1 bulkhead where the asset
 //!     was registered there, the vault's own deprecated per-chain balances
-//!     otherwise — without which every withdrawal of an L1-native asset reverts
-//!     after the upgrade. Idempotent per asset, so an interrupted run is resumed
-//!     by simply running the phase again.
+//!     otherwise — without which withdrawals of an L1-native asset with a
+//!     pre-upgrade legacy balance revert after the upgrade. Idempotent per
+//!     asset, so an interrupted run is resumed by simply running the phase again.
 //!
 //! Sequencing: runs *before* the per-chain upgrades (Phase 4), so that by the time
 //! a chain's diamond upgrade lands, every L1-native asset it can withdraw is
