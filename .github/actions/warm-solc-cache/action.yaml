@@ -1,0 +1,53 @@
+name: "Warm solc build cache"
+description: >
+  Restores the solc half of a previous commit's contract artifacts so `forge build` recompiles
+  only what changed, then drops artifacts whose source no longer exists.
+
+  Four PR-triggered workflows each compile l1-contracts from scratch (~440s apiece, ~29 minutes
+  of runner time per PR) and each saves to its own cache key. This shares one cross-commit cache
+  between them.
+
+  zksolc output is deliberately excluded: it is not reproducible across builds, so reusing a
+  cached `zkout` changes zkBytecodeHash and fails check-hashes. Only the solc side is reused;
+  every zkout is rebuilt.
+
+runs:
+  using: composite
+  steps:
+    - name: Restore solc build cache from a previous commit
+      uses: actions/cache/restore@v4
+      with:
+        key: artifacts-l1-ci-solc-${{ github.sha }}
+        restore-keys: |
+          artifacts-l1-ci-solc-
+        path: |
+          da-contracts/cache-forge
+          da-contracts/out
+          l1-contracts/cache-forge
+          l1-contracts/out
+
+    # Forge recompiles changed sources but never prunes artifacts for sources that are gone, and
+    # both calculate-hashes and `forge build --sizes` enumerate the artifact directories — so a
+    # cache from a commit that still had a contract would misreport on the commit that deleted it.
+    # Over-pruning is harmless: forge just recompiles.
+    - name: Prune artifacts with no source
+      shell: bash
+      run: |
+        set -euo pipefail
+        sources=$(mktemp)
+        find . -name '*.sol' -not -path '*/out/*' -not -path '*/zkout/*' -not -path '*/cache-forge/*' \
+          | sed 's#.*/##' | sort -u > "$sources"
+
+        pruned=0
+        for artifacts in da-contracts/out l1-contracts/out l1-contracts/zkout l2-contracts/zkout system-contracts/zkout; do
+          [ -d "$artifacts" ] || continue
+          for dir in "$artifacts"/*.sol; do
+            [ -d "$dir" ] || continue
+            if ! grep -qxF "$(basename "$dir")" "$sources"; then
+              echo "  pruning $dir (no source)"
+              rm -rf "$dir"
+              pruned=$((pruned + 1))
+            fi
+          done
+        done
+        echo "Pruned $pruned stale artifact director$([ "$pruned" = 1 ] && echo y || echo ies)"
