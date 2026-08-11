@@ -127,6 +127,22 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      # 431s of this job's 17.4m was a cold `forge build` of artifacts that l1-contracts-ci's
+      # `build` job already produced for this very commit. Warm the solc side from that cache;
+      # a miss just falls back to the full build, and zksolc output is deliberately excluded
+      # because it is not reproducible across builds.
+      - name: Restore solc build cache
+        uses: actions/cache/restore@v4
+        with:
+          key: artifacts-l1-ci-solc-${{ github.sha }}
+          restore-keys: |
+            artifacts-l1-ci-solc-
+          path: |
+            da-contracts/cache-forge
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
 

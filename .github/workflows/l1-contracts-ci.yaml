@@ -453,7 +453,7 @@ jobs:
         run: yarn
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
           key: artifacts-l1-ci-${{ github.sha }}
@@ -585,10 +585,10 @@ jobs:
         run: yarn
 
       - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           fail-on-cache-miss: true
-          key: artifacts-l1-${{ github.sha }}
+          key: artifacts-l1-ci-${{ github.sha }}
           path: |
             da-contracts/cache-forge
             da-contracts/out
@@ -783,7 +783,7 @@ jobs:
   #       run: yarn
 
   #     - name: Restore artifacts cache
-  #       uses: actions/cache/restore@v3
+  #       uses: actions/cache/restore@v4
   #       with:
   #         fail-on-cache-miss: true
   #         key: artifacts-l1-ci-${{ github.sha }}
