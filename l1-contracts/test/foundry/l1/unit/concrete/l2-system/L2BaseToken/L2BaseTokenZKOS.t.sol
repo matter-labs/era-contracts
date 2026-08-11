@@ -342,7 +342,6 @@ contract L2BaseTokenZKOSTest is Test {
         IL2BaseTokenBase token = IL2BaseTokenBase(address(l2BaseToken));
         assert(address(token) == address(l2BaseToken));
     }
-
 }
 
 /// @notice Helper contract that rejects ETH transfers via receive()
@@ -351,4 +350,3 @@ contract RejectingContract {
         revert("Rejected");
     }
 }
-

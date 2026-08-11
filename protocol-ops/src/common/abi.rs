@@ -262,7 +262,6 @@ pub mod il2_asset_router {
 }
 pub use il2_asset_router::IL2AssetRouterAbi;
 
-
 pub mod ctm_ext {
     alloy::sol!(
         #[sol(rpc)]
