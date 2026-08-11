@@ -4,8 +4,8 @@
 # change between era-contracts code revisions:
 #   - Debian + apt build deps
 #   - Node + Yarn
-#   - foundry-zksync (forge + cast)
-#   - foundry vanilla anvil
+#   - upstream foundry (forge + cast, v1.3.5 for ordinary-EVM builds)
+#   - foundry vanilla anvil (v1.5.1, state-compatible with committed chain states)
 #   - Rust toolchain (rustup + target + cargo-chef)
 #
 # Rebuilt on `Dockerfile.base` change, weekly cron, or manual dispatch
@@ -19,7 +19,7 @@
 # pick it up automatically.
 
 ARG FOUNDRY_ARCH=linux_amd64
-ARG FOUNDRY_ZKSYNC_TAG=nightly-807f47ace7cdd90eed7190dc4481952cfaa25938
+ARG FOUNDRY_FORGE_VERSION=v1.3.5
 ARG FOUNDRY_VANILLA_VERSION=v1.5.1
 ARG NODE_MAJOR=20
 ARG RUST_TARGET=x86_64-unknown-linux-gnu
@@ -29,7 +29,7 @@ ARG YARN_VERSION=1.22.19
 FROM debian:bookworm-slim
 
 ARG FOUNDRY_ARCH
-ARG FOUNDRY_ZKSYNC_TAG
+ARG FOUNDRY_FORGE_VERSION
 ARG FOUNDRY_VANILLA_VERSION
 ARG NODE_MAJOR
 ARG RUST_TARGET
@@ -55,9 +55,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
  && npm cache clean --force \
  && rm -rf /var/lib/apt/lists/*
 
-# Foundry zksync (forge + cast)
-RUN curl -L -o /tmp/foundry.tgz https://github.com/matter-labs/foundry-zksync/releases/download/${FOUNDRY_ZKSYNC_TAG}/foundry_zksync_nightly_${FOUNDRY_ARCH}.tar.gz \
- && tar zxf /tmp/foundry.tgz -C /usr/local/bin/ \
+# Upstream foundry (forge + cast) — v1.3.5, the pinned ordinary-EVM toolchain
+RUN curl -L -o /tmp/foundry.tgz https://github.com/foundry-rs/foundry/releases/download/${FOUNDRY_FORGE_VERSION}/foundry_${FOUNDRY_FORGE_VERSION}_${FOUNDRY_ARCH}.tar.gz \
+ && tar zxf /tmp/foundry.tgz -C /tmp/ forge cast \
+ && mv /tmp/forge /tmp/cast /usr/local/bin/ \
  && chmod +x /usr/local/bin/forge /usr/local/bin/cast \
  && rm /tmp/foundry.tgz
 

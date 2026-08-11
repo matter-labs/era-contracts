@@ -25,25 +25,12 @@ import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/m
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
+import {Bytes} from "contracts/vendor/Bytes.sol";
 
 /// @notice Test-only CTM upgrade that mocks large bytecode reads to avoid MemoryOOG
 contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
-    /// @notice This fixture is an Era ecosystem, which this release refuses to generate a per-chain upgrade
-    ///         for (`deployUsedUpgradeContract` reverts). The fixture exists to exercise the ecosystem-side
-    ///         flow — proxy upgrades, stage calls, wiring — so it falls back to the plain `DefaultUpgrade`
-    ///         for the chain step rather than skipping the chain upgrade entirely. The per-chain
-    ///         force-deployments-data substitution that ZKsync OS chains get is covered by the anvil
-    ///         v31 -> v32 scenario.
-    function deployUsedUpgradeContract() internal override returns (address) {
-        return deploySimpleContract("DefaultUpgrade", false);
-    }
-
-    /// @notice Override to return dummy bytecode hashes instead of reading huge JSON files
-    function getL2BytecodeHash(string memory /* contractName */) public view override returns (bytes32) {
-        // Return a valid dummy bytecode hash (must have version byte 0x01 and odd length marker)
-        return bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001));
-    }
-
     /// @notice Override to skip bytecode publishing which reads large JSON files.
     function publishBytecodes() public override {
         console.log("Test mode: Skipping bytecode publishing to avoid MemoryOOG");
@@ -139,10 +126,12 @@ contract UpgradeIntegrationTest_Local is
     TokenDeployer
 {
     using stdToml for string;
+    using Bytes for bytes;
 
     address private _serverNotifierProxy;
     address private _serverNotifierProxyAdmin;
     address private _expectedServerNotifierProxyAdminOwner;
+    bytes32 private _expectedRewrittenUpgradeTxHash;
 
     /// @notice Override to inject the mocked Core upgrade (skips setAssetTracker call).
     function createCoreUpgrade() internal override returns (CoreUpgrade_v31) {
@@ -166,20 +155,38 @@ contract UpgradeIntegrationTest_Local is
     }
 
     /// Substitute the batch history a live chain would have: a committed and executed batch (both at 1),
-    /// plus the L1MessageRoot per-chain placeholder that v31 set for this chain. This fixture runs the plain
-    /// `DefaultUpgrade` (see the override above), so it is the surrounding flow — the message root's
-    /// per-chain reads — that needs the state rather than a guard in the upgrade itself; a chain upgraded by
-    /// `DefaultUpgradeZKsyncOS` would additionally have to satisfy its outstanding-batches check.
+    /// plus the L1MessageRoot per-chain placeholder that v31 set for this chain. Equal committed and executed
+    /// counts are required by `DefaultUpgradeZKsyncOS`.
     /// Committing and executing a real batch needs a prover and a sequencer, so there is no public API to
     /// reach this state in a foundry fixture. See the fork-only-violation note at the top of this file.
     function beforeChainUpgrade() internal override {
-        address eraChainDiamond = addresses.bridgehub.getZKChain(eraZKChainId);
-        vm.store(eraChainDiamond, bytes32(ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT), bytes32(uint256(1)));
-        vm.store(eraChainDiamond, bytes32(ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT), bytes32(uint256(1)));
+        address sourceChainDiamond = addresses.bridgehub.getZKChain(eraZKChainId);
+        vm.store(sourceChainDiamond, bytes32(ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT), bytes32(uint256(1)));
+        vm.store(sourceChainDiamond, bytes32(ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT), bytes32(uint256(1)));
 
         address messageRoot = address(addresses.bridgehub.messageRoot());
         bytes32 v31MappingSlot = keccak256(abi.encode(eraZKChainId, L1_MESSAGE_ROOT_V31_UPGRADE_BATCH_NUMBER_SLOT));
         vm.store(messageRoot, v31MappingSlot, bytes32(V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE));
+    }
+
+    function _snapshotExpectedZKsyncOSUpgradeTxHash() private {
+        Diamond.DiamondCutData memory cut = abi.decode(
+            ctmUpgrade.getChainUpgradeDiamondCutData(),
+            (Diamond.DiamondCutData)
+        );
+        address defaultUpgrade = ctmUpgrade.getAddresses().stateTransition.defaultUpgrade;
+        assertEq(cut.initAddress, defaultUpgrade, "Wrong per-chain upgrade implementation");
+
+        ProposedUpgrade memory proposedUpgrade = abi.decode(cut.initCalldata.slice(4), (ProposedUpgrade));
+        bytes32 placeholderHash = keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx));
+        proposedUpgrade.l2ProtocolUpgradeTx.data = DefaultUpgradeZKsyncOS(cut.initAddress).getL2UpgradeTxData(
+            address(addresses.bridgehub),
+            eraZKChainId,
+            true,
+            proposedUpgrade.l2ProtocolUpgradeTx.data
+        );
+        _expectedRewrittenUpgradeTxHash = keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx));
+        assertNotEq(_expectedRewrittenUpgradeTxHash, placeholderHash, "OS rewrite was a no-op");
     }
 
     function setUp() public {
@@ -193,9 +200,14 @@ contract UpgradeIntegrationTest_Local is
         console.log("setUp: Tokens registered");
 
         _deployEra();
-        console.log("setUp: Era deployed");
+        console.log("setUp: Existing ZKsync OS chain deployed");
         chainId = eraZKChainId;
         acceptPendingAdmin();
+        assertTrue(addresses.chainTypeManager.isZKsyncOS(), "Fixture CTM is not ZKsync OS");
+        assertTrue(
+            IGetters(addresses.bridgehub.getZKChain(eraZKChainId)).getZKsyncOS(),
+            "Existing chain fixture is not ZKsync OS"
+        );
         console.log("setUp: Pending admin accepted");
         ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml";
         ECOSYSTEM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
@@ -207,6 +219,7 @@ contract UpgradeIntegrationTest_Local is
         console.log("setUp: Paths configured");
         setupUpgrade(true);
         console.log("setUp: Upgrade setup complete");
+        _snapshotExpectedZKsyncOSUpgradeTxHash();
 
         _serverNotifierProxy = ctmUpgrade.getAddresses().stateTransition.proxies.serverNotifier;
         if (_serverNotifierProxy != address(0)) {
@@ -217,17 +230,17 @@ contract UpgradeIntegrationTest_Local is
 
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         console.log("setUp: Got bridgehub address", bridgehub);
-        bytes32 eraBaseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(eraZKChainId);
-        _expectedBaseTokenAssetId = eraBaseTokenAssetId;
-        console.log("setUp: Got era base token asset ID");
+        bytes32 sourceBaseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(eraZKChainId);
+        _expectedBaseTokenAssetId = sourceBaseTokenAssetId;
+        console.log("setUp: Got existing chain base token asset ID");
 
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, 0), abi.encode(eraBaseTokenAssetId));
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, 0), abi.encode(sourceBaseTokenAssetId));
         console.log("setUp: Mock call setup");
         internalTest();
         console.log("setUp: Internal test complete");
     }
 
-    function test_DefaultUpgrade_Local() public {
+    function test_DefaultUpgradeZKsyncOS_Local() public {
         // Heavy execution and event assertions live in setUp -> internalTest()
         // (RAM constraint). This body validates persisted state outcomes.
         address ctm = ctmUpgrade.getCTMAddress();
@@ -235,15 +248,22 @@ contract UpgradeIntegrationTest_Local is
 
         // Protocol version bumps
         assertEq(IChainTypeManager(ctm).protocolVersion(), _expectedNewVersion, "CTM protocolVersion not bumped");
-        assertEq(IGetters(_eraDiamond).getProtocolVersion(), _expectedNewVersion, "Era chain not upgraded");
+        assertEq(IGetters(_eraDiamond).getProtocolVersion(), _expectedNewVersion, "Existing chain not upgraded");
+        assertTrue(IGetters(_eraDiamond).getZKsyncOS(), "Existing chain is not ZKsync OS after upgrade");
+        assertEq(
+            IGetters(_eraDiamond).getL2SystemContractsUpgradeTxHash(),
+            _expectedRewrittenUpgradeTxHash,
+            "Diamond did not record the rewritten OS transaction"
+        );
 
-        // Era chain identity preserved across upgrade
-        assertEq(IGetters(_eraDiamond).getChainId(), eraZKChainId, "Era diamond points at wrong chainId");
+        // Existing chain identity preserved across upgrade
+        assertEq(IGetters(_eraDiamond).getChainId(), eraZKChainId, "Existing diamond points at wrong chainId");
 
         // New chain registered, bound to the upgraded CTM, and exposes the right chainId/admin
         assertTrue(_newChainDiamond != address(0), "New chain ID not registered");
         assertEq(IGetters(_newChainDiamond).getChainId(), NEW_CHAIN_ID, "New diamond points at wrong chainId");
         assertEq(IGetters(_newChainDiamond).getProtocolVersion(), _expectedNewVersion, "New chain wrong version");
+        assertTrue(IGetters(_newChainDiamond).getZKsyncOS(), "New chain is not ZKsync OS");
         assertEq(IBridgehubBase(bridgehub).chainTypeManager(NEW_CHAIN_ID), ctm, "New chain not linked to CTM");
         assertEq(
             IChainTypeManager(ctm).getChainAdmin(NEW_CHAIN_ID),
@@ -251,7 +271,7 @@ contract UpgradeIntegrationTest_Local is
             "New chain admin mismatch"
         );
 
-        // Base-token asset id matches the era one (the mock at chainId=0 in setUp propagates it on creation)
+        // Base-token asset id matches the existing chain (the chainId=0 mock in setUp propagates it on creation)
         assertEq(
             IBridgehubBase(bridgehub).baseTokenAssetId(NEW_CHAIN_ID),
             _expectedBaseTokenAssetId,

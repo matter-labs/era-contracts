@@ -39,9 +39,11 @@ function readSelectorsFile(): string | null {
   return fs.readFileSync(SELECTORS_FILE, "utf8");
 }
 
-// Reads the computed selectors from temp file.
+// Reads the computed selectors from temp file. Trailing whitespace is
+// normalized to a single final newline — upstream forge emits a trailing
+// blank line that would otherwise trip `git diff --check` on the committed file.
 function readComputedSelectors(): string {
-  return fs.readFileSync(TEMP_SELECTORS_FILE, "utf8");
+  return fs.readFileSync(TEMP_SELECTORS_FILE, "utf8").trimEnd() + "\n";
 }
 
 // Writes the selectors to the file.

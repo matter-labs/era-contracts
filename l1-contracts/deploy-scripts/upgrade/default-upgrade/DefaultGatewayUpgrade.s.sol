@@ -128,7 +128,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         initializeConfig(
             _create2FactorySalt,
             _isZKsyncOS,
-            getChainCreationParamsConfig(Utils.genesisConfigPath(_isZKsyncOS)),
+            getChainCreationParamsConfig(Utils.genesisConfigPath()),
             _eraChainId,
             _priorityTxsL2GasLimit,
             _maxExpectedL1GasPrice,
@@ -158,7 +158,8 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         config.l1ChainId = block.chainid;
         config.eraChainId = _eraChainId;
         setAddressesBasedOnBridgehub();
-        config.isZKsyncOS = _isZKsyncOS;
+        // Only ZKsync-OS-based Gateways are supported on this release.
+        require(_isZKsyncOS, "EraVM Gateway upgrades are not supported");
         config.contracts.chainCreationParams = _chainCreationParams;
         if (_governance != address(0)) {
             config.ownerAddress = _governance;
@@ -382,10 +383,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
-        (, string memory gwCtmContractName) = DeployCTML1OrGateway.resolve(
-            config.isZKsyncOS,
-            CTMContract.ChainTypeManager
-        );
+        (, string memory gwCtmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
         gatewayConfig.gatewayStateTransition.implementations.chainTypeManager = deployGWContract(gwCtmContractName);
 
         deployUpgradeSpecificContractsGW();
@@ -588,10 +586,13 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             return BytecodeUtils.readBytecodeL1(false, "BytecodesSupplier.sol", "BytecodesSupplier");
         } else if (compareStrings(contractName, "TransitionaryOwner")) {
             return BytecodeUtils.readBytecodeL1(false, "TransitionaryOwner.sol", "TransitionaryOwner");
-        } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
-            return ContractsBytecodesLib.getCreationCodeEra("L2SharedBridgeLegacy");
-        } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            return ContractsBytecodesLib.getCreationCodeEra("ValidatorTimelock");
+        } else if (
+            compareStrings(contractName, "L2LegacySharedBridge") || compareStrings(contractName, "ValidatorTimelock")
+        ) {
+            // TODO(gateway-os): these were deployed onto the legacy EraVM Gateway from zkout bytecodes,
+            // which were removed together with EraVM support. The ZKsync-OS-based Gateway upgrade flow
+            // must source EVM bytecodes instead.
+            revert("TODO(gateway-os): EraVM Gateway bytecodes are no longer available");
         }
         return super.getCreationCode(contractName, isZKBytecode);
     }

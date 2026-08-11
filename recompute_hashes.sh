@@ -3,13 +3,13 @@
 
 set -e
 
-# Expected Foundry version and commit
-EXPECTED_VERSION="forge Version: 1.3.5-foundry-zksync-v0.1.5"
-EXPECTED_COMMIT="807f47ace"
+# Expected upstream Foundry version and commit for ordinary-EVM artifacts.
+EXPECTED_VERSION="forge Version: 1.3.5-v1.3.5"
+EXPECTED_COMMIT="9979a41b5"
 
 # Check if Foundry is installed
 if ! command -V forge &> /dev/null; then
-  echo "Foundry is not installed. Please install it using \"foundryup-zksync -i 0.1.5\"."
+  echo "Foundry is not installed. Please install upstream Foundry v1.3.5."
   exit 1
 fi
 
@@ -22,7 +22,7 @@ if [[ "$FORGE_VERSION" != "$EXPECTED_VERSION" ]]; then
   echo "Incorrect Foundry version."
   echo "Expected: ${EXPECTED_VERSION}"
   echo "Found:    ${FORGE_VERSION}"
-  echo "Run: foundryup-zksync -i 0.1.5"
+  echo "Install upstream Foundry v1.3.5."
   exit 1
 fi
 
@@ -32,7 +32,7 @@ if [[ "$FORGE_COMMIT" != "$EXPECTED_COMMIT" && "$FORGE_COMMIT" != "VERGEN_ID" ]]
   echo "Incorrect Foundry commit."
   echo "Expected: ${EXPECTED_COMMIT}"
   echo "Found:    ${FORGE_COMMIT}"
-  echo "Run: foundryup-zksync --commit ${EXPECTED_COMMIT}"
+  echo "Install upstream Foundry v1.3.5."
   exit 1
 fi
 
@@ -46,19 +46,12 @@ git submodule update --init --recursive
 
 yarn
 
-# Cleanup everything and recompile
-yarn --cwd da-contracts clean
+# Clean and rebuild only the active ordinary-EVM artifact roots. Historical
+# L1 ZK/L2/system rows are preserved by the transitional hash merge mode.
 forge clean --root da-contracts
-yarn --cwd l1-contracts clean
 forge clean --root l1-contracts
-yarn --cwd l2-contracts clean
-forge clean --root l2-contracts
-yarn --cwd system-contracts clean
-forge clean --root system-contracts
 
 yarn --cwd da-contracts build:foundry
 yarn --cwd l1-contracts build:foundry
-yarn --cwd l2-contracts build:foundry
-yarn --cwd system-contracts build:foundry
 
-yarn calculate-hashes:fix
+yarn calculate-hashes:l1-da:fix

@@ -11,6 +11,7 @@ import {
     GasPerPubdataMismatch,
     MsgValueTooLow,
     OnlyEraSupported,
+    TransactionNotAllowed,
     TooManyFactoryDeps
 } from "contracts/common/L1ContractErrors.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -55,6 +56,11 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
         tempBytesArr = new bytes[](0);
         tempBytes = "";
         utilsFacet.util_setChainId(eraChainId);
+    }
+
+    function test_finalizeEthWithdrawalAlwaysReverts() public {
+        vm.expectRevert(TransactionNotAllowed.selector);
+        mailboxFacet.finalizeEthWithdrawal(0, 0, 0, "", new bytes32[](0));
     }
 
     function test_RevertWhen_NotEra(uint256 randomChainId) public {

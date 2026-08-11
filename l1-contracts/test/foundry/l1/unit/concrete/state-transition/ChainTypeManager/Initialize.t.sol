@@ -2,14 +2,14 @@
 pragma solidity 0.8.28;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {
     IChainTypeManager,
     ChainCreationParams,
     ChainTypeManagerInitializeData
 } from "contracts/state-transition/IChainTypeManager.sol";
 import {
-    GenesisBatchCommitmentZero,
+    GenesisBatchCommitmentIncorrect,
     GenesisBatchHashZero,
     GenesisUpgradeZero
 } from "contracts/common/L1ContractErrors.sol";
@@ -37,7 +37,7 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             serverNotifier: serverNotifier
         });
 
-        EraChainTypeManager ctm = new EraChainTypeManager(
+        ZKsyncOSChainTypeManager ctm = new ZKsyncOSChainTypeManager(
             address(bridgehub),
             interopCenterAddress,
             address(0),
@@ -88,6 +88,6 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             forceDeploymentsData: bytes("")
         });
 
-        _deployCtmWithParams(chainCreationParams, GenesisBatchCommitmentZero.selector);
+        _deployCtmWithParams(chainCreationParams, GenesisBatchCommitmentIncorrect.selector);
     }
 }

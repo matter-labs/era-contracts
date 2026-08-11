@@ -175,15 +175,13 @@ contract DeployL1CoreUtils is DeployUtils {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        if (!isZKBytecode) {
-            // L1Nullifier has a config-dependent implementation swap
-            if (compareStrings(contractName, "L1Nullifier")) {
-                string memory resolved = config.supportL2LegacySharedBridgeTest ? "L1NullifierDev" : "L1Nullifier";
-                return ContractsBytecodesLib.getCreationCodeEVM(resolved);
-            }
-            return ContractsBytecodesLib.getCreationCodeEVM(contractName);
+        require(!isZKBytecode, "EraVM (ZK) bytecodes are not supported");
+        // L1Nullifier has a config-dependent implementation swap
+        if (compareStrings(contractName, "L1Nullifier")) {
+            string memory resolved = config.supportL2LegacySharedBridgeTest ? "L1NullifierDev" : "L1Nullifier";
+            return ContractsBytecodesLib.getCreationCodeEVM(resolved);
         }
-        return ContractsBytecodesLib.getCreationCodeEra(contractName);
+        return ContractsBytecodesLib.getCreationCodeEVM(contractName);
     }
 
     function getInitializeCalldata(

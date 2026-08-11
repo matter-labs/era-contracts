@@ -318,11 +318,6 @@
             "internalType": "bool"
           },
           {
-            "name": "isZKsyncOS",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
             "name": "contracts",
             "type": "tuple",
             "internalType": "struct ContractsConfig",

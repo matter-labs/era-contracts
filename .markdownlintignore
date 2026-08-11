@@ -18,7 +18,6 @@ protocol-ops/target-linux
 
 # system-contracts
 system-contracts/node_modules
-system-contracts/bootloader/test_infra/target
 
 l1-contracts/lib
 lib/

@@ -91,10 +91,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // The constructor will receive the new BytecodesSupplier and PermissionlessValidator proxy addresses.
         // Select the correct ChainTypeManager based on chain type (Era vs ZKsyncOS)
         // FIXME we never actually use deploySimpleContract or deploy TUPP with anything else than false. We need to clean this code.
-        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(
-            config.isZKsyncOS,
-            CTMContract.ChainTypeManager
-        );
+        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
         console.log("Deploying ChainTypeManager:", ctmContractName);
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
 
@@ -160,11 +157,8 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     }
 
     /// @notice Override to deploy the per-chain upgrade contract.
-    /// @dev Only ZKsync OS chains can be upgraded onto this release. There is no Era counterpart, and
-    ///      falling back to the v31 one would generate an upgrade that re-runs v31's one-time work, so this
-    ///      refuses to produce anything for Era instead.
+    /// @dev Only ZKsync OS chains can be upgraded onto this release (enforced in `initializeConfig`).
     function deployUsedUpgradeContract() internal virtual override returns (address) {
-        require(config.isZKsyncOS, "Upgrading Era chains onto this release is not supported");
         console.log("Deploying DefaultUpgradeZKsyncOS");
         return deploySimpleContract("DefaultUpgradeZKsyncOS", false);
     }
@@ -191,11 +185,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         override
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
     {
-        if (config.isZKsyncOS) {
-            return getV31AdditionalZKsyncOSUniversalForceDeployments();
-        }
-
-        return buildEraUniversalForceDeployments(getV31AdditionalFactoryDependencyContracts());
+        return getV31AdditionalZKsyncOSUniversalForceDeployments();
     }
 
     function getV31L2UpgradeCalldata() internal returns (bytes memory) {
@@ -205,20 +195,8 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         return
             abi.encodeCall(
                 IL2V32Upgrade.upgrade,
-                (
-                    config.isZKsyncOS,
-                    coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
-                    generatedData.forceDeploymentsData,
-                    ""
-                )
+                (true, coreAddresses.bridgehub.proxies.ctmDeploymentTracker, generatedData.forceDeploymentsData, "")
             );
-    }
-
-    function getEraL2UpgradeTargetAndData(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
-    ) internal virtual override returns (address, bytes memory) {
-        return
-            getComplexUpgraderTargetAndData(_deployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, getV31L2UpgradeCalldata());
     }
 
     /// @notice V31-specific: include L2V32Upgrade as an additional ZKsyncOS force deployment.

@@ -57,7 +57,6 @@ interface IAdminPreV31 {
 contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     using stdToml for string;
 
-    uint256 internal constant ERA_TEST_CREATE_CHAIN_ID = 555;
     uint256 internal constant ZKSYNC_OS_TEST_CREATE_CHAIN_ID = 556;
 
     // solhint-disable-next-line gas-struct-packing
@@ -172,7 +171,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         // The supplier is read off the CTM's `L1_BYTECODES_SUPPLIER()` immutable during discovery, so the
         // permanent-values entry is informational for this path.
         setAddressesBasedOnCTM();
-        config.isZKsyncOS = permanentConfig.isZKsyncOS;
+        // Only ZKsync OS CTMs can be upgraded onto this release; the flag stays in the permanent
+        // config as a guard against pointing the script at a legacy EraVM CTM section.
+        require(permanentConfig.isZKsyncOS, "Upgrading EraVM CTMs onto this release is not supported");
         // Must be non-zero: `InteropCenter.initL2` reverts on a zero asset ID. It runs on the genesis path
         // of `performForceDeployedContractsInit` only, so this aborts the genesis of chains created from the
         // release rather than this upgrade — caught here so the misconfiguration surfaces during
@@ -228,11 +229,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             create2FactorySalt: create2FactorySalt,
             zkTokenAssetId: zkTokenAssetId
         });
-        // Set config.isZKsyncOS before getChainCreationParamsConfig.
-        config.isZKsyncOS = isZKsyncOS;
-        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
-            Utils.genesisConfigPath(isZKsyncOS)
-        );
+        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(Utils.genesisConfigPath());
 
         // Optional override for v29 introspection selection
         if (toml.keyExists("$.pre_v32_introspection")) {
@@ -398,7 +395,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         }
 
         if (preV32Ecosystem) {
-            ctmAddresses = AddressIntrospector.getCTMAddressesV31(ctm, config.isZKsyncOS);
+            ctmAddresses = AddressIntrospector.getCTMAddressesV31(ctm);
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubAddr);
         } else {
             ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
@@ -457,45 +454,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
     function publishBytecodes() public virtual {
         bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
-            config.isZKsyncOS,
             getAdditionalFactoryDependencyContracts()
         );
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
-        PublishFactoryDepsResult memory result = BytecodePublisher.publishAndProcessFactoryDeps(
-            config.isZKsyncOS,
-            supplier,
-            allDeps
-        );
-
-        // Era-only invariant: factoryDepsHashes[0..3] == (bootloader,
-        // defaultAA, evmEmulator). ZKsyncOS has none of these concepts —
-        // `chainCreationParams.{bootloader,defaultAA,evmEmulator}Hash` are
-        // zero and the factoryDepsHashes describe a different, smaller set
-        // of contracts, so indexing [1]/[2] would go out of bounds.
-        if (!config.isZKsyncOS && result.factoryDepsHashes.length > 0) {
-            console.logBytes32(config.contracts.chainCreationParams.bootloaderHash);
-            console.log(result.factoryDepsHashes[0]);
-            console.logBytes32(config.contracts.chainCreationParams.defaultAAHash);
-            console.log(result.factoryDepsHashes[1]);
-            console.logBytes32(config.contracts.chainCreationParams.evmEmulatorHash);
-            console.log(result.factoryDepsHashes[2]);
-
-            if (!skipFactoryDepsCheck) {
-                require(
-                    bytes32(result.factoryDepsHashes[0]) == config.contracts.chainCreationParams.bootloaderHash,
-                    "bootloader hash factory dep mismatch"
-                );
-                require(
-                    bytes32(result.factoryDepsHashes[1]) == config.contracts.chainCreationParams.defaultAAHash,
-                    "default aa hash factory dep mismatch"
-                );
-                require(
-                    bytes32(result.factoryDepsHashes[2]) == config.contracts.chainCreationParams.evmEmulatorHash,
-                    "EVM emulator hash factory dep mismatch"
-                );
-            }
-        }
+        PublishFactoryDepsResult memory result = BytecodePublisher.publishAndProcessFactoryDeps(supplier, allDeps);
 
         factoryDepsResult = result;
         upgradeConfig.factoryDepsPublished = true;
@@ -838,7 +801,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
     /// @notice Tests that it is possible to create a new chain with the new version
     function getDefaultTestCreateChainId() public view virtual returns (uint256) {
-        return config.isZKsyncOS ? ZKSYNC_OS_TEST_CREATE_CHAIN_ID : ERA_TEST_CREATE_CHAIN_ID;
+        return ZKSYNC_OS_TEST_CREATE_CHAIN_ID;
     }
 
     function TESTONLY_prepareCreateChainCall() private returns (Call[] memory calls, address admin) {

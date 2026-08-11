@@ -39,7 +39,6 @@ import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrat
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
-import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
@@ -66,13 +65,14 @@ import {CTMDeployedAddresses} from "../utils/Types.sol";
 struct Config {
     uint256 l1ChainId;
     address deployerAddress;
+    // Historical/canonical ecosystem chain identifier; only consumed by the deprecated write-only
+    // `L2AssetRouter.ERA_CHAIN_ID` slot via `FixedForceDeploymentsData.eraChainId`.
     uint256 eraChainId;
     uint256 gatewayChainId;
     address ownerAddress;
     bytes32 zkTokenAssetId;
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
-    bool isZKsyncOS;
     ContractsConfig contracts;
 }
 
@@ -116,8 +116,8 @@ abstract contract DeployCTMUtils is DeployUtils {
         ctmAddresses.stateTransition.facets.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
-    function chainCreationParamsPath(bool _isZKsyncOS) internal virtual returns (string memory) {
-        return Utils.genesisConfigPath(_isZKsyncOS);
+    function chainCreationParamsPath() internal virtual returns (string memory) {
+        return Utils.genesisConfigPath();
     }
 
     function initializeConfig(string memory configPath, address bridgehub) internal virtual {
@@ -133,9 +133,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
 
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
-        if (toml.keyExists("$.is_zk_sync_os")) {
-            config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
-        }
         if (toml.keyExists("$.era_chain_id")) {
             config.eraChainId = toml.readUint("$.era_chain_id");
         }
@@ -152,7 +149,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.contracts.validatorTimelockExecutionDelay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
         );
-        config.contracts.chainCreationParams = getChainCreationParamsConfig(Utils.genesisConfigPath(config.isZKsyncOS));
+        config.contracts.chainCreationParams = getChainCreationParamsConfig(Utils.genesisConfigPath());
 
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
@@ -162,7 +159,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getChainCreationParamsConfig(
         string memory _config
     ) internal virtual returns (ChainCreationParamsConfig memory chainCreationParams) {
-        return ChainCreationParamsLib.getChainCreationParams(_config, config.isZKsyncOS);
+        return ChainCreationParamsLib.getChainCreationParams(_config);
     }
 
     /// @notice Get all six facet cuts
@@ -260,14 +257,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (DiamondInitializeDataNewChain memory) {
         require(stateTransition.verifiers.verifier != address(0), "verifier is zero");
-        if (!config.isZKsyncOS) {
-            require(config.contracts.chainCreationParams.bootloaderHash != bytes32(0), "bootloader hash is zero");
-            require(
-                config.contracts.chainCreationParams.defaultAAHash != bytes32(0),
-                "default account abstraction hash is zero"
-            );
-            require(config.contracts.chainCreationParams.evmEmulatorHash != bytes32(0), "EVM emulator hash is zero");
-        }
 
         return
             DiamondInitializeDataNewChain({
@@ -283,10 +272,8 @@ abstract contract DeployCTMUtils is DeployUtils {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        if (!isZKBytecode) {
-            return ContractsBytecodesLib.getCreationCodeEVM(contractName);
-        }
-        return ContractsBytecodesLib.getL2Bytecode(contractName, config.isZKsyncOS);
+        require(!isZKBytecode, "EraVM (ZK) bytecodes are not supported");
+        return ContractsBytecodesLib.getCreationCodeEVM(contractName);
     }
 
     function getRollupL2DACommitmentScheme() internal returns (L2DACommitmentScheme) {
@@ -311,11 +298,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode(ctmAddresses.daAddresses.availBridge);
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "EraVerifierFflonk")) {
-            return abi.encode();
-        } else if (
-            compareStrings(contractName, "EraVerifierPlonk") || compareStrings(contractName, "ZKsyncOSVerifierPlonk")
-        ) {
+        } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
             return abi.encode();
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
@@ -355,9 +338,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             return
                 DeployCTML1OrGateway.getCreationCalldata(
                     getCTMCoreDeploymentConfig(config),
-                    config.isZKsyncOS,
-                    DeployCTML1OrGateway.getCTMContractFromName(contractName),
-                    isZKBytecode
+                    DeployCTML1OrGateway.getCTMContractFromName(contractName)
                 );
         }
     }
@@ -365,10 +346,9 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getCTMCoreDeploymentConfig(Config memory _config) internal view returns (CTMCoreDeploymentConfig memory) {
         return
             CTMCoreDeploymentConfig({
-                isZKsyncOS: _config.isZKsyncOS,
                 testnetVerifier: _config.testnetVerifier,
-                eraChainId: _config.eraChainId,
                 l1ChainId: _config.l1ChainId,
+                eraChainId: _config.eraChainId,
                 bridgehubProxy: coreAddresses.bridgehub.proxies.bridgehub,
                 interopCenterProxy: L2_INTEROP_CENTER_ADDR,
                 rollupDAManager: ctmAddresses.daAddresses.daContracts.rollupDAManager,
@@ -381,21 +361,11 @@ abstract contract DeployCTMUtils is DeployUtils {
             });
     }
 
-    function getL2BytecodeHash(string memory contractName) public view virtual returns (bytes32) {
-        return L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, true));
-    }
-
     function getInitializeCalldata(
         string memory contractName,
         bool isZKBytecode
     ) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "EraChainTypeManager")) {
-            return
-                abi.encodeCall(
-                    ChainTypeManagerBase.initialize,
-                    getChainTypeManagerInitializeData(ctmAddresses.stateTransition)
-                );
-        } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
+        if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
             return
                 abi.encodeCall(
                     ChainTypeManagerBase.initialize,

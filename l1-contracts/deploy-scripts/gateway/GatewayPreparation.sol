@@ -343,19 +343,10 @@ contract GatewayPreparation is Script {
     function deployL2ChainAdmin() public {
         initializeConfig();
 
-        // TODO(EVM-925): it is deployed without any restrictions.
-        address l2ChainAdminAddress = Utils.deployThroughL1({
-            bytecode: ContractsBytecodesLib.getCreationCodeEra("ChainAdmin"),
-            constructorargs: abi.encode(new address[](0)),
-            create2salt: bytes32(0),
-            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-            factoryDeps: new bytes[](0),
-            chainId: config.gatewayChainId,
-            bridgehubAddress: config.bridgehub,
-            l1SharedBridgeProxy: config.sharedBridgeProxy
-        });
-
-        saveOutput(l2ChainAdminAddress);
+        // TODO(gateway-os): the EraVM (zkout) ChainAdmin deployment path was removed together with EraVM
+        // support. The ZKsync-OS-based Gateway needs an EVM-native L1->L2 deployment path for the
+        // ChainAdmin before chain migrations are re-enabled.
+        revert("TODO(gateway-os): ChainAdmin deployment on Gateway requires an EVM-native deploy path");
     }
 
     /// @dev Calling this function requires private key to the admin of the chain

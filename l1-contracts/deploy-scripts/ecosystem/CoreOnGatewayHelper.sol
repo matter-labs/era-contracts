@@ -3,19 +3,11 @@ pragma solidity ^0.8.24;
 
 import {Utils} from "../utils/Utils.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
-import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
-import {
-    CoreContract,
-    EraVmSystemContract,
-    Language,
-    ZkSyncOsSystemContract,
-    ZKsyncOSUpgradeType
-} from "./CoreContract.sol";
-import {UnknownCoreContract, UnknownZkSyncOsSystemContract, UnknownEraVmSystemContract} from "./DeployScriptErrors.sol";
+import {CoreContract, ZkSyncOsSystemContract, ZKsyncOSUpgradeType} from "./CoreContract.sol";
+import {UnknownCoreContract, UnknownZkSyncOsSystemContract} from "./DeployScriptErrors.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
@@ -44,87 +36,42 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title CoreOnGatewayHelper
-/// @notice Resolves CoreContract enum values to VM-specific artifact names
+/// @notice Resolves CoreContract enum values to ZKsyncOS artifact names
 ///         and provides bytecode / force-deployment helpers for core L2 contracts.
 ///         Delegates bytecode reading to ContractsBytecodesLib / BytecodeUtils.
 library CoreOnGatewayHelper {
     // ======================== Name resolution ========================
 
-    /// @notice Resolve a CoreContract to its (fileName, contractName) for the active VM.
-    function resolve(
-        bool _isZKsyncOS,
-        CoreContract _c
-    ) internal view returns (string memory fileName, string memory contractName) {
-        contractName = _resolveContractName(_isZKsyncOS, _c);
+    /// @notice Resolve a CoreContract to its (fileName, contractName).
+    function resolve(CoreContract _c) internal view returns (string memory fileName, string memory contractName) {
+        contractName = _resolveContractName(_c);
         fileName = string.concat(contractName, ".sol");
     }
 
     // ======================== Bytecode info ========================
 
-    /// @notice Get bytecode info for force deployments / upgrades.
-    ///         Era:      abi.encode(L2BytecodeHash).
-    ///         ZKsyncOS: proxy-upgrade bytecode info (impl + SystemContractProxy blake2s).
-    function getBytecodeInfo(bool _isZKsyncOS, CoreContract _c) internal returns (bytes memory) {
-        (string memory fileName, string memory contractName) = resolve(_isZKsyncOS, _c);
-        if (_isZKsyncOS) {
-            return Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
-        }
-        return abi.encode(BytecodeUtils.hashBytecode(false, ContractsBytecodesLib.getL2Bytecode(contractName, false)));
+    /// @notice Get bytecode info for force deployments / upgrades:
+    ///         proxy-upgrade bytecode info (impl + SystemContractProxy blake2s).
+    function getBytecodeInfo(CoreContract _c) internal returns (bytes memory) {
+        (string memory fileName, string memory contractName) = resolve(_c);
+        return Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
     }
 
-    /// @notice Get a bytecode hash of the deployed bytecode.
-    ///         Era:      L2ContractHelper.hashL2Bytecode (ZK bytecode hash).
-    ///         ZKsyncOS: keccak256 of deployed EVM bytecode.
-    /// @dev Note, that for ZKsyncOS it is NOT suitable for force deployments as these require bytecode info.
-    function getDeployedBytecodeHash(bool _isZKsyncOS, CoreContract _c) internal view returns (bytes32) {
-        (string memory fileName, string memory contractName) = resolve(_isZKsyncOS, _c);
-        return BytecodeUtils.getDeployedBytecodeHash(_isZKsyncOS, fileName, contractName);
-    }
-
-    // ======================== Force deployments ========================
-
-    /// @notice Build a universal force-deployment entry for an Era CTM upgrade's
-    ///         additional core contracts.
-    /// @dev Era-only by construction: ZKsyncOS upgrades emit their additional
-    ///      force-deployments through a different path
-    ///      (`EcosystemUpgrade_v30_zksync_os_blobs`-style helpers) and do not
-    ///      use this function. Adding ZKsyncOS support here would mean
-    ///      switching `getDeployedBytecodeHash` to the proxy-upgrade
-    ///      bytecode-info shape (see `getBytecodeInfo`) — out of scope while
-    ///      the only caller that executes the result is Era-only.
-    function getEraForceDeployment(
-        CoreContract _c
-    ) internal view returns (IComplexUpgrader.UniversalContractUpgradeInfo memory deployment) {
-        IL2ContractDeployer.ForceDeployment memory forceDeployment = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: getDeployedBytecodeHash(false, _c),
-            newAddress: _resolveAddress(_c),
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-
-        deployment = IComplexUpgrader.UniversalContractUpgradeInfo({
-            upgradeType: IComplexUpgrader.ContractUpgradeType.EraForceDeployment,
-            deployedBytecodeInfo: abi.encode(forceDeployment),
-            newAddress: forceDeployment.newAddress
-        });
+    /// @notice Get a bytecode hash (keccak256) of the deployed EVM bytecode.
+    /// @dev Note, that it is NOT suitable for force deployments as these require bytecode info.
+    function getDeployedBytecodeHash(CoreContract _c) internal view returns (bytes32) {
+        (string memory fileName, string memory contractName) = resolve(_c);
+        return BytecodeUtils.getDeployedBytecodeHash(true, fileName, contractName);
     }
 
     // ======================== Factory dependencies ========================
 
     function getFullListOfFactoryDependencies(
-        bool _isZKsyncOS,
         CoreContract[] memory _additionalDependencyContracts
     ) internal returns (bytes[] memory factoryDeps) {
-        bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies(_isZKsyncOS);
-        bytes[] memory sharedDependencies = _getFactoryDependencyBytecodes(
-            _isZKsyncOS,
-            _getSharedFactoryDependencyContracts(_isZKsyncOS)
-        );
-        bytes[] memory additionalDependencies = _getFactoryDependencyBytecodes(
-            _isZKsyncOS,
-            _additionalDependencyContracts
-        );
+        bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
+        bytes[] memory sharedDependencies = _getFactoryDependencyBytecodes(_getSharedFactoryDependencyContracts());
+        bytes[] memory additionalDependencies = _getFactoryDependencyBytecodes(_additionalDependencyContracts);
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, sharedDependencies);
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(factoryDeps, additionalDependencies);
@@ -133,68 +80,48 @@ library CoreOnGatewayHelper {
         // ZKOSContractDeployer) is force-deployed by buildZKsyncOSForceDeployments at upgrade
         // time but lives in a separate enum — without this merge their preimages never land
         // in the sequencer's oracle and the VM panics on the first SLOAD of their code.
-        if (_isZKsyncOS) {
-            factoryDeps = SystemContractsProcessing.mergeBytesArrays(factoryDeps, _getZKsyncOSExtraBytecodes());
-        }
+        factoryDeps = SystemContractsProcessing.mergeBytesArrays(factoryDeps, _getZKsyncOSExtraBytecodes());
 
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
     }
 
     // ======================== Private helpers ========================
 
-    function _getSharedFactoryDependencyContracts(
-        bool _isZKsyncOS
-    ) private pure returns (CoreContract[] memory dependencyContracts) {
-        if (_isZKsyncOS) {
-            // Reuse the canonical fixed-address core contract list - the same contract
-            // IDs `getBaseZKsyncOSForceDeployments` upgrades on L2 at upgrade
-            // time. Every bytecode hash the upgrade tx's force-deploy path
-            // queries must appear in the tx's `factory_deps`, otherwise the
-            // server has no way to know which `EVMBytecodePublished` events
-            // on `BytecodesSupplier` it should load into the preimage store
-            // and the VM panics on the first missing preimage.
-            //
-            // Plus `UpgradeableBeaconDeployer`, which
-            // `FixedForceDeploymentsData.beaconDeployerInfo` references but
-            // which is not one of the fixed-address core contracts.
-            CoreContract[] memory fixedAddressCoreContracts = SystemContractsProcessing.getFixedAddressCoreContracts();
-            // The ZKsync-OS-only contracts are force-deployed by `getBaseZKsyncOSForceDeployments` from a
-            // separate list, so their preimages have to be merged in here as well.
-            CoreContract[] memory zksyncOSOnlyContracts = SystemContractsProcessing.getZKsyncOSOnlyContracts();
-            dependencyContracts = new CoreContract[](
-                fixedAddressCoreContracts.length + zksyncOSOnlyContracts.length + 1
-            );
-            uint256 index;
-            for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
-                dependencyContracts[index++] = fixedAddressCoreContracts[i];
-            }
-            for (uint256 i = 0; i < zksyncOSOnlyContracts.length; i++) {
-                dependencyContracts[index++] = zksyncOSOnlyContracts[i];
-            }
-            dependencyContracts[index] = CoreContract.UpgradeableBeaconDeployer;
-            return dependencyContracts;
+    function _getSharedFactoryDependencyContracts() private pure returns (CoreContract[] memory dependencyContracts) {
+        // Reuse the canonical fixed-address core contract list - the same contract
+        // IDs `getBaseZKsyncOSForceDeployments` upgrades on L2 at upgrade
+        // time. Every bytecode hash the upgrade tx's force-deploy path
+        // queries must appear in the tx's `factory_deps`, otherwise the
+        // server has no way to know which `EVMBytecodePublished` events
+        // on `BytecodesSupplier` it should load into the preimage store
+        // and the VM panics on the first missing preimage.
+        //
+        // Plus `UpgradeableBeaconDeployer`, which
+        // `FixedForceDeploymentsData.beaconDeployerInfo` references but
+        // which is not one of the fixed-address core contracts.
+        CoreContract[] memory fixedAddressCoreContracts = SystemContractsProcessing.getFixedAddressCoreContracts();
+        // The ZKsync-OS-only contracts are force-deployed by `getBaseZKsyncOSForceDeployments` from a
+        // separate list, so their preimages have to be merged in here as well.
+        CoreContract[] memory zksyncOSOnlyContracts = SystemContractsProcessing.getZKsyncOSOnlyContracts();
+        dependencyContracts = new CoreContract[](fixedAddressCoreContracts.length + zksyncOSOnlyContracts.length + 1);
+        uint256 index;
+        for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
+            dependencyContracts[index++] = fixedAddressCoreContracts[i];
         }
-
-        dependencyContracts = new CoreContract[](4);
-        dependencyContracts[0] = CoreContract.L2SharedBridgeLegacy;
-        dependencyContracts[1] = CoreContract.BridgedStandardERC20;
-        dependencyContracts[2] = CoreContract.DiamondProxy;
-        dependencyContracts[3] = CoreContract.ProxyAdmin;
+        for (uint256 i = 0; i < zksyncOSOnlyContracts.length; i++) {
+            dependencyContracts[index++] = zksyncOSOnlyContracts[i];
+        }
+        dependencyContracts[index] = CoreContract.UpgradeableBeaconDeployer;
     }
 
     function _getFactoryDependencyBytecodes(
-        bool _isZKsyncOS,
         CoreContract[] memory _dependencyContracts
     ) private returns (bytes[] memory dependencyBytecodes) {
         dependencyBytecodes = new bytes[](_dependencyContracts.length);
 
         for (uint256 i; i < _dependencyContracts.length; i++) {
-            (, string memory contractName) = resolve(_isZKsyncOS, _dependencyContracts[i]);
-            if (_isZKsyncOS) {
-                dependencyBytecodes[i] = ContractsBytecodesLib.getL2DeployedBytecode(contractName, true);
-            } else {
-                dependencyBytecodes[i] = ContractsBytecodesLib.getCreationCodeEra(contractName);
-            }
+            (, string memory contractName) = resolve(_dependencyContracts[i]);
+            dependencyBytecodes[i] = ContractsBytecodesLib.getL2DeployedBytecode(contractName, true);
         }
     }
 
@@ -210,12 +137,10 @@ library CoreOnGatewayHelper {
         }
     }
 
-    /// @notice Resolve a CoreContract enum to its contract name for the active VM.
-    function _resolveContractName(bool _isZKsyncOS, CoreContract _c) internal pure returns (string memory) {
-        // Contracts with different names per VM
-        if (_c == CoreContract.L2NativeTokenVault) return _isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault";
+    /// @notice Resolve a CoreContract enum to its contract name.
+    function _resolveContractName(CoreContract _c) internal pure returns (string memory) {
+        if (_c == CoreContract.L2NativeTokenVault) return "L2NativeTokenVaultZKOS";
 
-        // Contracts with the same name across both VMs
         if (_c == CoreContract.L2Bridgehub) return "L2Bridgehub";
         if (_c == CoreContract.L2AssetRouter) return "L2AssetRouter";
         if (_c == CoreContract.L2MessageRoot) return "L2MessageRoot";
@@ -315,114 +240,5 @@ library CoreOnGatewayHelper {
         if (_c == ZkSyncOsSystemContract.SystemContext) return L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR;
         if (_c == ZkSyncOsSystemContract.ContractDeployer) return L2_DEPLOYER_SYSTEM_CONTRACT_ADDR;
         revert UnknownZkSyncOsSystemContract();
-    }
-
-    // ======================== EraVmSystemContract resolvers ========================
-
-    /// @notice Maps an EraVmSystemContract to its deployed address.
-    function _resolveAddress(EraVmSystemContract _id) internal pure returns (address) {
-        if (_id == EraVmSystemContract.EmptyContract_0x0000) return address(0x0000);
-        if (_id == EraVmSystemContract.Ecrecover) return address(0x0001);
-        if (_id == EraVmSystemContract.SHA256) return address(0x0002);
-        if (_id == EraVmSystemContract.Identity) return address(0x0004);
-        if (_id == EraVmSystemContract.EcAdd) return address(0x0006);
-        if (_id == EraVmSystemContract.EcMul) return address(0x0007);
-        if (_id == EraVmSystemContract.EcPairing) return address(0x0008);
-        if (_id == EraVmSystemContract.Modexp) return address(0x0005);
-        if (_id == EraVmSystemContract.EmptyContract_0x8001) return address(0x8001);
-        if (_id == EraVmSystemContract.AccountCodeStorage) return address(0x8002);
-        if (_id == EraVmSystemContract.NonceHolder) return address(0x8003);
-        if (_id == EraVmSystemContract.KnownCodesStorage) return address(0x8004);
-        if (_id == EraVmSystemContract.ImmutableSimulator) return address(0x8005);
-        if (_id == EraVmSystemContract.ContractDeployer) return address(0x8006);
-        if (_id == EraVmSystemContract.L1Messenger) return address(0x8008);
-        if (_id == EraVmSystemContract.MsgValueSimulator) return address(0x8009);
-        if (_id == EraVmSystemContract.L2BaseToken) return address(0x800A);
-        if (_id == EraVmSystemContract.SystemContext) return address(0x800B);
-        if (_id == EraVmSystemContract.BootloaderUtilities) return address(0x800C);
-        if (_id == EraVmSystemContract.EventWriter) return address(0x800D);
-        if (_id == EraVmSystemContract.Compressor) return address(0x800E);
-        if (_id == EraVmSystemContract.Keccak256) return address(0x8010);
-        if (_id == EraVmSystemContract.CodeOracle) return address(0x8012);
-        if (_id == EraVmSystemContract.EvmGasManager) return address(0x8013);
-        if (_id == EraVmSystemContract.EvmPredeploysManager) return address(0x8014);
-        if (_id == EraVmSystemContract.EvmHashesStorage) return address(0x8015);
-        if (_id == EraVmSystemContract.P256Verify) return address(0x0100);
-        if (_id == EraVmSystemContract.PubdataChunkPublisher) return address(0x8011);
-        if (_id == EraVmSystemContract.Create2Factory) return address(0x10000);
-        if (_id == EraVmSystemContract.SloadContract) return address(0x10006);
-        if (_id == EraVmSystemContract.SystemContractProxyAdmin) return L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR;
-        revert UnknownEraVmSystemContract();
-    }
-
-    /// @notice Maps an EraVmSystemContract to its Era code name.
-    function _resolveContractName(EraVmSystemContract _id) internal pure returns (string memory) {
-        if (_id == EraVmSystemContract.EmptyContract_0x0000) return "EmptyContract";
-        if (_id == EraVmSystemContract.Ecrecover) return "Ecrecover";
-        if (_id == EraVmSystemContract.SHA256) return "SHA256";
-        if (_id == EraVmSystemContract.Identity) return "Identity";
-        if (_id == EraVmSystemContract.EcAdd) return "EcAdd";
-        if (_id == EraVmSystemContract.EcMul) return "EcMul";
-        if (_id == EraVmSystemContract.EcPairing) return "EcPairing";
-        if (_id == EraVmSystemContract.Modexp) return "Modexp";
-        if (_id == EraVmSystemContract.EmptyContract_0x8001) return "EmptyContract";
-        if (_id == EraVmSystemContract.AccountCodeStorage) return "AccountCodeStorage";
-        if (_id == EraVmSystemContract.NonceHolder) return "NonceHolder";
-        if (_id == EraVmSystemContract.KnownCodesStorage) return "KnownCodesStorage";
-        if (_id == EraVmSystemContract.ImmutableSimulator) return "ImmutableSimulator";
-        if (_id == EraVmSystemContract.ContractDeployer) return "ContractDeployer";
-        if (_id == EraVmSystemContract.L1Messenger) return "L1Messenger";
-        if (_id == EraVmSystemContract.MsgValueSimulator) return "MsgValueSimulator";
-        if (_id == EraVmSystemContract.L2BaseToken) return "L2BaseToken";
-        if (_id == EraVmSystemContract.SystemContext) return "SystemContext";
-        if (_id == EraVmSystemContract.BootloaderUtilities) return "BootloaderUtilities";
-        if (_id == EraVmSystemContract.EventWriter) return "EventWriter";
-        if (_id == EraVmSystemContract.Compressor) return "Compressor";
-        if (_id == EraVmSystemContract.Keccak256) return "Keccak256";
-        if (_id == EraVmSystemContract.CodeOracle) return "CodeOracle";
-        if (_id == EraVmSystemContract.EvmGasManager) return "EvmGasManager";
-        if (_id == EraVmSystemContract.EvmPredeploysManager) return "EvmPredeploysManager";
-        if (_id == EraVmSystemContract.EvmHashesStorage) return "EvmHashesStorage";
-        if (_id == EraVmSystemContract.P256Verify) return "P256Verify";
-        if (_id == EraVmSystemContract.PubdataChunkPublisher) return "PubdataChunkPublisher";
-        if (_id == EraVmSystemContract.Create2Factory) return "Create2Factory";
-        if (_id == EraVmSystemContract.SloadContract) return "SloadContract";
-        if (_id == EraVmSystemContract.SystemContractProxyAdmin) return "SystemContractProxyAdmin";
-        revert UnknownEraVmSystemContract();
-    }
-
-    /// @notice Maps an EraVmSystemContract to its programming language.
-    function _resolveLanguage(EraVmSystemContract _id) internal pure returns (Language) {
-        if (
-            _id == EraVmSystemContract.Ecrecover ||
-            _id == EraVmSystemContract.SHA256 ||
-            _id == EraVmSystemContract.Identity ||
-            _id == EraVmSystemContract.EcAdd ||
-            _id == EraVmSystemContract.EcMul ||
-            _id == EraVmSystemContract.EcPairing ||
-            _id == EraVmSystemContract.Modexp ||
-            _id == EraVmSystemContract.EventWriter ||
-            _id == EraVmSystemContract.Keccak256 ||
-            _id == EraVmSystemContract.CodeOracle ||
-            _id == EraVmSystemContract.EvmGasManager ||
-            _id == EraVmSystemContract.P256Verify
-        ) {
-            return Language.Yul;
-        }
-        return Language.Solidity;
-    }
-
-    /// @notice Maps an EraVmSystemContract to whether it is a precompile.
-    function _resolveIsPrecompile(EraVmSystemContract _id) internal pure returns (bool) {
-        return (_id == EraVmSystemContract.Ecrecover ||
-            _id == EraVmSystemContract.SHA256 ||
-            _id == EraVmSystemContract.Identity ||
-            _id == EraVmSystemContract.EcAdd ||
-            _id == EraVmSystemContract.EcMul ||
-            _id == EraVmSystemContract.EcPairing ||
-            _id == EraVmSystemContract.Modexp ||
-            _id == EraVmSystemContract.Keccak256 ||
-            _id == EraVmSystemContract.CodeOracle ||
-            _id == EraVmSystemContract.P256Verify);
     }
 }

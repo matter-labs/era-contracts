@@ -51,9 +51,10 @@ pub struct ChainSetDaValidatorPairArgs {
     #[clap(long)]
     pub l1_da_validator: Address,
 
-    /// L2 DA commitment scheme. For Era v31+: `blobs-and-pubdata-keccak256`
-    /// (rollup, EraVM). For ZKsync OS: `blobs-z-k-sync-os`. For
-    /// no-DA validium chains: `empty-no-d-a`. Etc.
+    /// L2 DA commitment scheme. For L1-settling ZKsync OS rollups:
+    /// `blobs-z-k-sync-os`. For gateway-settling chains:
+    /// `blobs-and-pubdata-keccak256`. For no-DA validium chains:
+    /// `empty-no-d-a`. Etc.
     #[clap(long, value_enum)]
     pub l2_da_commitment_scheme: L2DACommitmentScheme,
 

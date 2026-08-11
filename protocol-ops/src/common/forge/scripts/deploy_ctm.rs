@@ -2,7 +2,6 @@ use alloy::primitives::{Address, B256};
 use serde::{Deserialize, Serialize};
 
 use crate::common::traits::FileConfigTrait;
-use crate::types::VMOption;
 
 use super::deploy_ecosystem::InitialDeploymentConfig;
 
@@ -31,10 +30,11 @@ impl DeployCTMConfig {
         testnet_verifier: bool,
         zk_token_asset_id: B256,
         support_l2_legacy_shared_bridge_test: bool,
-        vm_option: VMOption,
     ) -> Self {
         Self {
-            is_zk_sync_os: vm_option.is_zksync_os(),
+            // This tooling only provisions ZKsync OS CTMs; the config key is
+            // still emitted because DeployCTM.s.sol reads it.
+            is_zk_sync_os: true,
             testnet_verifier,
             owner_address,
             support_l2_legacy_shared_bridge_test,
