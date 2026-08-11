@@ -8,6 +8,7 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {
+    L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER,
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
@@ -26,6 +27,7 @@ import {MAX_TOKEN_BALANCE} from "contracts/common/Config.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol";
+import {IL2AssetHandler} from "contracts/bridge/interfaces/IL2AssetHandler.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
@@ -312,5 +314,39 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
 
         vm.expectRevert(BaseTokenNativeToThisChain.selector);
         L2_ASSET_TRACKER.assertBaseTokenRecoveryIsAccountingNeutral(505);
+    }
+
+    /// @notice The vault must consult the gate before disbursing a failed transfer, for a plain ERC20
+    /// too — not only for the base token. Driven through the real `bridgeRecoverFailedTransfer` entry
+    /// point as the asset router, so deleting the vault's `assertRecoveryIsAccountingNeutral` call
+    /// fails this test rather than silently widening what can be recovered.
+    /// @dev The upstream routers already reject L1-destined recoveries, which is why this is the only
+    /// way to reach the vault's own check.
+    function test_bridgeRecoverFailedTransfer_asksTheTrackerBeforeDisbursing() public {
+        address depositor = makeAddr("depositor");
+        uint256 amount = 5 ether;
+        TestnetERC20Token token = new TestnetERC20Token("NativeToken", "NTV", 18);
+        INativeTokenVaultBase(L2_NATIVE_TOKEN_VAULT_ADDR).registerToken(address(token));
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
+        bytes memory mintData = DataEncoding.encodeBridgeMintData({
+            _originalCaller: depositor,
+            _remoteReceiver: makeAddr("remoteReceiver"),
+            _originToken: address(token),
+            _amount: amount,
+            _erc20Metadata: ""
+        });
+
+        // An L1-destined bridge-out is never revertable: `totalWithdrawalsToL1` is append-only.
+        vm.prank(L2_ASSET_ROUTER_ADDR);
+        vm.expectRevert(RecoverToL1NotSupported.selector);
+        IL2AssetHandler(L2_NATIVE_TOKEN_VAULT_ADDR).bridgeRecoverFailedTransfer(L1_CHAIN_ID, assetId, mintData);
+
+        // Control: nothing was disbursed and the tracker's accounting is untouched.
+        assertEq(token.balanceOf(depositor), 0, "no tokens may be disbursed by a rejected recovery");
+        assertEq(
+            L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, assetId),
+            MAX_TOKEN_BALANCE,
+            "a rejected recovery must not re-credit chainBalance"
+        );
     }
 }

@@ -103,7 +103,7 @@ Both entry points (`sendMessage` and `sendBundle`, both `whenNotPaused nonReentr
 4. **Processes each call starter** (direct or indirect, applying the L1-destination restrictions) and accumulates two totals: `totalBurnedCallsValue` (sum of destination-side `interopCallValue`s) and `totalIndirectCallsValue` (sum of source-side `indirectCallMessageValue`s).
 5. **Collects fixed ZK fees**, if `useFixedFee` and the destination is not L1.
 6. **Collects and burns value** (`_ensureCorrectTotalValue`): `msg.value` must exactly match the expected total (`MsgValueMismatch`), where the expected total is:
-   - same base token on both chains: `totalBurnedCallsValue + totalIndirectCallsValue + protocolFee`; the interop-call value is burned on the source chain via `L2_BASE_TOKEN_HOLDER.burnAndStartBridging` (which records the outbound flow in the holder's own bookkeeping);
+   - same base token on both chains: `totalBurnedCallsValue + totalIndirectCallsValue + protocolFee`; the interop-call value is burned on the source chain via `L2_BASE_TOKEN_HOLDER.burnAndStartBridging` (notifying the L2AssetTracker);
    - different base tokens: `totalIndirectCallsValue + protocolFee`; the destination-chain value is instead deposited via `AssetRouter.bridgehubDepositBaseToken`.
 7. **Dispatches the bundle** (`_dispatchBundle`): a normal bundle is ABI-encoded, prefixed with `BUNDLE_IDENTIFIER`, and sent to L1 via the `L2ToL1Messenger`; an atomic bundle is instead appended to the interop IMT via the `AtomicFlowManager` and **not** published to L1.
 8. **Emits events**: one ERC-7786 `MessageSent` per call, plus one `InteropBundleSent(l2l1MsgHash, bundleHash, bundle)`.

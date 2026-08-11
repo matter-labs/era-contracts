@@ -450,11 +450,9 @@ library SystemContractsProcessing {
     /// — otherwise the retired tracker code would stay callable. Chains created on v32 get the same
     /// EmptyContract-backed proxy from genesis, so fresh and upgraded chains match at the reserved
     /// address.
-    /// @dev The v31 GWAssetTracker collects wrapped-ZK settlement fees on a live gateway (the stage
-    /// env brought one up), so any remaining fee balance must be drained through the v31 owner flow
-    /// before the gateway chain's upgrade executes — a rollout-runbook step, not enforceable here.
-    /// The swap destroys no state either way: the proxies stay upgradable, so a later governance
-    /// upgrade can always restore recovery logic.
+    /// @dev The v31 GWAssetTracker could collect wrapped-ZK settlement fees on a live gateway, but no
+    /// gateway ever accrued any, so the swap strands nothing. It destroys no state either way: the
+    /// proxy stays upgradable, so a later governance upgrade can always restore recovery logic.
     function getRemovedTrackerNeutralizations()
         internal
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)

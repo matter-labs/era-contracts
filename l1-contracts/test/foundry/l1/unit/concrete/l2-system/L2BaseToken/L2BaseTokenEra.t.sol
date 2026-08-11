@@ -534,8 +534,8 @@ contract L2BaseTokenEraTest is Test {
     }
 
     /// @dev Covers the holder->tracker forwarding only: the tracker is a recording dummy, so the
-    /// real tracker's settlement gating / `assetBookkeeping` update is exercised in
-    /// L2AssetBookkeeping.t.sol.
+    /// real tracker's settlement gating and `interopInfo` update are exercised in
+    /// L2AssetTracker.t.sol.
     function test_withdraw_forwardsBookkeepingWithL1ChainIdToTracker() public {
         // Deploy the real holder so the withdrawal reporting path executes; the holder reports the
         // flow to the tracker, whose recording dummy is already etched by `setUp`.

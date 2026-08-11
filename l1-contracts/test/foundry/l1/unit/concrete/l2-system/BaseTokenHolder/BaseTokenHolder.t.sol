@@ -19,7 +19,7 @@ import {BaseTokenNativeToThisChain, RecoverToL1NotSupported, Unauthorized} from 
 
 /// @dev Mock L2AssetTracker that records the base-token bridge flows the holder reports.
 /// The settlement-layer gating of these flows lives in the real tracker and is covered by the
-/// L2AssetBookkeeping tests; here we only verify what the holder forwards.
+/// L2AssetTracker tests; here we only verify what the holder forwards.
 contract MockRecordingAssetTracker {
     uint256 internal constant MOCK_L1_CHAIN_ID = 9;
     bytes32 internal constant MOCK_BASE_TOKEN_ASSET_ID = bytes32(uint256(0xba5e));
