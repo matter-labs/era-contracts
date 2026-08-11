@@ -11,7 +11,7 @@
   "default_aa_hash": "0x010005f9d84c1863bf21a9393f2fd1631af92aab68f12c35dba580c8d7a06146",
   "evm_emulator_hash": "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63",
   "prover": {
-    "recursion_scheduler_level_vk_hash": "0xcde2e1dc7800da93384e5b2e0bb1f195ed3eb4aed0ad01a877588a890f8bd970",
-    "fflonk_snark_wrapper_vk_hash": "0x95d735ed04680e0f7777f1d2016f3b6e2f507726b32e2d8b47a37fd8355fd47a"
+    "recursion_scheduler_level_vk_hash": "0x914f43ab458a01c5bbbf3c550cb58b96724093caefc0a8cfa14291c16f8933d8",
+    "fflonk_snark_wrapper_vk_hash": "0xde173061431510a2ecb7db0f3227ddd4d0b31352872d08f860aeccd8ce52e587"
   }
 }
