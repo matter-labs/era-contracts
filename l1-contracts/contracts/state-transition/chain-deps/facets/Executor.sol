@@ -309,6 +309,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         bytes32 chainConfigHash = keccak256(
             abi.encodePacked(s.chainId, uint256(0), uint256(_getZKsyncOSMaxTxGasLimit()))
         );
+        // Untruncated: the prover folds the full per-batch hashes, so PUBLIC_INPUT_SHIFT is
+        // applied once by `computeZKsyncOSHash` after the fold.
         return
             uint256(
                 keccak256(
@@ -319,7 +321,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                         _currentBatchCommitment
                     )
                 )
-            ) >> PUBLIC_INPUT_SHIFT;
+            );
     }
 
     /// @dev Gets zk proof public input for Era

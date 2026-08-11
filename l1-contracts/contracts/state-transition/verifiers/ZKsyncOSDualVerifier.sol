@@ -15,6 +15,7 @@ import {
     EmptyPublicInputsLength
 } from "../../common/L1ContractErrors.sol";
 import {IZKsyncOSDualVerifier} from "../chain-interfaces/IZKsyncOSDualVerifier.sol";
+import {PUBLIC_INPUT_SHIFT} from "../../common/Config.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 /// @title ZKsync OS Dual Verifier
@@ -168,18 +169,19 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier, IZKsyncOSDualVerifier 
         uint256 initialHash,
         uint256[] calldata _publicInputs
     ) public pure returns (uint256 result) {
-        uint256 publicInputsLength = _publicInputs.length;
-        result = initialHash;
-
-        uint256 i = 0;
-
-        if (result == 0) {
-            result = _publicInputs[0];
-            i = 1;
+        // The prover hashes the concatenation of all per-batch hashes ONCE, then truncates:
+        //   N == 1: H_1                         (no hash)
+        //   N >= 2: keccak(H_1 || ... || H_N)
+        // A rolling fold (`keccak(keccak(H_1, H_2), H_3)`) coincides for N <= 2 but diverges
+        // from N == 3 on, so it must not be used here.
+        if (initialHash == 0) {
+            result = _publicInputs.length == 1
+                ? _publicInputs[0]
+                : uint256(keccak256(abi.encodePacked(_publicInputs)));
+        } else {
+            // Partial ranges: the carried hash is the first element of the concatenation.
+            result = uint256(keccak256(abi.encodePacked(initialHash, _publicInputs)));
         }
-
-        for (; i < publicInputsLength; ++i) {
-            result = uint256(keccak256(abi.encodePacked(result, _publicInputs[i]))) >> 32;
-        }
+        result = result >> PUBLIC_INPUT_SHIFT;
     }
 }
