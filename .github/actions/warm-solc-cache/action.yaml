@@ -44,29 +44,24 @@ runs:
           l1-contracts/cache-forge
           l1-contracts/out
 
-    # Forge recompiles changed sources but never prunes artifacts for sources that are gone, and
-    # both calculate-hashes and `forge build --sizes` enumerate the artifact directories — so a
-    # cache from a commit that still had a contract would misreport on the commit that deleted it.
-    # Over-pruning is harmless: forge just recompiles.
+    # Forge never prunes artifacts for sources that are gone, and both calculate-hashes and
+    # `forge build --sizes` enumerate the artifact directories — so a cache from a commit that
+    # still had a contract would misreport on the commit that deleted it.
+    #
+    # Matching is per artifact on its full compilationTarget source path, not on the directory
+    # basename: forge names artifact directories after the source basename, this repo has 58
+    # duplicated basenames, and one directory can therefore hold artifacts from different sources
+    # (out/L1NativeTokenVault.sol/ holds both the production contract and the test file's
+    # contracts). A basename comparison keeps such a directory alive and its stale artifacts with
+    # it. Measured at ~1.5s over 994 artifacts.
+    #
+    # Only the directories this action actually restores are scanned. zkout is never restored
+    # here — zksolc output is not reproducible across builds — and zksolc artifacts carry no
+    # compilationTarget to match on anyway.
     - name: Prune artifacts with no source
       if: inputs.enabled == 'true'
       shell: bash
       run: |
-        set -euo pipefail
-        sources=$(mktemp)
-        find . -name '*.sol' -not -path '*/out/*' -not -path '*/zkout/*' -not -path '*/cache-forge/*' \
-          | sed 's#.*/##' | sort -u > "$sources"
-
-        pruned=0
-        for artifacts in da-contracts/out l1-contracts/out l1-contracts/zkout l2-contracts/zkout system-contracts/zkout; do
-          [ -d "$artifacts" ] || continue
-          for dir in "$artifacts"/*.sol; do
-            [ -d "$dir" ] || continue
-            if ! grep -qxF "$(basename "$dir")" "$sources"; then
-              echo "  pruning $dir (no source)"
-              rm -rf "$dir"
-              pruned=$((pruned + 1))
-            fi
-          done
-        done
-        echo "Pruned $pruned stale artifact director$([ "$pruned" = 1 ] && echo y || echo ies)"
+        node ${{ github.action_path }}/prune-stale-artifacts.js \
+          "da-contracts:da-contracts/out" \
+          "l1-contracts:l1-contracts/out"
