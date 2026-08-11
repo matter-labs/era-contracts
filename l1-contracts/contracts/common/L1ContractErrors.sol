@@ -47,8 +47,6 @@ error BaseTokenHolderAlreadyInitialized();
 error BaseTokenHolderMintFailed();
 // 0x8361ff70
 error BaseTokenNativeToThisChain();
-// 0x7f9159de
-error BaseTokenPreV31TotalSupplyAlreadySet();
 // 0x00a6b592
 error BaseTokenPreV31TotalSupplyNotSet();
 // 0xe3ec2bc9
@@ -248,12 +246,12 @@ error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 error L2TimestampTooBig();
 // 0xe37d2c02
 error LengthIsNotDivisibleBy32(uint256 length);
+// 0x1b6825bb
+error LogAlreadyProcessed(uint8);
 // 0xe4623697
 error LowerBoundAlreadyRecorded();
 // 0x5c25a57b
 error LowerBoundNotRecorded();
-// 0x1b6825bb
-error LogAlreadyProcessed(uint8);
 // 0x43e266b0
 error MalformedBytecode(BytecodeError);
 // 0xafbb7a4e
