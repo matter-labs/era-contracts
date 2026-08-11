@@ -128,16 +128,63 @@ Live environment variables:
 | `05-gateway-bridge`          | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW)                                                                                            |
 | `06-gateway-interop`         | L2A<->L2B interop transfers between GW-settled L2 chains                                                                                                     |
 
+## Coverage
+
+`run-coverage.ts` runs the specs against Anvil chains started with `--steps-tracing`, then
+replays the collected traces through the Forge source maps to produce an LCOV report.
+
+```bash
+# From this directory — shard the specs across parallel workers (default)
+yarn coverage
+
+# Single process, one set of chains, all specs (the pre-sharding behavior)
+yarn coverage:serial
+
+# One spec only (implies single process)
+yarn ts-node run-coverage.ts --spec test/anvil-interop/test/hardhat/07-interop-bundles.spec.ts
+```
+
+Each shard is a child process that owns its own six Anvil chains (own port offset, own run
+suffix, own state dir), runs its slice of the specs, and collects coverage from its own chains
+into `l1-contracts/coverage/anvil/shards/p<offset>/`. The parent then unions the per-shard
+reports into `l1-contracts/coverage/anvil/anvil-lcov.info`, which is what
+`yarn l1 coverage:merge` reads when combining Anvil hits with the Foundry report.
+
+Shards resolve only the contracts their own specs touched, so their file and line sets differ;
+the union takes the max hit count per line and per function. Denominators do not matter here —
+`scripts/merge-coverage.ts` rebases everything onto the Foundry LCOV. The union itself is
+covered by `yarn test:lcov-merge` (`test/unit/lcov-merge.test.ts`), which CI runs before the
+coverage pipeline.
+
+Tracing multiplies Anvil's memory and CPU cost, so cap the concurrency on small machines with
+`ANVIL_INTEROP_MAX_PARALLEL_WORKERS`. If coverage runs start failing with RPC errors mid-spec,
+lower it before looking anywhere else.
+
+CI splits the specs across a small number of runners and shards in-process within each. A
+runner costs the same whether it uses one core or four, so parallelism inside a job is free
+while extra jobs are not — measured, one-spec-per-runner spent ~43 runner-minutes to reach
+~7.0m wall clock, two groups reach ~7.5m for ~14. `plan-coverage-groups.ts` packs the specs
+into balanced groups (`yarn plan:groups`) and holds both the group count and the per-spec cost
+table; the costs are a scheduling hint, so a stale entry costs balance, never coverage.
+
+`l1-contracts-ci.yaml` then runs a `coverage-anvil` matrix job per group, each uploading its
+`anvil-lcov.info`. The `coverage-report` job downloads them and unions them with
+`yarn merge:shards <dir>` (`merge-shard-lcov.ts`), which walks the directory for
+`anvil-lcov.info` files and fails if it finds none — a group that produced nothing must not
+pass as "these specs added no coverage". Both union paths use the same `lcov-merge.ts`.
+
 ## Environment Variables
 
-| Variable                       | Effect                                                            |
-| ------------------------------ | ----------------------------------------------------------------- |
-| `ANVIL_INTEROP_SKIP_SETUP=1`   | Skip deployment, run only tests (requires chains already running) |
-| `ANVIL_INTEROP_SKIP_CLEANUP=1` | Don't kill Anvil processes after tests                            |
-| `ANVIL_INTEROP_KEEP_CHAINS=1`  | Same as `--keep-chains` flag                                      |
-| `ANVIL_INTEROP_FRESH_DEPLOY=1` | Force full deployment even if pregenerated state exists           |
-| `ANVIL_INTEROP_PORT_OFFSET=N`  | Offset all chain ports by N (useful for parallel runs)            |
-| `ANVIL_INTEROP_RUN_SUFFIX=X`   | Suffix for output dirs (set automatically by parallel workers)    |
+| Variable                               | Effect                                                                  |
+| -------------------------------------- | ----------------------------------------------------------------------- |
+| `ANVIL_INTEROP_SKIP_SETUP=1`           | Skip deployment, run only tests (requires chains already running)       |
+| `ANVIL_INTEROP_SKIP_CLEANUP=1`         | Don't kill Anvil processes after tests                                  |
+| `ANVIL_INTEROP_KEEP_CHAINS=1`          | Same as `--keep-chains` flag                                            |
+| `ANVIL_INTEROP_FRESH_DEPLOY=1`         | Force full deployment even if pregenerated state exists                 |
+| `ANVIL_INTEROP_PORT_OFFSET=N`          | Offset all chain ports by N (useful for parallel runs)                  |
+| `ANVIL_INTEROP_RUN_SUFFIX=X`           | Suffix for output dirs (set automatically by parallel workers)          |
+| `ANVIL_INTEROP_MAX_PARALLEL_WORKERS=N` | Cap concurrent test/coverage workers (0 or unset = one per spec)        |
+| `ANVIL_COVERAGE_MODE=1`                | Start Anvil with `--steps-tracing` so traces can be collected afterward |
 
 ### CLI Parameters
 
