@@ -142,8 +142,9 @@ contract UpgradeIntegrationTest_Local is
         return new CTMUpgrade_v31_Test();
     }
 
-    /// @notice Bump the CTM's protocol version from the upgrade input TOML so the local
-    ///         genesis-at-v31 fixture exercises a v31 → v32 upgrade.
+    /// @notice Bump the CTM's protocol version from the upgrade input TOML so the local fixture
+    ///         exercises an upgrade to one minor above the genesis version (currently v32 → v33).
+    ///         See `foundry-upgrade.toml`.
     /// @dev    Replaces the former `overrideProtocolVersionForLocalTesting` hook on the
     ///         deleted `DefaultEcosystemUpgrade` orchestrator.
     function afterInitHook() internal override {
