@@ -3,8 +3,8 @@
     "bridgehub": "0x2a6Fc2bc17906B81EAcF01C16a93e5BdCa988628",
     "l1SharedBridge": "0x9490ebe1dCBac4f7Cc85EC858369436Cc45248F7",
     "l1NullifierProxy": "0xf505C9E86A7A611968e361Ef168B36B438A4a194",
-    "l1NativeTokenVault": "0xf7607a641412394a63DE249D0236187A68289ABf",
-    "l1ERC20Bridge": "0x1f3702F798a88c55D4ca254B5a773346b5bea0D3",
+    "l1NativeTokenVault": "0x0386De97eF8511e2B9Fb39A16C97FD5AF4ABF647",
+    "l1ERC20Bridge": "0x29BFeCF0eB726E98Ca94603868833D5430d96F57",
     "governance": "0xa60F07cAaFA0aE451296c0ca5C261578A390105e",
     "transparentProxyAdmin": "0x0FA38b5c8cb180809E0C95E2EE923eC093123285",
     "messageRoot": "0xcf0513f02913fA540d9510eb17325602A6E32900",
@@ -12,7 +12,7 @@
     "chainRegistrationSender": "0x440BfB8eF27d14bec4B758fcF878755DB56Cc861"
   },
   "ctmAddresses": {
-    "chainTypeManager": "0x80E2269beA7055F53B45aD88FE00bf68f7d851D2",
+    "chainTypeManager": "0x0F792644df3A0B5D291cDBBdE2Dea010C04eC5bd",
     "chainAdmin": "0x16b5d0b1A5c64195453315C58671A6f847CE1aC2",
     "verifier": "0x843676318CB5c0b4b8BC526DA013754fFB6C83F8",
     "rollupL1DAValidator": "0xC533CcE441ED81782127ef99B936bFbeB62DD26B"
@@ -20,23 +20,23 @@
   "chainAddresses": [
     {
       "chainId": 10,
-      "diamondProxy": "0xA6f4bC5c91B9b5D0B66feA658995670474C68A86"
+      "diamondProxy": "0x768a88Fa204dAc9E721Ece1C62b7D07a33cEa73f"
     },
     {
       "chainId": 11,
-      "diamondProxy": "0x22847AaE5b6342c863B42C1924B99589b7EE5a00"
+      "diamondProxy": "0x0D18afd8464EF3658C84D2649EA7acb5B32A2455"
     },
     {
       "chainId": 12,
-      "diamondProxy": "0x268cB0c1E8EC5099894bEef5525d9D3eC03186c7"
+      "diamondProxy": "0x90a2Bd7f7c347e2f0E68467C9D4af1dc05B651EB"
     },
     {
       "chainId": 13,
-      "diamondProxy": "0xE8E3D246f1602292725De48D81282e5950883BEf"
+      "diamondProxy": "0x6797b30a5c8dF7787487CF89f3dd8e2b8C28D82e"
     },
     {
       "chainId": 14,
-      "diamondProxy": "0x0df9DAfdA11DD31D8746D9279aD505f0e9dF3118"
+      "diamondProxy": "0x16084EE02e1856F90e73FaFE4E83f90c9711EcaB"
     }
   ],
   "testTokens": {

@@ -84,9 +84,6 @@ uint256 constant ZKSYNC_OS_MOCK_PROOF_LENGTH = 2;
 /// @dev Marker expected as the first word in a proof-skipping ZKsync OS testnet proof.
 uint256 constant ZKSYNC_OS_MOCK_PROOF_MAGIC = 13;
 
-/// @dev Maximum number of linked-list leaves checked when correcting a stale indexed Merkle tree low leaf.
-uint256 constant MAX_LOW_INDEX_SEARCH_ATTEMPTS = 5;
-
 /// @dev Padding value for empty/unused leaves in an {IndexedMerkleTree}. Deliberately NOT a valid
 /// `hashLeaf(IMTLeaf)` output, so an unused padded index can't be presented as a `{0,0,0}` low leaf to forge
 /// a non-inclusion proof. The off-chain imt-engine must use the same value.
