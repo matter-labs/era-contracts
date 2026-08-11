@@ -20,7 +20,8 @@ import {
     ZKSYNC_OS_MOCK_PROOF_MAGIC,
     ZKSYNC_OS_MOCK_VERIFICATION_TYPE,
     ZKSYNC_OS_PLONK_VERIFICATION_TYPE,
-    ZKSYNC_OS_PROOF_METADATA_LENGTH
+    ZKSYNC_OS_PROOF_METADATA_LENGTH,
+    PUBLIC_INPUT_SHIFT
 } from "contracts/common/Config.sol";
 
 /// @notice Isolates wrapper routing and input handling from the generated cryptographic verifier.
@@ -267,10 +268,7 @@ contract ZKsyncOSVerifierTest is Test {
 
         uint256 result = verifier.computeZKsyncOSHash(initialHash, publicInputs);
 
-        // Manually compute expected hash
-        uint256 expected = initialHash;
-        expected = uint256(keccak256(abi.encodePacked(expected, publicInputs[0]))) >> 32;
-        expected = uint256(keccak256(abi.encodePacked(expected, publicInputs[1]))) >> 32;
+        uint256 expected = uint256(keccak256(abi.encodePacked(initialHash, publicInputs))) >> PUBLIC_INPUT_SHIFT;
 
         assertEq(result, expected);
     }
@@ -283,9 +281,7 @@ contract ZKsyncOSVerifierTest is Test {
 
         uint256 result = verifier.computeZKsyncOSHash(initialHash, publicInputs);
 
-        // When initial hash is 0, it takes the first public input as the starting hash
-        uint256 expected = publicInputs[0];
-        expected = uint256(keccak256(abi.encodePacked(expected, publicInputs[1]))) >> 32;
+        uint256 expected = uint256(keccak256(abi.encodePacked(publicInputs))) >> PUBLIC_INPUT_SHIFT;
 
         assertEq(result, expected);
     }
@@ -297,7 +293,7 @@ contract ZKsyncOSVerifierTest is Test {
 
         uint256 result = verifier.computeZKsyncOSHash(initialHash, publicInputs);
 
-        uint256 expected = uint256(keccak256(abi.encodePacked(initialHash, publicInputs[0]))) >> 32;
+        uint256 expected = uint256(keccak256(abi.encodePacked(initialHash, publicInputs))) >> PUBLIC_INPUT_SHIFT;
 
         assertEq(result, expected);
     }
@@ -309,8 +305,7 @@ contract ZKsyncOSVerifierTest is Test {
 
         uint256 result = verifier.computeZKsyncOSHash(initialHash, publicInputs);
 
-        // When initial is 0 and there's only one input, result is that input
-        assertEq(result, publicInputs[0]);
+        assertEq(result, publicInputs[0] >> PUBLIC_INPUT_SHIFT);
     }
 
     // ============ Fuzz Tests ============
