@@ -5,7 +5,7 @@ import { depositETHToL2 } from "../../src/helpers/l1-deposit-helper";
 import { withdrawETHFromL2 } from "../../src/helpers/l2-withdrawal-helper";
 import { getL1BridgedOut, getL1BaseTokenAssetId } from "../../src/helpers/bridged-out-helper";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_RECIPIENT_ADDR } from "../../src/core/const";
-import { getL2Chain, getChainIdByRole } from "../../src/core/utils";
+import { getL2Chain, getChainIdByRole, createProvider } from "../../src/core/utils";
 
 describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
   this.timeout(0);
@@ -24,12 +24,12 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
 
   describe("ETH deposits L1 -> L2", () => {
     it("deposits ETH from L1 to L2", async () => {
-      const l1Provider = new ethers.providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
+      const l1Provider = createProvider(state.chains!.l1!.rpcUrl);
       const senderAddr = ANVIL_DEFAULT_ACCOUNT_ADDR;
       const recipientAddr = ANVIL_RECIPIENT_ADDR;
       const amount = ethers.utils.parseEther("1.0");
       const l2Chain = getL2Chain(state.chains!, directSettledChainId);
-      const l2Provider = new ethers.providers.JsonRpcProvider(l2Chain.rpcUrl);
+      const l2Provider = createProvider(l2Chain.rpcUrl);
 
       // Snapshot sender's L1 balance and recipient's L2 balance separately
       const senderL1Before = await l1Provider.getBalance(senderAddr);
@@ -82,7 +82,7 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
 
   describe("ETH withdrawals L2 -> L1", () => {
     it("withdraws ETH from L2 to L1", async () => {
-      const l1Provider = new ethers.providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
+      const l1Provider = createProvider(state.chains!.l1!.rpcUrl);
       const recipientAddr = ANVIL_RECIPIENT_ADDR;
       const amount = ethers.utils.parseEther("0.5");
       const l2Chain = getL2Chain(state.chains!, directSettledChainId);
