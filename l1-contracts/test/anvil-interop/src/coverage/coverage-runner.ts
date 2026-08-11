@@ -9,7 +9,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { providers } from "ethers";
+import type { providers } from "ethers";
 import { collectChainTraces, mergeTraces } from "./trace-collector";
 import { resolveContracts, resolveByBytecode } from "./artifact-resolver";
 import {
@@ -23,6 +23,7 @@ import {
 import type { ContractSourceMap } from "./source-map-decoder";
 import { generateLcov, writeLcov, generateSummary, filterCoverageFiles } from "./lcov-generator";
 import type { FileCoverage } from "./lcov-generator";
+import { createProvider } from "../core/utils";
 
 export interface CoverageOptions {
   /** Path to the l1-contracts directory */
@@ -103,7 +104,7 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
   console.log("\n🔍 Step 5: Resolving remaining contract addresses...");
   const allProviders = new Map<string, providers.JsonRpcProvider>();
   for (const [label, url] of rpcUrls) {
-    allProviders.set(label, new providers.JsonRpcProvider(url));
+    allProviders.set(label, createProvider(url));
   }
 
   // Build a set of already-resolved addresses

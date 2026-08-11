@@ -1,4 +1,5 @@
-import { BigNumber, Contract, ethers, providers, Wallet } from "ethers";
+import type { providers } from "ethers";
+import { BigNumber, Contract, ethers, Wallet } from "ethers";
 import { DeploymentRunner } from "../deployment-runner";
 import type { MultiChainTokenTransferParams, MultiChainTokenTransferResult } from "../core/types";
 import { getAbi } from "../core/contracts";
@@ -12,6 +13,7 @@ import {
 } from "./interop-helpers";
 import { ANVIL_DEFAULT_PRIVATE_KEY, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
 import { encodeNtvAssetId, encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
+import { createProvider } from "../core/utils";
 
 type Logger = (line: string) => void;
 
@@ -61,8 +63,8 @@ export async function executeTokenTransfer(
   }
 
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
-  const sourceProvider = new providers.JsonRpcProvider(sourceChain.rpcUrl);
-  const targetProvider = new providers.JsonRpcProvider(targetChain.rpcUrl);
+  const sourceProvider = createProvider(sourceChain.rpcUrl);
+  const targetProvider = createProvider(targetChain.rpcUrl);
   const sourceWallet = new Wallet(privateKey, sourceProvider);
 
   const sourceToken = new Contract(sourceTokenAddr, getAbi("TestnetERC20Token"), sourceWallet);

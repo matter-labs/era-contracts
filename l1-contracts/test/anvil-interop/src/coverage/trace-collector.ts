@@ -10,7 +10,7 @@
  * to return non-empty structLogs.
  */
 
-import { providers } from "ethers";
+import { createProvider } from "../core/utils";
 
 /** Per-contract execution data: set of PCs that were executed */
 export type ContractPCs = Map<string, Set<number>>;
@@ -69,7 +69,7 @@ function extractCallTarget(log: StructLog): string | null {
  * @returns Map of lowercase address -> set of executed PCs
  */
 export async function collectChainTraces(rpcUrl: string, label: string): Promise<ContractPCs> {
-  const provider = new providers.JsonRpcProvider(rpcUrl);
+  const provider = createProvider(rpcUrl);
   const contractPCs: ContractPCs = new Map();
 
   const blockNumber = await provider.getBlockNumber();

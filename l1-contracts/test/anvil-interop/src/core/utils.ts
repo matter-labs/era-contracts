@@ -14,6 +14,26 @@ import {
 } from "./const";
 import { runtimeConfig } from "./runtime-config";
 import { getAbi } from "./contracts";
+
+/**
+ * ethers v5 polls for transaction receipts every `pollingInterval` ms, defaulting to 4000 — so
+ * every `tx.wait()` costs up to four seconds of waiting no matter how fast blocks are produced,
+ * and the interop relay loops in temp-sdk.ts sleep `provider.pollingInterval` per iteration on
+ * top of that. That is what paces this suite: dropping the anvil block time from 1s to 0.2s moved
+ * the wall clock by ~5%, because the specs were never waiting on block production.
+ *
+ * Build every provider through this helper so the interval is set in one place. Override with
+ * ANVIL_INTEROP_POLLING_INTERVAL_MS.
+ */
+export const PROVIDER_POLLING_INTERVAL_MS = Number(process.env.ANVIL_INTEROP_POLLING_INTERVAL_MS ?? 100);
+
+export function createProvider(rpcUrl: string): providers.JsonRpcProvider {
+  // eslint-disable-next-line no-restricted-syntax -- the one place that may construct a provider
+  const provider = new providers.JsonRpcProvider(rpcUrl);
+  provider.pollingInterval = PROVIDER_POLLING_INTERVAL_MS;
+  return provider;
+}
+
 import type {
   AnvilChainConfig,
   ChainAddresses,
@@ -35,7 +55,7 @@ export function timeIt(label: string, prefix = "⏱️  [TIMING]"): () => void {
 }
 
 export async function waitForChainReady(rpcUrl: string, maxAttempts = 30): Promise<boolean> {
-  const provider = new providers.JsonRpcProvider(rpcUrl);
+  const provider = createProvider(rpcUrl);
 
   for (let i = 0; i < maxAttempts; i++) {
     try {
@@ -376,8 +396,8 @@ async function resolvePriorityRelayPath(path: PriorityRelayResolvedPath): Promis
   gwDiamondProxy?: string;
   nestedL1DiamondProxy?: string;
 }> {
-  const l1Provider = new providers.JsonRpcProvider(path.l1RpcUrl);
-  const l2Provider = new providers.JsonRpcProvider(path.chainRpcUrl);
+  const l1Provider = createProvider(path.l1RpcUrl);
+  const l2Provider = createProvider(path.chainRpcUrl);
   const bridgehub = new ethers.Contract(path.bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
   const settlementLayerChainId = await getSettlementLayerChainId(l1Provider, path.bridgehubAddr, path.chainId);
   const relayChainId = settlementLayerChainId === 0 ? path.chainId : settlementLayerChainId;
@@ -410,7 +430,7 @@ async function resolvePriorityRelayPath(path: PriorityRelayResolvedPath): Promis
     throw new Error(`No L1 diamond proxy registered for nested chain ${path.chainId}`);
   }
 
-  const gwProvider = new providers.JsonRpcProvider(path.gwRpcUrl);
+  const gwProvider = createProvider(path.gwRpcUrl);
   const gwBridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), gwProvider);
   const gwDiamondProxy: string = await gwBridgehub.getZKChain(path.chainId);
 
@@ -646,7 +666,7 @@ export async function scanAndRelayPriorityRequests(
  * @returns The interopBundle argument from the first InteropBundleSent event found.
  */
 export async function extractInteropBundle(rpcUrl: string, txHash: string): Promise<InteropBundle> {
-  const provider = new providers.JsonRpcProvider(rpcUrl);
+  const provider = createProvider(rpcUrl);
   const receipt = await provider.getTransactionReceipt(txHash);
   const iface = new ethers.utils.Interface(getAbi("InteropCenter"));
 
