@@ -73,8 +73,10 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         assertEq(chainIds.length, 2);
         assertEq(chainIds[0], chainId);
 
+        // The CTM is deployed with the protocol version declared by the genesis config, so assert
+        // against that rather than a literal that goes stale on every patch bump.
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(chainId);
-        assertEq(protocolVersion, 133143986176);
+        assertEq(protocolVersion, ecosystemConfig.contracts.chainCreationParams.latestProtocolVersion);
     }
 
     function test_registerAlreadyDeployedZKChain() public {
