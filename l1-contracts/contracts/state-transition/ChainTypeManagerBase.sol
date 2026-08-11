@@ -19,7 +19,7 @@ import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIAL
 import {
     AdminZero,
     InitialForceDeploymentMismatch,
-    NotAPatchUpgrade,
+    NotAVerifierOnlyUpgrade,
     OutdatedProtocolVersion
 } from "./L1StateTransitionErrors.sol";
 import {
@@ -112,6 +112,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev Updating this mapping only affects CTM storage; it does NOT update already deployed chains.
     /// @dev Emergency verifier changes still require a chain upgrade (diamond cut).
     mapping(uint256 protocolVersion => address) public protocolVersionVerifier;
+
+    /// @dev The upgrade contract used for upgrades that need no custom upgrade logic.
+    /// @dev Populated starting from v32.
+    address public defaultUpgrade;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -330,6 +334,17 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         _setProtocolVersionVerifier(_protocolVersion, _verifier);
     }
 
+    /// @notice Sets the upgrade contract used by upgrades that need no custom upgrade logic, e.g. verifier-only ones
+    /// @param _defaultUpgrade The new default upgrade contract address
+    function setDefaultUpgrade(address _defaultUpgrade) external onlyOwner {
+        if (_defaultUpgrade == address(0)) {
+            revert ZeroAddress();
+        }
+        address oldDefaultUpgrade = defaultUpgrade;
+        defaultUpgrade = _defaultUpgrade;
+        emit NewDefaultUpgrade(oldDefaultUpgrade, _defaultUpgrade);
+    }
+
     /// @dev Internal function to set verifier address for a protocol version
     /// @param _protocolVersion The protocol version
     /// @param _verifier The verifier address
@@ -363,40 +378,40 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         });
     }
 
-    /// @notice Creates a patch upgrade for verifier-only upgrades (no facet changes)
-    /// @dev This function creates a DiamondCutData with empty facet cuts but with an upgrade contract.
+    /// @notice Creates a verifier-only upgrade (no facet changes) to a new minor or patch version
+    /// @dev This function creates a DiamondCutData with empty facet cuts that runs the stored `defaultUpgrade`
+    /// contract, which picks the new verifier up from `protocolVersionVerifier`.
     /// @dev ChainCreationParams remain unchanged - only the upgrade cut hash is set.
     /// @param _oldProtocolVersion the old protocol version
     /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
     /// @param _newProtocolVersion the new protocol version
     /// @param _verifier the verifier address for the new protocol version
-    /// @param _upgradeContract the address of the upgrade contract to execute
-    function createNewPatchUpgrade(
+    function createNewVerifierOnlyUpgrade(
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion,
-        address _verifier,
-        address _upgradeContract
+        address _verifier
     ) external onlyOwner {
-        if (_upgradeContract == address(0)) {
+        address upgradeContract = defaultUpgrade;
+        if (upgradeContract == address(0)) {
             revert ZeroAddress();
         }
-        // Validate this is a patch upgrade (major and minor versions must be the same).
-        // Note: Non-sequential patch jumps are allowed (e.g., 0.25.1 -> 0.25.4) to support
-        // skipping intermediate patch versions when needed.
+        // Only the minor and patch parts of the version may change, since a major version bump is not
+        // supported by the upgrade flow at all.
+        // Note: Non-sequential minor/patch jumps are allowed (e.g., 0.25.1 -> 0.25.4) to support
+        // skipping intermediate versions when needed.
         {
-            (uint32 oldMajor, uint32 oldMinor, uint32 oldPatch) = SemVer.unpackSemVer(
-                SafeCast.toUint96(_oldProtocolVersion)
-            );
-            (uint32 newMajor, uint32 newMinor, uint32 newPatch) = SemVer.unpackSemVer(
-                SafeCast.toUint96(_newProtocolVersion)
-            );
-            if (oldMajor != newMajor || oldMinor != newMinor || newPatch <= oldPatch) {
-                revert NotAPatchUpgrade(_oldProtocolVersion, _newProtocolVersion);
+            // slither-disable-next-line unused-return
+            (uint32 oldMajor, , ) = SemVer.unpackSemVer(SafeCast.toUint96(_oldProtocolVersion));
+            // slither-disable-next-line unused-return
+            (uint32 newMajor, , ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion));
+            // With equal major parts, comparing the packed versions compares (minor, patch) lexicographically.
+            if (oldMajor != newMajor || _newProtocolVersion <= _oldProtocolVersion) {
+                revert NotAVerifierOnlyUpgrade(_oldProtocolVersion, _newProtocolVersion);
             }
         }
 
-        // Construct minimal ProposedUpgrade for patch (VK-only) upgrade
+        // Construct minimal ProposedUpgrade for the verifier-only upgrade
         ProposedUpgrade memory proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(_newProtocolVersion);
 
         bytes memory upgradeCalldata = abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade));
@@ -405,11 +420,11 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         Diamond.FacetCut[] memory emptyFacetCuts = new Diamond.FacetCut[](0);
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: emptyFacetCuts,
-            initAddress: _upgradeContract,
+            initAddress: upgradeContract,
             initCalldata: upgradeCalldata
         });
 
-        // For patch upgrades, chain creation params don't change — carry forward from the old version.
+        // For verifier-only upgrades, chain creation params don't change — carry forward from the old version.
         newChainCreationParamsBlock[_newProtocolVersion] = newChainCreationParamsBlock[_oldProtocolVersion];
 
         _setNewVersionUpgrade({

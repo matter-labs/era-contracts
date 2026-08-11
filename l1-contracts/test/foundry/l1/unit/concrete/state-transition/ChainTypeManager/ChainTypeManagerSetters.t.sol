@@ -8,8 +8,10 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {NotAPatchUpgrade} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {NotAVerifierOnlyUpgrade} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
+import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
+import {ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract ChainTypeManagerSetters is ChainTypeManagerTest {
@@ -178,22 +180,207 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
         vm.stopPrank();
     }
 
-    // createNewPatchUpgrade - happy path
-    function test_SuccessfulCreateNewPatchUpgrade() public {
+    // setDefaultUpgrade - happy path
+    function test_SuccessfulSetDefaultUpgrade() public {
+        address firstDefaultUpgrade = makeAddr("firstDefaultUpgrade");
+        address secondDefaultUpgrade = makeAddr("secondDefaultUpgrade");
+
+        vm.prank(governor);
+        vm.expectEmit(true, true, true, true);
+        emit IChainTypeManager.NewDefaultUpgrade(address(0), firstDefaultUpgrade);
+        chainContractAddress.setDefaultUpgrade(firstDefaultUpgrade);
+        assertEq(chainContractAddress.defaultUpgrade(), firstDefaultUpgrade);
+
+        vm.prank(governor);
+        vm.expectEmit(true, true, true, true);
+        emit IChainTypeManager.NewDefaultUpgrade(firstDefaultUpgrade, secondDefaultUpgrade);
+        chainContractAddress.setDefaultUpgrade(secondDefaultUpgrade);
+        assertEq(chainContractAddress.defaultUpgrade(), secondDefaultUpgrade);
+    }
+
+    // setDefaultUpgrade - unhappy path (zero address)
+    function test_RevertWhen_SetDefaultUpgradeWithZeroAddress() public {
+        vm.prank(governor);
+        vm.expectRevert(ZeroAddress.selector);
+        chainContractAddress.setDefaultUpgrade(address(0));
+    }
+
+    // setDefaultUpgrade - unhappy path (unauthorized)
+    function test_RevertWhen_SetDefaultUpgradeUnauthorized() public {
+        address randomUser = makeAddr("randomUser");
+
+        vm.prank(randomUser);
+        vm.expectRevert("Ownable: caller is not the owner");
+        chainContractAddress.setDefaultUpgrade(makeAddr("defaultUpgrade"));
+    }
+
+    // createNewVerifierOnlyUpgrade - happy path (patch version bump)
+    function test_SuccessfulCreateNewVerifierOnlyUpgradePatchVersion() public {
         // Pack protocol versions: 0.25.0 -> 0.25.1 (patch upgrade)
         uint256 oldProtocolVersion = SemVer.packSemVer(0, 25, 0);
         uint256 newProtocolVersion = SemVer.packSemVer(0, 25, 1);
         uint256 oldProtocolVersionDeadline = block.timestamp + 1 days;
-        address newVerifier = makeAddr("patchVerifier");
-        address upgradeContract = address(new DefaultUpgrade());
+        address newVerifier = makeAddr("verifierOnlyVerifier");
+        address upgradeContract = _setDefaultUpgrade();
 
-        // Mock migration paused check
+        _advanceProtocolVersionTo(oldProtocolVersion);
+
+        vm.prank(governor);
+        vm.expectEmit(true, true, true, true);
+        emit IChainTypeManager.NewProtocolVersion(oldProtocolVersion, newProtocolVersion);
+        chainContractAddress.createNewVerifierOnlyUpgrade(
+            oldProtocolVersion,
+            oldProtocolVersionDeadline,
+            newProtocolVersion,
+            newVerifier
+        );
+
+        // Verify the new protocol version is set
+        assertEq(chainContractAddress.protocolVersion(), newProtocolVersion);
+        // Verify the verifier is set for the new protocol version
+        assertEq(chainContractAddress.protocolVersionVerifier(newProtocolVersion), newVerifier);
+        // Verify the upgrade cut runs the stored default upgrade contract with an otherwise empty upgrade
+        assertEq(
+            chainContractAddress.upgradeCutHash(oldProtocolVersion),
+            _expectedVerifierOnlyCutHash(upgradeContract, newProtocolVersion)
+        );
+        // Verify the old protocol version deadline is set
+        assertEq(chainContractAddress.protocolVersionDeadline(oldProtocolVersion), oldProtocolVersionDeadline);
+    }
+
+    // createNewVerifierOnlyUpgrade - happy path (minor version bump)
+    function test_SuccessfulCreateNewVerifierOnlyUpgradeMinorVersion() public {
+        // Pack protocol versions: 0.25.1 -> 0.26.0 (minor upgrade)
+        uint256 oldProtocolVersion = SemVer.packSemVer(0, 25, 1);
+        uint256 newProtocolVersion = SemVer.packSemVer(0, 26, 0);
+        uint256 oldProtocolVersionDeadline = block.timestamp + 1 days;
+        address newVerifier = makeAddr("verifierOnlyVerifier");
+        address upgradeContract = _setDefaultUpgrade();
+
+        _advanceProtocolVersionTo(oldProtocolVersion);
+
+        vm.prank(governor);
+        vm.expectEmit(true, true, true, true);
+        emit IChainTypeManager.NewProtocolVersion(oldProtocolVersion, newProtocolVersion);
+        chainContractAddress.createNewVerifierOnlyUpgrade(
+            oldProtocolVersion,
+            oldProtocolVersionDeadline,
+            newProtocolVersion,
+            newVerifier
+        );
+
+        assertEq(chainContractAddress.protocolVersion(), newProtocolVersion);
+        assertEq(chainContractAddress.protocolVersionVerifier(newProtocolVersion), newVerifier);
+        assertEq(
+            chainContractAddress.upgradeCutHash(oldProtocolVersion),
+            _expectedVerifierOnlyCutHash(upgradeContract, newProtocolVersion)
+        );
+    }
+
+    // createNewVerifierOnlyUpgrade - revert when major version changes
+    function test_RevertWhen_CreateNewVerifierOnlyUpgradeMajorVersionChanges() public {
+        // Pack protocol versions: 0.25.0 -> 1.25.0 (major upgrade)
+        uint256 oldProtocolVersion = SemVer.packSemVer(0, 25, 0);
+        uint256 newProtocolVersion = SemVer.packSemVer(1, 25, 0);
+        uint256 oldProtocolVersionDeadline = block.timestamp + 1 days;
+        address newVerifier = makeAddr("verifierOnlyVerifier");
+        _setDefaultUpgrade();
+
+        vm.prank(governor);
+        vm.expectRevert(
+            abi.encodeWithSelector(NotAVerifierOnlyUpgrade.selector, oldProtocolVersion, newProtocolVersion)
+        );
+        chainContractAddress.createNewVerifierOnlyUpgrade(
+            oldProtocolVersion,
+            oldProtocolVersionDeadline,
+            newProtocolVersion,
+            newVerifier
+        );
+    }
+
+    // createNewVerifierOnlyUpgrade - revert when the new version does not increase
+    function test_RevertWhen_CreateNewVerifierOnlyUpgradeVersionNotIncreased() public {
+        // Pack protocol versions: 0.25.2 -> 0.25.2 (no version change at all)
+        uint256 oldProtocolVersion = SemVer.packSemVer(0, 25, 2);
+        uint256 oldProtocolVersionDeadline = block.timestamp + 1 days;
+        address newVerifier = makeAddr("verifierOnlyVerifier");
+        _setDefaultUpgrade();
+
+        vm.prank(governor);
+        vm.expectRevert(
+            abi.encodeWithSelector(NotAVerifierOnlyUpgrade.selector, oldProtocolVersion, oldProtocolVersion)
+        );
+        chainContractAddress.createNewVerifierOnlyUpgrade(
+            oldProtocolVersion,
+            oldProtocolVersionDeadline,
+            oldProtocolVersion,
+            newVerifier
+        );
+
+        // Pack protocol versions: 0.25.2 -> 0.24.3 (minor version goes backwards)
+        uint256 lowerProtocolVersion = SemVer.packSemVer(0, 24, 3);
+        vm.prank(governor);
+        vm.expectRevert(
+            abi.encodeWithSelector(NotAVerifierOnlyUpgrade.selector, oldProtocolVersion, lowerProtocolVersion)
+        );
+        chainContractAddress.createNewVerifierOnlyUpgrade(
+            oldProtocolVersion,
+            oldProtocolVersionDeadline,
+            lowerProtocolVersion,
+            newVerifier
+        );
+    }
+
+    // createNewVerifierOnlyUpgrade - revert when the default upgrade contract is not set
+    function test_RevertWhen_CreateNewVerifierOnlyUpgradeWithoutDefaultUpgrade() public {
+        uint256 oldProtocolVersion = SemVer.packSemVer(0, 25, 0);
+        uint256 newProtocolVersion = SemVer.packSemVer(0, 25, 1);
+        uint256 oldProtocolVersionDeadline = block.timestamp + 1 days;
+        address newVerifier = makeAddr("verifierOnlyVerifier");
+
+        vm.prank(governor);
+        vm.expectRevert(ZeroAddress.selector);
+        chainContractAddress.createNewVerifierOnlyUpgrade(
+            oldProtocolVersion,
+            oldProtocolVersionDeadline,
+            newProtocolVersion,
+            newVerifier
+        );
+    }
+
+    // createNewVerifierOnlyUpgrade - revert when not owner
+    function test_RevertWhen_CreateNewVerifierOnlyUpgradeUnauthorized() public {
+        uint256 oldProtocolVersion = SemVer.packSemVer(0, 25, 0);
+        uint256 newProtocolVersion = SemVer.packSemVer(0, 25, 1);
+        uint256 oldProtocolVersionDeadline = block.timestamp + 1 days;
+        address newVerifier = makeAddr("verifierOnlyVerifier");
+        address randomUser = makeAddr("randomUser");
+        _setDefaultUpgrade();
+
+        vm.prank(randomUser);
+        vm.expectRevert("Ownable: caller is not the owner");
+        chainContractAddress.createNewVerifierOnlyUpgrade(
+            oldProtocolVersion,
+            oldProtocolVersionDeadline,
+            newProtocolVersion,
+            newVerifier
+        );
+    }
+
+    /// @dev Deploys an upgrade contract and stores it in the CTM as the default one.
+    function _setDefaultUpgrade() private returns (address defaultUpgrade) {
+        defaultUpgrade = address(new DefaultUpgrade());
+        vm.prank(governor);
+        chainContractAddress.setDefaultUpgrade(defaultUpgrade);
+    }
+
+    /// @dev Moves the CTM's protocolVersion from the initial `0` to `_protocolVersion` with an empty upgrade,
+    /// so that a verifier-only upgrade on top of it has the correct base.
+    function _advanceProtocolVersionTo(uint256 _protocolVersion) private {
         _mockMigrationPausedFromBridgehub();
 
-        // First advance the CTM's protocolVersion from 0 to 0.25.0 so the patch upgrade has the correct base
-        Diamond.FacetCut[] memory emptyFacetCuts = new Diamond.FacetCut[](0);
         Diamond.DiamondCutData memory emptyCut = Diamond.DiamondCutData({
-            facetCuts: emptyFacetCuts,
+            facetCuts: new Diamond.FacetCut[](0),
             initAddress: address(0),
             initCalldata: ""
         });
@@ -202,87 +389,26 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
             emptyCut,
             0,
             block.timestamp + 1 days,
-            oldProtocolVersion,
+            _protocolVersion,
             testnetVerifier
         );
-
-        vm.prank(governor);
-        vm.expectEmit(true, true, true, true);
-        emit IChainTypeManager.NewProtocolVersion(oldProtocolVersion, newProtocolVersion);
-        chainContractAddress.createNewPatchUpgrade(
-            oldProtocolVersion,
-            oldProtocolVersionDeadline,
-            newProtocolVersion,
-            newVerifier,
-            upgradeContract
-        );
-
-        // Verify the new protocol version is set
-        assertEq(chainContractAddress.protocolVersion(), newProtocolVersion);
-        // Verify the verifier is set for the new protocol version
-        assertEq(chainContractAddress.protocolVersionVerifier(newProtocolVersion), newVerifier);
-        // Verify the upgrade cut hash is set for the old protocol version
-        assertTrue(chainContractAddress.upgradeCutHash(oldProtocolVersion) != bytes32(0));
     }
 
-    // createNewPatchUpgrade - revert when minor version changes
-    function test_RevertWhen_CreateNewPatchUpgradeMinorVersionChanges() public {
-        // Pack protocol versions: 0.25.0 -> 0.26.0 (minor upgrade, not patch)
-        uint256 oldProtocolVersion = SemVer.packSemVer(0, 25, 0);
-        uint256 newProtocolVersion = SemVer.packSemVer(0, 26, 0);
-        uint256 oldProtocolVersionDeadline = block.timestamp + 1 days;
-        address newVerifier = makeAddr("patchVerifier");
-        address upgradeContract = address(new DefaultUpgrade());
-
-        vm.prank(governor);
-        vm.expectRevert(abi.encodeWithSelector(NotAPatchUpgrade.selector, oldProtocolVersion, newProtocolVersion));
-        chainContractAddress.createNewPatchUpgrade(
-            oldProtocolVersion,
-            oldProtocolVersionDeadline,
-            newProtocolVersion,
-            newVerifier,
-            upgradeContract
-        );
-    }
-
-    // createNewPatchUpgrade - revert when major version changes
-    function test_RevertWhen_CreateNewPatchUpgradeMajorVersionChanges() public {
-        // Pack protocol versions: 0.25.0 -> 1.25.0 (major upgrade, not patch)
-        uint256 oldProtocolVersion = SemVer.packSemVer(0, 25, 0);
-        uint256 newProtocolVersion = SemVer.packSemVer(1, 25, 0);
-        uint256 oldProtocolVersionDeadline = block.timestamp + 1 days;
-        address newVerifier = makeAddr("patchVerifier");
-        address upgradeContract = address(new DefaultUpgrade());
-
-        vm.prank(governor);
-        vm.expectRevert(abi.encodeWithSelector(NotAPatchUpgrade.selector, oldProtocolVersion, newProtocolVersion));
-        chainContractAddress.createNewPatchUpgrade(
-            oldProtocolVersion,
-            oldProtocolVersionDeadline,
-            newProtocolVersion,
-            newVerifier,
-            upgradeContract
-        );
-    }
-
-    // createNewPatchUpgrade - revert when not owner
-    function test_RevertWhen_CreateNewPatchUpgradeUnauthorized() public {
-        uint256 oldProtocolVersion = SemVer.packSemVer(0, 25, 0);
-        uint256 newProtocolVersion = SemVer.packSemVer(0, 25, 1);
-        uint256 oldProtocolVersionDeadline = block.timestamp + 1 days;
-        address newVerifier = makeAddr("patchVerifier");
-        address upgradeContract = makeAddr("upgradeContract");
-        address randomUser = makeAddr("randomUser");
-
-        vm.prank(randomUser);
-        vm.expectRevert("Ownable: caller is not the owner");
-        chainContractAddress.createNewPatchUpgrade(
-            oldProtocolVersion,
-            oldProtocolVersionDeadline,
-            newProtocolVersion,
-            newVerifier,
-            upgradeContract
-        );
+    /// @dev The diamond cut a verifier-only upgrade is expected to store: no facet changes, the stored default
+    /// upgrade contract and an otherwise empty upgrade.
+    function _expectedVerifierOnlyCutHash(
+        address _defaultUpgrade,
+        uint256 _newProtocolVersion
+    ) private pure returns (bytes32) {
+        Diamond.DiamondCutData memory expectedCut = Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: _defaultUpgrade,
+            initCalldata: abi.encodeCall(
+                IDefaultUpgrade.upgrade,
+                (ProposedUpgradeLib.emptyProposedUpgrade(_newProtocolVersion))
+            )
+        });
+        return keccak256(abi.encode(expectedCut));
     }
 
     // deactivatePriorityMode
