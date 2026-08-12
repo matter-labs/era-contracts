@@ -20,7 +20,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { formatMergeSummary, mergeLcovFiles } from "./src/coverage/lcov-merge";
+import { assertMergedCoverageUsable, formatMergeSummary, mergeLcovFiles } from "./src/coverage/lcov-merge";
 
 const LCOV_FILE_NAME = "anvil-lcov.info";
 
@@ -76,6 +76,12 @@ for (const shardPath of shardPaths) {
 }
 
 const { stats } = mergeLcovFiles(shardPaths, outputPath);
+
+// The same check the in-process path runs. Without it this command — the one `coverage-report`
+// uses — accepted shard reports that existed but contained no hits at all, which is exactly the
+// silent "covered nothing" outcome the guard exists to prevent.
+assertMergedCoverageUsable(stats, shardPaths.length);
+
 const summary = formatMergeSummary(stats, shardPaths.length);
 const summaryPath = path.join(path.dirname(outputPath), "anvil-coverage-summary.txt");
 fs.writeFileSync(summaryPath, summary);

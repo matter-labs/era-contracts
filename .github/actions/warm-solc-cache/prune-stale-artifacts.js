@@ -162,9 +162,30 @@ function staleSources(manifestPath) {
   for (const [sourcePath, blob] of Object.entries(manifest.sources || {})) {
     if (current.sources[sourcePath] !== blob) changed.add(sourcePath);
   }
+
+  // Any Solidity drift invalidates everything, rather than just the artifacts of the changed
+  // sources. Two reasons, both measured:
+  //
+  //  * Source-map source IDs are local to one compilation. Between two build-info files in this
+  //    repo, 223 of 224 shared IDs point at different paths — so applying one build's map to
+  //    artifacts retained from another misattributes coverage to the wrong files, silently. And
+  //    artifacts record no build id (only their own source id), so the matching map cannot be
+  //    picked per artifact.
+  //  * Keeping artifacts while dropping build-info is worse still: an unrelated change elsewhere
+  //    in the repo would delete l1-contracts/out/build-info while every L1 artifact stays, forge
+  //    would skip the compilation, and coverage would fail outright on "No build-info JSON files
+  //    found".
+  //
+  // The cost is that a commit touching any .sol rebuilds that project from scratch; the cache then
+  // helps pushes that do not touch Solidity. Correct attribution is worth more than the minutes.
   if (changed.size > 0) {
-    console.log(`  ${changed.size} source(s) changed since the cache was built`);
+    console.log(
+      `  ${changed.size} source(s) changed since the cache was built — invalidating all artifacts, ` +
+        "so artifacts and build-info come from one coherent compile"
+    );
+    return { changed, invalidateAll: true };
   }
+
   return { changed, invalidateAll: false };
 }
 
@@ -223,7 +244,7 @@ function prune(projectDir, artifactsDir, stale) {
   // describes the *old* source set, so after a change it can be applied to new source maps and
   // misattribute or drop hits. Only removed when a compilation is certain to follow — deleting it
   // on a fully incremental build would leave the collector with no mapping at all.
-  if (stale.invalidateAll || stale.changed.size > 0) {
+  if (stale.invalidateAll) {
     const buildInfo = path.join(artifactsDir, "build-info");
     if (fs.existsSync(buildInfo)) {
       fs.rmSync(buildInfo, { recursive: true });

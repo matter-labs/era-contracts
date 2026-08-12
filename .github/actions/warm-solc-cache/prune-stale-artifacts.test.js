@@ -99,13 +99,34 @@ test("prunes only the deleted source's artifacts when a basename is shared", () 
   git(root, ["commit", "-qm", "delete the test source"]);
 
   prune(root, manifestPath);
-  assert.equal(survives(root, "l1-contracts/out/L1NativeTokenVault.sol/L1NativeTokenVault.json"), true);
+  // A deletion is drift, so the whole cache goes — artifacts and build-info have to come from one
+  // compile. What matters here is that the *tracked* deletion is noticed at all.
   assert.equal(survives(root, "l1-contracts/out/L1NativeTokenVault.sol/L1NativeTokenVaultTest.json"), false);
+  assert.equal(survives(root, "l1-contracts/out/L1NativeTokenVault.sol/L1NativeTokenVault.json"), false);
+});
+
+// The per-artifact compilationTarget check still earns its place: a source that git never tracked
+// has no manifest entry, so no drift is detected, and only matching artifacts against their own
+// compilation target can tell that it is gone. Forge names directories after the *basename*, and
+// this repo has 58 duplicates, so the target — not the directory name — is what identifies it.
+test("prunes by compilation target when an untracked source disappears", () => {
+  const { root, manifestPath } = fixture({
+    sources: { "l1-contracts/contracts/Tracked.sol": "contract Tracked {}" },
+    artifacts: {
+      "l1-contracts/out/Tracked.sol/Tracked.json": "contracts/Tracked.sol",
+      // Same directory, different source — the duplicate-basename case — and never tracked.
+      "l1-contracts/out/Tracked.sol/Generated.json": "contracts/generated/Tracked.sol",
+    },
+  });
+
+  prune(root, manifestPath);
+  assert.equal(survives(root, "l1-contracts/out/Tracked.sol/Tracked.json"), true, "tracked source still there");
+  assert.equal(survives(root, "l1-contracts/out/Tracked.sol/Generated.json"), false, "its source does not exist");
 });
 
 // The permanent-failure case: the artifact's target still resolves, so without the manifest it
 // would be re-saved under every later SHA and fail check-hashes forever.
-test("prunes artifacts of a source that changed, not just one that vanished", () => {
+test("drops artifacts of a source that changed, not just one that vanished", () => {
   const { root, manifestPath } = fixture({
     sources: { "l1-contracts/contracts/Pair.sol": "contract Kept {}\ncontract Removed {}\n" },
     artifacts: {
@@ -121,6 +142,35 @@ test("prunes artifacts of a source that changed, not just one that vanished", ()
   prune(root, manifestPath);
   assert.equal(survives(root, "l1-contracts/out/Pair.sol/Removed.json"), false);
   assert.equal(survives(root, "l1-contracts/out/Pair.sol/Kept.json"), false, "the whole file recompiles");
+});
+
+// Artifacts and build-info must come from one compile: source-map IDs are compilation-local (223 of
+// 224 shared IDs disagree between two build-infos here), and artifacts carry no build id, so a
+// retained artifact plus a newer map misattributes coverage. A change anywhere therefore clears
+// everything, including artifacts of untouched sources and the build-info beside them.
+test("a change to one source invalidates unrelated artifacts and build-info too", () => {
+  const { root, manifestPath } = fixture({
+    sources: {
+      "l1-contracts/contracts/Touched.sol": "contract Touched {}",
+      "l1-contracts/contracts/Untouched.sol": "contract Untouched {}",
+    },
+    artifacts: {
+      "l1-contracts/out/Touched.sol/Touched.json": "contracts/Touched.sol",
+      "l1-contracts/out/Untouched.sol/Untouched.json": "contracts/Untouched.sol",
+    },
+  });
+  const buildInfo = path.join(root, "l1-contracts/out/build-info/abc.json");
+  fs.mkdirSync(path.dirname(buildInfo), { recursive: true });
+  fs.writeFileSync(buildInfo, JSON.stringify({ source_id_to_path: { 0: "contracts/Touched.sol" } }));
+
+  fs.writeFileSync(path.join(root, "l1-contracts/contracts/Touched.sol"), "contract Touched { uint x; }");
+  git(root, ["add", "-A"]);
+  git(root, ["commit", "-qm", "touch one source"]);
+
+  prune(root, manifestPath);
+  assert.equal(survives(root, "l1-contracts/out/Touched.sol/Touched.json"), false);
+  assert.equal(survives(root, "l1-contracts/out/Untouched.sol/Untouched.json"), false, "unrelated artifact too");
+  assert.equal(fs.existsSync(buildInfo), false, "build-info goes with the artifacts");
 });
 
 test("keeps everything when nothing changed", () => {
@@ -228,7 +278,7 @@ test("does not accept a directory as proof that a source exists", () => {
   assert.equal(survives(root, "l1-contracts/zkstack-out/Migrator.sol/Migrator.json"), true, "left alone");
 });
 
-test("leaves build-info alone", () => {
+test("leaves build-info alone when nothing changed", () => {
   const { root, manifestPath } = fixture({
     sources: { "l1-contracts/contracts/A.sol": "contract A {}" },
     artifacts: { "l1-contracts/out/A.sol/A.json": "contracts/A.sol" },

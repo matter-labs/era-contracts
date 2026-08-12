@@ -54,6 +54,11 @@ jobs:
 
           # `protected` covers anything the org protects now or later, without editing this file.
           #
+          # $REF_NAME is interpolated unencoded on purpose: this endpoint matches the {branch}
+          # segment greedily, so slashes work. Verified against this very branch —
+          # `gh api repos/matter-labs/era-contracts/branches/kl/ci-speedups` returns it, and the
+          # gate job succeeded on that push. Encoding the slash as %2F would be likelier to break.
+          #
           # A lookup failure must not read as "unprotected": that would silently skip verification
           # for a protected branch whose name is outside the patterns above — the one case the API
           # check exists to cover. Retry, then fail loudly rather than quietly skipping. A branch
