@@ -3,7 +3,6 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
-import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
@@ -125,9 +124,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
     /// @notice A verifier-only upgrade carries no L2 upgrade transaction, so there is nothing to substitute and
     ///         the rewrite — which would reject the empty transaction data — must be skipped.
     function test_upgradeWithoutAnL2TransactionSkipsTheRewrite() public {
-        ProposedUpgrade memory verifierOnlyUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(protocolVersion);
-
-        assertEq(upgradeContract.upgrade(verifierOnlyUpgrade), Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
+        assertEq(upgradeContract.upgradeVerifierOnly(protocolVersion), Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
 
         assertEq(upgradeContract.getProtocolVersion(), protocolVersion);
         assertEq(upgradeContract.getVerifier(), mockVerifier);

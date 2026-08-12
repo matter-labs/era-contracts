@@ -6,12 +6,12 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {AddressHasNoCode, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {NotAVerifierOnlyUpgrade} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
-import {ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract ChainTypeManagerSetters is ChainTypeManagerTest {
@@ -182,8 +182,8 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
 
     // setDefaultUpgrade - happy path
     function test_SuccessfulSetDefaultUpgrade() public {
-        address firstDefaultUpgrade = makeAddr("firstDefaultUpgrade");
-        address secondDefaultUpgrade = makeAddr("secondDefaultUpgrade");
+        address firstDefaultUpgrade = address(new DefaultUpgrade());
+        address secondDefaultUpgrade = address(new DefaultUpgrade());
 
         vm.prank(governor);
         vm.expectEmit(true, true, true, true);
@@ -201,8 +201,17 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
     // setDefaultUpgrade - unhappy path (zero address)
     function test_RevertWhen_SetDefaultUpgradeWithZeroAddress() public {
         vm.prank(governor);
-        vm.expectRevert(ZeroAddress.selector);
+        vm.expectRevert(abi.encodeWithSelector(AddressHasNoCode.selector, address(0)));
         chainContractAddress.setDefaultUpgrade(address(0));
+    }
+
+    // setDefaultUpgrade - unhappy path (address without code)
+    function test_RevertWhen_SetDefaultUpgradeWithoutCode() public {
+        address codeless = makeAddr("codelessDefaultUpgrade");
+
+        vm.prank(governor);
+        vm.expectRevert(abi.encodeWithSelector(AddressHasNoCode.selector, codeless));
+        chainContractAddress.setDefaultUpgrade(codeless);
     }
 
     // setDefaultUpgrade - unhappy path (unauthorized)
@@ -296,6 +305,48 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
             newProtocolVersion,
             newVerifier
         );
+    }
+
+    // createNewVerifierOnlyUpgrade - revert when the minor version jump exceeds the per-chain limit
+    function test_RevertWhen_CreateNewVerifierOnlyUpgradeMinorDeltaTooBig() public {
+        uint32 oldMinor = 25;
+        uint256 oldProtocolVersion = SemVer.packSemVer(0, oldMinor, 0);
+        uint256 newProtocolVersion = SemVer.packSemVer(0, oldMinor + uint32(MAX_ALLOWED_MINOR_VERSION_DELTA) + 1, 0);
+        uint256 oldProtocolVersionDeadline = block.timestamp + 1 days;
+        address newVerifier = makeAddr("verifierOnlyVerifier");
+        _setDefaultUpgrade();
+
+        vm.prank(governor);
+        vm.expectRevert(
+            abi.encodeWithSelector(NotAVerifierOnlyUpgrade.selector, oldProtocolVersion, newProtocolVersion)
+        );
+        chainContractAddress.createNewVerifierOnlyUpgrade(
+            oldProtocolVersion,
+            oldProtocolVersionDeadline,
+            newProtocolVersion,
+            newVerifier
+        );
+    }
+
+    // createNewVerifierOnlyUpgrade - the largest minor jump the per-chain upgrade allows still goes through
+    function test_SuccessfulCreateNewVerifierOnlyUpgradeWithMaximalMinorDelta() public {
+        uint32 oldMinor = 25;
+        uint256 oldProtocolVersion = SemVer.packSemVer(0, oldMinor, 0);
+        uint256 newProtocolVersion = SemVer.packSemVer(0, oldMinor + uint32(MAX_ALLOWED_MINOR_VERSION_DELTA), 0);
+        address newVerifier = makeAddr("verifierOnlyVerifier");
+        _setDefaultUpgrade();
+
+        _advanceProtocolVersionTo(oldProtocolVersion);
+
+        vm.prank(governor);
+        chainContractAddress.createNewVerifierOnlyUpgrade(
+            oldProtocolVersion,
+            block.timestamp + 1 days,
+            newProtocolVersion,
+            newVerifier
+        );
+
+        assertEq(chainContractAddress.protocolVersion(), newProtocolVersion);
     }
 
     // createNewVerifierOnlyUpgrade - revert when the new version does not increase
@@ -403,10 +454,7 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
         Diamond.DiamondCutData memory expectedCut = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
             initAddress: _defaultUpgrade,
-            initCalldata: abi.encodeCall(
-                IDefaultUpgrade.upgrade,
-                (ProposedUpgradeLib.emptyProposedUpgrade(_newProtocolVersion))
-            )
+            initCalldata: abi.encodeCall(IDefaultUpgrade.upgradeVerifierOnly, (_newProtocolVersion))
         });
         return keccak256(abi.encode(expectedCut));
     }
