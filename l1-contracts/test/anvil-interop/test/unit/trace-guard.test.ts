@@ -43,7 +43,8 @@ test("accepts a shard that only read, without transacting", () => {
 // The aggregate check: individual shards may contribute nothing, a whole run may not.
 test("fails when no shard in the run contributed any coverage", () => {
   assert.throws(
-    () => assertMergedCoverageUsable({ files: 28, lines: 2054, linesHit: 0, functions: 158, functionsHit: 0 }, 5, false),
+    () =>
+      assertMergedCoverageUsable({ files: 28, lines: 2054, linesHit: 0, functions: 158, functionsHit: 0 }, 5, false),
     /No coverage from any of the 5 shard\(s\)[\s\S]*steps-tracing/
   );
 });
