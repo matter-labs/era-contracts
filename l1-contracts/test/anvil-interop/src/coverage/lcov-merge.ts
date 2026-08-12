@@ -160,6 +160,36 @@ export function mergeLcovFiles(
   return { stats, mergedPaths };
 }
 
+/**
+ * Fails when a whole run produced no coverage at all.
+ *
+ * This is the aggregate counterpart to the per-shard trace guard, and the level the check belongs
+ * at: individual specs may legitimately only read (04-gateway-setup, 01-deployment-verification),
+ * but a run whose every shard contributed nothing means the collector was pointed at the wrong
+ * chains, or tracing was off — which otherwise writes an empty report that merges as
+ * "added 0 lines" and passes.
+ */
+export function assertMergedCoverageUsable(
+  stats: MergeStats,
+  shardCount: number,
+  allowEmpty = process.env.ANVIL_INTEROP_ALLOW_EMPTY_COVERAGE === "1"
+): void {
+  if (stats.linesHit > 0) return;
+
+  if (allowEmpty) {
+    console.warn("  ⚠️  No coverage from any shard; continuing because ANVIL_INTEROP_ALLOW_EMPTY_COVERAGE is set.");
+    return;
+  }
+
+  throw new Error(
+    `No coverage from any of the ${shardCount} shard(s): ${stats.lines} line(s) known, none hit. ` +
+      "Individual specs can be read-only, but a whole run with nothing hit usually means the " +
+      "collector read the wrong chains (a stale outputs/state*/chains.json, or an RPC the tests did " +
+      "not use) or that Anvil ran without --steps-tracing. Set ANVIL_INTEROP_ALLOW_EMPTY_COVERAGE=1 " +
+      "if an empty run is genuinely expected."
+  );
+}
+
 /** Renders the same shape of summary that `lcov-generator.generateSummary` produces. */
 export function formatMergeSummary(stats: MergeStats, shardCount: number): string {
   const linePct = stats.lines > 0 ? ((stats.linesHit / stats.lines) * 100).toFixed(2) : "0.00";

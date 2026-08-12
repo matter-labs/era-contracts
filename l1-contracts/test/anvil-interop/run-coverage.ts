@@ -36,7 +36,7 @@ import * as path from "path";
 import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { collectCoverage } from "./src/coverage/coverage-runner";
-import { formatMergeSummary, mergeLcovFiles } from "./src/coverage/lcov-merge";
+import { assertMergedCoverageUsable, formatMergeSummary, mergeLcovFiles } from "./src/coverage/lcov-merge";
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");
@@ -367,6 +367,7 @@ async function runSharded(specs: string[], basePortOffset: number, passthroughAr
   const scope = runScope(basePortOffset);
   const lcovPath = path.join(coverageRootDir, `anvil-lcov${scope}.info`);
   const { stats } = mergeLcovFiles(shardLcovPaths, lcovPath);
+  assertMergedCoverageUsable(stats, shardLcovPaths.length);
   const summary = formatMergeSummary(stats, shardLcovPaths.length);
   const summaryPath = path.join(coverageRootDir, `anvil-coverage-summary${scope}.txt`);
   fs.writeFileSync(summaryPath, summary);

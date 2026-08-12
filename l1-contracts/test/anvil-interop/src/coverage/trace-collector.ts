@@ -90,23 +90,15 @@ export function assertTracesUsable(stats: {
   traceFailures: number;
   tracedContracts: number;
   hitSourceFiles: number;
-  /** Set only when a run with no transactions is genuinely expected. */
-  allowEmpty?: boolean;
 }): void {
   if (stats.transactions === 0) {
-    // Not "nothing to conclude": the specs always transact, so zero means the collector looked at
-    // the wrong chains — a stale or malformed chains.json, an RPC that is not the one the tests
-    // used, freshly restarted chains. That produced an empty report that merged as "added nothing".
-    if (stats.allowEmpty) {
-      console.warn("  ⚠️  No transactions found; writing an empty report because allowEmpty was set.");
-      return;
-    }
-    throw new Error(
-      "Coverage collection found no transactions at all. The specs always transact, so this usually " +
-        "means the collector read the wrong chains (stale outputs/state*/chains.json, or an RPC that " +
-        "is not the one the tests ran against). Set ANVIL_INTEROP_ALLOW_EMPTY_COVERAGE=1 if an empty " +
-        "run is genuinely expected."
-    );
+    // Not a failure at this level: some specs only read. 04-gateway-setup and
+    // 01-deployment-verification assert over state the pre-generated snapshots already contain, so
+    // they transact nothing and a per-shard error here fails them on principle — as an earlier
+    // version of this guard did. Whether a *run* saw no transactions at all is the meaningful
+    // signal, and assertMergedCoverageUsable checks that once the shards are merged.
+    console.warn("  ⚠️  No transactions on these chains; this shard contributes no coverage.");
+    return;
   }
 
   if (stats.traceFailures === stats.transactions) {
