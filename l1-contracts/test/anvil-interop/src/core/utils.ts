@@ -52,8 +52,14 @@ export function pollingIntervalFor(rpcUrl: string): number {
   const override = process.env.ANVIL_INTEROP_POLLING_INTERVAL_MS;
   if (override !== undefined && override !== "") {
     const parsed = Number(override);
-    if (Number.isNaN(parsed) || parsed <= 0) {
-      throw new Error(`ANVIL_INTEROP_POLLING_INTERVAL_MS must be a positive number, got "${override}"`);
+    // ethers' own setter is stricter than "positive number": it rejects anything where
+    // `parseInt(String(value)) != value`, so 0.1, 1.5 and Infinity all throw "invalid polling
+    // interval" on assignment. Validate to the same contract here, where the message can say
+    // which variable is wrong.
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new Error(
+        `ANVIL_INTEROP_POLLING_INTERVAL_MS must be a positive whole number of milliseconds, got "${override}"`
+      );
     }
     return parsed;
   }

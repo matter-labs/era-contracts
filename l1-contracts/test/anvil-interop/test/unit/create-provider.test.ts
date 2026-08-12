@@ -14,6 +14,7 @@ import * as assert from "assert/strict";
 import {
   LOCAL_POLLING_INTERVAL_MS,
   REMOTE_POLLING_INTERVAL_MS,
+  createProvider,
   isLocalRpcUrl,
   pollingIntervalFor,
 } from "../../src/core/utils";
@@ -91,9 +92,28 @@ test("ignores an empty override rather than reading it as zero", () => {
 test("rejects a nonsensical override instead of degrading quietly", () => {
   for (const bad of ["abc", "0", "-100"]) {
     withOverride(bad, () => {
-      assert.throws(() => pollingIntervalFor("http://127.0.0.1:9545"), /positive number/, bad);
+      assert.throws(() => pollingIntervalFor("http://127.0.0.1:9545"), /positive whole number/, bad);
     });
   }
+});
+
+// ethers' setter rejects anything where parseInt(String(value)) != value, so these would pass a
+// looser check here and then throw "invalid polling interval" from inside createProvider — a
+// worse error, further from the cause.
+test("rejects overrides ethers itself would reject", () => {
+  for (const bad of ["0.1", "1.5", "Infinity", "1e-3"]) {
+    withOverride(bad, () => {
+      assert.throws(() => pollingIntervalFor("http://127.0.0.1:9545"), /positive whole number/, bad);
+      assert.throws(() => createProvider("http://127.0.0.1:9545"), /positive whole number/, bad);
+    });
+  }
+});
+
+test("accepts an integer override, and ethers accepts it too", () => {
+  withOverride("250", () => {
+    const provider = createProvider("http://127.0.0.1:9545");
+    assert.equal(provider.pollingInterval, 250);
+  });
 });
 
 test("treats a URL it cannot parse as remote", () => {

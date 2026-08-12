@@ -156,6 +156,12 @@ the union takes the max hit count per line and per function. Denominators do not
 covered by `yarn test:lcov-merge` (`test/unit/lcov-merge.test.ts`), which CI runs before the
 coverage pipeline.
 
+Two coverage runs can coexist: pass `--port-offset N` or export `ANVIL_INTEROP_PORT_OFFSET=N`
+(the flag wins) and both the Anvil ports and the output paths move with it — shard reports go to
+`coverage/anvil/shards-pN/` and the merged report to `coverage/anvil/anvil-lcov-pN.info`, so one
+run cannot delete the other's. Offset 0 keeps the unsuffixed paths that CI and
+`yarn l1 coverage:merge` expect.
+
 Tracing multiplies Anvil's memory and CPU cost, so cap the concurrency on small machines with
 `ANVIL_INTEROP_MAX_PARALLEL_WORKERS`. If coverage runs start failing with RPC errors mid-spec,
 lower it before looking anywhere else.

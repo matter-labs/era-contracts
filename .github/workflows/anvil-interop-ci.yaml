@@ -84,6 +84,12 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn test:create-provider
 
+      # Port offsets and shard paths only matter when runs coexist, which CI never does — so these
+      # need pinning here rather than being exercised incidentally.
+      - name: Unit-test the coverage shard paths
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn test:coverage-paths
+
       - name: Run interop tests (preloaded state)
         working-directory: l1-contracts/test/anvil-interop
         env:

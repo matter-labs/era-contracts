@@ -41,7 +41,22 @@ import { formatMergeSummary, mergeLcovFiles } from "./src/coverage/lcov-merge";
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");
 const coverageRootDir = path.join(l1ContractsDir, "coverage/anvil");
-const shardsDir = path.join(coverageRootDir, "shards");
+
+/**
+ * Shard reports and the merged output are scoped by base port offset, because two coverage runs
+ * are expected to coexist — that is what ANVIL_INTEROP_PORT_OFFSET is for — and the parent wipes
+ * its shard directory before fanning out. Unscoped, the second run would delete the first run's
+ * finished reports and its merge would fail on missing LCOV.
+ *
+ * Offset 0 keeps the unsuffixed paths so CI and `yarn coverage:merge` find what they expect.
+ */
+export function runScope(basePortOffset: number): string {
+  return basePortOffset ? `-p${basePortOffset}` : "";
+}
+
+export function shardsDirFor(basePortOffset: number): string {
+  return path.join(coverageRootDir, `shards${runScope(basePortOffset)}`);
+}
 const totalStart = Date.now();
 
 /** Ports are spaced this far apart so each worker's 6 chains never collide. */
@@ -78,6 +93,23 @@ function timedRun(label: string, command: string, args: string[], cwd: string, e
   console.log(`⏱️  [TIMING] Finished: ${label} in ${elapsedSince(start)} (total elapsed: ${elapsedSince(totalStart)})`);
 }
 
+/**
+ * `--port-offset` wins, then ANVIL_INTEROP_PORT_OFFSET — which the usage notes advertise and which
+ * exists so a run can dodge Anvil sessions already on the default ports. Reading only the flag
+ * meant an exported offset was silently dropped and the shards went back to 0, 100, 200...
+ */
+export function resolvePortOffset(argv: string[], envOffset?: string): number {
+  const idx = argv.indexOf("--port-offset");
+  const input = idx !== -1 ? argv[idx + 1] : envOffset;
+  if (input === undefined || input === "") return 0;
+
+  const parsed = Number(input);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`Port offset must be a non-negative whole number, got "${input}"`);
+  }
+  return parsed;
+}
+
 function parseRequestedSpecs(argv: string[]): string[] {
   const specArgs: string[] = [];
   for (let i = 0; i < argv.length; i++) {
@@ -110,15 +142,16 @@ function readLogTail(logPath: string, maxLines = 120): string {
   return lines.slice(-maxLines).join("\n");
 }
 
-/** Where a worker with the given port offset writes its LCOV. */
-function shardCoverageDir(portOffset: number): string {
-  return path.join(shardsDir, `p${portOffset}`);
+/** Where a worker with the given port offset writes its LCOV, under its run's scope. */
+export function shardCoverageDir(portOffset: number, basePortOffset = portOffset): string {
+  return path.join(shardsDirFor(basePortOffset), `p${portOffset}`);
 }
 
 async function runShardWorker(
   label: string,
   specs: string[],
   portOffset: number,
+  basePortOffset: number,
   passthroughArgs: string[]
 ): Promise<void> {
   const runSuffix = `-p${portOffset}`;
@@ -149,6 +182,8 @@ async function runShardWorker(
         ANVIL_INTEROP_COVERAGE_WORKER: "1",
         ANVIL_INTEROP_RUN_SUFFIX: runSuffix,
         ANVIL_INTEROP_PORT_OFFSET: portOffset.toString(),
+        // So the worker writes into this run's scope rather than one derived from its own offset.
+        ANVIL_INTEROP_SHARD_BASE_OFFSET: basePortOffset.toString(),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -209,6 +244,7 @@ async function runSharded(specs: string[], basePortOffset: number, passthroughAr
 
   // Drop stale per-shard reports so a shard that fails to produce one cannot be
   // silently merged from a previous run.
+  const shardsDir = shardsDirFor(basePortOffset);
   fs.rmSync(shardsDir, { recursive: true, force: true });
 
   console.log(`\n📊 Sharding ${specs.length} specs across up to ${maxWorkers} concurrent workers`);
@@ -224,6 +260,7 @@ async function runSharded(specs: string[], basePortOffset: number, passthroughAr
           `shard ${item.index + 1}`,
           item.group,
           basePortOffset + item.index * PORT_OFFSET_PER_WORKER,
+          basePortOffset,
           passthroughArgs
         );
       } catch (e) {
@@ -242,17 +279,18 @@ async function runSharded(specs: string[], basePortOffset: number, passthroughAr
 
   // Union the shard reports into the path `yarn coverage:merge` expects.
   const shardLcovPaths = shardGroups.map((_, index) =>
-    path.join(shardCoverageDir(basePortOffset + index * PORT_OFFSET_PER_WORKER), "anvil-lcov.info")
+    path.join(shardCoverageDir(basePortOffset + index * PORT_OFFSET_PER_WORKER, basePortOffset), "anvil-lcov.info")
   );
   const missing = shardLcovPaths.filter((p) => !fs.existsSync(p));
   if (missing.length > 0) {
     throw new Error(`Coverage shards produced no LCOV:\n  ${missing.join("\n  ")}`);
   }
 
-  const lcovPath = path.join(coverageRootDir, "anvil-lcov.info");
+  const scope = runScope(basePortOffset);
+  const lcovPath = path.join(coverageRootDir, `anvil-lcov${scope}.info`);
   const { stats } = mergeLcovFiles(shardLcovPaths, lcovPath);
   const summary = formatMergeSummary(stats, shardLcovPaths.length);
-  const summaryPath = path.join(coverageRootDir, "anvil-coverage-summary.txt");
+  const summaryPath = path.join(coverageRootDir, `anvil-coverage-summary${scope}.txt`);
   fs.writeFileSync(summaryPath, summary);
 
   console.log(`\n${summary}`);
@@ -326,8 +364,7 @@ async function main(): Promise<void> {
   const workerMode = process.env.ANVIL_INTEROP_COVERAGE_WORKER === "1";
   const requestedSpecs = parseRequestedSpecs(args);
 
-  const portOffsetIdx = args.indexOf("--port-offset");
-  const portOffset = portOffsetIdx !== -1 ? parseInt(args[portOffsetIdx + 1], 10) : 0;
+  const portOffset = resolvePortOffset(args, process.env.ANVIL_INTEROP_PORT_OFFSET);
   if (portOffset) {
     process.env.ANVIL_INTEROP_PORT_OFFSET = portOffset.toString();
   }
@@ -352,7 +389,10 @@ async function main(): Promise<void> {
       const passthroughArgs = l1Only ? ["--l1-only"] : [];
       await runSharded(specs, portOffset, passthroughArgs, html);
     } else {
-      const coverageDir = workerMode ? shardCoverageDir(portOffset) : coverageRootDir;
+      const baseOffset = process.env.ANVIL_INTEROP_SHARD_BASE_OFFSET;
+      const coverageDir = workerMode
+        ? shardCoverageDir(portOffset, baseOffset !== undefined ? Number(baseOffset) : portOffset)
+        : coverageRootDir;
       await runSingleProcess(specs, freshDeploy, coverageDir, html && !workerMode, l1Only);
     }
 
@@ -364,7 +404,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  console.error("❌ Coverage pipeline failed:", error.message || error);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error("❌ Coverage pipeline failed:", error.message || error);
+    process.exit(1);
+  });
+}
