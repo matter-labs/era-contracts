@@ -202,8 +202,6 @@ error InvalidCaller(address);
 error InvalidChainId();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
-// 0xa840274f
-error PriorityQueueNotReady();
 // 0xd95d4d82
 error PubdataContentLockedForPermanentRollup();
 // 0x3731bfa2
@@ -274,6 +272,8 @@ error MerkleWrongLength(uint256 newLeavesLength, uint256 leafNumber);
 error MigrationPaused();
 // 0x4e98b356
 error MigrationsNotPaused();
+// 0x7e472272
+error MissingBaseTokenAssetId();
 // 0xfa44b527
 error MissingSystemLogs(uint256 expected, uint256 actual);
 // 0x1508fb47
@@ -296,8 +296,6 @@ error NoCTMForAssetId(bytes32 assetId);
 error NoFunctionsForDiamondCut();
 // 0xcab098d8
 error NoFundsTransferred();
-// 0x7e472272
-error MissingBaseTokenAssetId();
 // 0xc4dc2673
 error NonCanonicalRepresentation();
 // 0xc21b1ab7
@@ -368,6 +366,8 @@ error PriorityModeRequiresPermanentRollup();
 error PriorityOperationsRollingHashMismatch();
 // 0xbeda0935
 error PriorityOpsRequestTimestampMissing(uint256 requestId);
+// 0xa840274f
+error PriorityQueueNotReady();
 // 0x1a4d284a
 error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 // 0xa461f651
