@@ -280,22 +280,23 @@ contract L2BaseTokenZKOSTest is Test {
         L2BaseTokenZKOSHarness token = L2BaseTokenZKOSHarness(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         token.harnessSetZkosPreV31TotalSupply(200);
 
-        // Post-upgrade steady state: the holder holds exactly the initial balance.
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new DummyL2BaseTokenHolder()).code);
+        // Post-upgrade steady state: the holder holds exactly the initial balance. The real holder
+        // is used so the bridging call below goes through its actual access control.
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
         vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
         // A holder of pre-v31 supply bridges 150 wei out to L1: the value flows into the holder.
-        // NOTE(port of #2364): upstream drove this through `L2BaseToken.withdraw()`, which this
-        // release removed along with the rest of the legacy withdrawal path — base-token exits now
-        // go through the InteropCenter. The resulting holder balance is what `totalSupply()` reads,
-        // so the end state is set directly here. This asserts the net-burn arithmetic, not the
-        // exit flow itself (that is covered by the InteropCenter tests).
-        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE + 150);
+        // Upstream (#2364) drove this through `L2BaseToken.withdraw()`, which this release removed
+        // with the rest of the legacy withdrawal path; base-token exits now go through the
+        // InteropCenter, which is the caller the holder still accepts.
+        vm.deal(L2_INTEROP_CENTER_ADDR, 150);
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: 150}(1);
 
         assertEq(
             L2_BASE_TOKEN_HOLDER_ADDR.balance,
             INITIAL_BASE_TOKEN_HOLDER_BALANCE + 150,
-            "the withdrawal must flow into the holder"
+            "the bridged-out value must flow into the holder"
         );
         // totalSupply = preV31Supply + INITIAL - holder.balance = 200 - 150 = 50
         assertEq(token.totalSupply(), 50, "net-burn state should decrease totalSupply without reverting");
