@@ -676,25 +676,19 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         require(release != address(0), "current release not deployed");
         require(releaseFactory != address(0), "release factory not deployed");
 
-        address liveReleaseFactory = IChainTypeManager(ctmProxy).releaseFactory();
-        bool needsFactoryMigration = liveReleaseFactory == address(0);
-        if (!needsFactoryMigration) {
-            // Already anchored: the release this upgrade pins must be attested by that same
-            // factory, otherwise `setCurrentRelease` would reject it.
-            require(liveReleaseFactory == releaseFactory, "live release factory differs from the deployed one");
-        }
-
-        calls = new Call[](needsFactoryMigration ? 3 : 2);
-        uint256 cursor = 0;
-        calls[cursor++] = ctmCall;
-        if (needsFactoryMigration) {
-            calls[cursor++] = Call({
-                target: ctmProxy,
-                data: abi.encodeCall(IChainTypeManager.setReleaseFactory, (releaseFactory)),
-                value: 0
-            });
-        }
-        calls[cursor] = Call({
+        // The anchor call is emitted unconditionally. It cannot be decided from a live read: the
+        // CTM only gained `releaseFactory()` in v32, so querying the pre-registry implementation
+        // this bundle is about to replace would revert during calldata GENERATION. Emitting it
+        // always is safe because the setter is idempotent for an identical value and rejects only
+        // a genuine re-point — which would mean the pinned release is not attested anyway.
+        calls = new Call[](3);
+        calls[0] = ctmCall;
+        calls[1] = Call({
+            target: ctmProxy,
+            data: abi.encodeCall(IChainTypeManager.setReleaseFactory, (releaseFactory)),
+            value: 0
+        });
+        calls[2] = Call({
             target: ctmProxy,
             data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (release)),
             value: 0

@@ -1059,7 +1059,7 @@ library GatewayCTMDeployerHelper {
     /// @notice Bytecodes required for Gateway CTM deployers on Era.
     // solhint-disable-next-line code-complexity
     function _gatewayCTMEraFactoryDependencies() private returns (bytes[] memory dependencies) {
-        uint256 totalDependencies = 28;
+        uint256 totalDependencies = 29;
         dependencies = new bytes[](totalDependencies);
         uint256 idx = 0;
 
@@ -1104,6 +1104,9 @@ library GatewayCTMDeployerHelper {
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Committer.sol", "CommitterFacet");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondInit.sol", "DiamondInit");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "L1GenesisUpgrade.sol", "L1GenesisUpgrade");
+        // The factory is itself DIRECT-deployed (by bytecode hash on an EraVM Gateway), so its own
+        // bytecode must be published too — not just the `CTMRelease` it later creates.
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "CTMRegistryFactory.sol", "CTMReleaseFactory");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "CTMRelease.sol", "CTMRelease");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Multicall3.sol", "Multicall3");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondProxy.sol", "DiamondProxy");

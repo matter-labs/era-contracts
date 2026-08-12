@@ -6,6 +6,7 @@ import {GenesisFacet, ICTMRelease} from "./ICTMRelease.sol";
 import {CodehashPinLib} from "./CodehashPinLib.sol";
 import {
     RegistryAlreadyInitialized,
+    RegistryDuplicateFacetRow,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
     RegistryUnknownKey,
@@ -77,6 +78,17 @@ contract CTMRelease is ICTMRelease {
                 revert RegistryEmptySelectors(_manifest.genesisFacets[i].facet);
             }
             _requirePin(_manifest.genesisFacets[i].facet, _manifest.genesisFacets[i].codehash);
+            // Exactly ONE row per facet address. A row carries that facet's complete selector
+            // list, so a second row is never needed — and `Diamond._addOneFunction` requires every
+            // selector of one facet address to share freezability, so two rows differing in
+            // `isFreezable` would install at genesis only to revert
+            // (`SelectorsMustAllHaveSameFreezability`). Reject the shape instead of pinning a
+            // release that cannot be applied.
+            for (uint256 prev = 0; prev < i; ++prev) {
+                if (_manifest.genesisFacets[prev].facet == _manifest.genesisFacets[i].facet) {
+                    revert RegistryDuplicateFacetRow(_manifest.genesisFacets[i].facet);
+                }
+            }
             // A diamond routes each selector exactly once — reject duplicates across the whole
             // routing (within AND across rows), not just when a transition later derives.
             for (uint256 j = 0; j < selectorsLength; ++j) {

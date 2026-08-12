@@ -145,11 +145,22 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
         chainContractAddress.setCurrentRelease(zeroHashRelease);
     }
 
-    /// @dev The setter is ONE-SHOT: it exists only to fill the gap on a CTM migrated from a
-    ///      pre-registry version, never to rotate the anchor. A freshly initialized CTM (this
-    ///      fixture) is already anchored, so the setter must refuse — re-pointing it would
-    ///      retroactively change what "factory-attested" means for every pinned release. The
-    ///      migration path itself (anchor still zero) is exercised by the v32 integration test.
+    /// @dev Re-setting the anchor to the value it ALREADY holds is a no-op, so one upgrade bundle
+    ///      works against both a migrated CTM (anchor zero) and an already-anchored one without the
+    ///      calldata predicting which it is.
+    function test_SettingReleaseFactoryToSameValueIsNoop() public {
+        address configured = chainContractAddress.releaseFactory();
+        assertTrue(configured != address(0), "fixture CTM should already be anchored");
+
+        vm.prank(governor);
+        chainContractAddress.setReleaseFactory(configured);
+
+        assertEq(chainContractAddress.releaseFactory(), configured, "anchor must be unchanged");
+    }
+
+    /// @dev But the anchor can never be RE-POINTED: every pinned release is attested against it, so
+    ///      changing it would retroactively change what "factory-attested" means. The migration path
+    ///      itself (anchor still zero) is exercised by the v32 integration test.
     function test_RevertWhen_ReplacingConfiguredReleaseFactory() public {
         address configured = chainContractAddress.releaseFactory();
         assertTrue(configured != address(0), "fixture CTM should already be anchored");

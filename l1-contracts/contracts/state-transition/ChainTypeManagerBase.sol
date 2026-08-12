@@ -251,16 +251,23 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     ///         storage predates the field) set it during their migration, BEFORE the first
     ///         `setCurrentRelease` — release provenance cannot be checked against a zero factory.
     /// @dev Deliberately NOT a rotation mechanism: the factory is the provenance anchor every
-    ///      pinned release is attested against, so re-pointing it would retroactively change what
-    ///      "factory-attested" means. It can only fill the gap left by migration, never replace an
-    ///      already-configured anchor. A genuine factory migration needs its own explicitly named
-    ///      entrypoint whose semantics governance reviews on its own terms.
+    ///      pinned release is attested against, so RE-POINTING it would retroactively change what
+    ///      "factory-attested" means. It can only fill the gap left by migration. A genuine factory
+    ///      migration needs its own explicitly named entrypoint whose semantics governance reviews
+    ///      on its own terms.
+    /// @dev Re-setting the anchor to the value it already holds is a no-op rather than a revert, so
+    ///      one upgrade bundle works against both a migrated CTM (anchor still zero) and an
+    ///      already-anchored one without the calldata having to predict which it is.
     function setReleaseFactory(address _releaseFactory) external onlyOwner {
         if (_releaseFactory == address(0)) {
             revert ZeroAddress();
         }
-        if (releaseFactory != address(0)) {
-            revert RegistryReleaseFactoryAlreadySet(releaseFactory);
+        address currentFactory = releaseFactory;
+        if (currentFactory == _releaseFactory) {
+            return;
+        }
+        if (currentFactory != address(0)) {
+            revert RegistryReleaseFactoryAlreadySet(currentFactory);
         }
         releaseFactory = _releaseFactory;
         emit NewReleaseFactory(_releaseFactory);

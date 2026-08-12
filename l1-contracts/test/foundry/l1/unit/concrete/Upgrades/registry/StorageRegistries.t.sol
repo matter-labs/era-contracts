@@ -18,7 +18,7 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ProposedUpgrade} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+import {MAX_NEW_FACTORY_DEPS, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
@@ -26,6 +26,7 @@ import {
     PatchMustReuseRelease,
     RegistryAlreadyInitialized,
     RegistryCodehashMismatch,
+    RegistryDuplicateFacetRow,
     RegistryDuplicateProxyRow,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
@@ -373,6 +374,37 @@ contract StorageRegistriesTest is Test {
         CTMTransition staleTransition = new CTMTransition();
         vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, OLD_VERSION, OLD_VERSION));
         staleTransition.initialize(manifest);
+    }
+
+    /// @dev Regression: two rows for the SAME facet address are rejected. `Diamond._addOneFunction`
+    ///      requires every selector of one facet to share freezability, so a split-row release would
+    ///      pin fine and then revert at genesis (and in any cut that adds it).
+    function test_revertWhen_releaseSplitsOneFacetAcrossRows() public {
+        CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
+        // Re-point the frozen row at the shared facet, keeping its distinct selectors: same facet
+        // address in two rows, with DIFFERENT freezability.
+        manifest.genesisFacets[2].facet = facetShared;
+        manifest.genesisFacets[2].codehash = facetShared.codehash;
+
+        CTMRelease splitRelease = new CTMRelease();
+        vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateFacetRow.selector, facetShared));
+        splitRelease.initialize(manifest);
+    }
+
+    /// @dev Regression: a plan carrying more factory deps than `BaseZkSyncUpgrade` accepts must be
+    ///      rejected at pin time. Otherwise `applyCTMUpgrade` bumps the CTM version and every
+    ///      per-chain upgrade then reverts, stranding chains on an unexecutable transition.
+    function test_revertWhen_transitionExceedsFactoryDepCap() public {
+        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        uint256[] memory tooManyDeps = new uint256[](MAX_NEW_FACTORY_DEPS + 1);
+        for (uint256 i = 0; i < tooManyDeps.length; ++i) {
+            tooManyDeps[i] = i + 1;
+        }
+        manifest.l2Plan.factoryDepHashes = tooManyDeps;
+
+        CTMTransition oversizedTransition = new CTMTransition();
+        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        oversizedTransition.initialize(manifest);
     }
 
     /// @dev Regression: a target release that blanks a base-system hash (nonzero -> zero) cannot be

@@ -10,6 +10,7 @@ import {CodehashPinLib} from "./CodehashPinLib.sol";
 import {TransitionDeltaLib} from "./TransitionDeltaLib.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {SemVer} from "../../common/libraries/SemVer.sol";
+import {MAX_NEW_FACTORY_DEPS} from "../../common/Config.sol";
 import {ProtocolVersionTooSmall} from "../ZkSyncUpgradeErrors.sol";
 import {
     MalformedL2UpgradePlan,
@@ -128,6 +129,13 @@ contract CTMTransition is ICTMTransition {
             (_manifest.l2Plan.delegateCalldata.length != 0 && _manifest.l2Plan.delegateTo == address(0)) ||
             (_manifest.l2Plan.factoryDepHashes.length != 0 && !hasL2Side)
         ) {
+            revert MalformedL2UpgradePlan();
+        }
+        // The same cap `BaseZkSyncUpgrade._verifyFactoryDeps` applies at execution. Without it here
+        // an oversized plan would initialize and `applyCTMUpgrade` would bump the CTM's version,
+        // after which EVERY chain upgrade reverts — stranding chains on a committed but
+        // unexecutable transition.
+        if (_manifest.l2Plan.factoryDepHashes.length > MAX_NEW_FACTORY_DEPS) {
             revert MalformedL2UpgradePlan();
         }
         // A same-release transition is verifier/schedule-only: the derived facet/hash delta is

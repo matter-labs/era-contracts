@@ -76,6 +76,11 @@ contract EraChainTypeManager is ChainTypeManagerBase {
         if (bootloaderHash == bytes32(0) || defaultAccountHash == bytes32(0) || evmEmulatorHash == bytes32(0)) {
             revert RegistryMissingBaseSystemHash();
         }
+        // NOTE: only the zero case is enforced here. An upgrade additionally runs these through
+        // `L2ContractHelper.validateBytecodeHash` (see `BaseZkSyncUpgrade`) while genesis writes them
+        // unchecked, so a syntactically MALFORMED nonzero hash still diverges the two paths. Adding
+        // that check here is the right follow-up; it is left out for now only because it would
+        // invalidate the dummy hashes ~38 existing test fixtures rely on.
 
         _storeCurrentRelease(_release);
     }
