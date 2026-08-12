@@ -35,6 +35,7 @@ const ARTIFACTS = {
   DefaultUpgrade: "DefaultUpgrade.sol/DefaultUpgrade.json",
   DiamondInit: "DiamondInit.sol/DiamondInit.json",
   ZKsyncOSTestnetVerifier: "ZKsyncOSTestnetVerifier.sol/ZKsyncOSTestnetVerifier.json",
+  ZKsyncOSVerifierPlonk: "ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",
   ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
   L1MessageRoot: "L1MessageRoot.sol/L1MessageRoot.json",
   // Fixed write-once release/transition/core-registry implementations

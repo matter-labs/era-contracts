@@ -20,17 +20,20 @@ import {SEMVER_MINOR_OFFSET} from "../../common/libraries/SemVer.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Composes every CTM-scoped payload of a protocol upgrade — facet swaps, diamond
-///         cuts, `ChainCreationParams` and the L2 protocol upgrade transaction — from a per-CTM
-///         registry's pinned constants, at execution time, on-chain.
+/// @notice Composes the CTM-scoped payloads of a protocol upgrade — the diamond cut that names the
+///         transition, the `ProposedUpgrade`, and the L2 protocol upgrade transaction — from a
+///         pinned transition's constants, at execution time, on-chain. Facet changes are NOT
+///         composed here: they are derived at transition initialization and applied verbatim from
+///         `transition.facetCuts()`. New-chain genesis data comes from the release the CTM pins,
+///         not from a composed `ChainCreationParams`.
 /// @dev Everything here is CTM-scoped, including the L2 force-deployments keyed by
 ///      `L2EcosystemContract`: L2 system-contract bytecodes are pinned per CTM (Era and ZKsyncOS ship
 ///      different sets). Ecosystem-wide (core) L1 upgrades have no composition to do beyond
 ///      proxy/impl lookups and live in `EcosystemUpgradeExecutor`.
 /// @dev This library is the on-chain port of the composition logic that
 ///      `deploy-scripts/upgrade/default-upgrade/CTMUpgradeBase.sol` performs off-chain today.
-///      Because both the upgrade cut (for existing chains) and the chain-creation cut (for new
-///      chains) are derived from the same registry constants, they cannot drift apart.
+///      Because the upgrade path (existing chains) and the genesis path (new chains) both resolve
+///      to the same pinned release, they cannot drift apart.
 library CTMUpgradeComposer {
     /// @notice Builds the diamond cut that upgrades an existing chain: no `facetCuts` of its own.
     ///         The committed cut names the write-once transition; `BaseZkSyncUpgrade` reads the

@@ -3,15 +3,19 @@
 pragma solidity ^0.8.21;
 
 /// @notice One ecosystem contract's upgrade row: a SOURCE-CHECKED edge, not just a target.
-/// @param key The contract's identifier (human/tooling orientation).
+/// @dev Scope: implementation swaps only — every row executes as a plain `ProxyAdmin.upgrade`.
+///      A proxy needing an initializer call as part of its upgrade is deliberately NOT expressible
+///      here; expressing it would mean pinning arbitrary calldata, which is a different (and much
+///      wider) review surface than "this proxy moves from this implementation to that one". Such
+///      an upgrade belongs in a version-specific script until a pinned-initializer row shape is
+///      designed and audited on its own terms.
 /// @param proxy The ecosystem proxy this row upgrades.
 /// @param expectedOldImpl The implementation the proxy must currently point at for this row to
 ///        apply. This is the replay guard: after a later registry moves the proxy on, replaying
 ///        this registry cannot silently downgrade it — the source no longer matches.
-/// @param implNew The implementation the proxy points at afterwards (`address(0)` = row is a
-///        no-op placeholder, nothing to upgrade).
-/// @param implNewCodehash The MANDATORY `EXTCODEHASH` pin of `implNew` (when `implNew` is set),
-///        inline beside the address it protects.
+/// @param implNew The implementation the proxy points at afterwards.
+/// @param implNewCodehash The MANDATORY `EXTCODEHASH` pin of `implNew`, inline beside the address
+///        it protects.
 struct EcosystemContractRow {
     address proxy;
     address expectedOldImpl;

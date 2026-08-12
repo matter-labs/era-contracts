@@ -666,23 +666,35 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             value: 0
         });
 
-        // Pin the release right after the version bump: `setReleaseFactory` first (a CTM migrated
-        // from a pre-registry version has no factory in storage, and release provenance cannot be
-        // checked against a zero one), then `setCurrentRelease`.
+        // Pin the release right after the version bump. A CTM migrated from a pre-registry version
+        // has no provenance anchor in storage yet, so the migration setter is emitted first — but
+        // only then: it is one-shot by design, so emitting it against an already-anchored CTM would
+        // revert the whole bundle.
         address ctmProxy = ctmAddresses.stateTransition.proxies.chainTypeManager;
         address release = ctmAddresses.stateTransition.currentRelease;
         address releaseFactory = ctmAddresses.stateTransition.releaseFactory;
         require(release != address(0), "current release not deployed");
         require(releaseFactory != address(0), "release factory not deployed");
 
-        calls = new Call[](3);
-        calls[0] = ctmCall;
-        calls[1] = Call({
-            target: ctmProxy,
-            data: abi.encodeCall(IChainTypeManager.setReleaseFactory, (releaseFactory)),
-            value: 0
-        });
-        calls[2] = Call({
+        address liveReleaseFactory = IChainTypeManager(ctmProxy).releaseFactory();
+        bool needsFactoryMigration = liveReleaseFactory == address(0);
+        if (!needsFactoryMigration) {
+            // Already anchored: the release this upgrade pins must be attested by that same
+            // factory, otherwise `setCurrentRelease` would reject it.
+            require(liveReleaseFactory == releaseFactory, "live release factory differs from the deployed one");
+        }
+
+        calls = new Call[](needsFactoryMigration ? 3 : 2);
+        uint256 cursor = 0;
+        calls[cursor++] = ctmCall;
+        if (needsFactoryMigration) {
+            calls[cursor++] = Call({
+                target: ctmProxy,
+                data: abi.encodeCall(IChainTypeManager.setReleaseFactory, (releaseFactory)),
+                value: 0
+            });
+        }
+        calls[cursor] = Call({
             target: ctmProxy,
             data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (release)),
             value: 0

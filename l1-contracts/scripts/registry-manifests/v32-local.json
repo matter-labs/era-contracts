@@ -7,7 +7,7 @@
       "L1MessageRoot": {
         "proxy": "0x1969F6bA05b769F507C7Fe15b1bae7d7B4FBf50D",
         "expectedOldImpl": "0xD282d6f075F9108358895d0c4A7861F913778436",
-        "implNew": "0x5133BBdfCCa3Eb4F739D599ee4eC45cBCD0E16c5",
+        "implNew": "0x821f3361D454cc98b7555221A06Be563a7E2E0A6",
         "implNewCodehash": "0x3d46f603e06d608584b5de79ee03a9ea717eacf7507495ff547ebb3fa487e4cd"
       }
     }
@@ -16,16 +16,16 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0x3C96F2539a88749E2DF3E357664a12D71a6BCe63",
+      "ctmProxy": "0x93B3E3f1765d7851F686156B590644ebf4A6aDc7",
       "release": {
         "diamondInit": {
-          "address": "0x821f3361D454cc98b7555221A06Be563a7E2E0A6",
+          "address": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
           "codehash": "0xf2cf35c0f870ffdfa3586c0bbd9a4f95b8ab0d128c54d2a73d7ab0c5e36dbf66"
         },
         "genesisFacets": [
           {
             "name": "AdminFacet",
-            "address": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057",
+            "address": "0xddE78e6202518FF4936b5302cC2891ec180E8bFf",
             "codehash": "0xcea0413680391f0b5e96b7408b89e2dd4f7453af7dd5975decb1b82efa01f976",
             "isFreezable": false,
             "selectors": [
@@ -59,7 +59,7 @@
           },
           {
             "name": "GettersFacet",
-            "address": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",
+            "address": "0xB06c856C8eaBd1d8321b687E188204C1018BC4E5",
             "codehash": "0xdbab3ee9de61015f5cc69316fb95cc807666ed262a542df96eaff6ed03bff62a",
             "isFreezable": false,
             "selectors": [
@@ -119,14 +119,14 @@
           },
           {
             "name": "ExecutorFacet",
-            "address": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
+            "address": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057",
             "codehash": "0xb296438cbeb82e3b679e9b08a4f060dc53de6e7eeaca8c39f9dfd193e6938508",
             "isFreezable": true,
             "selectors": ["0xa085344d", "0x9271e450", "0x7ca4eff7"]
           },
           {
             "name": "MigratorFacet",
-            "address": "0x2b5A4e5493d4a54E717057B127cf0C000C876f9B",
+            "address": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",
             "codehash": "0x5a0f5646180ccb491b045583f0347fb2566ee84e5b7c192bf6a774f39e435eeb",
             "isFreezable": false,
             "selectors": [
@@ -141,7 +141,7 @@
           },
           {
             "name": "CommitterFacet",
-            "address": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
+            "address": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
             "codehash": "0x395bb8514ef1e5929f5d0116b53947f6416efb30ad2a94b7714c7835714ebefb",
             "isFreezable": true,
             "selectors": ["0x0db9eb87", "0x0b6db820"]
@@ -193,11 +193,11 @@
         "releaseFactory": "0xF136E38B78B25C1B7e5a7CD42Adb36027d4C0755",
         "fromRelease": "0xB36fc4eA664B763de9e1200F2C635A35f110213A",
         "verifier": {
-          "address": "0x1780bCf4103D3F501463AD3414c7f4b654bb7aFd",
-          "codehash": "0x36e5d09f9182f3a618ad6c81d41b05a4a7b13f1c02004bd909729fec1c31e9e2"
+          "address": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
+          "codehash": "0x82a534229234e488c2e9118643871bd5741f25fd67ad4b2e3bab5c4974168dab"
         },
         "upgradeEngine": {
-          "address": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
+          "address": "0x2b5A4e5493d4a54E717057B127cf0C000C876f9B",
           "codehash": "0xb1989f3635d5b2e6e70a4234619aace894915a743536ced5485f1bc968a907d5"
         },
         "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",

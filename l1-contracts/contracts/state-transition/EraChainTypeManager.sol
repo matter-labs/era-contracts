@@ -10,6 +10,7 @@ import {
     GenesisBatchCommitmentZero,
     GenesisBatchHashZero,
     GenesisUpgradeZero,
+    RegistryMissingBaseSystemHash,
     RegistryWrongVM,
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
@@ -64,6 +65,16 @@ contract EraChainTypeManager is ChainTypeManagerBase {
         // Era chains require a non-zero genesis repeated-storage index.
         if (genesisIndexRepeatedStorageChanges == uint64(0)) {
             revert GenesisIndexStorageZero();
+        }
+
+        // Era chains run all three base-system contracts, and `DiamondInit` rejects a zero hash for
+        // any of them at genesis. Enforce the same at release acceptance: a zero hash here would be
+        // unreachable for new chains and unrepresentable for existing ones (an upgrade reads zero as
+        // "leave unchanged"), which is exactly the release/transition divergence this model rules out.
+        (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash) = release
+            .baseSystemContractHashes();
+        if (bootloaderHash == bytes32(0) || defaultAccountHash == bytes32(0) || evmEmulatorHash == bytes32(0)) {
+            revert RegistryMissingBaseSystemHash();
         }
 
         _storeCurrentRelease(_release);

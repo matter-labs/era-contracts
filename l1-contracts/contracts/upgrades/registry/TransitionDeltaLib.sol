@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {GenesisFacet, ICTMRelease} from "./ICTMRelease.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
-import {RegistryDuplicateSelector} from "../../common/L1ContractErrors.sol";
+import {RegistryDuplicateSelector, RegistryHashChangeToZero} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -100,9 +100,24 @@ library TransitionDeltaLib {
             .baseSystemContractHashes();
         (bytes32 newBootloader, bytes32 newDefaultAccount, bytes32 newEvmEmulator) = _newRelease
             .baseSystemContractHashes();
-        bootloaderChange = newBootloader == fromBootloader ? bytes32(0) : newBootloader;
-        defaultAccountChange = newDefaultAccount == fromDefaultAccount ? bytes32(0) : newDefaultAccount;
-        evmEmulatorChange = newEvmEmulator == fromEvmEmulator ? bytes32(0) : newEvmEmulator;
+        bootloaderChange = _deriveHashChange(fromBootloader, newBootloader);
+        defaultAccountChange = _deriveHashChange(fromDefaultAccount, newDefaultAccount);
+        evmEmulatorChange = _deriveHashChange(fromEvmEmulator, newEvmEmulator);
+    }
+
+    /// @dev The stored change for one base-system hash: zero when the releases agree.
+    ///      A nonzero -> zero change is NOT representable, because `BaseZkSyncUpgrade` reads zero
+    ///      as "leave unchanged": existing chains would keep the old hash while new chains take the
+    ///      target release's zero, so the two paths would diverge. Reject it at derivation rather
+    ///      than store a silent no-op.
+    function _deriveHashChange(bytes32 _fromHash, bytes32 _newHash) private pure returns (bytes32) {
+        if (_fromHash == _newHash) {
+            return bytes32(0);
+        }
+        if (_newHash == bytes32(0)) {
+            revert RegistryHashChangeToZero();
+        }
+        return _newHash;
     }
 
     /// @dev The selectors of `_facet` that do NOT appear in `_otherRouting` with the same facet

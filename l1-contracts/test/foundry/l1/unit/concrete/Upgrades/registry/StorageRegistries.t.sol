@@ -29,6 +29,7 @@ import {
     RegistryDuplicateProxyRow,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
+    RegistryHashChangeToZero,
     RegistryPinTargetHasNoCode,
     SameReleaseTransitionHasPayload,
     TransitionDeadlineBeforeUpgrade,
@@ -372,6 +373,27 @@ contract StorageRegistriesTest is Test {
         CTMTransition staleTransition = new CTMTransition();
         vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, OLD_VERSION, OLD_VERSION));
         staleTransition.initialize(manifest);
+    }
+
+    /// @dev Regression: a target release that blanks a base-system hash (nonzero -> zero) cannot be
+    ///      executed as an upgrade, because `BaseZkSyncUpgrade` reads a zero change as "leave
+    ///      unchanged". Existing chains would keep the old hash while fresh chains take the release
+    ///      value, so the derivation rejects it instead of storing a silent no-op.
+    function test_revertWhen_transitionBlanksBaseSystemHash() public {
+        // A target release identical to the source except that the bootloader hash goes to zero.
+        CTMRelease.ReleaseManifest memory blankingManifest = _releaseManifest(
+            facetNewAdmin,
+            _selectors2(bytes4(uint32(2)), bytes4(uint32(3))),
+            bytes32(0)
+        );
+        CTMRelease blankingRelease = CTMRelease(releaseFactory.deployOrGetRelease(blankingManifest));
+
+        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(blankingRelease);
+
+        CTMTransition blankingTransition = new CTMTransition();
+        vm.expectRevert(RegistryHashChangeToZero.selector);
+        blankingTransition.initialize(manifest);
     }
 
     function test_revertWhen_deadlineBeforeUpgradeTimestamp() public {

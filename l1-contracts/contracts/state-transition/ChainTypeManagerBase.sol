@@ -24,6 +24,7 @@ import {
     ChainAlreadyLive,
     MigrationsNotPaused,
     NotFactoryDeployed,
+    RegistryReleaseFactoryAlreadySet,
     Unauthorized,
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
@@ -245,13 +246,21 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         _setCurrentRelease(_release);
     }
 
-    /// @notice Sets the canonical release factory. Freshly initialized CTMs receive it in
-    ///         `initialize`; CTMs MIGRATED from pre-registry versions (whose storage predates the
-    ///         field) must set it during their migration, BEFORE the first `setCurrentRelease` —
-    ///         release provenance cannot be checked against a zero factory.
+    /// @notice One-shot migration setter for the canonical release factory. Freshly initialized
+    ///         CTMs receive it in `initialize`; CTMs MIGRATED from pre-registry versions (whose
+    ///         storage predates the field) set it during their migration, BEFORE the first
+    ///         `setCurrentRelease` — release provenance cannot be checked against a zero factory.
+    /// @dev Deliberately NOT a rotation mechanism: the factory is the provenance anchor every
+    ///      pinned release is attested against, so re-pointing it would retroactively change what
+    ///      "factory-attested" means. It can only fill the gap left by migration, never replace an
+    ///      already-configured anchor. A genuine factory migration needs its own explicitly named
+    ///      entrypoint whose semantics governance reviews on its own terms.
     function setReleaseFactory(address _releaseFactory) external onlyOwner {
         if (_releaseFactory == address(0)) {
             revert ZeroAddress();
+        }
+        if (releaseFactory != address(0)) {
+            revert RegistryReleaseFactoryAlreadySet(releaseFactory);
         }
         releaseFactory = _releaseFactory;
         emit NewReleaseFactory(_releaseFactory);

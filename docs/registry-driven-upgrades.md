@@ -267,7 +267,9 @@ v33 protocol-ops integration described above.
 - **Factory provenance is mandatory.** CTM and ecosystem executors accept objects only from their
   immutable transition/core factories; the CTM's stored canonical `releaseFactory` must attest
   every release pinned via `setCurrentRelease` (a spoofable manifest-carried factory pointer
-  does not exist).
+  does not exist). The anchor is write-once: `setReleaseFactory` only fills the gap on a CTM
+  migrated from a pre-registry version and refuses to replace a configured anchor, since
+  re-pointing it would retroactively change what "factory-attested" means.
 - **Registry addresses are deterministic.** Factories use CREATE2 with the manifest hash as salt;
   off-chain prediction must use the correct EVM/EraVM formula and exact creation code.
 - **Pins are inline and mandatory.** Every executable address a
@@ -284,8 +286,12 @@ v33 protocol-ops integration described above.
   edges (all fields nonzero, per-proxy dedup — `RegistryDuplicateProxyRow`). Facet
   self-description (`ISelfDescribingFacet.selectors()`) is a BUILD-time tool for manifest
   generators, not a consumption-time code read.
-- **Zero hash means unchanged in an upgrade.** Release pairs must not require a nonzero → zero
-  base-system hash change; that state transition is not representable by `BaseZkSyncUpgrade`.
+- **Zero hash means unchanged in an upgrade — and is now rejected, not merely discouraged.**
+  `BaseZkSyncUpgrade` reads a zero base-system hash change as "leave unchanged", so a nonzero → zero
+  change is unrepresentable: `TransitionDeltaLib` reverts (`RegistryHashChangeToZero`) rather than
+  storing a silent no-op, and the Era CTM rejects a release carrying a zero base-system hash at
+  `setCurrentRelease` (`RegistryMissingBaseSystemHash`) — the same values `DiamondInit` requires for
+  new chains. The upgrade path and the genesis path therefore cannot disagree about them.
 - **VM identity has one source**: the pinned `DiamondInit.IS_ZKSYNC_OS` immutable, validated by
   the CTM against its own flavour when a release is pinned, and read by the composer for the L2
   tx type.

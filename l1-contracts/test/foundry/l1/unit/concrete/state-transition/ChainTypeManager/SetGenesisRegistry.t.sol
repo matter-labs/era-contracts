@@ -8,7 +8,11 @@ import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamond
 import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
-import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {
+    RegistryMissingBaseSystemHash,
+    RegistryReleaseFactoryAlreadySet,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice From v32 the CTM no longer stores chain-creation params directly; it stores a pointer
 ///         to a genesis release and derives all genesis data from it. This exercises
@@ -36,6 +40,12 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
             abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
         );
         vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
+        // Era releases must carry all three base-system hashes; the CTM rejects a zero one.
+        vm.mockCall(
+            _registry,
+            abi.encodeWithSelector(ICTMRelease.baseSystemContractHashes.selector),
+            abi.encode(bytes32(uint256(0xB0)), bytes32(uint256(0xDA)), bytes32(uint256(0xE)))
+        );
         // VM identity is single-sourced from the release's DiamondInit; the mocked registry's
         // diamondInit placeholder is the registry itself, so mock the flag there.
         vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.diamondInit.selector), abi.encode(_registry));
@@ -116,16 +126,39 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
     // (upgraded proxies never re-run `initialize`); v32 stage calldata invokes it right before
     // the first `setCurrentRelease`.
 
-    function test_SettingReleaseFactory() public {
-        address newFactory = makeAddr("newReleaseFactory");
+    /// @dev Regression: an Era release that leaves a base-system hash at zero must be rejected when
+    ///      it is pinned. Accepting it would split the two paths the model promises cannot diverge —
+    ///      `DiamondInit` refuses zero hashes, so NEW chains could not be created, while EXISTING
+    ///      chains would silently keep the old hash (an upgrade reads a zero change as "unchanged").
+    function test_RevertWhen_EraReleaseHasZeroBaseSystemHash() public {
+        address zeroHashRelease = makeAddr("zeroHashRelease");
+        _mockRegistry(zeroHashRelease, makeAddr("gu"), bytes32(uint256(2)), bytes32(uint256(2)), 2);
+        // Blank the EVM emulator hash; the other two stay set.
+        vm.mockCall(
+            zeroHashRelease,
+            abi.encodeWithSelector(ICTMRelease.baseSystemContractHashes.selector),
+            abi.encode(bytes32(uint256(0xB0)), bytes32(uint256(0xDA)), bytes32(0))
+        );
 
-        vm.expectEmit(true, false, false, false);
-        emit IChainTypeManager.NewReleaseFactory(newFactory);
-
+        vm.expectRevert(RegistryMissingBaseSystemHash.selector);
         vm.prank(governor);
-        chainContractAddress.setReleaseFactory(newFactory);
+        chainContractAddress.setCurrentRelease(zeroHashRelease);
+    }
 
-        assertEq(chainContractAddress.releaseFactory(), newFactory, "Release factory was not set correctly");
+    /// @dev The setter is ONE-SHOT: it exists only to fill the gap on a CTM migrated from a
+    ///      pre-registry version, never to rotate the anchor. A freshly initialized CTM (this
+    ///      fixture) is already anchored, so the setter must refuse — re-pointing it would
+    ///      retroactively change what "factory-attested" means for every pinned release. The
+    ///      migration path itself (anchor still zero) is exercised by the v32 integration test.
+    function test_RevertWhen_ReplacingConfiguredReleaseFactory() public {
+        address configured = chainContractAddress.releaseFactory();
+        assertTrue(configured != address(0), "fixture CTM should already be anchored");
+
+        vm.expectRevert(abi.encodeWithSelector(RegistryReleaseFactoryAlreadySet.selector, configured));
+        vm.prank(governor);
+        chainContractAddress.setReleaseFactory(makeAddr("newReleaseFactory"));
+
+        assertEq(chainContractAddress.releaseFactory(), configured, "anchor must be unchanged");
     }
 
     function test_RevertWhen_SettingZeroReleaseFactory() public {

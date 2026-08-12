@@ -126,6 +126,7 @@ const DETERMINISTIC_SOURCES = [
   "contracts/state-transition/chain-deps/facets/Committer.sol",
   "contracts/upgrades/DefaultUpgrade.sol",
   "contracts/state-transition/chain-deps/DiamondInit.sol",
+  "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol",
   "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol",
   "contracts/core/message-root/L1MessageRoot.sol",
   "contracts/dev-contracts/MockContractDeployer.sol",
@@ -604,6 +605,7 @@ type DeployedMachinery = {
   newCommitterFacet: string;
   newDefaultUpgrade: string;
   newDiamondInit: string;
+  newVerifierPlonk: string;
   newVerifier: string;
   newMessageRootImpl: string;
 };
@@ -642,6 +644,7 @@ async function deployUpgradeMachinery(
   // key + starting nonce are fixed by the chain states, so each contract's address is a pure
   // function of its position in this sequence. Reordering/inserting deploys invalidates the
   // committed manifest (rerun with REGEN_REGISTRIES=1).
+  const newVerifierPlonk = await deployPinned("ZKsyncOSVerifierPlonk", []);
   // The trusted factories deploy FIRST: each executor is BOUND to its factory (and its
   // authority target) at construction — factory provenance is what it enforces on every
   // transition / core registry it accepts.
@@ -679,13 +682,11 @@ async function deployUpgradeMachinery(
     newCommitterFacet: await deployPinned("CommitterFacet", [params.l1ChainId]),
     newDefaultUpgrade: await deployPinned("DefaultUpgrade", []),
     newDiamondInit: await deployPinned("DiamondInit", [true /* _isZKOS */]),
-    // Real verifier contract for the new version (same type the ZKsyncOS CTM uses). The proof
-    // sub-verifiers are zero like in the foundry e2e test — no proofs are verified here.
-    newVerifier: await deployPinned("ZKsyncOSTestnetVerifier", [
-      ethers.constants.AddressZero,
-      ethers.constants.AddressZero,
-      deployer.address,
-    ]),
+    // Real verifier contract for the new version (same type the ZKsyncOS CTM uses). Since the
+    // dual-verifier removal the ZKsyncOS testnet verifier takes exactly one constructor argument,
+    // the plonk sub-verifier deployed just above; no proofs are verified in this harness.
+    newVerifierPlonk,
+    newVerifier: await deployPinned("ZKsyncOSTestnetVerifier", [newVerifierPlonk]),
     // Ecosystem leg: a fresh L1MessageRoot implementation with the live immutable values.
     newMessageRootImpl: await deployPinned("L1MessageRoot", [
       params.bridgehub,

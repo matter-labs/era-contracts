@@ -76,10 +76,9 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         }
 
         // Everything chain-independent is read from the current release the CTM pins — the
-        // committed chain-creation cut carries no init payload. Facets are installed here, by
-        // the init itself (their selector lists come from each facet's own bytecode at execution
-        // time), and the base system contract hashes are pinned per protocol version, so the
-        // registry reverts if the CTM's protocol version disagrees with the registry's pin.
+        // committed chain-creation cut carries no init payload. Facets are installed here, by the
+        // init itself, from the release's EXPLICIT routing (selector lists are pinned in the
+        // release manifest, not read back out of facet bytecode at execution time).
         address currentRelease = ctm.currentRelease();
         if (currentRelease == address(0)) {
             revert ZeroAddress();

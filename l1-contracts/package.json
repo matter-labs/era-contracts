@@ -110,7 +110,8 @@
     "zksync-os-genesis": "ts-node scripts/zksync-os-genesis.ts",
     "write-factory-deps-zksync-os": "ts-node scripts/write-factory-deps-zksync-os.ts",
     "fmt": "prettier --write \"**/*.json\" --cache",
-    "copy-to-zkstack-out": "ts-node scripts/copy-to-zkstack-out.ts && yarn fmt"
+    "copy-to-zkstack-out": "ts-node scripts/copy-to-zkstack-out.ts && yarn fmt",
+    "regen": "bash scripts/regen-generated-artifacts.sh"
   },
   "dependencies": {
     "dotenv": "^16.0.3",

@@ -216,8 +216,6 @@ error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 num
 error InvalidPackedPrecommitmentLength(uint256 length);
 // 0x09bde339
 error InvalidProof();
-// 0x5a1c353a
-error InvalidProofFormat();
 // 0x48c5fa28
 error InvalidProofLengthForFinalNode();
 // 0x5428eae7
@@ -388,8 +386,14 @@ error RegistryDuplicateProxyRow(address proxy);
 error RegistryDuplicateSelector(bytes4 selector);
 // 0xba5f0dd8
 error RegistryEmptySelectors(address facet);
+// 0xb130ce79
+error RegistryHashChangeToZero();
+// 0x30f6031b
+error RegistryMissingBaseSystemHash();
 // 0xa0c88a92
 error RegistryPinTargetHasNoCode(address target);
+// 0x9aae4ff8
+error RegistryReleaseFactoryAlreadySet(address current);
 // 0x1f20dafa
 error RegistryUnknownKey();
 // 0x3ea1345a
