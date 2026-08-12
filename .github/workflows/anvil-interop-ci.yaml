@@ -94,6 +94,11 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn test:block-time
 
+      # Guards against a tracing regression passing as "covered nothing".
+      - name: Unit-test the coverage trace guard
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn test:trace-guard
+
       - name: Run interop tests (preloaded state)
         working-directory: l1-contracts/test/anvil-interop
         env:

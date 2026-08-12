@@ -6,23 +6,19 @@ name: Verify merged commit (clean build)
 # cache could subvert, because they are derived from the artifacts rather than from the sources.
 #
 # It also produces the only artifacts worth trusting for reuse: the cache it saves comes from a
-# clean build on a protected base, so PRs targeting that base get a warm *and* trustworthy first
+# clean build on a verified base, so PRs targeting that base get a warm *and* trustworthy first
 # run instead of a cold one.
 #
 # `build-release.yaml` also builds cleanly, but only for release tags and manual runs, which is why
 # it does not cover ordinary merges.
 
 on:
+  # Every push is considered, and the `gate` job below decides. Branch protection alone would not
+  # do: of the branches PRs actually merge into, main, atomic-imt-interop-release and draft-v31 are
+  # protected, but atomic-imt-reduced — the busiest base — and draft-v32 are not. Protection alone
+  # would skip the busiest base; a glob list alone goes stale as new bases appear. So: either.
   push:
-    branches:
-      - main
-      # Long-lived integration and release bases that PRs are cut from and merged into. A new
-      # long-lived base needs adding here; short-lived feature branches deliberately do not run
-      # this, since their merges are verified when they land on one of the above.
-      - "draft-*"
-      - "atomic-imt-*"
-      - "release-*"
-  # Available for a base not covered by the globs above, or to re-verify on demand.
+    branches: ["**"]
   workflow_dispatch:
 
 permissions:
@@ -34,7 +30,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A few seconds on every push, so that verification follows the branches that matter without a
+  # hand-maintained list going stale. Pushes to feature branches stop here.
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      verify: ${{ steps.decide.outputs.verify }}
+    steps:
+      - name: Decide whether this ref is a long-lived base
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF_NAME: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # `protected` covers anything the org protects now or later, without editing this file.
+          is_protected=$(gh api "repos/$REPO/branches/$REF_NAME" --jq '.protected' 2>/dev/null || echo "false")
+
+          # ...and these are long-lived bases that are merged into but are not protected today.
+          case "$REF_NAME" in
+            main | draft-* | atomic-imt-* | release-*) matches_base="true" ;;
+            *) matches_base="false" ;;
+          esac
+
+          if [ "$is_protected" = "true" ] || [ "$matches_base" = "true" ]; then
+            echo "Verifying $REF_NAME (protected=$is_protected, long-lived base=$matches_base)"
+            echo "verify=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping $REF_NAME: not protected and not a long-lived base."
+            echo "verify=false" >> "$GITHUB_OUTPUT"
+          fi
+
   clean-build-and-check:
+    needs: gate
+    if: needs.gate.outputs.verify == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 

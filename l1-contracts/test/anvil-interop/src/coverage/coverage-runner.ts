@@ -10,7 +10,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { providers } from "ethers";
-import { collectChainTraces, mergeTraces } from "./trace-collector";
+import { assertTracesUsable, collectChainTraces, mergeTraces } from "./trace-collector";
 import { resolveContracts, resolveByBytecode } from "./artifact-resolver";
 import {
   loadSourceIdMap,
@@ -84,16 +84,22 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
   // 4. Collect traces from all chains
   console.log("\n🔍 Step 4: Collecting execution traces...");
   const chainTraces = [];
+  let totalTransactions = 0;
+  let totalTraceFailures = 0;
 
   if (state.chains?.l1?.rpcUrl) {
     const l1Traces = await collectChainTraces(state.chains.l1.rpcUrl, "L1");
-    chainTraces.push(l1Traces);
+    chainTraces.push(l1Traces.contractPCs);
+    totalTransactions += l1Traces.transactions;
+    totalTraceFailures += l1Traces.traceFailures;
   }
 
   if (!options.l1Only && state.chains?.l2) {
     for (const l2 of state.chains.l2) {
       const l2Traces = await collectChainTraces(l2.rpcUrl, `L2-${l2.chainId}`);
-      chainTraces.push(l2Traces);
+      chainTraces.push(l2Traces.contractPCs);
+      totalTransactions += l2Traces.transactions;
+      totalTraceFailures += l2Traces.traceFailures;
     }
   }
 
@@ -149,6 +155,14 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
   }
 
   console.log(`  Coverage data for ${fileHitLines.size} source files`);
+
+  // Refuse to write a report that would look like "this ran and covered nothing".
+  assertTracesUsable({
+    transactions: totalTransactions,
+    traceFailures: totalTraceFailures,
+    tracedContracts: allTraces.size,
+    hitSourceFiles: fileHitLines.size,
+  });
 
   // 7. Compute executable lines and extract function data
   console.log("\n🔍 Step 7: Computing executable lines and extracting functions...");

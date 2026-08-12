@@ -57,6 +57,26 @@ function currentGitState() {
   return { sources, submodules, blobs };
 }
 
+/** Manifest versions this reader understands; anything else is not trusted. */
+const SUPPORTED_MANIFEST_VERSIONS = new Set([1]);
+
+const isPlainObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Describes what is wrong with a manifest, or null when it is usable. */
+function validateManifest(manifest) {
+  if (!isPlainObject(manifest)) return "is not an object";
+  if (!SUPPORTED_MANIFEST_VERSIONS.has(manifest.version))
+    return `has unsupported version ${JSON.stringify(manifest.version)}`;
+  for (const field of ["sources", "submodules"]) {
+    if (!isPlainObject(manifest[field])) return `has no usable "${field}" map`;
+  }
+  // configInputs arrived later than version 1's first shape, so treat it as optional but typed.
+  if (manifest.configInputs !== undefined && !isPlainObject(manifest.configInputs)) {
+    return 'has a malformed "configInputs" map';
+  }
+  return null;
+}
+
 /**
  * Source paths (repo-relative) whose contents differ from what the cache was built from, or
  * `"*"` when a submodule pin moved and nothing can be trusted. Empty when there is no manifest.
@@ -72,6 +92,16 @@ function staleSources(manifestPath) {
     manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
   } catch {
     console.log("  source manifest unreadable — treating the whole cache as stale");
+    return { changed: new Set(), invalidateAll: true };
+  }
+
+  // This file decides whether restored artifacts are trusted, so anything it cannot vouch for is
+  // treated as untrustworthy. Valid JSON is not enough: `null` used to crash on .submodules, and
+  // `{}` or a manifest from a future writer would report "nothing changed" and keep every stale
+  // artifact — the quiet failure this whole mechanism exists to prevent.
+  const problem = validateManifest(manifest);
+  if (problem) {
+    console.log(`  source manifest ${problem} — treating the whole cache as stale`);
     return { changed: new Set(), invalidateAll: true };
   }
 
@@ -207,9 +237,20 @@ function prune(projectDir, artifactsDir, stale) {
 }
 
 const argv = process.argv.slice(2);
-const manifestIdx = argv.indexOf("--manifest");
-const manifestPath = manifestIdx !== -1 ? argv[manifestIdx + 1] : undefined;
-const targets = argv.filter((arg, i) => i !== manifestIdx && i !== manifestIdx + 1 && !arg.startsWith("--"));
+let manifestPath;
+const targets = [];
+// Walked rather than filtered by index: with no --manifest, `indexOf` returns -1 and an
+// index-based filter drops argv[0] — the only target — leaving the documented no-manifest
+// invocation printing usage instead of running.
+for (let i = 0; i < argv.length; i++) {
+  if (argv[i] === "--manifest") {
+    manifestPath = argv[i + 1];
+    i++;
+    continue;
+  }
+  if (argv[i].startsWith("--")) continue;
+  targets.push(argv[i]);
+}
 if (targets.length === 0) {
   console.error("Usage: node prune-stale-artifacts.js [--manifest <path>] <project-dir>:<artifacts-dir> [...]");
   process.exit(1);

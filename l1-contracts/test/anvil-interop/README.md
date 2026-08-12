@@ -140,9 +140,17 @@ yarn coverage
 # Single process, one set of chains, all specs (the pre-sharding behavior)
 yarn coverage:serial
 
-# One spec only (implies single process)
+# One spec only (a single spec has nothing to shard, so this runs in one process)
 yarn ts-node run-coverage.ts --spec test/anvil-interop/test/hardhat/07-interop-bundles.spec.ts
+
+# Several named specs — still sharded, one worker each. Add --serial to keep them in one process
+# against a single set of chains.
+yarn ts-node run-coverage.ts --spec .../07-interop-bundles.spec.ts --spec .../09-interop-unbundle.spec.ts
 ```
+
+Sharding is also skipped when there are no pre-generated chain states, because each worker would
+otherwise run its own full deployment concurrently, racing on the shared `config/permanent-values.toml`
+and `broadcast/` directories. The run says so when it falls back.
 
 Each shard is a child process that owns its own six Anvil chains (own port offset, own run
 suffix, own state dir), runs its slice of the specs, and collects coverage from its own chains
@@ -158,9 +166,14 @@ coverage pipeline.
 
 Two coverage runs can coexist: pass `--port-offset N` or export `ANVIL_INTEROP_PORT_OFFSET=N`
 (the flag wins) and both the Anvil ports and the output paths move with it — shard reports go to
-`coverage/anvil/shards-pN/` and the merged report to `coverage/anvil/anvil-lcov-pN.info`, so one
-run cannot delete the other's. Offset 0 keeps the unsuffixed paths that CI and
-`yarn l1 coverage:merge` expect.
+`coverage/anvil/shards-pN/`, the merged report to `coverage/anvil/anvil-lcov-pN.info`, single-process
+output to `coverage/anvil/run-pN/`, and `--html` to `coverage/anvil/html-pN/`, so one run cannot
+delete the other's. Offset 0 keeps the unsuffixed paths that CI and `yarn l1 coverage:merge` expect.
+
+**Valid offsets are 0, 1000, 2000, …** — whole multiples of 1000. A run reserves 1000 ports (up to
+ten shards, 100 apart), so bases closer than that overlap: a run at 500 would allocate the same
+ports as shards 6 to 10 of a run at 0, and the later run's `startChain` kills the earlier run's
+Anvil processes. Anything else is rejected with a message naming the valid values.
 
 Tracing multiplies Anvil's memory and CPU cost, so cap the concurrency on small machines with
 `ANVIL_INTEROP_MAX_PARALLEL_WORKERS`. If coverage runs start failing with RPC errors mid-spec,

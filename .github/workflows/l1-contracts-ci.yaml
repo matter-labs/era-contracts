@@ -30,6 +30,12 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      # Fixture tests for the pruning that decides which restored artifacts are trusted. Every bug
+      # found in it needed a deleted or modified source to show up, so an ordinary run never
+      # exercises it — hence pinning it here, next to the job that relies on it.
+      - name: Unit-test the cache pruning
+        run: node .github/actions/warm-solc-cache/prune-stale-artifacts.test.js
+
       - name: Warm solc build cache
         uses: ./.github/actions/warm-solc-cache
 
