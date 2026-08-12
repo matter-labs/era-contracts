@@ -175,11 +175,10 @@ library CoreOnGatewayHelper {
             return dependencyContracts;
         }
 
-        dependencyContracts = new CoreContract[](4);
-        dependencyContracts[0] = CoreContract.L2SharedBridgeLegacy;
-        dependencyContracts[1] = CoreContract.BridgedStandardERC20;
-        dependencyContracts[2] = CoreContract.DiamondProxy;
-        dependencyContracts[3] = CoreContract.ProxyAdmin;
+        dependencyContracts = new CoreContract[](3);
+        dependencyContracts[0] = CoreContract.BridgedStandardERC20;
+        dependencyContracts[1] = CoreContract.DiamondProxy;
+        dependencyContracts[2] = CoreContract.ProxyAdmin;
     }
 
     function _getFactoryDependencyBytecodes(
@@ -235,7 +234,6 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2InteropRootStorage) return "L2InteropRootStorage";
         if (_c == CoreContract.BeaconProxy) return "BeaconProxy";
         if (_c == CoreContract.L2V32Upgrade) return "L2V32Upgrade";
-        if (_c == CoreContract.L2SharedBridgeLegacy) return "L2SharedBridgeLegacy";
         if (_c == CoreContract.BridgedStandardERC20) return "BridgedStandardERC20";
         if (_c == CoreContract.DiamondProxy) return "DiamondProxy";
         if (_c == CoreContract.ProxyAdmin) return "ProxyAdmin";

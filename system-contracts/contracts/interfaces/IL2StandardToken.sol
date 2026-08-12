@@ -12,8 +12,4 @@ interface IL2StandardToken {
     function bridgeMint(address _account, uint256 _amount) external;
 
     function bridgeBurn(address _account, uint256 _amount) external;
-
-    function l1Address() external view returns (address);
-
-    function l2Bridge() external view returns (address);
 }
