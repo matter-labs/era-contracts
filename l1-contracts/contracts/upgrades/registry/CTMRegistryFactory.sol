@@ -9,6 +9,7 @@ pragma solidity 0.8.28;
 import {CTMRelease} from "./CTMRelease.sol";
 import {CTMTransition} from "./CTMTransition.sol";
 import {CoreRegistry} from "./CoreRegistry.sol";
+import {RegistryBootstrapMigration} from "./RegistryBootstrapMigration.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -112,5 +113,37 @@ contract CoreRegistryFactory {
         coreRegistry.initialize(_manifest);
         emit CoreRegistryDeployed(address(coreRegistry), manifestHash);
         return address(coreRegistry);
+    }
+}
+
+/// @title RegistryBootstrapMigrationFactory
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @notice Atomic deploy-and-initialize for {RegistryBootstrapMigration}, with the same CREATE2
+///         manifest-hash salt the release/transition/core factories use: the address IS the
+///         commitment to the migration's pinned starting state and target.
+contract RegistryBootstrapMigrationFactory {
+    /// @notice The instance deployed for each manifest hash (zero = not deployed yet).
+    mapping(bytes32 manifestHash => address instance) public deployedFor;
+
+    /// @notice Emitted once a bootstrap migration has been deployed and initialized atomically.
+    event BootstrapMigrationDeployed(address indexed migration, bytes32 manifestHash);
+
+    /// @notice Deploys + initializes a {RegistryBootstrapMigration} for `_manifest`, or returns the
+    ///         instance this factory already deployed for the same manifest.
+    function deployOrGetMigration(
+        RegistryBootstrapMigration.BootstrapManifest calldata _manifest
+    ) external returns (address) {
+        bytes32 manifestHash = keccak256(abi.encode(_manifest));
+        address existing = deployedFor[manifestHash];
+        if (existing != address(0)) {
+            return existing;
+        }
+        RegistryBootstrapMigration migration = new RegistryBootstrapMigration{salt: manifestHash}();
+        // Attested before initialization; see the note in `deployOrGetRelease`.
+        deployedFor[manifestHash] = address(migration);
+        migration.initialize(_manifest);
+        emit BootstrapMigrationDeployed(address(migration), manifestHash);
+        return address(migration);
     }
 }

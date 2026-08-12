@@ -55,6 +55,8 @@ error BatchHashMismatch(bytes32 expected, bytes32 actual);
 error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumber);
 // 0x41c329f7
 error BatchTimestampGreaterThanLastL2BlockTimestamp();
+// 0x63506488
+error BootstrapAlreadyExecuted();
 // 0x6cf12312
 error BridgeHubAlreadyRegistered();
 // 0xdb538614
