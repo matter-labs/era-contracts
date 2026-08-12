@@ -15,6 +15,8 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {ChainCreationParamsLib} from "../../../../deploy-scripts/ctm/ChainCreationParamsLib.sol";
+import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 
 contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -73,8 +75,14 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         assertEq(chainIds.length, 2);
         assertEq(chainIds[0], chainId);
 
+        // Derived from the same genesis config the CTM was deployed from, rather than hardcoded:
+        // the packed version moves on every protocol bump, and a literal here silently rots.
+        uint256 expectedProtocolVersion = ChainCreationParamsLib
+            .getChainCreationParams(Utils.genesisConfigPath(false), false)
+            .latestProtocolVersion;
+
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(chainId);
-        assertEq(protocolVersion, 133143986176);
+        assertEq(protocolVersion, expectedProtocolVersion);
     }
 
     function test_registerAlreadyDeployedZKChain() public {
