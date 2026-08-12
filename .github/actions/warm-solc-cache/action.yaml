@@ -18,6 +18,10 @@ description: >
   committed hashes. Even so, keep this out of any job whose output is committed or released, and
   pass enabled: false where a from-scratch build is the point.
 
+  verify-merged-commit.yaml is the independent check on all of the above: every merge onto a
+  long-lived base gets one cache-disabled build plus the hash, selector and zkstack-out checks, and
+  only then is the resulting cache saved for PRs to reuse.
+
 inputs:
   enabled:
     description: >
