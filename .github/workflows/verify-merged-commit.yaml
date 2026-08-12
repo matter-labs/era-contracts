@@ -1,0 +1,110 @@
+name: Verify merged commit (clean build)
+
+# The per-PR workflows all trigger on `pull_request` and warm the solc cache, so nothing verified a
+# merged commit from scratch: the last run for anything that lands was a PR run built on a cache.
+# This closes that gap — one cache-disabled build per merge, plus the checks a stale or poisoned
+# cache could subvert, because they are derived from the artifacts rather than from the sources.
+#
+# It also produces the only artifacts worth trusting for reuse: the cache it saves comes from a
+# clean build on a protected base, so PRs targeting that base get a warm *and* trustworthy first
+# run instead of a cold one.
+#
+# `build-release.yaml` also builds cleanly, but only for release tags and manual runs, which is why
+# it does not cover ordinary merges.
+
+on:
+  push:
+    branches:
+      - main
+      # Long-lived integration and release bases that PRs are cut from and merged into. A new
+      # long-lived base needs adding here; short-lived feature branches deliberately do not run
+      # this, since their merges are verified when they land on one of the above.
+      - "draft-*"
+      - "atomic-imt-*"
+      - "release-*"
+  # Available for a base not covered by the globs above, or to re-verify on demand.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One verification per branch is enough; a newer merge supersedes an in-flight run.
+concurrency:
+  group: verify-merged-commit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clean-build-and-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install foundry-zksync
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      # Explicitly disabled rather than simply omitted, so the intent is visible in the log and the
+      # escape hatch has a real caller: this build restores nothing and prunes nothing.
+      - name: Confirm the solc cache is disabled for this build
+        uses: ./.github/actions/warm-solc-cache
+        with:
+          enabled: "false"
+
+      # Removed before building so the check below also catches a deleted entry, not just a changed one.
+      - name: Drop the committed zkstack-out
+        working-directory: l1-contracts
+        run: rm -rf zkstack-out
+
+      - name: Build da contracts
+        working-directory: da-contracts
+        run: yarn build:foundry
+
+      - name: Build l1 contracts
+        working-directory: l1-contracts
+        run: yarn build:foundry
+
+      - name: Build l2 contracts
+        working-directory: l2-contracts
+        run: yarn build:foundry
+
+      - name: Build system contracts
+        working-directory: system-contracts
+        run: |
+          yarn install
+          yarn build:foundry
+
+      # The three checks whose answers come from the artifacts, so a cache could have shifted them.
+      # Here they are answered by a build with no cache at all.
+      - name: Check hashes
+        run: yarn calculate-hashes:check
+
+      - name: Check selectors
+        run: yarn l1 selectors --check
+
+      - name: Check zkstack-out
+        working-directory: l1-contracts
+        run: |
+          if [ -n "$(git status --porcelain -- zkstack-out)" ]; then
+            echo "::error::l1-contracts/zkstack-out does not match a clean build of this commit."
+            git --no-pager status --porcelain -- zkstack-out
+            git --no-pager diff -- zkstack-out || true
+            exit 1
+          fi
+
+      # Only reached when the clean build agrees with everything committed, so these artifacts are
+      # the trustworthy ones to hand to PRs branching from here.
+      - name: Save the verified solc build cache
+        uses: ./.github/actions/save-solc-cache
