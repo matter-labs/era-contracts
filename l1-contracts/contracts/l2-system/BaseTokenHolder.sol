@@ -84,7 +84,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
             return;
         }
 
-        L2_ASSET_TRACKER.handleRecoverBaseTokenBridgingOnL2(_toChainId, _amount);
+        L2_ASSET_TRACKER.assertBaseTokenRecoveryIsAccountingNeutral(_toChainId);
         Address.sendValue(payable(_to), _amount);
         emit BaseTokenRecovered(_to, _amount);
     }

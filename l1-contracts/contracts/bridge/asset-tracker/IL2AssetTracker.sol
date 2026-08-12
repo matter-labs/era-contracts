@@ -61,12 +61,18 @@ interface IL2AssetTracker {
     /// @param _amount The amount of base tokens being bridged out.
     function handleInitiateBaseTokenBridgingOnL2(uint256 _maybeToBlockChainId, uint256 _amount) external;
 
-    /// @notice Recovery-side counterpart of `handleInitiateBaseTokenBridgingOnL2`, called when a failed/
+    /// @notice Asserts that recovering a failed bridge-out originally destined to `_toChainId` needs no
+    /// bookkeeping reversal beyond the `chainBalance` re-credit `handleFinalizeBridgingOnL2` performs:
+    /// `totalWithdrawalsToL1` is append-only (L2 -> L1 withdrawals are never revertable), and the base
+    /// token never originates from this chain (so it has no `chainBalance` at all).
+    /// @param _assetId The asset being recovered.
+    /// @param _toChainId The original bridge-out destination chain id.
+    function assertRecoveryIsAccountingNeutral(bytes32 _assetId, uint256 _toChainId) external view;
+
+    /// @notice Base-token counterpart of `assertRecoveryIsAccountingNeutral`, called when a failed/
     /// timed-out base-token bridge-out's escrow is returned via `BaseTokenHolder.recoverBaseToken`.
     /// @param _toChainId The original bridge-out destination chain id.
-    /// @param _amount The recovered amount (unused until there is accounting to reverse; kept for hook
-    /// symmetry).
-    function handleRecoverBaseTokenBridgingOnL2(uint256 _toChainId, uint256 _amount) external;
+    function assertBaseTokenRecoveryIsAccountingNeutral(uint256 _toChainId) external view;
 
     /// @notice Base-token counterpart of `handleFinalizeBridgingOnL2`.
     /// @param _fromChainId The source chain id of the transfer.
@@ -90,12 +96,4 @@ interface IL2AssetTracker {
     /// @notice Eagerly registers a pre-v31 (legacy) token, storing its total-supply snapshot before its
     /// first post-v31 bridge operation. Permissionless; no-op if already registered.
     function registerLegacyToken(bytes32 _assetId) external;
-
-    /// @notice True while the ZKsync OS base token's pre-v31 total supply still needs to be backfilled.
-    function needBaseTokenTotalSupplyBackfill() external view returns (bool);
-
-    /// @notice Backfills the base token's pre-v31 total supply on ZKsync OS chains, where `totalSupply()`
-    /// is not available by default.
-    /// @param _amount The pre-v31 total supply amount.
-    function backFillZKSyncOSBaseTokenV31MigrationData(uint256 _amount) external;
 }

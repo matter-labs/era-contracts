@@ -14,18 +14,15 @@ import {
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "../../common/l2-helpers/L2ContractInterfaces.sol";
-import {RecoverToL1NotSupported, Unauthorized} from "../../common/L1ContractErrors.sol";
-
 import {
     AssetIdNotRegistered,
     BaseTokenNativeToThisChain,
-    BaseTokenTotalSupplyBackfillNotNeeded,
     ChainBalanceMustBeZeroBeforeMigration,
     InsufficientChainBalance,
     MissingBaseTokenAssetId,
-    TotalPreV31SupplyNotSaved,
-    TotalPreV31SupplyShouldBeZero
-} from "./AssetTrackerErrors.sol";
+    RecoverToL1NotSupported,
+    Unauthorized
+} from "../../common/L1ContractErrors.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IL2AssetTracker, SavedTotalSupply} from "./IL2AssetTracker.sol";
 import {MAX_TOKEN_BALANCE} from "../../common/Config.sol";
@@ -59,13 +56,13 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
 
     /// @notice Token total-supply snapshot captured before the token's first post-v31 bridge operation.
     /// See {protocol-docs/bridging.md#l2-asset-tracker}.
-    /// @dev IMPORTANT: for the base token on ZKsync OS chains the value is a placeholder until backfilled;
-    /// check `needBaseTokenTotalSupplyBackfill == false` before using it.
     mapping(bytes32 assetId => SavedTotalSupply snapshot) public totalPreV31TotalSupply;
 
-    /// @inheritdoc IL2AssetTracker
-    /// @dev Expected to be deleted once every ZKsync OS chain has its base token backfilled.
-    bool public needBaseTokenTotalSupplyBackfill;
+    /// @dev Slot previously holding `needBaseTokenTotalSupplyBackfill`. The ZKsync OS base-token
+    /// backfill it gated is complete on every chain that can take this upgrade, which is enforced on
+    /// L1 (see {V32UpgradeZKsyncOS}), so this release has no backfill entry point left.
+    // slither-disable-next-line unused-state
+    bool private __DEPRECATED_needBaseTokenTotalSupplyBackfill;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -93,34 +90,6 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
             revert Unauthorized(msg.sender);
         }
         _;
-    }
-
-    modifier onlyL2BaseToken() {
-        if (msg.sender != address(L2_BASE_TOKEN_SYSTEM_CONTRACT)) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /// @inheritdoc IL2AssetTracker
-    /// @dev Called by L2BaseTokenZKOS.setZKsyncOSPreV31TotalSupply() after setting the total supply.
-    function backFillZKSyncOSBaseTokenV31MigrationData(uint256 _amount) external onlyL2BaseToken {
-        if (!needBaseTokenTotalSupplyBackfill) {
-            revert BaseTokenTotalSupplyBackfillNotNeeded();
-        }
-
-        // Registration (genesis or v31 upgrade) must already have stored the {isSaved: true, amount: 0}
-        // placeholder; only that placeholder may be backfilled.
-        require(isAssetRegistered[BASE_TOKEN_ASSET_ID], AssetIdNotRegistered(BASE_TOKEN_ASSET_ID));
-        SavedTotalSupply memory baseTokenPreV31TotalSupply = totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID];
-        require(baseTokenPreV31TotalSupply.isSaved, TotalPreV31SupplyNotSaved(BASE_TOKEN_ASSET_ID));
-        require(
-            baseTokenPreV31TotalSupply.amount == 0,
-            TotalPreV31SupplyShouldBeZero(BASE_TOKEN_ASSET_ID, baseTokenPreV31TotalSupply.amount)
-        );
-        totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID].amount = _amount;
-
-        needBaseTokenTotalSupplyBackfill = false;
     }
 
     /// @inheritdoc IL2AssetTracker
@@ -204,20 +173,20 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
     }
 
     /// @inheritdoc IL2AssetTracker
-    /// @dev Asserts the two invariants that make recovery a no-op here. See
-    /// {protocol-docs/bridging.md#l2-asset-tracker}.
-    function handleRecoverBaseTokenBridgingOnL2(
-        uint256 _toChainId,
-        uint256 /* _amount */
-    ) external onlyBaseTokenHolder {
+    function assertRecoveryIsAccountingNeutral(bytes32 _assetId, uint256 _toChainId) public view override {
         // L2->L1 withdrawals are never revertable: `totalWithdrawalsToL1` must stay append-only.
         // See {protocol-docs/bridging.md#l2-asset-tracker}.
         require(_toChainId != L1_CHAIN_ID, RecoverToL1NotSupported());
-        // The base token never originates from this chain, so there is no chainBalance to re-credit.
-        require(
-            L2_NATIVE_TOKEN_VAULT.originChainId(BASE_TOKEN_ASSET_ID) != block.chainid,
-            BaseTokenNativeToThisChain()
-        );
+        // The base token never originates from this chain, so there is no chainBalance to re-credit;
+        // for every other asset the re-credit happens through `handleFinalizeBridgingOnL2`.
+        if (_assetId == BASE_TOKEN_ASSET_ID) {
+            require(L2_NATIVE_TOKEN_VAULT.originChainId(_assetId) != block.chainid, BaseTokenNativeToThisChain());
+        }
+    }
+
+    /// @inheritdoc IL2AssetTracker
+    function assertBaseTokenRecoveryIsAccountingNeutral(uint256 _toChainId) external view {
+        assertRecoveryIsAccountingNeutral(BASE_TOKEN_ASSET_ID, _toChainId);
     }
 
     /// @inheritdoc IL2AssetTracker

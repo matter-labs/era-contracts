@@ -18,7 +18,6 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 /// The constructor arg is immutable so the value survives `vm.etch`.
 contract DummyL2AssetTracker {
     uint256 public immutable L1_CHAIN_ID = 1;
-    bool public immutable needBaseTokenTotalSupplyBackfill = false;
 
     /// @dev When non-zero, recording mode is active. The address to observe.
     address public immutable recordTarget;
@@ -35,16 +34,29 @@ contract DummyL2AssetTracker {
     /// @dev Storage slot 1 — set to true when handleFinalizeBaseTokenBridgingOnL2 is called.
     bool public wasCalled;
 
+    /// @dev The outbound flow reported by the caller, so tests can assert what was forwarded, and a
+    /// per-direction call count so they can assert that nothing was reported.
+    uint256 public recordedToChainId;
+    uint256 public recordedToAmount;
+    uint256 public toChainCalls;
+    uint256 public fromChainCalls;
+
     constructor(address _recordTarget, RecordMode _recordMode) {
         recordTarget = _recordTarget;
         recordMode = _recordMode;
     }
 
-    function handleInitiateBaseTokenBridgingOnL2(uint256, uint256) external {}
+    function handleInitiateBaseTokenBridgingOnL2(uint256 _toChainId, uint256 _amount) external {
+        recordedToChainId = _toChainId;
+        recordedToAmount = _amount;
+        toChainCalls++;
+    }
 
-    function handleRecoverBaseTokenBridgingOnL2(uint256, uint256) external {}
+    function assertBaseTokenRecoveryIsAccountingNeutral(uint256) external {}
 
     function handleFinalizeBaseTokenBridgingOnL2(uint256, uint256) external {
+        fromChainCalls++;
+
         if (recordTarget != address(0)) {
             if (recordMode == RecordMode.TotalSupply) {
                 recordedValue = IERC20(recordTarget).totalSupply();
@@ -54,6 +66,4 @@ contract DummyL2AssetTracker {
             wasCalled = true;
         }
     }
-
-    function backFillZKSyncOSBaseTokenV31MigrationData(uint256) external {}
 }
