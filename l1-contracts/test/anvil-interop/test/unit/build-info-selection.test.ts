@@ -11,7 +11,10 @@
  */
 
 import * as assert from "assert/strict";
-import { allSourcePaths, selectBuildInfo } from "../../src/coverage/source-map-decoder";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+import { allSourcePaths, buildInfoById, loadArtifactBuildIds } from "../../src/coverage/source-map-decoder";
 import type { BuildInfo } from "../../src/coverage/source-map-decoder";
 
 const tests: Array<[string, () => void]> = [];
@@ -32,32 +35,47 @@ const older: BuildInfo = {
 };
 const buildInfos = [newer, older]; // newest first, as loadBuildInfos returns them
 
-test("picks the build-info whose numbering matches the artifact", () => {
-  // A.sol is id 0 in the newer compilation and id 1 in the older one.
-  assert.equal(selectBuildInfo(buildInfos, 0, "contracts/A.sol")?.file, "newer.json");
-  assert.equal(selectBuildInfo(buildInfos, 1, "contracts/A.sol")?.file, "older.json");
-  assert.equal(selectBuildInfo(buildInfos, 0, "contracts/B.sol")?.file, "older.json");
-  assert.equal(selectBuildInfo(buildInfos, 1, "contracts/B.sol")?.file, "newer.json");
+// Forge's own linkage, which is exact. The heuristic this replaced — find the build-info whose map
+// sends the artifact's source id to its compilation target — was unsound: a build-info saying
+// `0 -> A` does not say A was its target, so old `{0:A, 1:B}` and new `{0:A, 1:C}` both "match" an
+// old A artifact, and its references to id 1 then resolve to C. Selection looked successful, so
+// nothing was flagged and the coverage report was skewed silently.
+test("resolves an artifact to its build-info by forge's recorded build_id", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "build-id-"));
+  fs.mkdirSync(path.join(root, "cache-forge"), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, "cache-forge/solidity-files-cache.json"),
+    JSON.stringify({
+      files: {
+        "contracts/A.sol": {
+          artifacts: { A: { "0.8.28": { default: { path: "A.sol/A.json", build_id: "older" } } } },
+        },
+        "contracts/C.sol": {
+          artifacts: { C: { "0.8.28": { default: { path: "C.sol/C.json", build_id: "newer" } } } },
+        },
+      },
+    })
+  );
+
+  const buildIds = loadArtifactBuildIds(root);
+  assert.equal(buildIds.get("A.sol/A.json"), "older", "the old artifact keeps its own build");
+  assert.equal(buildIds.get("C.sol/C.json"), "newer");
+  assert.equal(buildIds.get("Absent.sol/Absent.json"), undefined);
+
+  // ...and the id selects that build-info, not merely one that happens to agree on an entry.
+  assert.equal(buildInfoById(buildInfos, "older")?.file, "older.json");
+  assert.equal(buildInfoById(buildInfos, "newer")?.file, "newer.json");
+  assert.equal(buildInfoById(buildInfos, "gone"), null, "caller must handle a missing build-info");
 });
 
-// The whole point: an artifact left over from the older compile must not be decoded with the newer
-// map, which would attribute its lines to a different file.
-test("does not hand an older artifact the newer map", () => {
-  const selected = selectBuildInfo(buildInfos, 1, "contracts/A.sol");
-  assert.equal(selected?.file, "older.json");
-  assert.equal(selected?.sourceIdMap["1"], "contracts/A.sol");
-  assert.notEqual(newer.sourceIdMap["1"], "contracts/A.sol", "the newer map disagrees, as expected");
-});
+test("survives a missing or malformed forge cache without inventing a linkage", () => {
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), "no-cache-"));
+  assert.equal(loadArtifactBuildIds(empty).size, 0);
 
-test("returns null when nothing matches, so the caller can count it", () => {
-  assert.equal(selectBuildInfo(buildInfos, 9, "contracts/A.sol"), null);
-  assert.equal(selectBuildInfo(buildInfos, 0, "contracts/Unknown.sol"), null);
-  assert.equal(selectBuildInfo([], 0, "contracts/A.sol"), null);
-});
-
-test("prefers the newest when both compilations agree", () => {
-  const agreeing = [newer, { ...older, sourceIdMap: { "0": "contracts/A.sol" } }];
-  assert.equal(selectBuildInfo(agreeing, 0, "contracts/A.sol")?.file, "newer.json");
+  const broken = fs.mkdtempSync(path.join(os.tmpdir(), "bad-cache-"));
+  fs.mkdirSync(path.join(broken, "cache-forge"), { recursive: true });
+  fs.writeFileSync(path.join(broken, "cache-forge/solidity-files-cache.json"), "{not json");
+  assert.equal(loadArtifactBuildIds(broken).size, 0, "callers treat an empty map as unresolved");
 });
 
 test("unions the source paths across compilations", () => {

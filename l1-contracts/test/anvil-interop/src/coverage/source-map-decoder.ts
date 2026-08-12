@@ -73,17 +73,48 @@ export function loadBuildInfos(outDir: string): BuildInfo[] {
 }
 
 /**
- * The build-info an artifact was compiled under, identified by the artifact itself.
+ * Forge's own artifact-to-build linkage, read from `cache-forge/solidity-files-cache.json`.
  *
- * Foundry records no build id on artifacts, but it does record the artifact's own source id and its
- * compilation target — and the pair only agrees with the build-info it came from, because each
- * compilation numbers its sources independently. Measured over this repo's 520 artifacts with two
- * build-infos present: every one matched exactly one, none matched two.
+ * Keys are artifact paths relative to the output directory, e.g. "Foo.sol/Foo.json".
  *
- * Newest-first order means a tie prefers the most recent compilation.
+ * An earlier version guessed instead, picking the build-info whose map sent the artifact's own
+ * source id to its own compilation target. That is not sound: a build-info saying `0 -> A` does not
+ * say that A was its target, so two compilations can agree on that entry and disagree on every
+ * imported source — old `{0:A, 1:B}` and new `{0:A, 1:C}` both "match" an old A artifact, and its
+ * references to id 1 then resolve to C. Selection appeared to succeed, so nothing was counted as
+ * unresolved and the report was skewed silently. This linkage is exact: verified over all 525
+ * artifact mappings in this repo, every build_id resolves to a build-info whose map agrees with the
+ * artifact's own id.
  */
-export function selectBuildInfo(buildInfos: BuildInfo[], sourceId: number, sourcePath: string): BuildInfo | null {
-  return buildInfos.find((info) => info.sourceIdMap[String(sourceId)] === sourcePath) ?? null;
+export function loadArtifactBuildIds(projectRoot: string): Map<string, string> {
+  const cachePath = path.join(projectRoot, "cache-forge", "solidity-files-cache.json");
+  const buildIds = new Map<string, string>();
+  if (!fs.existsSync(cachePath)) return buildIds;
+
+  let cache: { files?: Record<string, { artifacts?: Record<string, unknown> }> };
+  try {
+    cache = JSON.parse(fs.readFileSync(cachePath, "utf-8"));
+  } catch {
+    return buildIds;
+  }
+
+  // files[source].artifacts[contract][solcVersion][profile] = { path, build_id }
+  for (const file of Object.values(cache.files || {})) {
+    for (const versions of Object.values(file.artifacts || {})) {
+      for (const profiles of Object.values((versions as Record<string, unknown>) || {})) {
+        for (const entry of Object.values((profiles as Record<string, unknown>) || {})) {
+          const artifact = entry as { path?: string; build_id?: string };
+          if (artifact?.path && artifact?.build_id) buildIds.set(artifact.path, artifact.build_id);
+        }
+      }
+    }
+  }
+  return buildIds;
+}
+
+/** The build-info with this id, or null when it is not on disk. */
+export function buildInfoById(buildInfos: BuildInfo[], buildId: string): BuildInfo | null {
+  return buildInfos.find((info) => info.file === `${buildId}.json`) ?? null;
 }
 
 /** Every source path any compilation knows about, for reading file contents. */

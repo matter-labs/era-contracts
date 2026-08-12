@@ -15,14 +15,15 @@ import { resolveContracts, resolveByBytecode } from "./artifact-resolver";
 import {
   allSourcePaths,
   loadBuildInfos,
-  selectBuildInfo,
+  buildInfoById,
+  loadArtifactBuildIds,
   loadSourceContents,
   resolveSourceLocations,
   getExecutableLines,
   extractFunctions,
   resolveFunctionHits,
 } from "./source-map-decoder";
-import type { ContractSourceMap, SourceIdMap } from "./source-map-decoder";
+import type { DecodedContract, SourceIdMap } from "./source-map-decoder";
 import { generateLcov, writeLcov, generateSummary, filterCoverageFiles } from "./lcov-generator";
 import type { FileCoverage } from "./lcov-generator";
 import { createProvider } from "../core/utils";
@@ -147,41 +148,37 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
   console.log("\n🔍 Step 6: Mapping traces to source locations...");
   const fileHitLines = new Map<string, Set<number>>();
 
-  // artifact source id + compilation target identifies the build-info it was compiled under.
-  const mapForArtifact = new Map<string, SourceIdMap>();
-  let unresolvedBuildInfo = 0;
-  const sourceIdMapOf = (contract: (typeof resolvedContracts)[number]): SourceIdMap => {
-    const cached = mapForArtifact.get(contract.artifactPath);
-    if (cached) return cached;
+  // Forge records which build each artifact came from; that linkage is exact, so nothing here has to
+  // guess. Decoding an artifact with any other compilation's map silently attributes its lines to
+  // the wrong files, because source ids are numbered per compilation.
+  const artifactBuildIds = loadArtifactBuildIds(projectRoot);
+  const mapForArtifact = new Map<string, SourceIdMap | null>();
+  const sourceIdMapOf = (artifactPath: string): SourceIdMap | null => {
+    if (mapForArtifact.has(artifactPath)) return mapForArtifact.get(artifactPath) ?? null;
 
-    let selected: SourceIdMap | null = null;
-    try {
-      const artifact = JSON.parse(fs.readFileSync(contract.artifactPath, "utf-8"));
-      const rawMeta = artifact.metadata || artifact.rawMetadata || "{}";
-      const metadata = typeof rawMeta === "string" ? JSON.parse(rawMeta) : rawMeta;
-      const target = Object.keys(metadata?.settings?.compilationTarget || {})[0];
-      if (target !== undefined && artifact.id !== undefined) {
-        selected = selectBuildInfo(buildInfos, artifact.id, target)?.sourceIdMap ?? null;
-      }
-    } catch {
-      selected = null;
-    }
-
-    if (!selected) {
-      // Falling back to the newest map may misattribute this contract's lines, so it is counted and
-      // reported rather than passed over quietly.
-      unresolvedBuildInfo++;
-      selected = buildInfos[0].sourceIdMap;
-    }
-    mapForArtifact.set(contract.artifactPath, selected);
-    return selected;
+    const relative = path.relative(outDir, artifactPath);
+    const buildId = artifactBuildIds.get(relative);
+    const resolved = buildId ? (buildInfoById(buildInfos, buildId)?.sourceIdMap ?? null) : null;
+    mapForArtifact.set(artifactPath, resolved);
+    return resolved;
   };
 
   for (const contract of resolvedContracts) {
     const pcs = allTraces.get(contract.address);
     if (!pcs || pcs.size === 0) continue;
 
-    const locations = resolveSourceLocations(contract.sourceMap, pcs, sourceIdMapOf(contract), sourceContents);
+    const sourceIdMap = sourceIdMapOf(contract.artifactPath);
+    if (!sourceIdMap) {
+      // Its executed lines cannot be placed. Decoding through another compilation's map would put
+      // them on the wrong files, which is worse than failing, and skipping silently would under-report.
+      throw new Error(
+        `No build-info linkage for ${path.relative(outDir, contract.artifactPath)} (${contract.name}), ` +
+          "which has execution traces. cache-forge/solidity-files-cache.json must accompany the " +
+          "artifacts it describes — restore both from the same cache, or build from scratch."
+      );
+    }
+
+    const locations = resolveSourceLocations(contract.sourceMap, pcs, sourceIdMap, sourceContents);
 
     for (const [filePath, lines] of locations) {
       let existing = fileHitLines.get(filePath);
@@ -207,14 +204,24 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
 
   // 7. Compute executable lines and extract function data
   console.log("\n🔍 Step 7: Computing executable lines and extracting functions...");
-  const decodedContracts = resolvedContracts
-    .filter((c) => c.sourceMap !== null)
-    .map((c) => ({ contractMap: c.sourceMap as ContractSourceMap, sourceIdMap: sourceIdMapOf(c) }));
+  const decodedContracts: DecodedContract[] = [];
+  let withoutLinkage = 0;
+  for (const contract of resolvedContracts) {
+    if (contract.sourceMap === null) continue;
+    const sourceIdMap = sourceIdMapOf(contract.artifactPath);
+    if (!sourceIdMap) {
+      // No traces reached it (that case threw above), so it only affects the denominator. Left out
+      // rather than counted through the wrong map, and reported so the omission is visible.
+      withoutLinkage++;
+      continue;
+    }
+    decodedContracts.push({ contractMap: contract.sourceMap, sourceIdMap });
+  }
 
-  if (unresolvedBuildInfo > 0) {
+  if (withoutLinkage > 0) {
     console.warn(
-      `  ⚠️  ${unresolvedBuildInfo} artifact(s) could not be matched to a build-info; their lines were ` +
-        "decoded with the newest map and may be misattributed."
+      `  ⚠️  ${withoutLinkage} artifact(s) have no build-info linkage and were excluded from the ` +
+        "executable-line totals. They had no execution traces, so no hits are lost."
     );
   }
 
