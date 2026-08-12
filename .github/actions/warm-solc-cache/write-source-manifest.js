@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 
 /**
  * Records the Solidity sources a cached build was produced from, so a later restore can tell which

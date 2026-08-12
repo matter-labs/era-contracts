@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 
 /**
  * Deletes artifacts whose source file no longer exists, so a restored cache cannot leave stale
