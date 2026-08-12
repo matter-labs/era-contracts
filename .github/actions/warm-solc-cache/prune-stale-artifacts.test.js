@@ -173,6 +173,23 @@ test("a change to one source invalidates unrelated artifacts and build-info too"
   assert.equal(fs.existsSync(buildInfo), false, "build-info goes with the artifacts");
 });
 
+// Adding a source is drift too: forge compiles it into a second build-info whose source IDs are
+// incompatible with the retained artifacts'. Walking only the recorded keys missed this.
+test("invalidates when a source is added, not only changed or removed", () => {
+  const { root, manifestPath } = fixture({
+    sources: { "l1-contracts/contracts/A.sol": "contract A {}" },
+    artifacts: { "l1-contracts/out/A.sol/A.json": "contracts/A.sol" },
+  });
+
+  fs.writeFileSync(path.join(root, "l1-contracts/contracts/B.sol"), "contract B {}");
+  git(root, ["add", "-A"]);
+  git(root, ["commit", "-qm", "add a source"]);
+
+  const output = prune(root, manifestPath);
+  assert.match(output, /B\.sol was added/);
+  assert.equal(survives(root, "l1-contracts/out/A.sol/A.json"), false);
+});
+
 test("keeps everything when nothing changed", () => {
   const { root, manifestPath } = fixture({
     sources: { "l1-contracts/contracts/A.sol": "contract A {}" },

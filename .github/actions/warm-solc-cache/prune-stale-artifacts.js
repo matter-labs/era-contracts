@@ -158,10 +158,11 @@ function staleSources(manifestPath) {
     return { changed: new Set(), invalidateAll: true };
   }
 
-  const changed = new Set();
-  for (const [sourcePath, blob] of Object.entries(manifest.sources || {})) {
-    if (current.sources[sourcePath] !== blob) changed.add(sourcePath);
-  }
+  // Symmetric, like the config comparison above. Walking only the recorded keys missed an *added*
+  // .sol: `changed` stayed empty, the cache was kept, and forge then compiled the new source into a
+  // second build-info whose source IDs are incompatible with the retained artifacts' — the same
+  // silent misattribution. An added source is drift.
+  const sourceDrift = firstDifference(manifest.sources || {}, current.sources);
 
   // Any Solidity drift invalidates everything, rather than just the artifacts of the changed
   // sources. Two reasons, both measured:
@@ -178,15 +179,15 @@ function staleSources(manifestPath) {
   //
   // The cost is that a commit touching any .sol rebuilds that project from scratch; the cache then
   // helps pushes that do not touch Solidity. Correct attribution is worth more than the minutes.
-  if (changed.size > 0) {
+  if (sourceDrift) {
     console.log(
-      `  ${changed.size} source(s) changed since the cache was built — invalidating all artifacts, ` +
+      `  ${sourceDrift} since the cache was built — invalidating all artifacts, ` +
         "so artifacts and build-info come from one coherent compile"
     );
-    return { changed, invalidateAll: true };
+    return { changed: new Set(), invalidateAll: true };
   }
 
-  return { changed, invalidateAll: false };
+  return { changed: new Set(), invalidateAll: false };
 }
 
 function isFile(candidate) {
@@ -271,20 +272,13 @@ function prune(projectDir, artifactsDir, stale) {
         continue;
       }
 
-      // Source paths in artifacts are project-relative; the manifest is repo-relative.
-      const repoRelative = path.relative(process.cwd(), path.resolve(projectDir, sourcePath));
-
       if (stale.invalidateAll) {
         fs.rmSync(artifactPath);
         stats.removed++;
         continue;
       }
 
-      if (stale.changed.has(repoRelative)) {
-        console.log(`  pruning ${artifactPath} (source changed: ${repoRelative})`);
-        fs.rmSync(artifactPath);
-        stats.removed++;
-      } else if (exists(sourcePath)) {
+      if (exists(sourcePath)) {
         stats.kept++;
       } else {
         console.log(`  pruning ${artifactPath} (source gone: ${sourcePath})`);
