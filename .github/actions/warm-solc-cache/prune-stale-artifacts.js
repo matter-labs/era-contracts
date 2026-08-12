@@ -57,6 +57,36 @@ function currentGitState() {
   return { sources, submodules, blobs };
 }
 
+/** Must match write-source-manifest.js, so an added config input is noticed here too. */
+const CONFIG_INPUT_PATTERNS = [
+  /^yarn\.lock$/,
+  /(^|\/)foundry\.toml$/,
+  /(^|\/)remappings\.txt$/,
+  /(^|\/)package\.json$/,
+];
+
+function currentConfigInputs(blobs) {
+  const inputs = {};
+  for (const [filePath, object] of Object.entries(blobs)) {
+    if (CONFIG_INPUT_PATTERNS.some((pattern) => pattern.test(filePath))) inputs[filePath] = object;
+  }
+  return inputs;
+}
+
+/**
+ * Describes the first key that differs between two maps — added, removed or changed — or null when
+ * they match. Both directions, so an added entry counts as drift.
+ */
+function firstDifference(recorded, current, label = "") {
+  for (const key of new Set([...Object.keys(recorded), ...Object.keys(current)])) {
+    if (recorded[key] === current[key]) continue;
+    if (recorded[key] === undefined) return `${label}${key} was added`;
+    if (current[key] === undefined) return `${label}${key} was removed`;
+    return `${label}${key} changed`;
+  }
+  return null;
+}
+
 /** Manifest versions this reader understands; anything else is not trusted. */
 const SUPPORTED_MANIFEST_VERSIONS = new Set([1]);
 
@@ -83,8 +113,11 @@ function validateManifest(manifest) {
  */
 function staleSources(manifestPath) {
   if (!manifestPath || !fs.existsSync(manifestPath)) {
-    console.log("  no source manifest in the cache — only deleted sources can be detected");
-    return { changed: new Set(), invalidateAll: false };
+    // Deletion-only detection is not a safe fallback: a contract removed from a surviving file
+    // leaves an artifact that this run would rebuild into a new cache *alongside a fresh manifest*,
+    // which then vouches for it on every later commit. One cold rebuild ends that permanently.
+    console.log("  no source manifest in the cache — treating the whole cache as stale");
+    return { changed: new Set(), invalidateAll: true };
   }
 
   let manifest;
@@ -110,18 +143,19 @@ function staleSources(manifestPath) {
   // Dependency resolution and foundry config decide what solc compiles, so a change to either can
   // invalidate artifacts without any tracked .sol changing — including a contract disappearing from
   // a dependency source, which the per-source comparison below cannot see.
-  for (const [inputPath, blob] of Object.entries(manifest.configInputs || {})) {
-    if (current.blobs[inputPath] !== blob) {
-      console.log(`  ${inputPath} changed since the cache was built — invalidating all artifacts`);
-      return { changed: new Set(), invalidateAll: true };
-    }
+  //
+  // Compared in both directions: walking only the recorded entries misses an *added* foundry.toml,
+  // remappings.txt, lockfile or submodule, which is exactly a configuration change.
+  const configDrift = firstDifference(manifest.configInputs || {}, currentConfigInputs(current.blobs));
+  if (configDrift) {
+    console.log(`  ${configDrift} since the cache was built — invalidating all artifacts`);
+    return { changed: new Set(), invalidateAll: true };
   }
 
-  for (const [submodule, pin] of Object.entries(manifest.submodules || {})) {
-    if (current.submodules[submodule] !== pin) {
-      console.log(`  submodule ${submodule} moved since the cache was built — invalidating all artifacts`);
-      return { changed: new Set(), invalidateAll: true };
-    }
+  const submoduleDrift = firstDifference(manifest.submodules || {}, current.submodules, "submodule ");
+  if (submoduleDrift) {
+    console.log(`  ${submoduleDrift} since the cache was built — invalidating all artifacts`);
+    return { changed: new Set(), invalidateAll: true };
   }
 
   const changed = new Set();
@@ -185,9 +219,20 @@ function prune(projectDir, artifactsDir, stale) {
     return sourceExists.get(sourcePath);
   };
 
+  // build-info carries the source-id-to-path mapping the coverage collector reads. A restored one
+  // describes the *old* source set, so after a change it can be applied to new source maps and
+  // misattribute or drop hits. Only removed when a compilation is certain to follow — deleting it
+  // on a fully incremental build would leave the collector with no mapping at all.
+  if (stale.invalidateAll || stale.changed.size > 0) {
+    const buildInfo = path.join(artifactsDir, "build-info");
+    if (fs.existsSync(buildInfo)) {
+      fs.rmSync(buildInfo, { recursive: true });
+      console.log(`  removed ${buildInfo} (the build will regenerate it for the current sources)`);
+    }
+  }
+
   for (const entry of fs.readdirSync(artifactsDir, { withFileTypes: true })) {
-    // build-info holds compiler input/output, not per-contract artifacts, and nothing enumerates
-    // it for hashes or sizes.
+    // Anything left in build-info at this point matches the artifacts beside it.
     if (!entry.isDirectory() || entry.name === "build-info") continue;
 
     const dir = path.join(artifactsDir, entry.name);

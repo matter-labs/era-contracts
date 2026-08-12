@@ -29,11 +29,19 @@ test("tolerates a few failed traces among many", () => {
   );
 });
 
-// Nothing ran, so there is nothing to conclude — this is the --l1-only or empty-spec case, not a
-// failure, and it must not turn into one.
-test("says nothing when no transactions were executed", () => {
+// Zero transactions is a symptom, not a valid state: the specs always transact, so it means the
+// collector read the wrong chains — a stale chains.json, or an RPC the tests never used — and the
+// result was an empty report that merged as "added nothing".
+test("fails when no transactions were found at all", () => {
+  assert.throws(
+    () => assertTracesUsable({ transactions: 0, traceFailures: 0, tracedContracts: 0, hitSourceFiles: 0 }),
+    /found no transactions at all[\s\S]*chains\.json/
+  );
+});
+
+test("allows an empty run only when explicitly asked", () => {
   assert.doesNotThrow(() =>
-    assertTracesUsable({ transactions: 0, traceFailures: 0, tracedContracts: 0, hitSourceFiles: 0 })
+    assertTracesUsable({ transactions: 0, traceFailures: 0, tracedContracts: 0, hitSourceFiles: 0, allowEmpty: true })
   );
 });
 

@@ -162,6 +162,7 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
     traceFailures: totalTraceFailures,
     tracedContracts: allTraces.size,
     hitSourceFiles: fileHitLines.size,
+    allowEmpty: process.env.ANVIL_INTEROP_ALLOW_EMPTY_COVERAGE === "1",
   });
 
   // 7. Compute executable lines and extract function data

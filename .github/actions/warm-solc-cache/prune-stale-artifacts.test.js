@@ -183,21 +183,36 @@ test("invalidates everything for a malformed or unsupported manifest", () => {
   }
 });
 
-// A cache saved before the manifest existed must still work, just with less detection.
-test("falls back to deletion-only detection with no manifest", () => {
+// A cache from before the manifest existed cannot be trusted at all: deletion-only detection would
+// let a contract removed from a surviving file be rebuilt into a new cache *with* a fresh manifest,
+// which then vouches for it on every later commit. One cold rebuild ends that.
+test("invalidates everything when the cache has no manifest", () => {
   const { root } = fixture({
     sources: { "l1-contracts/contracts/A.sol": "contract A {}" },
-    artifacts: {
-      "l1-contracts/out/A.sol/A.json": "contracts/A.sol",
-      "l1-contracts/out/Gone.sol/Gone.json": "contracts/Gone.sol",
-    },
+    artifacts: { "l1-contracts/out/A.sol/A.json": "contracts/A.sol" },
     writeManifest: false,
   });
 
   const output = prune(root, undefined);
   assert.match(output, /no source manifest/);
-  assert.equal(survives(root, "l1-contracts/out/A.sol/A.json"), true);
-  assert.equal(survives(root, "l1-contracts/out/Gone.sol/Gone.json"), false, "a vanished source is still caught");
+  assert.equal(survives(root, "l1-contracts/out/A.sol/A.json"), false);
+});
+
+// Only recorded keys used to be compared, so an added config input or submodule — itself a
+// configuration change — was invisible.
+test("invalidates when a config input is added or removed, not just changed", () => {
+  const { root, manifestPath } = fixture({
+    sources: { "l1-contracts/contracts/A.sol": "contract A {}" },
+    artifacts: { "l1-contracts/out/A.sol/A.json": "contracts/A.sol" },
+  });
+
+  fs.writeFileSync(path.join(root, "l1-contracts/remappings.txt"), "foo/=lib/foo/\n");
+  git(root, ["add", "-A"]);
+  git(root, ["commit", "-qm", "add remappings"]);
+
+  const output = prune(root, manifestPath);
+  assert.match(output, /remappings\.txt was added/);
+  assert.equal(survives(root, "l1-contracts/out/A.sol/A.json"), false);
 });
 
 // This repo commits generated artifact directories named after their source (zkstack-out/X.sol/), so

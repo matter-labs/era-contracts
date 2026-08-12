@@ -49,8 +49,22 @@ export function loadSourceIdMap(outDir: string): SourceIdMap {
     throw new Error(`No build-info JSON files found in ${buildInfoDir}`);
   }
 
-  // Use the first (and typically only) build-info file
-  const buildInfo = JSON.parse(fs.readFileSync(path.join(buildInfoDir, files[0]), "utf-8"));
+  // Newest wins, rather than whichever readdir happened to return first. With a warm artifact cache
+  // more than one can be present — a restored one describing the old source set plus the one this
+  // build wrote — and picking the stale mapping silently misattributes or drops coverage hits.
+  const newest = files
+    .map((file) => ({ file, mtimeMs: fs.statSync(path.join(buildInfoDir, file)).mtimeMs }))
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)[0].file;
+
+  if (files.length > 1) {
+    console.warn(
+      `  ⚠️  ${files.length} build-info files in ${buildInfoDir}; using the newest (${newest}). ` +
+        "Source IDs are only meaningful within one build-info, so coverage for contracts compiled " +
+        "under an older one may be misattributed. A clean build removes the ambiguity."
+    );
+  }
+
+  const buildInfo = JSON.parse(fs.readFileSync(path.join(buildInfoDir, newest), "utf-8"));
   return buildInfo.source_id_to_path || {};
 }
 

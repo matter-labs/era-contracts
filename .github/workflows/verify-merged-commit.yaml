@@ -46,14 +46,33 @@ jobs:
         run: |
           set -euo pipefail
 
-          # `protected` covers anything the org protects now or later, without editing this file.
-          is_protected=$(gh api "repos/$REPO/branches/$REF_NAME" --jq '.protected' 2>/dev/null || echo "false")
-
-          # ...and these are long-lived bases that are merged into but are not protected today.
+          # These are long-lived bases that are merged into but are not protected today.
           case "$REF_NAME" in
             main | draft-* | atomic-imt-* | release-*) matches_base="true" ;;
             *) matches_base="false" ;;
           esac
+
+          # `protected` covers anything the org protects now or later, without editing this file.
+          #
+          # A lookup failure must not read as "unprotected": that would silently skip verification
+          # for a protected branch whose name is outside the patterns above — the one case the API
+          # check exists to cover. Retry, then fail loudly rather than quietly skipping. A branch
+          # already matching a pattern does not need the API at all, so a flaky lookup cannot block
+          # a merge onto a known base.
+          is_protected="false"
+          if [ "$matches_base" = "false" ]; then
+            for attempt in 1 2 3; do
+              if is_protected=$(gh api "repos/$REPO/branches/$REF_NAME" --jq '.protected'); then
+                break
+              fi
+              if [ "$attempt" = "3" ]; then
+                echo "::error::Could not determine whether $REF_NAME is protected after 3 attempts." \
+                  "Refusing to assume it is unprotected, which would skip clean verification."
+                exit 1
+              fi
+              sleep 5
+            done
+          fi
 
           if [ "$is_protected" = "true" ] || [ "$matches_base" = "true" ]; then
             echo "Verifying $REF_NAME (protected=$is_protected, long-lived base=$matches_base)"

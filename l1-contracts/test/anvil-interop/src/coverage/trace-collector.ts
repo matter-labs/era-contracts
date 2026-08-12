@@ -90,8 +90,24 @@ export function assertTracesUsable(stats: {
   traceFailures: number;
   tracedContracts: number;
   hitSourceFiles: number;
+  /** Set only when a run with no transactions is genuinely expected. */
+  allowEmpty?: boolean;
 }): void {
-  if (stats.transactions === 0) return; // genuinely nothing ran; not this function's problem
+  if (stats.transactions === 0) {
+    // Not "nothing to conclude": the specs always transact, so zero means the collector looked at
+    // the wrong chains — a stale or malformed chains.json, an RPC that is not the one the tests
+    // used, freshly restarted chains. That produced an empty report that merged as "added nothing".
+    if (stats.allowEmpty) {
+      console.warn("  ⚠️  No transactions found; writing an empty report because allowEmpty was set.");
+      return;
+    }
+    throw new Error(
+      "Coverage collection found no transactions at all. The specs always transact, so this usually " +
+        "means the collector read the wrong chains (stale outputs/state*/chains.json, or an RPC that " +
+        "is not the one the tests ran against). Set ANVIL_INTEROP_ALLOW_EMPTY_COVERAGE=1 if an empty " +
+        "run is genuinely expected."
+    );
+  }
 
   if (stats.traceFailures === stats.transactions) {
     throw new Error(
