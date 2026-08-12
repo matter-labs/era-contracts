@@ -57,10 +57,49 @@ export function runScope(basePortOffset: number): string {
 export function shardsDirFor(basePortOffset: number): string {
   return path.join(coverageRootDir, `shards${runScope(basePortOffset)}`);
 }
+
+/**
+ * Where a single-process run (one spec, --serial, --fresh-deploy) writes its report. Scoped too:
+ * unscoped, two runs at different offsets overwrote each other's LCOV while both reported success.
+ */
+export function singleRunCoverageDir(basePortOffset: number): string {
+  return basePortOffset ? path.join(coverageRootDir, `run${runScope(basePortOffset)}`) : coverageRootDir;
+}
 const totalStart = Date.now();
 
 /** Ports are spaced this far apart so each worker's 6 chains never collide. */
 const PORT_OFFSET_PER_WORKER = 100;
+
+/**
+ * Ports a single run reserves. A run at base B uses B, B+100, ... per worker, so two runs are only
+ * disjoint if their bases are a whole span apart: base 0 and base 500 both allocate 500, 600, 700,
+ * 800 and 900, and the second run's `startChain` kills the first run's Anvil processes outright.
+ * Bases are therefore required to be multiples of this.
+ */
+const RUN_PORT_SPAN = 1000;
+const MAX_SHARDS_PER_RUN = RUN_PORT_SPAN / PORT_OFFSET_PER_WORKER;
+
+/** The port-offset range [start, end) a run occupies. */
+export function portRangeFor(basePortOffset: number, shardCount: number): { start: number; end: number } {
+  return { start: basePortOffset, end: basePortOffset + shardCount * PORT_OFFSET_PER_WORKER };
+}
+
+/** Throws unless a run at this base cannot overlap a run at any other permitted base. */
+export function assertDisjointPortRange(basePortOffset: number, shardCount: number): void {
+  if (basePortOffset % RUN_PORT_SPAN !== 0) {
+    throw new Error(
+      `Port offset ${basePortOffset} would overlap another run: sharded coverage reserves ` +
+        `${RUN_PORT_SPAN} ports per run, so the offset must be a multiple of ${RUN_PORT_SPAN} ` +
+        `(0, ${RUN_PORT_SPAN}, ${RUN_PORT_SPAN * 2}, ...).`
+    );
+  }
+  if (shardCount > MAX_SHARDS_PER_RUN) {
+    throw new Error(
+      `${shardCount} shards need ${shardCount * PORT_OFFSET_PER_WORKER} ports but a run reserves ` +
+        `only ${RUN_PORT_SPAN}; raise RUN_PORT_SPAN.`
+    );
+  }
+}
 
 function elapsedSince(start: number): string {
   const ms = Date.now() - start;
@@ -91,6 +130,17 @@ function timedRun(label: string, command: string, args: string[], cwd: string, e
   console.log(`\n⏱️  [TIMING] Starting: ${label} (total elapsed: ${elapsedSince(totalStart)})`);
   runOrThrow(command, args, cwd, env);
   console.log(`⏱️  [TIMING] Finished: ${label} in ${elapsedSince(start)} (total elapsed: ${elapsedSince(totalStart)})`);
+}
+
+/**
+ * Publishes the resolved offset to the environment the chains and cleanup read.
+ *
+ * Unconditionally: guarding on a truthy value left an inherited non-zero
+ * ANVIL_INTEROP_PORT_OFFSET in place when `--port-offset 0` was passed, so the flag lost to the
+ * environment it is documented to beat and the chains came up on the inherited ports.
+ */
+export function applyPortOffset(portOffset: number): void {
+  process.env.ANVIL_INTEROP_PORT_OFFSET = portOffset.toString();
 }
 
 /**
@@ -240,6 +290,7 @@ async function runSharded(specs: string[], basePortOffset: number, passthroughAr
   // causes load-dependent RPC flakes. ANVIL_INTEROP_MAX_PARALLEL_WORKERS caps the
   // concurrency; unset (or 0) runs one worker per spec.
   const shardGroups = specs.map((spec) => [spec]);
+  assertDisjointPortRange(basePortOffset, shardGroups.length);
   const maxWorkers = Number(process.env.ANVIL_INTEROP_MAX_PARALLEL_WORKERS || 0) || shardGroups.length;
 
   // Drop stale per-shard reports so a shard that fails to produce one cannot be
@@ -365,9 +416,7 @@ async function main(): Promise<void> {
   const requestedSpecs = parseRequestedSpecs(args);
 
   const portOffset = resolvePortOffset(args, process.env.ANVIL_INTEROP_PORT_OFFSET);
-  if (portOffset) {
-    process.env.ANVIL_INTEROP_PORT_OFFSET = portOffset.toString();
-  }
+  applyPortOffset(portOffset);
 
   // Enable steps tracing for all Anvil chains started by this process (and, via
   // inheritance, by any worker it spawns).
@@ -392,7 +441,7 @@ async function main(): Promise<void> {
       const baseOffset = process.env.ANVIL_INTEROP_SHARD_BASE_OFFSET;
       const coverageDir = workerMode
         ? shardCoverageDir(portOffset, baseOffset !== undefined ? Number(baseOffset) : portOffset)
-        : coverageRootDir;
+        : singleRunCoverageDir(portOffset);
       await runSingleProcess(specs, freshDeploy, coverageDir, html && !workerMode, l1Only);
     }
 

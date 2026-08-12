@@ -19,16 +19,76 @@
  *
  * Over-pruning is harmless — forge recompiles whatever is missing.
  *
- * Known limit: removing a *contract* from a source file that still exists leaves that contract's
- * artifact behind, since its compilationTarget still resolves. Forge does not prune those either,
- * and nothing here can see it without compiling. Such a mismatch fails loudly in check-hashes
- * rather than passing quietly, and `enabled: false` gives a from-scratch build.
+ * A deleted source is only half the problem. Removing one *contract* from a file that still exists
+ * leaves that contract's artifact behind with a target that still resolves — and because the build
+ * then re-saves it under the new SHA, every later commit restores it through the prefix key, so
+ * check-hashes and check-zkstack-out would fail forever with no way to self-heal. So when the cache
+ * carries a source manifest (see write-source-manifest.js), artifacts of *modified* sources are
+ * dropped too, by comparing git blob hashes. A changed submodule pin invalidates everything, since
+ * submodule sources are not listed in the superproject.
  *
- * Usage: node prune-stale-artifacts.js <project-dir>:<artifacts-dir> [...]
+ * Without a manifest (a cache from before this existed) only deletions are detectable, which is the
+ * old behaviour rather than a regression.
+ *
+ * Usage: node prune-stale-artifacts.js [--manifest <path>] <project-dir>:<artifacts-dir> [...]
  */
 
 const fs = require("fs");
 const path = require("path");
+
+const { execFileSync } = require("child_process");
+
+/** Current blob hashes for tracked sources and submodule pins, in the manifest's shape. */
+function currentGitState() {
+  const out = execFileSync("git", ["ls-files", "-s"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  const sources = {};
+  const submodules = {};
+  for (const line of out.split("\n")) {
+    if (!line) continue;
+    const [meta, filePath] = line.split("\t");
+    const [mode, object] = meta.split(/\s+/);
+    if (mode === "160000") submodules[filePath] = object;
+    else if (filePath.endsWith(".sol")) sources[filePath] = object;
+  }
+  return { sources, submodules };
+}
+
+/**
+ * Source paths (repo-relative) whose contents differ from what the cache was built from, or
+ * `"*"` when a submodule pin moved and nothing can be trusted. Empty when there is no manifest.
+ */
+function staleSources(manifestPath) {
+  if (!manifestPath || !fs.existsSync(manifestPath)) {
+    console.log("  no source manifest in the cache — only deleted sources can be detected");
+    return { changed: new Set(), invalidateAll: false };
+  }
+
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  } catch {
+    console.log("  source manifest unreadable — treating the whole cache as stale");
+    return { changed: new Set(), invalidateAll: true };
+  }
+
+  const current = currentGitState();
+
+  for (const [submodule, pin] of Object.entries(manifest.submodules || {})) {
+    if (current.submodules[submodule] !== pin) {
+      console.log(`  submodule ${submodule} moved since the cache was built — invalidating all artifacts`);
+      return { changed: new Set(), invalidateAll: true };
+    }
+  }
+
+  const changed = new Set();
+  for (const [sourcePath, blob] of Object.entries(manifest.sources || {})) {
+    if (current.sources[sourcePath] !== blob) changed.add(sourcePath);
+  }
+  if (changed.size > 0) {
+    console.log(`  ${changed.size} source(s) changed since the cache was built`);
+  }
+  return { changed, invalidateAll: false };
+}
 
 function isFile(candidate) {
   try {
@@ -65,7 +125,7 @@ function sourcePathOf(artifactPath) {
   return sourcePath || null;
 }
 
-function prune(projectDir, artifactsDir) {
+function prune(projectDir, artifactsDir, stale) {
   const stats = { removed: 0, kept: 0, unattributed: 0, dirsRemoved: 0 };
   if (!fs.existsSync(artifactsDir)) return stats;
 
@@ -101,7 +161,20 @@ function prune(projectDir, artifactsDir) {
         continue;
       }
 
-      if (exists(sourcePath)) {
+      // Source paths in artifacts are project-relative; the manifest is repo-relative.
+      const repoRelative = path.relative(process.cwd(), path.resolve(projectDir, sourcePath));
+
+      if (stale.invalidateAll) {
+        fs.rmSync(artifactPath);
+        stats.removed++;
+        continue;
+      }
+
+      if (stale.changed.has(repoRelative)) {
+        console.log(`  pruning ${artifactPath} (source changed: ${repoRelative})`);
+        fs.rmSync(artifactPath);
+        stats.removed++;
+      } else if (exists(sourcePath)) {
         stats.kept++;
       } else {
         console.log(`  pruning ${artifactPath} (source gone: ${sourcePath})`);
@@ -119,11 +192,16 @@ function prune(projectDir, artifactsDir) {
   return stats;
 }
 
-const targets = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const manifestIdx = argv.indexOf("--manifest");
+const manifestPath = manifestIdx !== -1 ? argv[manifestIdx + 1] : undefined;
+const targets = argv.filter((arg, i) => i !== manifestIdx && i !== manifestIdx + 1 && !arg.startsWith("--"));
 if (targets.length === 0) {
-  console.error("Usage: node prune-stale-artifacts.js <project-dir>:<artifacts-dir> [...]");
+  console.error("Usage: node prune-stale-artifacts.js [--manifest <path>] <project-dir>:<artifacts-dir> [...]");
   process.exit(1);
 }
+
+const stale = staleSources(manifestPath);
 
 const totals = { removed: 0, kept: 0, unattributed: 0, dirsRemoved: 0 };
 for (const target of targets) {
@@ -132,7 +210,7 @@ for (const target of targets) {
     console.error(`Malformed target "${target}", expected <project-dir>:<artifacts-dir>`);
     process.exit(1);
   }
-  const stats = prune(projectDir, artifactsDir);
+  const stats = prune(projectDir, artifactsDir, stale);
   for (const key of Object.keys(totals)) totals[key] += stats[key];
 }
 

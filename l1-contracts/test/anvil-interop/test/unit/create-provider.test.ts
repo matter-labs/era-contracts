@@ -11,6 +11,8 @@
  */
 
 import * as assert from "assert/strict";
+import * as fs from "fs";
+import * as path from "path";
 import {
   LOCAL_POLLING_INTERVAL_MS,
   REMOTE_POLLING_INTERVAL_MS,
@@ -119,6 +121,35 @@ test("accepts an integer override, and ethers accepts it too", () => {
 test("treats a URL it cannot parse as remote", () => {
   assert.equal(isLocalRpcUrl("not a url"), false);
   withOverride(undefined, () => assert.equal(pollingIntervalFor("not a url"), REMOTE_POLLING_INTERVAL_MS));
+});
+
+// The point of the helper is that it is the *only* provider constructor: the first conversion pass
+// missed the `new ethers.providers.*` spelling, which silently left 07/13/08 and the upgrade runner
+// on 4s polling, and a later pass still missed run-fork-upgrade-test.ts. Assert the invariant
+// instead of trusting it.
+test("no provider is constructed outside createProvider", () => {
+  const root = path.resolve(__dirname, "../..");
+  const offenders: string[] = [];
+
+  const walk = (dir: string): void => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name === "outputs" || entry.name.startsWith(".")) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (!entry.name.endsWith(".ts")) continue;
+      if (full === path.join(root, "src/core/utils.ts")) continue; // the one permitted constructor
+      const text = fs.readFileSync(full, "utf8");
+      if (/new\s+(ethers\.)?providers\.JsonRpcProvider\s*\(/.test(text)) {
+        offenders.push(path.relative(root, full));
+      }
+    }
+  };
+
+  walk(root);
+  assert.deepEqual(offenders, [], `construct these through createProvider(): ${offenders.join(", ")}`);
 });
 
 let failed = 0;

@@ -58,10 +58,13 @@ runs:
     # Only the directories this action actually restores are scanned. zkout is never restored
     # here — zksolc output is not reproducible across builds — and zksolc artifacts carry no
     # compilationTarget to match on anyway.
-    - name: Prune artifacts with no source
+    - name: Drop artifacts whose source is gone or has changed
       if: inputs.enabled == 'true'
       shell: bash
       run: |
-        node ${{ github.action_path }}/prune-stale-artifacts.js \
+        node "${{ github.action_path }}/prune-stale-artifacts.js" \
+          --manifest "$MANIFEST_PATH" \
           "da-contracts:da-contracts/out" \
           "l1-contracts:l1-contracts/out"
+      env:
+        MANIFEST_PATH: l1-contracts/cache-forge/.warm-solc-cache-sources.json
