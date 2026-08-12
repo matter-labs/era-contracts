@@ -11,6 +11,4 @@ pragma solidity ^0.8.20;
  * now a private deprecated storage slot on `L2AssetRouter` and is no longer callable, so advertising it
  * here would hand downstream consumers a selector that reverts.
  */
-interface IL2AssetRouter {
-
-}
+interface IL2AssetRouter {}
