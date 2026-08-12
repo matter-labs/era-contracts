@@ -99,10 +99,12 @@ test("prunes only the deleted source's artifacts when a basename is shared", () 
   git(root, ["commit", "-qm", "delete the test source"]);
 
   prune(root, manifestPath);
-  // A deletion is drift, so the whole cache goes — artifacts and build-info have to come from one
-  // compile. What matters here is that the *tracked* deletion is noticed at all.
   assert.equal(survives(root, "l1-contracts/out/L1NativeTokenVault.sol/L1NativeTokenVaultTest.json"), false);
-  assert.equal(survives(root, "l1-contracts/out/L1NativeTokenVault.sol/L1NativeTokenVault.json"), false);
+  assert.equal(
+    survives(root, "l1-contracts/out/L1NativeTokenVault.sol/L1NativeTokenVault.json"),
+    true,
+    "the surviving source's artifact is kept, despite sharing the directory"
+  );
 });
 
 // The per-artifact compilationTarget check still earns its place: a source that git never tracked
@@ -144,11 +146,9 @@ test("drops artifacts of a source that changed, not just one that vanished", () 
   assert.equal(survives(root, "l1-contracts/out/Pair.sol/Kept.json"), false, "the whole file recompiles");
 });
 
-// Artifacts and build-info must come from one compile: source-map IDs are compilation-local (223 of
-// 224 shared IDs disagree between two build-infos here), and artifacts carry no build id, so a
-// retained artifact plus a newer map misattributes coverage. A change anywhere therefore clears
-// everything, including artifacts of untouched sources and the build-info beside them.
-test("a change to one source invalidates unrelated artifacts and build-info too", () => {
+// Only the drifted source's artifacts go. Mixing compilations is safe now that the collector matches
+// each artifact to its own build-info, so untouched artifacts and the build-info beside them stay.
+test("a change to one source leaves unrelated artifacts and build-info alone", () => {
   const { root, manifestPath } = fixture({
     sources: {
       "l1-contracts/contracts/Touched.sol": "contract Touched {}",
@@ -168,9 +168,9 @@ test("a change to one source invalidates unrelated artifacts and build-info too"
   git(root, ["commit", "-qm", "touch one source"]);
 
   prune(root, manifestPath);
-  assert.equal(survives(root, "l1-contracts/out/Touched.sol/Touched.json"), false);
-  assert.equal(survives(root, "l1-contracts/out/Untouched.sol/Untouched.json"), false, "unrelated artifact too");
-  assert.equal(fs.existsSync(buildInfo), false, "build-info goes with the artifacts");
+  assert.equal(survives(root, "l1-contracts/out/Touched.sol/Touched.json"), false, "drifted source recompiles");
+  assert.equal(survives(root, "l1-contracts/out/Untouched.sol/Untouched.json"), true, "unrelated artifact kept");
+  assert.equal(fs.existsSync(buildInfo), true, "build-info kept; the collector selects per artifact");
 });
 
 // Adding a source is drift too: forge compiles it into a second build-info whose source IDs are
@@ -186,8 +186,9 @@ test("invalidates when a source is added, not only changed or removed", () => {
   git(root, ["commit", "-qm", "add a source"]);
 
   const output = prune(root, manifestPath);
-  assert.match(output, /B\.sol was added/);
-  assert.equal(survives(root, "l1-contracts/out/A.sol/A.json"), false);
+  assert.match(output, /1 source\(s\) added, changed or removed/);
+  // Nothing to prune for a brand-new source, and A's artifact is still valid.
+  assert.equal(survives(root, "l1-contracts/out/A.sol/A.json"), true);
 });
 
 test("keeps everything when nothing changed", () => {

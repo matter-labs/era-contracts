@@ -99,6 +99,12 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn test:trace-guard
 
+      # Matching each artifact to the build-info it was compiled under is what lets the artifact
+      # cache stay warm without misattributing coverage, so it is pinned.
+      - name: Unit-test the build-info selection
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn test:build-info
+
       - name: Run interop tests (preloaded state)
         working-directory: l1-contracts/test/anvil-interop
         env:

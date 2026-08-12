@@ -158,36 +158,23 @@ function staleSources(manifestPath) {
     return { changed: new Set(), invalidateAll: true };
   }
 
-  // Symmetric, like the config comparison above. Walking only the recorded keys missed an *added*
-  // .sol: `changed` stayed empty, the cache was kept, and forge then compiled the new source into a
-  // second build-info whose source IDs are incompatible with the retained artifacts' — the same
-  // silent misattribution. An added source is drift.
-  const sourceDrift = firstDifference(manifest.sources || {}, current.sources);
-
-  // Any Solidity drift invalidates everything, rather than just the artifacts of the changed
-  // sources. Two reasons, both measured:
+  // Symmetric, like the config comparison above: walking only the recorded keys missed an *added*
+  // .sol, and an added source is drift too.
   //
-  //  * Source-map source IDs are local to one compilation. Between two build-info files in this
-  //    repo, 223 of 224 shared IDs point at different paths — so applying one build's map to
-  //    artifacts retained from another misattributes coverage to the wrong files, silently. And
-  //    artifacts record no build id (only their own source id), so the matching map cannot be
-  //    picked per artifact.
-  //  * Keeping artifacts while dropping build-info is worse still: an unrelated change elsewhere
-  //    in the repo would delete l1-contracts/out/build-info while every L1 artifact stays, forge
-  //    would skip the compilation, and coverage would fail outright on "No build-info JSON files
-  //    found".
-  //
-  // The cost is that a commit touching any .sol rebuilds that project from scratch; the cache then
-  // helps pushes that do not touch Solidity. Correct attribution is worth more than the minutes.
-  if (sourceDrift) {
-    console.log(
-      `  ${sourceDrift} since the cache was built — invalidating all artifacts, ` +
-        "so artifacts and build-info come from one coherent compile"
-    );
-    return { changed: new Set(), invalidateAll: true };
+  // Only the drifted sources' artifacts are dropped, not the whole cache. Mixing artifacts from
+  // different compilations used to corrupt coverage attribution — source IDs are numbered per
+  // compilation — but the collector now matches each artifact to the build-info it was compiled
+  // under (see selectBuildInfo), so incremental artifacts are safe to keep and the cache stays
+  // useful on commits that touch Solidity.
+  const changed = new Set();
+  for (const key of new Set([...Object.keys(manifest.sources || {}), ...Object.keys(current.sources)])) {
+    if ((manifest.sources || {})[key] !== current.sources[key]) changed.add(key);
+  }
+  if (changed.size > 0) {
+    console.log(`  ${changed.size} source(s) added, changed or removed since the cache was built`);
   }
 
-  return { changed: new Set(), invalidateAll: false };
+  return { changed, invalidateAll: false };
 }
 
 function isFile(candidate) {
@@ -241,10 +228,9 @@ function prune(projectDir, artifactsDir, stale) {
     return sourceExists.get(sourcePath);
   };
 
-  // build-info carries the source-id-to-path mapping the coverage collector reads. A restored one
-  // describes the *old* source set, so after a change it can be applied to new source maps and
-  // misattribute or drop hits. Only removed when a compilation is certain to follow — deleting it
-  // on a fully incremental build would leave the collector with no mapping at all.
+  // build-info is kept unless the whole cache is invalid: the collector selects the build-info each
+  // artifact was compiled under, so several coexisting are fine — and deleting them on an
+  // incremental build would leave it with no mapping for retained artifacts at all.
   if (stale.invalidateAll) {
     const buildInfo = path.join(artifactsDir, "build-info");
     if (fs.existsSync(buildInfo)) {
@@ -278,7 +264,14 @@ function prune(projectDir, artifactsDir, stale) {
         continue;
       }
 
-      if (exists(sourcePath)) {
+      // Repo-relative, to compare against the manifest's keys.
+      const repoRelative = path.relative(process.cwd(), path.resolve(projectDir, sourcePath));
+
+      if (stale.changed.has(repoRelative)) {
+        console.log(`  pruning ${artifactPath} (source drifted: ${repoRelative})`);
+        fs.rmSync(artifactPath);
+        stats.removed++;
+      } else if (exists(sourcePath)) {
         stats.kept++;
       } else {
         console.log(`  pruning ${artifactPath} (source gone: ${sourcePath})`);

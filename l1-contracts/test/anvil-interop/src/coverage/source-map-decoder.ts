@@ -38,7 +38,21 @@ export type SourceIdMap = Record<string, string>;
 /**
  * Loads the source_id_to_path mapping from the Forge build-info directory.
  */
-export function loadSourceIdMap(outDir: string): SourceIdMap {
+export interface BuildInfo {
+  file: string;
+  mtimeMs: number;
+  sourceIdMap: SourceIdMap;
+}
+
+/**
+ * Every build-info in the output directory, newest first.
+ *
+ * There is usually more than one: forge writes a build-info per compilation, so `forge build`
+ * followed by a test compile leaves two, and a warm artifact cache can add another from an earlier
+ * commit. Their source IDs are *not* comparable — of 224 IDs present in two of them here, 223 point
+ * at different files — so an artifact must be decoded with the map from its own compilation.
+ */
+export function loadBuildInfos(outDir: string): BuildInfo[] {
   const buildInfoDir = path.join(outDir, "build-info");
   if (!fs.existsSync(buildInfoDir)) {
     throw new Error(`Build info directory not found: ${buildInfoDir}`);
@@ -49,23 +63,34 @@ export function loadSourceIdMap(outDir: string): SourceIdMap {
     throw new Error(`No build-info JSON files found in ${buildInfoDir}`);
   }
 
-  // Newest wins, rather than whichever readdir happened to return first. With a warm artifact cache
-  // more than one can be present — a restored one describing the old source set plus the one this
-  // build wrote — and picking the stale mapping silently misattributes or drops coverage hits.
-  const newest = files
-    .map((file) => ({ file, mtimeMs: fs.statSync(path.join(buildInfoDir, file)).mtimeMs }))
-    .sort((a, b) => b.mtimeMs - a.mtimeMs)[0].file;
+  return files
+    .map((file) => {
+      const full = path.join(buildInfoDir, file);
+      const parsed = JSON.parse(fs.readFileSync(full, "utf-8"));
+      return { file, mtimeMs: fs.statSync(full).mtimeMs, sourceIdMap: parsed.source_id_to_path || {} };
+    })
+    .sort((a, b) => b.mtimeMs - a.mtimeMs);
+}
 
-  if (files.length > 1) {
-    console.warn(
-      `  ⚠️  ${files.length} build-info files in ${buildInfoDir}; using the newest (${newest}). ` +
-        "Source IDs are only meaningful within one build-info, so coverage for contracts compiled " +
-        "under an older one may be misattributed. A clean build removes the ambiguity."
-    );
-  }
+/**
+ * The build-info an artifact was compiled under, identified by the artifact itself.
+ *
+ * Foundry records no build id on artifacts, but it does record the artifact's own source id and its
+ * compilation target — and the pair only agrees with the build-info it came from, because each
+ * compilation numbers its sources independently. Measured over this repo's 520 artifacts with two
+ * build-infos present: every one matched exactly one, none matched two.
+ *
+ * Newest-first order means a tie prefers the most recent compilation.
+ */
+export function selectBuildInfo(buildInfos: BuildInfo[], sourceId: number, sourcePath: string): BuildInfo | null {
+  return buildInfos.find((info) => info.sourceIdMap[String(sourceId)] === sourcePath) ?? null;
+}
 
-  const buildInfo = JSON.parse(fs.readFileSync(path.join(buildInfoDir, newest), "utf-8"));
-  return buildInfo.source_id_to_path || {};
+/** Every source path any compilation knows about, for reading file contents. */
+export function allSourcePaths(buildInfos: BuildInfo[]): Set<string> {
+  const paths = new Set<string>();
+  for (const info of buildInfos) for (const p of Object.values(info.sourceIdMap)) paths.add(p);
+  return paths;
 }
 
 /**
@@ -373,28 +398,35 @@ export function resolveFunctionHits(
  * Counts the total number of executable lines in a source file by checking
  * which lines appear in any contract's source map.
  */
+/** A contract's source map paired with the source-id map of the compilation it came from. */
+export interface DecodedContract {
+  contractMap: ContractSourceMap;
+  sourceIdMap: SourceIdMap;
+}
+
 export function getExecutableLines(
   filePath: string,
-  sourceIdMap: SourceIdMap,
-  allContractMaps: ContractSourceMap[],
+  contracts: DecodedContract[],
   sourceContents: Map<string, string>
 ): Set<number> {
   const content = sourceContents.get(filePath);
   if (!content) return new Set();
 
-  // Find the source file index for this path
-  let fileIndex = -1;
-  for (const [id, p] of Object.entries(sourceIdMap)) {
-    if (p === filePath) {
-      fileIndex = parseInt(id, 10);
-      break;
-    }
-  }
-  if (fileIndex < 0) return new Set();
-
   const executableLines = new Set<number>();
 
-  for (const contractMap of allContractMaps) {
+  for (const { contractMap, sourceIdMap } of contracts) {
+    // The file's index differs per compilation, so it has to be looked up in this contract's own
+    // map. Using one index across contracts from different compilations attributes lines to the
+    // wrong files.
+    let fileIndex = -1;
+    for (const [id, p] of Object.entries(sourceIdMap)) {
+      if (p === filePath) {
+        fileIndex = parseInt(id, 10);
+        break;
+      }
+    }
+    if (fileIndex < 0) continue;
+
     for (const entry of contractMap.entries) {
       if (entry.fileIndex === fileIndex && entry.start >= 0 && entry.length > 0) {
         const line = byteOffsetToLine(content, entry.start);

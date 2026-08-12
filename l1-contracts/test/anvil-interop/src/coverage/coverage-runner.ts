@@ -13,14 +13,16 @@ import type { providers } from "ethers";
 import { assertTracesUsable, collectChainTraces, mergeTraces } from "./trace-collector";
 import { resolveContracts, resolveByBytecode } from "./artifact-resolver";
 import {
-  loadSourceIdMap,
+  allSourcePaths,
+  loadBuildInfos,
+  selectBuildInfo,
   loadSourceContents,
   resolveSourceLocations,
   getExecutableLines,
   extractFunctions,
   resolveFunctionHits,
 } from "./source-map-decoder";
-import type { ContractSourceMap } from "./source-map-decoder";
+import type { ContractSourceMap, SourceIdMap } from "./source-map-decoder";
 import { generateLcov, writeLcov, generateSummary, filterCoverageFiles } from "./lcov-generator";
 import type { FileCoverage } from "./lcov-generator";
 import { createProvider } from "../core/utils";
@@ -62,9 +64,18 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
 
   // 2. Load source maps and build info
   console.log("\n🔍 Step 2: Loading compilation artifacts...");
-  const sourceIdMap = loadSourceIdMap(outDir);
-  const sourceContents = loadSourceContents(sourceIdMap, projectRoot);
-  console.log(`  Loaded ${Object.keys(sourceIdMap).length} source IDs, ${sourceContents.size} source files`);
+  // One map per compilation, and artifacts are matched to their own — see selectBuildInfo. A single
+  // global map silently misattributes whenever more than one compilation contributed artifacts.
+  const buildInfos = loadBuildInfos(outDir);
+  const knownSourcePaths = allSourcePaths(buildInfos);
+  const sourceContents = loadSourceContents(
+    Object.fromEntries([...knownSourcePaths].map((p, i) => [String(i), p])),
+    projectRoot
+  );
+  console.log(
+    `  Loaded ${buildInfos.length} build-info file(s), ${knownSourcePaths.size} source paths, ` +
+      `${sourceContents.size} source files`
+  );
 
   // 3. Resolve known contract addresses to artifacts
   console.log("\n🔍 Step 3: Resolving contract artifacts...");
@@ -136,11 +147,41 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
   console.log("\n🔍 Step 6: Mapping traces to source locations...");
   const fileHitLines = new Map<string, Set<number>>();
 
+  // artifact source id + compilation target identifies the build-info it was compiled under.
+  const mapForArtifact = new Map<string, SourceIdMap>();
+  let unresolvedBuildInfo = 0;
+  const sourceIdMapOf = (contract: (typeof resolvedContracts)[number]): SourceIdMap => {
+    const cached = mapForArtifact.get(contract.artifactPath);
+    if (cached) return cached;
+
+    let selected: SourceIdMap | null = null;
+    try {
+      const artifact = JSON.parse(fs.readFileSync(contract.artifactPath, "utf-8"));
+      const rawMeta = artifact.metadata || artifact.rawMetadata || "{}";
+      const metadata = typeof rawMeta === "string" ? JSON.parse(rawMeta) : rawMeta;
+      const target = Object.keys(metadata?.settings?.compilationTarget || {})[0];
+      if (target !== undefined && artifact.id !== undefined) {
+        selected = selectBuildInfo(buildInfos, artifact.id, target)?.sourceIdMap ?? null;
+      }
+    } catch {
+      selected = null;
+    }
+
+    if (!selected) {
+      // Falling back to the newest map may misattribute this contract's lines, so it is counted and
+      // reported rather than passed over quietly.
+      unresolvedBuildInfo++;
+      selected = buildInfos[0].sourceIdMap;
+    }
+    mapForArtifact.set(contract.artifactPath, selected);
+    return selected;
+  };
+
   for (const contract of resolvedContracts) {
     const pcs = allTraces.get(contract.address);
     if (!pcs || pcs.size === 0) continue;
 
-    const locations = resolveSourceLocations(contract.sourceMap, pcs, sourceIdMap, sourceContents);
+    const locations = resolveSourceLocations(contract.sourceMap, pcs, sourceIdMapOf(contract), sourceContents);
 
     for (const [filePath, lines] of locations) {
       let existing = fileHitLines.get(filePath);
@@ -166,9 +207,16 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
 
   // 7. Compute executable lines and extract function data
   console.log("\n🔍 Step 7: Computing executable lines and extracting functions...");
-  const allContractMaps: ContractSourceMap[] = resolvedContracts
-    .map((c) => c.sourceMap)
-    .filter((sm): sm is ContractSourceMap => sm !== null);
+  const decodedContracts = resolvedContracts
+    .filter((c) => c.sourceMap !== null)
+    .map((c) => ({ contractMap: c.sourceMap as ContractSourceMap, sourceIdMap: sourceIdMapOf(c) }));
+
+  if (unresolvedBuildInfo > 0) {
+    console.warn(
+      `  ⚠️  ${unresolvedBuildInfo} artifact(s) could not be matched to a build-info; their lines were ` +
+        "decoded with the newest map and may be misattributed."
+    );
+  }
 
   // Build a map of source file -> list of contract names that compile from it
   // (used for function extraction — we need the contract name for qualified names)
@@ -204,11 +252,11 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
   let totalFunctionsHit = 0;
 
   // Include all source files that have contract code (not just hit files)
-  for (const [, filePath] of Object.entries(sourceIdMap)) {
+  for (const filePath of knownSourcePaths) {
     // Only process contract source files
     if (!filePath.startsWith("contracts/") && !filePath.includes("/contracts/")) continue;
 
-    const executableLines = getExecutableLines(filePath, sourceIdMap, allContractMaps, sourceContents);
+    const executableLines = getExecutableLines(filePath, decodedContracts, sourceContents);
     if (executableLines.size === 0) continue;
 
     const hitLines = fileHitLines.get(filePath) || new Set<number>();
