@@ -30,11 +30,32 @@
  * Without a manifest (a cache from before this existed) only deletions are detectable, which is the
  * old behaviour rather than a regression.
  *
+ * Deleting an artifact is not enough on its own. Forge tracks what it believes is compiled in
+ * cache-forge/solidity-files-cache.json, and an entry there claiming an artifact this script just
+ * deleted does not make forge recompile that one file — it discards its incremental plan and
+ * rebuilds the whole project. Measured on l1-contracts:
+ *
+ *   one source edited, cache left coherent      ->  10.9s, 24 artifacts rewritten
+ *   one artifact deleted, cache entry retained  ->  3m23s, all 1011 rewritten
+ *
+ * So every source whose artifacts went missing also loses its freshness entry, which is the state
+ * forge is in for a file it has never seen: it recompiles that file and its dependents, and keeps
+ * the rest. The invariant is checked against the disk rather than tracked alongside the deletions
+ * above — the cache must never claim an artifact that is not there — so it cannot drift from the
+ * pruning logic, and it covers artifacts dropped for having no compilationTarget too.
+ *
+ * Retained entries keep pointing at the build-info they were compiled under, which is what the
+ * coverage collector resolves them through (see source-map-decoder.ts). Forge deletes a build-info
+ * once no entry references it, so that lookup cannot outlive its target.
+ *
  * Usage: node prune-stale-artifacts.js [--manifest <path>] <project-dir>:<artifacts-dir> [...]
  */
 
 const fs = require("fs");
 const path = require("path");
+
+/** Forge's incremental-compilation bookkeeping, relative to a project directory. */
+const FRESHNESS_CACHE = path.join("cache-forge", "solidity-files-cache.json");
 
 const { execFileSync } = require("child_process");
 
@@ -212,6 +233,68 @@ function sourcePathOf(artifactPath) {
   return sourcePath || null;
 }
 
+/**
+ * Drops every freshness entry whose recorded artifacts are no longer on disk, so forge treats those
+ * sources as unseen and recompiles them incrementally instead of rebuilding the project.
+ *
+ * Entries are all-or-nothing: a file's contracts are compiled together, so keeping a partial entry
+ * would tell forge some of them are still fresh.
+ */
+function pruneFreshnessCache(projectDir, artifactsDir, stale) {
+  const stats = { entriesDropped: 0 };
+  const cachePath = path.join(projectDir, FRESHNESS_CACHE);
+  if (!fs.existsSync(cachePath)) return stats;
+
+  // Nothing survived, so neither should the plan that describes it.
+  if (stale.invalidateAll) {
+    fs.rmSync(cachePath);
+    console.log(`  removed ${cachePath} (no artifacts were kept)`);
+    return stats;
+  }
+
+  let cache;
+  try {
+    cache = JSON.parse(fs.readFileSync(cachePath, "utf8"));
+  } catch {
+    // Unreadable bookkeeping cannot be reasoned about. Dropping it costs one full rebuild; trusting
+    // it risks forge skipping a source whose artifact is missing.
+    fs.rmSync(cachePath);
+    console.log(`  removed ${cachePath} (unparsable)`);
+    return stats;
+  }
+
+  if (!isPlainObject(cache) || !isPlainObject(cache.files)) {
+    fs.rmSync(cachePath);
+    console.log(`  removed ${cachePath} (unexpected shape)`);
+    return stats;
+  }
+
+  for (const [sourcePath, entry] of Object.entries(cache.files)) {
+    // { <contract>: { <solc version>: { <profile>: { path, build_id } } } }
+    const recorded = [];
+    for (const versions of Object.values(isPlainObject(entry?.artifacts) ? entry.artifacts : {})) {
+      for (const profiles of Object.values(isPlainObject(versions) ? versions : {})) {
+        for (const artifact of Object.values(isPlainObject(profiles) ? profiles : {})) {
+          if (typeof artifact?.path === "string") recorded.push(artifact.path);
+        }
+      }
+    }
+
+    if (recorded.length === 0) continue;
+    if (recorded.every((relative) => isFile(path.join(artifactsDir, relative)))) continue;
+
+    delete cache.files[sourcePath];
+    stats.entriesDropped++;
+  }
+
+  if (stats.entriesDropped > 0) {
+    fs.writeFileSync(cachePath, JSON.stringify(cache));
+    console.log(`  dropped ${stats.entriesDropped} freshness entr(ies) whose artifacts were pruned`);
+  }
+
+  return stats;
+}
+
 function prune(projectDir, artifactsDir, stale) {
   const stats = { removed: 0, kept: 0, unattributed: 0, dirsRemoved: 0 };
   if (!fs.existsSync(artifactsDir)) return stats;
@@ -311,7 +394,7 @@ if (targets.length === 0) {
 
 const stale = staleSources(manifestPath);
 
-const totals = { removed: 0, kept: 0, unattributed: 0, dirsRemoved: 0 };
+const totals = { removed: 0, kept: 0, unattributed: 0, dirsRemoved: 0, entriesDropped: 0 };
 for (const target of targets) {
   const [projectDir, artifactsDir] = target.split(":");
   if (!projectDir || !artifactsDir) {
@@ -319,11 +402,14 @@ for (const target of targets) {
     process.exit(1);
   }
   const stats = prune(projectDir, artifactsDir, stale);
-  for (const key of Object.keys(totals)) totals[key] += stats[key];
+  // After the artifacts are gone, so the disk is the source of truth for what forge may still claim.
+  Object.assign(stats, pruneFreshnessCache(projectDir, artifactsDir, stale));
+  for (const key of Object.keys(totals)) totals[key] += stats[key] ?? 0;
 }
 
 console.log(
   `Pruned ${totals.removed} stale artifact(s) and ${totals.dirsRemoved} empty director(ies); ` +
     `kept ${totals.kept}` +
-    (totals.unattributed > 0 ? `; ${totals.unattributed} had no compilationTarget and were dropped` : "")
+    (totals.unattributed > 0 ? `; ${totals.unattributed} had no compilationTarget and were dropped` : "") +
+    (totals.entriesDropped > 0 ? `; ${totals.entriesDropped} freshness entr(ies) dropped` : "")
 );
