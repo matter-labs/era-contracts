@@ -145,6 +145,28 @@ test("scopes single-process output, keeping offset 0 at the default path", () =>
   assert.notEqual(singleRunCoverageDir(1000), shardsDirFor(1000));
 });
 
+// A flag with no value is malformed input. Reading it as 0 also overrode an inherited safe offset,
+// putting the run on the default ports and killing whatever was already there.
+test("rejects --port-offset with no value", () => {
+  assert.throws(() => resolvePortOffset(["--port-offset"]), /requires a value/);
+  assert.throws(() => resolvePortOffset(["--html", "--port-offset"]), /requires a value/);
+  // ...and must not fall back to the environment, which would mask the mistake.
+  assert.throws(() => resolvePortOffset(["--port-offset"], "1000"), /requires a value/);
+});
+
+// The range check was only reached in the sharded branch, so a one-spec, --serial or
+// --fresh-deploy run at offset 500 still collided with shard 6 of a permitted base-0 run.
+test("a single-process run needs a disjoint range too", () => {
+  assert.throws(() => assertDisjointPortRange(500, 1), /multiple of 1000/);
+  assert.doesNotThrow(() => assertDisjointPortRange(1000, 1));
+});
+
+test("scopes the HTML directory so concurrent runs cannot overwrite it", () => {
+  // Derived from the same run scope as the LCOV: coverage/anvil/html vs html-p1000.
+  assert.equal(runScope(0), "");
+  assert.equal(runScope(1000), "-p1000");
+});
+
 let failed = 0;
 for (const [name, fn] of tests) {
   try {

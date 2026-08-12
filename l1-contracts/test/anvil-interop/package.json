@@ -14,6 +14,7 @@
     "test:plan-groups": "ts-node test/unit/plan-coverage-groups.test.ts",
     "test:create-provider": "ts-node test/unit/create-provider.test.ts",
     "test:coverage-paths": "ts-node test/unit/run-coverage-paths.test.ts",
+    "test:block-time": "ts-node test/unit/block-time.test.ts",
     "plan:groups": "ts-node plan-coverage-groups.ts",
     "coverage": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts",
     "coverage:serial": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts --serial",

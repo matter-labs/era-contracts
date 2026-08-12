@@ -5,6 +5,22 @@ import * as path from "path";
 import type { AnvilChain } from "../core/types";
 import { waitForChainReady, formatChainInfo, createProvider } from "../core/utils";
 
+/**
+ * Seconds between blocks for interval mining; 0 means none, which switches Anvil to instant mining.
+ *
+ * Rejecting only NaN was not enough: a negative value fell through the `> 0` guard below, silently
+ * dropping --block-time and changing the mining mode, and Infinity was handed to Anvil to fail later
+ * as an opaque process-start error. An explicit argument wins, which keeps setup-and-dump-state.ts
+ * pinned at 1s for determinism.
+ */
+export function resolveBlockTime(explicit?: number, envBlockTime?: string): number {
+  const value = explicit ?? (envBlockTime !== undefined && envBlockTime !== "" ? Number(envBlockTime) : 1);
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`Block time must be a finite, non-negative number of seconds, got "${explicit ?? envBlockTime}"`);
+  }
+  return value;
+}
+
 export class AnvilManager {
   private chains: Map<number, AnvilChain> = new Map();
   private pidFilePath: string;
@@ -106,11 +122,7 @@ export class AnvilManager {
     //
     // Callers that pass blockTime explicitly win, which keeps setup-and-dump-state.ts pinned to 1
     // for state-generation determinism.
-    const envBlockTime = process.env.ANVIL_INTEROP_BLOCK_TIME;
-    const effectiveBlockTime = blockTime ?? (envBlockTime !== undefined ? Number(envBlockTime) : 1);
-    if (Number.isNaN(effectiveBlockTime)) {
-      throw new Error(`ANVIL_INTEROP_BLOCK_TIME must be a number, got "${envBlockTime}"`);
-    }
+    const effectiveBlockTime = resolveBlockTime(blockTime, process.env.ANVIL_INTEROP_BLOCK_TIME);
     const args = [
       "--port",
       port.toString(),

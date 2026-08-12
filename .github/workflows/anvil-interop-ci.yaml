@@ -90,6 +90,10 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn test:coverage-paths
 
+      - name: Unit-test the block-time resolution
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn test:block-time
+
       - name: Run interop tests (preloaded state)
         working-directory: l1-contracts/test/anvil-interop
         env:

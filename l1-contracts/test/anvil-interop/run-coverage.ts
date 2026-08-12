@@ -150,6 +150,11 @@ export function applyPortOffset(portOffset: number): void {
  */
 export function resolvePortOffset(argv: string[], envOffset?: string): number {
   const idx = argv.indexOf("--port-offset");
+  if (idx !== -1 && !argv[idx + 1]) {
+    // Silently reading this as 0 would also override an inherited safe offset and start on — and
+    // kill processes using — the default ports.
+    throw new Error("--port-offset requires a value");
+  }
   const input = idx !== -1 ? argv[idx + 1] : envOffset;
   if (input === undefined || input === "") return 0;
 
@@ -267,8 +272,10 @@ async function runShardWorker(
   });
 }
 
-function generateHtmlReport(lcovPath: string): void {
-  const htmlDir = path.join(coverageRootDir, "html");
+function generateHtmlReport(lcovPath: string, basePortOffset = 0): void {
+  // Scoped like the LCOV beside it: unscoped, concurrent runs at different offsets overwrote each
+  // other's HTML.
+  const htmlDir = path.join(coverageRootDir, `html${runScope(basePortOffset)}`);
   const result = spawnSync(
     "genhtml",
     [lcovPath, "-o", htmlDir, "--branch-coverage", "--ignore-errors", "category", "--ignore-errors", "inconsistent"],
@@ -290,7 +297,6 @@ async function runSharded(specs: string[], basePortOffset: number, passthroughAr
   // causes load-dependent RPC flakes. ANVIL_INTEROP_MAX_PARALLEL_WORKERS caps the
   // concurrency; unset (or 0) runs one worker per spec.
   const shardGroups = specs.map((spec) => [spec]);
-  assertDisjointPortRange(basePortOffset, shardGroups.length);
   const maxWorkers = Number(process.env.ANVIL_INTEROP_MAX_PARALLEL_WORKERS || 0) || shardGroups.length;
 
   // Drop stale per-shard reports so a shard that fails to produce one cannot be
@@ -349,7 +355,7 @@ async function runSharded(specs: string[], basePortOffset: number, passthroughAr
   console.log(`  📄 Summary written to: ${summaryPath}`);
 
   if (html) {
-    generateHtmlReport(lcovPath);
+    generateHtmlReport(lcovPath, basePortOffset);
   }
 }
 
@@ -432,6 +438,13 @@ async function main(): Promise<void> {
   // sharding one spec would just add a child process. An explicit multi-spec `--spec` list
   // does shard, which is how the CI matrix runs a group of specs on one runner.
   const shouldShard = !workerMode && !serial && !freshDeploy && specs.length > 1;
+
+  // Every parent run must own a disjoint port range, whichever mode it picks: a single-process run
+  // at offset 500 still collides with shard 6 of a permitted base-0 run and would kill its chains.
+  // Workers are exempt — their offsets are handed to them from inside a range already reserved.
+  if (!workerMode) {
+    assertDisjointPortRange(portOffset, shouldShard ? specs.length : 1);
+  }
 
   try {
     if (shouldShard) {

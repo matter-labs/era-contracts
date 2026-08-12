@@ -54,17 +54,12 @@ jobs:
           yarn install
           yarn build:foundry
 
-      # Cross-commit cache for the next push's incremental solc build; the full per-sha cache
-      # below is the handoff to this run's downstream jobs.
+      # Cross-commit cache for the next push's incremental solc build, and the source manifest that
+      # lets the restore side drop artifacts of sources that changed — without it a contract removed
+      # from a surviving file leaves an artifact that every later commit inherits. The full per-sha
+      # cache below is the separate handoff to this run's downstream jobs.
       - name: Save solc build cache
-        uses: actions/cache/save@v4
-        with:
-          key: artifacts-l1-ci-solc-${{ github.sha }}
-          path: |
-            da-contracts/cache-forge
-            da-contracts/out
-            l1-contracts/cache-forge
-            l1-contracts/out
+        uses: ./.github/actions/save-solc-cache
 
       - name: Create cache
         uses: actions/cache/save@v4
