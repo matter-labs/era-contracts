@@ -12,6 +12,7 @@
 import * as assert from "assert/strict";
 import {
   applyPortOffset,
+  shouldShardRun,
   assertDisjointPortRange,
   portRangeFor,
   resolvePortOffset,
@@ -165,6 +166,23 @@ test("scopes the HTML directory so concurrent runs cannot overwrite it", () => {
   // Derived from the same run scope as the LCOV: coverage/anvil/html vs html-p1000.
   assert.equal(runScope(0), "");
   assert.equal(runScope(1000), "-p1000");
+});
+
+// Without snapshots each worker does its own full deployment, so sharding would run them
+// concurrently against one shared config/permanent-values.toml and broadcast directory.
+test("does not shard when chain-state snapshots are missing", () => {
+  const base = { workerMode: false, serial: false, freshDeploy: false, specCount: 10 };
+  assert.equal(shouldShardRun({ ...base, snapshotsAvailable: true }), true);
+  assert.equal(shouldShardRun({ ...base, snapshotsAvailable: false }), false);
+});
+
+test("does not shard for a fresh deploy, --serial, a worker, or a single spec", () => {
+  const base = { workerMode: false, serial: false, freshDeploy: false, snapshotsAvailable: true, specCount: 10 };
+  assert.equal(shouldShardRun(base), true);
+  assert.equal(shouldShardRun({ ...base, freshDeploy: true }), false);
+  assert.equal(shouldShardRun({ ...base, serial: true }), false);
+  assert.equal(shouldShardRun({ ...base, workerMode: true }), false);
+  assert.equal(shouldShardRun({ ...base, specCount: 1 }), false);
 });
 
 let failed = 0;

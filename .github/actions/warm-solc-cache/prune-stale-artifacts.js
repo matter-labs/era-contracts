@@ -43,14 +43,18 @@ function currentGitState() {
   const out = execFileSync("git", ["ls-files", "-s"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   const sources = {};
   const submodules = {};
+  const blobs = {};
   for (const line of out.split("\n")) {
     if (!line) continue;
     const [meta, filePath] = line.split("\t");
     const [mode, object] = meta.split(/\s+/);
     if (mode === "160000") submodules[filePath] = object;
-    else if (filePath.endsWith(".sol")) sources[filePath] = object;
+    else {
+      blobs[filePath] = object;
+      if (filePath.endsWith(".sol")) sources[filePath] = object;
+    }
   }
-  return { sources, submodules };
+  return { sources, submodules, blobs };
 }
 
 /**
@@ -72,6 +76,16 @@ function staleSources(manifestPath) {
   }
 
   const current = currentGitState();
+
+  // Dependency resolution and foundry config decide what solc compiles, so a change to either can
+  // invalidate artifacts without any tracked .sol changing — including a contract disappearing from
+  // a dependency source, which the per-source comparison below cannot see.
+  for (const [inputPath, blob] of Object.entries(manifest.configInputs || {})) {
+    if (current.blobs[inputPath] !== blob) {
+      console.log(`  ${inputPath} changed since the cache was built — invalidating all artifacts`);
+      return { changed: new Set(), invalidateAll: true };
+    }
+  }
 
   for (const [submodule, pin] of Object.entries(manifest.submodules || {})) {
     if (current.submodules[submodule] !== pin) {

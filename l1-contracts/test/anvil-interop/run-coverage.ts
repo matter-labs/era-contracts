@@ -133,6 +133,27 @@ function timedRun(label: string, command: string, args: string[], cwd: string, e
 }
 
 /**
+ * Whether the parent should fan out into shards.
+ *
+ * `snapshotsAvailable` is load-bearing and was missing: without pre-generated chain states each
+ * worker falls back to its own full deployment, so sharding would run ten concurrent deployments
+ * that race on the shared config/permanent-values.toml and broadcast directories — where the
+ * pre-sharding code did exactly one. A fresh deploy is excluded for the same reason, and a single
+ * spec or an explicit --serial has nothing to gain.
+ */
+export function shouldShardRun(opts: {
+  workerMode: boolean;
+  serial: boolean;
+  freshDeploy: boolean;
+  snapshotsAvailable: boolean;
+  specCount: number;
+}): boolean {
+  if (opts.workerMode || opts.serial) return false;
+  if (opts.freshDeploy || !opts.snapshotsAvailable) return false;
+  return opts.specCount > 1;
+}
+
+/**
  * Publishes the resolved offset to the environment the chains and cleanup read.
  *
  * Unconditionally: guarding on a truthy value left an inherited non-zero
@@ -437,7 +458,16 @@ async function main(): Promise<void> {
   // serial. Worker processes are single-process by definition, and so is a single spec —
   // sharding one spec would just add a child process. An explicit multi-spec `--spec` list
   // does shard, which is how the CI matrix runs a group of specs on one runner.
-  const shouldShard = !workerMode && !serial && !freshDeploy && specs.length > 1;
+  // Constructed here only to ask whether snapshots exist; the run's own runner is made later.
+  const snapshotsAvailable = new DeploymentRunner().hasChainStates();
+  const shouldShard = shouldShardRun({ workerMode, serial, freshDeploy, snapshotsAvailable, specCount: specs.length });
+
+  if (!workerMode && !serial && !freshDeploy && !snapshotsAvailable && specs.length > 1) {
+    console.log(
+      "\nNo pre-generated chain states found — running serially: sharding would deploy once per worker,\n" +
+        "concurrently, on shared config and broadcast files."
+    );
+  }
 
   // Every parent run must own a disjoint port range, whichever mode it picks: a single-process run
   // at offset 500 still collides with shard 6 of a permitted base-0 run and would kill its chains.
