@@ -859,12 +859,7 @@ contract ExperimentalBridgeTest is Test {
         // emits NewInteropRoot before NewChain — failing the expectEmit with
         // "NewInteropRoot != expected NewChain". Precompiles cannot be mocked usefully either.
         // Excluding them keeps this about the Bridgehub rather than about what the fuzzer picked.
-        assumeAddressIsNot(
-            newChainAddress,
-            AddressType.ZeroAddress,
-            AddressType.Precompile,
-            AddressType.ForgeAddress
-        );
+        assumeAddressIsNot(newChainAddress, AddressType.ZeroAddress, AddressType.Precompile, AddressType.ForgeAddress);
 
         _initializeBridgehub();
 
