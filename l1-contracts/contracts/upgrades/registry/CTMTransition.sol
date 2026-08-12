@@ -10,8 +10,13 @@ import {CodehashPinLib} from "./CodehashPinLib.sol";
 import {TransitionDeltaLib} from "./TransitionDeltaLib.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {SemVer} from "../../common/libraries/SemVer.sol";
-import {MAX_NEW_FACTORY_DEPS} from "../../common/Config.sol";
-import {ProtocolVersionTooSmall} from "../ZkSyncUpgradeErrors.sol";
+import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../../common/Config.sol";
+import {
+    NewProtocolMajorVersionNotZero,
+    PreviousProtocolMajorVersionNotZero,
+    ProtocolVersionMinorDeltaTooBig,
+    ProtocolVersionTooSmall
+} from "../ZkSyncUpgradeErrors.sol";
 import {
     MalformedL2UpgradePlan,
     PatchMustReuseRelease,
@@ -116,6 +121,21 @@ contract CTMTransition is ICTMTransition {
             (uint32 newMajor, uint32 newMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_manifest.newProtocolVersion));
             if (oldMajor == newMajor && oldMinor == newMinor && _manifest.fromRelease != _manifest.newRelease) {
                 revert PatchMustReuseRelease(_manifest.fromRelease, _manifest.newRelease);
+            }
+            // The same version-shape rules `BaseZkSyncUpgrade._setNewProtocolVersion` applies per
+            // chain. Without them a transition pins fine and `applyCTMUpgrade` bumps the CTM, after
+            // which EVERY chain upgrade reverts and only break-glass can recover.
+            if (oldMajor != 0) {
+                revert PreviousProtocolMajorVersionNotZero();
+            }
+            if (newMajor != 0) {
+                revert NewProtocolMajorVersionNotZero();
+            }
+            // Safe: majors are both zero and the packed new version is strictly greater, so the
+            // minor cannot have decreased.
+            uint256 minorDelta = newMinor - oldMinor;
+            if (minorDelta > MAX_ALLOWED_MINOR_VERSION_DELTA) {
+                revert ProtocolVersionMinorDeltaTooBig(MAX_ALLOWED_MINOR_VERSION_DELTA, minorDelta);
             }
         }
         // L2 plan shape: committed data must be data the composed transaction actually EXECUTES.

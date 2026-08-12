@@ -18,7 +18,11 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ProposedUpgrade} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {MAX_NEW_FACTORY_DEPS, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+import {
+    MAX_ALLOWED_MINOR_VERSION_DELTA,
+    MAX_NEW_FACTORY_DEPS,
+    ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
+} from "contracts/common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
@@ -36,7 +40,11 @@ import {
     TransitionDeadlineBeforeUpgrade,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
-import {ProtocolVersionTooSmall} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {
+    NewProtocolMajorVersionNotZero,
+    ProtocolVersionMinorDeltaTooBig,
+    ProtocolVersionTooSmall
+} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 
 /// @notice Unit tests for the write-once upgrade objects in the DERIVED model: releases carry
 ///         explicit routing + inline mandatory pins; transitions derive their facet/hash delta
@@ -389,6 +397,36 @@ contract StorageRegistriesTest is Test {
         CTMRelease splitRelease = new CTMRelease();
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateFacetRow.selector, facetShared));
         splitRelease.initialize(manifest);
+    }
+
+    /// @dev Regression: the transition must enforce the SAME version shape chains enforce at
+    ///      execution (`BaseZkSyncUpgrade._setNewProtocolVersion`). Otherwise the transition pins,
+    ///      `applyCTMUpgrade` bumps the CTM, and every per-chain upgrade then reverts.
+    function test_revertWhen_transitionUsesNonzeroMajorVersion() public {
+        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        // major = 1 — rejected per-chain, so it must be rejected at pin time too.
+        manifest.newProtocolVersion = SemVer.packSemVer(1, 0, 0);
+
+        CTMTransition majorTransition = new CTMTransition();
+        vm.expectRevert(NewProtocolMajorVersionNotZero.selector);
+        majorTransition.initialize(manifest);
+    }
+
+    function test_revertWhen_transitionMinorDeltaTooBig() public {
+        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        (, uint32 oldMinor, ) = SemVer.unpackSemVer(uint96(manifest.oldProtocolVersion));
+        uint32 tooFar = oldMinor + uint32(MAX_ALLOWED_MINOR_VERSION_DELTA) + 1;
+        manifest.newProtocolVersion = SemVer.packSemVer(0, tooFar, 0);
+
+        CTMTransition farTransition = new CTMTransition();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ProtocolVersionMinorDeltaTooBig.selector,
+                MAX_ALLOWED_MINOR_VERSION_DELTA,
+                uint256(tooFar - oldMinor)
+            )
+        );
+        farTransition.initialize(manifest);
     }
 
     /// @dev Regression: a plan carrying more factory deps than `BaseZkSyncUpgrade` accepts must be

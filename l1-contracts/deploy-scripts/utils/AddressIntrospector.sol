@@ -258,10 +258,11 @@ library AddressIntrospector {
             genesisUpgrade: ctm.l1GenesisUpgrade(),
             defaultUpgrade: address(0),
             chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr),
-            // Genesis registry pointer introspection is not supported: pre-registry CTM
-            // versions do not expose it (and neither is the canonical release factory).
-            currentRelease: address(0),
-            releaseFactory: address(0)
+            // Pre-registry CTMs expose neither getter, so those are the only ones reported as
+            // zero; from v32 on the live pointers are read, otherwise callers that merely
+            // introspect (rather than deploy) would silently see an unanchored CTM.
+            currentRelease: _isPreV32 ? address(0) : ctm.currentRelease(),
+            releaseFactory: _isPreV32 ? address(0) : ctm.releaseFactory()
         });
         info.l1Specific = L1SpecificStateTransitionAddresses({
             legacyValidatorTimelock: ctm.validatorTimelock(),

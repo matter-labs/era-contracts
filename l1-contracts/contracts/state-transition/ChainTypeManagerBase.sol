@@ -236,6 +236,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             revert ZeroAddress();
         }
         releaseFactory = _initializeData.releaseFactory;
+        emit NewReleaseFactory(_initializeData.releaseFactory);
         _setCurrentRelease(_initializeData.currentRelease);
     }
 
