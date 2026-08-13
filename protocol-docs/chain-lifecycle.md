@@ -124,7 +124,7 @@ destination's `L2NativeTokenVault.updateL2` consumes to initialize the chain's b
 (per the L1 `MessageRoot`), its base token is registered in the L1 `NativeTokenVault`
 (`tokenAddress(baseAssetId) != address(0)`, otherwise L1->L2 base-token deposits would not work
 on the destination), and the base token supports `totalSupply()` (true for everything except
-pre-v31 ZKsync OS chains, where the value must first be backfilled).
+pre-v31 ZKsync OS chains, whose value is backfilled during v31 before the v32 upgrade).
 
 ### v32: chain migrations are explicitly disabled
 
@@ -236,3 +236,10 @@ as well. Both `initL2`s therefore run on the upgrade path too, unconditionally: 
 nor their addresses existed in v31, so no chain can arrive at this upgrade with them already seeded,
 and the force deployments in the same transaction install their code before the `initL2`s run. Era
 chains never receive them — this release upgrades ZKsync OS chains only.
+
+The same upgrade list also neutralizes the tracker this release removes
+(`SystemContractsProcessing.getRemovedTrackerNeutralizations`): v31 deployed the `GWAssetTracker` as a
+system-proxied built-in on every ZKsync OS chain, so the upgrade swaps that proxy's implementation for
+`EmptyContract` — otherwise the retired tracker code would stay callable. Chains created on v32 receive
+the same EmptyContract-backed proxy from genesis, so fresh and upgraded chains match at the reserved
+address.

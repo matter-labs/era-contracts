@@ -7,9 +7,7 @@ import {
   ANVIL_FUND_BALANCE,
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
-  L1_MESSAGE_SENT_EVENT_SIG,
   L1_TO_L2_ALIAS_OFFSET,
-  L2_ASSET_TRACKER_ADDR,
   L2_BRIDGEHUB_ADDR,
   L2_INTEROP_HANDLER_ADDR,
   NEW_PRIORITY_REQUEST_EVENT_SIG,
@@ -22,7 +20,6 @@ import type {
   ChainInfo,
   ChainRole,
   DeploymentState,
-  FinalizeWithdrawalParams,
   InteropBundle,
   L2ChainInfo,
   PriorityRequestData,
@@ -263,40 +260,6 @@ export async function getSettlementLayerChainId(
   const slChainIdNum = slChainId.toNumber();
   const isGatewaySettled = slChainIdNum !== 0 && slChainIdNum !== runtimeConfig.l1ChainId;
   return isGatewaySettled ? slChainIdNum : 0;
-}
-
-/**
- * Extract FinalizeWithdrawalParams from an L2 transaction receipt.
- *
- * Parses the L1MessageSent event from the L1MessengerZKOS and builds
- * the finalization params needed to call receiveL1ToGatewayMigrationOnL1 on L1.
- * Uses an empty merkle proof (relies on DummyL1MessageRoot returning true).
- */
-export function buildFinalizeWithdrawalParams(
-  l2Receipt: ethers.providers.TransactionReceipt,
-  chainId: number
-): FinalizeWithdrawalParams {
-  // Parse L1MessageSent event from L1MessengerZKOS
-  const l1MessageSentTopic = ethers.utils.id(L1_MESSAGE_SENT_EVENT_SIG);
-  const l1MessageSentLog = l2Receipt.logs.find((logEntry) => logEntry.topics[0] === l1MessageSentTopic);
-
-  if (!l1MessageSentLog) {
-    throw new Error("L1MessageSent event not found in L2 tx receipt. Check L1MessengerZKOS emits the event.");
-  }
-
-  // Decode the message bytes from the event data
-  // Event: L1MessageSent(address indexed _sender, bytes32 indexed _hash, bytes _message)
-  const messageBytes = ethers.utils.defaultAbiCoder.decode(["bytes"], l1MessageSentLog.data)[0] as string;
-
-  return {
-    chainId,
-    l2BatchNumber: 0,
-    l2MessageIndex: 0,
-    l2Sender: L2_ASSET_TRACKER_ADDR,
-    l2TxNumberInBatch: 0,
-    message: messageBytes,
-    merkleProof: [], // Empty proof — DummyL1MessageRoot always returns true
-  };
 }
 
 /**

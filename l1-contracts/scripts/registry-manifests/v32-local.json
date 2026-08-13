@@ -16,7 +16,7 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0x93B3E3f1765d7851F686156B590644ebf4A6aDc7",
+      "ctmProxy": "0x97423C02EFf81c0fb30023ed91979Fd4A9ea1F87",
       "release": {
         "diamondInit": {
           "address": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
@@ -26,10 +26,9 @@
           {
             "name": "AdminFacet",
             "address": "0xddE78e6202518FF4936b5302cC2891ec180E8bFf",
-            "codehash": "0xcea0413680391f0b5e96b7408b89e2dd4f7453af7dd5975decb1b82efa01f976",
+            "codehash": "0xb716ca4cff27938fc5bc9d8622a7c81dba8478bd1b8eb8e84dadc8b19c1ed2cf",
             "isFreezable": false,
             "selectors": [
-              "0x054e80a3",
               "0x0e18b681",
               "0x17338945",
               "0xf9afb97e",
@@ -190,8 +189,8 @@
         }
       },
       "transition": {
-        "releaseFactory": "0xF136E38B78B25C1B7e5a7CD42Adb36027d4C0755",
-        "fromRelease": "0xB36fc4eA664B763de9e1200F2C635A35f110213A",
+        "releaseFactory": "0x022a2BA2D217C9ca5a2FE32884b0E545c9cA2b27",
+        "fromRelease": "0xc8Bcd88AAe8C300B4Cb7E9E542C4cf390187648c",
         "verifier": {
           "address": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
           "codehash": "0x82a534229234e488c2e9118643871bd5741f25fd67ad4b2e3bab5c4974168dab"

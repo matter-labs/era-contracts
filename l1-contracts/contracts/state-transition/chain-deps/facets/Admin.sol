@@ -34,7 +34,6 @@ import {
 } from "../../L1StateTransitionErrors.sol";
 import {
     AlreadyPermanentRollup,
-    BaseTokenPreV31TotalSupplyAlreadySet,
     PubdataContentLockedForPermanentRollup,
     DenominatorIsZero,
     DiamondAlreadyFrozen,
@@ -63,13 +62,9 @@ import {
 } from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {
-    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
-} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
 import {IServerNotifier} from "../../../governance/IServerNotifier.sol";
-import {IL2BaseTokenZKOS} from "../../../l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -518,23 +513,6 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
         emit EnableEvmEmulator();
     }
 
-    /// @inheritdoc IAdmin
-    function setZKsyncOSPreV31TotalSupply(
-        uint256 _totalSupply
-    ) external onlyAdmin onlyL1 notPriorityMode onlyZKsyncOS returns (bytes32 canonicalTxHash) {
-        if (s.baseTokenHasTotalSupply) {
-            revert BaseTokenPreV31TotalSupplyAlreadySet();
-        }
-        // Service transactions cannot fail, so this is safe to set eagerly.
-        s.baseTokenHasTotalSupply = true;
-
-        canonicalTxHash = IMailbox(address(this)).requestL2ServiceTransaction(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeCall(IL2BaseTokenZKOS.setZKsyncOSPreV31TotalSupply, (_totalSupply))
-        );
-        emit ZKsyncOSPreV31TotalSupplySet(_totalSupply);
-    }
-
     /*//////////////////////////////////////////////////////////////
                             UPGRADE EXECUTION
     //////////////////////////////////////////////////////////////*/
@@ -658,7 +636,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     ///      0x3b6d7534 upgradeChainFromVersion(address,uint256,((address,uint8,bool,bytes4[])[],address,bytes))
     function selectors() public pure returns (bytes4[] memory result) {
         bytes
-            memory packed = hex"054e80a30e18b68117338945f9afb97e1b48b94a1cc5d10321f603d7235d9eb523b311922765d07927ae4c162878fe742f257a5c3b6d75344623c91d4dd18bf55b89874860eae0e764bf8d66e76db8656e762e98a9f6d941b4fcb577be6f11cfc5f1f1f5e51935f5";
+            memory packed = hex"0e18b68117338945f9afb97e1b48b94a1cc5d10321f603d7235d9eb523b311922765d07927ae4c162878fe742f257a5c3b6d75344623c91d4dd18bf55b89874860eae0e764bf8d66e76db8656e762e98a9f6d941b4fcb577be6f11cfc5f1f1f5e51935f5";
         uint256 count = packed.length / 4;
         result = new bytes4[](count);
         for (uint256 i = 0; i < count; ++i) {

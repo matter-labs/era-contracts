@@ -54,6 +54,7 @@ const ARTIFACTS = {
   ChainRegistrationSender: "ChainRegistrationSender.sol/ChainRegistrationSender.json",
   DummyInteropRecipient: "DummyInteropRecipient.sol/DummyInteropRecipient.json",
   ExecutorFacet: "Executor.sol/ExecutorFacet.json",
+  EmptyContract: "EmptyContract.sol/EmptyContract.json",
   GettersFacet: "Getters.sol/GettersFacet.json",
   IBaseToken: "IBaseToken.sol/IBaseToken.json",
   IERC7786Attributes: "IERC7786Attributes.sol/IERC7786Attributes.json",
@@ -96,7 +97,9 @@ const ARTIFACTS = {
   MockL2MessageVerification: "MockL2MessageVerification.sol/MockL2MessageVerification.json",
   MockMintBaseTokenHook: "MockMintBaseTokenHook.sol/MockMintBaseTokenHook.json",
   Ownable2Step: "Ownable2Step.sol/Ownable2Step.json",
+  PriorityOpLowerBound: "PriorityOpLowerBound.sol/PriorityOpLowerBound.json",
   DefaultUpgradeZKsyncOS: "DefaultUpgradeZKsyncOS.sol/DefaultUpgradeZKsyncOS.json",
+  V32UpgradeZKsyncOS: "V32UpgradeZKsyncOS.sol/V32UpgradeZKsyncOS.json",
   SystemContractProxy: "SystemContractProxy.sol/SystemContractProxy.json",
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
@@ -153,4 +156,13 @@ export function getDeterministicCreationBytecode(name: ContractName): string {
  */
 export const LEGACY_ADMIN_ABI: string[] = [
   "function upgradeChainFromVersion(uint256, tuple(tuple(address,uint8,bool,bytes4[])[],address,bytes))",
+];
+
+/**
+ * v31 Admin facet entry point removed in v32 (the backfill service-transaction request). The
+ * harness calls it on forked v31 chains whose fixture never ran the backfill, so the current
+ * AdminFacet artifact no longer carries the selector.
+ */
+export const LEGACY_V31_ADMIN_BACKFILL_ABI: string[] = [
+  "function setZKsyncOSPreV31TotalSupply(uint256 _totalSupply) returns (bytes32)",
 ];

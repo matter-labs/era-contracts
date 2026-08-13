@@ -533,8 +533,8 @@ contract L2BaseTokenEraTest is Test {
                     ORDERING INVARIANT TESTS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice The tracker hook must run BEFORE totalSupply changes: _needToForceSetAssetMigrationOnL2
-    /// reads totalSupply(), so the very first deposit must still observe the pre-mint supply.
+    /// @notice The tracker hook must run BEFORE totalSupply changes: a legacy token's baseline is
+    /// derived from the pre-operation supply, so the very first deposit must still observe it.
     function test_mint_callsAssetTrackerBeforeTotalSupplyChange() public {
         _initL2();
         uint256 mintAmount = 5 ether;

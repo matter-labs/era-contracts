@@ -227,9 +227,12 @@ to preserve the deployed storage layout.
     is L1 and the chain settles on L1, `totalSuccessfulDepositsFromL1` is increased. For the base token,
     failed deposits are refunded on L2 to the `refundRecipient` rather than claimed on L1, so the gap
     between initiated deposits and this counter is not uniformly "claimable on L1" across asset types.
-  - `handleRecoverBaseTokenBridgingOnL2` — recovery of a failed/timed-out base-token bridge-out. Only
-    L2 -> L2 bridge-outs are recoverable and their forward accounting recorded nothing to reverse (the base
-    token is never native to the chain, and the destination was not L1); both invariants are asserted.
+  - `assertRecoveryIsAccountingNeutral` (and its base-token wrapper
+    `assertBaseTokenRecoveryIsAccountingNeutral`, called by `BaseTokenHolder.recoverBaseToken`) — recovery of
+    a failed/timed-out bridge-out. Only L2 -> L2 bridge-outs are recoverable, and beyond the `chainBalance`
+    re-credit `handleFinalizeBridgingOnL2` performs there is nothing to reverse: the destination was not L1,
+    and the base token is never native to the chain (so it has no `chainBalance` at all). Both invariants
+    are asserted, for every asset — the vault asks before disbursing a failed transfer.
 - `interopInfo` (`totalWithdrawalsToL1`, `totalSuccessfulDepositsFromL1`) is the L2-side accounting used to
   compute the amount to keep on L1 during the L1 -> Gateway migration; `totalWithdrawalsToL1` is consumed
   once during that migration and must stay append-only.
@@ -240,12 +243,14 @@ to preserve the deployed storage layout.
   directly to the NTV are treated the same, since they are effectively frozen). New tokens registered via
   `registerNewTokenIfNeeded` get `MAX_TOKEN_BALANCE` (native) or `0` (first-time bridged). Legacy tokens are
   registered lazily on their first bridge operation, or eagerly by anyone via `registerLegacyToken`.
-- **ZKsync OS base token**: `totalSupply()` of the base token is not available by default on ZKsync OS
-  chains, so the pre-v31 supply must be backfilled (`needBaseTokenTotalSupplyBackfill`,
-  `backFillZKSyncOSBaseTokenV31MigrationData`, called by `L2BaseTokenZKOS`) before the value is used;
-  chains that went through the v31 upgrade had the base token registered by it with a zero placeholder. From
-  v32 on the tracker is initialized on the genesis path only, so that upgrade-only entry point is gone; the
-  remaining fields are expected to be deleted once every ZKsync OS chain is backfilled.
+- **ZKsync OS base token**: the pre-v31 supply of an upgraded ZKsync OS chain lives in
+  `L2BaseTokenZKOS.zkosPreV31TotalSupply`, populated while the chain ran v31 (via the since-removed backfill
+  service transaction), so `totalSupply()` is always available here. This release carries no backfill path:
+  the v32 upgrade of a ZKsync OS chain is forbidden on L1 (`V32UpgradeZKsyncOS`) unless
+  `baseTokenHasTotalSupply` was set by the v31 backfill _and_ its L2 execution is proven — a
+  `PriorityOpLowerBound` registry permissionlessly pins a priority-op count observed after the flag was set,
+  and the upgrade requires all ops below it to be processed. Fresh chains have no pre-v31 history and keep
+  zero. The tracker's own backfill flag and entry point are gone, and its slot is deprecated.
 
 ## L1Nullifier and failed-deposit recovery
 
@@ -300,7 +305,7 @@ mintData)` on the asset handler registered for the asset (`assetHandlerAddress[a
 
 - **L2 -> L1 withdrawals are never revertable.** The `InteropCenter` rejects L1-destined atomic bundles at
   send time, and both `L2AssetRouter.recoverAtomicCall` and
-  `L2AssetTracker.handleRecoverBaseTokenBridgingOnL2` assert `destChainId != L1_CHAIN_ID`. The reason is
+  `L2AssetTracker.assertRecoveryIsAccountingNeutral` assert `destChainId != L1_CHAIN_ID`. The reason is
   accounting: `totalWithdrawalsToL1` is consumed exactly once during the L1 -> Gateway migration and must
   stay append-only; a revertable withdrawal would corrupt the migrated balance.
 - **Message forgery**: finalization is only reachable through the interop handler with a proven message,

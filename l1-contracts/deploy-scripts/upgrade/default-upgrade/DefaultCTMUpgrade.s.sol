@@ -247,7 +247,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             chainCreationParams.latestProtocolVersion = toml.readUint("$.contracts.latest_protocol_version");
         }
 
-        // Optional override for v29 introspection selection
+        // Optional override for pre-v32 introspection selection
         if (toml.keyExists("$.pre_v32_introspection")) {
             newConfig.hasPreV32IntrospectionOverride = true;
             newConfig.usePreV32IntrospectionOverride = toml.readBool("$.pre_v32_introspection");
@@ -960,6 +960,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
                 "server_notifier_implementation_addr",
                 ctmAddresses.stateTransition.implementations.serverNotifier
             );
+        }
+        if (priorityOpLowerBound != address(0)) {
+            vm.serializeAddress("state_transition", "priority_op_lower_bound_addr", priorityOpLowerBound);
         }
         string memory stateTransition = vm.serializeAddress(
             "state_transition",

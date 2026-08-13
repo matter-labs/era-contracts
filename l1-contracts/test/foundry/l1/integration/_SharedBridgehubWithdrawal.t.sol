@@ -14,7 +14,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {InteropWithdrawalBundleEncoder} from "test-utils/InteropWithdrawalBundleEncoder.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {InsufficientChainBalance} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {InsufficientChainBalance} from "contracts/common/L1ContractErrors.sol";
 
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 

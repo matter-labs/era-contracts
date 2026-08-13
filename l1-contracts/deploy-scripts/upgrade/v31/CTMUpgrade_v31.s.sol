@@ -171,8 +171,13 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     ///      refuses to produce anything for Era instead.
     function deployUsedUpgradeContract() internal virtual override returns (address) {
         require(config.isZKsyncOS, "Upgrading Era chains onto this release is not supported");
-        console.log("Deploying DefaultUpgradeZKsyncOS");
-        return deploySimpleContract("DefaultUpgradeZKsyncOS", false);
+
+        // The registry must exist first: the v32 upgrade contract embeds its address as an immutable.
+        priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound", false);
+        console.log("Deployed PriorityOpLowerBound at", priorityOpLowerBound);
+
+        console.log("Deploying V32UpgradeZKsyncOS");
+        return deploySimpleContract("V32UpgradeZKsyncOS", false);
     }
 
     function getV31AdditionalFactoryDependencyContracts()

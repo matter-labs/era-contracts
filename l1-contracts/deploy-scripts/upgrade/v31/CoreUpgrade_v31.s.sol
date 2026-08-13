@@ -166,11 +166,10 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     /// @notice Override to add version-specific governance calls for stage 1
     /// @dev Stage 1 runs after proxy upgrades, so the new `L1ChainAssetHandler`
     ///      implementation is already in place when these calls execute.
-    /// @dev Two calls are emitted:
-    ///      1. ChainRegistrationSender.acceptOwnership (completes 2-step transfer started during deploy)
-    ///      2. L1ChainAssetHandler.setAddresses (caches messageRoot/assetRouter from bridgehub)
+    /// @dev Emits the ChainRegistrationSender proxy upgrade, L1ChainAssetHandler.setAddresses,
+    ///      and the L1InteropHandler wiring calls (see `_buildL1InteropHandlerWiringCalls`).
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
-        console.log("Preparing v31-specific stage1 governance calls...");
+        console.log("Preparing v32-specific stage1 governance calls...");
 
         address chainAssetHandlerProxy = coreAddresses.bridgehub.proxies.chainAssetHandler;
         require(chainAssetHandlerProxy != address(0), "ChainAssetHandler proxy address not found");
@@ -254,7 +253,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     /// @dev The registration has to come first: the population only sees assets that are present in the
     ///      vault's `bridgedTokens` enumeration.
     function stage3(address bridgehubProxy) public {
-        console.log("Starting v31 stage3 post-governance registration...");
+        console.log("Starting v32 stage3 post-governance registration...");
         console.log("Bridgehub proxy:", bridgehubProxy);
 
         vm.startBroadcast();
@@ -262,7 +261,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         BridgedOutPopulationLib.populateBridgedOutForAllAssets(bridgehubProxy);
         vm.stopBroadcast();
 
-        console.log("v31 stage3 registration complete!");
+        console.log("v32 stage3 registration complete!");
     }
 
     /// @notice Build the legacy-GW decommission calls (historical intervals + blacklist).

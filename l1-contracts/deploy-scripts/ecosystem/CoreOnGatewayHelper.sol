@@ -214,8 +214,9 @@ library CoreOnGatewayHelper {
     /// @notice Resolve a L2EcosystemContract enum to its contract name for the active VM.
     function _resolveContractName(bool _isZKsyncOS, L2EcosystemContract _c) internal pure returns (string memory) {
         // Contracts with different names per VM
-        if (_c == L2EcosystemContract.L2NativeTokenVault)
+        if (_c == L2EcosystemContract.L2NativeTokenVault) {
             return _isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault";
+        }
 
         // Contracts with the same name across both VMs
         if (_c == L2EcosystemContract.L2Bridgehub) return "L2Bridgehub";
@@ -263,6 +264,12 @@ library CoreOnGatewayHelper {
         if (_c == L2EcosystemContract.InteropCenter) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == L2EcosystemContract.InteropAttributeParser) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == L2EcosystemContract.L2InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == L2EcosystemContract.L2InteropCommitmentTree) {
+            return ZKsyncOSUpgradeType.SystemProxy;
+        }
+        if (_c == L2EcosystemContract.AtomicFlowManager) {
+            return ZKsyncOSUpgradeType.SystemProxy;
+        }
         revert UnknownCoreContract();
     }
 

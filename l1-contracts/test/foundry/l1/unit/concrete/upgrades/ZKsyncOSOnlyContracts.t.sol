@@ -7,12 +7,14 @@ import {L2EcosystemContract} from "deploy-scripts/ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "deploy-scripts/ecosystem/CoreOnGatewayHelper.sol";
 import {SystemContractsProcessing} from "deploy-scripts/upgrade/SystemContractsProcessing.s.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
+import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {
     L2_ATOMIC_FLOW_MANAGER_ADDR,
-    L2_INTEROP_COMMITMENT_TREE_ADDR
+    L2_INTEROP_COMMITMENT_TREE_ADDR,
+    L2_REMOVED_GW_ASSET_TRACKER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @notice The ZKsync-OS-only contracts are force-deployed from their own list, so their bytecodes have to
@@ -63,6 +65,47 @@ contract ZKsyncOSOnlyContractsTest is Test {
             );
         }
         assertEq(matches, 1, "expected exactly one deployment for the address");
+    }
+
+    /// @notice The removed v31 GWAssetTracker must be neutralized: exactly one system-proxy entry
+    /// for its reserved address, installing the EmptyContract implementation, and the EmptyContract
+    /// preimage must be published with the factory dependencies.
+    function test_forceDeploymentsNeutralizeTheRemovedTracker() public {
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = SystemContractsProcessing
+            .getBaseZKsyncOSForceDeployments();
+        bytes memory emptyContractInfo = Utils.getZKOSProxyUpgradeBytecodeInfo("EmptyContract.sol", "EmptyContract");
+
+        uint256 matches;
+        for (uint256 i = 0; i < deployments.length; ++i) {
+            if (deployments[i].newAddress != L2_REMOVED_GW_ASSET_TRACKER_ADDR) {
+                continue;
+            }
+            ++matches;
+            assertEq(
+                uint256(deployments[i].upgradeType),
+                uint256(IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade),
+                "neutralization must be a system-proxy implementation swap"
+            );
+            assertEq(
+                keccak256(deployments[i].deployedBytecodeInfo),
+                keccak256(emptyContractInfo),
+                "the removed tracker's proxy must point at EmptyContract"
+            );
+        }
+        assertEq(matches, 1, "expected exactly one neutralization for the removed tracker");
+
+        bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
+            true,
+            new L2EcosystemContract[](0)
+        );
+        bytes32 emptyContractCodeHash = keccak256(
+            BytecodeUtils.readDeployedBytecodeL1(true, "EmptyContract.sol", "EmptyContract")
+        );
+        assertEq(
+            _countBytecode(factoryDeps, emptyContractCodeHash),
+            1,
+            "EmptyContract preimage not published exactly once"
+        );
     }
 
     function test_zkSyncOSFactoryDependenciesIncludeTheNewBuiltInImplementations() public {
