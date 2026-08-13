@@ -41,12 +41,18 @@ if (!outputPath) {
   process.exit(1);
 }
 
-// `git ls-files -s` prints: <mode> <object> <stage>\t<path>
-const entries = git(["ls-files", "-s"])
-  .split("\n")
+// `git ls-files -sz` prints: <mode> <object> <stage>\t<path>\0
+//
+// -z matters for correctness, not just tidiness. Without it git quotes and escapes any path with a
+// non-ASCII character, so `contracts/Ünicode.sol` is reported as `"contracts/\303\234nicode.sol"` — a key
+// that matches no path on disk and does not even end in `.sol`, so the file would never be recorded
+// as a source and drift in it would go undetected, leaving exactly the stale artifact this manifest
+// exists to catch. -z emits raw paths.
+const entries = git(["ls-files", "-sz"])
+  .split("\0")
   .filter(Boolean)
-  .map((line) => {
-    const [meta, filePath] = line.split("\t");
+  .map((record) => {
+    const [meta, filePath] = record.split("\t");
     const [mode, object] = meta.split(/\s+/);
     return { mode, object, filePath };
   });

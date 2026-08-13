@@ -60,15 +60,21 @@ const FRESHNESS_CACHE = path.join("cache-forge", "solidity-files-cache.json");
 
 const { execFileSync } = require("child_process");
 
-/** Current blob hashes for tracked sources and submodule pins, in the manifest's shape. */
+/**
+ * Current blob hashes for tracked sources and submodule pins, in the manifest's shape.
+ *
+ * -z for the same reason write-source-manifest.js uses it: git quotes non-ASCII paths, and a quoted
+ * key matches nothing on disk, so drift in such a file would be invisible here too. Both sides must
+ * agree, and both must agree with the filesystem.
+ */
 function currentGitState() {
-  const out = execFileSync("git", ["ls-files", "-s"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  const out = execFileSync("git", ["ls-files", "-sz"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   const sources = {};
   const submodules = {};
   const blobs = {};
-  for (const line of out.split("\n")) {
-    if (!line) continue;
-    const [meta, filePath] = line.split("\t");
+  for (const record of out.split("\0")) {
+    if (!record) continue;
+    const [meta, filePath] = record.split("\t");
     const [mode, object] = meta.split(/\s+/);
     if (mode === "160000") submodules[filePath] = object;
     else {

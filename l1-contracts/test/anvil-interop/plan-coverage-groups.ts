@@ -59,11 +59,31 @@ export interface SpecGroup {
   specs: string;
 }
 
+/**
+ * What a spec file may be called. Stricter than the discovery pattern on purpose: these names are
+ * emitted space-separated into a workflow matrix and expanded by a shell, so a name containing a
+ * space, `;`, backtick or `$(...)` would be a command-injection primitive reachable by adding a file
+ * to the repo. Nothing legitimate needs those characters.
+ */
+const SAFE_SPEC_NAME = /^\d+[0-9A-Za-z._-]*\.spec\.ts$/;
+
 export function discoverSpecs(specDir: string): string[] {
-  return fs
+  const candidates = fs
     .readdirSync(specDir)
     .filter((f) => /^\d+-.*\.spec\.ts$/.test(f))
     .sort();
+
+  // Rejected loudly rather than filtered out: silently skipping a spec would drop a test from
+  // coverage while every job still went green, which is the failure this planner exists to prevent.
+  const unsafe = candidates.filter((f) => !SAFE_SPEC_NAME.test(f));
+  if (unsafe.length > 0) {
+    throw new Error(
+      `Spec file name(s) unsafe for shell expansion: ${unsafe.map((f) => JSON.stringify(f)).join(", ")}. ` +
+        "Spec names must match digits followed by letters, digits, dots, underscores or hyphens."
+    );
+  }
+
+  return candidates;
 }
 
 export function costOf(specFile: string): number {
