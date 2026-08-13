@@ -1,9 +1,11 @@
 # Registry-Driven Protocol Upgrades
 
 **Status:** Architecture implemented in era-contracts PR #2270. v32 bootstraps each CTM's
-`currentRelease` through the legacy governance-calldata pipeline. Deploying the bound executors and
-handing them CTM / `ProxyAdmin` ownership is explicit v33 protocol-ops integration work; see
-"Legacy path" below.
+`currentRelease` through the legacy governance-calldata pipeline. A `RegistryBootstrapMigration`
+that collapses that whole legacy leg into one pinned object exists and is tested, but is **not yet
+wired into any deploy script** — choosing between the two bootstrap routes is an open decision, see
+"Bootstrap" below. Deploying the bound executors and handing them CTM / `ProxyAdmin` ownership is
+explicit v33 protocol-ops integration work; see "Legacy path" below.
 **Scope:** L1 + L2 era-contracts, upgrade tooling, governance proposal shape.
 
 The model separates two concepts that earlier drafts conflated:
@@ -52,9 +54,11 @@ flowchart TB
       REL["CTMRelease<br/>explicit facet routing + inline pins,<br/>DiamondInit, system hashes,<br/>genesis params, force-deploy data<br/>(version- and VM-flag-independent)"]
       TRA["CTMTransition<br/>DERIVED final facet cuts + hash delta (stored at init),<br/>version edge, pinned verifier + upgradeEngine,<br/>schedule, typed L2UpgradePlan"]
       COREREG["CoreRegistry<br/>source-checked rows:<br/>proxy, expectedOldImpl -> implNew + pin"]
+      BOOT["RegistryBootstrapMigration (unwired)<br/>one-shot PRE-registry -> registry edge:<br/>source-checked swaps, anchor + genesis release,<br/>version edge, authority handover"]
       FACT -->|"deploys + initializes"| REL
       FACT -->|"deploys + initializes"| TRA
       FACT -->|"deploys + initializes"| COREREG
+      FACT -->|"deploys + initializes"| BOOT
       TRA -->|"validates BOTH releases;<br/>pins fromRelease -> newRelease"| REL
     end
 
@@ -71,6 +75,8 @@ flowchart TB
       BASE["BaseZkSyncUpgrade<br/>upgradeFromTransition(transition)"]
     end
 
+    BOOT -.->|"one-time: installs anchor + genesis release,<br/>then hands ownership to the BOUND executors"| CTMEXE
+    BOOT -.->|"binding + pin checked before handover"| ECOEXE
     CTMEXE -->|owns| CTM
     CTMEXE -->|factory-attest + validate + apply| TRA
     CTMEXE -->|"buildUpgradeCutData<br/>(cut = upgradeEngine.upgradeFromTransition)"| COMPOSER
@@ -105,6 +111,7 @@ flowchart TB
 | `CTMReleaseFactory` / `CTMTransitionFactory` / `CoreRegistryFactory` | `contracts/upgrades/registry/` | Atomic, **idempotent** deploy-and-initialize (`deployOrGet*`) via CREATE2 with `salt = keccak256(abi.encode(manifest))`. Addresses are manifest commitments and nonce-independent; same-manifest races return the attested instance, while different manifests cannot displace it. One factory per type because combining their embedded creation code exceeds EIP-170.                                                                                                                                                                                      |
 | `CTMUpgradeExecutor`                                                 | `contracts/upgrades/registry/` | Executor **bound to one immutable CTM and one immutable `CTMTransitionFactory`**. It rejects transitions not attested by that factory. Fixed logic: `applyCTMUpgrade`, `upgradeChain` (owner during the window, permissionless after the deadline), and `acceptCTMOwnership`.                                                                                                                                                                                                                                                                                |
 | `EcosystemUpgradeExecutor`                                           | `contracts/upgrades/registry/` | Executor **bound to one immutable ecosystem `ProxyAdmin` and one immutable `CoreRegistryFactory`**. It rejects non-attested registries, then applies source-checked rows: at `implNew` ⇒ skip, at `expectedOldImpl` ⇒ upgrade, anything else ⇒ revert.                                                                                                                                                                                                                                                                                                       |
+| `RegistryBootstrapMigration` + its factory                           | `contracts/upgrades/registry/` | Write-once, one-shot, factory-attested edge from a PRE-registry ecosystem into this model: source-checked implementation swaps, the `releaseFactory` anchor, the genesis `currentRelease`, the version edge, and the authority handover to the bound executors — all in one transaction. No arbitrary-call surface. Built and tested; **not wired into any deploy script** (see "Bootstrap").                                                                                                                                                                |
 | `UpgradeExecutorBase`                                                | `contracts/governance/`        | Shared base: `Ownable2Step` (owner = PUH) drives the fixed entrypoints; `forward(Call[])` is gated by a **separately governed `breakGlassGovernor`** (own two-step handover) — raw authority that CAN bypass transition invariants, so it belongs to a distinct holder (e.g. a security council).                                                                                                                                                                                                                                                            |
 
 **Validation API and provenance.** Executors first require factory attestation using the object's
@@ -189,11 +196,28 @@ longer exist: one object sources both the final cuts and the proposal, and its d
 function of two factory-attested releases.
 
 **Bootstrap (migration into this architecture).** `fromRelease` is **never zero**: one-time
-migration accommodations live in one-time migration code, not in every future transition. The
-v32 legacy upgrade scripts install `currentRelease` on every CTM (`setCurrentRelease` in the
-governance calldata; fresh Gateway CTMs pin it at genesis), so every v33+ transition has a real,
-validated source release. A pre-v32 CTM that never received its v32 leg must get one before it
-can take a registry-driven transition.
+migration accommodations live in one-time migration code, not in every future transition. A pre-v32
+CTM must therefore receive `currentRelease` (and the `releaseFactory` anchor) once, before it can
+take any registry-driven transition. Fresh Gateway CTMs pin both at genesis and need no bootstrap.
+
+There are two routes for existing CTMs, and **only the first is currently wired**:
+
+1. **Legacy governance calldata (what v32 ships).** `CTMUpgrade_v32` deploys the genesis release and
+   emits `setReleaseFactory` + `setCurrentRelease` alongside the rest of the stage-1 bundle. The
+   bundle is a long list of individually-reviewed calls executed against whatever state the
+   ecosystem happens to be in.
+2. **`RegistryBootstrapMigration` (built, tested, unwired).** The same edge as ONE pinned,
+   factory-attested object — the legacy leg expressed in the data discipline the rest of this
+   document describes. Governance hands it CTM + `ProxyAdmin` ownership, `migrate()` runs the whole
+   edge, and ownership leaves to the bound executors in the same transaction. It is deliberately not
+   another generic executor: there is no arbitrary-call surface, and it refuses to run unless the
+   live ecosystem is exactly the starting state its manifest names — so the reviewable question is
+   "is this the edge we intend?" rather than "are these calls right against a state I must verify
+   separately". See "Bootstrap object" below.
+
+The decision between them is a review-cost trade-off, not a correctness one: route 1 is many small
+familiar calls, route 2 is one unfamiliar object whose _contents_ are mechanically checkable. Route 2
+also removes the last flow in which authority is handed to governance-controlled EOAs mid-upgrade.
 
 **Patches.** There is exactly ONE patch representation: a same-release transition. (The old
 side-door — `createNewPatchUpgrade` + `DefaultUpgrade.patchUpgrade`, which accepted an arbitrary
@@ -232,6 +256,37 @@ creation code would exceed the EIP-3860 initcode cap). The helper rebuilds the e
 manifest from the deployment artifacts and predicts the manifest-salted release address. The
 prediction is independent of factory nonce, closing the earlier different-manifest griefing race.
 
+### Bootstrap object
+
+`RegistryBootstrapMigration` pins, in one manifest committed by `manifestHash` and salted into its
+own CREATE2 address: the CTM and its departing protocol version, the `ProxyAdmin`, the
+source-checked `EcosystemContractRow[]` implementation swaps (the CTM's own implementation is one of
+them), the `releaseFactory` anchor, the genesis `currentRelease`, the version edge with its
+deadline, the verifier, the upgrade cut, and the two executors that receive authority. Every address
+carries an inline `EXTCODEHASH` pin.
+
+`validate()` — run on the execution path, not just off-chain — requires that the migration already
+owns both the CTM and the `ProxyAdmin`, that the CTM sits at the departing version, that every proxy
+is still at its `expectedOldImpl`, that every pin holds, that the release is attested by the very
+factory being installed, and that **each executor is BOUND to the contract it is about to receive**
+(`CTMUpgradeExecutor.CTM`, `EcosystemUpgradeExecutor.PROXY_ADMIN`). That last check matters because
+the edge is one-shot: an executor bound elsewhere would take ownership its fixed entrypoints cannot
+drive, leaving break-glass as the only recovery.
+
+Two properties are worth stating explicitly because they look like omissions:
+
+- **`migrate()` is permissionless.** The gate is the state, not the caller — nothing runs until
+  governance has handed over both ownerships, which is the approval, and every value written
+  afterwards is pinned. This means the edge cannot be left half-applied because one privileged
+  account failed to send the final transaction.
+- **`upgradeCut` is pinned data, not derived.** Unlike a transition, the departing version predates
+  releases, so there is no `fromRelease` to diff against. Its `facetCuts` carry no per-facet pins —
+  the one unpinned payload in the object, and the reason this edge is reviewed as legacy calldata.
+
+Ownership of the CTM is transferred (`Ownable2Step`), not forced: `migrate()` nominates the
+executor, and `CTMUpgradeExecutor.acceptCTMOwnership()` — owner-gated, and therefore the governance
+bundle's final call — completes it. That gate is deliberately not loosened to save one call.
+
 **Legacy path.** `deploy-scripts/upgrade/default-upgrade/*` still targets _pre-v32_ CTMs and keeps
 encoding the old `setChainCreationParams`; the struct + entrypoint live in
 `ILegacyChainTypeManager` (not on the current CTM) so those scripts still compile.
@@ -259,8 +314,17 @@ v33 protocol-ops integration described above.
 
 - **`currentRelease` is mandatory.** A CTM with `currentRelease == 0` cannot create chains;
   `setCurrentRelease(0)` reverts `ZeroAddress`.
-- **`fromRelease` is mandatory.** Transitions never accept a zero source; pre-registry migration
-  is the v32 legacy scripts' job (see Bootstrap above).
+- **`fromRelease` is mandatory.** Transitions never accept a zero source; pre-registry migration is
+  a one-time bootstrap — today the v32 legacy scripts, optionally a `RegistryBootstrapMigration`
+  (see Bootstrap above) — never an accommodation inside the transition model.
+- **Source-checked row sets are per-proxy unique.** Both `CoreRegistry` and
+  `RegistryBootstrapMigration` reject two rows naming one proxy (`RegistryDuplicateProxyRow`):
+  duplicates would both pass the source check and the last would silently win, so the reviewed edge
+  and the executed edge could differ.
+- **Authority is never handed to an executor that cannot use it.** `RegistryBootstrapMigration`
+  requires each receiving executor to be pinned AND bound to the contract it receives
+  (`BootstrapExecutorNotBound`); the edge is one-shot, so a mis-bound handover would be recoverable
+  only through break-glass.
 - **Releases and transitions are pinned deployed contracts, write-once.** `initialize` reverts if
   already set; the committed `manifestHash` is what a proposal pins; the addresses referenced by
   governance are implementation addresses, never proxies.

@@ -29,9 +29,13 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
     BootstrapAlreadyExecuted,
+    BootstrapAuthorityNotHeld,
+    BootstrapExecutorNotBound,
     EcosystemImplMismatch,
     NotFactoryDeployed,
-    RegistryCodehashMismatch
+    RegistryCodehashMismatch,
+    RegistryDuplicateProxyRow,
+    ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
@@ -175,7 +179,9 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 }),
                 upgradeCutInitCodehash: upgradeCutInit.codehash,
                 ctmExecutor: address(ctmExecutor),
-                ecosystemExecutor: address(ecoExecutor)
+                ctmExecutorCodehash: address(ctmExecutor).codehash,
+                ecosystemExecutor: address(ecoExecutor),
+                ecosystemExecutorCodehash: address(ecoExecutor).codehash
             });
     }
 
@@ -234,8 +240,137 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     function test_revertWhen_authorityNotHandedOver() public {
         // Without ownership the migration could not perform any of the work; it must say so rather
         // than fail deep inside a proxy call.
-        vm.expectRevert(abi.encodeWithSelector(NotFactoryDeployed.selector, address(chainContractAddress)));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BootstrapAuthorityNotHeld.selector,
+                address(chainContractAddress),
+                chainContractAddress.owner()
+            )
+        );
         migration.migrate();
+    }
+
+    // ─────────────────────────── executor binding ───────────────────────────
+
+    /// @dev The executors receive ALL the authority this edge moves, so a manifest naming one that
+    ///      is bound elsewhere must be refused BEFORE the one-shot edge is spent — otherwise the
+    ///      handover completes into an executor whose fixed entrypoints cannot drive what it owns.
+    function test_revertWhen_ctmExecutorIsBoundToAnotherCtm() public {
+        address foreignCtm = makeAddr("foreignCtm");
+        CTMUpgradeExecutor foreignExecutor = new CTMUpgradeExecutor(
+            governor,
+            makeAddr("breakGlass2"),
+            IChainTypeManager(foreignCtm),
+            new CTMTransitionFactory()
+        );
+        RegistryBootstrapMigration.BootstrapManifest memory manifest = _manifest();
+        manifest.ctmExecutor = address(foreignExecutor);
+        manifest.ctmExecutorCodehash = address(foreignExecutor).codehash;
+
+        RegistryBootstrapMigration mismatched = RegistryBootstrapMigration(
+            migrationFactory.deployOrGetMigration(manifest)
+        );
+        vm.prank(governor);
+        chainContractAddress.transferOwnership(address(mismatched));
+        ecosystemProxyAdmin.transferOwnership(address(mismatched));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BootstrapExecutorNotBound.selector,
+                address(foreignExecutor),
+                address(chainContractAddress),
+                foreignCtm
+            )
+        );
+        mismatched.migrate();
+        assertFalse(mismatched.executed(), "a refused edge must stay unspent");
+    }
+
+    function test_revertWhen_ecosystemExecutorIsBoundToAnotherProxyAdmin() public {
+        ProxyAdmin foreignProxyAdmin = new ProxyAdmin();
+        EcosystemUpgradeExecutor foreignExecutor = new EcosystemUpgradeExecutor(
+            governor,
+            makeAddr("breakGlass2"),
+            foreignProxyAdmin,
+            new CoreRegistryFactory()
+        );
+        RegistryBootstrapMigration.BootstrapManifest memory manifest = _manifest();
+        manifest.ecosystemExecutor = address(foreignExecutor);
+        manifest.ecosystemExecutorCodehash = address(foreignExecutor).codehash;
+
+        RegistryBootstrapMigration mismatched = RegistryBootstrapMigration(
+            migrationFactory.deployOrGetMigration(manifest)
+        );
+        vm.prank(governor);
+        chainContractAddress.transferOwnership(address(mismatched));
+        ecosystemProxyAdmin.transferOwnership(address(mismatched));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BootstrapExecutorNotBound.selector,
+                address(foreignExecutor),
+                address(ecosystemProxyAdmin),
+                address(foreignProxyAdmin)
+            )
+        );
+        mismatched.migrate();
+    }
+
+    function test_revertWhen_executorCodehashDrifted() public {
+        bytes32 pinnedCodehash = address(ctmExecutor).codehash;
+        vm.etch(address(ctmExecutor), hex"6001600155");
+        _handOverAuthority();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryCodehashMismatch.selector,
+                address(ctmExecutor),
+                pinnedCodehash,
+                address(ctmExecutor).codehash
+            )
+        );
+        migration.migrate();
+    }
+
+    // ─────────────────────────── manifest shape ───────────────────────────
+
+    /// @dev Two rows for one proxy would BOTH pass the source check (they compare against the same
+    ///      pre-migration implementation) and the last would silently win — so the reviewed edge
+    ///      and the executed edge would differ. Same rule {CoreRegistry} enforces.
+    function test_revertWhen_manifestCarriesDuplicateProxyRows() public {
+        EcosystemContractRow[] memory rows = new EcosystemContractRow[](2);
+        rows[0] = EcosystemContractRow({
+            proxy: address(ecosystemProxy),
+            expectedOldImpl: implV31,
+            implNew: implV32,
+            implNewCodehash: implV32.codehash
+        });
+        rows[1] = EcosystemContractRow({
+            proxy: address(ecosystemProxy),
+            expectedOldImpl: implV31,
+            implNew: implV31,
+            implNewCodehash: implV31.codehash
+        });
+        RegistryBootstrapMigration.BootstrapManifest memory manifest = _manifest();
+        manifest.proxyRows = rows;
+
+        vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateProxyRow.selector, address(ecosystemProxy)));
+        migrationFactory.deployOrGetMigration(manifest);
+    }
+
+    function test_revertWhen_manifestCarriesAZeroRowField() public {
+        EcosystemContractRow[] memory rows = new EcosystemContractRow[](1);
+        rows[0] = EcosystemContractRow({
+            proxy: address(ecosystemProxy),
+            expectedOldImpl: address(0),
+            implNew: implV32,
+            implNewCodehash: implV32.codehash
+        });
+        RegistryBootstrapMigration.BootstrapManifest memory manifest = _manifest();
+        manifest.proxyRows = rows;
+
+        vm.expectRevert(ZeroAddress.selector);
+        migrationFactory.deployOrGetMigration(manifest);
     }
 
     function test_revertWhen_departingVersionIsNotTheExpectedOne() public {

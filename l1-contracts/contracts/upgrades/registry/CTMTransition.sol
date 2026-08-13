@@ -79,8 +79,8 @@ contract CTMTransition is ICTMTransition {
             revert RegistryAlreadyInitialized();
         }
         // `fromRelease` is MANDATORY: every transition departs from a real, pinned release.
-        // Pre-registry migration (v31 -> v32) is one-time migration code in the legacy upgrade
-        // scripts — it installs `currentRelease` so that every later transition has a source.
+        // Bootstrapping a pre-registry CTM is one-time migration code, never an accommodation
+        // here; see the Bootstrap section of {docs/registry-driven-upgrades.md}.
         if (
             _manifest.verifier == address(0) ||
             _manifest.fromRelease == address(0) ||

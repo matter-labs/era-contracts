@@ -59,6 +59,10 @@ error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumb
 error BatchTimestampGreaterThanLastL2BlockTimestamp();
 // 0x63506488
 error BootstrapAlreadyExecuted();
+// 0x81ded943
+error BootstrapAuthorityNotHeld(address target, address actualOwner);
+// 0xb772460f
+error BootstrapExecutorNotBound(address executor, address expectedTarget, address actualTarget);
 // 0x6cf12312
 error BridgeHubAlreadyRegistered();
 // 0xdb538614

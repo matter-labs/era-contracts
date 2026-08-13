@@ -9,14 +9,19 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {EcosystemContractRow} from "./ICoreRegistry.sol";
 import {CodehashPinLib} from "./CodehashPinLib.sol";
 import {CTMReleaseFactory} from "./CTMRegistryFactory.sol";
+import {CTMUpgradeExecutor} from "./CTMUpgradeExecutor.sol";
+import {EcosystemUpgradeExecutor} from "./EcosystemUpgradeExecutor.sol";
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {
     BootstrapAlreadyExecuted,
+    BootstrapAuthorityNotHeld,
+    BootstrapExecutorNotBound,
     EcosystemImplMismatch,
     NotFactoryDeployed,
     RegistryAlreadyInitialized,
+    RegistryDuplicateProxyRow,
     RegistryUnknownKey,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
@@ -58,10 +63,16 @@ contract RegistryBootstrapMigration {
     /// @param upgradeCut The diamond cut committed for chains upgrading across this edge. It cannot
     ///        be DERIVED the way a transition's is: the departing version predates releases, so
     ///        there is no `fromRelease` to diff against. It is therefore pinned data, committed by
-    ///        the manifest hash, with its init target pinned separately below.
+    ///        the manifest hash, with its init target pinned separately below. Its `facetCuts` carry
+    ///        no per-facet pins — the one unpinned payload here, and the reason this edge is
+    ///        reviewed as legacy calldata rather than as a derived delta.
     /// @param upgradeCutInitCodehash Inline pin of `upgradeCut.initAddress`.
-    /// @param ctmExecutor The `CTMUpgradeExecutor` that receives CTM ownership.
+    /// @param ctmExecutor The `CTMUpgradeExecutor` that receives CTM ownership. It must be BOUND to
+    ///        `ctm`, otherwise its fixed entrypoints could never drive the CTM it is handed.
+    /// @param ctmExecutorCodehash Inline pin of `ctmExecutor`.
     /// @param ecosystemExecutor The `EcosystemUpgradeExecutor` that receives ProxyAdmin ownership.
+    ///        It must be BOUND to `ctmProxyAdmin`, for the same reason.
+    /// @param ecosystemExecutorCodehash Inline pin of `ecosystemExecutor`.
     struct BootstrapManifest {
         address ctm;
         uint256 expectedProtocolVersion;
@@ -77,7 +88,9 @@ contract RegistryBootstrapMigration {
         Diamond.DiamondCutData upgradeCut;
         bytes32 upgradeCutInitCodehash;
         address ctmExecutor;
+        bytes32 ctmExecutorCodehash;
         address ecosystemExecutor;
+        bytes32 ecosystemExecutorCodehash;
     }
 
     /// @notice Commitment to the pinned manifest — the 32 bytes governance approves.
@@ -113,8 +126,24 @@ contract RegistryBootstrapMigration {
         }
         // An edge with no implementation swaps is not a bootstrap; it would silently reduce to
         // "install anchors and hand over authority", which is a different (unreviewed) operation.
-        if (_manifest.proxyRows.length == 0) {
+        uint256 rowsLength = _manifest.proxyRows.length;
+        if (rowsLength == 0) {
             revert RegistryUnknownKey();
+        }
+        // Same row discipline as {CoreRegistry}: every row is a real, unique edge. Without the
+        // per-proxy dedup two rows naming one proxy would BOTH pass the source check (they compare
+        // against the same pre-migration implementation) and the last one would silently win — so
+        // the edge governance reviewed would not be the edge that executes.
+        for (uint256 i = 0; i < rowsLength; ++i) {
+            EcosystemContractRow calldata row = _manifest.proxyRows[i];
+            if (row.proxy == address(0) || row.expectedOldImpl == address(0) || row.implNew == address(0)) {
+                revert ZeroAddress();
+            }
+            for (uint256 j = 0; j < i; ++j) {
+                if (_manifest.proxyRows[j].proxy == row.proxy) {
+                    revert RegistryDuplicateProxyRow(row.proxy);
+                }
+            }
         }
 
         manifest = _manifest;
@@ -124,6 +153,10 @@ contract RegistryBootstrapMigration {
 
     /// @notice Reverts unless the live ecosystem is exactly the starting state the manifest names.
     /// @dev Runs on the execution path, so a drifted ecosystem cannot be migrated by accident.
+    /// @dev NOT a complete precondition oracle: `setNewVersionUpgrade` additionally requires chain
+    ///      migrations to be paused, which is bundle SEQUENCING (stage 0 opens the window) rather
+    ///      than ecosystem state this object pins. A migration that passes here can still revert
+    ///      inside `migrate` if it is run outside that window.
     function validate() public view {
         if (!initialized) {
             revert RegistryUnknownKey();
@@ -131,11 +164,29 @@ contract RegistryBootstrapMigration {
         BootstrapManifest storage m = manifest;
 
         // Authority must already rest here, or `migrate` could not perform any of the work.
-        if (Ownable2Step(m.ctm).owner() != address(this)) {
-            revert NotFactoryDeployed(m.ctm);
+        address ctmOwner = Ownable2Step(m.ctm).owner();
+        if (ctmOwner != address(this)) {
+            revert BootstrapAuthorityNotHeld(m.ctm, ctmOwner);
         }
-        if (m.ctmProxyAdmin.owner() != address(this)) {
-            revert NotFactoryDeployed(address(m.ctmProxyAdmin));
+        address proxyAdminOwner = m.ctmProxyAdmin.owner();
+        if (proxyAdminOwner != address(this)) {
+            revert BootstrapAuthorityNotHeld(address(m.ctmProxyAdmin), proxyAdminOwner);
+        }
+
+        // The executors are where ALL of this authority ends up, so they are checked exactly as
+        // hard as everything else the manifest names: pinned, and BOUND to the very contracts they
+        // receive. An executor bound elsewhere would take ownership its fixed entrypoints cannot
+        // drive — and since the edge is one-shot, recovering from that would mean falling back to
+        // break-glass, the one authority this design exists to avoid depending on.
+        m.ctmExecutor.requirePin(m.ctmExecutorCodehash);
+        m.ecosystemExecutor.requirePin(m.ecosystemExecutorCodehash);
+        address boundCtm = address(CTMUpgradeExecutor(payable(m.ctmExecutor)).CTM());
+        if (boundCtm != m.ctm) {
+            revert BootstrapExecutorNotBound(m.ctmExecutor, m.ctm, boundCtm);
+        }
+        address boundProxyAdmin = address(EcosystemUpgradeExecutor(payable(m.ecosystemExecutor)).PROXY_ADMIN());
+        if (boundProxyAdmin != address(m.ctmProxyAdmin)) {
+            revert BootstrapExecutorNotBound(m.ecosystemExecutor, address(m.ctmProxyAdmin), boundProxyAdmin);
         }
 
         // The departing version fixes which ecosystem this edge is valid for.
@@ -174,6 +225,11 @@ contract RegistryBootstrapMigration {
     /// @notice Performs the whole edge, then hands authority to the bound executors.
     /// @dev Ordering is load-bearing: the CTM implementation is swapped BEFORE the registry setters
     ///      are called, because those setters only exist on the new implementation.
+    /// @dev Deliberately PERMISSIONLESS. The gate is not the caller but the state: nothing here can
+    ///      run until governance has handed this object both ownerships, which IS the approval, and
+    ///      every value it then writes is pinned by the manifest. Leaving the trigger open means the
+    ///      edge cannot be left half-applied because one privileged account failed to send the final
+    ///      transaction.
     function migrate() external {
         if (executed) {
             revert BootstrapAlreadyExecuted();

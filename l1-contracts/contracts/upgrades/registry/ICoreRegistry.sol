@@ -34,12 +34,12 @@ struct EcosystemContractRow {
 ///      `validate()` / `verifyAll()`. Version-schedule identity is owned by {ICTMTransition},
 ///      not pinned here.
 interface ICoreRegistry {
-    /// @notice Every ecosystem contract participating in this upgrade, as complete typed rows —
-    ///         one call, no per-key rescans. Consumers iterate these directly.
     /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value,
     ///         and the key under which the deploying factory attests this instance.
     function manifestHash() external view returns (bytes32);
 
+    /// @notice Every ecosystem contract participating in this upgrade, as complete typed rows —
+    ///         one call, no per-key rescans. Consumers iterate these directly.
     function ecosystemRows() external view returns (EcosystemContractRow[] memory);
 
     /// @notice Walks every pinned implementation and compares its `EXTCODEHASH` against the hash
@@ -47,5 +47,6 @@ interface ICoreRegistry {
     ///         matches what was audited. Each registry (core + per-CTM) is verified independently.
     function verifyAll() external view returns (bool);
 
+    /// @notice The reverting counterpart of {verifyAll}, used on execution paths.
     function validate() external view;
 }

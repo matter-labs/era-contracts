@@ -105,15 +105,14 @@ contract CoreRegistry is ICoreRegistry {
         return true;
     }
 
+    /// @inheritdoc ICoreRegistry
     function validate() external view {
         if (!initialized) {
             revert RegistryUnknownKey();
         }
         uint256 length = contractRows.length;
         for (uint256 i = 0; i < length; ++i) {
-            if (contractRows[i].implNew != address(0)) {
-                _requirePin(contractRows[i].implNew, contractRows[i].implNewCodehash);
-            }
+            _requirePin(contractRows[i].implNew, contractRows[i].implNewCodehash);
         }
     }
 
