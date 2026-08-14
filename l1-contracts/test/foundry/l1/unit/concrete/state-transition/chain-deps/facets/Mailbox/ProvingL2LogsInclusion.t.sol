@@ -14,7 +14,7 @@ import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {HashedLogIsDefault} from "contracts/common/L1ContractErrors.sol";
 
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
-import {TxStatus} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {TxStatus} from "contracts/common/Messaging.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -38,12 +38,16 @@ contract MailboxL2LogsProve is MailboxTest {
     bool isService;
     uint8 shardId;
     L1MessageRoot messageRoot;
+    /// @dev Cached chain id of the diamond under test. It is cached so that the prove helpers do not
+    /// perform an extra external call after `vm.expectRevert`, which would consume the expectation.
+    uint256 chainId;
 
     /// @dev Gateway chain ID used for legacy historical migration intervals.
     uint256 constant LEGACY_GW_CHAIN_ID = 1;
 
     function setUp() public virtual {
         setupDiamondProxy();
+        chainId = gettersFacet.getChainId();
 
         // MessageRoot rejects batch zero proofs, so keep tests on a non-zero executed batch.
         // Use batch 2 so that we can set migrateToGWBatchNumber=1 (must be >0).
@@ -425,7 +429,14 @@ contract MailboxL2LogsProve is MailboxTest {
             );
         }
 
-        return mailboxFacet.proveL2LeafInclusion(batchNumber, proofInfo.leafProofMask, proofInfo.leaf, proof);
+        return
+            mailboxFacet.proveL2LeafInclusionShared({
+                _chainId: chainId,
+                _blockOrBatchNumber: batchNumber,
+                _leafProofMask: proofInfo.leafProofMask,
+                _leaf: proofInfo.leaf,
+                _proof: proof
+            });
     }
 
     function test_successRecursiveProof() external {
@@ -562,7 +573,13 @@ contract MailboxL2LogsProve is MailboxTest {
                 LEGACY_GW_CHAIN_ID
             )
         );
-        mailboxFacet.proveL2LeafInclusion(batchNumber, proofInfo.leafProofMask, proofInfo.leaf, proof);
+        mailboxFacet.proveL2LeafInclusionShared({
+            _chainId: chainId,
+            _blockOrBatchNumber: batchNumber,
+            _leafProofMask: proofInfo.leafProofMask,
+            _leaf: proofInfo.leaf,
+            _proof: proof
+        });
     }
 
     function test_RevertWhen_recursiveProofBatchAfterReturnFromSL() external {
@@ -634,7 +651,13 @@ contract MailboxL2LogsProve is MailboxTest {
                 LEGACY_GW_CHAIN_ID
             )
         );
-        mailboxFacet.proveL2LeafInclusion(batchNumber, proofInfo.leafProofMask, proofInfo.leaf, proof);
+        mailboxFacet.proveL2LeafInclusionShared({
+            _chainId: chainId,
+            _blockOrBatchNumber: batchNumber,
+            _leafProofMask: proofInfo.leafProofMask,
+            _leaf: proofInfo.leaf,
+            _proof: proof
+        });
     }
 
     function test_calculateRoot() public {
@@ -710,7 +733,8 @@ contract MailboxL2LogsProve is MailboxTest {
         bytes32[] memory _merkleProof,
         TxStatus _status
     ) internal returns (bool) {
-        bool retOldEncoding = mailboxFacet.proveL1ToL2TransactionStatus({
+        bool retOldEncoding = mailboxFacet.proveL1ToL2TransactionStatusShared({
+            _chainId: chainId,
             _l2TxHash: _l2TxHash,
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
@@ -718,7 +742,8 @@ contract MailboxL2LogsProve is MailboxTest {
             _merkleProof: _merkleProof,
             _status: _status
         });
-        bool retNewEncoding = mailboxFacet.proveL1ToL2TransactionStatus({
+        bool retNewEncoding = mailboxFacet.proveL1ToL2TransactionStatusShared({
+            _chainId: chainId,
             _l2TxHash: _l2TxHash,
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
@@ -743,8 +768,9 @@ contract MailboxL2LogsProve is MailboxTest {
         if (_expectedError.length > 0) {
             vm.expectRevert(_expectedError);
         }
-        bool retOldEncoding = mailboxFacet.proveL2LogInclusion({
-            _batchNumber: _batchNumber,
+        bool retOldEncoding = mailboxFacet.proveL2LogInclusionShared({
+            _chainId: chainId,
+            _blockOrBatchNumber: _batchNumber,
             _index: _index,
             _proof: _proof,
             _log: _log
@@ -753,8 +779,9 @@ contract MailboxL2LogsProve is MailboxTest {
         if (_expectedError.length > 0) {
             vm.expectRevert(_expectedError);
         }
-        bool retNewEncoding = mailboxFacet.proveL2LogInclusion({
-            _batchNumber: _batchNumber,
+        bool retNewEncoding = mailboxFacet.proveL2LogInclusionShared({
+            _chainId: chainId,
+            _blockOrBatchNumber: _batchNumber,
             _index: _index,
             _proof: _appendProofMetadata(_proof),
             _log: _log
@@ -774,8 +801,9 @@ contract MailboxL2LogsProve is MailboxTest {
         if (_expectedError.length > 0) {
             vm.expectRevert(_expectedError);
         }
-        bool retOldEncoding = mailboxFacet.proveL2MessageInclusion({
-            _batchNumber: _batchNumber,
+        bool retOldEncoding = mailboxFacet.proveL2MessageInclusionShared({
+            _chainId: chainId,
+            _blockOrBatchNumber: _batchNumber,
             _index: _index,
             _message: _message,
             _proof: _proof
@@ -784,8 +812,9 @@ contract MailboxL2LogsProve is MailboxTest {
         if (_expectedError.length > 0) {
             vm.expectRevert(_expectedError);
         }
-        bool retNewEncoding = mailboxFacet.proveL2MessageInclusion({
-            _batchNumber: _batchNumber,
+        bool retNewEncoding = mailboxFacet.proveL2MessageInclusionShared({
+            _chainId: chainId,
+            _blockOrBatchNumber: _batchNumber,
             _index: _index,
             _message: _message,
             _proof: _appendProofMetadata(_proof)
