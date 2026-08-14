@@ -26,20 +26,6 @@ function test(name: string, fn: () => void): void {
   tests.push([name, fn]);
 }
 
-/** Runs fn with ANVIL_INTEROP_POLLING_INTERVAL_MS set (or cleared), then restores it. */
-function withOverride(value: string | undefined, fn: () => void): void {
-  const key = "ANVIL_INTEROP_POLLING_INTERVAL_MS";
-  const previous = process.env[key];
-  if (value === undefined) delete process.env[key];
-  else process.env[key] = value;
-  try {
-    fn();
-  } finally {
-    if (previous === undefined) delete process.env[key];
-    else process.env[key] = previous;
-  }
-}
-
 test("recognises the local RPCs the harness actually starts", () => {
   // The anvil-interop chains: L1 on 9545, L2s on 4050-4054, plus port offsets for parallel shards.
   for (const url of [
@@ -51,7 +37,7 @@ test("recognises the local RPCs the harness actually starts", () => {
     "http://app.localhost:3050",
   ]) {
     assert.equal(isLocalRpcUrl(url), true, url);
-    withOverride(undefined, () => assert.equal(pollingIntervalFor(url), LOCAL_POLLING_INTERVAL_MS, url));
+    assert.equal(pollingIntervalFor(url), LOCAL_POLLING_INTERVAL_MS, url);
   }
 });
 
@@ -66,7 +52,7 @@ test("treats live and remote RPCs as remote, keeping ethers' conservative defaul
     "https://localhost.example.com/rpc", // not a local host despite the prefix
   ]) {
     assert.equal(isLocalRpcUrl(url), false, url);
-    withOverride(undefined, () => assert.equal(pollingIntervalFor(url), REMOTE_POLLING_INTERVAL_MS, url));
+    assert.equal(pollingIntervalFor(url), REMOTE_POLLING_INTERVAL_MS, url);
   }
 });
 
@@ -76,51 +62,16 @@ test("keeps the remote default at ethers' own, so live behaviour is unchanged", 
   assert.ok(LOCAL_POLLING_INTERVAL_MS < REMOTE_POLLING_INTERVAL_MS);
 });
 
-test("honours the env override for both local and remote", () => {
-  withOverride("250", () => {
-    assert.equal(pollingIntervalFor("http://127.0.0.1:9545"), 250);
-    assert.equal(pollingIntervalFor("https://mainnet.era.zksync.io"), 250);
-  });
-});
-
-test("ignores an empty override rather than reading it as zero", () => {
-  withOverride("", () => {
-    assert.equal(pollingIntervalFor("http://127.0.0.1:9545"), LOCAL_POLLING_INTERVAL_MS);
-  });
-});
-
-// A silently-zero or NaN interval would spin the wait loops as fast as the event loop allows,
-// which against a live endpoint is exactly the failure this is meant to avoid.
-test("rejects a nonsensical override instead of degrading quietly", () => {
-  for (const bad of ["abc", "0", "-100"]) {
-    withOverride(bad, () => {
-      assert.throws(() => pollingIntervalFor("http://127.0.0.1:9545"), /positive whole number/, bad);
-    });
-  }
-});
-
-// ethers' setter rejects anything where parseInt(String(value)) != value, so these would pass a
-// looser check here and then throw "invalid polling interval" from inside createProvider — a
-// worse error, further from the cause.
-test("rejects overrides ethers itself would reject", () => {
-  for (const bad of ["0.1", "1.5", "Infinity", "1e-3"]) {
-    withOverride(bad, () => {
-      assert.throws(() => pollingIntervalFor("http://127.0.0.1:9545"), /positive whole number/, bad);
-      assert.throws(() => createProvider("http://127.0.0.1:9545"), /positive whole number/, bad);
-    });
-  }
-});
-
-test("accepts an integer override, and ethers accepts it too", () => {
-  withOverride("250", () => {
-    const provider = createProvider("http://127.0.0.1:9545");
-    assert.equal(provider.pollingInterval, 250);
-  });
+// ethers' setter rejects anything where `parseInt(String(value)) != value`, so the constants have to
+// be whole numbers or every provider construction throws "invalid polling interval" on assignment.
+test("the interval it picks is one ethers will accept", () => {
+  const provider = createProvider("http://127.0.0.1:9545");
+  assert.equal(provider.pollingInterval, LOCAL_POLLING_INTERVAL_MS);
 });
 
 test("treats a URL it cannot parse as remote", () => {
   assert.equal(isLocalRpcUrl("not a url"), false);
-  withOverride(undefined, () => assert.equal(pollingIntervalFor("not a url"), REMOTE_POLLING_INTERVAL_MS));
+  assert.equal(pollingIntervalFor("not a url"), REMOTE_POLLING_INTERVAL_MS);
 });
 
 // The point of the helper is that it is the *only* provider constructor: the first conversion pass

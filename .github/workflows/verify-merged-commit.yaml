@@ -111,12 +111,8 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      # Explicitly disabled rather than simply omitted, so the intent is visible in the log and the
-      # escape hatch has a real caller: this build restores nothing and prunes nothing.
-      - name: Confirm the solc cache is disabled for this build
-        uses: ./.github/actions/warm-solc-cache
-        with:
-          enabled: "false"
+      # No warm-solc-cache step on purpose: this build is the one that must not trust a cache.
+      # It is also the only writer of one — see the save step at the end.
 
       # Removed before building so the check below also catches a deleted entry, not just a changed one.
       - name: Drop the committed zkstack-out

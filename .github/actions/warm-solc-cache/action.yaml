@@ -24,23 +24,14 @@ description: >
   forged artifact belongs to a source that did not change, so no drift-based rule prunes it. The
   writer is the only thing worth constraining.
 
-  Pass enabled: false where a from-scratch build is the point.
-
-inputs:
-  enabled:
-    description: >
-      Set to "false" to skip the restore and compile from scratch. Verification runs — anything
-      whose output gets committed or released — should build clean rather than trust a cache.
-      The dispatch workflows that commit AllContractsHashes.json, selectors, zkstack-out and the
-      chain-state snapshots deliberately do not use this action at all.
-    required: false
-    default: "true"
+  A build that must not trust a cache simply does not use this action: verify-merged-commit.yaml
+  and the dispatch workflows that commit AllContractsHashes.json, selectors, zkstack-out and the
+  chain-state snapshots all omit it.
 
 runs:
   using: composite
   steps:
     - name: Restore solc build cache from a previous commit
-      if: inputs.enabled == 'true'
       uses: actions/cache/restore@v4
       with:
         key: artifacts-l1-ci-solc-${{ github.sha }}
@@ -67,7 +58,6 @@ runs:
     # here — zksolc output is not reproducible across builds — and zksolc artifacts carry no
     # compilationTarget to match on anyway.
     - name: Drop artifacts whose source is gone or has changed
-      if: inputs.enabled == 'true'
       shell: bash
       run: |
         node "${{ github.action_path }}/prune-stale-artifacts.js" \

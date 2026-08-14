@@ -183,9 +183,9 @@ lower it before looking anywhere else.
 CI splits the specs across a small number of runners and shards in-process within each. A
 runner costs the same whether it uses one core or four, so parallelism inside a job is free
 while extra jobs are not — measured, one-spec-per-runner spent ~43 runner-minutes to reach
-~7.0m wall clock, two groups reach ~7.5m for ~14. `plan-coverage-groups.ts` packs the specs
-into balanced groups (`yarn plan:groups`) and holds both the group count and the per-spec cost
-table; the costs are a scheduling hint, so a stale entry costs balance, never coverage.
+~7.0m wall clock, two groups reach ~7.5m for ~14. The groups are listed by hand in the
+`coverage-anvil` matrix; `coverage-report` fails if the specs the groups report having run are
+not exactly the specs on disk, so a spec left out of the matrix cannot pass unnoticed.
 
 `l1-contracts-ci.yaml` then runs a `coverage-anvil` matrix job per group, each uploading its
 `anvil-lcov.info`. The `coverage-report` job downloads them and unions them with
