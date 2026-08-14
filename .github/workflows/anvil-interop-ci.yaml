@@ -78,28 +78,19 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn tsc --noEmit
 
-      # Pins which RPCs get the fast 100ms polling. Getting this wrong is invisible against Anvil
-      # and only bites in live mode, where 100ms is ten requests per second per waiter.
-      - name: Unit-test the provider polling interval
+      # ~7s for the harness's six unit suites. Each covers something an ordinary run cannot fail on:
+      # which RPCs get the fast 100ms polling (invisible against Anvil, bites only in live mode);
+      # port offsets and shard paths (only matter when runs coexist, which CI never does); the guard
+      # against a tracing regression passing as "covered nothing"; matching each artifact to the
+      # build-info it was compiled under, which is what lets the artifact cache stay warm without
+      # misattributing coverage; and the shard LCOV merge and group packing.
+      #
+      # `coverage-anvil-groups` and `coverage-report` in l1-contracts-ci.yaml additionally run the
+      # planner and merge suites on their own, so a bug there fails the job whose output it would
+      # corrupt rather than one in another workflow.
+      - name: Unit-test the interop harness
         working-directory: l1-contracts/test/anvil-interop
-        run: yarn test:create-provider
-
-      # Port offsets and shard paths only matter when runs coexist, which CI never does — so these
-      # need pinning here rather than being exercised incidentally.
-      - name: Unit-test the coverage shard paths
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn test:coverage-paths
-
-      # Guards against a tracing regression passing as "covered nothing".
-      - name: Unit-test the coverage trace guard
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn test:trace-guard
-
-      # Matching each artifact to the build-info it was compiled under is what lets the artifact
-      # cache stay warm without misattributing coverage, so it is pinned.
-      - name: Unit-test the build-info selection
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn test:build-info
+        run: yarn test:unit
 
       - name: Run interop tests (preloaded state)
         working-directory: l1-contracts/test/anvil-interop
