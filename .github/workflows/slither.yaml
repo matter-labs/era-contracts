@@ -27,8 +27,10 @@ jobs:
         with:
           python-version: 3.8
 
-      - name: Install foundry-zksync
-        uses: ./.github/actions/install-zksync-foundry
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.3.5
 
       - name: Install Slither
         run: |
@@ -56,10 +58,5 @@ jobs:
       - name: Run Slither for L1 contracts
         working-directory: ./l1-contracts
         # FIXME? --skip assembly because otherwise IR for DummyPlonkVerifier can't be generated (Slither issue).
-        run: |
-          slither --config ./slither.config.json --skip-assembly .
-
-      - name: Run Slither for L2 contracts
-        working-directory: ./l2-contracts
         run: |
           slither --config ./slither.config.json --skip-assembly .

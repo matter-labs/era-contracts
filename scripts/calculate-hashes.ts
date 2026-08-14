@@ -6,16 +6,12 @@ import { join } from "path";
 import * as blakejs from "blakejs";
 import { hashBytecode } from "zksync-ethers/build/utils";
 
-const SOLIDITY_SOURCE_CODE_PATHS = ["system-contracts/", "l2-contracts/", "l1-contracts/", "da-contracts/"];
-const YUL_SOURCE_CODE_PATHS = ["system-contracts/"];
+const SOLIDITY_SOURCE_CODE_PATHS = ["l1-contracts/", "da-contracts/"];
+const YUL_SOURCE_CODE_PATHS: string[] = [];
+const ACTIVE_L1_DA_EVM_SOURCE_CODE_PATHS = ["l1-contracts/", "da-contracts/"];
 const OUTPUT_FILE_PATH = "AllContractsHashes.json";
 
-const SKIPPED_FOLDERS = [
-  "l1-contracts/deploy-scripts",
-  "l1-contracts/test",
-  "l1-contracts/contracts/dev-contracts",
-  "system-contracts/bootloader/tests/bootloader",
-];
+const SKIPPED_FOLDERS = ["l1-contracts/deploy-scripts", "l1-contracts/test", "l1-contracts/contracts/dev-contracts"];
 const FORCE_INCLUDE = ["Create2AndTransfer.sol", "L1MessageRootStageSepolia.sol"];
 
 // Opens a Solidity file and returns all the contracts/libraries created inside of it.
@@ -332,6 +328,44 @@ const getSolidityContractsDetails = (dir: string): ContractsInfo[] => {
   return mergedContracts;
 };
 
+/// Refreshes the EVM fields emitted by the transitional standard-Forge L1/DA
+/// build. This is deliberately not called an OS allowlist: until Era sources are
+/// removed from l1-contracts, ordinary EVM artifacts are still emitted for them.
+/// Entries not rebuilt here and all ZK fields are retained for protocol-ops.
+const mergeL1DaEvmHashes = (
+  oldHashes: ContractsInfo[],
+  activeEvmHashes: SourceAndEvmCompilationDetails[]
+): ContractsInfo[] => {
+  const activeByName = new Map(activeEvmHashes.map((contract) => [contract.contractName, contract]));
+
+  const merged = oldHashes.map((oldContract) => {
+    const activeContract = activeByName.get(oldContract.contractName);
+    if (!activeContract) {
+      return oldContract;
+    }
+
+    activeByName.delete(oldContract.contractName);
+    return {
+      ...oldContract,
+      evmBytecodePath: activeContract.evmBytecodePath,
+      evmBytecodeHash: activeContract.evmBytecodeHash,
+      evmDeployedBytecodeHash: activeContract.evmDeployedBytecodeHash,
+      evmDeployedBytecodeBlakeHash: activeContract.evmDeployedBytecodeBlakeHash,
+      evmDeployedBytecodeLength: activeContract.evmDeployedBytecodeLength,
+    };
+  });
+
+  for (const activeContract of activeByName.values()) {
+    merged.push({
+      ...activeContract,
+      zkBytecodePath: null,
+      zkBytecodeHash: null,
+    });
+  }
+
+  return merged;
+};
+
 const getYulContractsDetails = (dir: string): ContractsInfo[] => {
   const bytecodesDir = join(dir, SOLIDITY_ARTIFACTS_ZK_DIR);
   const dirsEndingWithYul = findDirsEndingWith(bytecodesDir, ".yul").filter(
@@ -441,23 +475,36 @@ const findDifferences = (newHashes: ContractsInfo[], oldHashes: ContractsInfo[])
 };
 
 const main = async () => {
-  const args = process.argv;
-  if (args.length > 3 || (args.length == 3 && !args.includes("--check-only"))) {
+  const args = process.argv.slice(2);
+  const allowedArgs = new Set(["--check-only", "--l1-da-evm-only"]);
+  if (args.some((arg) => !allowedArgs.has(arg)) || new Set(args).size !== args.length) {
     console.log(
-      `This command can be used with no arguments or with the --check-only flag. Use the --check-only flag to check the hashes without updating the ${OUTPUT_FILE_PATH} file.`
+      `Usage: calculate-hashes.ts [--check-only] [--l1-da-evm-only]. Use --check-only to check without updating ${OUTPUT_FILE_PATH}; --l1-da-evm-only refreshes L1/DA EVM hashes while retaining unbuilt entries and ZK fields.`
     );
     process.exit(1);
   }
   const checkOnly = args.includes("--check-only");
-
-  const solidityContractsDetails = _.flatten(SOLIDITY_SOURCE_CODE_PATHS.map(getSolidityContractsDetails));
-  const yulContractsDetails = _.flatten(YUL_SOURCE_CODE_PATHS.map(getYulContractsDetails));
-  const systemContractsDetails = [...solidityContractsDetails, ...yulContractsDetails];
-
-  console.log("New hashes: ", systemContractsDetails.length);
-
-  const newSystemContractsHashes = systemContractsDetails;
+  const l1DaEvmOnly = args.includes("--l1-da-evm-only");
   const oldSystemContractsHashes = readSystemContractsHashesFile(OUTPUT_FILE_PATH);
+
+  let newSystemContractsHashes: ContractsInfo[];
+  if (l1DaEvmOnly) {
+    const activeEvmHashesBySource = ACTIVE_L1_DA_EVM_SOURCE_CODE_PATHS.map((sourcePath) => {
+      const hashes = getEVMSolidityContractsDetailsWithArtifactsDir(sourcePath);
+      if (hashes.length === 0) {
+        throw new Error(`No EVM artifacts found for ${sourcePath}; run its build:foundry script first.`);
+      }
+      return hashes;
+    });
+    const activeEvmHashes = _.flatten(activeEvmHashesBySource);
+    newSystemContractsHashes = mergeL1DaEvmHashes(oldSystemContractsHashes, activeEvmHashes);
+  } else {
+    const solidityContractsDetails = _.flatten(SOLIDITY_SOURCE_CODE_PATHS.map(getSolidityContractsDetails));
+    const yulContractsDetails = _.flatten(YUL_SOURCE_CODE_PATHS.map(getYulContractsDetails));
+    newSystemContractsHashes = [...solidityContractsDetails, ...yulContractsDetails];
+  }
+
+  console.log("New hashes: ", newSystemContractsHashes.length);
   if (_.isEqual(newSystemContractsHashes, oldSystemContractsHashes)) {
     console.log(`Calculated hashes match the hashes in the ${OUTPUT_FILE_PATH} file.`);
     console.log("Exiting...");
@@ -467,7 +514,8 @@ const main = async () => {
   console.log(`Calculated hashes differ from the hashes in the ${OUTPUT_FILE_PATH} file. Differences:`);
   console.log(differences);
   if (checkOnly) {
-    console.log(`You can use the \`yarn calculate-hashes:fix\` command to update the ${OUTPUT_FILE_PATH} file.`);
+    const fixCommand = l1DaEvmOnly ? "calculate-hashes:l1-da:fix" : "calculate-hashes:fix";
+    console.log(`You can use the \`yarn ${fixCommand}\` command to update the ${OUTPUT_FILE_PATH} file.`);
     console.log("Exiting...");
     process.exit(1);
   } else {
@@ -483,6 +531,6 @@ main()
   .then(() => process.exit(0))
   .catch((err) => {
     console.error("Error:", err.message || err);
-    console.log("Please make sure to run `yarn sc build` before running this script.");
+    console.log("Please make sure the contract projects selected for hashing have been built first.");
     process.exit(1);
   });

@@ -133,10 +133,7 @@ WORKDIR /contracts
 # so the subsequent `COPY . /contracts` only overlays source on top.
 COPY package.json yarn.lock /contracts/
 COPY l1-contracts/package.json /contracts/l1-contracts/
-COPY l2-contracts/package.json /contracts/l2-contracts/
 COPY da-contracts/package.json /contracts/da-contracts/
-COPY system-contracts/package.json /contracts/system-contracts/
-COPY gas-bound-caller/package.json /contracts/gas-bound-caller/
 RUN yarn install --frozen-lockfile
 
 # === Copy all source code ===
@@ -165,8 +162,6 @@ COPY zk-governance /zk-governance
 # through a "trigger regen → wait → re-trigger docker" loop.
 RUN yarn --cwd da-contracts build:foundry
 RUN yarn --cwd l1-contracts build:foundry
-RUN yarn --cwd l2-contracts build:foundry
-RUN yarn --cwd system-contracts build:foundry
 
 # Pre-compile zk-governance contracts. This both seeds /root/.svm/ with solc
 # 0.8.24 (zk-governance pins it; the runtime image runs with FOUNDRY_OFFLINE=true
@@ -221,23 +216,16 @@ COPY --from=cargo-builder /contracts/tools/upgrade-readiness-checker/upgrade-rea
 WORKDIR /contracts
 COPY --from=forge-builder /contracts/configs /contracts/configs
 COPY --from=forge-builder /contracts/l1-contracts /contracts/l1-contracts
-COPY --from=forge-builder /contracts/l2-contracts /contracts/l2-contracts
-COPY --from=forge-builder /contracts/system-contracts /contracts/system-contracts
 COPY --from=forge-builder /contracts/da-contracts /contracts/da-contracts
 COPY --from=forge-builder /contracts/lib /contracts/lib
 COPY --from=forge-builder /contracts/node_modules /contracts/node_modules
 COPY --from=forge-builder /contracts/package.json /contracts/package.json
 COPY --from=forge-builder /contracts/AllContractsHashes.json /contracts/AllContractsHashes.json
-COPY --from=forge-builder /contracts/SystemConfig.json /contracts/SystemConfig.json
 
 # zk-governance lives at `/zk-governance` (sibling-style path) so protocol-ops
 # resolves it correctly via `<era>/../../zk-governance`.
 COPY --from=forge-builder /zk-governance /zk-governance
 
-# Disable foundry-zksync telemetry
-RUN mkdir -p /etc/xdg/zksync-tooling && \
-    echo '{"enabled":false,"instance_id":"00000000-0000-0000-0000-000000000000","created_at":"2024-01-01T00:00:00Z","config_path":null}' \
-    > /etc/xdg/zksync-tooling/telemetry.json
 
 # Sanity
 RUN forge --version && cast --version && anvil --version && protocol_ops --help && \

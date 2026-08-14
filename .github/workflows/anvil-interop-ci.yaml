@@ -7,7 +7,6 @@ on:
   pull_request:
     paths:
       - ".github/workflows/anvil-interop-ci.yaml"
-      - ".github/actions/install-zksync-foundry/**"
       - "l1-contracts/contracts/**"
       - "l1-contracts/deploy-scripts/**"
       - "l1-contracts/lib/**"
@@ -16,19 +15,7 @@ on:
       - "l1-contracts/foundry.toml"
       - "l1-contracts/hardhat.config.ts"
       - "l1-contracts/package.json"
-      - "l2-contracts/contracts/**"
-      - "l2-contracts/lib/**"
-      - "l2-contracts/src/**"
-      - "l2-contracts/test/**"
-      - "l2-contracts/foundry.toml"
-      - "l2-contracts/hardhat.config.ts"
-      - "l2-contracts/package.json"
-      - "system-contracts/bootloader/**"
-      - "system-contracts/contracts/**"
-      - "system-contracts/lib/**"
-      - "system-contracts/scripts/**"
-      - "system-contracts/test/**"
-      - "system-contracts/foundry.toml"
+      - "system-contracts/contracts/Constants.sol"
       - "system-contracts/hardhat.config.ts"
       - "system-contracts/package.json"
       - "da-contracts/contracts/**"
@@ -110,13 +97,20 @@ jobs:
         with:
           submodules: true
 
-      - name: Install Foundry (for Anvil)
+      # The committed v31 state uses the v1.5 Anvil trace schema, while the
+      # release bytecode is reproduced with the repository-era v1.3.5 Forge.
+      - name: Install Foundry v1.5.1 for state-compatible Anvil
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.5.1
 
-      - name: Install foundry-zksync (for forge --zksync)
-        uses: ./.github/actions/install-zksync-foundry
+      - name: Preserve Anvil v1.5.1
+        run: cp "$(command -v anvil)" "$RUNNER_TEMP/anvil-v1.5.1"
+
+      - name: Install foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.3.5
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -130,9 +124,6 @@ jobs:
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
 
-      - name: Build system-contracts artifacts
-        run: yarn sc build:foundry
-
       - name: Build l1-contracts artifacts
         run: yarn l1 build:foundry
 
@@ -142,6 +133,8 @@ jobs:
 
       - name: Run V31 to V32 upgrade test
         working-directory: l1-contracts/test/anvil-interop
+        env:
+          ANVIL_BIN: ${{ runner.temp }}/anvil-v1.5.1
         run: |
           echo "Running V31 -> V32 upgrade test..."
           yarn ts-node run-v31-to-v32-upgrade-test.ts

@@ -27,7 +27,6 @@ jobs:
     strategy:
       matrix:
         branch: ${{ fromJSON(needs.define-matrix.outputs.branches) }}
-        command: ["test:invariant:l1-context", "test:invariant:l2-context"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,10 +34,10 @@ jobs:
           submodules: recursive
           ref: ${{ matrix.branch }}
 
-      - name: Install foundry-zksync
-        uses: dutterbutter/foundry-zksync-toolchain@5b0459c3701903f1913b8b2558a22bf49138e495 # v1.0.0
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly-34fe0bc655c6b15e869ffd465addde001f6b474d
+          version: v1.3.5
 
       - name: Show forge version
         shell: bash
@@ -54,16 +53,7 @@ jobs:
         shell: bash
         run: yarn
 
-      - name: Build artifacts
-        shell: bash
-        run: |
-          # creates JSON files needed for `yarn l1 test:zkfoundry`
-          yarn sc build:foundry
-          cd l1-contracts
-          # creates `l1-contracts/script-out/diamond-selectors.toml` which is needed for `l1-contracts/deploy-scripts/utils/DeployUtils.s.sol`
-          yarn test:zkfoundry
-
       - name: Run tests
         run: |
           cd l1-contracts
-          yarn ${{ matrix.command }}
+          yarn test:invariant:l1-context
