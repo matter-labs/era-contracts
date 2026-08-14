@@ -161,8 +161,9 @@ reports into `l1-contracts/coverage/anvil/anvil-lcov.info`, which is what
 Shards resolve only the contracts their own specs touched, so their file and line sets differ;
 the union takes the max hit count per line and per function. Denominators do not matter here —
 `scripts/merge-coverage.ts` rebases everything onto the Foundry LCOV. The union itself is
-covered by `yarn test:lcov-merge` (`test/unit/lcov-merge.test.ts`), which CI runs before the
-coverage pipeline.
+covered by `yarn test:lcov-merge` (`test/unit/lcov-merge.test.ts`). `yarn test:unit` runs that and
+the harness's five other unit suites in one go — 59 cases in about 10s — and CI runs the merge and
+group-planner suites again inside the jobs that depend on them.
 
 Two coverage runs can coexist: pass `--port-offset N` or export `ANVIL_INTEROP_PORT_OFFSET=N`
 (the flag wins) and both the Anvil ports and the output paths move with it — shard reports go to
