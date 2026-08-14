@@ -5,22 +5,6 @@ import * as path from "path";
 import type { AnvilChain } from "../core/types";
 import { waitForChainReady, formatChainInfo, createProvider } from "../core/utils";
 
-/**
- * Seconds between blocks for interval mining; 0 means none, which switches Anvil to instant mining.
- *
- * Rejecting only NaN was not enough: a negative value fell through the `> 0` guard below, silently
- * dropping --block-time and changing the mining mode, and Infinity was handed to Anvil to fail later
- * as an opaque process-start error. An explicit argument wins, which keeps setup-and-dump-state.ts
- * pinned at 1s for determinism.
- */
-export function resolveBlockTime(explicit?: number, envBlockTime?: string): number {
-  const value = explicit ?? (envBlockTime !== undefined && envBlockTime !== "" ? Number(envBlockTime) : 1);
-  if (!Number.isFinite(value) || value < 0) {
-    throw new Error(`Block time must be a finite, non-negative number of seconds, got "${explicit ?? envBlockTime}"`);
-  }
-  return value;
-}
-
 export class AnvilManager {
   private chains: Map<number, AnvilChain> = new Map();
   private pidFilePath: string;
@@ -113,16 +97,10 @@ export class AnvilManager {
     const foundryBinPath = homeDir ? path.join(homeDir, ".foundry/bin") : "";
     const enrichedPath = foundryBinPath ? `${foundryBinPath}:${process.env.PATH || ""}` : process.env.PATH;
 
-    // Interval mining paces the whole interop suite: the specs are full of `.wait()`, so each
-    // transaction costs up to one block time of pure waiting, and that — not CPU — is what the
-    // suite spends its wall clock on (a spec that takes 272s alone takes 311s with four of them
-    // sharing a 4-core runner, i.e. 1.14x for 4x the concurrency). anvil takes a fractional
-    // --block-time, so the cadence is tunable: ANVIL_INTEROP_BLOCK_TIME=0.2 mines five blocks a
-    // second instead of one.
-    //
-    // Callers that pass blockTime explicitly win, which keeps setup-and-dump-state.ts pinned to 1
-    // for state-generation determinism.
-    const effectiveBlockTime = resolveBlockTime(blockTime, process.env.ANVIL_INTEROP_BLOCK_TIME);
+    // Interval mining is required so the interop relayers and TBM keep progressing. It is not what
+    // paces the suite, though: 0.2s blocks moved it by ~5%, because the specs wait on receipts
+    // rather than on blocks — see createProvider in core/utils.ts for what actually cost the time.
+    const effectiveBlockTime = blockTime ?? 1;
     const args = [
       "--port",
       port.toString(),

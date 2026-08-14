@@ -14,7 +14,6 @@
     "test:plan-groups": "ts-node test/unit/plan-coverage-groups.test.ts",
     "test:create-provider": "ts-node test/unit/create-provider.test.ts",
     "test:coverage-paths": "ts-node test/unit/run-coverage-paths.test.ts",
-    "test:block-time": "ts-node test/unit/block-time.test.ts",
     "test:trace-guard": "ts-node test/unit/trace-guard.test.ts",
     "test:build-info": "ts-node test/unit/build-info-selection.test.ts",
     "plan:groups": "ts-node plan-coverage-groups.ts",

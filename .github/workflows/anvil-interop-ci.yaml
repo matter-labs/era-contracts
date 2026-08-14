@@ -90,10 +90,6 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn test:coverage-paths
 
-      - name: Unit-test the block-time resolution
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn test:block-time
-
       # Guards against a tracing regression passing as "covered nothing".
       - name: Unit-test the coverage trace guard
         working-directory: l1-contracts/test/anvil-interop
