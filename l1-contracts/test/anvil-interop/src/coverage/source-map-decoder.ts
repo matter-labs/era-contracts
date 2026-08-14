@@ -47,10 +47,8 @@ export interface BuildInfo {
 /**
  * Every build-info in the output directory, newest first.
  *
- * There is usually more than one: forge writes a build-info per compilation, so `forge build`
- * followed by a test compile leaves two, and a warm artifact cache can add another from an earlier
- * commit. Their source IDs are *not* comparable — of 224 IDs present in two of them here, 223 point
- * at different files — so an artifact must be decoded with the map from its own compilation.
+ * Usually more than one, and their source IDs are *not* comparable: of 224 IDs present in two of
+ * them here, 223 point at different files. An artifact must be decoded with its own compilation's map.
  */
 export function loadBuildInfos(outDir: string): BuildInfo[] {
   const buildInfoDir = path.join(outDir, "build-info");
@@ -77,14 +75,9 @@ export function loadBuildInfos(outDir: string): BuildInfo[] {
  *
  * Keys are artifact paths relative to the output directory, e.g. "Foo.sol/Foo.json".
  *
- * An earlier version guessed instead, picking the build-info whose map sent the artifact's own
- * source id to its own compilation target. That is not sound: a build-info saying `0 -> A` does not
- * say that A was its target, so two compilations can agree on that entry and disagree on every
- * imported source — old `{0:A, 1:B}` and new `{0:A, 1:C}` both "match" an old A artifact, and its
- * references to id 1 then resolve to C. Selection appeared to succeed, so nothing was counted as
- * unresolved and the report was skewed silently. This linkage is exact: verified over all 525
- * artifact mappings in this repo, every build_id resolves to a build-info whose map agrees with the
- * artifact's own id.
+ * Read rather than inferred. Guessing from the artifact's own source id is unsound — `{0:A, 1:B}`
+ * and `{0:A, 1:C}` both "match" an A artifact while disagreeing on id 1 — and it fails silently,
+ * counting nothing as unresolved. Verified over all 525 artifact mappings here.
  */
 export function loadArtifactBuildIds(projectRoot: string): Map<string, string> {
   const cachePath = path.join(projectRoot, "cache-forge", "solidity-files-cache.json");

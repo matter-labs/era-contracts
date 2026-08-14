@@ -10,6 +10,7 @@
  */
 
 import * as assert from "assert/strict";
+import { createSuite } from "./harness";
 import {
   applyPortOffset,
   shouldShardRun,
@@ -22,10 +23,7 @@ import {
   singleRunCoverageDir,
 } from "../../run-coverage";
 
-const tests: Array<[string, () => void]> = [];
-function test(name: string, fn: () => void): void {
-  tests.push([name, fn]);
-}
+const { test, run } = createSuite("run-coverage-paths");
 
 test("takes the port offset from --port-offset", () => {
   assert.equal(resolvePortOffset(["--port-offset", "500"]), 500);
@@ -185,19 +183,4 @@ test("does not shard for a fresh deploy, --serial, a worker, or a single spec", 
   assert.equal(shouldShardRun({ ...base, specCount: 1 }), false);
 });
 
-let failed = 0;
-for (const [name, fn] of tests) {
-  try {
-    fn();
-    console.log(`  ✓ ${name}`);
-  } catch (error) {
-    failed++;
-    console.error(`  ✗ ${name}`);
-    console.error(`    ${(error as Error).message}`);
-  }
-}
-
-console.log(`\n${tests.length - failed}/${tests.length} run-coverage-paths tests passed`);
-if (failed > 0) {
-  process.exit(1);
-}
+run();

@@ -3,26 +3,14 @@
 
 /**
  * Records the Solidity sources a cached build was produced from, so a later restore can tell which
- * of them have since changed.
+ * have since changed. Deleted sources are detectable from the artifacts alone, but a *modified* one
+ * is not: removing a contract from a surviving file leaves an artifact whose target still resolves,
+ * which the build re-saves and every later commit restores — check-hashes then fails forever.
  *
- * Deleted sources can be detected from the artifacts alone (their compilationTarget stops
- * resolving), but *modified* sources cannot: removing one contract from a file that still exists
- * leaves that contract's artifact behind with a target that still resolves. Forge does not prune
- * it, so the build re-saves it under the new SHA and every later commit restores it through the
- * prefix key — check-hashes and check-zkstack-out then fail on every commit, with no way to
- * self-heal. This manifest is what lets the restore side drop those artifacts.
- *
- * Identity comes from git blob hashes rather than file contents, so no hashing is needed here and
- * the comparison is exact. Submodules contribute their gitlink SHA: their sources are not listed in
- * the superproject, so a pin change is treated as invalidating everything.
- *
- * Tracked sources are not the whole compilation input. Solidity also arrives through node_modules
- * (the OpenZeppelin packages) and through remappings and solc settings in foundry.toml — none of
- * which are tracked .sol files. A dependency bump or a remapping change can therefore alter what
- * gets compiled while every recorded blob stays identical, and a contract removed from a dependency
- * source would leave a stale artifact that the prune keeps. The lock and config files that decide
- * those inputs are recorded too, and any change to them invalidates the whole cache; they change
- * rarely, so the cost of being blunt here is low.
+ * Identity is the git blob hash, so the comparison is exact and nothing needs hashing here.
+ * Submodules contribute their gitlink SHA, and the lock/config files that decide what solc compiles
+ * (node_modules resolution, remappings, solc settings) are recorded too; a change to either
+ * invalidates everything, which is blunt but they change rarely.
  *
  * Usage: node write-source-manifest.js <output-path>
  */
@@ -43,11 +31,9 @@ if (!outputPath) {
 
 // `git ls-files -sz` prints: <mode> <object> <stage>\t<path>\0
 //
-// -z matters for correctness, not just tidiness. Without it git quotes and escapes any path with a
-// non-ASCII character, so `contracts/Ünicode.sol` is reported as `"contracts/\303\234nicode.sol"` — a key
-// that matches no path on disk and does not even end in `.sol`, so the file would never be recorded
-// as a source and drift in it would go undetected, leaving exactly the stale artifact this manifest
-// exists to catch. -z emits raw paths.
+// -z is load-bearing: without it git quotes non-ASCII paths, so `contracts/Ünicode.sol` arrives as
+// `"contracts/\303\234nicode.sol"` — a key matching nothing on disk that does not even end in
+// `.sol`, making such a file invisible to drift detection.
 const entries = git(["ls-files", "-sz"])
   .split("\0")
   .filter(Boolean)
@@ -60,11 +46,7 @@ const entries = git(["ls-files", "-sz"])
 const sources = entries.filter((e) => e.mode !== "160000" && e.filePath.endsWith(".sol"));
 const submodules = entries.filter((e) => e.mode === "160000");
 
-/**
- * Inputs that change what solc compiles without any tracked .sol changing: dependency resolution
- * (which supplies Solidity under node_modules) and the per-project foundry config, which carries
- * remappings, solc version and optimizer settings.
- */
+/** Inputs that change what solc compiles without any tracked .sol changing. */
 const CONFIG_INPUT_PATTERNS = [
   /^yarn\.lock$/,
   /(^|\/)foundry\.toml$/,

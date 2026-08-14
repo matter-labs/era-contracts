@@ -60,20 +60,11 @@ jobs:
           yarn install
           yarn build:foundry
 
-      # This job deliberately does NOT write the cross-commit solc cache, only reads it.
-      #
-      # A `pull_request` run builds code the PR author controls, and GitHub lets a PR's later runs
-      # restore what its earlier runs saved. So a PR could have written a forged artifact plus a
-      # source manifest vouching for it, then pushed a clean-looking commit whose build restored it
-      # and skipped recompiling — making check-hashes, check-selectors and check-zkstack-out attest
-      # to bytecode that never came from these sources. Anchoring the drift check in git rather than
-      # in the manifest would not help: the forged artifact belongs to a source that did not change,
-      # so no drift-based rule ever prunes it. Only the writer can be constrained.
-      #
-      # `verify-merged-commit.yaml` is therefore the sole writer: it builds with the cache disabled
-      # and saves only after the hash, selector and zkstack-out checks pass. The cost is small —
-      # a PR still warms from its base's verified cache, and forge's incremental build makes
-      # re-running a push's own recompile about 11s.
+      # Reads the cross-commit solc cache, never writes it. A PR's later runs can restore what its
+      # earlier runs saved, so a PR could plant a forged artifact plus a manifest vouching for it and
+      # have check-hashes attest to bytecode that never came from its sources. Constraining the writer
+      # is the only fix: verify-merged-commit.yaml builds clean and saves only after those checks pass.
+      # Costs a PR ~11s — its own incremental recompile — since it still warms from the base's cache.
       - name: Create cache
         uses: actions/cache/save@v4
         with:
@@ -487,16 +478,12 @@ jobs:
       # partial merge anyway, since it requires every group to report.
       fail-fast: false
       matrix:
-        # Listed by hand rather than generated, so this file says what runs. `yarn plan:groups`
-        # prints a cost-balanced assignment to paste here when the specs or their costs change;
-        # today's split is within 5% (354s vs 337s) and `coverage-foundry` at 383s dominates both,
-        # so rebalancing cannot move the stage's wall clock anyway.
+        # Listed by hand, so this file says what runs. Today's split is within 5% (354s vs 337s)
+        # while coverage-foundry at 383s dominates both, so rebalancing cannot move the stage.
         #
-        # A spec added here to the repo but not to this list would simply never run, with every job
-        # still green. `coverage-report` therefore checks the specs the groups report having *run*
-        # against the specs on disk, and fails naming any that no group covered — see
-        # assertEverySpecRan. That is evidence of execution, not of intent, so it also catches a
-        # group that quietly skipped one.
+        # A spec missing from these lists would never run, with every job green — so coverage-report
+        # checks the specs the groups report having *run* against the specs on disk
+        # (assertEverySpecRan), which also catches a group that quietly skipped one.
         group:
           - name: group-1
             specs: 03-interop-transfer.spec.ts 04-gateway-setup.spec.ts 06-gateway-interop.spec.ts 09-interop-unbundle.spec.ts 13-imt-atomic-swap.spec.ts
@@ -583,8 +570,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-anvil-${{ matrix.group.name }}
-          # specs-run.json travels with the report: it is what `coverage-report` checks against the
-          # specs on disk to prove no spec was left out of the matrix above.
+          # specs-run.json is what coverage-report checks against the specs on disk.
           path: |
             l1-contracts/coverage/anvil/anvil-lcov.info
             l1-contracts/coverage/anvil/specs-run.json
@@ -618,8 +604,7 @@ jobs:
         run: yarn install
 
       # Guards the union below. Pure string/map logic, no chains involved, runs in seconds.
-      # The merge and the spec-completeness check both live here, so this job runs the harness
-      # suites that gate what it publishes.
+      # The merge and the completeness check both live here, so this job runs the harness suites.
       - name: Unit-test the interop harness
         working-directory: l1-contracts/test/anvil-interop
         run: yarn test:unit

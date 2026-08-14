@@ -16,11 +16,9 @@ import * as os from "os";
 import * as path from "path";
 import { allSourcePaths, buildInfoById, loadArtifactBuildIds } from "../../src/coverage/source-map-decoder";
 import type { BuildInfo } from "../../src/coverage/source-map-decoder";
+import { createSuite } from "./harness";
 
-const tests: Array<[string, () => void]> = [];
-function test(name: string, fn: () => void): void {
-  tests.push([name, fn]);
-}
+const { test, run } = createSuite("build-info-selection");
 
 // Two compilations of an overlapping source set, numbered independently — the real situation.
 const newer: BuildInfo = {
@@ -83,19 +81,4 @@ test("unions the source paths across compilations", () => {
   assert.deepEqual([...paths].sort(), ["contracts/A.sol", "contracts/B.sol", "test/T.t.sol"]);
 });
 
-let failed = 0;
-for (const [name, fn] of tests) {
-  try {
-    fn();
-    console.log(`  ✓ ${name}`);
-  } catch (error) {
-    failed++;
-    console.error(`  ✗ ${name}`);
-    console.error(`    ${(error as Error).message}`);
-  }
-}
-
-console.log(`\n${tests.length - failed}/${tests.length} build-info-selection tests passed`);
-if (failed > 0) {
-  process.exit(1);
-}
+run();

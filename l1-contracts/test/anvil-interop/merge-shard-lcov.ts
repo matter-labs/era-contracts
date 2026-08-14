@@ -3,10 +3,9 @@
 /**
  * Unions the per-shard Anvil LCOV reports produced by separate CI jobs.
  *
- * The `coverage-anvil` matrix runs one spec per runner and uploads that runner's
- * `anvil-lcov.info` as its own artifact. The reporting job downloads them all into
- * one directory tree and calls this script to union them into the single report that
- * `yarn coverage:merge` consumes.
+ * Each `coverage-anvil` group uploads its `anvil-lcov.info` and `specs-run.json`. The reporting job
+ * downloads them all and calls this script, which checks every spec ran and unions the reports into
+ * the one `yarn coverage:merge` consumes.
  *
  * In-process sharding (`run-coverage.ts` without `--spec`) unions its own shards and
  * does not need this script.
@@ -100,10 +99,8 @@ for (const shardPath of shardPaths) {
   console.log(`   ${path.relative(inputDir, shardPath)}`);
 }
 
-// Before merging numbers, check the population they came from. The matrix in l1-contracts-ci.yaml
-// lists its groups by hand, so a spec added to the repo and not to the matrix would simply never
-// run — every job green, that spec's coverage silently gone. This compares what the groups report
-// having run against the specs on disk, which is evidence of execution rather than of intent.
+// Check the population before the numbers: the matrix is hand-written, so a spec missing from it
+// would never run with every job still green. This is evidence of execution, not of intent.
 const specsRun = specsActuallyRun(inputDir);
 const specsOnDisk = discoverSpecs(path.join(__dirname, "test/hardhat"));
 assertEverySpecRan(specsOnDisk, specsRun);
@@ -111,9 +108,7 @@ console.log(`✅ All ${specsOnDisk.length} specs were run by some group`);
 
 const { stats } = mergeLcovFiles(shardPaths, outputPath);
 
-// The same check the in-process path runs. Without it this command — the one `coverage-report`
-// uses — accepted shard reports that existed but contained no hits at all, which is exactly the
-// silent "covered nothing" outcome the guard exists to prevent.
+// The same check the in-process path runs: shard reports that exist but contain no hits at all.
 assertMergedCoverageUsable(stats, shardPaths.length);
 
 const summary = formatMergeSummary(stats, shardPaths.length);

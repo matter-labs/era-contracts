@@ -12,11 +12,9 @@
 import * as assert from "assert/strict";
 import { assertTracesUsable } from "../../src/coverage/trace-collector";
 import { assertMergedCoverageUsable } from "../../src/coverage/lcov-merge";
+import { createSuite } from "./harness";
 
-const tests: Array<[string, () => void]> = [];
-function test(name: string, fn: () => void): void {
-  tests.push([name, fn]);
-}
+const { test, run } = createSuite("trace-guard");
 
 test("accepts a healthy run", () => {
   assert.doesNotThrow(() =>
@@ -85,19 +83,4 @@ test("fails when traces mapped to no source lines", () => {
   );
 });
 
-let failed = 0;
-for (const [name, fn] of tests) {
-  try {
-    fn();
-    console.log(`  ✓ ${name}`);
-  } catch (error) {
-    failed++;
-    console.error(`  ✗ ${name}`);
-    console.error(`    ${(error as Error).message}`);
-  }
-}
-
-console.log(`\n${tests.length - failed}/${tests.length} trace-guard tests passed`);
-if (failed > 0) {
-  process.exit(1);
-}
+run();

@@ -5,16 +5,10 @@
  * workers into the single `coverage/anvil/anvil-lcov.info` that
  * `scripts/merge-coverage.ts` consumes.
  *
- * Shards do not all see the same contracts: a shard only resolves the addresses
- * its own specs actually touched, and `getExecutableLines` derives the line
- * universe from those resolved contracts. So the file/line sets differ between
- * shards and the merge takes the union of the line universe and the max hit
- * count per line and per function. That is the correct reading: a line was
- * covered by the suite if any shard hit it.
- *
- * The union denominator (LF) only affects the standalone "Anvil (raw)" summary.
- * `merge-coverage.ts` rebases hits onto the Foundry LCOV, so the merged and
- * rebased reports keep Foundry's denominator regardless of what shards saw.
+ * A shard only resolves the addresses its own specs touched, so file and line sets differ between
+ * shards: the union takes the whole line universe and the max hit count per line and per function —
+ * a line was covered if any shard hit it. The union denominator only affects the standalone "Anvil
+ * (raw)" summary, since merge-coverage.ts rebases hits onto Foundry's.
  */
 
 import * as fs from "fs";
@@ -161,13 +155,9 @@ export function mergeLcovFiles(
 }
 
 /**
- * Fails when a whole run produced no coverage at all.
- *
- * This is the aggregate counterpart to the per-shard trace guard, and the level the check belongs
- * at: individual specs may legitimately only read (04-gateway-setup, 01-deployment-verification),
- * but a run whose every shard contributed nothing means the collector was pointed at the wrong
- * chains, or tracing was off — which otherwise writes an empty report that merges as
- * "added 0 lines" and passes.
+ * Fails when a whole run produced no coverage at all — the aggregate level is the right one, since
+ * individual specs may legitimately only read (01, 04), but every shard contributing nothing means
+ * the collector saw the wrong chains or tracing was off, which otherwise merges as "added 0 lines".
  */
 export function assertMergedCoverageUsable(
   stats: MergeStats,

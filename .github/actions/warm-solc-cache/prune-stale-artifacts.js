@@ -2,52 +2,29 @@
 // @ts-check
 
 /**
- * Deletes artifacts whose source file no longer exists, so a restored cache cannot leave stale
- * entries for a contract the current commit deleted. `calculate-hashes` and `forge build --sizes`
- * both enumerate the artifact directories, so a survivor there fails CI on the commit that
- * removed the contract — the exact case this exists to prevent.
+ * Drops restored artifacts that the current commit's sources no longer justify, so `calculate-hashes`
+ * and `forge build --sizes` — both of which enumerate artifact directories — cannot fail on a
+ * survivor from an older build. Over-pruning is harmless; forge recompiles whatever is missing.
  *
- * Matching is per artifact, on the full source path from `metadata.settings.compilationTarget`,
- * not on the directory basename. Forge names artifact directories after the source *basename*,
- * and this repo has 58 duplicated basenames, so one directory can hold artifacts from different
- * sources:
+ * Three rules, each covering a case the previous one misses:
  *
- *   out/L1NativeTokenVault.sol/L1NativeTokenVault.json      <- contracts/bridge/ntv/L1NativeTokenVault.sol
- *   out/L1NativeTokenVault.sol/L1NativeTokenVaultTest.json  <- test/foundry/.../L1NativeTokenVault.sol
+ * 1. Match per artifact on `metadata.settings.compilationTarget`, never on the directory basename.
+ *    Forge names directories after the source basename and this repo has 58 duplicates, so
+ *    out/L1NativeTokenVault.sol/ holds artifacts from both the contract and a test file.
+ * 2. Drop artifacts of *modified* sources too, by git blob hash against the manifest
+ *    (write-source-manifest.js). A contract removed from a surviving file otherwise leaves an
+ *    artifact whose target still resolves, which the build re-saves and every later commit
+ *    restores — check-hashes then fails forever with no way to self-heal. No manifest, an
+ *    unreadable one, or a moved submodule pin invalidates everything.
+ * 3. Drop the freshness entry of anything deleted. Forge reads
+ *    cache-forge/solidity-files-cache.json to decide what is compiled, and an entry claiming a
+ *    deleted artifact makes it abandon incremental compilation: measured on l1-contracts, one
+ *    edited source costs 10.9s and 24 artifacts with the entry dropped, against 3m23s and all
+ *    1011 with it retained. The invariant is checked against the disk — the cache must never claim
+ *    an artifact that is not there — so it cannot drift from the rules above.
  *
- * Deleting either source leaves the other basename present, so a basename comparison would keep
- * the whole directory and its stale artifacts with it.
- *
- * Over-pruning is harmless — forge recompiles whatever is missing.
- *
- * A deleted source is only half the problem. Removing one *contract* from a file that still exists
- * leaves that contract's artifact behind with a target that still resolves — and because the build
- * then re-saves it under the new SHA, every later commit restores it through the prefix key, so
- * check-hashes and check-zkstack-out would fail forever with no way to self-heal. So when the cache
- * carries a source manifest (see write-source-manifest.js), artifacts of *modified* sources are
- * dropped too, by comparing git blob hashes. A changed submodule pin invalidates everything, since
- * submodule sources are not listed in the superproject.
- *
- * Without a manifest (a cache from before this existed) only deletions are detectable, which is the
- * old behaviour rather than a regression.
- *
- * Deleting an artifact is not enough on its own. Forge tracks what it believes is compiled in
- * cache-forge/solidity-files-cache.json, and an entry there claiming an artifact this script just
- * deleted does not make forge recompile that one file — it discards its incremental plan and
- * rebuilds the whole project. Measured on l1-contracts:
- *
- *   one source edited, cache left coherent      ->  10.9s, 24 artifacts rewritten
- *   one artifact deleted, cache entry retained  ->  3m23s, all 1011 rewritten
- *
- * So every source whose artifacts went missing also loses its freshness entry, which is the state
- * forge is in for a file it has never seen: it recompiles that file and its dependents, and keeps
- * the rest. The invariant is checked against the disk rather than tracked alongside the deletions
- * above — the cache must never claim an artifact that is not there — so it cannot drift from the
- * pruning logic, and it covers artifacts dropped for having no compilationTarget too.
- *
- * Retained entries keep pointing at the build-info they were compiled under, which is what the
- * coverage collector resolves them through (see source-map-decoder.ts). Forge deletes a build-info
- * once no entry references it, so that lookup cannot outlive its target.
+ * Retained entries keep pointing at the build-info they were compiled under, which is how the
+ * coverage collector decodes them (source-map-decoder.ts).
  *
  * Usage: node prune-stale-artifacts.js [--manifest <path>] <project-dir>:<artifacts-dir> [...]
  */
@@ -141,9 +118,8 @@ function validateManifest(manifest) {
  */
 function staleSources(manifestPath) {
   if (!manifestPath || !fs.existsSync(manifestPath)) {
-    // Deletion-only detection is not a safe fallback: a contract removed from a surviving file
-    // leaves an artifact that this run would rebuild into a new cache *alongside a fresh manifest*,
-    // which then vouches for it on every later commit. One cold rebuild ends that permanently.
+    // Deletion-only detection is not a safe fallback: the rebuilt cache would carry a fresh manifest
+    // vouching for a stale artifact on every later commit. One cold rebuild ends that permanently.
     console.log("  no source manifest in the cache — treating the whole cache as stale");
     return { changed: new Set(), invalidateAll: true };
   }
@@ -156,10 +132,8 @@ function staleSources(manifestPath) {
     return { changed: new Set(), invalidateAll: true };
   }
 
-  // This file decides whether restored artifacts are trusted, so anything it cannot vouch for is
-  // treated as untrustworthy. Valid JSON is not enough: `null` used to crash on .submodules, and
-  // `{}` or a manifest from a future writer would report "nothing changed" and keep every stale
-  // artifact — the quiet failure this whole mechanism exists to prevent.
+  // Valid JSON is not enough: `null` crashed on .submodules, and `{}` or a future writer's shape
+  // would report "nothing changed" and keep every stale artifact.
   const problem = validateManifest(manifest);
   if (problem) {
     console.log(`  source manifest ${problem} — treating the whole cache as stale`);
@@ -168,12 +142,8 @@ function staleSources(manifestPath) {
 
   const current = currentGitState();
 
-  // Dependency resolution and foundry config decide what solc compiles, so a change to either can
-  // invalidate artifacts without any tracked .sol changing — including a contract disappearing from
-  // a dependency source, which the per-source comparison below cannot see.
-  //
-  // Compared in both directions: walking only the recorded entries misses an *added* foundry.toml,
-  // remappings.txt, lockfile or submodule, which is exactly a configuration change.
+  // Dependency resolution and foundry config change what solc compiles without any tracked .sol
+  // changing. Compared in both directions, so an *added* config file counts as drift too.
   const configDrift = firstDifference(manifest.configInputs || {}, currentConfigInputs(current.blobs));
   if (configDrift) {
     console.log(`  ${configDrift} since the cache was built — invalidating all artifacts`);
@@ -186,14 +156,9 @@ function staleSources(manifestPath) {
     return { changed: new Set(), invalidateAll: true };
   }
 
-  // Symmetric, like the config comparison above: walking only the recorded keys missed an *added*
-  // .sol, and an added source is drift too.
-  //
-  // Only the drifted sources' artifacts are dropped, not the whole cache. Mixing artifacts from
-  // different compilations used to corrupt coverage attribution — source IDs are numbered per
-  // compilation — but the collector now matches each artifact to the build-info it was compiled
-  // under (see selectBuildInfo), so incremental artifacts are safe to keep and the cache stays
-  // useful on commits that touch Solidity.
+  // Symmetric for the same reason as the config comparison. Only the drifted sources' artifacts go:
+  // mixing compilations is safe because the collector decodes each artifact through the build-info
+  // its freshness entry records (source-map-decoder.ts).
   const changed = new Set();
   for (const key of new Set([...Object.keys(manifest.sources || {}), ...Object.keys(current.sources)])) {
     if ((manifest.sources || {})[key] !== current.sources[key]) changed.add(key);
@@ -263,8 +228,7 @@ function pruneFreshnessCache(projectDir, artifactsDir, stale) {
   try {
     cache = JSON.parse(fs.readFileSync(cachePath, "utf8"));
   } catch {
-    // Unreadable bookkeeping cannot be reasoned about. Dropping it costs one full rebuild; trusting
-    // it risks forge skipping a source whose artifact is missing.
+    // Dropping it costs one full rebuild; trusting it risks forge skipping a missing artifact.
     fs.rmSync(cachePath);
     console.log(`  removed ${cachePath} (unparsable)`);
     return stats;
@@ -310,17 +274,15 @@ function prune(projectDir, artifactsDir, stale) {
   const sourceExists = new Map();
   const exists = (sourcePath) => {
     if (!sourceExists.has(sourcePath)) {
-      // Must be a *file*: this repo commits generated artifact directories named after their
-      // source (zkstack-out/L2MessageRoot.sol/ and friends), so an existence check alone would
-      // accept a directory as proof that a deleted source is still present.
+      // Must be a *file*: this repo commits directories named after sources (zkstack-out/X.sol/),
+      // so a bare existence check would accept one as proof that a deleted source survives.
       sourceExists.set(sourcePath, isFile(path.resolve(projectDir, sourcePath)));
     }
     return sourceExists.get(sourcePath);
   };
 
-  // build-info is kept unless the whole cache is invalid: the collector selects the build-info each
-  // artifact was compiled under, so several coexisting are fine — and deleting them on an
-  // incremental build would leave it with no mapping for retained artifacts at all.
+  // build-info survives unless everything is invalid: several coexisting are fine, and deleting them
+  // would leave retained artifacts with no source map at all.
   if (stale.invalidateAll) {
     const buildInfo = path.join(artifactsDir, "build-info");
     if (fs.existsSync(buildInfo)) {
@@ -340,8 +302,7 @@ function prune(projectDir, artifactsDir, stale) {
       const sourcePath = sourcePathOf(artifactPath);
 
       if (sourcePath === null) {
-        // Cannot attribute it, so cannot prove its source still exists. Drop it and let forge
-        // rebuild — losing a little cache beats keeping an artifact we cannot account for.
+        // Unattributable, so unprovable. Drop it and let forge rebuild.
         fs.rmSync(artifactPath);
         stats.unattributed++;
         stats.removed++;
@@ -382,9 +343,7 @@ function prune(projectDir, artifactsDir, stale) {
 const argv = process.argv.slice(2);
 let manifestPath;
 const targets = [];
-// Walked rather than filtered by index: with no --manifest, `indexOf` returns -1 and an
-// index-based filter drops argv[0] — the only target — leaving the documented no-manifest
-// invocation printing usage instead of running.
+// Walked, not index-filtered: with no --manifest, `indexOf` returns -1 and dropped argv[0].
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === "--manifest") {
     manifestPath = argv[i + 1];

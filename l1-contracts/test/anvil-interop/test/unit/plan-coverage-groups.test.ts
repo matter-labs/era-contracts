@@ -12,11 +12,9 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { assertEverySpecRan, discoverSpecs } from "../../plan-coverage-groups";
+import { createSuite } from "./harness";
 
-const tests: Array<[string, () => void]> = [];
-function test(name: string, fn: () => void): void {
-  tests.push([name, fn]);
-}
+const { test, run } = createSuite("plan-coverage-groups");
 
 const realSpecs = discoverSpecs(path.join(__dirname, "../hardhat"));
 
@@ -78,19 +76,4 @@ test("assertEverySpecRan tolerates a spec reported by more than one record", () 
   assert.doesNotThrow(() => assertEverySpecRan(["01-a.spec.ts"], ["01-a.spec.ts", "01-a.spec.ts"]));
 });
 
-let failed = 0;
-for (const [name, fn] of tests) {
-  try {
-    fn();
-    console.log(`  ✓ ${name}`);
-  } catch (error) {
-    failed++;
-    console.error(`  ✗ ${name}`);
-    console.error(`    ${(error as Error).message}`);
-  }
-}
-
-console.log(`\n${tests.length - failed}/${tests.length} plan-coverage-groups tests passed`);
-if (failed > 0) {
-  process.exit(1);
-}
+run();

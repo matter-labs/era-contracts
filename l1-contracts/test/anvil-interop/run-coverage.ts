@@ -43,12 +43,9 @@ const l1ContractsDir = path.resolve(__dirname, "../..");
 const coverageRootDir = path.join(l1ContractsDir, "coverage/anvil");
 
 /**
- * Shard reports and the merged output are scoped by base port offset, because two coverage runs
- * are expected to coexist — that is what ANVIL_INTEROP_PORT_OFFSET is for — and the parent wipes
- * its shard directory before fanning out. Unscoped, the second run would delete the first run's
- * finished reports and its merge would fail on missing LCOV.
- *
- * Offset 0 keeps the unsuffixed paths so CI and `yarn coverage:merge` find what they expect.
+ * Output paths are scoped by base port offset: the parent wipes its shard directory before fanning
+ * out, so unscoped, a second concurrent run would delete the first's finished reports. Offset 0 stays
+ * unsuffixed, which is what CI and `yarn coverage:merge` expect.
  */
 export function runScope(basePortOffset: number): string {
   return basePortOffset ? `-p${basePortOffset}` : "";
@@ -58,10 +55,7 @@ export function shardsDirFor(basePortOffset: number): string {
   return path.join(coverageRootDir, `shards${runScope(basePortOffset)}`);
 }
 
-/**
- * Where a single-process run (one spec, --serial, --fresh-deploy) writes its report. Scoped too:
- * unscoped, two runs at different offsets overwrote each other's LCOV while both reported success.
- */
+/** Where a single-process run (one spec, --serial, --fresh-deploy) writes its report. Scoped too. */
 export function singleRunCoverageDir(basePortOffset: number): string {
   return basePortOffset ? path.join(coverageRootDir, `run${runScope(basePortOffset)}`) : coverageRootDir;
 }
@@ -71,10 +65,8 @@ const totalStart = Date.now();
 const PORT_OFFSET_PER_WORKER = 100;
 
 /**
- * Ports a single run reserves. A run at base B uses B, B+100, ... per worker, so two runs are only
- * disjoint if their bases are a whole span apart: base 0 and base 500 both allocate 500, 600, 700,
- * 800 and 900, and the second run's `startChain` kills the first run's Anvil processes outright.
- * Bases are therefore required to be multiples of this.
+ * Ports a run reserves. Bases must be multiples of this: base 0 and base 500 both allocate 500-900,
+ * and the later run's `startChain` would kill the earlier run's Anvil processes.
  */
 const RUN_PORT_SPAN = 1000;
 const MAX_SHARDS_PER_RUN = RUN_PORT_SPAN / PORT_OFFSET_PER_WORKER;
@@ -135,11 +127,9 @@ function timedRun(label: string, command: string, args: string[], cwd: string, e
 /**
  * Whether the parent should fan out into shards.
  *
- * `snapshotsAvailable` is load-bearing and was missing: without pre-generated chain states each
- * worker falls back to its own full deployment, so sharding would run ten concurrent deployments
- * that race on the shared config/permanent-values.toml and broadcast directories — where the
- * pre-sharding code did exactly one. A fresh deploy is excluded for the same reason, and a single
- * spec or an explicit --serial has nothing to gain.
+ * Without pre-generated chain states each worker does its own full deployment, so sharding would race
+ * ten of them on one config/permanent-values.toml and broadcast directory. Fresh deploys are excluded
+ * for the same reason; a single spec or --serial has nothing to gain.
  */
 export function shouldShardRun(opts: {
   workerMode: boolean;
@@ -154,11 +144,8 @@ export function shouldShardRun(opts: {
 }
 
 /**
- * Publishes the resolved offset to the environment the chains and cleanup read.
- *
- * Unconditionally: guarding on a truthy value left an inherited non-zero
- * ANVIL_INTEROP_PORT_OFFSET in place when `--port-offset 0` was passed, so the flag lost to the
- * environment it is documented to beat and the chains came up on the inherited ports.
+ * Publishes the resolved offset for the chains and cleanup to read. Unconditionally: guarding on a
+ * truthy value let an inherited offset survive `--port-offset 0`, which the flag is meant to beat.
  */
 export function applyPortOffset(portOffset: number): void {
   process.env.ANVIL_INTEROP_PORT_OFFSET = portOffset.toString();

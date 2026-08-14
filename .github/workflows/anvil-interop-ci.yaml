@@ -78,16 +78,7 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn tsc --noEmit
 
-      # ~7s for the harness's six unit suites. Each covers something an ordinary run cannot fail on:
-      # which RPCs get the fast 100ms polling (invisible against Anvil, bites only in live mode);
-      # port offsets and shard paths (only matter when runs coexist, which CI never does); the guard
-      # against a tracing regression passing as "covered nothing"; matching each artifact to the
-      # build-info it was compiled under, which is what lets the artifact cache stay warm without
-      # misattributing coverage; and the shard LCOV merge and group packing.
-      #
-      # `coverage-anvil-groups` and `coverage-report` in l1-contracts-ci.yaml additionally run the
-      # planner and merge suites on their own, so a bug there fails the job whose output it would
-      # corrupt rather than one in another workflow.
+      # ~7s. Each suite covers something an ordinary run cannot fail on; see their headers.
       - name: Unit-test the interop harness
         working-directory: l1-contracts/test/anvil-interop
         run: yarn test:unit
@@ -141,15 +132,9 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      # 431s of this job's 17.4m was a cold `forge build` of artifacts that l1-contracts-ci's
-      # `build` job already produced for this very commit.
-      #
-      # This must go through the action rather than restoring the cache directly: the workflows
-      # run independently, so on a first run the current-SHA entry does not exist yet and the
-      # prefix key lands a *previous* commit's `out`. Without the action's pruning, artifacts for
-      # sources this commit deleted survive, and copy-to-zkstack-out and the upgrade harness would
-      # then consume stale ABIs — letting the upgrade test pass against a contract no longer built
-      # from the current tree.
+      # 431s of this job's 17.4m was a cold rebuild of artifacts l1-contracts-ci already produced.
+      # Via the action, not a bare cache restore: the prefix key can land a previous commit's `out`,
+      # and without the pruning a deleted contract's stale ABI would reach the upgrade harness.
       - name: Warm solc build cache
         uses: ./.github/actions/warm-solc-cache
 
@@ -159,13 +144,8 @@ jobs:
       - name: Build system-contracts artifacts
         run: yarn sc build:foundry
 
-      # `build:foundry` is `forge build` + a full zksolc pass + copy-to-zkstack-out, and the
-      # zksolc half is dead weight here: the test variant of the upgrade script states it
-      # outright — "Skip loading zkout bytecodes — they are already on L2 via anvil_setCode" —
-      # and it skips factory-deps validation for the same reason. So run solc and refresh
-      # zkstack-out (which protocol-ops reads, and which is generated from out/, not zkout),
-      # and skip the zksolc pass. That is also the half the solc cache above cannot warm,
-      # since zkout is excluded from it deliberately.
+      # No zksolc pass: the test variant of the upgrade script says it skips zkout bytecodes
+      # ("already on L2 via anvil_setCode"). zkstack-out comes from out/, so solc alone suffices.
       - name: Build l1-contracts artifacts (solc only — zkout is unused here)
         working-directory: l1-contracts
         run: forge build && yarn copy-to-zkstack-out

@@ -1,16 +1,10 @@
 name: Verify merged commit (clean build)
 
-# The per-PR workflows all trigger on `pull_request` and warm the solc cache, so nothing verified a
-# merged commit from scratch: the last run for anything that lands was a PR run built on a cache.
-# This closes that gap — one cache-disabled build per merge, plus the checks a stale or poisoned
-# cache could subvert, because they are derived from the artifacts rather than from the sources.
-#
-# It also produces the only artifacts worth trusting for reuse: the cache it saves comes from a
-# clean build on a verified base, so PRs targeting that base get a warm *and* trustworthy first
-# run instead of a cold one.
-#
-# `build-release.yaml` also builds cleanly, but only for release tags and manual runs, which is why
-# it does not cover ordinary merges.
+# The per-PR workflows all warm the solc cache, so nothing built a merged commit from scratch. This
+# does: one cache-disabled build per merge, plus the checks a stale or poisoned cache could subvert
+# (they are derived from artifacts, not sources). It is also the only writer of that cache, so what a
+# PR restores comes from a clean, checked build. build-release.yaml builds cleanly too, but only for
+# release tags.
 
 on:
   # Every push is considered, and the `gate` job below decides. Branch protection alone would not

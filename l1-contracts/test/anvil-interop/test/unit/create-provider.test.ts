@@ -11,8 +11,7 @@
  */
 
 import * as assert from "assert/strict";
-import * as fs from "fs";
-import * as path from "path";
+import { createSuite } from "./harness";
 import {
   LOCAL_POLLING_INTERVAL_MS,
   REMOTE_POLLING_INTERVAL_MS,
@@ -21,10 +20,7 @@ import {
   pollingIntervalFor,
 } from "../../src/core/utils";
 
-const tests: Array<[string, () => void]> = [];
-function test(name: string, fn: () => void): void {
-  tests.push([name, fn]);
-}
+const { test, run } = createSuite("create-provider");
 
 test("recognises the local RPCs the harness actually starts", () => {
   // The anvil-interop chains: L1 on 9545, L2s on 4050-4054, plus port offsets for parallel shards.
@@ -74,48 +70,4 @@ test("treats a URL it cannot parse as remote", () => {
   assert.equal(pollingIntervalFor("not a url"), REMOTE_POLLING_INTERVAL_MS);
 });
 
-// The point of the helper is that it is the *only* provider constructor: the first conversion pass
-// missed the `new ethers.providers.*` spelling, which silently left 07/13/08 and the upgrade runner
-// on 4s polling, and a later pass still missed run-fork-upgrade-test.ts. Assert the invariant
-// instead of trusting it.
-test("no provider is constructed outside createProvider", () => {
-  const root = path.resolve(__dirname, "../..");
-  const offenders: string[] = [];
-
-  const walk = (dir: string): void => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name === "node_modules" || entry.name === "outputs" || entry.name.startsWith(".")) continue;
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-        continue;
-      }
-      if (!entry.name.endsWith(".ts")) continue;
-      if (full === path.join(root, "src/core/utils.ts")) continue; // the one permitted constructor
-      const text = fs.readFileSync(full, "utf8");
-      if (/new\s+(ethers\.)?providers\.JsonRpcProvider\s*\(/.test(text)) {
-        offenders.push(path.relative(root, full));
-      }
-    }
-  };
-
-  walk(root);
-  assert.deepEqual(offenders, [], `construct these through createProvider(): ${offenders.join(", ")}`);
-});
-
-let failed = 0;
-for (const [name, fn] of tests) {
-  try {
-    fn();
-    console.log(`  ✓ ${name}`);
-  } catch (error) {
-    failed++;
-    console.error(`  ✗ ${name}`);
-    console.error(`    ${(error as Error).message}`);
-  }
-}
-
-console.log(`\n${tests.length - failed}/${tests.length} create-provider tests passed`);
-if (failed > 0) {
-  process.exit(1);
-}
+run();

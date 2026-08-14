@@ -12,6 +12,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { formatMergeSummary, mergeLcovFiles } from "../../src/coverage/lcov-merge";
+import { createSuite } from "./harness";
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lcov-merge-test-"));
 
@@ -33,10 +34,7 @@ function recordFor(lcov: string, sourceFile: string): string[] {
     .filter((l) => l.length > 0);
 }
 
-const tests: Array<[string, () => void]> = [];
-function test(name: string, fn: () => void): void {
-  tests.push([name, fn]);
-}
+const { test, run } = createSuite("lcov-merge");
 
 // A line hit by any shard counts as hit, and the highest hit count wins. Shards
 // disagree in both directions here: shard A hit line 11, shard B hit line 21, and
@@ -231,21 +229,6 @@ test("empty input produces an empty report rather than throwing", () => {
   assert.equal(fs.readFileSync(out, "utf-8").trim(), "");
 });
 
-let failed = 0;
-for (const [name, fn] of tests) {
-  try {
-    fn();
-    console.log(`  ✓ ${name}`);
-  } catch (error) {
-    failed++;
-    console.error(`  ✗ ${name}`);
-    console.error(`    ${(error as Error).message}`);
-  }
-}
+run();
 
 fs.rmSync(tmpRoot, { recursive: true, force: true });
-
-console.log(`\n${tests.length - failed}/${tests.length} lcov-merge tests passed`);
-if (failed > 0) {
-  process.exit(1);
-}

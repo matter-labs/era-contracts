@@ -1,7 +1,14 @@
 {
-  "extends": ["@matterlabs/eslint-config-typescript"],
+  "extends": [
+    "@matterlabs/eslint-config-typescript"
+  ],
   "rules": {
-    "no-multiple-empty-lines": ["error", { "max": 1 }],
+    "no-multiple-empty-lines": [
+      "error",
+      {
+        "max": 1
+      }
+    ],
     "@typescript-eslint/no-namespace": "off",
     "@typescript-eslint/ban-ts-comment": "off",
     "import/no-named-as-default-member": "off",
@@ -18,5 +25,21 @@
     "system-contracts/scripts/utils.ts",
     "**/dist/**",
     "**/node_modules/**"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "l1-contracts/test/anvil-interop/**/*.ts"
+      ],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "NewExpression[callee.property.name=/^(JsonRpcProvider|StaticJsonRpcProvider|WebSocketProvider|Web3Provider)$/]",
+            "message": "Construct providers via createProvider() in src/core/utils.ts, which sets the polling interval. Direct construction silently returns to ethers' 4000ms default."
+          }
+        ]
+      }
+    }
   ]
 }
