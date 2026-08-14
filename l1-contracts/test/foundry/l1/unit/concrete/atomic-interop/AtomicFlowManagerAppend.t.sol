@@ -276,6 +276,7 @@ contract AtomicFlowManagerAppendTest is Test {
         uint256 unregisteredChainId = 888;
 
         AtomicFlowPreimage memory preimage;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);

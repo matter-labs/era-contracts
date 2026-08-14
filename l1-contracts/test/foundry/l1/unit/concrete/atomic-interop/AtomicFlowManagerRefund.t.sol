@@ -8,9 +8,16 @@ import {AtomicInteropProofBuilder} from "./AtomicInteropProofBuilder.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
-import {AtomicFlow, AtomicFlowPreimage, ImtProof, LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {
+    AtomicFlow,
+    AtomicFlowPreimage,
+    ImtProof,
+    LegState,
+    ATOMIC_FLOW_PREIMAGE_VERSION
+} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
     ManagerFlowIdMismatch,
+    ManagerMissingLegIndexOutOfRange,
     ManagerLegNotRevertable,
     ProofSourceChainMismatch,
     ProofImtRootInclusionFailed
@@ -93,6 +100,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         committedLeg = InteropDataEncoding.encodeInteropBundleHash(committedLegBundleBytes);
         missingLeg = keccak256("never committed leg");
 
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = SETTLEMENT_LAYER_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);
@@ -200,6 +208,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         // Canonical (strictly ascending) leg order. The two committable legs are local; the missing
         // leg declares a remote source so its absence can be authenticated against a real aggregation.
         AtomicFlowPreimage memory multiPreimage;
+        multiPreimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         multiPreimage.deadline = DEADLINE;
         multiPreimage.settlementLayerChainId = SETTLEMENT_LAYER_CHAIN_ID;
         multiPreimage.legBundleHashes = new bytes32[](3);
@@ -335,6 +344,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
 
         // Two-leg all-local flow; the LATE leg is the one whose absence gets proven (_missingLegIndex).
         AtomicFlowPreimage memory latePreimage;
+        latePreimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         latePreimage.deadline = DEADLINE;
         latePreimage.settlementLayerChainId = SETTLEMENT_LAYER_CHAIN_ID;
         latePreimage.legBundleHashes = new bytes32[](2);
@@ -400,18 +410,21 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         );
     }
 
-    /// @notice An out-of-range `_missingLegIndex` reverts rather than misbehaving. `authorizeRefund`
-    /// indexes the aligned `legSourceChainIds` / `legBundleHashes` arrays by `_missingLegIndex` before
-    /// any explicit bound check, so an index >= leg count reverts with the Solidity array
-    /// out-of-bounds panic (0x32). This documents the intended behaviour: a bad index is a safe revert
-    /// (no state change, no fund movement), not silent corruption — `authorizeRefund` is permissionless,
-    /// so a caller passing garbage simply fails.
+    /// @notice An out-of-range `_missingLegIndex` is rejected with the typed
+    /// `ManagerMissingLegIndexOutOfRange` before the aligned `legSourceChainIds` / `legBundleHashes`
+    /// arrays are indexed — a safe revert (no state change, no fund movement); `authorizeRefund` is
+    /// permissionless, so a caller passing garbage simply fails.
     function test_RevertWhen_MissingLegIndexOutOfRange() public {
         ImtProof memory absence = _validAbsence();
         uint256 outOfRangeIndex = preimage.legBundleHashes.length; // == 2, one past the last valid index
 
-        // Solidity array out-of-bounds panic (0x32).
-        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x32));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ManagerMissingLegIndexOutOfRange.selector,
+                preimage.legBundleHashes.length,
+                outOfRangeIndex
+            )
+        );
         manager.authorizeRefund(_flow(), outOfRangeIndex, absence);
     }
 

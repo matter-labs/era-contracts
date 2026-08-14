@@ -8,7 +8,8 @@ import {
     AtomicFlow,
     AtomicFlowPreimage,
     AtomicFinalityProof,
-    ImtProof
+    ImtProof,
+    ATOMIC_FLOW_PREIMAGE_VERSION
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {
@@ -68,6 +69,7 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         bytes32 legB = keccak256("finalize leg B");
         (legFirst, legSecond) = legA < legB ? (legA, legB) : (legB, legA);
 
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = SETTLEMENT_LAYER_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);

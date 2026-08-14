@@ -4,7 +4,8 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
-import {ManagerNoRecoverableCalls} from "contracts/atomic-interop/AtomicInteropErrors.sol";
+import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
+import {ManagerLegNotRevertable} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.sol";
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
@@ -81,6 +82,7 @@ contract AtomicFlowManagerRecoverTest is Test {
 
     bytes32 internal constant SOURCE_BASE_TOKEN_ASSET_ID = keccak256("source-base-token");
     bytes32 internal constant OTHER_BASE_TOKEN_ASSET_ID = keccak256("other-base-token");
+    bytes32 internal constant FLOW_ID = keccak256("recover-flow");
 
     uint256 internal constant DEST_CHAIN_ID = 271;
     address internal constant DEPOSITOR = address(0xD3903170);
@@ -288,7 +290,7 @@ contract AtomicFlowManagerRecoverTest is Test {
         calls[1] = _call(DEPOSITOR, 0, hex""); // direct, no value -> nothing to reverse (skipped)
         calls[2] = _call(DEPOSITOR, 4 ether, hex""); // direct value leg -> base-token recovery
 
-        manager.exposedRecoverBundle(FLOW_ID, BUNDLE_HASH, _multiCallBundle(calls));
+        manager.exposedRecoverBundle(_multiCallBundle(calls));
 
         assertEq(router.recoverAttempts(), 1, "exactly one router-backed call is asked to recover");
         assertEq(router.recoverSuccesses(), 1, "the router-backed call recovers once");
@@ -296,8 +298,8 @@ contract AtomicFlowManagerRecoverTest is Test {
     }
 
     /// @notice A router-backed call that returns `false` (nothing to recover) does not abort the loop: a
-    /// LATER recoverable call still succeeds, so the whole bundle counts as recovered and does not revert.
-    /// Guards against a regression that treated a `false` as terminal.
+    /// LATER recoverable call is still attempted and recovers. Guards against a regression that treated
+    /// a `false` as terminal.
     function test_recoverBundle_multiCall_falseThenLaterSuccess() public {
         MockRecoveryRouter router = _deployMockRouter();
         router.scriptReturnsFalse(hex"deed");
@@ -306,18 +308,18 @@ contract AtomicFlowManagerRecoverTest is Test {
         calls[0] = _call(L2_ASSET_ROUTER_ADDR, 0, hex"deed"); // recoverAtomicCall -> false
         calls[1] = _call(L2_ASSET_ROUTER_ADDR, 0, hex"adad"); // recoverAtomicCall -> true
 
-        // Does not revert (recovered != 0 thanks to the later call).
-        manager.exposedRecoverBundle(FLOW_ID, BUNDLE_HASH, _multiCallBundle(calls));
+        manager.exposedRecoverBundle(_multiCallBundle(calls));
 
         assertEq(router.recoverAttempts(), 2, "both router-backed calls are attempted");
         assertEq(router.recoverSuccesses(), 1, "only the second call actually recovers");
     }
 
-    /// @notice If EVERY router-backed recovery returns `false`, nothing was recovered: `claimRefund`
-    /// reverts `ManagerNoRecoverableCalls`, the leg stays `Revertable`, no `FlowRefunded` is emitted, and
-    /// no payout occurs. This is the case a mutant that increments `recovered` regardless of the return
-    /// value would slip past (the false-then-true test alone does not catch it, since one call succeeds).
-    function test_claimRefund_multiCall_allRouterFalseRevertsAndKeepsRevertable() public {
+    /// @notice If EVERY router-backed recovery returns `false`, nothing is recovered — and the refund
+    /// must STILL go through: a bundle with no recoverable funds has nothing to return, but flipping the
+    /// leg to `Reverted` is meaningful on its own and must not be blocked (see
+    /// {AtomicFlowManager._recoverBundle}). All calls are attempted, no payout occurs, `FlowRefunded` is
+    /// emitted, and the leg lands terminal `Reverted` (a further claim is rejected).
+    function test_claimRefund_multiCall_allRouterFalseSucceedsWithoutPayout() public {
         MockRecoveryRouter router = _deployMockRouter();
         router.scriptReturnsFalse(hex"1111");
         router.scriptReturnsFalse(hex"2222");
@@ -331,18 +333,24 @@ contract AtomicFlowManagerRecoverTest is Test {
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundleBytes);
         manager.forceRevertable(FLOW_ID, bundleHash);
 
-        // The revert discards any FlowRefunded event and all state — so the expectRevert alone proves
-        // "no FlowRefunded, no payout"; the post-revert reads below confirm the rollback.
-        vm.expectRevert(abi.encodeWithSelector(ManagerNoRecoverableCalls.selector, FLOW_ID, bundleHash));
+        vm.expectEmit(true, true, false, true, address(manager));
+        emit IAtomicFlowManager.FlowRefunded(FLOW_ID, bundleHash);
         manager.claimRefund(FLOW_ID, bundleBytes);
 
-        assertEq(router.recoverAttempts(), 0, "the reverted claim rolls back the attempt tally too");
+        assertEq(router.recoverAttempts(), 2, "every router-backed call is still attempted");
+        assertEq(router.recoverSuccesses(), 0, "nothing actually recovers");
         assertEq(router.baseTokenRecoveries(), 0, "no base-token payout occurred");
         assertEq(
             uint256(manager.legState(FLOW_ID, bundleHash)),
-            uint256(LegState.Revertable),
-            "the leg must stay Revertable when nothing was recoverable"
+            uint256(LegState.Reverted),
+            "the leg is terminally Reverted even though nothing was recoverable"
         );
+
+        // Terminal: the no-op refund cannot be claimed again.
+        vm.expectRevert(
+            abi.encodeWithSelector(ManagerLegNotRevertable.selector, FLOW_ID, bundleHash, LegState.Reverted)
+        );
+        manager.claimRefund(FLOW_ID, bundleBytes);
     }
 
     /// @notice A later call reverting during recovery rolls the WHOLE `claimRefund` back: the earlier
