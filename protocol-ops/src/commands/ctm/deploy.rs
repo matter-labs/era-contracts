@@ -13,14 +13,13 @@ use crate::common::{
     traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
 };
-use crate::types::{L1Network, VMOption};
+use crate::types::L1Network;
 
 /// Input parameters for deploying CTM contracts.
 #[derive(Debug, Clone, Serialize)]
 pub struct CtmDeployInput {
     pub bridgehub: Address,
     pub owner: Address,
-    pub vm_type: VMOption,
     pub reuse_gov_and_admin: bool,
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
@@ -55,7 +54,6 @@ pub fn deploy(
         input.with_testnet_verifier,
         zk_token_asset_id,
         input.with_legacy_bridge,
-        input.vm_type,
     );
 
     let input_path = runner.input_path(&DEPLOY_CTM_INVOCATION)?;

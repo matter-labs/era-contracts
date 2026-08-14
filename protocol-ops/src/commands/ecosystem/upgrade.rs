@@ -542,8 +542,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // works on a fork via `anvil_impersonateAccount`; on a real chain
         // nobody can sign as that contract. The caller must pass
         // `--deployer-address <real-EOA>` (or derive it from the broadcast
-        // signer's private key — see `regen-and-verify-stage.sh` for an
-        // example using `cast wallet address`).
+        // signer's private key with `cast wallet address`).
         // Default --upgrade-input-path to upgrade-envs/v0.31.0-interopB/<env>.toml
         // when running with `--env`. The CLI default is `local.toml` (for
         // local-anvil fixtures). On stage / mainnet / testnet the per-env

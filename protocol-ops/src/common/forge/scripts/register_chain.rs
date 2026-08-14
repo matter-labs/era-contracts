@@ -3,15 +3,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::forge::scripts::Create2Addresses;
 use crate::common::traits::FileConfigTrait;
-use crate::types::{DAValidatorType, L2ChainId, VMOption};
+use crate::types::{DAValidatorType, L2ChainId};
 
 pub use super::REGISTER_CHAIN_INVOCATION as REGISTER_CHAIN_SCRIPT_PARAMS;
-
-pub use super::DEPLOY_PAYMASTER_INVOCATION as DEPLOY_PAYMASTER_SCRIPT_PARAMS;
-
 pub use super::SETUP_LEGACY_BRIDGE_INVOCATION as SETUP_LEGACY_BRIDGE;
-
-pub use super::ENABLE_EVM_EMULATOR_INVOCATION as ENABLE_EVM_EMULATOR_PARAMS;
 
 // ── Input types ──────────────────────────────────────────────────────────────
 
@@ -28,7 +23,6 @@ pub struct NewChainParams {
     pub execute_operator: Address,
     pub token_multiplier_setter: Option<Address>,
     pub da_mode: DAValidatorType,
-    pub vm_type: VMOption,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -65,14 +59,8 @@ impl RegisterChainL1Config {
                 // TODO fix script to assign roles correctly
                 validator_sender_operator_eth: chain_params.prove_operator,
                 validator_sender_operator_blobs_eth: chain_params.commit_operator,
-                validator_sender_operator_prove: match chain_params.vm_type {
-                    VMOption::EraVM => Address::ZERO,
-                    VMOption::ZKSyncOsVM => chain_params.prove_operator,
-                },
-                validator_sender_operator_execute: match chain_params.vm_type {
-                    VMOption::EraVM => Address::ZERO,
-                    VMOption::ZKSyncOsVM => chain_params.execute_operator,
-                },
+                validator_sender_operator_prove: chain_params.prove_operator,
+                validator_sender_operator_execute: chain_params.execute_operator,
                 allow_evm_emulator: evm_emulator,
             },
             owner_address: chain_params.owner,

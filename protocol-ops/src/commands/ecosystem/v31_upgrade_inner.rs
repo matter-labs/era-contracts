@@ -258,7 +258,7 @@ impl<'a> V31UpgradeInner<'a> {
             .with_broadcast()
             .with_ffi()
             .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
-            .with_disable_labels()
+            .with_offline()
             .with_wallet(deployer);
 
         logger::step("Running v31 core prepare");
@@ -437,7 +437,7 @@ impl<'a> V31UpgradeInner<'a> {
             .with_broadcast()
             .with_ffi()
             .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
-            .with_disable_labels()
+            .with_offline()
             .with_wallet(deployer);
 
         logger::step(format!("Running v31 ctm prepare for {ctm_proxy:#x}"));

@@ -13,7 +13,6 @@ use crate::common::forge::scripts::deploy_ecosystem::DeployL1CoreContractsOutput
 use crate::common::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
-use crate::types::VMOption;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -46,9 +45,6 @@ pub struct EcosystemInitArgs {
     /// Era chain ID (default: 270, or env's `era_chain_id` when `--env` is set).
     #[clap(long, help_heading = "Advanced input")]
     pub era_chain_id: Option<u64>,
-    /// VM type: zksyncos (default) or eravm
-    #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM, help_heading = "Advanced input")]
-    pub vm_type: VMOption,
     /// Use testnet verifier (default: true)
     #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_testnet_verifier: bool,
@@ -91,7 +87,6 @@ pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
         sender: sender.address,
         owner: owner.address,
         era_chain_id,
-        vm_type: args.vm_type,
         with_testnet_verifier: args.with_testnet_verifier,
         with_legacy_bridge: args.with_legacy_bridge,
         zk_token_asset_id,
@@ -141,7 +136,6 @@ pub async fn ecosystem_init(
     let ctm_input = CtmInitInput {
         bridgehub: bridgehub_addr,
         owner: owner.address,
-        vm_type: input.vm_type,
         reuse_gov_and_admin: true,
         with_testnet_verifier: input.with_testnet_verifier,
         with_legacy_bridge: input.with_legacy_bridge,
@@ -163,7 +157,6 @@ pub struct EcosystemInitInput {
     pub sender: Address,
     pub owner: Address,
     pub era_chain_id: u64,
-    pub vm_type: VMOption,
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
     pub zk_token_asset_id: Option<B256>,

@@ -5,26 +5,22 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{
-    IDeployL2ContractsAbi, IDeployPaymasterAbi, IEnableEvmEmulatorAbi, IFinalizeChainInitAbi,
-    IRegisterOnAllChainsAbi, IRegisterZKChainAbi, ISetupLegacyBridgeAbi,
+    IFinalizeChainInitAbi, IRegisterOnAllChainsAbi, IRegisterZKChainAbi, ISetupLegacyBridgeAbi,
 };
 use crate::common::addresses::{ETH_ADDRESS, ZERO_ADDRESS};
 use crate::common::forge::scripts::{
-    deploy_l2_contracts::{
-        ConsensusRegistryOutput, DefaultL2UpgradeOutput, Multicall3Output, TimestampAsserterOutput,
-    },
     register_chain::{NewChainParams, RegisterChainL1Config, RegisterChainOutput},
-    DEPLOY_L2_CONTRACTS_INVOCATION, DEPLOY_PAYMASTER_INVOCATION, REGISTER_CHAIN_INVOCATION,
+    REGISTER_CHAIN_INVOCATION,
 };
 use crate::common::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{
     forge::ForgeRunner,
     logger,
-    traits::{FileConfigTrait, ReadConfig, SaveConfig},
+    traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
 };
-use crate::types::{DAValidatorType, L2ChainId, L2DACommitmentScheme, VMOption};
+use crate::types::{DAValidatorType, L2ChainId, L2DACommitmentScheme};
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -40,10 +36,10 @@ pub struct ChainInitArgs {
     /// L1 batch commit operator
     #[clap(long, help_heading = "Input")]
     pub commit_operator: Address,
-    /// L1 batch prove operator (also execute operator for EraVM)
+    /// L1 batch prove operator
     #[clap(long, help_heading = "Input")]
     pub prove_operator: Address,
-    /// L1 batch execute operator (ZKSync OS only)
+    /// L1 batch execute operator
     #[clap(long, help_heading = "Input")]
     pub execute_operator: Option<Address>,
 
@@ -93,16 +89,16 @@ pub struct ChainInitArgs {
     /// Keep deposits paused after init
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub pause_deposits: bool,
-    /// Enable EVM emulator on the chain
+    /// Enable EVM emulator on the chain (forwarded to the register-chain
+    /// script config as `allow_evm_emulator`)
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub evm_emulator: bool,
-    /// Deploy testnet paymaster contract
-    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
-    pub deploy_paymaster: bool,
     /// Make the chain a permanent rollup (irreversible)
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub make_permanent_rollup: bool,
-    /// Skip L2 deployments via priority transactions
+    /// Deprecated no-op, kept for CLI compatibility: ZKsync OS chains never
+    /// deploy L2 contracts via priority transactions (L2 system contracts
+    /// live in genesis).
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub skip_priority_txs: bool,
     /// Enable support for legacy bridge testing
@@ -133,19 +129,15 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
             .context("Failed to discover CTM proxy from L1")?;
     logger::info(format!("CTM proxy (from L1): {:#x}", ctm_proxy));
 
-    // Resolve VM type from CTM.
-    let vm_type = {
-        let is_zksync_os =
-            crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
-                .await
-                .context("Failed to resolve isZKsyncOS from CTM")?;
-        if is_zksync_os {
-            VMOption::ZKSyncOsVM
-        } else {
-            VMOption::EraVM
-        }
-    };
-    logger::info(format!("VM type (from L1): {:?}", vm_type));
+    // This tooling only provisions ZKsync OS chains — refuse EraVM CTMs.
+    let is_zksync_os =
+        crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
+            .await
+            .context("Failed to resolve isZKsyncOS from CTM")?;
+    anyhow::ensure!(
+        is_zksync_os,
+        "CTM {ctm_proxy:#x} is not a ZKsync OS CTM; this tooling only supports ZKsync OS chains"
+    );
 
     let chain_params = NewChainParams {
         chain_id: L2ChainId::new(args.chain_id)
@@ -159,7 +151,6 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         execute_operator: args.execute_operator.unwrap_or(Address::ZERO),
         token_multiplier_setter: args.token_multiplier_setter,
         da_mode: args.da_mode,
-        vm_type,
     };
 
     let input = ChainInitInput {
@@ -167,15 +158,12 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         bridgehub: args.bridgehub,
         l1_da_validator: args.l1_da_validator,
         chain_params,
-        vm_type,
         l2_da_commitment_scheme: args.l2_da_commitment_scheme,
         with_legacy_bridge: args.with_legacy_bridge,
         create2_factory_salt: None,
         pause_deposits: args.pause_deposits,
         evm_emulator: args.evm_emulator,
-        deploy_paymaster: args.deploy_paymaster,
         make_permanent_rollup: args.make_permanent_rollup,
-        skip_priority_txs: args.skip_priority_txs,
     };
     let output = chain_init(&mut runner, &deployer, &owner, &bridgehub_admin, &input).await?;
 
@@ -194,7 +182,7 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Initialize a chain: register, accept admin, configure DA/validators, deploy L2 contracts.
+/// Initialize a chain: register, accept admin, configure DA/validators.
 pub async fn chain_init(
     runner: &mut ForgeRunner,
     deployer: &Wallet,
@@ -218,11 +206,10 @@ pub async fn chain_init(
     let register_output = register_chain(runner, deployer, input)?;
     let diamond_proxy = register_output.diamond_proxy_addr;
     let chain_admin = register_output.chain_admin_addr;
-    let mut full_output = FullChainInitOutput::from_register(&register_output);
+    let full_output = FullChainInitOutput::from_register(&register_output);
     let should_unpause_deposits = !input.pause_deposits && !input.with_legacy_bridge;
     // The DA validator pair is always required for the chain to commit
-    // batches; it is an admin call, not a priority transaction, so it must
-    // not be skipped for ZKsync OS chains (skip_priority_txs=true).
+    // batches.
     let should_set_da_validator_pair = true;
     let eth_base_token: Address = ETH_ADDRESS.parse().expect("valid address");
     let token_multiplier_setter = if input.chain_params.base_token_addr != eth_base_token {
@@ -234,9 +221,9 @@ pub async fn chain_init(
     } else {
         Address::ZERO
     };
-    let commitment_scheme = input.l2_da_commitment_scheme.unwrap_or_else(|| {
-        L2DACommitmentScheme::from_da_and_vm_types(input.chain_params.da_mode, input.vm_type)
-    });
+    let commitment_scheme = input
+        .l2_da_commitment_scheme
+        .unwrap_or_else(|| L2DACommitmentScheme::from_da_type(input.chain_params.da_mode));
 
     logger::step("Finalizing chain admin operations...");
     runner.run(
@@ -258,58 +245,6 @@ pub async fn chain_init(
             })
             .with_wallet(owner),
     )?;
-
-    // The Era-style L2 contract bootstrap (EVM emulator enable, paymaster,
-    // ConsensusRegistry/Multicall3/TimestampAsserter/etc.) is irrelevant on
-    // ZKsync-OS chains: those L2 contracts are Era-specific and the helpers
-    // read ZK-format bytecode from `zkout/`. Skip the whole block for OS.
-    if !input.skip_priority_txs && !input.vm_type.is_zksync_os() {
-        // These EraVM-only steps invoke default entrypoints that read/write
-        // conventional IO paths; their scripts have no path-taking variants.
-        anyhow::ensure!(
-            runner.subdir().is_none(),
-            "--subdir is not yet supported for EraVM chain-init steps \
-             (L2 contracts / paymaster deployment)"
-        );
-        // Enable EVM emulator (if requested)
-        if input.evm_emulator {
-            logger::step("Enabling EVM emulator...");
-            enable_evm_emulator_step(runner, owner, chain_admin, diamond_proxy)?;
-        }
-
-        // Deploy paymaster (if requested, as owner — before L2 contracts so
-        // all owner/multisig transactions are grouped together)
-        if input.deploy_paymaster {
-            logger::step("Deploying paymaster...");
-            let paymaster_addr = deploy_paymaster_step(
-                runner,
-                owner,
-                input.bridgehub,
-                input.chain_params.chain_id.as_u64(),
-            )?;
-            full_output.paymaster_addr = Some(paymaster_addr);
-            logger::info(format!("Paymaster deployed at: {:#x}", paymaster_addr));
-        }
-
-        // Deploy L2 contracts (deployer — last so all owner/multisig
-        // transactions above are in a single signing batch)
-        let governance = register_output.governance_addr;
-        logger::step("Deploying L2 contracts...");
-        let l2_output = deploy_l2_contracts_step(
-            runner,
-            deployer,
-            input.bridgehub,
-            input.chain_params.chain_id.as_u64(),
-            governance,
-            input.chain_params.owner,
-            input.chain_params.da_mode,
-            input.with_legacy_bridge,
-        )?;
-        full_output.l2_default_upgrader = Some(l2_output.l2_default_upgrader);
-        full_output.consensus_registry_proxy = Some(l2_output.consensus_registry_proxy);
-        full_output.multicall3 = Some(l2_output.multicall3);
-        full_output.timestamp_asserter = Some(l2_output.timestamp_asserter);
-    }
 
     // Setup legacy bridge (if requested)
     if input.with_legacy_bridge {
@@ -392,93 +327,6 @@ fn parse_ratio(s: &str) -> anyhow::Result<(u64, u64)> {
     Ok((num, den))
 }
 
-fn enable_evm_emulator_step(
-    runner: &mut ForgeRunner,
-    auth: &Wallet,
-    chain_admin: Address,
-    diamond_proxy: Address,
-) -> anyhow::Result<()> {
-    let forge = runner
-        .script_call(IEnableEvmEmulatorAbi::chainAllowEvmEmulationCall {
-            chainAdmin: chain_admin,
-            target: diamond_proxy,
-        })
-        .with_wallet(auth);
-
-    runner.run(forge)?;
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-fn deploy_l2_contracts_step(
-    runner: &mut ForgeRunner,
-    auth: &Wallet,
-    bridgehub: Address,
-    chain_id: u64,
-    governance: Address,
-    consensus_registry_owner: Address,
-    da_mode: DAValidatorType,
-    with_legacy_bridge: bool,
-) -> anyhow::Result<FullL2DeployOutput> {
-    let calldata = if with_legacy_bridge {
-        IDeployL2ContractsAbi::runWithLegacyBridgeCall {
-            _bridgehub: bridgehub,
-            _chainId: U256::from(chain_id),
-            _governance: governance,
-            _consensusRegistryOwner: consensus_registry_owner,
-            _daValidatorType: U256::from(da_mode.to_u8()),
-        }
-        .abi_encode()
-    } else {
-        IDeployL2ContractsAbi::runCall {
-            _bridgehub: bridgehub,
-            _chainId: U256::from(chain_id),
-            _governance: governance,
-            _consensusRegistryOwner: consensus_registry_owner,
-            _daValidatorType: U256::from(da_mode.to_u8()),
-        }
-        .abi_encode()
-    };
-    let forge = runner
-        .script_with_calldata(&DEPLOY_L2_CONTRACTS_INVOCATION, calldata)
-        .with_wallet(auth);
-
-    runner.run(forge)?;
-
-    let output_path = runner.output_path(&DEPLOY_L2_CONTRACTS_INVOCATION);
-    let upgrader_output = DefaultL2UpgradeOutput::read(&output_path)?;
-    let consensus_output = ConsensusRegistryOutput::read(&output_path)?;
-    let multicall3_output = Multicall3Output::read(&output_path)?;
-    let timestamp_output = TimestampAsserterOutput::read(&output_path)?;
-
-    Ok(FullL2DeployOutput {
-        l2_default_upgrader: upgrader_output.l2_default_upgrader,
-        consensus_registry_proxy: consensus_output.consensus_registry_proxy,
-        multicall3: multicall3_output.multicall3,
-        timestamp_asserter: timestamp_output.timestamp_asserter,
-    })
-}
-
-fn deploy_paymaster_step(
-    runner: &mut ForgeRunner,
-    auth: &Wallet,
-    bridgehub: Address,
-    chain_id: u64,
-) -> anyhow::Result<Address> {
-    let forge = runner
-        .script_call(IDeployPaymasterAbi::runCall {
-            _bridgehub: bridgehub,
-            _chainId: U256::from(chain_id),
-        })
-        .with_wallet(auth);
-
-    runner.run(forge)?;
-
-    let output_path = runner.output_path(&DEPLOY_PAYMASTER_INVOCATION);
-    let output = DeployPaymasterOutput::read(output_path)?;
-    Ok(output.paymaster)
-}
-
 fn _register_on_all_chains_step(
     runner: &mut ForgeRunner,
     auth: &Wallet,
@@ -521,15 +369,12 @@ pub struct ChainInitInput {
     pub bridgehub: Address,
     pub l1_da_validator: Address,
     pub chain_params: NewChainParams,
-    pub vm_type: VMOption,
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
     pub with_legacy_bridge: bool,
     pub create2_factory_salt: Option<B256>,
     pub pause_deposits: bool,
     pub evm_emulator: bool,
-    pub deploy_paymaster: bool,
     pub make_permanent_rollup: bool,
-    pub skip_priority_txs: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -540,11 +385,6 @@ pub struct FullChainInitOutput {
     pub access_control_restriction_addr: Address,
     pub chain_proxy_admin_addr: Address,
     pub l2_legacy_shared_bridge_addr: Option<Address>,
-    pub l2_default_upgrader: Option<Address>,
-    pub consensus_registry_proxy: Option<Address>,
-    pub multicall3: Option<Address>,
-    pub timestamp_asserter: Option<Address>,
-    pub paymaster_addr: Option<Address>,
 }
 
 impl FullChainInitOutput {
@@ -556,35 +396,11 @@ impl FullChainInitOutput {
             access_control_restriction_addr: output.access_control_restriction_addr,
             chain_proxy_admin_addr: output.chain_proxy_admin_addr,
             l2_legacy_shared_bridge_addr: output.l2_legacy_shared_bridge_addr,
-            ..Default::default()
         }
     }
 }
 
-#[derive(Debug, Clone)]
-struct FullL2DeployOutput {
-    l2_default_upgrader: Address,
-    consensus_registry_proxy: Address,
-    multicall3: Address,
-    timestamp_asserter: Address,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-struct DeployPaymasterOutput {
-    paymaster: Address,
-}
-
-impl FileConfigTrait for DeployPaymasterOutput {}
-
 // ── Output structs ──────────────────────────────────────────────────────────
-
-#[derive(Serialize)]
-pub struct ChainInitL2Contracts {
-    pub l2_default_upgrader: Address,
-    pub consensus_registry_addr: Address,
-    pub multicall3_addr: Address,
-    pub timestamp_asserter_addr: Address,
-}
 
 #[derive(Serialize)]
 pub struct ChainInitOutputData {
@@ -594,29 +410,10 @@ pub struct ChainInitOutputData {
     pub access_control_restriction_addr: Address,
     pub chain_proxy_admin_addr: Address,
     pub l2_legacy_shared_bridge_addr: Option<Address>,
-    pub l2_contracts: Option<ChainInitL2Contracts>,
-    pub paymaster_addr: Option<Address>,
 }
 
 impl ChainInitOutputData {
     pub fn from_full_output(output: &FullChainInitOutput) -> Self {
-        let l2_contracts = match (
-            output.l2_default_upgrader,
-            output.consensus_registry_proxy,
-            output.multicall3,
-            output.timestamp_asserter,
-        ) {
-            (Some(upgrader), Some(consensus), Some(multicall3), Some(ts_asserter)) => {
-                Some(ChainInitL2Contracts {
-                    l2_default_upgrader: upgrader,
-                    consensus_registry_addr: consensus,
-                    multicall3_addr: multicall3,
-                    timestamp_asserter_addr: ts_asserter,
-                })
-            }
-            _ => None,
-        };
-
         Self {
             diamond_proxy_addr: output.diamond_proxy_addr,
             governance_addr: output.governance_addr,
@@ -624,8 +421,6 @@ impl ChainInitOutputData {
             access_control_restriction_addr: output.access_control_restriction_addr,
             chain_proxy_admin_addr: output.chain_proxy_admin_addr,
             l2_legacy_shared_bridge_addr: output.l2_legacy_shared_bridge_addr,
-            l2_contracts,
-            paymaster_addr: output.paymaster_addr,
         }
     }
 }

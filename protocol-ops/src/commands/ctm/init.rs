@@ -12,7 +12,6 @@ use crate::common::forge::scripts::deploy_ctm::DeployCTMOutput;
 use crate::common::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
-use crate::types::VMOption;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -30,9 +29,6 @@ pub struct CtmInitArgs {
     /// from `permanent-values/<env>.toml`).
     #[clap(long, help_heading = "Input")]
     pub bridgehub: Option<Address>,
-    /// VM type: zksyncos or eravm
-    #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM, help_heading = "Input")]
-    pub vm_type: VMOption,
 
     /// Owner address (default: sender, or env's `owner_address` when `--env`
     /// is set).
@@ -116,7 +112,6 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
     let ctm_input = CtmInitInput {
         bridgehub,
         owner: owner.address,
-        vm_type: args.vm_type,
         reuse_gov_and_admin: args.reuse_gov_and_admin,
         with_testnet_verifier: args.with_testnet_verifier,
         with_legacy_bridge: args.with_legacy_bridge,
@@ -155,7 +150,6 @@ pub async fn ctm_init(
     let deploy_input = CtmDeployInput {
         bridgehub: input.bridgehub,
         owner: input.owner,
-        vm_type: input.vm_type,
         reuse_gov_and_admin: input.reuse_gov_and_admin,
         with_testnet_verifier: input.with_testnet_verifier,
         with_legacy_bridge: input.with_legacy_bridge,
@@ -205,7 +199,6 @@ pub async fn ctm_init(
 pub struct CtmInitInput {
     pub bridgehub: Address,
     pub owner: Address,
-    pub vm_type: VMOption,
     pub reuse_gov_and_admin: bool,
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,

@@ -6,14 +6,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{
     AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi, ICoreUpgradeV31Abi,
-    IDeployCTMAbi, IDeployL1CoreContractsAbi, IDeployPaymasterAbi, IEnableEvmEmulatorAbi,
-    IFinalizeChainInitAbi, IGatewayVotePreparationAbi, IRegisterOnAllChainsAbi,
-    ISetupLegacyBridgeAbi,
+    IDeployCTMAbi, IDeployL1CoreContractsAbi, IFinalizeChainInitAbi, IGatewayVotePreparationAbi,
+    IRegisterOnAllChainsAbi, ISetupLegacyBridgeAbi,
 };
 
 pub mod deploy_ctm;
 pub mod deploy_ecosystem;
-pub mod deploy_l2_contracts;
 pub mod register_chain;
 
 pub const ADMIN_FUNCTIONS_SCRIPT_PATH: &str = "deploy-scripts/AdminFunctions.s.sol";
@@ -151,14 +149,6 @@ pub static GATEWAY_VOTE_PREPARATION_INVOCATION: ForgeScriptParams =
         .with_ffi()
         .with_rpc_url();
 
-pub static DEPLOY_L2_CONTRACTS_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
-    "script-config/config-deploy-l2-contracts.toml",
-    "script-out/output-deploy-l2-contracts.toml",
-    "deploy-scripts/chain/DeployL2Contracts.sol",
-)
-.with_ffi()
-.with_rpc_url();
-
 pub static REGISTER_CHAIN_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
     "script-config/register-zk-chain.toml",
     "script-out/output-register-zk-chain.toml",
@@ -167,26 +157,10 @@ pub static REGISTER_CHAIN_INVOCATION: ForgeScriptParams = ForgeScriptParams::new
 .with_ffi()
 .with_rpc_url();
 
-pub static DEPLOY_PAYMASTER_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
-    "script-config/config-deploy-paymaster.toml",
-    "script-out/output-deploy-paymaster.toml",
-    "deploy-scripts/chain/DeployPaymaster.s.sol",
-)
-.with_ffi()
-.with_rpc_url();
-
 pub static SETUP_LEGACY_BRIDGE_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
     "script-config/setup-legacy-bridge.toml",
     "script-out/setup-legacy-bridge.toml",
     "deploy-scripts/dev/SetupLegacyBridge.s.sol",
-)
-.with_ffi()
-.with_rpc_url();
-
-pub static ENABLE_EVM_EMULATOR_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
-    "script-config/enable-evm-emulator.toml",
-    "script-out/output-enable-evm-emulator.toml",
-    "deploy-scripts/chain/EnableEvmEmulator.s.sol",
 )
 .with_ffi()
 .with_rpc_url();
@@ -251,8 +225,6 @@ script_calls! {
     DeployGatewayTransactionFiltererAbi::deployAndSetOnChainCall        => DEPLOY_GATEWAY_TRANSACTION_FILTERER_INVOCATION,
     IGatewayVotePreparationAbi::runCall                                 => GATEWAY_VOTE_PREPARATION_INVOCATION,
     IFinalizeChainInitAbi::finalizeChainInitCall                        => FINALIZE_CHAIN_INIT_INVOCATION,
-    IEnableEvmEmulatorAbi::chainAllowEvmEmulationCall                   => ENABLE_EVM_EMULATOR_INVOCATION,
-    IDeployPaymasterAbi::runCall                                        => DEPLOY_PAYMASTER_INVOCATION,
     IRegisterOnAllChainsAbi::registerOnOtherChainsCall                  => REGISTER_ON_ALL_CHAINS_INVOCATION,
     ISetupLegacyBridgeAbi::runCall                                      => SETUP_LEGACY_BRIDGE_INVOCATION,
     IDeployL1CoreContractsAbi::runInnerCall                             => DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,

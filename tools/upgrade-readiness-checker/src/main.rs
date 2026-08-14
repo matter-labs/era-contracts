@@ -8,8 +8,8 @@
 //!   4. Poll the chain's L2 RPC for a receipt; once present, the server processed
 //!      the upgrade in L2 block N.
 //!   5. Poll `eth_getBlockByNumber("finalized")` until the finalized block is
-//!      >= N-1 (the batch containing the preceding block is executed on the
-//!      settlement layer). In zksync-os, the `"finalized"` tag resolves to
+//!      at least N-1 (the batch containing the preceding block is executed on
+//!      the settlement layer). In zksync-os, the `"finalized"` tag resolves to
 //!      `last_executed_block`.
 //!
 //! The tool blocks indefinitely until finalization — transient RPC errors are
@@ -71,13 +71,11 @@ struct Cli {
     #[arg(long, env = "TARGET_PATCH_VERSION", default_value_t = 0)]
     target_patch_version: u32,
 
-    /// Whether the chain being upgraded is a ZKsync OS chain. Needed for the
-    /// v31 upgrade contract's `getL2UpgradeTxData(_, _, zksyncOS, _)` parameter.
-    /// We can't reliably query `diamond.getZKsyncOS()` on pre-v31 chains because
-    /// the getter isn't always registered on the diamond facets, so we require it
-    /// as an explicit flag from the caller. Pass `--zksync-os` (flag) on ZKsync OS
-    /// chains; omit it on Era chains.
-    #[arg(long, env = "ZKSYNC_OS", action = clap::ArgAction::SetTrue)]
+    /// Deprecated no-op, kept for CLI compatibility: every chain served by this
+    /// tooling is a ZKsync OS chain, so the v31 upgrade contract's
+    /// `getL2UpgradeTxData(_, _, zksyncOS, _)` parameter is always `true`.
+    #[arg(long, env = "ZKSYNC_OS", action = clap::ArgAction::SetTrue, hide = true)]
+    #[allow(dead_code)]
     zksync_os: bool,
 }
 
@@ -102,7 +100,8 @@ async fn main() -> ExitCode {
 async fn run() -> Result<()> {
     let cli = Cli::parse();
 
-    let target_protocol_version = pack_protocol_version(cli.target_minor_version, cli.target_patch_version);
+    let target_protocol_version =
+        pack_protocol_version(cli.target_minor_version, cli.target_patch_version);
     info!(
         minor = cli.target_minor_version,
         patch = cli.target_patch_version,
@@ -130,7 +129,6 @@ async fn run() -> Result<()> {
         ctm,
         cli.bridgehub_address,
         cli.chain_id,
-        cli.zksync_os,
         target_protocol_version,
         LOOKBACK_BLOCKS,
     )
