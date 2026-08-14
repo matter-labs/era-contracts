@@ -16,10 +16,8 @@ import {
     L2CanonicalTransaction,
     L2Log,
     L2Message,
-    TxStatus,
     WritePriorityOpParams
 } from "../../../common/Messaging.sol";
-import {MessageHashing} from "../../../common/libraries/MessageHashing.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
@@ -144,23 +142,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             });
     }
 
-    /// @inheritdoc IMailboxImpl
-    function proveL2MessageInclusion(
-        uint256 _batchNumber,
-        uint256 _index,
-        L2Message calldata _message,
-        bytes32[] calldata _proof
-    ) public view returns (bool) {
-        return
-            _proveL2LogInclusion({
-                _chainId: s.chainId,
-                _blockOrBatchNumber: _batchNumber,
-                _index: _index,
-                _log: MessageHashing._l2MessageToLog(_message),
-                _proof: _proof
-            });
-    }
-
     /// @inheritdoc IMessageVerification
     function proveL2LogInclusionShared(
         uint256 _chainId,
@@ -179,44 +160,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 _index: _index,
                 _log: _log,
                 _proof: _proof
-            });
-    }
-
-    /// @inheritdoc IMailboxImpl
-    function proveL2LogInclusion(
-        uint256 _batchNumber,
-        uint256 _index,
-        L2Log calldata _log,
-        bytes32[] calldata _proof
-    ) external view returns (bool) {
-        return
-            _proveL2LogInclusion({
-                _chainId: s.chainId,
-                _blockOrBatchNumber: _batchNumber,
-                _index: _index,
-                _log: _log,
-                _proof: _proof
-            });
-    }
-
-    /// @inheritdoc IMailboxImpl
-    function proveL1ToL2TransactionStatus(
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof,
-        TxStatus _status
-    ) public view returns (bool) {
-        return
-            proveL1ToL2TransactionStatusShared({
-                _chainId: s.chainId,
-                _l2TxHash: _l2TxHash,
-                _l2BatchNumber: _l2BatchNumber,
-                _l2MessageIndex: _l2MessageIndex,
-                _l2TxNumberInBatch: _l2TxNumberInBatch,
-                _merkleProof: _merkleProof,
-                _status: _status
             });
     }
 
@@ -241,23 +184,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             });
     }
 
-    /// @inheritdoc IMailboxImpl
-    function proveL2LeafInclusion(
-        uint256 _batchNumber,
-        uint256 _leafProofMask,
-        bytes32 _leaf,
-        bytes32[] calldata _proof
-    ) external view returns (bool) {
-        return
-            _proveL2LeafInclusion({
-                _chainId: s.chainId,
-                _blockOrBatchNumber: _batchNumber,
-                _leafProofMask: _leafProofMask,
-                _leaf: _leaf,
-                _proof: _proof
-            });
-    }
-
     function _proveL2LeafInclusionRecursive(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -266,7 +192,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32[] calldata _proof,
         uint256 _depth
     ) internal view override returns (bool) {
-        // No gas optimization here as the usage of the method is discouraged and the Bridgehub one should be used.
+        // No gas optimization here as the usage of the method is discouraged and the MessageRoot one should be used.
         return
             MessageVerification(address(IBridgehubBase(s.bridgehub).messageRoot()))
                 .proveL2LeafInclusionSharedRecursive({

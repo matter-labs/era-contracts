@@ -13,6 +13,7 @@ import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Commi
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 
 import {
@@ -397,15 +398,15 @@ library Utils {
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](11);
         uint256 i = 0;
-        selectors[i++] = MailboxFacet.proveL2MessageInclusion.selector;
-        selectors[i++] = MailboxFacet.proveL2LogInclusion.selector;
-        selectors[i++] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
+        selectors[i++] = MailboxFacet.proveL2MessageInclusionShared.selector;
+        selectors[i++] = MailboxFacet.proveL2LogInclusionShared.selector;
+        selectors[i++] = IMessageVerification.proveL1ToL2TransactionStatusShared.selector;
         selectors[i++] = MailboxFacet.finalizeEthWithdrawal.selector; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
         selectors[i++] = MailboxFacet.requestL2Transaction.selector; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
         selectors[i++] = MailboxFacet.bridgehubRequestL2Transaction.selector;
         selectors[i++] = MailboxFacet.bridgehubRequestL2TransactionOnGateway.selector;
         selectors[i++] = MailboxFacet.l2TransactionBaseCost.selector;
-        selectors[i++] = MailboxFacet.proveL2LeafInclusion.selector;
+        selectors[i++] = MailboxFacet.proveL2LeafInclusionShared.selector;
         selectors[i++] = MailboxFacet.requestL2TransactionToGatewayMailbox.selector;
         selectors[i++] = MailboxFacet.requestL2ServiceTransaction.selector;
         return selectors;
