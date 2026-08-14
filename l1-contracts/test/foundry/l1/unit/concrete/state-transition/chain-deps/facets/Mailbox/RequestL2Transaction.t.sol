@@ -11,6 +11,7 @@ import {
     GasPerPubdataMismatch,
     MsgValueTooLow,
     OnlyEraSupported,
+    TransactionNotAllowed,
     TooManyFactoryDeps
 } from "contracts/common/L1ContractErrors.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";

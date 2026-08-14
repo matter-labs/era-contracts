@@ -12,9 +12,8 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
@@ -29,7 +28,7 @@ contract TestFacet is ZKChainBase {
 
 contract DiamondProxyTest is UtilsCallMockerTest {
     Diamond.FacetCut[] internal facetCuts;
-    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
     InitializeData internal initializeData;
 
@@ -57,6 +56,9 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         );
         dummyBridgehub = new DummyBridgehub();
         initializeData = Utils.makeInitializeData(address(dummyBridgehub));
+        initializeData.l2BootloaderBytecodeHash = bytes32(0);
+        initializeData.l2DefaultAccountBytecodeHash = bytes32(0);
+        initializeData.l2EvmEmulatorBytecodeHash = bytes32(0);
 
         mockDiamondInitInteropCenterCallsWithAddress(initializeData.bridgehub, address(0), bytes32(0));
         mockChainTypeManagerVerifier(testnetVerifier);
@@ -65,7 +67,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
     function test_revertWhen_chainIdDiffersFromBlockChainId() public {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -76,7 +78,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
     function test_revertWhen_calledWithEmptyMsgData() public {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -91,7 +93,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
     function test_revertWhen_calledWithFullSelectorInMsgData() public {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -106,7 +108,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
     function test_revertWhen_calledWithPartialSelector() public {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -126,7 +128,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
     function test_revertWhen_proxyHasNoFacetForSelector() public {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -140,7 +142,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
     function test_revertWhenFacetIsFrozen() public {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -157,7 +159,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
     function test_successfulExecution() public {
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -180,7 +182,7 @@ contract DiamondProxyTest is UtilsCallMockerTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: cuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 

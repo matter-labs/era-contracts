@@ -23,7 +23,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -36,7 +36,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -49,7 +49,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -62,7 +62,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -75,7 +75,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -88,7 +88,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -106,7 +106,7 @@ contract InitializeTest is DiamondInitTest {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit(false)),
+            initAddress: address(new DiamondInit(true)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 

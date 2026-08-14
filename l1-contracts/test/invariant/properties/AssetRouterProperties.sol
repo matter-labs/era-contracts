@@ -17,7 +17,7 @@ abstract contract AssetRouterProperties is Test {
     UserActorHandler[] public userActorHandlers;
     L1AssetRouterActorHandler public l1AssetRouterActorHandler;
 
-    function invariant_TotalDepositsEqualTotalSupply() public {
+    function invariant_TotalDepositsEqualSupplyPlusWithdrawals() public view {
         address l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
 
         uint256 totalSupply;
@@ -27,19 +27,19 @@ abstract contract AssetRouterProperties is Test {
             totalSupply = BridgedStandardERC20(l2TokenAddress).totalSupply();
         }
 
-        uint256 totalDepositAmount = l1AssetRouterActorHandler.ghost_totalDeposits();
+        uint256 totalWithdrawalAmount;
         for (uint256 i; i < userActorHandlers.length; i++) {
-            totalDepositAmount += userActorHandlers[i].ghost_totalWithdrawalAmount();
+            totalWithdrawalAmount += userActorHandlers[i].ghost_totalWithdrawalAmount();
         }
 
         assertEq(
-            totalDepositAmount,
-            totalSupply,
-            "total deposit amount must be equal to total supply of all bridged tokens"
+            l1AssetRouterActorHandler.ghost_totalDeposits(),
+            totalSupply + totalWithdrawalAmount,
+            "total deposits must equal bridged-token supply plus total withdrawals"
         );
     }
 
-    function invariant_L1AssetRouterActorHandlerHasZeroBalance() public {
+    function invariant_L1AssetRouterActorHandlerHasZeroBalance() public view {
         address l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
 
         if (l2TokenAddress.code.length == 0) {
@@ -51,5 +51,18 @@ abstract contract AssetRouterProperties is Test {
             0,
             "L1AssetRouter must own zero bridged tokens"
         );
+    }
+
+    function invariant_HandlersHaveSuccessfulCalls() public view {
+        uint256 totalWithdrawalAmount;
+        uint256 totalWithdrawalCalls;
+        for (uint256 i; i < userActorHandlers.length; i++) {
+            totalWithdrawalAmount += userActorHandlers[i].ghost_totalWithdrawalAmount();
+            totalWithdrawalCalls += userActorHandlers[i].ghost_totalFunctionCalls();
+        }
+
+        assertGt(l1AssetRouterActorHandler.ghost_totalDeposits(), 0, "at least one deposit must succeed");
+        assertGt(totalWithdrawalAmount, 0, "at least one withdrawal must succeed");
+        assertGt(totalWithdrawalCalls, 0, "the withdrawal handler must record a successful call");
     }
 }

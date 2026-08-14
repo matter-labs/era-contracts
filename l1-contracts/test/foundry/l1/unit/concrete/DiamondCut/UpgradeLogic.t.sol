@@ -18,8 +18,7 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {DiamondAlreadyFrozen, DiamondNotFrozen, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
@@ -59,13 +58,13 @@ contract UpgradeLogicTest is DiamondCutTest {
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
 
         diamondCutTestContract = new DiamondCutTestContract();
-        diamondInit = new DiamondInit(false);
+        diamondInit = new DiamondInit(true);
         adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         gettersFacet = new GettersFacet();
         permissionlessValidator = new PermissionlessValidator();
 
         // Mock CTM to return a verifier for protocol version 0
-        address testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+        address testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
         vm.mockCall(
             chainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, uint256(0)),
@@ -101,9 +100,9 @@ contract UpgradeLogicTest is DiamondCutTest {
             // genesisIndexRepeatedStorageChanges: 0,
             // genesisBatchCommitment: bytes32(0),
             // zkPorterIsAvailable: false,
-            l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-            l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-            l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
+            l2BootloaderBytecodeHash: bytes32(0),
+            l2DefaultAccountBytecodeHash: bytes32(0),
+            l2EvmEmulatorBytecodeHash: bytes32(0)
         });
         // initialProtocolVersion: 0,
 

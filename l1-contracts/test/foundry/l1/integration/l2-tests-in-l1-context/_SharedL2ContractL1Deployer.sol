@@ -63,10 +63,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         ctmAddresses.admin.governance = makeAddr("governance");
         ctmAddresses.chainAdmin = makeAddr("chainAdmin");
         ctmAddresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
-        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
-            config.isZKsyncOS,
-            config.testnetVerifier
-        );
+        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, true);
         ctmAddresses.stateTransition.proxies.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
         (
@@ -76,7 +73,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         ctmAddresses.admin.eip7702Checker = address(0);
         initializeGeneratedData();
         deployStateTransitionDiamondFacets();
-        string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        string memory ctmContractName = "ZKsyncOSChainTypeManager";
         (
             ctmAddresses.stateTransition.implementations.chainTypeManager,
             ctmAddresses.stateTransition.proxies.chainTypeManager
@@ -94,7 +91,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         override(DeployCTMIntegrationScript, DeployIntegrationUtils)
         returns (Diamond.FacetCut[] memory)
     {
-        return super.getChainCreationFacetCuts(stateTransition);
+        // This standard-EVM harness reads selectors from ordinary Forge artifacts.
+        // It must not depend on the old Foundry-ZKsync test side effect that wrote
+        // script-out/diamond-selectors.toml.
+        return DeployIntegrationUtils.getChainCreationFacetCuts(stateTransition);
     }
 
     function getUpgradeAddedFacetCuts(
@@ -105,7 +105,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         override(DeployCTMIntegrationScript, DeployIntegrationUtils)
         returns (Diamond.FacetCut[] memory)
     {
-        return super.getUpgradeAddedFacetCuts(stateTransition);
+        return DeployIntegrationUtils.getUpgradeAddedFacetCuts(stateTransition);
     }
 
     function getInitializeCalldata(

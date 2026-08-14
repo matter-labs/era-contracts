@@ -40,7 +40,7 @@ contract ZKsyncOSOnlyContractsTest is Test {
         address _address,
         CoreContract _contract
     ) private {
-        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _contract);
+        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(_contract);
         bytes memory expectedBytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
 
         uint256 matches;
@@ -90,7 +90,7 @@ contract ZKsyncOSOnlyContractsTest is Test {
         }
         assertEq(matches, 1, "expected exactly one neutralization for the removed tracker");
 
-        bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(true, new CoreContract[](0));
+        bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(new CoreContract[](0));
         bytes32 emptyContractCodeHash = keccak256(
             BytecodeUtils.readDeployedBytecodeL1(true, "EmptyContract.sol", "EmptyContract")
         );
@@ -102,7 +102,7 @@ contract ZKsyncOSOnlyContractsTest is Test {
     }
 
     function test_zkSyncOSFactoryDependenciesIncludeTheNewBuiltInImplementations() public {
-        bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(true, new CoreContract[](0));
+        bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(new CoreContract[](0));
 
         // The implementation preimages of the two new built-ins, which is what this release adds to the
         // list. Their `SystemContractProxy` preimage is shared with every other ZKsync OS force deployment
@@ -132,7 +132,7 @@ contract ZKsyncOSOnlyContractsTest is Test {
 
     /// @dev Same accessor the factory-dependency builder uses for ZKsync OS: the deployed EVM bytecode.
     function _deployedBytecode(CoreContract _contract) private view returns (bytes memory) {
-        (, string memory contractName) = CoreOnGatewayHelper.resolve(true, _contract);
+        (, string memory contractName) = CoreOnGatewayHelper.resolve(_contract);
         return ContractsBytecodesLib.getL2DeployedBytecode(contractName, true);
     }
 

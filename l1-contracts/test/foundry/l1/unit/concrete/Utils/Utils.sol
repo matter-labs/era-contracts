@@ -543,6 +543,27 @@ library Utils {
         return address(diamondProxy);
     }
 
+    function makeZKsyncOSDiamondProxy(
+        Diamond.FacetCut[] memory _facetCuts,
+        address _bridgehub
+    ) public returns (address) {
+        DiamondInit diamondInit = new DiamondInit(true);
+        InitializeData memory initializeData = makeInitializeData(_bridgehub);
+        initializeData.l2BootloaderBytecodeHash = bytes32(0);
+        initializeData.l2DefaultAccountBytecodeHash = bytes32(0);
+        initializeData.l2EvmEmulatorBytecodeHash = bytes32(0);
+
+        bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, initializeData);
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: _facetCuts,
+            initAddress: address(diamondInit),
+            initCalldata: diamondInitData
+        });
+
+        DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
+        return address(diamondProxy);
+    }
+
     function makeEmptyL2CanonicalTransaction() public returns (L2CanonicalTransaction memory) {
         uint256[4] memory reserved;
         uint256[] memory factoryDeps = new uint256[](1);
