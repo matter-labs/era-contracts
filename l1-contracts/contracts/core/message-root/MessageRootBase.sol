@@ -100,13 +100,6 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @dev An expected invariant is that for all batches starting from currentChainBatchNumber + 1, the `chainBatchRoots` is 0.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
-    /// @notice The settlement-layer block timestamp at which each `(chainId, batchNumber)` chainBatchRoot
-    /// was aggregated (i.e. when the chain settled on this layer).
-    /// @dev This is the same `l1Timestamp` that is bound into the batch leaf (`MessageHashing.batchLeafHash`),
-    /// so it is provable via the aggregated-root inclusion proof. Stored so that off-chain proof builders
-    /// can retrieve the exact timestamp they must feed into a proof.
-    mapping(uint256 chainId => mapping(uint256 batchNumber => uint256 l1Timestamp)) public chainBatchRootTimestamp;
-
     /// @notice The current logId value emitted in `NewInteropRoot` events.
     /// @dev Increments at most once per block: all emissions within the same block share the same
     /// logId, and the counter only advances when `block.number` changes.
@@ -118,12 +111,21 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// events share the same logId value, and the counter only advances when the block changes.
     uint256 public lastEmitBlock;
 
+    /// @notice The settlement-layer block timestamp at which each `(chainId, batchNumber)` chainBatchRoot
+    /// was aggregated (i.e. when the chain settled on this layer).
+    /// @dev This is the same `l1Timestamp` that is bound into the batch leaf (`MessageHashing.batchLeafHash`),
+    /// so it is provable via the aggregated-root inclusion proof. Stored so that off-chain proof builders
+    /// can retrieve the exact timestamp they must feed into a proof.
+    /// @dev New in v32; declared at the storage tail (taking a slot from `__gap`) so the v31 slots
+    /// above keep their positions across the implementation upgrade.
+    mapping(uint256 chainId => mapping(uint256 batchNumber => uint256 l1Timestamp)) public chainBatchRootTimestamp;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[35] private __gap;
+    uint256[34] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
