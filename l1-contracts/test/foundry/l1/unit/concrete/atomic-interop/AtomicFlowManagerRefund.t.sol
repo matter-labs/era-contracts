@@ -302,13 +302,15 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
     }
 
     /// @notice A leg that commits LATE is still refundable through the SAME `_missingLegIndex` slot.
-    /// `append` has no deadline check, so a leg may commit in a post-deadline batch: its local state
-    /// is `Committed`, yet its absence is provable against that batch's begin root (it was not present
-    /// when the batch started). `authorizeRefund` deliberately transitions EVERY committed leg —
-    /// including the one at `_missingLegIndex` — so this late leg becomes `Revertable` and its own
-    /// sender can claim the refund. A mutant that skipped `_missingLegIndex` would strand exactly this
-    /// late sender, and no other test exercises `_missingLegIndex` pointing at a locally committed leg
-    /// (elsewhere it is always a remote, `Unset` leg).
+    /// `append`'s expired-flow gate is BEST EFFORT (it only fires once a post-deadline settlement-layer
+    /// root has been imported — see {AtomicFlowManager.append}), so a leg may still commit past the
+    /// deadline before any such import, exactly as staged here: its local state is `Committed`, yet its
+    /// absence is provable against that batch's begin root (it was not present when the batch started).
+    /// `authorizeRefund` deliberately transitions EVERY committed leg — including the one at
+    /// `_missingLegIndex` — so this late leg becomes `Revertable` and its own sender can claim the
+    /// refund. A mutant that skipped `_missingLegIndex` would strand exactly this late sender, and no
+    /// other test exercises `_missingLegIndex` pointing at a locally committed leg (elsewhere it is
+    /// always a remote, `Unset` leg).
     /// @dev The recovery mechanics are isolated to a single mock (`recoverAtomicCall`), consistent
     /// with this file's scope — the real recovery chain is covered by `AtomicRecoveryForgery.t.sol`
     /// and the send/refund integration suite; here the point is the leg-state transition + claim
