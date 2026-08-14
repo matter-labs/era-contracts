@@ -71,8 +71,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         upgradeContract.setPriorityTxMaxGasLimit(1 ether);
         upgradeContract.setPriorityTxMaxPubdata(1000000);
         upgradeContract.setChainTypeManager(mockChainTypeManager);
-        upgradeContract.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
-
+        proposedUpgrade.verifier = mockVerifier;
         upgradeContract.setBridgehub(mockBridgehub);
         upgradeContract.setChainId(CHAIN_ID);
         upgradeContract.setZKsyncOS(true);

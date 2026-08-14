@@ -104,8 +104,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
             _cutData: _buildUpgradeCut(_transition),
             _oldProtocolVersion: oldProtocolVersion,
             _oldProtocolVersionDeadline: _transition.oldProtocolVersionDeadline(),
-            _newProtocolVersion: newProtocolVersion,
-            _verifier: _transition.verifier()
+            _newProtocolVersion: newProtocolVersion
         });
         CTM.setCurrentRelease(_transition.newRelease());
 

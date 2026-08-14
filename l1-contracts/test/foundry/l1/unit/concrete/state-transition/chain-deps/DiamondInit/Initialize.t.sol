@@ -36,8 +36,8 @@ contract InitializeTest is DiamondInitTest {
     function test_revertWhen_verifierIsZeroAddress() public {
         // Mock CTM to return zero address for verifier
         vm.mockCall(
-            Utils.TEST_CHAIN_TYPE_MANAGER,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, uint256(0)),
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.verifier.selector),
             abi.encode(address(0))
         );
 
@@ -106,8 +106,8 @@ contract InitializeTest is DiamondInitTest {
     function test_valuesCorrectWhenSuccessfulInit() public {
         // Mock CTM to return testnetVerifier for this protocol version
         vm.mockCall(
-            Utils.TEST_CHAIN_TYPE_MANAGER,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, uint256(0)),
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.verifier.selector),
             abi.encode(testnetVerifier)
         );
 

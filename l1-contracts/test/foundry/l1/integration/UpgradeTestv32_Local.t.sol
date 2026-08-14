@@ -23,6 +23,7 @@ import {UpgradeIntegrationTestBase} from "./UpgradeTestShared.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 
@@ -212,9 +213,10 @@ contract UpgradeIntegrationTest_v32_Local is
             _expectedUpgradeCutHash,
             "Stored upgradeCutHash mismatch"
         );
+        // The verifier now lives on the release the CTM pins, not in a version-keyed map.
         assertTrue(
-            IChainTypeManager(ctm).protocolVersionVerifier(_expectedNewVersion) != address(0),
-            "Missing verifier for new version"
+            ICTMRelease(IChainTypeManager(ctm).currentRelease()).verifier() != address(0),
+            "Missing verifier on the pinned release"
         );
 
         // Bridgehub-side registrations.

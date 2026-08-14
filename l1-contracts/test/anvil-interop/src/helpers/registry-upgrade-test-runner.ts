@@ -373,11 +373,8 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       (await ctm.upgradeCutHash(live.oldVersion)) !== ethers.constants.HashZero,
       "CTM upgradeCutHash committed for the old version"
     );
-    assertEq(
-      await ctm.protocolVersionVerifier(live.newVersion),
-      deployed.newVerifier,
-      "CTM registered the fresh verifier for the new version"
-    );
+    const pinnedRelease = new ethers.Contract(await ctm.currentRelease(), getAbi("ICTMRelease"), l1Provider);
+    assertEq(await pinnedRelease.verifier(), deployed.newVerifier, "the pinned release carries the fresh verifier");
     for (const chain of upgradeChains) {
       const diamond = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), l1Provider);
       assertEq(
@@ -779,6 +776,9 @@ async function buildRegistryManifest(
         // What a chain at the target release IS — version-independent reusable chain state.
         release: {
           diamondInit: { address: deployed.newDiamondInit, codehash: await codehash(deployed.newDiamondInit) },
+          // The verifier is installed chain state, so it is pinned by the release; both the
+          // genesis path and the upgrade path read it from the release they resolve to.
+          verifier: { address: deployed.newVerifier, codehash: await codehash(deployed.newVerifier) },
           genesisFacets,
           // Complete target values (this bump changes none of them, so they equal the live ones
           // and the DERIVED hash changes are zero).
@@ -805,7 +805,6 @@ async function buildRegistryManifest(
           // The canonical factory attesting BOTH release edges (the chain states' factory).
           releaseFactory: releaseFactoryAddr,
           fromRelease: live.fromRelease,
-          verifier: { address: deployed.newVerifier, codehash: await codehash(deployed.newVerifier) },
           upgradeEngine: {
             address: deployed.newDefaultUpgrade,
             codehash: await codehash(deployed.newDefaultUpgrade),
@@ -892,7 +891,7 @@ function assertCommittedManifestMatchesLiveDeployment(
     ["ctm.ctmProxy", ctm?.ctmProxy, ctmProxy],
     ["ctm.transition.fromRelease", ctm?.transition?.fromRelease, live.fromRelease],
     ["ctm.transition.releaseFactory", ctm?.transition?.releaseFactory, releaseFactoryAddr],
-    ["ctm.transition.verifier.address", ctm?.transition?.verifier?.address, deployed.newVerifier],
+    ["ctm.release.verifier.address", ctm?.release?.verifier?.address, deployed.newVerifier],
     ["ctm.transition.upgradeEngine.address", ctm?.transition?.upgradeEngine?.address, deployed.newDefaultUpgrade],
     // No facet swaps in the manifest at all: the delta is DERIVED on-chain from the release
     // pair, so the reviewable artifact carries only the two releases' complete routing.

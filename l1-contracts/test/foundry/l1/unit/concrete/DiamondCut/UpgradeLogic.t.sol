@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -67,8 +68,8 @@ contract UpgradeLogicTest is DiamondCutTest {
         // Mock CTM to return a verifier for protocol version 0
         address testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
         vm.mockCall(
-            chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, uint256(0)),
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.verifier.selector),
             abi.encode(testnetVerifier)
         );
 

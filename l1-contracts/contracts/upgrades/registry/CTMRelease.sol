@@ -24,6 +24,8 @@ contract CTMRelease is ICTMRelease {
     struct ReleaseManifest {
         address diamondInit;
         bytes32 diamondInitCodehash;
+        address verifier;
+        bytes32 verifierCodehash;
         GenesisFacet[] genesisFacets;
         bytes32 bootloaderHash;
         bytes32 defaultAccountHash;
@@ -41,6 +43,8 @@ contract CTMRelease is ICTMRelease {
 
     address internal releaseDiamondInit;
     bytes32 internal diamondInitCodehash;
+    address internal releaseVerifier;
+    bytes32 internal verifierCodehash;
     GenesisFacet[] internal releaseGenesisFacets;
     bytes32 internal bootloaderHash;
     bytes32 internal defaultAccountHash;
@@ -56,12 +60,17 @@ contract CTMRelease is ICTMRelease {
         if (initialized) {
             revert RegistryAlreadyInitialized();
         }
-        if (_manifest.diamondInit == address(0) || _manifest.genesisUpgrade == address(0)) {
+        if (
+            _manifest.diamondInit == address(0) ||
+            _manifest.genesisUpgrade == address(0) ||
+            _manifest.verifier == address(0)
+        ) {
             revert ZeroAddress();
         }
 
         _requirePin(_manifest.diamondInit, _manifest.diamondInitCodehash);
         _requirePin(_manifest.genesisUpgrade, _manifest.genesisUpgradeCodehash);
+        _requirePin(_manifest.verifier, _manifest.verifierCodehash);
         uint256 length = _manifest.genesisFacets.length;
         // A release IS a complete chain routing — an empty one would describe an unusable chain
         // and, worse, derive a remove-everything delta in any transition that departs from a
@@ -108,6 +117,8 @@ contract CTMRelease is ICTMRelease {
         manifestHash = keccak256(abi.encode(_manifest));
         releaseDiamondInit = _manifest.diamondInit;
         diamondInitCodehash = _manifest.diamondInitCodehash;
+        releaseVerifier = _manifest.verifier;
+        verifierCodehash = _manifest.verifierCodehash;
         for (uint256 i = 0; i < length; ++i) {
             releaseGenesisFacets.push(_manifest.genesisFacets[i]);
         }
@@ -124,6 +135,10 @@ contract CTMRelease is ICTMRelease {
 
     function diamondInit() external view returns (address) {
         return releaseDiamondInit;
+    }
+
+    function verifier() external view returns (address) {
+        return releaseVerifier;
     }
 
     function genesisFacets() external view returns (GenesisFacet[] memory) {
@@ -148,6 +163,7 @@ contract CTMRelease is ICTMRelease {
         }
         _requirePin(releaseDiamondInit, diamondInitCodehash);
         _requirePin(genesisUpgrade, genesisUpgradeCodehash);
+        _requirePin(releaseVerifier, verifierCodehash);
         uint256 length = releaseGenesisFacets.length;
         for (uint256 i = 0; i < length; ++i) {
             _requirePin(releaseGenesisFacets[i].facet, releaseGenesisFacets[i].codehash);
@@ -160,7 +176,8 @@ contract CTMRelease is ICTMRelease {
         }
         if (
             !CodehashPinLib.pinHolds(releaseDiamondInit, diamondInitCodehash) ||
-            !CodehashPinLib.pinHolds(genesisUpgrade, genesisUpgradeCodehash)
+            !CodehashPinLib.pinHolds(genesisUpgrade, genesisUpgradeCodehash) ||
+            !CodehashPinLib.pinHolds(releaseVerifier, verifierCodehash)
         ) {
             return false;
         }

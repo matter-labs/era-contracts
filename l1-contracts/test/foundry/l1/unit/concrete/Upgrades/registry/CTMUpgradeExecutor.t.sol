@@ -116,6 +116,8 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
             CTMRelease.ReleaseManifest({
                 diamondInit: diamondInit,
                 diamondInitCodehash: diamondInit.codehash,
+                verifier: address(testnetVerifier),
+                verifierCodehash: address(testnetVerifier).codehash,
                 genesisFacets: genesisFacets,
                 bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                 defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
@@ -167,8 +169,6 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                 CTMTransition.TransitionManifest({
                     oldProtocolVersion: _oldProtocolVersion,
                     newProtocolVersion: newVersion,
-                    verifier: testnetVerifier,
-                    verifierCodehash: testnetVerifier.codehash,
                     // The default transition departs from whatever release the fixture CTM was
                     // genesis'd with (its current release), as the executor's release-edge pin requires.
                     fromRelease: _fromRelease,
@@ -207,7 +207,8 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         assertEq(chainContractAddress.protocolVersion(), newVersion);
         assertEq(chainContractAddress.protocolVersionDeadline(0), 1000);
         assertEq(chainContractAddress.protocolVersionDeadline(newVersion), type(uint256).max);
-        assertEq(chainContractAddress.protocolVersionVerifier(newVersion), testnetVerifier);
+        // The verifier is pinned by the release the CTM now points at, not by a version-keyed map.
+        assertEq(CTMRelease(chainContractAddress.currentRelease()).verifier(), address(testnetVerifier));
         assertEq(chainContractAddress.upgradeCutHash(0), keccak256(abi.encode(_expectedUpgradeCut(transition))));
         assertEq(chainContractAddress.currentRelease(), address(release));
         assertEq(chainContractAddress.l1GenesisUpgrade(), makeAddr("genesisUpgrade"));

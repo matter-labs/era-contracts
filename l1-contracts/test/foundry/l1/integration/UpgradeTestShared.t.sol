@@ -225,12 +225,8 @@ contract UpgradeIntegrationTestBase is Test {
             "Cut hash storage mismatch"
         );
 
-        // NewProtocolVersionVerifier: both fields are indexed.
-        Vm.Log memory npvv = ecosystemLogs.requireOneFrom(
-            "NewProtocolVersionVerifier(uint256,address)",
-            ctmUpgrade.getCTMAddress()
-        );
-        assertEq(uint256(npvv.topics[1]), ctmUpgrade.getNewProtocolVersion(), "Verifier protocol version mismatch");
+        // The verifier is no longer keyed by version on the CTM; it is pinned by the release,
+        // which `NewCurrentRelease` announces and the state-level asserts check.
 
         // Chain-op events
         chainOpsLogs.requireAtLeast("DiamondCut((address,uint8,bool,bytes4[])[],address,bytes)", 1);

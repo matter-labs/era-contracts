@@ -219,18 +219,26 @@ contract UtilsCallMockerTest is Test {
             abi.encodeWithSelector(ICTMRelease.fixedForceDeploymentsData.selector),
             abi.encode(bytes(""))
         );
+        // The verifier is part of the release's installed chain state; `DiamondInit` reads it from
+        // here. Fixtures that assert on a specific verifier re-mock it via
+        // `mockChainTypeManagerVerifier`.
+        vm.mockCall(
+            genesisRegistry,
+            abi.encodeWithSelector(ICTMRelease.verifier.selector),
+            abi.encode(Utils.TEST_GENESIS_REGISTRY)
+        );
     }
 
-    /// @notice Mocks the CTM's protocolVersionVerifier call for DiamondInit
-    /// @dev The chainTypeManager address (0x1234567890876543567890) and protocolVersion (0)
-    ///      match Utils.TEST_CHAIN_TYPE_MANAGER, which direct-diamond fixtures prank as.
+    /// @notice Mocks the verifier `DiamondInit` reads, which lives on the release.
+    /// @dev The chainTypeManager address (0x1234567890876543567890) matches
+    ///      Utils.TEST_CHAIN_TYPE_MANAGER, which direct-diamond fixtures prank as.
     function mockChainTypeManagerVerifier(address verifier) public {
+        mockGenesisRegistry(DEFAULT_CHAIN_TYPE_MANAGER);
         vm.mockCall(
-            DEFAULT_CHAIN_TYPE_MANAGER,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, DEFAULT_PROTOCOL_VERSION),
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.verifier.selector),
             abi.encode(verifier)
         );
-        mockGenesisRegistry(DEFAULT_CHAIN_TYPE_MANAGER);
     }
 
     function test() internal virtual {}

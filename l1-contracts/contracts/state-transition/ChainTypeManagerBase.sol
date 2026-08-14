@@ -111,11 +111,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev Populated starting from v31 and only when chain creation params change.
     mapping(uint256 protocolVersion => uint256) public newChainCreationParamsBlock;
 
-    /// @dev The verifier address per protocol version.
-    /// @dev Populated starting from v31.
-    /// @dev Updating this mapping only affects CTM storage; it does NOT update already deployed chains.
-    /// @dev Emergency verifier changes still require a chain upgrade (diamond cut).
-    mapping(uint256 protocolVersion => address) public protocolVersionVerifier;
+    /// @dev Retained only to preserve the upgradeable storage layout. The verifier is part of the
+    /// installed chain state and is pinned by the release (`ICTMRelease.verifier`), so both the
+    /// genesis path and the upgrade path read it from the release they resolve to.
+    mapping(uint256 protocolVersion => address) internal __DEPRECATED_protocolVersionVerifier;
 
     /// @dev The release whose post-upgrade state is used for new-chain genesis. A release is not
     /// version-keyed at read time, so patch upgrades can reuse it without making genesis data
@@ -228,7 +227,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
         protocolVersion = _initializeData.protocolVersion;
         _setProtocolVersionDeadline(_initializeData.protocolVersion, type(uint256).max);
-        _setProtocolVersionVerifier(_initializeData.protocolVersion, _initializeData.verifier);
         validatorTimelockPostV29 = _initializeData.validatorTimelock;
         serverNotifierAddress = _initializeData.serverNotifier;
 
@@ -375,43 +373,22 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         emit NewServerNotifier(oldServerNotifier, _serverNotifier);
     }
 
-    /// @notice Sets verifier address for a protocol version
-    /// @param _protocolVersion The protocol version
-    /// @param _verifier The verifier address
-    function setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) external onlyOwner {
-        _setProtocolVersionVerifier(_protocolVersion, _verifier);
-    }
-
-    /// @dev Internal function to set verifier address for a protocol version
-    /// @param _protocolVersion The protocol version
-    /// @param _verifier The verifier address
-    function _setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) internal {
-        if (_verifier == address(0)) {
-            revert ZeroAddress();
-        }
-        protocolVersionVerifier[_protocolVersion] = _verifier;
-        emit NewProtocolVersionVerifier(_protocolVersion, _verifier);
-    }
-
     /// @dev set New Version with upgrade from old version
     /// @param _cutData the new diamond cut data
     /// @param _oldProtocolVersion the old protocol version
     /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
     /// @param _newProtocolVersion the new protocol version
-    /// @param _verifier the verifier address for the new protocol version
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
-        uint256 _newProtocolVersion,
-        address _verifier
+        uint256 _newProtocolVersion
     ) external onlyOwner {
         _setNewVersionUpgrade({
             _cutData: _cutData,
             _oldProtocolVersion: _oldProtocolVersion,
             _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
-            _newProtocolVersion: _newProtocolVersion,
-            _verifier: _verifier
+            _newProtocolVersion: _newProtocolVersion
         });
     }
 
@@ -420,14 +397,12 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @param _oldProtocolVersion the old protocol version
     /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
     /// @param _newProtocolVersion the new protocol version
-    /// @param _verifier the verifier address for the new protocol version
     /// @dev Note: non-sequential protocol versions are allowed (e.g., minor/patch jumps).
     function _setNewVersionUpgrade(
         Diamond.DiamondCutData memory _cutData,
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
-        uint256 _newProtocolVersion,
-        address _verifier
+        uint256 _newProtocolVersion
     ) internal {
         // Migrations must be paused before setting new version upgrades
         if (!IChainAssetHandlerBase(IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()).migrationPaused()) {
@@ -449,7 +424,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
         setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
-        _setProtocolVersionVerifier(_newProtocolVersion, _verifier);
         // Emit event with backward compatible hack.
         emit NewUpgradeCutData(_newProtocolVersion, _cutData);
     }

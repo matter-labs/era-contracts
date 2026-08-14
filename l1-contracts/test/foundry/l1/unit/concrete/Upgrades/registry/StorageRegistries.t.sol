@@ -146,6 +146,8 @@ contract StorageRegistriesTest is Test {
             CTMRelease.ReleaseManifest({
                 diamondInit: diamondInit,
                 diamondInitCodehash: diamondInit.codehash,
+                verifier: verifier,
+                verifierCodehash: verifier.codehash,
                 genesisFacets: facets,
                 bootloaderHash: _bootloaderHash,
                 defaultAccountHash: DEFAULT_ACCOUNT_HASH,
@@ -199,8 +201,6 @@ contract StorageRegistriesTest is Test {
             CTMTransition.TransitionManifest({
                 oldProtocolVersion: OLD_VERSION,
                 newProtocolVersion: NEW_VERSION,
-                verifier: verifier,
-                verifierCodehash: verifier.codehash,
                 fromRelease: address(fromRelease),
                 newRelease: address(newRelease),
                 upgradeEngine: upgradeEngine,
@@ -236,9 +236,10 @@ contract StorageRegistriesTest is Test {
     }
 
     function test_releasePinsPostUpgradeGenesis() public view {
-        // Version + verifier are transition (version-schedule) concerns, not release concerns.
+        // The version schedule is a transition concern; the verifier is installed chain state and
+        // therefore lives on the release, so both paths resolve it from the same object.
         assertEq(transition.newProtocolVersion(), NEW_VERSION);
-        assertEq(transition.verifier(), verifier);
+        assertEq(newRelease.verifier(), verifier);
         assertEq(newRelease.diamondInit(), diamondInit);
         assertEq(newRelease.fixedForceDeploymentsData(), hex"f1f2");
         Diamond.FacetCut[] memory installations = ReleaseFacetReader.newChainInstallations(
@@ -600,9 +601,26 @@ contract StorageRegistriesTest is Test {
 
     function test_revertWhen_transitionPinMismatch() public {
         CTMTransition.TransitionManifest memory manifest = _transitionManifest();
-        manifest.verifierCodehash = keccak256("not the verifier's code");
+        manifest.upgradeEngineCodehash = keccak256("not the engine's code");
 
         CTMTransition mispinned = new CTMTransition();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryCodehashMismatch.selector,
+                upgradeEngine,
+                keccak256("not the engine's code"),
+                upgradeEngine.codehash
+            )
+        );
+        mispinned.initialize(manifest);
+    }
+
+    /// @dev The verifier pin moved to the release along with the verifier itself.
+    function test_revertWhen_releaseVerifierPinMismatch() public {
+        CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.verifierCodehash = keccak256("not the verifier's code");
+
+        CTMRelease mispinned = new CTMRelease();
         vm.expectRevert(
             abi.encodeWithSelector(
                 RegistryCodehashMismatch.selector,

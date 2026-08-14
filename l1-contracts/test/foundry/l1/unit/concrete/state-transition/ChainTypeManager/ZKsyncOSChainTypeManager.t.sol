@@ -166,7 +166,6 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             releaseFactory: Utils.TEST_RELEASE_FACTORY,
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
-            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -187,7 +186,6 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             releaseFactory: Utils.TEST_RELEASE_FACTORY,
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
-            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -271,8 +269,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             cutData,
             oldProtocolVersion,
             oldProtocolVersionDeadline,
-            newProtocolVersion,
-            testnetVerifier
+            newProtocolVersion
         );
 
         // Verify that the protocol version deadline was set
@@ -280,7 +277,6 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         // Verify that the new protocol version is set
         assertEq(chainContractAddress.protocolVersion(), newProtocolVersion);
         // Verify that the verifier is set for the new protocol version
-        assertEq(chainContractAddress.protocolVersionVerifier(newProtocolVersion), testnetVerifier);
     }
 
     function test_RevertWhen_setNewVersionUpgradeNotOwner() public {
@@ -303,8 +299,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             cutData,
             oldProtocolVersion,
             oldProtocolVersionDeadline,
-            newProtocolVersion,
-            testnetVerifier
+            newProtocolVersion
         );
     }
 

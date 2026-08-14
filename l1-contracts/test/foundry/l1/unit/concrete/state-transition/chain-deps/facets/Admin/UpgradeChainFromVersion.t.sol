@@ -231,11 +231,6 @@ contract UpgradeChainFromVersionTest is AdminTest {
             abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector, oldProtocolVersion),
             abi.encode(cutHashInput)
         );
-        vm.mockCall(
-            chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, newProtocolVersion),
-            abi.encode(mockVerifier)
-        );
         // Set upgrade timestamp to 1000, warp to exactly that time
         uint256 upgradeTimestamp = 1000;
         vm.warp(upgradeTimestamp);

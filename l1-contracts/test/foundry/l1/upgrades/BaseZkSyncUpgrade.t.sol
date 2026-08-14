@@ -47,7 +47,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
         // Set up CTM for verifier lookup
         baseZkSyncUpgrade.setChainTypeManager(mockChainTypeManager);
-        baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
+        proposedUpgrade.verifier = mockVerifier;
     }
 
     // Upgrade is not ready yet
@@ -148,7 +148,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
     function test_revertWhen_PatchUpgradeCantSetBootloader() public {
         uint256 newVersion = SemVer.packSemVer(0, 1, 1);
         baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
-        baseZkSyncUpgrade.mockProtocolVersionVerifier(newVersion, mockVerifier);
+        proposedUpgrade.verifier = mockVerifier;
         proposedUpgrade.newProtocolVersion = newVersion;
 
         vm.expectRevert(abi.encodeWithSelector(PatchUpgradeCantSetBootloader.selector));
@@ -159,7 +159,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
     function test_revertWhen_PatchUpgradeCantSetDefaultAccount() public {
         uint256 newVersion = SemVer.packSemVer(0, 1, 1);
         baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
-        baseZkSyncUpgrade.mockProtocolVersionVerifier(newVersion, mockVerifier);
+        proposedUpgrade.verifier = mockVerifier;
         proposedUpgrade.newProtocolVersion = newVersion;
         proposedUpgrade.bootloaderHash = bytes32(0);
 
@@ -185,7 +185,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
         uint256 newVersion = SemVer.packSemVer(0, 1, 1);
         baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
-        baseZkSyncUpgrade.mockProtocolVersionVerifier(newVersion, mockVerifier);
+        proposedUpgrade.verifier = mockVerifier;
         proposedUpgrade.newProtocolVersion = newVersion;
 
         vm.expectRevert(abi.encodeWithSelector(PatchCantSetUpgradeTxn.selector));
@@ -203,8 +203,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         uint256 semVerNewProtocolVersion = SemVer.packSemVer(0, newProtocolVersion, 0);
 
         baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, newProtocolVersion - 1, 0));
-        baseZkSyncUpgrade.mockProtocolVersionVerifier(semVerNewProtocolVersion, mockVerifier);
-
+        proposedUpgrade.verifier = mockVerifier;
         proposedUpgrade.newProtocolVersion = semVerNewProtocolVersion;
         proposedUpgrade.l2ProtocolUpgradeTx.nonce = nonce;
 
@@ -272,12 +271,25 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 
-    function test_revertWhen_VerifierIsZeroAddress() public {
-        // Mock CTM to return address(0) as verifier for the new protocol version.
-        // After the change from silent return to revert, this should now revert with ZeroAddress.
-        baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, address(0));
-
-        vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
+    /// @dev A zero verifier in the proposal means "leave unchanged", the same convention the
+    ///      base-system hashes use — it is how the genesis upgrade runs after `DiamondInit` has
+    ///      already installed the release's verifier.
+    function test_zeroVerifierLeavesTheInstalledOneUnchanged() public {
+        // Install a verifier first (genesis does this via `DiamondInit`), then upgrade with zero.
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
+        address installed = baseZkSyncUpgrade.getVerifier();
+        assertEq(installed, mockVerifier, "the first upgrade must install the proposal's verifier");
+
+        // A patch bump: same minor, so no L2 upgrade transaction has to be finalized first.
+        proposedUpgrade.newProtocolVersion = protocolVersion + 1;
+        proposedUpgrade.verifier = address(0);
+        delete proposedUpgrade.l2ProtocolUpgradeTx;
+        proposedUpgrade.bootloaderHash = bytes32(0);
+        proposedUpgrade.defaultAccountHash = bytes32(0);
+        proposedUpgrade.evmEmulatorHash = bytes32(0);
+
+        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(baseZkSyncUpgrade.getVerifier(), installed, "zero must not clear the verifier");
     }
 }

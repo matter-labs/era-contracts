@@ -24,6 +24,7 @@ contract CTMRegistryBootstrapTest is Test {
     bytes32 internal constant DEFAULT_ACCOUNT_HASH = bytes32(uint256(0xDEFA));
     bytes32 internal constant EVM_EMULATOR_HASH = bytes32(uint256(0xE7E7));
     address internal constant GENESIS_UPGRADE = address(0xABCD);
+    address internal constant VERIFIER = address(0xABCE);
 
     Facets internal facets =
         Facets({
@@ -63,6 +64,7 @@ contract CTMRegistryBootstrapTest is Test {
         // `diamondInit` and `genesisUpgrade` are pinned by the manifest too (see `_genesisManifest`).
         vm.etch(facets.diamondInit, hex"600001");
         vm.etch(GENESIS_UPGRADE, hex"600002");
+        vm.etch(VERIFIER, hex"600003");
     }
 
     function _genesisManifest() internal view returns (CTMRelease.ReleaseManifest memory) {
@@ -70,6 +72,7 @@ contract CTMRegistryBootstrapTest is Test {
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
                     facets: facets,
+                    verifier: VERIFIER,
                     bootloaderHash: BOOTLOADER_HASH,
                     defaultAccountHash: DEFAULT_ACCOUNT_HASH,
                     evmEmulatorHash: EVM_EMULATOR_HASH,
@@ -152,6 +155,7 @@ contract CTMRegistryBootstrapTest is Test {
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
                     facets: facets,
+                    verifier: VERIFIER,
                     bootloaderHash: 0,
                     defaultAccountHash: 0,
                     evmEmulatorHash: 0,

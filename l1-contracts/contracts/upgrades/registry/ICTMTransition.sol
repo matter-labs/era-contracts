@@ -22,7 +22,7 @@ struct L2UpgradePlan {
 /// @notice Immutable description of how one CTM release becomes another.
 /// @dev The facet cuts and base-system hash CHANGES are NOT authored: they are DERIVED from the
 ///      `(fromRelease, newRelease)` pair at initialization and stored. What governance reviews
-///      is two releases and this transition's schedule/verifier/engine/L2 plan; the delta is a
+///      is two releases and this transition's schedule/engine/L2 plan; the delta is a
 ///      pure function of the release pair, so transition and release state cannot diverge.
 interface ICTMTransition {
     /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value,
@@ -33,10 +33,8 @@ interface ICTMTransition {
 
     function newProtocolVersion() external view returns (uint256);
 
-    function verifier() external view returns (address);
-
-    /// @notice The release this transition departs from. Never zero: pre-registry migration is
-    ///         one-time migration code (the v32 legacy scripts), not a permanent special case.
+    /// @notice The release this transition departs from. Never zero — bootstrapping a pre-registry
+    ///         CTM is one-time migration code, not a permanent special case.
     function fromRelease() external view returns (address);
 
     function newRelease() external view returns (address);

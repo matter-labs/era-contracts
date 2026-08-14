@@ -7,6 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
 import {
     Utils,
     DEFAULT_L2_LOGS_TREE_ROOT_HASH,
@@ -290,12 +291,6 @@ contract ExecutorTest is UtilsCallMockerTest {
         );
         DiamondInit diamondInit = new DiamondInit(isZKsyncOS());
         EraTestnetVerifier testnetVerifier = new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
-        // Mock the CTM to return a verifier for protocol version 0
-        vm.mockCall(
-            address(chainTypeManager),
-            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, uint256(0)),
-            abi.encode(address(testnetVerifier))
-        );
         validatorTimelock = ValidatorTimelock(deployValidatorTimelock(address(dummyBridgehub), owner, 0));
 
         genesisStoredBatchInfo = IExecutor.StoredBatchInfo({
@@ -326,6 +321,13 @@ contract ExecutorTest is UtilsCallMockerTest {
             baseTokenAssetId,
             address(validatorTimelock),
             keccak256(abi.encode(genesisStoredBatchInfo))
+        );
+        // The verifier `DiamondInit` installs comes from the release the CTM pins. Must be mocked
+        // AFTER the shared mockers above, which re-install the release mock with its default.
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.verifier.selector),
+            abi.encode(address(testnetVerifier))
         );
 
         bytes memory diamondInitData = abi.encodeCall(diamondInit.initialize, (l2ChainId, owner));

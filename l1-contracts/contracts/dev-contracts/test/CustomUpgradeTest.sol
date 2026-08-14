@@ -32,12 +32,8 @@ contract CustomUpgradeTest is BaseZkSyncUpgrade {
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
         (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion, true);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        // Fetch verifier from CTM based on new protocol version
-        address ctmVerifier = IChainTypeManager(s.chainTypeManager).protocolVersionVerifier(
-            _proposedUpgrade.newProtocolVersion
-        );
-        if (ctmVerifier != address(0)) {
-            _setVerifier(IVerifier(ctmVerifier));
+        if (_proposedUpgrade.verifier != address(0)) {
+            _setVerifier(IVerifier(_proposedUpgrade.verifier));
         }
         _setBaseSystemContracts(
             _proposedUpgrade.bootloaderHash,

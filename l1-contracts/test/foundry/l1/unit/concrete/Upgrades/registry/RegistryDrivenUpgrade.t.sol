@@ -137,7 +137,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         // mocked genesis release is replaced by a REAL factory-deployed one describing the
         // chain's current routing — hop 1 then departs from (and, being facet-neutral, also
         // targets) exactly that release.
-        address genesisRelease = releaseFactory.deployOrGetRelease(_releaseManifest(address(0)));
+        address genesisRelease = releaseFactory.deployOrGetRelease(
+            _releaseManifest(address(0), address(testnetVerifier))
+        );
         _attestReleaseOnFixtureFactory(genesisRelease);
 
         // Hand CTM ownership to the executor through its fixed entrypoint, then perform two raw
@@ -186,15 +188,19 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     }
 
     /// @dev One release's full manifest: the fixture's routing (AdminFacet swapped for
-    ///      `_adminFacet` when nonzero), carried base-system hashes, genesis params. Hop 1's
-    ///      target (facet-neutral) manifest is IDENTICAL to the genesis release's, so the
-    ///      deployOrGet factory resolves both to ONE instance — hop 1 is a same-release,
-    ///      verifier/schedule-only transition, exactly the intended patch shape.
-    function _releaseManifest(address _adminFacet) internal returns (CTMRelease.ReleaseManifest memory) {
+    ///      `_adminFacet` when nonzero), the verifier, carried base-system hashes, genesis params.
+    ///      Hop 1 changes only the verifier, so its target release differs from genesis in that
+    ///      one field and the DERIVED facet/hash delta is empty — an L1-only upgrade.
+    function _releaseManifest(
+        address _adminFacet,
+        address _verifier
+    ) internal returns (CTMRelease.ReleaseManifest memory) {
         return
             CTMRelease.ReleaseManifest({
                 diamondInit: diamondInit,
                 diamondInitCodehash: diamondInit.codehash,
+                verifier: _verifier,
+                verifierCodehash: _verifier.codehash,
                 genesisFacets: _releaseFacets(_adminFacet),
                 // Carried unchanged through every hop: the release pins the complete values, so
                 // the derived hash changes are zero.
@@ -245,7 +251,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         address _fromRelease,
         address _newAdminFacet
     ) internal returns (CTMTransition transition) {
-        address release = releaseFactory.deployOrGetRelease(_releaseManifest(_newAdminFacet));
+        address release = releaseFactory.deployOrGetRelease(_releaseManifest(_newAdminFacet, _verifier));
         _attestReleaseOnFixtureFactory(release);
 
         bool hasL2Side = _newAdminFacet != address(0);
@@ -273,8 +279,6 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
                 CTMTransition.TransitionManifest({
                     oldProtocolVersion: _oldVersion,
                     newProtocolVersion: _newVersion,
-                    verifier: _verifier,
-                    verifierCodehash: _verifier.codehash,
                     fromRelease: _fromRelease,
                     newRelease: release,
                     upgradeEngine: defaultUpgrade,
@@ -295,8 +299,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     }
 
     function test_registryDrivenUpgrade_v32ThenV33_endToEnd() public {
-        // Hop 1 (0.0.0 -> 0.32.0): L1-only registry-driven upgrade — no facet changes, no L2
-        // transaction, new verifier. The cut executes on the real chain with the real
+        // Hop 1 (0.0.0 -> 0.32.0): L1-only registry-driven upgrade — the target release differs
+        // from genesis only in the verifier, so the DERIVED facet/hash delta is empty and no L2
+        // transaction is composed. The cut executes on the real chain with the real
         // DefaultUpgrade init.
         _runHop(transitionV32);
 

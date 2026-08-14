@@ -34,7 +34,7 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
 
         // Set up CTM for verifier lookup
         baseZkSyncUpgrade.setChainTypeManager(mockChainTypeManager);
-        baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
+        proposedUpgrade.verifier = mockVerifier;
     }
 
     // New protocol version is not greater than the current one

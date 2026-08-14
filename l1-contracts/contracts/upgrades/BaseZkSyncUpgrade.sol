@@ -6,7 +6,6 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
-import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ICTMTransition} from "./registry/ICTMTransition.sol";
 import {CTMUpgradeComposer} from "./registry/CTMUpgradeComposer.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
@@ -89,12 +88,11 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
             isOnSettlementLayer
         );
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        // Fetch verifier from CTM based on new protocol version.
-        // It must be set for every protocol version.
-        address ctmVerifier = IChainTypeManager(s.chainTypeManager).protocolVersionVerifier(
-            _proposedUpgrade.newProtocolVersion
-        );
-        _setVerifier(IVerifier(ctmVerifier));
+        // Zero means "leave unchanged", the same convention the base-system hashes use: the genesis
+        // upgrade runs after `DiamondInit` has already installed the verifier from the release.
+        if (_proposedUpgrade.verifier != address(0)) {
+            _setVerifier(IVerifier(_proposedUpgrade.verifier));
+        }
         _setBaseSystemContracts(
             _proposedUpgrade.bootloaderHash,
             _proposedUpgrade.defaultAccountHash,

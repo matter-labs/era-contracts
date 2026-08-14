@@ -48,7 +48,6 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             releaseFactory: Utils.TEST_RELEASE_FACTORY,
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
-            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 

@@ -32,17 +32,16 @@ import {
 ///      DERIVED from the `(fromRelease, newRelease)` pair at initialization (see
 ///      {TransitionDeltaLib}) and stored. Transition and release state cannot diverge because
 ///      the delta is a pure function of the two pinned releases.
-/// @dev What IS authored: the version edge, verifier, upgrade engine, schedule and the L2 plan —
-///      each either derived-checked or codehash-pinned inline. The L2 plan is reviewed-and-pinned
-///      data (L1 cannot verify L2 execution effects); the on-chain convergence guarantee covers
-///      L1 diamond routing and base-system hashes only.
+/// @dev What IS authored: the version edge, upgrade engine, schedule and the L2 plan — each either
+///      derived-checked or codehash-pinned inline. The verifier is NOT authored here: it is part of
+///      the installed chain state and therefore lives on the release, so it converges by the same
+///      mechanism as facet routing. The L2 plan is reviewed-and-pinned data (L1 cannot verify L2
+///      execution effects); the on-chain convergence guarantee covers L1 state only.
 contract CTMTransition is ICTMTransition {
     // solhint-disable-next-line gas-struct-packing
     struct TransitionManifest {
         uint256 oldProtocolVersion;
         uint256 newProtocolVersion;
-        address verifier;
-        bytes32 verifierCodehash;
         address fromRelease;
         address newRelease;
         address upgradeEngine;
@@ -57,8 +56,6 @@ contract CTMTransition is ICTMTransition {
 
     uint256 internal transitionOldProtocolVersion;
     uint256 internal transitionNewProtocolVersion;
-    address internal transitionVerifier;
-    bytes32 internal verifierCodehash;
     address internal transitionFromRelease;
     address internal transitionNewRelease;
     address internal transitionUpgradeEngine;
@@ -82,7 +79,6 @@ contract CTMTransition is ICTMTransition {
         // Bootstrapping a pre-registry CTM is one-time migration code, never an accommodation
         // here; see the Bootstrap section of {docs/registry-driven-upgrades.md}.
         if (
-            _manifest.verifier == address(0) ||
             _manifest.fromRelease == address(0) ||
             _manifest.newRelease == address(0) ||
             _manifest.upgradeEngine == address(0)
@@ -100,7 +96,6 @@ contract CTMTransition is ICTMTransition {
             revert TransitionDeadlineBeforeUpgrade(_manifest.oldProtocolVersionDeadline, _manifest.upgradeTimestamp);
         }
 
-        _requirePin(_manifest.verifier, _manifest.verifierCodehash);
         _requirePin(_manifest.upgradeEngine, _manifest.upgradeEngineCodehash);
         // Live validation of both edges. RELEASE PROVENANCE is deliberately NOT checked here: a
         // permissionless manifest could name any "factory", so the attestation that both edges
@@ -158,7 +153,7 @@ contract CTMTransition is ICTMTransition {
         if (_manifest.l2Plan.factoryDepHashes.length > MAX_NEW_FACTORY_DEPS) {
             revert MalformedL2UpgradePlan();
         }
-        // A same-release transition is verifier/schedule-only: the derived facet/hash delta is
+        // A same-release transition is schedule-only: the derived facet/hash delta is
         // empty by construction, and it must not carry an L2 payload either.
         if (_manifest.fromRelease == _manifest.newRelease && hasL2Side) {
             revert SameReleaseTransitionHasPayload();
@@ -168,8 +163,6 @@ contract CTMTransition is ICTMTransition {
         manifestHash = keccak256(abi.encode(_manifest));
         transitionOldProtocolVersion = _manifest.oldProtocolVersion;
         transitionNewProtocolVersion = _manifest.newProtocolVersion;
-        transitionVerifier = _manifest.verifier;
-        verifierCodehash = _manifest.verifierCodehash;
         transitionFromRelease = _manifest.fromRelease;
         transitionNewRelease = _manifest.newRelease;
         transitionUpgradeEngine = _manifest.upgradeEngine;
@@ -204,10 +197,6 @@ contract CTMTransition is ICTMTransition {
 
     function newProtocolVersion() external view returns (uint256) {
         return transitionNewProtocolVersion;
-    }
-
-    function verifier() external view returns (address) {
-        return transitionVerifier;
     }
 
     function fromRelease() external view returns (address) {
@@ -248,7 +237,6 @@ contract CTMTransition is ICTMTransition {
         }
         ICTMRelease(transitionNewRelease).validate();
         ICTMRelease(transitionFromRelease).validate();
-        _requirePin(transitionVerifier, verifierCodehash);
         _requirePin(transitionUpgradeEngine, upgradeEngineCodehash);
     }
 
@@ -259,9 +247,7 @@ contract CTMTransition is ICTMTransition {
         if (!ICTMRelease(transitionNewRelease).verifyAll() || !ICTMRelease(transitionFromRelease).verifyAll()) {
             return false;
         }
-        return
-            CodehashPinLib.pinHolds(transitionVerifier, verifierCodehash) &&
-            CodehashPinLib.pinHolds(transitionUpgradeEngine, upgradeEngineCodehash);
+        return CodehashPinLib.pinHolds(transitionUpgradeEngine, upgradeEngineCodehash);
     }
 
     function _requirePin(address _target, bytes32 _expectedCodehash) private view {

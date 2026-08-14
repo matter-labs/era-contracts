@@ -96,6 +96,8 @@ export function releaseInitArgs(ctm: any): any {
   return {
     diamondInit: release.diamondInit.address,
     diamondInitCodehash: release.diamondInit.codehash,
+    verifier: release.verifier.address,
+    verifierCodehash: release.verifier.codehash,
     genesisFacets,
     bootloaderHash: release.baseSystemContracts.bootloader,
     defaultAccountHash: release.baseSystemContracts.defaultAccount,
@@ -131,8 +133,6 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string):
   return {
     oldProtocolVersion: packSemVer(manifest.oldVersion),
     newProtocolVersion: packSemVer(manifest.newVersion),
-    verifier: transition.verifier.address,
-    verifierCodehash: transition.verifier.codehash,
     fromRelease: transition.fromRelease,
     newRelease,
     upgradeEngine: transition.upgradeEngine.address,

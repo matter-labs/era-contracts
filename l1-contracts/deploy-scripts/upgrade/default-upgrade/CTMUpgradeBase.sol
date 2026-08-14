@@ -205,8 +205,9 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             bootloaderHash: _chainCreationParams.bootloaderHash,
             defaultAccountHash: _chainCreationParams.defaultAAHash,
             evmEmulatorHash: _chainCreationParams.evmEmulatorHash,
-            // Verifier is resolved from CTM; keep zeroed fields for calldata compatibility.
-            verifier: address(0),
+            // The verifier now rides in the proposal itself: the CTM no longer keeps a
+            // version-keyed verifier map (registry-driven upgrades read it from the release).
+            verifier: _stateTransition.verifiers.verifier,
             verifierParams: ProposedUpgradeLib.emptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: encodePostUpgradeCalldata(_stateTransition),

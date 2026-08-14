@@ -213,7 +213,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             releaseFactory: Utils.TEST_RELEASE_FACTORY,
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
-            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -230,7 +229,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             releaseFactory: Utils.TEST_RELEASE_FACTORY,
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
-            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -320,6 +318,13 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             Utils.TEST_GENESIS_REGISTRY,
             abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
             abi.encode(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(uint256(0x01)), uint64(0x01))
+        );
+        // Same reason: the verifier `DiamondInit` installs comes off the release, and the generic
+        // mocker resets it to a codeless placeholder. Re-mock the fixture's real verifier last.
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.verifier.selector),
+            abi.encode(testnetVerifier)
         );
     }
 

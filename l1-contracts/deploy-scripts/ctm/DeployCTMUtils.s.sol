@@ -150,6 +150,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         CTMRelease.ReleaseManifest memory manifest = GenesisManifestLib.buildGenesisManifest(
             GenesisManifestLib.GenesisConfig({
                 facets: ctmAddresses.stateTransition.facets,
+                verifier: ctmAddresses.stateTransition.verifiers.verifier,
                 bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
                 defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
                 evmEmulatorHash: config.contracts.chainCreationParams.evmEmulatorHash,
@@ -268,7 +269,6 @@ abstract contract DeployCTMUtils is DeployUtils {
                 releaseFactory: stateTransition.releaseFactory,
                 currentRelease: stateTransition.currentRelease,
                 protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
-                verifier: stateTransition.verifiers.verifier,
                 serverNotifier: stateTransition.proxies.serverNotifier
             });
     }

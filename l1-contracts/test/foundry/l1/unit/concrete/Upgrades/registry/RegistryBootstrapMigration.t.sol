@@ -130,6 +130,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 CTMRelease.ReleaseManifest({
                     diamondInit: diamondInit,
                     diamondInitCodehash: diamondInit.codehash,
+                    verifier: address(testnetVerifier),
+                    verifierCodehash: address(testnetVerifier).codehash,
                     genesisFacets: genesisFacets,
                     bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                     defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
@@ -170,8 +172,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 currentRelease: address(genesisRelease),
                 newProtocolVersion: newVersion,
                 oldProtocolVersionDeadline: type(uint256).max,
-                verifier: address(testnetVerifier),
-                verifierCodehash: address(testnetVerifier).codehash,
                 upgradeCut: Diamond.DiamondCutData({
                     facetCuts: noFacetCuts,
                     initAddress: upgradeCutInit,
@@ -217,7 +217,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         assertEq(chainContractAddress.currentRelease(), address(genesisRelease), "release must be pinned");
         assertEq(chainContractAddress.protocolVersion(), newVersion, "version must be bumped");
         assertTrue(chainContractAddress.upgradeCutHash(oldVersion) != bytes32(0), "upgrade cut must be committed");
-        assertEq(chainContractAddress.protocolVersionVerifier(newVersion), address(testnetVerifier));
+        // The verifier is pinned by the release the bootstrap installs, not by a version-keyed map.
+        assertEq(CTMRelease(chainContractAddress.currentRelease()).verifier(), address(testnetVerifier));
 
         // Authority ended up with the executors — never left resting in the migration.
         assertEq(chainContractAddress.owner(), address(ctmExecutor), "CTM must be owned by its executor");

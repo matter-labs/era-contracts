@@ -58,8 +58,6 @@ contract RegistryBootstrapMigration {
     ///        `releaseFactory`, which the CTM re-checks itself.
     /// @param newProtocolVersion The version the CTM moves to.
     /// @param oldProtocolVersionDeadline Until when the departing version stays usable.
-    /// @param verifier The verifier pinned for `newProtocolVersion`.
-    /// @param verifierCodehash Inline pin of `verifier`.
     /// @param upgradeCut The diamond cut committed for chains upgrading across this edge. It cannot
     ///        be DERIVED the way a transition's is: the departing version predates releases, so
     ///        there is no `fromRelease` to diff against. It is therefore pinned data, committed by
@@ -83,8 +81,6 @@ contract RegistryBootstrapMigration {
         address currentRelease;
         uint256 newProtocolVersion;
         uint256 oldProtocolVersionDeadline;
-        address verifier;
-        bytes32 verifierCodehash;
         Diamond.DiamondCutData upgradeCut;
         bytes32 upgradeCutInitCodehash;
         address ctmExecutor;
@@ -118,7 +114,6 @@ contract RegistryBootstrapMigration {
             address(_manifest.ctmProxyAdmin) == address(0) ||
             _manifest.releaseFactory == address(0) ||
             _manifest.currentRelease == address(0) ||
-            _manifest.verifier == address(0) ||
             _manifest.ctmExecutor == address(0) ||
             _manifest.ecosystemExecutor == address(0)
         ) {
@@ -208,7 +203,6 @@ contract RegistryBootstrapMigration {
         }
 
         m.releaseFactory.requirePin(m.releaseFactoryCodehash);
-        m.verifier.requirePin(m.verifierCodehash);
         m.upgradeCut.initAddress.requirePin(m.upgradeCutInitCodehash);
 
         // The release must be attested by the very factory this migration installs, so the anchor
@@ -255,8 +249,7 @@ contract RegistryBootstrapMigration {
             _cutData: m.upgradeCut,
             _oldProtocolVersion: m.expectedProtocolVersion,
             _oldProtocolVersionDeadline: m.oldProtocolVersionDeadline,
-            _newProtocolVersion: m.newProtocolVersion,
-            _verifier: m.verifier
+            _newProtocolVersion: m.newProtocolVersion
         });
         // The anchor first: `setCurrentRelease` checks the release against it.
         ctm.setReleaseFactory(m.releaseFactory);

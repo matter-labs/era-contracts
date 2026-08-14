@@ -655,13 +655,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             target: ctmAddresses.stateTransition.proxies.chainTypeManager,
             data: abi.encodeCall(
                 IChainTypeManager.setNewVersionUpgrade,
-                (
-                    upgradeCut,
-                    previousProtocolVersion,
-                    deadline,
-                    newProtocolVersion,
-                    ctmAddresses.stateTransition.verifiers.verifier
-                )
+                (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
             ),
             value: 0
         });

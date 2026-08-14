@@ -91,6 +91,11 @@ struct DirectDeployedAddresses {
     bytes4[][6] genesisFacetSelectors;
     bytes32 diamondInitCodehash;
     bytes32 genesisUpgradeCodehash;
+    /// @dev The main verifier and its predicted live codehash. Not a direct deployment (it comes
+    ///      from the verifiers deployer), but it is part of the genesis manifest, so it is carried
+    ///      here with the other predicted manifest inputs.
+    address verifier;
+    bytes32 verifierCodehash;
 }
 
 /// @notice CREATE2 calldata for contracts deployed directly (no deployer)
@@ -188,6 +193,8 @@ library GatewayCTMDeployerHelper {
 
         DirectDeployedAddresses memory directAddresses;
         (directAddresses, directCalldata) = _calculateDirectDeployments(_create2Salt, config, im.daResult);
+        directAddresses.verifier = im.verifiersResult.verifier;
+        directAddresses.verifierCodehash = _mainVerifierCodehash(config, im.verifiersResult);
 
         GatewayCTMFinalResult memory ctmResult;
         (deployers.ctmDeployer, deployerCalldata.ctmCalldata, ctmResult) = _calculateCTMDeployer(
@@ -650,6 +657,7 @@ library GatewayCTMDeployerHelper {
             GenesisManifestLib.buildGenesisManifestFromRows(
                 GenesisManifestLib.GenesisConfig({
                     facets: _direct.facets,
+                    verifier: _direct.verifier,
                     bootloaderHash: _baseConfig.bootloaderHash,
                     defaultAccountHash: _baseConfig.defaultAccountHash,
                     evmEmulatorHash: _baseConfig.evmEmulatorHash,
@@ -661,6 +669,7 @@ library GatewayCTMDeployerHelper {
                 }),
                 rows,
                 _direct.diamondInitCodehash,
+                _direct.verifierCodehash,
                 _direct.genesisUpgradeCodehash
             );
     }
@@ -839,6 +848,23 @@ library GatewayCTMDeployerHelper {
         }
     }
 
+    /// @dev The predicted live codehash of the main verifier, resolved through the same
+    ///      file/name/args triple `_calculateVerifiersDeployerAddresses` uses to predict its
+    ///      address, so the manifest reconstruction matches what the deployer produces on-chain.
+    function _mainVerifierCodehash(
+        GatewayCTMDeployerConfig memory config,
+        Verifiers memory verifiersResult
+    ) internal returns (bytes32) {
+        (string memory mainVerifierFile, string memory mainVerifierName) = DeployCTML1OrGateway.resolveMainVerifier(
+            config.isZKsyncOS,
+            config.testnetVerifier
+        );
+        bytes memory creationArgs = config.isZKsyncOS
+            ? abi.encode(verifiersResult.verifierPlonk)
+            : abi.encode(verifiersResult.verifierFflonk, verifiersResult.verifierPlonk);
+        return _simulatedCodehash(config.isZKsyncOS, mainVerifierFile, mainVerifierName, creationArgs);
+    }
+
     function _calculateCTMDeployerAddresses(
         address deployerAddr,
         GatewayCTMFinalConfig memory config,
@@ -936,7 +962,6 @@ library GatewayCTMDeployerHelper {
             releaseFactory: config.bootstrapReleaseFactory,
             currentRelease: currentRelease,
             protocolVersion: baseConfig.protocolVersion,
-            verifier: config.verifier,
             serverNotifier: serverNotifierProxy
         });
         bytes memory initCalldata = abi.encodeCall(IChainTypeManager.initialize, (diamondInitData));

@@ -125,9 +125,9 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.baseTokenAssetId = baseTokenAssetId;
         s.protocolVersion = protocolVersion;
 
-        // Fetch verifier from CTM based on protocol version to keep CTM as the single source of truth
-        // and avoid including the verifier address in the diamond cut init calldata.
-        address verifier = ctm.protocolVersionVerifier(protocolVersion);
+        // The verifier is part of the release's installed chain state, so it comes from the same
+        // object as the facets and base-system hashes rather than from a separate CTM lookup.
+        address verifier = release.verifier();
         if (verifier == address(0)) {
             revert ZeroAddress();
         }

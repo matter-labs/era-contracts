@@ -9,16 +9,16 @@ addresses, not calldata; the contracts hold the data, validate it, and the execu
 
 Two objects, deliberately separate:
 
-|          | **Release**                                                                             | **Transition**                                            |
-| -------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Answers  | what a chain **is**                                                                     | how release A **becomes** release B                       |
-| Contains | facet routing, `DiamondInit`, base-system hashes, genesis params, force-deployment data | version edge, verifier, upgrade engine, schedule, L2 plan |
-| Version  | none — version-independent, reusable                                                    | owns the `old -> new` version edge                        |
-| Verifier | none                                                                                    | pinned                                                    |
-| VM flag  | none — read from the pinned `DiamondInit.IS_ZKSYNC_OS`                                  | —                                                         |
+|          | **Release**                                                                                       | **Transition**                                  |
+| -------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Answers  | what a chain **is**                                                                               | how release A **becomes** release B             |
+| Contains | facet routing, `DiamondInit`, verifier, base-system hashes, genesis params, force-deployment data | version edge, upgrade engine, schedule, L2 plan |
+| Version  | none — version-independent, reusable                                                              | owns the `old -> new` version edge              |
+| VM flag  | none — read from the pinned `DiamondInit.IS_ZKSYNC_OS`                                            | —                                               |
 
-A release is reusable chain state: a verifier-only patch reuses the same release unchanged, which is
-why version and verifier live on the transition instead.
+A release is reusable chain state: everything a chain _runs_ belongs to it, including the verifier
+(the chain stores it as `s.verifier`). What a release does **not** carry is anything about _when_ —
+the version edge and the schedule are the transition's, and one release can serve several versions.
 
 **A transition's facet cuts and hash changes are not authored.** They are derived from its
 `(fromRelease, newRelease)` pair at initialization and stored. Governance reviews two releases plus
@@ -29,12 +29,12 @@ the transition's own fields; the delta between them is computed, not written.
 All are storage-backed, initialized exactly once from a manifest, and commit
 `manifestHash = keccak256(abi.encode(manifest))`.
 
-| Contract                     | Holds                                                                                                                                                                                                              |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `CTMRelease`                 | `diamondInit` + pin, `GenesisFacet[]` (address, freezability, explicit selectors, pin), three base-system hashes, `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin                                |
-| `CTMTransition`              | version edge, `verifier` + pin, `fromRelease`, `newRelease`, `upgradeEngine` + pin, deadline, `upgradeTimestamp`, `L2UpgradePlan`; **derived and stored:** final `Diamond.FacetCut[]` and base-system hash changes |
-| `CoreRegistry`               | `EcosystemContractRow[]` — `(proxy, expectedOldImpl, implNew, implNewCodehash)`                                                                                                                                    |
-| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                     |
+| Contract                     | Holds                                                                                                                                                                                                 |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, explicit selectors, pin), three base-system hashes, `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin |
+| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine` + pin, deadline, `upgradeTimestamp`, `L2UpgradePlan`; **derived and stored:** final `Diamond.FacetCut[]` and base-system hash changes      |
+| `CoreRegistry`               | `EcosystemContractRow[]` — `(proxy, expectedOldImpl, implNew, implNewCodehash)`                                                                                                                       |
+| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                        |
 
 Supporting libraries:
 
@@ -98,7 +98,7 @@ itself: `releaseFactory` is CTM state, and `setCurrentRelease` rejects any relea
 not deploy. A transition carries no factory pointer, so there is nothing to spoof.
 
 **Inline codehash pins.** Every executable address an object names carries its expected
-`EXTCODEHASH` beside it — facets in their rows, `DiamondInit`, the genesis upgrade, the verifier, the
+`EXTCODEHASH` beside it — facets in their rows, `DiamondInit`, the verifier, the genesis upgrade, the
 upgrade engine, each `implNew`. Pins are checked at initialization and re-checked by `validate()`.
 There is no detached, optional pin list. A pin holds only against an account that **has code**, so an
 empty account can never satisfy one.
@@ -114,6 +114,11 @@ The CTM stores one release pointer and derives genesis data from it:
 - `currentRelease` — the release every new chain is created at. `storedBatchZero()` and
   `l1GenesisUpgrade()` are views over `ICTMRelease(currentRelease).genesisParams()`.
 - `releaseFactory` — the provenance anchor every pinned release is checked against.
+
+Nothing else about a chain's installed state is keyed by protocol version on the CTM. The verifier in
+particular is not: a chain several versions behind resolves it from the release its own transition
+names (`transition.newRelease()`), so a lagging chain is never affected by where `currentRelease` has
+moved since.
 
 When a release is pinned, the CTM validates VM identity against
 `IDiamondInit(release.diamondInit()).IS_ZKSYNC_OS()` and applies its VM-specific genesis rules (Era
@@ -131,7 +136,7 @@ init calldata, so the committed cut and the source of the derived facet cuts are
    `initAddress = currentRelease.diamondInit()`, empty `initCalldata`, and deploys the `DiamondProxy`.
 3. `DiamondInit.initialize(chainId, admin)` is delegatecalled from the proxy constructor, so
    `msg.sender` is the CTM. It reads `currentRelease`, installs that release's explicit routing via
-   `ReleaseFacetReader`, and takes the base-system hashes from the release.
+   `ReleaseFacetReader`, and takes the verifier and base-system hashes from the release.
 4. The CTM runs `IAdmin.genesisUpgrade` with the release's `fixedForceDeploymentsData` and genesis
    upgrade address.
 
@@ -154,7 +159,7 @@ sequenceDiagram
 
     G->>E: applyCTMUpgrade(transition)
     Note over E: factory-attest, validate,<br/>check release + version edges
-    E->>C: setNewVersionUpgrade(cut, oldV, deadline, newV, verifier)
+    E->>C: setNewVersionUpgrade(cut, oldV, deadline, newV)
     E->>C: setCurrentRelease(newRelease)
     G->>E: upgradeChain(transition, chainId)
     E->>C: upgradeChainFromVersion(chainId, oldV, cut)
@@ -188,10 +193,10 @@ that commitment is written exclusively by the CTM-bound executor.
 
 ## What the derivation guarantees
 
-For any representable release pair, the L1-side guarantee is that **the facet routing and
+For any representable release pair, the L1-side guarantee is that **the facet routing, verifier and
 base-system hashes an existing chain ends up with are byte-for-byte what a fresh chain at
 `newRelease` gets**. The upgrade path and the genesis path resolve to the same pinned release, so
-they cannot drift.
+they cannot drift. There is no second mechanism for any part of installed chain state.
 
 The **L2 side is reviewed-and-pinned data, not proven**. L1 cannot verify L2 execution effects. The
 `L2UpgradePlan` is shape-validated at initialization — a plan whose data the composed transaction
@@ -211,6 +216,8 @@ transition cannot pin successfully and then strand every chain.
 **Patches.** A patch is a same-release transition — the only patch representation. A SemVer patch
 bump must reuse the departing release; a same-release transition's derived delta is empty by
 construction and it must carry no L2 payload. `currentRelease` stays put, so genesis keeps resolving.
+Because the verifier is part of a release, changing it is a change of installed state and therefore
+needs a new release — a schedule-only patch cannot rotate the verifier.
 
 **Schedule.** `oldProtocolVersionDeadline >= upgradeTimestamp`, so the old protocol is never disabled
 before chains may upgrade.
@@ -222,7 +229,9 @@ are rejected as dead payload. The factory-dep count is capped at the same limit 
 **Base-system hashes.** Zero means "leave unchanged" in an upgrade, so a nonzero → zero change is not
 representable and is rejected at derivation rather than stored as a silent no-op. The Era CTM
 likewise rejects a release carrying a zero base-system hash — the same values `DiamondInit` requires
-for new chains.
+for new chains. The verifier follows the same zero-means-unchanged convention on the upgrade path,
+which is how the genesis upgrade runs after `DiamondInit` has already installed it; a release itself
+can never pin a zero verifier.
 
 **Row sets.** Core-registry and bootstrap rows are real, unique edges: all fields nonzero, one row
 per proxy. Duplicates would both pass the source check and the last would silently win, so the
@@ -237,9 +246,9 @@ no bootstrap.
 
 `RegistryBootstrapMigration` expresses that crossing as a single pinned object. Its manifest carries
 the CTM and its departing version, the `ProxyAdmin`, the source-checked implementation swaps (the
-CTM's own implementation among them), the `releaseFactory` anchor, the genesis `currentRelease`, the
-version edge and deadline, the verifier, the upgrade cut, and the two executors that receive
-authority. Every address carries an inline pin.
+CTM's own implementation among them), the `releaseFactory` anchor, the genesis `currentRelease`
+(which carries the verifier), the version edge and deadline, the upgrade cut, and the two executors
+that receive authority. Every address carries an inline pin.
 
 Governance transfers CTM and `ProxyAdmin` ownership to it; `migrate()` performs the whole edge and
 hands ownership to the bound executors in the same transaction. Authority is never parked: the object

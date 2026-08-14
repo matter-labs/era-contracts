@@ -453,14 +453,8 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
 
         bytes memory l2Calldata = abi.encodeCall(
             IChainTypeManager.setNewVersionUpgrade,
-            (
-                upgradeCutData,
-                previousProtocolVersion,
-                deadline,
-                newProtocolVersion,
-                // Legacy pipeline: facet changes ride in the cut's own facetCuts.
-                gatewayConfig.gatewayStateTransition.verifiers.verifier
-            )
+            // Legacy pipeline: facet changes ride in the cut's own facetCuts.
+            (upgradeCutData, previousProtocolVersion, deadline, newProtocolVersion)
         );
 
         calls = _prepareL1ToGatewayCall(

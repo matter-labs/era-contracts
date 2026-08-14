@@ -95,6 +95,10 @@ library CTMUpgradeComposer {
         uint256 newVersion = _transition.newProtocolVersion();
         proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(newVersion);
         proposedUpgrade.l2ProtocolUpgradeTx = buildL2UpgradeTx(_transition);
+        // Straight from the TARGET release, not from `CTM.currentRelease()`: a chain several
+        // versions behind executes the transition that names its own next release, and the CTM may
+        // already have moved past it.
+        proposedUpgrade.verifier = ICTMRelease(_transition.newRelease()).verifier();
         (
             proposedUpgrade.bootloaderHash,
             proposedUpgrade.defaultAccountHash,

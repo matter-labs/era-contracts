@@ -206,11 +206,6 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         );
         vm.mockCall(
             mockCTM,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector),
-            abi.encode(makeAddr("mockVerifier"))
-        );
-        vm.mockCall(
-            mockCTM,
             abi.encodeWithSelector(IChainTypeManager.BRIDGE_HUB.selector),
             abi.encode(L2_BRIDGEHUB_ADDR)
         );
@@ -267,11 +262,18 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         DeployedContracts memory contracts,
         GatewayCTMDeployerConfig memory config
     ) internal returns (address) {
+        // The verifiers are deployed by their own deployer contract, which this fixture does not
+        // simulate (it only replays the DIRECT create2 deployments above). The release pins the
+        // verifier's codehash, so give the predicted address code before building the manifest —
+        // the verifier's own behaviour is out of scope here; only the diamond cut is under test.
+        vm.etch(contracts.stateTransition.verifiers.verifier, hex"600160005500");
+
         CTMRelease release = new CTMRelease();
         release.initialize(
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
                     facets: contracts.stateTransition.facets,
+                    verifier: contracts.stateTransition.verifiers.verifier,
                     bootloaderHash: config.bootloaderHash,
                     defaultAccountHash: config.defaultAccountHash,
                     evmEmulatorHash: config.evmEmulatorHash,

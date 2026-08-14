@@ -16,11 +16,15 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0x97423C02EFf81c0fb30023ed91979Fd4A9ea1F87",
+      "ctmProxy": "0xbE18886eC7575F8d2732DDA721dE7c310548bE75",
       "release": {
         "diamondInit": {
           "address": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
-          "codehash": "0xf2cf35c0f870ffdfa3586c0bbd9a4f95b8ab0d128c54d2a73d7ab0c5e36dbf66"
+          "codehash": "0x2e5e41e7e43a2cd60468754f69a6413210961cce8b1b3de37b0d65d0f801b043"
+        },
+        "verifier": {
+          "address": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
+          "codehash": "0x82a534229234e488c2e9118643871bd5741f25fd67ad4b2e3bab5c4974168dab"
         },
         "genesisFacets": [
           {
@@ -180,8 +184,8 @@
         "fixedForceDeploymentsData": "0xf1f2",
         "genesis": {
           "genesisUpgrade": {
-            "address": "0xF7925aAefE52805CBa59455621Acc60D8042Fcd0",
-            "codehash": "0x6b03f24611747cd3984d0d4714e73598aa03c64c1350c1989f748b6968adf7ff"
+            "address": "0x71f84c3388c2824F353240291C2BDeA7dd41ce47",
+            "codehash": "0x8ce0cea81ecd576ebafd6f21334f3088fff6bc65edd088f4a872052bfa478dee"
           },
           "batchHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
           "batchCommitment": "0x0000000000000000000000000000000000000000000000000000000000000001",
@@ -189,15 +193,11 @@
         }
       },
       "transition": {
-        "releaseFactory": "0x022a2BA2D217C9ca5a2FE32884b0E545c9cA2b27",
-        "fromRelease": "0xc8Bcd88AAe8C300B4Cb7E9E542C4cf390187648c",
-        "verifier": {
-          "address": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
-          "codehash": "0x82a534229234e488c2e9118643871bd5741f25fd67ad4b2e3bab5c4974168dab"
-        },
+        "releaseFactory": "0x854c8Aea4599F9f90Ef56ba711D9d8E0084B5D21",
+        "fromRelease": "0xeD741C07d7c3D5C25081fb74C01BD76130605D94",
         "upgradeEngine": {
           "address": "0x2b5A4e5493d4a54E717057B127cf0C000C876f9B",
-          "codehash": "0xb1989f3635d5b2e6e70a4234619aace894915a743536ced5485f1bc968a907d5"
+          "codehash": "0xd96c7336c2b8f9e4c383cfee08642e0bad3588e0e37b1abc19c847e5326688c3"
         },
         "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "upgradeTimestamp": 0,

@@ -100,7 +100,8 @@ abstract contract GatewayCTMDeployerCTMBase {
             _releaseFactory: _config.bootstrapReleaseFactory,
             _genesisUpgrade: _config.genesisUpgrade,
             _baseConfig: baseConfig,
-            _facets: facets
+            _facets: facets,
+            _verifier: _config.verifier
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
@@ -117,7 +118,6 @@ abstract contract GatewayCTMDeployerCTMBase {
             releaseFactory: _config.bootstrapReleaseFactory,
             currentRelease: currentRelease,
             protocolVersion: baseConfig.protocolVersion,
-            verifier: _config.verifier,
             serverNotifier: _result.serverNotifierProxy
         });
 
@@ -139,19 +139,21 @@ abstract contract GatewayCTMDeployerCTMBase {
     /// @param _genesisUpgrade The L1 genesis upgrade contract new chains run at creation.
     /// @param _baseConfig The deployment config (base system hashes, genesis params).
     /// @param _facets The deployed diamond facet addresses.
+    /// @param _verifier The verifier a chain at this release runs.
     /// @return release The initialized bootstrap release.
-    /// @dev A release is version-INDEPENDENT: no protocol version or verifier is pinned here;
-    ///      the CTM holds those (see `diamondInitData`).
+    /// @dev A release is version-INDEPENDENT: no protocol version is pinned here; the CTM holds it.
     function _deployCurrentRelease(
         address _releaseFactory,
         address _genesisUpgrade,
         GatewayCTMDeployerConfig memory _baseConfig,
-        Facets memory _facets
+        Facets memory _facets,
+        address _verifier
     ) internal returns (address release) {
         release = CTMReleaseFactory(_releaseFactory).deployOrGetRelease(
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
                     facets: _facets,
+                    verifier: _verifier,
                     bootloaderHash: _baseConfig.bootloaderHash,
                     defaultAccountHash: _baseConfig.defaultAccountHash,
                     evmEmulatorHash: _baseConfig.evmEmulatorHash,

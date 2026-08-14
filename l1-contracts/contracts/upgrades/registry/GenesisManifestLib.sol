@@ -21,9 +21,10 @@ library GenesisManifestLib {
     uint256 internal constant GENESIS_FACET_COUNT = 6;
 
     /// @notice Everything the deploy flow feeds into a bootstrap manifest.
-    /// @dev A release is version-INDEPENDENT and VM-flag-free: version/verifier are transition
-    ///      concerns, and VM identity is single-sourced from the pinned DiamondInit immutable.
+    /// @dev A release is version-INDEPENDENT and VM-flag-free: the version schedule is a transition
+    ///      concern, and VM identity is single-sourced from the pinned DiamondInit immutable.
     /// @param facets The deployed diamond facet addresses (incl. DiamondInit).
+    /// @param verifier The verifier a chain at this release runs.
     /// @param bootloaderHash The hash of the bootloader L2 bytecode (zero on ZKsync OS).
     /// @param defaultAccountHash The hash of the default account L2 bytecode (zero on ZKsync OS).
     /// @param evmEmulatorHash The hash of the EVM emulator L2 bytecode (zero on ZKsync OS).
@@ -35,6 +36,7 @@ library GenesisManifestLib {
     // solhint-disable-next-line gas-struct-packing
     struct GenesisConfig {
         Facets facets;
+        address verifier;
         bytes32 bootloaderHash;
         bytes32 defaultAccountHash;
         bytes32 evmEmulatorHash;
@@ -66,12 +68,13 @@ library GenesisManifestLib {
         }
 
         return
-            buildGenesisManifestFromRows(
-                _cfg,
-                genesisFacets,
-                _cfg.facets.diamondInit.codehash,
-                _cfg.genesisUpgrade.codehash
-            );
+            buildGenesisManifestFromRows({
+                _cfg: _cfg,
+                _genesisFacets: genesisFacets,
+                _diamondInitCodehash: _cfg.facets.diamondInit.codehash,
+                _verifierCodehash: _cfg.verifier.codehash,
+                _genesisUpgradeCodehash: _cfg.genesisUpgrade.codehash
+            });
     }
 
     /// @notice Pure manifest assembly from precomputed facet rows and codehashes. Off-chain
@@ -84,10 +87,13 @@ library GenesisManifestLib {
         GenesisConfig memory _cfg,
         GenesisFacet[] memory _genesisFacets,
         bytes32 _diamondInitCodehash,
+        bytes32 _verifierCodehash,
         bytes32 _genesisUpgradeCodehash
     ) internal pure returns (CTMRelease.ReleaseManifest memory manifest) {
         manifest.diamondInit = _cfg.facets.diamondInit;
         manifest.diamondInitCodehash = _diamondInitCodehash;
+        manifest.verifier = _cfg.verifier;
+        manifest.verifierCodehash = _verifierCodehash;
         manifest.genesisFacets = _genesisFacets;
         manifest.bootloaderHash = _cfg.bootloaderHash;
         manifest.defaultAccountHash = _cfg.defaultAccountHash;

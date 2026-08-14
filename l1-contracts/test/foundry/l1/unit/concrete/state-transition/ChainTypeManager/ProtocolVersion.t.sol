@@ -31,8 +31,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
             getDiamondCutData(diamondInit),
             oldProtocolVersion,
             1000,
-            newProtocolVersionSemVer,
-            testnetVerifier
+            newProtocolVersionSemVer
         );
         vm.stopPrank();
 
@@ -49,7 +48,6 @@ contract ProtocolVersion is ChainTypeManagerTest {
         assertEq(newProtocolVersion, newProtocolVersionSemVer);
         assertEq(newProtocolVersionDeadline, type(uint256).max);
         assertEq(oldProtocolVersionDeadline, 1000);
-        assertEq(chainContractAddress.protocolVersionVerifier(newProtocolVersionSemVer), testnetVerifier);
     }
 
     // protocolVersionIsActive
@@ -62,7 +60,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
         _mockMigrationPausedFromBridgehub();
 
         vm.startPrank(governor);
-        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, 0, 1, testnetVerifier);
+        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, 0, 1);
         vm.stopPrank();
 
         assertEq(chainContractAddress.protocolVersionIsActive(1), true);
@@ -124,8 +122,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
             getDiamondCutDataWithCustomFacets(address(0), customFacetCuts),
             0,
             0,
-            1,
-            testnetVerifier
+            1
         );
 
         vm.expectRevert(ProtocolIdNotGreater.selector);
