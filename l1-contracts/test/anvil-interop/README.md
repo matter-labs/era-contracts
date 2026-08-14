@@ -164,7 +164,7 @@ Copy-paste into a terminal (while chains are still running) to get the full exec
 test/anvil-interop/
 ├── run-hardhat-interop-test.ts    # Main entry: deployment + hardhat test runner
 ├── setup-and-dump-state.ts        # Generate pregenerated chain state snapshots
-├── run-v29-to-v31-upgrade-test.ts # V29 → V31 upgrade test
+├── run-v31-to-v32-upgrade-test.ts # V31 → V32 upgrade test
 ├── cleanup.sh                     # Kill Anvil processes, reset state
 ├── config/
 │   ├── anvil-config.json          # Chain IDs, ports, gateway designation
@@ -260,9 +260,9 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 - **Interop proofs**: Correct struct shape but empty proof arrays
 - **processLogsAndMessages impersonation**: The diamond proxy is impersonated instead of the operator (production uses the operator role)
 - **Settlement layer notification via impersonation**: `SystemContext.setSettlementLayerChainId` is called by impersonating the bootloader. On ZKsync OS, this is only emitted during actual migration between settlement layers (and during genesis/v31 upgrades), not at every batch
-- **v29 -> v31 / v30 -> v31 upgrade harnesses**: `run-v29-to-v31-upgrade-test.ts` and `run-v30-to-v31-upgrade-test.ts` still apply direct `anvil_setStorageAt` patches before per-chain upgrade. Today this clears the lingering pre-v31 genesis-upgrade hash and seeds minimal batch counters (`totalBatchesExecuted = totalBatchesCommitted = 1`) so `saveV31UpgradeChainBatchNumber()` can run. This is a test-only compatibility bridge, not a production upgrade flow.
+- **v31 -> v32 upgrade harness**: `run-v31-to-v32-upgrade-test.ts` still applies two direct `anvil_setStorageAt` patches. Before governance it clears the genesis-upgrade tx hash the fixture's chains still carry, which a real chain's server clears once it processes the batch and which otherwise blocks a new upgrade with `PreviousUpgradeNotFinalized`. Before each per-chain upgrade, `forceBatchExecutedEqualsCommitted` copies `totalBatchesCommitted` onto `totalBatchesExecuted` so the upgrade's outstanding-batches check passes without a sequencer and prover. Both are test-only compatibility bridges, not a production upgrade flow.
 - **L2 genesis bootstrap**: `l2-genesis-upgrade-deployer.ts` still bootstraps contract code and base-token balance via Anvil RPC before relaying the real genesis transaction. Production chains get that state directly from genesis.
-- **Temporary upgrade inputs**: the upgrade harness copies v29 config inputs into `test/anvil-interop/outputs/upgrade-harness-inputs/` and passes them to Forge via env overrides. It no longer mutates checked-in `upgrade-envs/.../local.toml`.
+- **Temporary upgrade inputs**: the upgrade harness copies the scenario's config inputs into `test/anvil-interop/outputs/upgrade-harness-inputs-<scenario label>/` and passes them to Forge via env overrides. It no longer mutates checked-in `upgrade-envs/.../local.toml`.
 
 ## Adding New Tests
 

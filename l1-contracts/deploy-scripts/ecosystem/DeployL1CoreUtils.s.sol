@@ -108,9 +108,7 @@ contract DeployL1CoreUtils is DeployUtils {
         } else if (compareStrings(contractName, "L1Bridgehub")) {
             return abi.encode(config.ownerAddress, config.contracts.maxNumberOfChains);
         } else if (
-            compareStrings(contractName, "L1MessageRoot") ||
-            compareStrings(contractName, "DummyL1MessageRoot") ||
-            compareStrings(contractName, "L1MessageRootStageSepolia")
+            compareStrings(contractName, "L1MessageRoot") || compareStrings(contractName, "DummyL1MessageRoot")
         ) {
             return
                 abi.encode(
@@ -132,7 +130,7 @@ contract DeployL1CoreUtils is DeployUtils {
         } else if (compareStrings(contractName, "L1Nullifier")) {
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub, coreAddresses.bridgehub.proxies.messageRoot);
         } else if (compareStrings(contractName, "L1InteropHandler")) {
-            return abi.encode(coreAddresses.bridgehub.proxies.messageRoot);
+            return abi.encode(coreAddresses.bridgehub.proxies.messageRoot, coreAddresses.bridges.proxies.l1AssetRouter);
         } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
             return abi.encode(config.ownerAddress, coreAddresses.bridgehub.proxies.bridgehub);
         } else if (compareStrings(contractName, "L1AssetRouter")) {

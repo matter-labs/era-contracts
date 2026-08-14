@@ -7,7 +7,7 @@ import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
-import {L2DACommitmentScheme} from "../../common/Config.sol";
+import {L2DACommitmentScheme, PubdataContent} from "../../common/Config.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
@@ -34,6 +34,14 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
+    /// @notice Change the ZKsync OS single-transaction gas limit (EIP-7825).
+    /// @dev Only for ZKsync OS chains, callable on the active settlement layer instance. The limit is
+    /// part of the runtime chain config committed into each batch proof public input, so it can only
+    /// change when all committed batches are verified.
+    /// @param _newMaxTxGasLimit The new single-transaction gas limit; must not be below
+    /// `ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`
+    function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external;
+
     /// @notice Change the fee params for L1->L2 transactions
     /// @param _newFeeParams The new fee params
     function changeFeeParams(FeeParams calldata _newFeeParams) external;
@@ -56,11 +64,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice Allow EVM emulation on chain
     function allowEvmEmulation() external returns (bytes32 canonicalTxHash);
-
-    /// @notice Sets the pre-V31 total supply on ZKOS chains.
-    /// @dev Sends a service transaction to L2BaseTokenZKOS to set the value.
-    /// @param _totalSupply The total supply that existed before the V31 upgrade.
-    function setZKsyncOSPreV31TotalSupply(uint256 _totalSupply) external returns (bytes32 canonicalTxHash);
 
     /// @notice Allow Priority Mode to be activated on the chain (does not activate it).
     function permanentlyAllowPriorityMode() external;
@@ -114,6 +117,14 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _l2DACommitmentScheme The scheme of the L2 DA commitment
     function setDAValidatorPair(address _l1DAValidator, L2DACommitmentScheme _l2DACommitmentScheme) external;
 
+    /// @notice Sets the pubdata content. Orthogonal to the DA commitment scheme: it selects whether
+    /// the whole pubdata (`FULL_PUBDATA`) or only the mandatory L2->L1 log region (`LOGS_ONLY`) is
+    /// committed. Committed into the ZKsync OS batch public input via the chain config hash, so it is
+    /// enforced by the batch proof. Callable only for ZKsync OS chains — the setting has no meaning on
+    /// Era-VM chains.
+    /// @param _pubdataContent The new pubdata content.
+    function setPubdataContent(PubdataContent _pubdataContent) external;
+
     /// @notice Makes the chain as permanent rollup.
     /// @dev This is a security feature needed for chains that should be
     /// trusted to keep their data available even if the chain admin becomes malicious
@@ -136,6 +147,9 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice Priority transaction max L2 gas limit changed
     event NewPriorityTxMaxGasLimit(uint256 oldPriorityTxMaxGasLimit, uint256 newPriorityTxMaxGasLimit);
+
+    /// @notice ZKsync OS single-transaction gas limit (EIP-7825) changed
+    event NewZKsyncOSMaxTxGasLimit(uint64 oldMaxTxGasLimit, uint64 newMaxTxGasLimit);
 
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
@@ -169,14 +183,15 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @notice The EVM emulator has been enabled
     event EnableEvmEmulator();
 
-    /// @notice Emitted when the ZKOS pre-V31 total supply is set via service transaction
-    event ZKsyncOSPreV31TotalSupplySet(uint256 totalSupply);
-
     /// @notice New L2 DA commitment scheme set
     event NewL2DACommitmentScheme(
         L2DACommitmentScheme indexed oldL2DACommitmentScheme,
         L2DACommitmentScheme indexed newL2DACommitmentScheme
     );
+
+    /// @notice New pubdata content set
+    event NewPubdataContent(PubdataContent indexed oldPubdataContent, PubdataContent indexed newPubdataContent);
+
     event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
 
     event BridgeMint(address indexed _account, uint256 _amount);

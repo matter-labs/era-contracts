@@ -4,8 +4,17 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
-import {AtomicFlow, AtomicFinalityProof, ImtProof} from "contracts/atomic-interop/IAtomicInterop.sol";
-import {ManagerAlreadyInitialized, ManagerSettlementLayerNotL1} from "contracts/atomic-interop/AtomicInteropErrors.sol";
+import {
+    AtomicFlow,
+    AtomicFinalityProof,
+    ImtProof,
+    ATOMIC_FLOW_PREIMAGE_VERSION
+} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {
+    ManagerAlreadyInitialized,
+    ManagerMissingLegIndexOutOfRange,
+    ManagerSettlementLayerNotL1
+} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {Unauthorized} from "contracts/l2-system/zksync-os/errors/ZKOSContractErrors.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -27,6 +36,7 @@ contract AtomicFlowManagerInitTest is Test {
 
     /// @dev A minimal well-formed flow (correct flowId) declaring `_settlementLayerChainId`.
     function _flow(uint256 _settlementLayerChainId) internal pure returns (AtomicFlow memory flow) {
+        flow.preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         flow.preimage.deadline = 123;
         flow.preimage.settlementLayerChainId = _settlementLayerChainId;
         flow.preimage.legBundleHashes = new bytes32[](1);
@@ -69,5 +79,13 @@ contract AtomicFlowManagerInitTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(ManagerSettlementLayerNotL1.selector, L1_CHAIN_ID, L1_CHAIN_ID + 1));
         manager.authorizeRefund(flow, 0, absence);
+    }
+
+    function test_RevertWhen_refundMissingLegIndexOutOfRange() public {
+        AtomicFlow memory flow = _flow(L1_CHAIN_ID);
+        ImtProof memory absence;
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerMissingLegIndexOutOfRange.selector, 1, 1));
+        manager.authorizeRefund(flow, 1, absence);
     }
 }

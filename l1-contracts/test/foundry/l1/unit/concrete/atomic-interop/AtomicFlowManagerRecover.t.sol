@@ -23,8 +23,8 @@ import {
 /// tested in isolation, and lets a leg be forced `Revertable` so the full `claimRefund` state machine
 /// (Committed->Revertable->Reverted, with rollback on a failing recovery) can be driven directly.
 contract AtomicFlowManagerRecoverHarness is AtomicFlowManager {
-    function exposedRecoverBundle(bytes32 _flowId, bytes32 _bundleHash, InteropBundle memory _bundle) external {
-        _recoverBundle(_flowId, _bundleHash, _bundle);
+    function exposedRecoverBundle(InteropBundle memory _bundle) external {
+        _recoverBundle(_bundle);
     }
 
     function forceRevertable(bytes32 _flowId, bytes32 _bundleHash) external {
@@ -74,8 +74,8 @@ contract MockRecoveryRouter {
 
 /// @notice Unit tests for the native-value refund branch in {AtomicFlowManager._recoverBundle}.
 /// The external asset-router recovery collaborator is mocked so we assert purely the dispatch logic: the
-/// destination base-token asset id is forwarded, a value leg always counts as recovered, and a fully
-/// non-recoverable bundle reverts.
+/// destination base-token asset id is forwarded, a value leg is refunded through the router, and a fully
+/// non-recoverable bundle succeeds without touching the router.
 contract AtomicFlowManagerRecoverTest is Test {
     AtomicFlowManagerRecoverHarness internal manager;
 
@@ -85,9 +85,6 @@ contract AtomicFlowManagerRecoverTest is Test {
     uint256 internal constant DEST_CHAIN_ID = 271;
     address internal constant DEPOSITOR = address(0xD3903170);
     address internal constant CALL_TARGET = address(0xCA11);
-
-    bytes32 internal constant FLOW_ID = bytes32(uint256(1));
-    bytes32 internal constant BUNDLE_HASH = bytes32(uint256(2));
 
     function setUp() public {
         manager = new AtomicFlowManagerRecoverHarness();
@@ -152,7 +149,7 @@ contract AtomicFlowManagerRecoverTest is Test {
                 (DEST_CHAIN_ID, SOURCE_BASE_TOKEN_ASSET_ID, DEPOSITOR, value)
             )
         );
-        manager.exposedRecoverBundle(FLOW_ID, BUNDLE_HASH, _bundle(SOURCE_BASE_TOKEN_ASSET_ID, value));
+        manager.exposedRecoverBundle(_bundle(SOURCE_BASE_TOKEN_ASSET_ID, value));
     }
 
     /// @dev Dispatch-only counterpart of {test_recoverBundle_directValueLeg_forwardsSameBaseAssetIdToRouter}
@@ -174,24 +171,24 @@ contract AtomicFlowManagerRecoverTest is Test {
                 (DEST_CHAIN_ID, OTHER_BASE_TOKEN_ASSET_ID, DEPOSITOR, value)
             )
         );
-        manager.exposedRecoverBundle(FLOW_ID, BUNDLE_HASH, _bundle(OTHER_BASE_TOKEN_ASSET_ID, value));
+        manager.exposedRecoverBundle(_bundle(OTHER_BASE_TOKEN_ASSET_ID, value));
     }
 
     function test_recoverBundle_revertsWhenDestinationIsL1() public {
         // L2->L1 atomic bundles are rejected at send, so recovery must never process an L1-destined bundle:
-        // that keeps it away from the append-only L1 counters in L2AssetTracker (whose settlement-layer
+        // that keeps it away from the append-only L1 counters in BaseTokenHolder (whose settlement-layer
         // updates are only correct at send time). Set L1_CHAIN_ID == the builder's DEST_CHAIN_ID so the bundle
         // is L1-destined, and assert the guard reverts before any refund dispatch.
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         manager.initL2(DEST_CHAIN_ID);
 
         vm.expectRevert(RecoverToL1NotSupported.selector);
-        manager.exposedRecoverBundle(FLOW_ID, BUNDLE_HASH, _bundle(SOURCE_BASE_TOKEN_ASSET_ID, 5 ether));
+        manager.exposedRecoverBundle(_bundle(SOURCE_BASE_TOKEN_ASSET_ID, 5 ether));
     }
 
-    function test_recoverBundle_pureValueCallCountsAsRecovered() public {
-        // A value leg whose direct sender has no per-sender recovery must still succeed: the value refund
-        // itself counts, so the bundle is not rejected as non-recoverable.
+    function test_recoverBundle_pureValueCallIsRefunded() public {
+        // A value leg whose direct sender has no per-sender recovery must still succeed: the value
+        // refund is dispatched through the router on its own.
         vm.mockCall(
             L2_ASSET_ROUTER_ADDR,
             abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
@@ -199,7 +196,7 @@ contract AtomicFlowManagerRecoverTest is Test {
         );
 
         // Does not revert.
-        manager.exposedRecoverBundle(FLOW_ID, BUNDLE_HASH, _bundle(SOURCE_BASE_TOKEN_ASSET_ID, 1 ether));
+        manager.exposedRecoverBundle(_bundle(SOURCE_BASE_TOKEN_ASSET_ID, 1 ether));
     }
 
     function test_recoverBundle_routerBackedValueDoesNotRefundSeparately() public {
@@ -217,17 +214,24 @@ contract AtomicFlowManagerRecoverTest is Test {
             "double recovery"
         );
 
-        manager.exposedRecoverBundle(
-            FLOW_ID,
-            BUNDLE_HASH,
-            _bundleFrom(L2_ASSET_ROUTER_ADDR, SOURCE_BASE_TOKEN_ASSET_ID, 1 ether, callData)
-        );
+        manager.exposedRecoverBundle(_bundleFrom(L2_ASSET_ROUTER_ADDR, SOURCE_BASE_TOKEN_ASSET_ID, 1 ether, callData));
     }
 
-    function test_recoverBundle_revertsWhenNothingRecoverable() public {
-        // No value and a direct, non-asset-router sender: nothing to reverse, so the refund is rejected.
-        vm.expectRevert(abi.encodeWithSelector(ManagerNoRecoverableCalls.selector, FLOW_ID, BUNDLE_HASH));
-        manager.exposedRecoverBundle(FLOW_ID, BUNDLE_HASH, _bundle(SOURCE_BASE_TOKEN_ASSET_ID, 0));
+    function test_recoverBundle_succeedsWhenNothingRecoverable() public {
+        // No value and a direct, non-asset-router sender: nothing to reverse. The refund must still go
+        // through (flipping the leg to Reverted is meaningful on its own) and must not touch the asset
+        // router at all — both router entry points are set to revert, so any dispatch would fail the test.
+        vm.mockCallRevert(
+            L2_ASSET_ROUTER_ADDR,
+            abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
+            "unexpected value refund"
+        );
+        vm.mockCallRevert(
+            L2_ASSET_ROUTER_ADDR,
+            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector),
+            "unexpected recovery"
+        );
+        manager.exposedRecoverBundle(_bundle(SOURCE_BASE_TOKEN_ASSET_ID, 0));
     }
 
     // ------------------------------------------------------------------------------------------------

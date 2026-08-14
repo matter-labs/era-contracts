@@ -14,11 +14,9 @@ import {
 import {MessageRootIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-/// @notice Unit tests for the `L2InteropRootStorage` import gates: the full `(root, timestamp)`
-/// tuple is stored, and malformed imports (zero root, zero timestamp, duplicates, extra sides) are
-/// rejected. The zero-timestamp gate keeps the {IL2InteropRootStorage} invariant — a zero stored
-/// timestamp only ever means "nothing imported at this key" — structural rather than relying on the
-/// executor's settlement-layer double check.
+/// @notice Covers the `L2InteropRootStorage` import gates: the `(root, timestamp)` tuple is stored and
+/// malformed imports are rejected, keeping the {IL2InteropRootStorage} zero-timestamp invariant
+/// structural. See {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}.
 contract L2InteropRootStorageTest is Test {
     uint256 internal constant CHAIN_ID = 320;
     uint256 internal constant BLOCK_NUMBER = 7;
@@ -70,6 +68,39 @@ contract L2InteropRootStorageTest is Test {
         vm.prank(L2_BOOTLOADER_ADDRESS);
         vm.expectRevert(InteropRootAlreadyExists.selector);
         rootStorage.addSingleInteropRoot(_root(TIMESTAMP + 1, keccak256("other")));
+    }
+
+    /// @notice The tracked latest timestamp is the MAXIMUM over all imports for the chain — imports
+    /// need not arrive in timestamp order, and the value must never decrease (the atomic-interop send
+    /// path relies on its monotonicity to keep expired flows closed for good).
+    function test_latestInteropRootTimestamp_tracksMaximumAcrossImports() public {
+        assertEq(rootStorage.latestInteropRootTimestamp(CHAIN_ID), 0, "no import yet");
+
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        rootStorage.addSingleInteropRoot(_root(TIMESTAMP, keccak256("root")));
+        assertEq(rootStorage.latestInteropRootTimestamp(CHAIN_ID), TIMESTAMP);
+
+        // A fresher root bumps the tracked value.
+        InteropRoot memory fresher = _root(TIMESTAMP + 100, keccak256("fresher"));
+        fresher.blockOrBatchNumber = BLOCK_NUMBER + 1;
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        rootStorage.addSingleInteropRoot(fresher);
+        assertEq(rootStorage.latestInteropRootTimestamp(CHAIN_ID), TIMESTAMP + 100);
+
+        // An out-of-order (older) root must NOT lower it.
+        InteropRoot memory older = _root(TIMESTAMP + 50, keccak256("older"));
+        older.blockOrBatchNumber = BLOCK_NUMBER + 2;
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        rootStorage.addSingleInteropRoot(older);
+        assertEq(rootStorage.latestInteropRootTimestamp(CHAIN_ID), TIMESTAMP + 100, "maximum must be kept");
+    }
+
+    /// @notice Tracking is per chain id: an import for one chain leaves other chains' values untouched.
+    function test_latestInteropRootTimestamp_isPerChain() public {
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        rootStorage.addSingleInteropRoot(_root(TIMESTAMP, keccak256("root")));
+
+        assertEq(rootStorage.latestInteropRootTimestamp(CHAIN_ID + 1), 0);
     }
 
     function test_RevertWhen_sidesLengthNotOne() public {

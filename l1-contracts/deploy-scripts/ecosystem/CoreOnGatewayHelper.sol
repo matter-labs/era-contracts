@@ -38,7 +38,9 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
     L2_VERSION_SPECIFIC_UPGRADER_ADDR,
-    L2_INTEROP_ATTRIBUTE_PARSER_ADDR
+    L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
+    L2_INTEROP_COMMITMENT_TREE_ADDR,
+    L2_ATOMIC_FLOW_MANAGER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title CoreOnGatewayHelper
@@ -156,19 +158,27 @@ library CoreOnGatewayHelper {
             // `FixedForceDeploymentsData.beaconDeployerInfo` references but
             // which is not one of the fixed-address core contracts.
             CoreContract[] memory fixedAddressCoreContracts = SystemContractsProcessing.getFixedAddressCoreContracts();
-            dependencyContracts = new CoreContract[](fixedAddressCoreContracts.length + 1);
+            // The ZKsync-OS-only contracts are force-deployed by `getBaseZKsyncOSForceDeployments` from a
+            // separate list, so their preimages have to be merged in here as well.
+            CoreContract[] memory zksyncOSOnlyContracts = SystemContractsProcessing.getZKsyncOSOnlyContracts();
+            dependencyContracts = new CoreContract[](
+                fixedAddressCoreContracts.length + zksyncOSOnlyContracts.length + 1
+            );
+            uint256 index;
             for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
-                dependencyContracts[i] = fixedAddressCoreContracts[i];
+                dependencyContracts[index++] = fixedAddressCoreContracts[i];
             }
-            dependencyContracts[fixedAddressCoreContracts.length] = CoreContract.UpgradeableBeaconDeployer;
+            for (uint256 i = 0; i < zksyncOSOnlyContracts.length; i++) {
+                dependencyContracts[index++] = zksyncOSOnlyContracts[i];
+            }
+            dependencyContracts[index] = CoreContract.UpgradeableBeaconDeployer;
             return dependencyContracts;
         }
 
-        dependencyContracts = new CoreContract[](4);
-        dependencyContracts[0] = CoreContract.L2SharedBridgeLegacy;
-        dependencyContracts[1] = CoreContract.BridgedStandardERC20;
-        dependencyContracts[2] = CoreContract.DiamondProxy;
-        dependencyContracts[3] = CoreContract.ProxyAdmin;
+        dependencyContracts = new CoreContract[](3);
+        dependencyContracts[0] = CoreContract.BridgedStandardERC20;
+        dependencyContracts[1] = CoreContract.DiamondProxy;
+        dependencyContracts[2] = CoreContract.ProxyAdmin;
     }
 
     function _getFactoryDependencyBytecodes(
@@ -202,7 +212,9 @@ library CoreOnGatewayHelper {
     /// @notice Resolve a CoreContract enum to its contract name for the active VM.
     function _resolveContractName(bool _isZKsyncOS, CoreContract _c) internal pure returns (string memory) {
         // Contracts with different names per VM
-        if (_c == CoreContract.L2NativeTokenVault) return _isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault";
+        if (_c == CoreContract.L2NativeTokenVault) {
+            return _isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault";
+        }
 
         // Contracts with the same name across both VMs
         if (_c == CoreContract.L2Bridgehub) return "L2Bridgehub";
@@ -213,14 +225,15 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2ChainAssetHandler) return "L2ChainAssetHandler";
         if (_c == CoreContract.InteropCenter) return "InteropCenter";
         if (_c == CoreContract.InteropAttributeParser) return "InteropAttributeParser";
+        if (_c == CoreContract.L2InteropCommitmentTree) return "L2InteropCommitmentTree";
+        if (_c == CoreContract.AtomicFlowManager) return "AtomicFlowManager";
         if (_c == CoreContract.L2InteropHandler) return "L2InteropHandler";
         if (_c == CoreContract.L2AssetTracker) return "L2AssetTracker";
         if (_c == CoreContract.L2WrappedBaseToken) return "L2WrappedBaseToken";
         if (_c == CoreContract.L2MessageVerification) return "L2MessageVerification";
         if (_c == CoreContract.L2InteropRootStorage) return "L2InteropRootStorage";
         if (_c == CoreContract.BeaconProxy) return "BeaconProxy";
-        if (_c == CoreContract.L2V31Upgrade) return "L2V31Upgrade";
-        if (_c == CoreContract.L2SharedBridgeLegacy) return "L2SharedBridgeLegacy";
+        if (_c == CoreContract.L2V32Upgrade) return "L2V32Upgrade";
         if (_c == CoreContract.BridgedStandardERC20) return "BridgedStandardERC20";
         if (_c == CoreContract.DiamondProxy) return "DiamondProxy";
         if (_c == CoreContract.ProxyAdmin) return "ProxyAdmin";
@@ -248,13 +261,19 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.InteropCenter) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.InteropAttributeParser) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.L2InteropCommitmentTree) {
+            return ZKsyncOSUpgradeType.SystemProxy;
+        }
+        if (_c == CoreContract.AtomicFlowManager) {
+            return ZKsyncOSUpgradeType.SystemProxy;
+        }
         revert UnknownCoreContract();
     }
 
     /// @notice Resolve a CoreContract enum to its canonical L2 address.
     /// @dev Only covers contracts with well-known constant addresses.
     function _resolveAddress(CoreContract _c) internal pure returns (address) {
-        if (_c == CoreContract.L2V31Upgrade) {
+        if (_c == CoreContract.L2V32Upgrade) {
             return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
         }
         if (_c == CoreContract.L2Bridgehub) return L2_BRIDGEHUB_ADDR;
@@ -271,6 +290,8 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.InteropAttributeParser) return L2_INTEROP_ATTRIBUTE_PARSER_ADDR;
         if (_c == CoreContract.L2InteropHandler) return L2_INTEROP_HANDLER_ADDR;
         if (_c == CoreContract.UpgradeableBeaconDeployer) return L2_NTV_BEACON_DEPLOYER_ADDR;
+        if (_c == CoreContract.L2InteropCommitmentTree) return L2_INTEROP_COMMITMENT_TREE_ADDR;
+        if (_c == CoreContract.AtomicFlowManager) return L2_ATOMIC_FLOW_MANAGER_ADDR;
         revert UnknownCoreContract();
     }
 

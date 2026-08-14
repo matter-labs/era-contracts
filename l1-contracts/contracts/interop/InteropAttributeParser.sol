@@ -66,7 +66,7 @@ contract InteropAttributeParser is IInteropAttributeParser {
             } else if (idx == 4) {
                 bundleAttributes.useFixedFee = AttributesDecoder.decodeBool(_attributes[i]);
             } else if (idx == 5) {
-                // The atomic send metadata (flowId/deadline/lowNullifierIndex) is parsed separately via
+                // The atomic send metadata (the flow preimage plus lowNullifierIndex) is parsed separately via
                 // `parseAtomicSend` and NOT stored in `BundleAttributes` — it must stay out of the
                 // cross-chain bundle so `bundleHash` does not depend on `flowId` (a circular dependency).
                 // Here we only validate it is a permitted, non-duplicate bundle attribute (done above).
@@ -89,6 +89,8 @@ contract InteropAttributeParser is IInteropAttributeParser {
                     _attributes[i]
                 );
                 atomicSend.isAtomic = true;
+                // The attribute may appear at most once (`parseAttributes` rejects duplicates), so stop scanning.
+                break;
             }
         }
     }

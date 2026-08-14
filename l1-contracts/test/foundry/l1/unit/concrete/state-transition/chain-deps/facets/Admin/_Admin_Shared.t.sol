@@ -30,6 +30,7 @@ contract AdminTest is UtilsCallMockerTest {
         selectors[i++] = IAdmin.setValidator.selector;
         selectors[i++] = IAdmin.setPorterAvailability.selector;
         selectors[i++] = IAdmin.setPriorityTxMaxGasLimit.selector;
+        selectors[i++] = IAdmin.setZKsyncOSMaxTxGasLimit.selector;
         selectors[i++] = IAdmin.changeFeeParams.selector;
         selectors[i++] = IAdmin.setTokenMultiplier.selector;
         selectors[i++] = IAdmin.upgradeChainFromVersion.selector;
@@ -45,7 +46,6 @@ contract AdminTest is UtilsCallMockerTest {
         selectors[i++] = IAdmin.setDAValidatorPair.selector;
         selectors[i++] = IAdmin.allowEvmEmulation.selector;
         selectors[i++] = IAdmin.makePermanentRollup.selector;
-        selectors[i++] = IAdmin.setZKsyncOSPreV31TotalSupply.selector;
         return selectors;
     }
 

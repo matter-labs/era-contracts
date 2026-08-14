@@ -56,30 +56,19 @@ library AddressIntrospector {
         if (address(_bridgehub) == L2_BRIDGEHUB_ADDR) {
             return _getL2BridgehubAddresses();
         }
-        return _getL1BridgehubAddressesInternal(_bridgehub, false);
-    }
-
-    function getBridgehubAddressesV29(IL1Bridgehub _bridgehub) public view returns (BridgehubAddresses memory info) {
-        if (address(_bridgehub) == L2_BRIDGEHUB_ADDR) {
-            return _getL2BridgehubAddresses();
-        }
-        return _getL1BridgehubAddressesInternal(_bridgehub, true);
+        return _getL1BridgehubAddressesInternal(_bridgehub);
     }
 
     function _getL1BridgehubAddressesInternal(
-        IL1Bridgehub _bridgehub,
-        bool isV29
+        IL1Bridgehub _bridgehub
     ) private view returns (BridgehubAddresses memory info) {
         address bridgehubProxy = address(_bridgehub);
         address messageRoot = address(_bridgehub.messageRoot());
         address ctmDeploymentTrackerProxy = address(_bridgehub.l1CtmDeployer());
         address chainAssetHandler = _bridgehub.chainAssetHandler();
 
-        // chainRegistrationSender is only available post-V29
-        address chainRegistrationSenderAddr = address(0);
-        if (!isV29) {
-            chainRegistrationSenderAddr = IBridgehubBase(bridgehubProxy).chainRegistrationSender();
-        }
+        // Present from v31 on; zero until the ecosystem registers it.
+        address chainRegistrationSenderAddr = IBridgehubBase(bridgehubProxy).chainRegistrationSender();
 
         BridgehubContracts memory proxies = BridgehubContracts({
             bridgehub: bridgehubProxy,
@@ -121,10 +110,9 @@ library AddressIntrospector {
         return _getBridgesDeployedAddressesInternal(_assetRouter, false);
     }
 
-    /// @dev Naming note: the `V29` suffix marks the LEGACY introspection path. For the bridge contracts the
-    /// only version-dependent getter is `l1InteropHandler()` (introduced in v32), so this variant is correct
-    /// for every pre-v32 deployment (v29/v30/v31), not just v29 itself — hence the `isPreV32` flag it passes.
-    function getBridgesDeployedAddressesV29(
+    /// @notice Bridge discovery for a v31 ecosystem: the nullifier has no `l1InteropHandler()` yet, so the
+    /// interop handler is reported as absent and the upgrade deploys it.
+    function getBridgesDeployedAddressesV31(
         address _assetRouter
     ) public view returns (BridgesDeployedAddresses memory info) {
         if (_assetRouter == address(0) || _assetRouter.code.length == 0) {
@@ -135,15 +123,14 @@ library AddressIntrospector {
 
     function _getBridgesDeployedAddressesInternal(
         address _assetRouter,
-        bool isPreV32
+        bool _isPreV32
     ) private view returns (BridgesDeployedAddresses memory info) {
         L1AssetRouter assetRouter = L1AssetRouter(_assetRouter);
 
         address l1NullifierProxy = address(assetRouter.L1_NULLIFIER());
         address l1NativeTokenVaultProxy = address(assetRouter.nativeTokenVault());
-        // The L1 interop handler is introduced in v32, so it does not exist on any earlier version (v29/v30/v31);
-        // the nullifier only exposes `l1InteropHandler()` from v32 onward. Skip the call for pre-v32 deployments.
-        address l1InteropHandlerProxy = isPreV32 ? address(0) : L1Nullifier(l1NullifierProxy).l1InteropHandler();
+        // `l1InteropHandler()` only exists on the nullifier from v32 onward; skip the call for pre-v32 deployments.
+        address l1InteropHandlerProxy = _isPreV32 ? address(0) : L1Nullifier(l1NullifierProxy).l1InteropHandler();
 
         require(l1NativeTokenVaultProxy != address(0), "NativeTokenVault address is zero");
         NativeTokenVaultBase ntv = NativeTokenVaultBase(l1NativeTokenVaultProxy);
@@ -190,19 +177,22 @@ library AddressIntrospector {
         coreAddresses.shared.governance = IOwnable(_bridgehubProxy).owner();
     }
 
-    function getCoreDeployedAddressesV29(
+    /// @notice Discovery for a v31 ecosystem: the bridgehub already exposes `chainRegistrationSender`,
+    /// but the nullifier has no `l1InteropHandler` yet — that arrives with the v32 implementations.
+    /// @dev Calling `getCoreDeployedAddresses` on a v31 ecosystem reverts on the missing nullifier getter.
+    function getCoreDeployedAddressesV31(
         address _bridgehubProxy
     ) public view returns (CoreDeployedAddresses memory coreAddresses) {
         require(_bridgehubProxy != address(0), "Bridgehub address is zero");
         require(_bridgehubProxy.code.length > 0, "Bridgehub has no code");
 
-        coreAddresses.bridgehub = getBridgehubAddressesV29(IL1Bridgehub(_bridgehubProxy));
+        coreAddresses.bridgehub = getBridgehubAddresses(IL1Bridgehub(_bridgehubProxy));
 
         address assetRouter = address(IL1Bridgehub(_bridgehubProxy).assetRouter());
         require(assetRouter != address(0), "AssetRouter address is zero");
         require(assetRouter.code.length > 0, "AssetRouter has no code");
 
-        coreAddresses.bridges = getBridgesDeployedAddressesV29(assetRouter);
+        coreAddresses.bridges = getBridgesDeployedAddressesV31(assetRouter);
         coreAddresses.shared.transparentProxyAdmin = Utils.getProxyAdminAddress(_bridgehubProxy);
         coreAddresses.shared.bridgehubAdmin = address(IL1Bridgehub(_bridgehubProxy).admin());
         coreAddresses.shared.governance = IOwnable(_bridgehubProxy).owner();
@@ -211,23 +201,28 @@ library AddressIntrospector {
     // ============ CTM Addresses ============
 
     function getCTMAddresses(ChainTypeManagerBase _ctm) public view returns (CTMDeployedAddresses memory info) {
-        return _getCTMAddressesInternal(address(_ctm), false, _ctm.isZKsyncOS());
+        return _getCTMAddressesInternal(address(_ctm), _ctm.isZKsyncOS(), false);
     }
 
-    function getCTMAddressesV29(
+    /// @notice CTM discovery for a v31 ecosystem.
+    /// @dev The sub-verifier getters differ: a v31 ZKsync OS verifier exposes `fflonkVerifiers(i)` /
+    /// `plonkVerifiers(i)`, while this release's exposes a single `PLONK_VERIFIER()`. Reading the v32 shape
+    /// off a v31 verifier reverts, and the upgrade deploys fresh verifiers anyway, so the sub-verifiers are
+    /// reported as absent — the same thing the v29 path used to do.
+    function getCTMAddressesV31(
         address _ctmAddr,
-        bool isZKsyncOS
+        bool _isZKsyncOS
     ) public view returns (CTMDeployedAddresses memory info) {
         if (_ctmAddr == address(0) || _ctmAddr.code.length == 0) {
             return info;
         }
-        return _getCTMAddressesInternal(_ctmAddr, true, isZKsyncOS);
+        return _getCTMAddressesInternal(_ctmAddr, _isZKsyncOS, true);
     }
 
     function _getCTMAddressesInternal(
         address _ctmAddr,
-        bool isV29,
-        bool isZKsyncOS
+        bool _isZKsyncOS,
+        bool _isPreV32
     ) private view returns (CTMDeployedAddresses memory info) {
         ChainTypeManagerBase ctm = ChainTypeManagerBase(_ctmAddr);
 
@@ -235,13 +230,12 @@ library AddressIntrospector {
 
         Facets memory facets = _getFacetsFromUptoDateZkChain(ctm);
         address verifier = _getVerifierFromUptoDateZkChain(ctm);
-        // V29 verifier is a dual verifier, but the sub-verifier getters were added in V31
-        (address verifierFflonk, address verifierPlonk) = isV29
+        // The bytecodes supplier and the permissionless validator exist from v31 on, which is the oldest
+        // ecosystem this release can upgrade; the sub-verifier shape does not (see `getCTMAddressesV31`).
+        (address verifierFflonk, address verifierPlonk) = _isPreV32
             ? (address(0), address(0))
-            : _getSubVerifiers(verifier, isZKsyncOS);
-
-        // bytecodesSupplier only available in newer versions
-        address bytecodesSupplier = isV29 ? address(0) : ctm.L1_BYTECODES_SUPPLIER();
+            : _getSubVerifiers(verifier, _isZKsyncOS);
+        address bytecodesSupplier = ctm.L1_BYTECODES_SUPPLIER();
 
         // Note: daAddresses is left zero-initialized (Solidity default)
         info.stateTransition = StateTransitionDeployedAddresses({
@@ -250,8 +244,7 @@ library AddressIntrospector {
                 serverNotifier: ctm.serverNotifierAddress(),
                 validatorTimelock: validatorTimelock,
                 bytecodesSupplier: bytecodesSupplier,
-                // PERMISSIONLESS_VALIDATOR only available in newer versions
-                permissionlessValidator: isV29 ? address(0) : ctm.PERMISSIONLESS_VALIDATOR()
+                permissionlessValidator: ctm.PERMISSIONLESS_VALIDATOR()
             }),
             implementations: StateTransitionContracts({
                 chainTypeManager: Utils.getImplementation(_ctmAddr),
@@ -361,17 +354,25 @@ library AddressIntrospector {
         return _zkChain.facetAddresses();
     }
 
-    /// @notice Determines whether to use v29-compatible introspection based on protocol version
-    function shouldUseV29Introspection(address _bridgehubProxy) public view returns (bool) {
+    /// @notice Whether the ecosystem predates v32, i.e. its nullifier has no `l1InteropHandler` getter and
+    /// the upgrade still has to deploy and wire the interop handler.
+    /// @dev Reverts on an ecosystem with no registered chains: there is nothing to read a protocol version
+    /// from, and answering anyway would silently pick a discovery path. Callers decide what such an
+    /// ecosystem means for them — see `hasRegisteredChains`.
+    function shouldUsePreV32Introspection(address _bridgehubProxy) public view returns (bool) {
         require(_bridgehubProxy != address(0) && _bridgehubProxy.code.length > 0, "Bridgehub contract does not exist");
 
         address[] memory zkChains = IL1Bridgehub(_bridgehubProxy).getAllZKChains();
-        if (zkChains.length == 0) {
-            return false;
-        }
+        require(zkChains.length != 0, "Ecosystem has no chain to read a protocol version from");
 
-        uint256 v31Version = SemVer.packSemVer(0, 31, 0);
-        return IZKChain(zkChains[0]).getProtocolVersion() < v31Version;
+        return IZKChain(zkChains[0]).getProtocolVersion() < SemVer.packSemVer(0, 32, 0);
+    }
+
+    /// @notice Whether the ecosystem has at least one registered chain, i.e. whether its protocol version
+    /// can be inspected at all.
+    function hasRegisteredChains(address _bridgehubProxy) public view returns (bool) {
+        require(_bridgehubProxy != address(0) && _bridgehubProxy.code.length > 0, "Bridgehub contract does not exist");
+        return IL1Bridgehub(_bridgehubProxy).getAllZKChains().length != 0;
     }
 
     /// @notice Convenience method to fetch everything for a specific chainId
@@ -470,9 +471,9 @@ library AddressIntrospector {
         return address(0);
     }
 
-    /// @notice Get fflonk and plonk sub-verifiers from a dual verifier
+    /// @notice Get the sub-verifiers used by the active verifier.
     /// @param _verifier The verifier address
-    /// @param _isZKsyncOS If true, uses ZKsyncOSDualVerifier interface; otherwise EraDualVerifier
+    /// @param _isZKsyncOS If true, returns only the ZKsync OS PLONK verifier; otherwise both Era verifiers.
     function _getSubVerifiers(
         address _verifier,
         bool _isZKsyncOS

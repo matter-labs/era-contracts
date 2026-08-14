@@ -14,16 +14,34 @@
   },
   {
     "type": "function",
-    "name": "backFillZKSyncOSBaseTokenV31MigrationData",
+    "name": "assertBaseTokenRecoveryIsAccountingNeutral",
     "inputs": [
       {
-        "name": "_amount",
+        "name": "_toChainId",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "assertRecoveryIsAccountingNeutral",
+    "inputs": [
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_toChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -148,24 +166,6 @@
   },
   {
     "type": "function",
-    "name": "handleRecoverBaseTokenBridgingOnL2",
-    "inputs": [
-      {
-        "name": "_toChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "initL2",
     "inputs": [
       {
@@ -177,11 +177,6 @@
         "name": "_baseTokenAssetId",
         "type": "bytes32",
         "internalType": "bytes32"
-      },
-      {
-        "name": "_needBaseTokenTotalSupplyBackfill",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "outputs": [],
@@ -205,26 +200,6 @@
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "needBaseTokenTotalSupplyBackfill",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "registerBaseTokenDuringUpgrade",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -256,18 +231,5 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "event",
-    "name": "BaseTokenRegisteredDuringUpgrade",
-    "inputs": [
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
   }
 ]

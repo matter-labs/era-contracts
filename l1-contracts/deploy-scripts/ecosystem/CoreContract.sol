@@ -8,10 +8,6 @@ enum Language {
     Yul
 }
 
-/// @notice Canonical identifier for core L2 contracts that participate in
-///         force-deployments and factory-dependency publishing.
-///         The enum value is VM-neutral; `CoreOnGatewayHelper.resolve` maps it to
-///         the correct Era or ZKsyncOS contract / artifact name.
 /// @notice How a built-in contract is deployed in ZKsyncOS upgrades.
 /// SystemProxy: deployed via conductContractUpgrade (behind a system proxy).
 /// Unsafe: force-deployed directly (no proxy upgrade flow).
@@ -59,6 +55,10 @@ enum EraVmSystemContract {
     SystemContractProxyAdmin
 }
 
+/// @notice Canonical identifier for core L2 contracts that participate in
+///         force-deployments and factory-dependency publishing.
+///         The enum value is VM-neutral; `CoreOnGatewayHelper.resolve` maps it to
+///         the correct Era or ZKsyncOS contract / artifact name.
 enum CoreContract {
     L2Bridgehub,
     L2AssetRouter,
@@ -75,12 +75,15 @@ enum CoreContract {
     L2MessageVerification,
     L2InteropRootStorage,
     BeaconProxy,
-    L2V31Upgrade,
-    L2SharedBridgeLegacy,
+    L2V32Upgrade,
     BridgedStandardERC20,
     DiamondProxy,
     ProxyAdmin,
-    TransparentUpgradeableProxy
+    TransparentUpgradeableProxy,
+    // Atomic-interop built-ins, part of `getZKsyncOSOnlyContracts`: the commitment tree's storage is read
+    // by the ZKsync OS bootloader, and Era chains have no atomic interop.
+    L2InteropCommitmentTree,
+    AtomicFlowManager
 }
 
 /// @notice System contracts that have ZKsyncOS-specific implementations in l1-contracts.

@@ -15,6 +15,4 @@ interface IL2AssetTracker {
     function handleInitiateBaseTokenBridgingOnL2(uint256 _toChainId, uint256 _amount) external;
 
     function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external;
-
-    function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external;
 }

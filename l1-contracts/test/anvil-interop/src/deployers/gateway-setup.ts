@@ -223,13 +223,10 @@ export class GatewaySetup {
   }
 
   /**
-   * Install the test-only chain asset handlers used by the Gateway migration fixture.
-   *
-   * Production v32 handlers deliberately reject bridgeBurn/bridgeMint, while this harness
-   * deliberately keeps the migration machinery covered. Keep the production implementations
-   * in place through Gateway deployment and registration, then swap only the handlers that
-   * participate in Step 7. L1 uses the real proxy upgrade surface; the Gateway system-contract
-   * address receives storage-compatible Dev bytecode through the existing Anvil-only shim.
+   * Install the test-only (migration-enabled) chain asset handlers used by the Gateway migration
+   * fixture; production v32 handlers reject bridgeBurn/bridgeMint. The production implementations
+   * stay in place through Gateway deployment and registration — only the handlers that participate
+   * in Step 7 are swapped.
    */
   private async installMigrationEnabledChainAssetHandlers(gatewayContext?: GatewayContext): Promise<void> {
     const l1HandlerProxy = await installL1ChainAssetHandlerDev(this.l1Provider, this.l1Addresses.bridgehub);

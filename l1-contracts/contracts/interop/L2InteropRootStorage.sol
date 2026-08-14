@@ -12,11 +12,11 @@ import {InteropRoot, StoredInteropRoot} from "contracts/common/Messaging.sol";
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice InteropRootStorage contract responsible for storing the message roots of other chains on the L2.
+ * @notice Stores the message roots of other chains on the L2, imported by the bootloader.
+ * See {protocol-docs/interop.md#root-import-l2interoprootstorage}.
  */
 contract L2InteropRootStorage is IL2InteropRootStorage {
-    /// @notice Modifier that makes sure that the method
-    /// can only be called from the bootloader.
+    /// @dev Only allows calls from the bootloader.
     modifier onlyCallFromBootloader() {
         if (msg.sender != L2_BOOTLOADER_ADDRESS) {
             revert Unauthorized(msg.sender);
@@ -24,22 +24,19 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
         _;
     }
 
-    /// @notice Mapping of chain ID to block or batch number to the imported message root and its
-    /// creation timestamp, i.e. the storage holds `(blockOrBatchNumber, root, timestamp)` tuples per
-    /// chain. The tuple is double checked on the settlement layer during batch execution (see
-    /// `ExecutorFacet._verifyDependencyInteropRoots`), so time-sensitive proofs (e.g. the
-    /// atomic-interop timeout protocol) can rely on the timestamp as much as on the root itself.
-    /// @dev IMPORTANT: this logic is not compatible with EraVM, as the EraVM bootloader does not yet
-    /// support the (timestamp-carrying) add-interop-roots entry points; it is expected to be
-    /// deployed on ZKsync OS chains only.
-    /// No roots recorded under previous protocol versions exist: interop was not activated in v31.
-    /// @dev Note on storage compatibility with v31: since interop has not been enabled in v31, this
-    /// mapping was empty at the time of the upgrade; additionally, mapping values live at hashed
-    /// locations, so extending the value type from `bytes32` to a struct (whose first member `root`
-    /// occupies exactly the slot the plain `bytes32` used) does not shift any other storage.
+    /// @notice Imported `(root, timestamp)` per (chainId, blockOrBatchNumber).
+    /// See {protocol-docs/interop.md#root-import-l2interoprootstorage}.
+    /// @dev ZKsync OS only: the EraVM bootloader lacks the timestamp-carrying import entry points.
+    /// @dev v31 storage compatibility: the mapping was empty at upgrade time (interop was inactive in
+    /// v31) and the struct's first member occupies the old `bytes32` slot, so widening the value type
+    /// is layout-safe.
     mapping(uint256 chainId => mapping(uint256 blockOrBatchNumber => StoredInteropRoot)) internal storedInteropRoots;
 
-    /// @notice Returns the imported `(root, timestamp)` tuple for a chain ID and block or batch number.
+    /// @inheritdoc IL2InteropRootStorage
+    /// @dev Appended after `storedInteropRoots`, so the v31 layout note above is unaffected.
+    mapping(uint256 chainId => uint256 timestamp) public latestInteropRootTimestamp;
+
+    /// @inheritdoc IL2InteropRootStorage
     function interopRoots(
         uint256 chainId,
         uint256 blockOrBatchNumber
@@ -47,20 +44,16 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
         return storedInteropRoots[chainId][blockOrBatchNumber];
     }
 
-    /// @dev Adds a message root to the L2InteropRootStorage contract.
-    /// @dev Imports the full `(blockOrBatchNumber, root, timestamp)` tuple; see {InteropRoot}.
-    /// @dev For both proof-based and commit-based interop, the `sides` parameter contains only the root.
-    /// @dev Once pre-commit interop is introduced, `sides` will include both the root and its associated sides.
-    /// @dev In proof-based and pre-commit interop, `blockOrBatchNumber` represents the block number, in commit-based
-    /// interop it represents the batch number. This distinction reflects the implementation requirements of each
-    /// interop finality form.
-    /// @param interopRoot The interop root to be added. See the description of the corresponding struct above.
+    /// @notice Imports a single interop root as a full `(blockOrBatchNumber, root, timestamp)` tuple.
+    /// See {protocol-docs/interop.md#root-import-l2interoprootstorage} for the `sides` and
+    /// block-vs-batch-number semantics.
+    /// @param interopRoot The interop root to be added; see {InteropRoot}.
     function addSingleInteropRoot(InteropRoot calldata interopRoot) external onlyCallFromBootloader {
         _addInteropRoot(interopRoot.chainId, interopRoot.blockOrBatchNumber, interopRoot.timestamp, interopRoot.sides);
     }
 
-    /// @dev Adds a group of interop roots to the L2InteropRootStorage contract.
-    /// @param interopRootsInput The array of interop roots to be added. See the description of the corresponding struct above.
+    /// @notice Imports a group of interop roots (see {addSingleInteropRoot}).
+    /// @param interopRootsInput The array of interop roots to be added.
     function addInteropRootsInBatch(InteropRoot[] calldata interopRootsInput) external onlyCallFromBootloader {
         unchecked {
             uint256 amountOfRoots = interopRootsInput.length;
@@ -81,7 +74,7 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
         uint256 timestamp,
         bytes32[] calldata sides
     ) private {
-        // In the current code sides should only contain the Interop Root itself, as mentioned above.
+        // For now `sides` must contain only the interop root itself.
         if (sides.length != 1) {
             revert SidesLengthNotOne();
         }
@@ -94,13 +87,18 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
             revert InteropRootTimestampIsZero();
         }
 
-        // Make sure that interopRoots for specified chainId and blockOrBatchNumber wasn't set already.
         if (storedInteropRoots[chainId][blockOrBatchNumber].root != bytes32(0)) {
             revert InteropRootAlreadyExists();
         }
 
-        // Set interopRoots for specified chainId and blockOrBatchNumber, emit event.
         storedInteropRoots[chainId][blockOrBatchNumber] = StoredInteropRoot({root: sides[0], timestamp: timestamp});
+
+        // Track the chain's freshest imported root creation time. Imports need not arrive in
+        // timestamp order, so keep the maximum rather than the last value — the tracked timestamp
+        // must never decrease.
+        if (timestamp > latestInteropRootTimestamp[chainId]) {
+            latestInteropRootTimestamp[chainId] = timestamp;
+        }
 
         emit InteropRootAdded(chainId, blockOrBatchNumber, timestamp, sides);
     }

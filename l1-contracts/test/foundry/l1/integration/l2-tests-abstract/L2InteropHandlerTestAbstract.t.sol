@@ -83,8 +83,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     }
 
     function test_requestL2TransactionDirectWithCalldata() public {
-        // Build the L2TransactionRequestDirect struct with explicit values
-        // These values represent a real transaction request
         uint256 chainId = 505;
         uint256 mintValue = 20000000000000000000; // 20 ETH
         address l2Contract = 0x9Ca26d77cDe9CFf9145D06725b400b2Ec4Bbc616;
@@ -95,7 +93,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         bytes[] memory factoryDeps = new bytes[](0);
         address refundRecipient = 0x9Ca26d77cDe9CFf9145D06725b400b2Ec4Bbc616;
 
-        // Encode the transaction request using abi.encodeWithSelector with the raw selector
         bytes memory data = abi.encodeWithSelector(
             REQUEST_L2_TX_DIRECT_SELECTOR,
             chainId,
@@ -115,25 +112,21 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encode(bytes32(0))
         );
 
-        // Mock the requestL2TransactionDirect call on L2 Bridgehub.
-        // In L1 context, the L2 Bridgehub isn't fully set up, so we mock the response.
+        // In L1 context the L2 Bridgehub isn't fully set up, so the response is mocked.
         bytes32 mockedTxHash = bytes32(uint256(1));
         vm.mockCall(L2_BRIDGEHUB_ADDR, abi.encodeWithSelector(REQUEST_L2_TX_DIRECT_SELECTOR), abi.encode(mockedTxHash));
 
-        // Verify the call dispatches to L2_BRIDGEHUB with exactly the calldata we constructed.
         vm.expectCall(L2_BRIDGEHUB_ADDR, data);
         (bool success, bytes memory result) = L2_BRIDGEHUB_ADDR.call(data);
         assertTrue(success, "Call to L2_BRIDGEHUB should succeed");
 
-        // Verify the returned tx hash is decoded and matches the mocked value
-        // (catches regressions where the return value is silently dropped).
+        // Catches regressions where the return value is silently dropped.
         assertEq(abi.decode(result, (bytes32)), mockedTxHash, "Returned tx hash should match the mocked value");
     }
 
     function test_l2MessageVerification() public {
         MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
 
-        // Verify the proof is properly constructed
         assertTrue(proof.chainId > 0, "Chain ID should be positive");
         assertTrue(proof.proof.length > 0, "Proof should have elements");
         assertEq(proof.message.sender, L2_INTEROP_CENTER_ADDR, "Message sender should be InteropCenter");
@@ -145,7 +138,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encode(true)
         );
 
-        // Call the verification function
         bool result = L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(
             proof.chainId,
             proof.l1BatchNumber,
@@ -168,10 +160,8 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             (uint256, uint256, uint256, L2Message, bytes32[])
         );
 
-        // Verify the captured proof's identifying fields so silent edits to the hex blob are caught
-        // (F-023). Decoding as the typed argument tuple of proveL2MessageInclusionShared also
-        // surfaces any layout drift in L2Message / proof types as an abi.decode revert rather
-        // than as a silent test pass (F-057).
+        // Asserting the identifying fields catches silent edits to the hex blob (F-023); decoding as the
+        // typed tuple surfaces layout drift as an abi.decode revert rather than a silent pass (F-057).
         assertEq(chainId, 271, "captured proof must be for chainId 271");
         assertEq(l1BatchNumber, 26, "captured proof must be for L1 batch 26");
         assertEq(l2MessageIndex, 0, "captured proof must be at message index 0");
@@ -195,12 +185,10 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         );
         // For an atomic bundle the cross-chain binding is the bundle's own sourceChainId.
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
-        // Expect event
         vm.expectEmit(true, false, false, false);
         emit IInteropHandlerBase.BundleExecuted(bundleHash);
         vm.prank(EXECUTION_ADDRESS);
         L2_INTEROP_HANDLER.executeAtomicBundle(bundle, finality);
-        // Check storage changes
         assertEq(
             uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             2,
@@ -285,7 +273,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         callStatuses2[0] = CallStatus.Executed;
         callStatuses2[1] = CallStatus.Cancelled;
         callStatuses2[2] = CallStatus.Unprocessed;
-        // Expect events for first unbundle
         vm.expectEmit(true, false, false, false);
         emit IInteropHandlerBase.CallProcessed(bundleHash, 1, CallStatus.Cancelled);
         vm.expectEmit(true, false, false, false);
@@ -294,7 +281,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         emit IInteropHandlerBase.BundleUnbundled(bundleHash);
         vm.prank(UNBUNDLER_ADDRESS);
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(bundle, callStatuses1);
-        // Check storage changes after first unbundle
         assertEq(
             uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
             0,
@@ -315,14 +301,12 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             3,
             "BundleStatus should be Unbundled"
         );
-        // Expect events for second unbundle
         vm.expectEmit(true, false, false, false);
         emit IInteropHandlerBase.CallProcessed(bundleHash, 0, CallStatus.Executed);
         vm.expectEmit(true, false, false, false);
         emit IInteropHandlerBase.BundleUnbundled(bundleHash);
         vm.prank(UNBUNDLER_ADDRESS);
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(bundle, callStatuses2);
-        // Check storage changes after second unbundle
         assertEq(
             uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
             1,
@@ -439,8 +423,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     // gate is covered by AtomicFlowManagerAccessControl.t.sol; the L1 message-sender check for withdrawals is
     // covered by L1InteropHandler.t.sol (test_ExecuteBundle_RevertWhen_UnauthorizedMessageSender).
 
-    /// @notice Regression test to ensure bundles can only be executed on the correct destination chain
-    /// @dev This test verifies that the fix for destination chain ID validation is working
+    /// @notice Regression: bundles can only be verified on their declared destination chain.
     function test_verifyBundle_revertWhen_wrongDestinationChainId() public {
         InteropBundle memory interopBundle = getInteropBundle(1);
         uint256 wrongChainId = 12345;
@@ -590,7 +573,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
 
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(bundle, finality);
 
-        // Verify the bundle status was updated correctly
         assertEq(
             uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             1, // BundleStatus.Verified
@@ -606,14 +588,13 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         AtomicFinalityProof memory finality;
         _mockRequireFlowFinalized();
 
-        // Simulate gateway mode - settling on Gateway, not L1.
+        // Settlement-layer mock: gateway mode (settling on Gateway, not L1).
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
             abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
             abi.encode(GATEWAY_CHAIN_ID)
         );
 
-        // Additional required mocks
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
@@ -633,7 +614,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         vm.prank(EXECUTION_ADDRESS);
         L2_INTEROP_HANDLER.executeAtomicBundle(bundle, finality);
 
-        // Verify successful execution
         assertEq(
             uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
             2, // BundleStatus.FullyExecuted
@@ -682,7 +662,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         _baseTokenAssetId = baseTokenAssetId;
         uint256 l1ChainId = L1_CHAIN_ID;
 
-        // Set BASE_TOKEN_ASSET_ID and L1_CHAIN_ID on the asset tracker
         stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(_baseTokenAssetId));
         stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(l1ChainId);
 
@@ -707,7 +686,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encode(l1ChainId)
         );
 
-        // Mock totalSupply on L2_BASE_TOKEN_SYSTEM_CONTRACT
         vm.mockCall(
             address(L2_BASE_TOKEN_SYSTEM_CONTRACT),
             abi.encodeWithSelector(IERC20.totalSupply.selector),
@@ -757,10 +735,8 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encode(bytes32(0))
         );
 
-        // Record deposits before
         uint256 depositsBefore = _readTotalSuccessfulDepositsFromL1(_baseTokenAssetId);
 
-        // Verify that handleFinalizeBaseTokenBridgingOnL2 is called with the correct amount
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
             abi.encodeWithSelector(
@@ -770,14 +746,13 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             )
         );
 
-        // Verify BaseTokenMintedInterop event is emitted (give() sends to InteropHandler)
+        // give() sends the value to L2InteropHandler, hence the event recipient.
         vm.expectEmit(true, false, false, true, L2_BASE_TOKEN_HOLDER_ADDR);
         emit IBaseTokenHolder.BaseTokenMintedInterop(L2_INTEROP_HANDLER_ADDR, callValue);
 
         vm.prank(EXECUTION_ADDRESS);
         L2_INTEROP_HANDLER.executeAtomicBundle(bundle, finality);
 
-        // Interop source is ERA_CHAIN_ID (not L1), so totalSuccessfulDepositsFromL1 must NOT increase
         uint256 depositsAfter = _readTotalSuccessfulDepositsFromL1(_baseTokenAssetId);
         assertEq(depositsAfter, depositsBefore, "totalSuccessfulDepositsFromL1 should NOT increase for non-L1 source");
     }
@@ -800,16 +775,13 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         uint256 burnAmount = 500;
         uint256 toChainId = L1_CHAIN_ID;
 
-        // Record withdrawals before
         uint256 withdrawalsBefore = _readTotalWithdrawalsToL1(_baseTokenAssetId);
 
-        // Verify that handleInitiateBaseTokenBridgingOnL2 is called with the correct args
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
             abi.encodeWithSelector(IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector, toChainId, burnAmount)
         );
 
-        // Verify BaseTokenBurntInterop event is emitted
         vm.expectEmit(true, false, false, true, L2_BASE_TOKEN_HOLDER_ADDR);
         emit IBaseTokenHolder.BaseTokenBurntInterop(L2_INTEROP_CENTER_ADDR, toChainId, burnAmount);
 
@@ -817,7 +789,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         vm.prank(L2_INTEROP_CENTER_ADDR);
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(toChainId);
 
-        // Verify asset tracker storage was actually updated
         uint256 withdrawalsAfter = _readTotalWithdrawalsToL1(_baseTokenAssetId);
         assertEq(
             withdrawalsAfter,

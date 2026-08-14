@@ -28,8 +28,11 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {OriginChainIdNotFound} from "contracts/common/L1ContractErrors.sol";
-import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
-import {InsufficientChainBalance} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {AssetNotNativeToL1, OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {InsufficientChainBalance} from "contracts/common/L1ContractErrors.sol";
+import {ILegacyL1AssetTracker} from "contracts/bridge/asset-tracker/ILegacyL1AssetTracker.sol";
+import {MockLegacyL1AssetTracker} from "../../_shared/MockLegacyL1AssetTracker.sol";
+import {MAX_TOKEN_BALANCE} from "contracts/common/Config.sol";
 
 /// @dev Test helper contract that exposes internal functions
 contract L1NativeTokenVaultTestHelper is L1NativeTokenVault {
@@ -50,6 +53,17 @@ contract L1NativeTokenVaultTestHelper is L1NativeTokenVault {
 
     function setTokenAddress(bytes32 _assetId, address _token) external {
         tokenAddress[_assetId] = _token;
+    }
+
+    /// @dev Stands in for the pre-v31 per-chain accounting that an already-deployed vault carries into the
+    /// upgrade. There is no production writer for it anymore, so the population tests have to seed it here.
+    function setDeprecatedChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _balance) external {
+        DEPRECATED_chainBalance[_chainId][_assetId] = _balance;
+    }
+
+    /// @dev Stands in for the v31 upgrade having pointed the vault at an `L1AssetTracker`.
+    function setLegacyAssetTracker(address _tracker) external {
+        __DEPRECATED_l1AssetTracker = _tracker;
     }
 
     // add this to be excluded from coverage report
@@ -75,6 +89,8 @@ contract L1NativeTokenVaultTest is Test {
 
     uint256 public chainId;
     uint256 public eraChainId;
+    /// @dev A second chain, used to check that per-chain legacy amounts accumulate.
+    uint256 public constant SECOND_CHAIN_ID = 271;
     address public eraDiamondProxy;
 
     bytes32 public tokenAssetId;
@@ -384,6 +400,150 @@ contract L1NativeTokenVaultTest is Test {
         nativeTokenVault.bridgeConfirmTransferResult(chainId, TxStatus.Failure, bridgedAssetId, owner, data);
 
         assertEq(nativeTokenVault.bridgedOut(bridgedAssetId), 0, "no accounting for a non-L1-native token");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        bridgedOut population
+    //////////////////////////////////////////////////////////////*/
+
+    function _assetIdArray(bytes32 _assetId) internal pure returns (bytes32[] memory assetIds) {
+        assetIds = new bytes32[](1);
+        assetIds[0] = _assetId;
+    }
+
+    /// @dev The vault reads the chain list from the bridgehub when it falls back to its own legacy entries.
+    ///      The bridgehub lists ZK chains only — never L1 itself — which is why the sum needs no exclusion.
+    function _mockRegisteredChains() internal {
+        uint256[] memory chainIds = new uint256[](2);
+        chainIds[0] = chainId;
+        chainIds[1] = SECOND_CHAIN_ID;
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
+            abi.encode(chainIds)
+        );
+    }
+
+    function test_populateBridgedOut_SumsDeprecatedChainBalanceOverTheRegisteredChains() public {
+        // Pre-v31 accounting: the amounts sit in the vault, one entry per chain, and the vault reads the
+        // chain list from the bridgehub itself so no caller can under-report it.
+        nativeTokenVault.setDeprecatedChainBalance(chainId, tokenAssetId, 100);
+        nativeTokenVault.setDeprecatedChainBalance(SECOND_CHAIN_ID, tokenAssetId, 40);
+        _mockRegisteredChains();
+
+        vm.expectEmit(true, false, false, true, address(nativeTokenVault));
+        emit IL1NativeTokenVault.BridgedOutPopulated(tokenAssetId, 140);
+        uint256[] memory populated = nativeTokenVault.populateBridgedOut(_assetIdArray(tokenAssetId));
+
+        assertEq(populated.length, 1, "one amount per requested asset");
+        assertEq(populated[0], 140, "amounts summed across the registered chains");
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 140, "legacy amount folded in");
+        assertTrue(nativeTokenVault.bridgedOutPopulated(tokenAssetId), "asset marked as populated");
+    }
+
+    function test_populateBridgedOut_ReadsL1sBulkheadFromTheLegacyTracker() public {
+        // A registered asset's amount comes from L1's own bulkhead in the tracker: `MAX_TOKEN_BALANCE`
+        // minus everything ever bridged out of L1. Per-chain entries are ignored, so amounts moved between
+        // chains after the upgrade cannot change the result.
+        MockLegacyL1AssetTracker tracker = new MockLegacyL1AssetTracker();
+        tracker.setChainBalance(block.chainid, tokenAssetId, MAX_TOKEN_BALANCE - 120);
+        tracker.setChainBalance(chainId, tokenAssetId, 60);
+        nativeTokenVault.setLegacyAssetTracker(address(tracker));
+
+        assertEq(nativeTokenVault.legacyL1AssetTracker(), address(tracker), "tracker exposed for the scripts");
+        assertEq(nativeTokenVault.legacyBridgedOut(tokenAssetId), 120, "L1's outflow, not the chain entries");
+
+        nativeTokenVault.populateBridgedOut(_assetIdArray(tokenAssetId));
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 120);
+    }
+
+    function test_populateBridgedOut_FallsBackToTheVaultForAssetsTheTrackerNeverRegistered() public {
+        // The tracker exists but never registered this asset, so its bulkhead is meaningless (a zero
+        // balance would read as `MAX_TOKEN_BALANCE` bridged out) and the vault's own entries are used.
+        MockLegacyL1AssetTracker tracker = new MockLegacyL1AssetTracker();
+        tracker.setChainBalance(block.chainid, ETH_TOKEN_ASSET_ID, MAX_TOKEN_BALANCE);
+        nativeTokenVault.setLegacyAssetTracker(address(tracker));
+        nativeTokenVault.setDeprecatedChainBalance(chainId, tokenAssetId, 7);
+        _mockRegisteredChains();
+
+        assertEq(nativeTokenVault.legacyBridgedOut(tokenAssetId), 7, "vault entries used for the asset");
+
+        nativeTokenVault.populateBridgedOut(_assetIdArray(tokenAssetId));
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 7);
+    }
+
+    function test_populateBridgedOut_SkipsAlreadyPopulatedAssets() public {
+        nativeTokenVault.setDeprecatedChainBalance(chainId, tokenAssetId, 100);
+        _mockRegisteredChains();
+        nativeTokenVault.populateBridgedOut(_assetIdArray(tokenAssetId));
+
+        // Re-running a batch (e.g. after a partially mined stage3) must not double count.
+        uint256[] memory populated = nativeTokenVault.populateBridgedOut(_assetIdArray(tokenAssetId));
+        assertEq(populated[0], 0, "nothing populated the second time");
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 100, "amount not double counted");
+    }
+
+    function test_populateBridgedOut_KeepsFlowsThatHappenedBeforeIt() public {
+        // The population is additive, so deposits made in the window between the upgrade and stage3 survive.
+        _depositNativeTestToken(30);
+        nativeTokenVault.setDeprecatedChainBalance(chainId, tokenAssetId, 100);
+        _mockRegisteredChains();
+
+        nativeTokenVault.populateBridgedOut(_assetIdArray(tokenAssetId));
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 130);
+    }
+
+    function test_populateBridgedOut_RevertWhen_AssetNotNativeToL1() public {
+        bytes32 bridgedAssetId = keccak256(abi.encode("bridgedAsset"));
+        nativeTokenVault.setOriginChainId(bridgedAssetId, 999);
+
+        vm.expectRevert(abi.encodeWithSelector(AssetNotNativeToL1.selector, bridgedAssetId, 999));
+        nativeTokenVault.populateBridgedOut(_assetIdArray(bridgedAssetId));
+    }
+
+    function test_legacyBridgedOut_RevertWhen_AssetNotNativeToL1() public {
+        // Without the guard the registered branch would return `MAX_TOKEN_BALANCE - chainBalance(L1)` for an
+        // L2-native asset, where L1's entry is a bridged-in balance — a ~2^256 number rather than an outflow.
+        bytes32 bridgedAssetId = keccak256(abi.encode("l2NativeAsset"));
+        nativeTokenVault.setOriginChainId(bridgedAssetId, chainId);
+
+        MockLegacyL1AssetTracker tracker = new MockLegacyL1AssetTracker();
+        // `setChainBalance` also marks the asset registered, i.e. the branch the guard protects.
+        tracker.setChainBalance(block.chainid, bridgedAssetId, 5);
+        nativeTokenVault.setLegacyAssetTracker(address(tracker));
+
+        vm.expectRevert(abi.encodeWithSelector(AssetNotNativeToL1.selector, bridgedAssetId, chainId));
+        nativeTokenVault.legacyBridgedOut(bridgedAssetId);
+    }
+
+    function test_populateBridgedOut_UnblocksWithdrawalOfEscrowedFunds() public {
+        // The point of the population: an upgraded vault holds pre-upgrade escrow but starts with
+        // `bridgedOut == 0`, so every withdrawal of it would be rejected as forged.
+        uint256 amount = 100;
+        testToken.mint(address(nativeTokenVault), amount);
+        nativeTokenVault.setDeprecatedChainBalance(chainId, tokenAssetId, amount);
+        _mockRegisteredChains();
+
+        bytes memory mintData = DataEncoding.encodeBridgeMintData({
+            _originalCaller: owner,
+            _remoteReceiver: owner,
+            _originToken: address(testToken),
+            _amount: amount,
+            _erc20Metadata: BridgeHelper.getERC20Getters(address(testToken), block.chainid)
+        });
+
+        vm.prank(address(assetRouter));
+        vm.expectRevert(abi.encodeWithSelector(InsufficientChainBalance.selector, chainId, tokenAssetId, amount));
+        nativeTokenVault.bridgeMint(chainId, tokenAssetId, mintData);
+
+        nativeTokenVault.populateBridgedOut(_assetIdArray(tokenAssetId));
+
+        uint256 balanceBefore = testToken.balanceOf(owner);
+        vm.prank(address(assetRouter));
+        nativeTokenVault.bridgeMint(chainId, tokenAssetId, mintData);
+
+        assertEq(testToken.balanceOf(owner) - balanceBefore, amount, "withdrawal paid out");
+        assertEq(nativeTokenVault.bridgedOut(tokenAssetId), 0, "withdrawal consumed the populated amount");
     }
 
     // add this to be excluded from coverage report

@@ -32,6 +32,11 @@
         "internalType": "struct AtomicFlowPreimage",
         "components": [
           {
+            "name": "version",
+            "type": "bytes1",
+            "internalType": "bytes1"
+          },
+          {
             "name": "deadline",
             "type": "uint64",
             "internalType": "uint64"
@@ -76,6 +81,11 @@
             "type": "tuple",
             "internalType": "struct AtomicFlowPreimage",
             "components": [
+              {
+                "name": "version",
+                "type": "bytes1",
+                "internalType": "bytes1"
+              },
               {
                 "name": "deadline",
                 "type": "uint64",
@@ -297,6 +307,11 @@
                 "internalType": "struct AtomicFlowPreimage",
                 "components": [
                   {
+                    "name": "version",
+                    "type": "bytes1",
+                    "internalType": "bytes1"
+                  },
+                  {
                     "name": "deadline",
                     "type": "uint64",
                     "internalType": "uint64"
@@ -461,11 +476,6 @@
   },
   {
     "type": "error",
-    "name": "HashedLogIsDefault",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "IMTLeafValueMismatch",
     "inputs": [
       {
@@ -587,6 +597,22 @@
   },
   {
     "type": "error",
+    "name": "ManagerFlowDeadlinePassed",
+    "inputs": [
+      {
+        "name": "deadline",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "latestImportedRootTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ManagerFlowIdMismatch",
     "inputs": [
       {
@@ -600,6 +626,27 @@
         "internalType": "bytes32"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "ManagerFlowPreimageVersionMismatch",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "bytes1",
+        "internalType": "bytes1"
+      },
+      {
+        "name": "actual",
+        "type": "bytes1",
+        "internalType": "bytes1"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ManagerL1ChainIdZero",
+    "inputs": []
   },
   {
     "type": "error",
@@ -667,17 +714,17 @@
   },
   {
     "type": "error",
-    "name": "ManagerNoRecoverableCalls",
+    "name": "ManagerMissingLegIndexOutOfRange",
     "inputs": [
       {
-        "name": "flowId",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "name": "legs",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        "name": "bundleHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "name": "missingLegIndex",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },
@@ -737,12 +784,23 @@
   },
   {
     "type": "error",
-    "name": "MerkleIndexOutOfBounds",
-    "inputs": []
+    "name": "ManagerTooManyLegs",
+    "inputs": [
+      {
+        "name": "maxLegs",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "legs",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",
-    "name": "MerklePathEmpty",
+    "name": "MerkleIndexOutOfBounds",
     "inputs": []
   },
   {

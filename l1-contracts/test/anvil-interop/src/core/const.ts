@@ -35,6 +35,8 @@ export const L2_BASE_TOKEN_HOLDER_ADDR = "0x000000000000000000000000000000000001
 // L2_INTEROP_COMMITMENT_TREE_ADDR / L2_ATOMIC_FLOW_MANAGER_ADDR in
 // contracts/common/l2-helpers/L2ContractAddresses.sol. Slot 0x10013 is intentionally
 // skipped: it previously hosted the removed L2GlobalInteropRootImporter.
+// The removed v31 GWAssetTracker, neutralized to EmptyContract by the v32 upgrade.
+export const L2_REMOVED_GW_ASSET_TRACKER_ADDR = "0x0000000000000000000000000000000000010010";
 export const L2_INTEROP_COMMITMENT_TREE_ADDR = "0x0000000000000000000000000000000000010012";
 export const L2_ATOMIC_FLOW_MANAGER_ADDR = "0x0000000000000000000000000000000000010014";
 
@@ -79,11 +81,9 @@ export const ANVIL_INTEROP_TWO_BRIDGES_PRIORITY_REQUEST_COUNT = 2;
 export const TEST_TOKEN_DECIMALS = 18;
 export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
 
-// Mirrors the InteropBundle struct in contracts/common/Messaging.sol. The trailing BundleAttributes
-// tuple is the 4 fields (executionAddress, unbundlerAddress, useFixedFee, salt). Atomic-send params
-// (the full flowId preimage + lowNullifierIndex) do NOT live in the bundle — they travel via the
-// `atomicBundle` ERC-7786 attribute and are parsed by the InteropCenter into an internal AtomicSend
-// struct, so they never affect the bundle bytes / bundleHash.
+// Mirrors the InteropBundle struct in contracts/common/Messaging.sol; the trailing tuple is
+// BundleAttributes (executionAddress, unbundlerAddress, useFixedFee, salt). Atomic-send params do
+// NOT live in the bundle (see {protocol-docs/atomicity/README.md#key-values}), so they never affect bundleHash.
 export const INTEROP_BUNDLE_TUPLE_TYPE =
   "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool,bytes32))";
 // Canonical signature of `InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle)`,

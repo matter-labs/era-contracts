@@ -20,12 +20,10 @@ import {
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {IMTLeafValueMismatch, IMTLowLeafNextTooSmall} from "contracts/common/L1ContractErrors.sol";
 
-/// @notice Unit tests for the {AtomicInteropProof} library (cross-chain authentication + clock logic
-/// of the atomic interop flow; the protocol itself is described in the library header).
-/// Atomicity is deployed only on L1-settled ecosystems, so every fixture uses a single L1 settlement
-/// layer (`SETTLEMENT_LAYER_CHAIN_ID`).
-///
-/// The happy paths run END-TO-END with nothing mocked: the commit value is aggregated into a REAL
+/// @notice Covers the {AtomicInteropProof} library — cross-chain authentication and clock logic of the
+/// atomic finalize/timeout proofs. See {protocol-docs/atomicity/proofs.md}. Atomicity is deployed only on
+/// L1-settled ecosystems, so every fixture uses a single L1 settlement layer.
+/// @dev The happy paths run END-TO-END with nothing mocked: the commit value is aggregated into a REAL
 /// {L1MessageRoot}, imported into the REAL {L2InteropRootStorage}, and authenticated through the REAL
 /// {L2MessageVerification} (see {AtomicInteropProofBuilder}'s `_real*` helpers).
 ///
@@ -133,8 +131,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
             DEADLINE - 1
         );
         uint256 wrongDepth = ChainBatchRootTree.TREE_DEPTH + 1;
-        // Rebuild the metadata word with a deeper top-tree section (contents are irrelevant: the
-        // depth check runs before any hashing).
+        // Contents are irrelevant: the depth check runs before any hashing.
         proof.settlementProof[0] = _composeMetadata({
             _logLeafProofLen: wrongDepth,
             _batchLeafProofLen: 0,
@@ -391,9 +388,8 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
-    /// @dev In-time branch with a batch that is NOT the chain's last inside the settlement-layer interop root: the
-    /// batch-leaf path carries a populated (non-empty-subtree) right sibling, so a later batch —
-    /// which may contain the commit — exists and the proof is rejected.
+    /// @dev In-time batch that is NOT the chain's last inside the settlement-layer interop root: a
+    /// populated right sibling means a later batch — which may contain the commit — exists, so rejected.
     function test_RevertWhen_timeout_inTimeBatchNotLastInRoot() public {
         _mockVerifier(true);
         bytes32 populatedSibling = keccak256("populated-right-subtree");
@@ -565,12 +561,10 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     // ============ inclusion / timeout mutual exclusivity (library-level anti-double-mint) ============
 
-    /// @dev A value that is present in the tree cannot also be given a valid non-inclusion proof: its
-    /// predecessor leaf's `nextValue` equals the value, so the engine rejects the bracketing claim. This is
-    /// the library-level guarantee that a leg cannot be simultaneously finalizable (included in time) and
-    /// refundable (proven absent). Note: this library does not check that an absence proof targets the
-    /// leg's own source chain; that binding (which blocks a cross-chain force-refund) is enforced by the
-    /// caller, `AtomicFlowManager.authorizeRefund`, so it is out of scope for this library-level test.
+    /// @dev Library-level anti-double-mint: a present value's predecessor leaf has `nextValue == value`,
+    /// so the bracketing (absence) claim is rejected — a leg cannot be both finalizable and refundable.
+    /// Binding an absence proof to the leg's own source chain is the caller's job
+    /// (`AtomicFlowManager.authorizeRefund`) and out of scope here. See {protocol-docs/atomicity/security.md#timeout-protocol-preconditions}.
     /// The inclusion half runs end-to-end (real aggregation); the illegitimate absence half crafts a
     /// begin-root proof from the real tree's predecessor leaf, so its verifier is stubbed.
     function test_includedValueCannotBeProvenAbsent() public {
@@ -579,8 +573,8 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         _expectRootAuthentication(inclusion, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
         proofLib.verifyInclusion(inclusion, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
 
-        // Build an (illegitimate) absence proof using the committed value's true predecessor leaf,
-        // against a late batch inside the post-deadline settlement-layer interop root.
+        // Forge an absence proof from the committed value's true predecessor leaf, against a late batch
+        // inside the post-deadline settlement-layer interop root (crafted blob, so the verifier is stubbed).
         _mockVerifier(true);
         uint256 predIndex = _predecessorIndexOf(committedValue);
         ImtProof memory absence = ImtProof({
@@ -627,10 +621,9 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         proofLib.verifyInclusion(proof, committedValue, _deadline, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
-    /// @dev Timeout succeeds iff the settlement-layer interop root is strictly after the deadline (`T > deadline`).
-    /// Notably `T <= deadline` must FAIL regardless of the batch's own timestamp — that is the guard
-    /// that a stale/genesis root cannot force a refund. Both branches (late batch -> begin root,
-    /// in-time last batch -> end root) are exercised by the fuzzed batch timestamp.
+    /// @dev Timeout passes iff the settlement-layer interop root is strictly after the deadline;
+    /// `T <= deadline` must FAIL regardless of the batch's own timestamp (stale/genesis-root guard).
+    /// Both branches (late batch -> begin root, in-time last batch -> end root) are fuzzed.
     function testFuzz_verifyTimeoutAbsence_interopRootWindow(
         uint64 _batchTimestamp,
         uint64 _interopRootTimestamp,

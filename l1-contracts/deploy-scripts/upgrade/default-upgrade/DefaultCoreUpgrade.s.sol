@@ -42,8 +42,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     struct AdditionalConfigParams {
         uint256 newProtocolVersion;
         bool isZKsyncOS;
-        bool hasV29IntrospectionOverride;
-        bool useV29IntrospectionOverride;
+        bool hasPreV32IntrospectionOverride;
+        bool usePreV32IntrospectionOverride;
     }
     AdditionalConfigParams internal additionalConfig;
 
@@ -123,10 +123,13 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
         additionalConfig.isZKsyncOS = isZKsyncOS;
 
-        // Optional override for v29 introspection selection
-        if (upgradeToml.keyExists("$.use_v29_introspection")) {
-            additionalConfig.hasV29IntrospectionOverride = true;
-            additionalConfig.useV29IntrospectionOverride = upgradeToml.readBool("$.use_v29_introspection");
+        // Optional override for pre-v32 introspection selection. Autodetection reads the protocol version of
+        // a registered chain, which lags the L1 contracts: an ecosystem whose core contracts are already v32
+        // while its chains have not upgraded yet (mid-upgrade, or a fixture deployed from current code with a
+        // v31 genesis) must state so here.
+        if (upgradeToml.keyExists("$.pre_v32_introspection")) {
+            additionalConfig.hasPreV32IntrospectionOverride = true;
+            additionalConfig.usePreV32IntrospectionOverride = upgradeToml.readBool("$.pre_v32_introspection");
         }
 
         // Protocol version comes from genesis config
@@ -166,13 +169,21 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     function setAddressesBasedOnBridgehub() internal virtual {
         address bridgehubProxy = coreAddresses.bridgehub.proxies.bridgehub;
 
-        // Determine which introspection method to use based on protocol version or override
-        bool useV29Introspection = additionalConfig.hasV29IntrospectionOverride
-            ? additionalConfig.useV29IntrospectionOverride
-            : AddressIntrospector.shouldUseV29Introspection(bridgehubProxy);
+        bool preV32Ecosystem;
+        if (additionalConfig.hasPreV32IntrospectionOverride) {
+            preV32Ecosystem = additionalConfig.usePreV32IntrospectionOverride;
+        } else if (!AddressIntrospector.hasRegisteredChains(bridgehubProxy)) {
+            // A chainless ecosystem has no protocol version to inspect. It cannot have been upgraded into
+            // existence either, so it was deployed from scratch with the current contracts.
+            preV32Ecosystem = false;
+        } else {
+            preV32Ecosystem = AddressIntrospector.shouldUsePreV32Introspection(bridgehubProxy);
+        }
 
-        if (useV29Introspection) {
-            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV29(bridgehubProxy);
+        if (preV32Ecosystem) {
+            // v31 ecosystem: the nullifier has no `l1InteropHandler` getter yet, so the discovered
+            // address stays zero and the upgrade deploys the handler itself.
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubProxy);
         } else {
             coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubProxy);
         }
@@ -253,6 +264,13 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             "bridged_standard_erc20_impl",
             coreAddresses.bridges.bridgedStandardERC20Implementation
         );
+        // Same keys as the from-scratch deployment writes, so downstream tooling reads one shape.
+        vm.serializeAddress(
+            "bridges",
+            "l1_interop_handler_implementation_addr",
+            coreAddresses.bridges.implementations.l1InteropHandler
+        );
+        vm.serializeAddress("bridges", "l1_interop_handler_proxy_addr", coreAddresses.bridges.proxies.l1InteropHandler);
 
         string memory bridgesSerialized = vm.serializeAddress(
             "bridges",
@@ -427,11 +445,11 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridges.implementations.l1NativeTokenVault
         );
 
-        // L1MessageRoot: Use upgradeAndCall to call initializeL1V31Upgrade
-        calls[4] = _buildCallProxyUpgradeAndCall(
+        // L1MessageRoot is a plain upgrade like the rest: v31's `initializeL1V31Upgrade` reinitializer was
+        // removed in this release, and every ecosystem it can upgrade had already consumed that version.
+        calls[4] = _buildCallProxyUpgrade(
             coreAddresses.bridgehub.proxies.messageRoot,
-            coreAddresses.bridgehub.implementations.messageRoot,
-            "L1MessageRoot"
+            coreAddresses.bridgehub.implementations.messageRoot
         );
 
         calls[5] = _buildCallProxyUpgrade(
@@ -456,25 +474,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             data: abi.encodeCall(
                 ProxyAdmin.upgrade,
                 (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress)
-            ),
-            value: 0
-        });
-    }
-
-    function _buildCallProxyUpgradeAndCall(
-        address proxyAddress,
-        address newImplementationAddress,
-        string memory contractName
-    ) internal virtual returns (Call memory call) {
-        require(coreAddresses.shared.transparentProxyAdmin != address(0), "transparentProxyAdmin not newConfigured");
-
-        bytes memory initializeCalldata = getInitializeCalldata(contractName, false);
-
-        call = Call({
-            target: coreAddresses.shared.transparentProxyAdmin,
-            data: abi.encodeCall(
-                ProxyAdmin.upgradeAndCall,
-                (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress, initializeCalldata)
             ),
             value: 0
         });

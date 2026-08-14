@@ -10,6 +10,7 @@ import {
   ANVIL_DEFAULT_ACCOUNT_ADDR,
   ANVIL_DEFAULT_PRIVATE_KEY,
   INITIAL_BASE_TOKEN_HOLDER_BALANCE,
+  INTEROP_ATTRIBUTE_PARSER_ADDR,
   INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_ASSET_TRACKER_ADDR,
@@ -20,11 +21,14 @@ import {
   L2_COMPLEX_UPGRADER_ADDR,
   L2_CONTRACT_DEPLOYER_ADDR,
   L2_FORCE_DEPLOYER_ADDR,
+  L2_ATOMIC_FLOW_MANAGER_ADDR,
+  L2_INTEROP_COMMITMENT_TREE_ADDR,
   L2_INTEROP_HANDLER_ADDR,
   L2_INTEROP_ROOT_STORAGE_ADDR,
   L2_MESSAGE_ROOT_ADDR,
   L2_MESSAGE_VERIFICATION_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
+  L2_REMOVED_GW_ASSET_TRACKER_ADDR,
   L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
   L2_TO_L1_MESSENGER_ADDR,
   L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
@@ -35,12 +39,16 @@ import {
 } from "../core/const";
 import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
-import { forceBatchExecutedEqualsCommitted, transferOwnable2Step } from "./harness-shims";
+import { forceBatchExecutedEqualsCommitted, modelV31BackfillPrerequisite, transferOwnable2Step } from "./harness-shims";
 import { impersonateAndRun } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
 
 // ── Constants ────────────────────────────────────────────────────────
+
+// Protocol version this release upgrades chains to. The upgrade inputs under `config/` carry it as a
+// literal too, since TOML cannot import it.
+export const TARGET_PROTOCOL_VERSION = "0x2000000000";
 
 // EIP-1967 admin slot: keccak256("eip1967.proxy.admin") - 1
 const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
@@ -80,8 +88,9 @@ export type V31UpgradeScenario = {
   upgradeInputTemplatePath: string;
   isZKsyncOS: boolean;
   targetRoles: ChainRole[];
+  // Protocol version the chains must report once the upgrade has been applied.
+  expectedProtocolVersion: string;
   clearGenesisUpgradeTxHash?: boolean;
-  seedBatchCounters?: boolean;
   transferL1ChainAssetHandlerOwnership?: boolean;
 };
 
@@ -166,10 +175,20 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       console.log("\n── Clearing legacy genesis upgrade tx hashes ──");
       await clearGenesisUpgradeTxHash(l1Provider, upgradeChainAddresses);
     }
-    if (scenario.seedBatchCounters) {
-      console.log("\n── Seeding batch counters for v31 upgrade compatibility ──");
-      await seedBatchCounters(l1Provider, upgradeChainAddresses);
-    }
+    // ── Stage 3: post-governance migration ──
+    // Runs BEFORE the per-chain upgrades, matching production sequencing (see
+    // protocol-ops ecosystem stage3): every withdrawable L1-native asset must be registered and
+    // populated by the time a chain's diamond upgrade lands.
+    console.log("\n── Running stage3 post-governance migration ──");
+    await runForgeScript({
+      scriptPath: CORE_UPGRADE_TEST_SCRIPT,
+      envVars: upgradeHarnessInputs.envVars,
+      rpcUrl: l1Chain.rpcUrl,
+      senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
+      projectRoot: l1ContractsDir,
+      sig: "stage3()",
+    });
+
     // ── Run per-chain upgrades (L1) and relay to L2 ──
     // `default_upgrade_addr` lives in the per-CTM output TOML written by
     // `CTMUpgradeV31ForTests.saveOutput` directly to `script-out/` (forge
@@ -183,7 +202,7 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     const settlementLayerUpgradeAddr = readNestedString(
       ctmOutputToml,
       ["state_transition", "default_upgrade_addr"],
-      "SettlementLayerV31Upgrade address"
+      "per-chain upgrade contract address"
     );
     await runChainUpgradesAndRelayL2({
       l1Provider,
@@ -195,19 +214,8 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       isZKsyncOS: scenario.isZKsyncOS,
       protocolOpsOutDir: path.join(upgradeHarnessInputs.protocolOpsOutDir, "chains"),
     });
-
-    // ── Stage 3: post-governance migration ──
-    console.log("\n── Running stage3 post-governance migration ──");
-    await runForgeScript({
-      scriptPath: CORE_UPGRADE_TEST_SCRIPT,
-      envVars: upgradeHarnessInputs.envVars,
-      rpcUrl: l1Chain.rpcUrl,
-      senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
-      projectRoot: l1ContractsDir,
-      sig: "stage3()",
-    });
-    console.log("\n── Stage 3 complete, verifying final protocol versions ──");
-    await verifyProtocolVersions(l1Provider, upgradeChainAddresses);
+    console.log("\n── Chain upgrades complete, verifying final protocol versions ──");
+    await verifyProtocolVersions(l1Provider, upgradeChainAddresses, scenario.expectedProtocolVersion);
     console.log("✅ All protocol versions verified successfully!\n");
   } finally {
     if (cleanupUpgradeHarnessInputs) {
@@ -229,6 +237,7 @@ async function transferL1Ownership(
     bridgehub: string;
     l1SharedBridge: string;
     l1NativeTokenVault: string;
+    l1NullifierProxy?: string;
     l1ChainAssetHandler?: string;
   },
   ctmAddresses: { chainTypeManager: string },
@@ -239,12 +248,52 @@ async function transferL1Ownership(
   await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1SharedBridge);
   await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1NativeTokenVault);
   await transferOwnership2Step(provider, defaultSigner, gov, ctmAddresses.chainTypeManager);
-  // The pre-v31 chain states record the old L1ChainAssetHandler proxy (the v31 ecosystem
-  // upgrade reuses this proxy in place). Governance must own it to run the stage-0
-  // pauseMigration() governance call.
+  // A production ecosystem hands the nullifier to governance at deploy time; the fixtures leave it with
+  // the deployer. Governance needs it to wire the interop handler in stage 1.
+  if (l1Addresses.l1NullifierProxy) {
+    await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1NullifierProxy);
+  }
+  // The fixture leaves the ChainAssetHandler owned by its deployer, and this upgrade reuses that proxy
+  // in place. Governance must own it to run the stage-0 pauseMigration() governance call.
   if (scenario.transferL1ChainAssetHandlerOwnership && l1Addresses.l1ChainAssetHandler) {
     await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1ChainAssetHandler);
   }
+  await normalizeProxyAdminOwnerToEoa(provider, defaultSigner, ctmAddresses.chainTypeManager);
+}
+
+/**
+ * Hand the CTM's ProxyAdmin to the deployer EOA when a contract owns it.
+ *
+ * For the upgrade scripts to issue calls from a contract owner, that owner has to be listed in
+ * `ownable_proxies`, which reaches them only through protocol-ops' `--env` config — not available to this
+ * harness, which passes addresses explicitly. So every owner has to be an EOA instead. In the v31 fixture
+ * the CTM deployment leaves its ProxyAdmin owned by its own `Governance.sol` instance.
+ */
+async function normalizeProxyAdminOwnerToEoa(
+  provider: ethers.providers.JsonRpcProvider,
+  defaultSigner: ethers.Wallet,
+  proxyAddress: string
+): Promise<void> {
+  const rawAdmin = await provider.getStorageAt(proxyAddress, EIP1967_ADMIN_SLOT);
+  const proxyAdmin = ethers.utils.getAddress(ethers.utils.hexDataSlice(rawAdmin, 12));
+
+  const proxyAdminContract = new ethers.Contract(proxyAdmin, getAbi("ProxyAdmin"), provider);
+  const owner: string = await proxyAdminContract.owner();
+  if ((await provider.getCode(owner)) === "0x") {
+    return;
+  }
+
+  console.log(`   Normalizing ProxyAdmin ${proxyAdmin} owner ${owner} -> ${defaultSigner.address}`);
+  await provider.send("anvil_impersonateAccount", [owner]);
+  await provider.send("anvil_setBalance", [owner, "0x56BC75E2D63100000"]);
+  const ownerSigner = provider.getSigner(owner);
+  const tx = await ownerSigner.sendTransaction({
+    to: proxyAdmin,
+    data: proxyAdminContract.interface.encodeFunctionData("transferOwnership", [defaultSigner.address]),
+    gasLimit: 5_000_000,
+  });
+  await tx.wait();
+  await provider.send("anvil_stopImpersonatingAccount", [owner]);
 }
 
 async function deployChainAdmins(
@@ -372,7 +421,7 @@ async function executeSafeBundles(outDir: string, rpcUrl: string): Promise<void>
 /**
  * Env-preset variant of `runEcosystemUpgradeScripts` for fork-mode upgrades
  * against a real env (stage / mainnet / testnet). Skips the synthetic
- * permanent-values templating that the v30→v31 harness does — the env preset
+ * permanent-values templating the state-dump scenarios do — the env preset
  * already has the canonical bridgehub, ctm list, ownable_proxies, deployer,
  * etc. We override only the ones that change per fork run: `--out` (temp dir)
  * and `--l1-rpc-url` (the forked anvil instance).
@@ -534,9 +583,8 @@ export async function runEcosystemUpgradeScripts(params: {
   const prepareOutDir = path.join(params.upgradeHarnessInputs.protocolOpsOutDir, "prepare");
   fs.rmSync(prepareOutDir, { recursive: true, force: true });
 
-  // Pre-v31 ecosystems don't have `ctm.isZKsyncOS()` / bytecodes-supplier /
-  // rollup-DA-manager getters, so we pass the values from the snapshot config
-  // explicitly. On v31+ these would be auto-resolved.
+  // Passed explicitly rather than auto-resolved from the CTM: a fork run may target an ecosystem whose
+  // getters predate v31, and the snapshot config is authoritative for it.
   runProtocolOps(
     [
       "ecosystem",
@@ -633,7 +681,7 @@ export async function runChainUpgradesAndRelayL2(params: {
 
   const settlementLayerUpgrade = new ethers.Contract(
     settlementLayerUpgradeAddr,
-    getAbi(isZKsyncOS ? "ZKsyncOSSettlementLayerV31Upgrade" : "EraSettlementLayerV31Upgrade"),
+    getAbi("V32UpgradeZKsyncOS"),
     l1Provider
   );
   const l1Chain = anvilManager.getL1Chain()!;
@@ -643,11 +691,21 @@ export async function runChainUpgradesAndRelayL2(params: {
     const chainOutDir = path.join(protocolOpsOutDir, `chain-${chain.chainId}`);
     fs.rmSync(chainOutDir, { recursive: true, force: true });
 
-    // `SettlementLayerV31UpgradeBase.upgrade` requires `totalBatchesCommitted ==
+    // The v31 per-chain upgrade required `totalBatchesCommitted ==
     // totalBatchesExecuted`. On a forked chain that has uncommitted-but-pending
     // batches at fork time, copy committed onto executed to model the
     // "all batches executed" prerequisite without running the executor.
     await forceBatchExecutedEqualsCommitted(l1Provider, chain.diamondProxy);
+
+    // ZKsync OS chains must additionally have the v31 base-token backfill behind them
+    // (flag + executed-priority-op lower bound); model the missing history on the fork.
+    if (isZKsyncOS) {
+      await modelV31BackfillPrerequisite({
+        l1Provider,
+        diamondProxyAddr: chain.diamondProxy,
+        settlementLayerUpgradeAddr,
+      });
+    }
 
     runProtocolOps([
       "chain",
@@ -670,15 +728,28 @@ export async function runChainUpgradesAndRelayL2(params: {
     await executeSafeBundles(chainOutDir, l1Chain.rpcUrl);
 
     // Decode the L2 upgrade tx from the protocol-ops Safe bundle.
-    const originalUpgradeTxData = decodeLatestL2UpgradeTxData(safeBundles[0].file);
+    const { tx: originalUpgradeTx, paramType: upgradeTxParamType } = decodeLatestL2UpgradeTx(safeBundles[0].file);
+    const originalUpgradeTxData = originalUpgradeTx.data as string;
 
-    // Rewrite the L2 upgrade tx with per-chain data via SettlementLayerV31Upgrade
+    // Rewrite the L2 upgrade tx with per-chain data, the same way the per-chain upgrade contract does.
     const rewrittenUpgradeTxData = await settlementLayerUpgrade.getL2UpgradeTxData(
       bridgehubAddr,
       chain.chainId,
       isZKsyncOS,
       originalUpgradeTxData
     );
+
+    // The chain must have recorded exactly this transaction. Without this check the relay below would
+    // succeed even if the upgrade contract never rewrote the placeholder, since the rewrite is reproduced
+    // here rather than read back from the diamond (the diamond only stores the hash).
+    await assertRecordedUpgradeTxMatches({
+      provider: l1Provider,
+      diamondProxy: chain.diamondProxy,
+      chainId: chain.chainId,
+      upgradeTx: { ...originalUpgradeTx, data: rewrittenUpgradeTxData },
+      placeholderUpgradeTx: originalUpgradeTx,
+      upgradeTxParamType,
+    });
 
     // Relay the upgrade to the L2 chain
     const l2Chain = anvilManager.getL2Chains().find((c) => c.chainId === chain.chainId);
@@ -699,7 +770,9 @@ export async function runChainUpgradesAndRelayL2(params: {
 /**
  * Multi-CTM aware variant of `runChainUpgradesAndRelayL2`. Used by env-preset
  * fork tests (e.g. stage) where the bridgehub has both an Era CTM and an
- * Atlas (zkOS) CTM, each with its own SettlementLayerV31Upgrade address.
+ * Atlas (zkOS) CTM, each with its own per-chain upgrade contract address. This release only produces one
+ * for the ZKsync OS CTM (`CTMUpgrade_v31.deployUsedUpgradeContract` refuses Era), so the Era half of the
+ * grouping stays empty here and is exercised only by fork runs against older ecosystems.
  *
  * Groups chains by their on-chain CTM, looks up the per-CTM
  * `script-out/v31-upgrade-ctm-<ctm>.toml` (written by
@@ -775,7 +848,7 @@ export async function runChainUpgradesPerCtm(params: {
     const settlementLayerUpgradeAddr = readNestedString(
       ctmOutputToml,
       ["state_transition", "default_upgrade_addr"],
-      "SettlementLayerV31Upgrade address"
+      "per-chain upgrade contract address"
     );
     const isZKsyncOS = (ctmOutputToml as { is_zk_sync_os?: boolean }).is_zk_sync_os === true;
 
@@ -815,7 +888,7 @@ async function prepareAndRelayL2Upgrade(
 
   // Send the original upgrade calldata to ComplexUpgrader.
   // The outer force deployments no-op (MockContractDeployer), then upgrade() delegatecalls
-  // to L2V31Upgrade which runs performForceDeployedContractsInit (inner deploys also no-op).
+  // to L2V32Upgrade which runs performForceDeployedContractsInit (inner deploys also no-op).
   const txHash = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
     const tx = await signer.sendTransaction({
       to: L2_COMPLEX_UPGRADER_ADDR,
@@ -879,7 +952,7 @@ async function deployL2Contracts(
   const contractMap = buildAddressToContract(isZKsyncOS);
   for (const entry of forceDeployEntries) {
     // ZKsyncOSUnsafeForceDeployment entries are direct deployments (e.g. the SystemContractProxyAdmin
-    // at L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, and L2V31Upgrade at a random delegate address).
+    // at L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, and L2V32Upgrade at a random delegate address).
     // Both are already set up above (anvil_setCode for the proxy admin, and the delegateTo code
     // is set separately below), so we skip them here.
     if (entry.upgradeType === UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY) {
@@ -891,7 +964,7 @@ async function deployL2Contracts(
       // Era force deployments include the EmptyContract placeholder (0x0000), the EraVM
       // precompiles (0x0001..0x0008), and the system contracts at 0x800x (AccountCodeStorage,
       // NonceHolder, etc.). These are either not exercised by the anvil harness (precompiles)
-      // or are already present in the loaded v29/v30 chain state, so we do not need to deploy
+      // or are already present in the loaded chain state, so we do not need to deploy
       // their bytecode via anvil_setCode. Skip silently for entries we do not know about.
       if (entry.upgradeType === UPGRADE_TYPE_ERA_FORCE_DEPLOYMENT) {
         continue;
@@ -909,8 +982,8 @@ async function deployL2Contracts(
     }
   }
 
-  // Deploy the delegateTo target (L2V31Upgrade).
-  await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V31Upgrade")]);
+  // Deploy the delegateTo target (L2V32Upgrade).
+  await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V32Upgrade")]);
 
   // L2BaseToken: for Era it's deployed directly as L2BaseTokenEra (not in force deployment list).
   // For ZKsyncOS it's in the force deployment list as ZKsyncOSSystemProxyUpgrade and handled above.
@@ -918,7 +991,7 @@ async function deployL2Contracts(
     await l2Provider.send("anvil_setCode", [L2_BASE_TOKEN_ADDR, getBytecode("L2BaseTokenEra")]);
   }
 
-  // L2BaseToken.initL2 (called from _initializeV31Contracts) mints an initial balance into the
+  // L2BaseToken.initL2 (called on the genesis path of performForceDeployedContractsInit) mints an initial balance into the
   // BaseTokenHolder. For Era it reads the pre-existing __DEPRECATED_totalSupply; for ZKsyncOS it
   // mints via the MINT_BASE_TOKEN_HOOK system hook, which is a no-op mock in the anvil harness.
   // In both cases L2BaseToken then transfers ETH to the holder, so it needs a non-zero balance
@@ -967,7 +1040,7 @@ async function deployL2Contracts(
  * 4. Set the proxy admin (EIP-1967 admin slot) to SystemContractProxyAdmin
  * 5. Set the implementation (EIP-1967 implementation slot) to the derived address
  *
- * TODO: This proxy setup should ideally be done during the V30 chain state generation
+ * TODO: This proxy setup should ideally be done during the chain state generation
  * (setup-and-dump-state.ts) so that the pre-generated states already have proper
  * SystemContractProxy layout at 0x800x addresses, matching production ZKsyncOS genesis.
  */
@@ -1075,9 +1148,12 @@ function decodeUpgradeTxData(upgradeTxData: string): {
  *
  * Walks transactions in reverse looking for a ChainAdminOwnable.multicall
  * containing a single upgradeChainFromVersion call, then extracts the
- * l2ProtocolUpgradeTx.data from the SettlementLayerV31Upgrade.upgrade calldata.
+ * l2ProtocolUpgradeTx.data from the per-chain upgrade calldata.
  */
-function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
+function decodeLatestL2UpgradeTx(broadcastPath: string): {
+  tx: Record<string, unknown>;
+  paramType: ethers.utils.ParamType;
+} {
   const broadcast = JSON.parse(fs.readFileSync(broadcastPath, "utf8")) as {
     transactions?: Array<Record<string, unknown>>;
   };
@@ -1091,7 +1167,7 @@ function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
   // Legacy ABI: v29/v30 states have upgradeChainFromVersion(uint256, DiamondCutData) (2 params).
   // Current ABI has upgradeChainFromVersion(address, uint256, DiamondCutData) (3 params).
   const legacyAdminIface = new ethers.utils.Interface(LEGACY_ADMIN_ABI);
-  const settlementLayerIface = new ethers.utils.Interface(getAbi("EraSettlementLayerV31Upgrade"));
+  const settlementLayerIface = new ethers.utils.Interface(getAbi("V32UpgradeZKsyncOS"));
 
   const errors: string[] = [];
 
@@ -1121,7 +1197,12 @@ function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
       }
 
       const [proposedUpgrade] = settlementLayerIface.decodeFunctionData("upgrade", initCalldata);
-      return proposedUpgrade.l2ProtocolUpgradeTx.data;
+      const proposedUpgradeType = settlementLayerIface.getFunction("upgrade").inputs[0];
+      const txParamType = proposedUpgradeType.components.find((c) => c.name === "l2ProtocolUpgradeTx");
+      if (!txParamType) {
+        throw new Error("ProposedUpgrade ABI has no l2ProtocolUpgradeTx component");
+      }
+      return { tx: proposedUpgrade.l2ProtocolUpgradeTx, paramType: txParamType };
     } catch (e) {
       errors.push(`tx decode failed: ${e instanceof Error ? e.message.slice(0, 120) : String(e)}`);
       continue;
@@ -1133,6 +1214,45 @@ function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
       `  Transactions: ${transactions.length}\n` +
       errors.map((e) => `  - ${e}`).join("\n")
   );
+}
+
+/**
+ * Assert the chain recorded the L2 upgrade transaction we are about to relay.
+ *
+ * `BaseZkSyncUpgrade` stores `keccak256(abi.encode(l2ProtocolUpgradeTx))`, so hashing the transaction with
+ * the rewritten calldata and comparing proves the per-chain upgrade contract performed the same rewrite.
+ */
+async function assertRecordedUpgradeTxMatches(params: {
+  provider: ethers.providers.JsonRpcProvider;
+  diamondProxy: string;
+  chainId: number;
+  upgradeTx: Record<string, unknown>;
+  placeholderUpgradeTx: Record<string, unknown>;
+  upgradeTxParamType: ethers.utils.ParamType;
+}): Promise<void> {
+  const hashOf = (tx: Record<string, unknown>): string =>
+    ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode([params.upgradeTxParamType], [tx]));
+
+  const expectedHash = hashOf(params.upgradeTx);
+  const placeholderHash = hashOf(params.placeholderUpgradeTx);
+  if (expectedHash === placeholderHash) {
+    throw new Error(
+      `Chain ${params.chainId}: the rewritten L2 upgrade tx is identical to the placeholder, so this check ` +
+        "cannot tell whether the upgrade contract rewrote anything."
+    );
+  }
+
+  const getters = new ethers.Contract(params.diamondProxy, getAbi("GettersFacet"), params.provider);
+  const recordedHash: string = await getters.getL2SystemContractsUpgradeTxHash();
+
+  if (recordedHash.toLowerCase() !== expectedHash.toLowerCase()) {
+    throw new Error(
+      `Chain ${params.chainId}: the diamond recorded L2 upgrade tx ${recordedHash}, but the transaction ` +
+        `being relayed hashes to ${expectedHash}. The per-chain upgrade contract did not record the ` +
+        "rewritten transaction."
+    );
+  }
+  console.log(`   Recorded L2 upgrade tx hash matches the relayed transaction (${expectedHash})`);
 }
 
 /**
@@ -1204,17 +1324,17 @@ async function verifyL2UpgradeResult(l2Provider: ethers.providers.JsonRpcProvide
   }
 
   const baseTokenAssetId = await assetTracker.BASE_TOKEN_ASSET_ID();
-  const registered = await assetTracker.isAssetRegistered(baseTokenAssetId);
-  if (!registered) {
-    throw new Error(`Chain ${chainId}: base token not registered after L2 upgrade`);
+  if (!(await assetTracker.isAssetRegistered(baseTokenAssetId))) {
+    throw new Error(`Chain ${chainId}: base token bookkeeping not initialized after L2 upgrade`);
   }
 }
 
 export async function verifyProtocolVersions(
   provider: ethers.providers.JsonRpcProvider,
-  chains: Array<{ chainId: number; diamondProxy: string }>
+  chains: Array<{ chainId: number; diamondProxy: string }>,
+  expectedProtocolVersion: string
 ): Promise<void> {
-  const expectedVersion = ethers.BigNumber.from("0x1f00000000");
+  const expectedVersion = ethers.BigNumber.from(expectedProtocolVersion);
   for (const chain of chains) {
     const diamond = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), provider);
     const version = await diamond.getProtocolVersion();
@@ -1276,20 +1396,6 @@ async function clearGenesisUpgradeTxHash(
   }
 }
 
-async function seedBatchCounters(
-  provider: ethers.providers.JsonRpcProvider,
-  chains: Array<{ chainId: number; diamondProxy: string }>
-): Promise<void> {
-  const TOTAL_BATCHES_EXECUTED_SLOT = ethers.utils.hexZeroPad(ethers.utils.hexlify(11), 32);
-  const TOTAL_BATCHES_COMMITTED_SLOT = ethers.utils.hexZeroPad(ethers.utils.hexlify(13), 32);
-  const ONE = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 32);
-
-  for (const chain of chains) {
-    await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_EXECUTED_SLOT, ONE]);
-    await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_COMMITTED_SLOT, ONE]);
-  }
-}
-
 // ── Ownership helpers ────────────────────────────────────────────────
 
 async function transferOwnership2Step(
@@ -1346,9 +1452,9 @@ export function prepareUpgradeHarnessInputs(
   fs.mkdirSync(tempDir, { recursive: true });
 
   const permanentValuesPath = path.join(tempDir, `${scenario.label}-permanent-values.toml`);
-  const upgradeInputPath = path.join(tempDir, `${scenario.label}-to-v31-upgrade.toml`);
-  const ecosystemOutputPath = path.join(tempDir, `${scenario.label}-v31-upgrade-ecosystem.toml`);
-  const governanceTomlPath = path.join(tempDir, `${scenario.label}-v31-governance.toml`);
+  const upgradeInputPath = path.join(tempDir, `${scenario.label}-upgrade-input.toml`);
+  const ecosystemOutputPath = path.join(tempDir, `${scenario.label}-upgrade-ecosystem.toml`);
+  const governanceTomlPath = path.join(tempDir, `${scenario.label}-governance.toml`);
   const protocolOpsOutDir = path.join(tempDir, "protocol-ops");
 
   const primaryChainId = state.chainAddresses[0]?.chainId;
@@ -1418,6 +1524,7 @@ function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, Contra
     [L2_CHAIN_ASSET_HANDLER_ADDR.toLowerCase(), "L2ChainAssetHandler"],
     [L2_ASSET_TRACKER_ADDR.toLowerCase(), "L2AssetTracker"],
     [INTEROP_CENTER_ADDR.toLowerCase(), "InteropCenter"],
+    [INTEROP_ATTRIBUTE_PARSER_ADDR.toLowerCase(), "InteropAttributeParser"],
     [L2_INTEROP_HANDLER_ADDR.toLowerCase(), "L2InteropHandler"],
     [L2_BASE_TOKEN_HOLDER_ADDR.toLowerCase(), "BaseTokenHolder"],
     [L2_WRAPPED_BASE_TOKEN_IMPL_ADDR.toLowerCase(), "L2WrappedBaseToken"],
@@ -1426,10 +1533,15 @@ function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, Contra
   ];
   if (isZKsyncOS) {
     entries.push(
+      // Atomic-interop built-ins: force-deployed by this release's upgrade on ZKsync OS chains.
+      [L2_INTEROP_COMMITMENT_TREE_ADDR.toLowerCase(), "L2InteropCommitmentTree"],
+      [L2_ATOMIC_FLOW_MANAGER_ADDR.toLowerCase(), "AtomicFlowManager"],
       [L2_BASE_TOKEN_ADDR.toLowerCase(), "L2BaseTokenZKOS"],
       [L2_TO_L1_MESSENGER_ADDR.toLowerCase(), "L1MessengerZKOS"],
       [SYSTEM_CONTEXT_ADDR.toLowerCase(), "SystemContext"],
-      [L2_CONTRACT_DEPLOYER_ADDR.toLowerCase(), "ZKOSContractDeployer"]
+      [L2_CONTRACT_DEPLOYER_ADDR.toLowerCase(), "ZKOSContractDeployer"],
+      // The removed v31 GWAssetTracker: the upgrade swaps its proxy's implementation for EmptyContract.
+      [L2_REMOVED_GW_ASSET_TRACKER_ADDR.toLowerCase(), "EmptyContract"]
     );
   }
   return new Map(entries);

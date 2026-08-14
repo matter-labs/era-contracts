@@ -213,28 +213,18 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function deployVerifiers() internal {
-        (, string memory fflonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierFflonk);
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierPlonk);
         (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
             config.isZKsyncOS,
             config.testnetVerifier
         );
 
-        ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
+        if (!config.isZKsyncOS) {
+            (, string memory fflonkName) = DeployCTML1OrGateway.resolve(false, CTMContract.VerifierFflonk);
+            ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
+        }
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
-
-        // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
-        vm.startBroadcast(getDeployerAddress());
-        // Called as library (not through vms) to preserve msg.sender
-        DeployCTML1OrGateway.initializeVerifier(
-            ctmAddresses.stateTransition.verifiers.verifier,
-            ctmAddresses.stateTransition.verifiers.verifierFflonk,
-            ctmAddresses.stateTransition.verifiers.verifierPlonk,
-            config.ownerAddress,
-            config.isZKsyncOS
-        );
-        vm.stopBroadcast();
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -316,14 +306,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         IOwnable(ctmAddresses.stateTransition.proxies.serverNotifier).transferOwnership(ctmAddresses.chainAdmin);
         IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
 
-        // Called as library (not through vms) to preserve msg.sender
-        DeployCTML1OrGateway.transferVerifierOwnership(
-            ctmAddresses.stateTransition.verifiers.verifier,
-            ctmAddresses.admin.governance,
-            config.isZKsyncOS
-        );
-
-        IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
         vm.stopBroadcast();
         console.log("Owners updated");
     }
@@ -495,7 +477,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.writeFile(tmpFile, "");
 
         bytes[10] memory bytecodes;
-        for (uint256 i = 0; i < 10; i++) {
+        for (uint256 i = 0; i < contracts.length; i++) {
             (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, contracts[i]);
             bytecodes[i] = BytecodeUtils.readDeployedBytecodeL1(true, fileName, contractName);
             vm.writeLine(tmpFile, vm.toString(bytecodes[i]));
@@ -516,9 +498,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         input[3] = tmpFile;
         bytes memory result = vm.ffi(input);
 
-        uint256 totalBytecodes = 11;
+        // The batch is the `contracts` list plus the SystemContractProxy appended above.
+        uint256 totalBytecodes = contracts.length + 1;
         require(result.length == totalBytecodes * 32, "Unexpected batch blake2s result length");
-        for (uint256 i = 0; i < 10; i++) {
+        for (uint256 i = 0; i < contracts.length; i++) {
             bytes32 hash;
             assembly {
                 hash := mload(add(result, add(32, mul(i, 32))))
@@ -526,9 +509,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             _blakeCache[keccak256(bytecodes[i])] = hash;
         }
         {
+            uint256 proxyIndex = contracts.length;
             bytes32 proxyHash;
             assembly {
-                proxyHash := mload(add(result, add(32, mul(10, 32))))
+                proxyHash := mload(add(result, add(32, mul(proxyIndex, 32))))
             }
             _blakeCache[keccak256(proxyBytecode)] = proxyHash;
         }

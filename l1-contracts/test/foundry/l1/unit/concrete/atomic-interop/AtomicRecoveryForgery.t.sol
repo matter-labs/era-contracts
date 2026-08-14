@@ -5,12 +5,11 @@ import {Test} from "forge-std/Test.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
-import {ManagerNoRecoverableCalls} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.sol";
-import {RecoverToL1NotSupported, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {AssetHandlerDoesNotExist, RecoverToL1NotSupported, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {
     BundleAttributes,
     INTEROP_BUNDLE_VERSION,
@@ -48,6 +47,13 @@ contract L2AssetRouterRecoveryHarness is L2AssetRouter {
     /// @dev Initializes the inherited reentrancy guard via its real initializer (rather than a storage
     /// override), so `recoverAtomicCall`'s `nonReentrant` modifier is armed for the test.
     function initReentrancyGuardForTest() external reentrancyGuardInitializer {}
+
+    /// @dev Registers an asset handler directly. In production the mapping is populated by the burn
+    /// itself (`_burn` / `tryRegisterTokenFromBurnData`); the harness short-circuits that since these
+    /// tests start from an already-Revertable leg and never run the send path.
+    function setAssetHandlerForTest(bytes32 _assetId, address _handler) external {
+        _setAssetHandler(_assetId, _handler);
+    }
 }
 
 contract MockRecoveringNativeTokenVault {
@@ -67,12 +73,12 @@ contract MockRecoveringNativeTokenVault {
     }
 }
 
-/// @notice Regression tests for the atomic-interop recovery forgery: an atomic bundle can carry a
-/// `finalizeDeposit` call, but on timeout recovery only calls produced by the asset router's own burn path
-/// (`InteropCall.from == L2_ASSET_ROUTER_ADDR`, set by `_processCallStarter`'s indirect path) may be
-/// re-credited; a direct/forged call is skipped. The NTV is mocked to isolate the provenance gate from real
-/// vault accounting; the `Revertable` state is set via a harness (the full send + `authorizeRefund` proof
-/// path is covered by the anvil-interop suite) since the gate under test is at recovery.
+/// @notice Regression tests for the atomic-recovery forgery: on timeout recovery only calls produced by
+/// the asset router's own burn path (`InteropCall.from == L2_ASSET_ROUTER_ADDR`) may be re-credited;
+/// forged direct calls are skipped. See {protocol-docs/bridging.md#atomic-recovery-hook}.
+/// @dev The NTV is mocked to isolate the provenance gate from real vault accounting; `Revertable` state
+/// is forced via a harness (the full send + `authorizeRefund` proof path is covered by the anvil-interop
+/// suite) since the gate under test is at recovery.
 contract AtomicRecoveryForgeryTest is Test {
     uint256 internal constant L1_CHAIN_ID = 1;
     uint256 internal constant ERA_CHAIN_ID = 271;
@@ -98,6 +104,9 @@ contract AtomicRecoveryForgeryTest is Test {
         );
         router = L2AssetRouterRecoveryHarness(L2_ASSET_ROUTER_ADDR);
         router.initReentrancyGuardForTest();
+        // Recovery routes through the handler registered for the asset at burn time; the burn is
+        // short-circuited in these tests, so register the mock vault as the asset's handler explicitly.
+        router.setAssetHandlerForTest(assetId, address(ntv));
     }
 
     /// @dev Builds a single-call atomic bundle whose only call is a `finalizeDeposit`, with the call's
@@ -160,20 +169,19 @@ contract AtomicRecoveryForgeryTest is Test {
     // ---------------------------------------------------------------------------------------------
 
     /// A forged, never-burned `finalizeDeposit` (its `from` is the attacker, not the router's burn path) is
-    /// skipped on recovery: nothing is recovered, `claimRefund` reverts, the NTV is never asked to release
-    /// funds, and the leg stays `Revertable`.
-    function test_forgedDirectFinalizeDepositIsRejectedOnRecovery() external {
+    /// skipped on recovery: the NTV is never asked to release funds. The claim itself still goes through —
+    /// a bundle with nothing recoverable simply flips to `Reverted` without moving funds.
+    function test_forgedDirectFinalizeDepositIsSkippedOnRecovery() external {
         InteropBundle memory bundle = _buildBundle({_from: attacker, _to: address(router)});
         (bytes32 flowId, bytes32 bundleHash, bytes memory encodedBundle) = _commitRevertable(bundle);
 
-        vm.expectRevert(abi.encodeWithSelector(ManagerNoRecoverableCalls.selector, flowId, bundleHash));
         manager.claimRefund(flowId, encodedBundle);
 
         assertEq(ntv.recoveries(), 0, "forged call must not trigger any recovery");
         assertEq(
             uint256(manager.legState(flowId, bundleHash)),
-            uint256(LegState.Revertable),
-            "leg must stay Revertable when the forged claim reverts"
+            uint256(LegState.Reverted),
+            "the no-op claim still consumes the leg"
         );
     }
 
@@ -192,6 +200,46 @@ contract AtomicRecoveryForgeryTest is Test {
         assertEq(ntv.recoveredOriginalCaller(), attacker);
         assertEq(ntv.recoveredAmount(), amount);
         assertEq(uint256(manager.legState(flowId, bundleHash)), uint256(LegState.Reverted));
+    }
+
+    /// Recovery must reverse the burn through the SAME handler that performed it: a bridged asset whose
+    /// burns run through a custom (non-NTV) asset handler is recovered through that handler, and the
+    /// NTV is never consulted.
+    function test_recoveryRoutesThroughRegisteredCustomAssetHandler() external {
+        MockRecoveringNativeTokenVault customHandler = new MockRecoveringNativeTokenVault();
+        router.setAssetHandlerForTest(assetId, address(customHandler));
+
+        InteropBundle memory bundle = _buildBundle({_from: L2_ASSET_ROUTER_ADDR, _to: address(router)});
+        (bytes32 flowId, bytes32 bundleHash, bytes memory encodedBundle) = _commitRevertable(bundle);
+
+        manager.claimRefund(flowId, encodedBundle);
+
+        assertEq(customHandler.recoveries(), 1, "burn must be reversed by its own handler");
+        assertEq(customHandler.recoveredAssetId(), assetId);
+        assertEq(customHandler.recoveredOriginalCaller(), attacker);
+        assertEq(customHandler.recoveredAmount(), amount);
+        assertEq(ntv.recoveries(), 0, "the NTV must not be consulted for a custom-handled asset");
+        assertEq(uint256(manager.legState(flowId, bundleHash)), uint256(LegState.Reverted));
+    }
+
+    /// A genuine burn always leaves its handler registered, so a missing registration means the call
+    /// cannot be safely recovered — the claim reverts instead of guessing a handler.
+    function test_recoveryRevertsWhenAssetHandlerNotRegistered() external {
+        bytes32 unregisteredAssetId = keccak256("never burned through this router");
+        assetId = unregisteredAssetId;
+
+        InteropBundle memory bundle = _buildBundle({_from: L2_ASSET_ROUTER_ADDR, _to: address(router)});
+        (bytes32 flowId, bytes32 bundleHash, bytes memory encodedBundle) = _commitRevertable(bundle);
+
+        vm.expectRevert(abi.encodeWithSelector(AssetHandlerDoesNotExist.selector, unregisteredAssetId));
+        manager.claimRefund(flowId, encodedBundle);
+
+        assertEq(ntv.recoveries(), 0);
+        assertEq(
+            uint256(manager.legState(flowId, bundleHash)),
+            uint256(LegState.Revertable),
+            "leg must stay Revertable when the claim reverts"
+        );
     }
 
     /// A timed-out value leg is recovered through the asset router wrapper: the wrapper reconstructs
@@ -221,10 +269,9 @@ contract AtomicRecoveryForgeryTest is Test {
         router.bridgehubRecoverBaseToken(L1_CHAIN_ID, assetId, attacker, amount);
     }
 
-    /// L2->L1 interop is never revertable (`InteropCenter` rejects L1-destined atomic bundles at send), so
-    /// the recovery entry point asserts the invariant: even a genuine router-backed burn is rejected when
-    /// its destination is L1 — the whole `claimRefund` reverts (leaving the leg `Revertable`) instead of
-    /// unwinding the append-only `totalWithdrawalsToL1` accounting.
+    /// L2->L1 interop is never revertable (rejected at send), so recovery asserts the invariant: even a
+    /// genuine router-backed burn reverts wholesale when destined to L1 — leaving the leg `Revertable`
+    /// instead of unwinding the append-only `totalWithdrawalsToL1` accounting.
     function test_recoverToL1IsUnreachable() external {
         // Arm the router's L1 chain id through the real upgrade entry point.
         _initializeRouterChainIds();

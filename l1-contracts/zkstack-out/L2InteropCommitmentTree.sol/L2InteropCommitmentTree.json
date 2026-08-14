@@ -1,5 +1,9 @@
 [
   {
+    "type": "fallback",
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "function",
     "name": "appender",
     "inputs": [],
@@ -182,22 +186,6 @@
   },
   {
     "type": "error",
-    "name": "IMTLowLeafNextTooSmall",
-    "inputs": [
-      {
-        "name": "lowNextValue",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "newValue",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "IMTLowLeafValueTooLarge",
     "inputs": [
       {
@@ -235,6 +223,11 @@
   },
   {
     "type": "error",
+    "name": "InteropCommitmentLeafHookFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "MerkleNothingToProve",
     "inputs": []
   },
@@ -253,6 +246,16 @@
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "NotEnoughGasSupplied",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotSelfCall",
+    "inputs": []
   },
   {
     "type": "error",

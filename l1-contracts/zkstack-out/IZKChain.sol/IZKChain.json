@@ -813,6 +813,19 @@
   },
   {
     "type": "function",
+    "name": "getPubdataContent",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "enum PubdataContent"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getPubdataPricingMode",
     "inputs": [],
     "outputs": [
@@ -990,6 +1003,19 @@
         "name": "",
         "type": "bool",
         "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getZKsyncOSMaxTxGasLimit",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
       }
     ],
     "stateMutability": "view"
@@ -1974,6 +2000,19 @@
   },
   {
     "type": "function",
+    "name": "setPubdataContent",
+    "inputs": [
+      {
+        "name": "_pubdataContent",
+        "type": "uint8",
+        "internalType": "enum PubdataContent"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setPubdataPricingMode",
     "inputs": [
       {
@@ -2036,21 +2075,15 @@
   },
   {
     "type": "function",
-    "name": "setZKsyncOSPreV31TotalSupply",
+    "name": "setZKsyncOSMaxTxGasLimit",
     "inputs": [
       {
-        "name": "_totalSupply",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "_newMaxTxGasLimit",
+        "type": "uint64",
+        "internalType": "uint64"
       }
     ],
-    "outputs": [
-      {
-        "name": "canonicalTxHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
+    "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
@@ -2769,6 +2802,25 @@
   },
   {
     "type": "event",
+    "name": "NewPubdataContent",
+    "inputs": [
+      {
+        "name": "oldPubdataContent",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "enum PubdataContent"
+      },
+      {
+        "name": "newPubdataContent",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "enum PubdataContent"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "NewRelayedPriorityTransaction",
     "inputs": [
       {
@@ -2807,6 +2859,25 @@
         "type": "address",
         "indexed": false,
         "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewZKsyncOSMaxTxGasLimit",
+    "inputs": [
+      {
+        "name": "oldMaxTxGasLimit",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      },
+      {
+        "name": "newMaxTxGasLimit",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
       }
     ],
     "anonymous": false
@@ -2977,19 +3048,6 @@
         "type": "bool",
         "indexed": false,
         "internalType": "bool"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ZKsyncOSPreV31TotalSupplySet",
-    "inputs": [
-      {
-        "name": "totalSupply",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
       }
     ],
     "anonymous": false

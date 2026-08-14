@@ -505,13 +505,6 @@
   },
   {
     "type": "function",
-    "name": "initializeL1V31Upgrade",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "interopRootLogId",
     "inputs": [],
     "outputs": [
@@ -1178,11 +1171,6 @@
         "internalType": "uint256"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "NotAllChainsOnL1",
-    "inputs": []
   },
   {
     "type": "error",

@@ -82,7 +82,7 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCodeEra.
-        string[56] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[53] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction",
             "BaseTokenHolder",
             "L2AssetTracker",
@@ -104,26 +104,23 @@ library ContractsBytecodesLib {
             "DiamondInit",
             "DiamondProxy",
             "DefaultUpgrade",
-            "EraSettlementLayerV31Upgrade",
-            "ZKsyncOSSettlementLayerV31Upgrade",
+            "DefaultUpgradeZKsyncOS",
+            "V32UpgradeZKsyncOS",
             "InteropCenter",
             "InteropAttributeParser",
             "L2InteropHandler",
             "EraDualVerifier",
-            "ZKsyncOSDualVerifier",
+            "ZKsyncOSVerifier",
             "L1GenesisUpgrade",
             "L2AdminFactory",
             "L2AssetRouter",
             "L2NativeTokenVault",
-            "L2SharedBridgeLegacy",
-            "L2SharedBridgeLegacyDev",
             "EraTestnetVerifier",
             "L2ProxyAdminDeployer",
             "L2WrappedBaseToken",
             "Multicall3",
             "DummyL1MessageRoot",
             "L1MessageRoot",
-            "L1MessageRootStageSepolia",
             "L2MessageRoot",
             "PermanentRestriction",
             "ProxyAdmin",
@@ -136,7 +133,7 @@ library ContractsBytecodesLib {
             "ValidiumL1DAValidator",
             "L2InteropRootStorage",
             "L2MessageVerification",
-            "L2V31Upgrade",
+            "L2V32Upgrade",
             "UpgradeableBeaconDeployer",
             "SystemContractProxyAdmin"
         ];
@@ -177,8 +174,6 @@ library ContractsBytecodesLib {
             return Utils.readBytecodeL1(false, "EraVerifierFflonk.sol", "EraVerifierFflonk");
         } else if (Utils.compareStrings(contractIdentifier, "EraVerifierPlonk")) {
             return Utils.readBytecodeL1(false, "EraVerifierPlonk.sol", "EraVerifierPlonk");
-        } else if (Utils.compareStrings(contractIdentifier, "ZKsyncOSVerifierFflonk")) {
-            return Utils.readBytecodeL1(false, "ZKsyncOSVerifierFflonk.sol", "ZKsyncOSVerifierFflonk");
         } else if (Utils.compareStrings(contractIdentifier, "ZKsyncOSVerifierPlonk")) {
             return Utils.readBytecodeL1(false, "ZKsyncOSVerifierPlonk.sol", "ZKsyncOSVerifierPlonk");
         }
