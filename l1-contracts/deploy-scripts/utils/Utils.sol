@@ -274,20 +274,6 @@ library Utils {
     }
 
     /**
-     * @dev Returns the bytecode hash of the batch bootloader.
-     */
-    function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
-        return BytecodeUtils.readZKFoundryBytecodeSystemContracts("proved_batch.yul", "Bootloader");
-    }
-
-    /**
-     * @dev Returns the bytecode hash of the EVM emulator.
-     */
-    function getEvmEmulatorBytecodeHash() internal view returns (bytes memory) {
-        return BytecodeUtils.readZKFoundryBytecodeSystemContracts("EvmEmulator.yul", "EvmEmulator");
-    }
-
-    /**
      * @dev Read hardhat bytecodes
      */
     function readHardhatBytecode(string memory artifactPath) internal view returns (bytes memory) {
@@ -341,7 +327,10 @@ library Utils {
     }
 
     /**
-     * @dev Deploy l2 contracts through l1
+     * @dev Deploy l2 contracts through l1.
+     * TODO(gateway-os): this helper CREATE2-deploys EraVM-format (zkout) bytecode via the EraVM deployer
+     * system contract and only works against the legacy EraVM-based Gateway. The future ZKsync-OS-based
+     * Gateway needs an EVM-native deployment path; replace the remaining consumers when it lands.
      */
     function deployThroughL1(
         bytes memory bytecode,
@@ -435,6 +424,7 @@ library Utils {
 
     /**
      * @dev Deploy l2 contracts through l1, while using built-in L2 Create2Factory contract.
+     * TODO(gateway-os): EraVM-format bytecode only; see {deployThroughL1}.
      */
     function deployThroughL1Deterministic(
         bytes memory bytecode,
@@ -1569,17 +1559,11 @@ library Utils {
         return address(uint160(uint256(value)));
     }
 
-    string private constant GENESIS_FILENAME_ERA = "era/latest.json";
     string private constant GENESIS_FILENAME_ZKOS = "zksync-os/latest.json";
 
-    /// @notice Absolute path to genesis / chain-creation JSON under `configs/genesis/` for the given VM mode.
-    function genesisConfigPath(bool _isZKsyncOS) internal returns (string memory) {
-        return
-            string.concat(
-                vm.projectRoot(),
-                "/../configs/genesis/",
-                _isZKsyncOS ? GENESIS_FILENAME_ZKOS : GENESIS_FILENAME_ERA
-            );
+    /// @notice Absolute path to the ZKsync OS genesis / chain-creation JSON under `configs/genesis/`.
+    function genesisConfigPath() internal returns (string memory) {
+        return string.concat(vm.projectRoot(), "/../configs/genesis/", GENESIS_FILENAME_ZKOS);
     }
 
     // add this to be excluded from coverage report

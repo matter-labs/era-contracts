@@ -50,6 +50,12 @@ import {
 } from "./Types.sol";
 import {DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
 
+/// @notice Getter that existed on pre-v32 `L1AssetRouter` implementations.
+interface ILegacyAssetRouterEraChainId {
+    // solhint-disable-next-line func-name-mixedcase
+    function ERA_CHAIN_ID() external view returns (uint256);
+}
+
 library AddressIntrospector {
     error NoUptoDateZkChainFound();
 
@@ -207,7 +213,7 @@ library AddressIntrospector {
     // ============ CTM Addresses ============
 
     function getCTMAddresses(ChainTypeManagerBase _ctm) public view returns (CTMDeployedAddresses memory info) {
-        return _getCTMAddressesInternal(address(_ctm), _ctm.isZKsyncOS(), false);
+        return _getCTMAddressesInternal(address(_ctm), false);
     }
 
     /// @notice CTM discovery for a v31 ecosystem.
@@ -215,19 +221,15 @@ library AddressIntrospector {
     /// `plonkVerifiers(i)`, while this release's exposes a single `PLONK_VERIFIER()`. Reading the v32 shape
     /// off a v31 verifier reverts, and the upgrade deploys fresh verifiers anyway, so the sub-verifiers are
     /// reported as absent — the same thing the v29 path used to do.
-    function getCTMAddressesV31(
-        address _ctmAddr,
-        bool _isZKsyncOS
-    ) public view returns (CTMDeployedAddresses memory info) {
+    function getCTMAddressesV31(address _ctmAddr) public view returns (CTMDeployedAddresses memory info) {
         if (_ctmAddr == address(0) || _ctmAddr.code.length == 0) {
             return info;
         }
-        return _getCTMAddressesInternal(_ctmAddr, _isZKsyncOS, true);
+        return _getCTMAddressesInternal(_ctmAddr, true);
     }
 
     function _getCTMAddressesInternal(
         address _ctmAddr,
-        bool _isZKsyncOS,
         bool _isPreV32
     ) private view returns (CTMDeployedAddresses memory info) {
         ChainTypeManagerBase ctm = ChainTypeManagerBase(_ctmAddr);
@@ -240,7 +242,7 @@ library AddressIntrospector {
         // ecosystem this release can upgrade; the sub-verifier shape does not (see `getCTMAddressesV31`).
         (address verifierFflonk, address verifierPlonk) = _isPreV32
             ? (address(0), address(0))
-            : _getSubVerifiers(verifier, _isZKsyncOS);
+            : _getSubVerifiers(verifier);
         address bytecodesSupplier = ctm.L1_BYTECODES_SUPPLIER();
 
         // Note: daAddresses is left zero-initialized (Solidity default)
@@ -374,7 +376,9 @@ library AddressIntrospector {
     }
 
     function getEraChainId(address _assetRouter) public view returns (uint256 eraChainId) {
-        return IL1AssetRouter(_assetRouter).ERA_CHAIN_ID();
+        // Pre-v32 asset-router implementations expose the (now removed) `ERA_CHAIN_ID` immutable;
+        // the upgrade scripts still read it from live ecosystems as the historical ecosystem identifier.
+        return ILegacyAssetRouterEraChainId(_assetRouter).ERA_CHAIN_ID();
     }
 
     function getZkChainFacetAddresses(IZKChain _zkChain) public view returns (address[] memory) {
@@ -504,13 +508,9 @@ library AddressIntrospector {
         return address(0);
     }
 
-    /// @notice Get the sub-verifiers used by the active verifier.
+    /// @notice Get fflonk and plonk sub-verifiers from a ZKsyncOS dual verifier
     /// @param _verifier The verifier address
-    /// @param _isZKsyncOS If true, returns only the ZKsync OS PLONK verifier; otherwise both Era verifiers.
-    function _getSubVerifiers(
-        address _verifier,
-        bool _isZKsyncOS
-    ) private view returns (address fflonk, address plonk) {
-        return DeployCTML1OrGateway.getSubVerifiers(_verifier, _isZKsyncOS);
+    function _getSubVerifiers(address _verifier) private view returns (address fflonk, address plonk) {
+        return DeployCTML1OrGateway.getSubVerifiers(_verifier);
     }
 }

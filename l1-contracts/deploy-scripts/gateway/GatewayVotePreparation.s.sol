@@ -114,7 +114,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             eraChainId: eraChainId,
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
-            isZKsyncOS: config.isZKsyncOS,
+            // Only ZKsync-OS-based gateway CTMs are supported on this release.
+            isZKsyncOS: true,
             adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),

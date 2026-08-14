@@ -27,72 +27,22 @@ import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {
-    CoreContract,
-    EraVmSystemContract,
-    Language,
-    ZkSyncOsSystemContract,
-    ZKsyncOSUpgradeType
-} from "../ecosystem/CoreContract.sol";
+import {CoreContract, ZkSyncOsSystemContract, ZKsyncOSUpgradeType} from "../ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 import {DeduplicateBytecodesCountMismatch} from "../ecosystem/DeployScriptErrors.sol";
-import {EraForceDeploymentsLib} from "./default-upgrade/EraForceDeploymentsLib.sol";
 
 // solhint-disable no-console
 
-/// @notice Struct representing a system contract's details
-struct SystemContract {
-    address addr; // Contract address
-    string codeName; // Name of the contract code
-    Language lang; // Programming language used
-    bool isPrecompile; // Whether precompile or not
-}
-
-/// @dev The number of EraVM system contracts force-deployed from system-contracts / EraVM bytecodes.
-uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
-/// @dev Fixed-address CoreContract entries backed by l1-contracts bytecodes.
-///      Era deploys them directly; ZKsyncOS upgrades them via universal force deployments.
+/// @dev Fixed-address CoreContract entries backed by l1-contracts bytecodes,
+///      upgraded on ZKsyncOS via universal force deployments.
 uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 12;
-/// @dev Era runtime creation bytecodes published as factory deps but not force-deployed.
-uint256 constant RUNTIME_ONLY_FACTORY_DEPS_COUNT = 2;
-/// @dev Era factory deps: fixed-address core contracts plus runtime-only proxy creation bytecodes.
-uint256 constant ERA_FACTORY_DEPENDENCY_CONTRACTS_COUNT = FIXED_ADDRESS_CORE_CONTRACTS_COUNT +
-    RUNTIME_ONLY_FACTORY_DEPS_COUNT;
 /// @dev System contracts (0x800x) with l1-contracts EVM bytecodes for ZKsyncOS proxy upgrades.
 uint256 constant ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT = 3;
 
 /// @dev Core contracts that only exist on ZKsync OS chains.
 uint256 constant ZKOS_ONLY_CONTRACTS_COUNT = 2;
 
-/// @notice A fixed-address core contract's identity plus its Era bytecode.
-struct FixedAddressCoreContractDeployInfo {
-    CoreContract id;
-    address addr;
-    bytes bytecode;
-}
-
 library SystemContractsProcessing {
-    /// @notice Retrieves the entire list of system contracts as a memory array.
-    /// @dev Covers contracts based in the `system-contracts` folder plus fixed-address
-    ///      EraVM system helpers; fixed-address CoreContract entries are handled separately.
-    /// Note, that we do not populate the system contract for the genesis upgrade address,
-    /// as it is used during the genesis upgrade or during upgrades (and so it should be populated
-    /// as part of the upgrade script).
-    /// @return An array of SystemContract structs containing all system contracts
-    function getSystemContracts() public pure returns (SystemContract[] memory) {
-        SystemContract[] memory systemContracts = new SystemContract[](SYSTEM_CONTRACTS_COUNT);
-        for (uint256 i = 0; i < SYSTEM_CONTRACTS_COUNT; i++) {
-            EraVmSystemContract id = EraVmSystemContract(i);
-            systemContracts[i] = SystemContract({
-                addr: CoreOnGatewayHelper._resolveAddress(id),
-                codeName: CoreOnGatewayHelper._resolveContractName(id),
-                lang: CoreOnGatewayHelper._resolveLanguage(id),
-                isPrecompile: CoreOnGatewayHelper._resolveIsPrecompile(id)
-            });
-        }
-        return systemContracts;
-    }
-
     /// @notice Deduplicates the array of bytecodes.
     function deduplicateBytecodes(bytes[] memory input) internal pure returns (bytes[] memory output) {
         // A more efficient way would be to sort + deduplicate, but
@@ -133,67 +83,16 @@ library SystemContractsProcessing {
         require(included == toInclude, DeduplicateBytecodesCountMismatch());
     }
 
-    function getSystemContractsBytecodes() internal view returns (bytes[] memory result) {
-        result = new bytes[](SYSTEM_CONTRACTS_COUNT);
-
-        SystemContract[] memory systemContracts = getSystemContracts();
-        for (uint256 i = 0; i < SYSTEM_CONTRACTS_COUNT; i++) {
-            if (systemContracts[i].isPrecompile) {
-                result[i] = BytecodeUtils.readPrecompileBytecode(systemContracts[i].codeName);
-            } else {
-                // L2BaseToken is now in l1-contracts as L2BaseTokenEra
-                if (Utils.compareStrings(systemContracts[i].codeName, "L2BaseToken")) {
-                    result[i] = BytecodeUtils.readBytecodeL1(false, "L2BaseTokenEra.sol", "L2BaseTokenEra");
-                } else if (Utils.compareStrings(systemContracts[i].codeName, "SystemContractProxyAdmin")) {
-                    result[i] = ContractsBytecodesLib.getCreationCodeEra(systemContracts[i].codeName);
-                } else if (systemContracts[i].lang == Language.Solidity) {
-                    result[i] = BytecodeUtils.readSystemContractsBytecode(systemContracts[i].codeName);
-                } else {
-                    result[i] = BytecodeUtils.readSystemContractsYulBytecode(systemContracts[i].codeName);
-                }
-            }
-        }
-    }
-
-    function getSystemContractsForceDeployments()
-        internal
-        view
-        returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments)
-    {
-        forceDeployments = new IL2ContractDeployer.ForceDeployment[](SYSTEM_CONTRACTS_COUNT);
-
-        SystemContract[] memory systemContracts = getSystemContracts();
-        bytes[] memory bytecodes = getSystemContractsBytecodes();
-        for (uint256 i = 0; i < SYSTEM_CONTRACTS_COUNT; i++) {
-            forceDeployments[i] = IL2ContractDeployer.ForceDeployment({
-                bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[i]),
-                newAddress: systemContracts[i].addr,
-                callConstructor: false,
-                value: 0,
-                input: ""
-            });
-        }
-    }
-
     /// @notice CoreContract entries with canonical fixed L2 addresses.
-    /// @dev The IDs are shared by Era and ZKsyncOS; bytecode/artifact resolution happens per VM.
     function getFixedAddressCoreContracts() internal pure returns (CoreContract[] memory ids) {
         ids = new CoreContract[](FIXED_ADDRESS_CORE_CONTRACTS_COUNT);
         _fillFixedAddressCoreContracts(ids);
     }
 
-    function getEraFactoryDependencyContracts() internal pure returns (CoreContract[] memory ids) {
-        ids = new CoreContract[](ERA_FACTORY_DEPENDENCY_CONTRACTS_COUNT);
-        _fillFixedAddressCoreContracts(ids);
-        uint256 runtimeOnlyIndex = FIXED_ADDRESS_CORE_CONTRACTS_COUNT;
-        ids[runtimeOnlyIndex++] = CoreContract.TransparentUpgradeableProxy;
-        ids[runtimeOnlyIndex++] = CoreContract.BeaconProxy;
-    }
-
     function _fillFixedAddressCoreContracts(CoreContract[] memory ids) private pure {
         // NOTE: L2WrappedBaseToken is intentionally NOT in this list. v31 must not touch the
         // WrappedBaseToken impl on either VM, so it is excluded from both the force-deployment list
-        // and the factory deps (this list feeds Era + ZKsyncOS force deployments and factory deps).
+        // and the factory deps.
         uint256 i = 0;
         ids[i++] = CoreContract.L2Bridgehub;
         ids[i++] = CoreContract.L2AssetRouter;
@@ -216,8 +115,6 @@ library SystemContractsProcessing {
     /// @notice Core contracts that a ZKsync OS chain has and an Era chain does not, on top of the
     /// fixed-address core contracts. Currently the atomic-interop built-ins, see
     /// {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}.
-    /// @dev Kept out of `getFixedAddressCoreContracts` because that list also drives the Era force
-    ///      deployments and Era factory deps; anything here must never be deployed onto an Era chain.
     function getZKsyncOSOnlyContracts() internal pure returns (CoreContract[] memory ids) {
         ids = new CoreContract[](ZKOS_ONLY_CONTRACTS_COUNT);
         uint256 i;
@@ -229,8 +126,7 @@ library SystemContractsProcessing {
 
     /// @notice System contracts that have l1-contracts EVM bytecodes and need ZKsyncOS proxy upgrades.
     /// @dev Separate from getFixedAddressCoreContracts because these are ZKsyncOS system-space contracts
-    ///      with l1-contracts EVM bytecodes; Era handles the corresponding system-space contracts through
-    ///      getSystemContractsForceDeployments().
+    ///      with l1-contracts EVM bytecodes.
     ///      ContractDeployer (0x8006) is intentionally excluded: it's a sequencer hook dispatcher,
     ///      not a wrappable contract. Attempting to force-deploy a SystemContractProxy at 0x8006
     ///      and then calling forceInitAdmin on it hits the hook with an unknown selector and reverts.
@@ -239,71 +135,6 @@ library SystemContractsProcessing {
         ids[0] = ZkSyncOsSystemContract.L2BaseToken;
         ids[1] = ZkSyncOsSystemContract.L1Messenger;
         ids[2] = ZkSyncOsSystemContract.SystemContext;
-    }
-
-    /// @notice Era deployment metadata for the fixed-address CoreContract list.
-    /// @dev Loads Era creation bytecodes and canonical L2 addresses.
-    function getEraFixedAddressCoreContractDeployInfo()
-        internal
-        view
-        returns (FixedAddressCoreContractDeployInfo[] memory contracts)
-    {
-        CoreContract[] memory ids = getFixedAddressCoreContracts();
-        contracts = new FixedAddressCoreContractDeployInfo[](ids.length);
-        for (uint256 i = 0; i < ids.length; i++) {
-            string memory eraName = CoreOnGatewayHelper._resolveContractName(false, ids[i]);
-            contracts[i] = FixedAddressCoreContractDeployInfo({
-                id: ids[i],
-                addr: CoreOnGatewayHelper._resolveAddress(ids[i]),
-                bytecode: ContractsBytecodesLib.getCreationCodeEra(eraName)
-            });
-        }
-    }
-
-    /// @notice Era factory-dependency bytecodes for fixed-address core contracts plus runtime-only proxy bytecodes.
-    function getEraFactoryDependencyBytecodes() internal view returns (bytes[] memory bytecodes) {
-        CoreContract[] memory contracts = getEraFactoryDependencyContracts();
-        bytecodes = new bytes[](contracts.length);
-        for (uint256 i = 0; i < contracts.length; i++) {
-            string memory eraName = CoreOnGatewayHelper._resolveContractName(false, contracts[i]);
-            bytecodes[i] = ContractsBytecodesLib.getCreationCodeEra(eraName);
-        }
-    }
-
-    /// @notice Build Era direct ForceDeployment[] entries from the fixed-address core contract list.
-    function getEraFixedAddressCoreContractForceDeployments(
-        uint256 l1ChainId,
-        address owner
-    ) internal view returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
-        FixedAddressCoreContractDeployInfo[] memory contracts = getEraFixedAddressCoreContractDeployInfo();
-        forceDeployments = new IL2ContractDeployer.ForceDeployment[](contracts.length);
-
-        for (uint256 i = 0; i < contracts.length; i++) {
-            forceDeployments[i] = IL2ContractDeployer.ForceDeployment({
-                bytecodeHash: L2ContractHelper.hashL2Bytecode(contracts[i].bytecode),
-                newAddress: contracts[i].addr,
-                callConstructor: false,
-                value: 0,
-                input: ""
-            });
-        }
-
-        // Special case: L2ChainAssetHandler needs an initializer call after force deployment.
-        // Find it by address rather than hardcoding an array index.
-        for (uint256 i = 0; i < contracts.length; i++) {
-            if (contracts[i].addr == L2_CHAIN_ASSET_HANDLER_ADDR) {
-                forceDeployments[i].callConstructor = true;
-                // solhint-disable-next-line func-named-parameters
-                forceDeployments[i].input = abi.encode(
-                    l1ChainId,
-                    AddressAliasHelper.applyL1ToL2Alias(owner),
-                    L2_BRIDGEHUB_ADDR,
-                    L2_ASSET_ROUTER_ADDR,
-                    L2_MESSAGE_ROOT_ADDR
-                );
-                break;
-            }
-        }
     }
 
     function forceDeploymentsToHashes(
@@ -338,64 +169,27 @@ library SystemContractsProcessing {
         }
     }
 
-    function getBaseForceDeployments(
-        uint256 l1ChainId,
-        address owner
-    ) internal view returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
-        IL2ContractDeployer.ForceDeployment[]
-            memory fixedAddressCoreForceDeployments = getEraFixedAddressCoreContractForceDeployments(l1ChainId, owner);
-        IL2ContractDeployer.ForceDeployment[] memory systemForceDeployments = getSystemContractsForceDeployments();
-
-        forceDeployments = mergeForceDeployments(systemForceDeployments, fixedAddressCoreForceDeployments);
-    }
-
-    function getBaseListOfDependencies(bool _isZKsyncOS) internal view returns (bytes[] memory factoryDeps) {
-        if (_isZKsyncOS) {
-            // ZKsyncOS has no bootloader / DefaultAccount / EVM emulator — those
-            // are Era-VM concepts.
-            //
-            // Additional baselines, none in the CoreContract enum:
-            //  - `SystemContractProxy`: every `updateZKsyncOSContract` call that needs
-            //    to materialize a proxy at a previously-empty system address force-deploys
-            //    this bytecode.
-            //  - `SystemContractProxyAdmin` (at 0x1000c): a direct-deployed ProxyAdmin present from
-            //    genesis. v31 no longer force-deploys it (see getBaseZKsyncOSForceDeployments), but its
-            //    bytecode preimage is still published as a ZKsyncOS baseline.
-            factoryDeps = new bytes[](3);
-            factoryDeps[0] = BytecodeUtils.readDeployedBytecodeL1(
-                true,
-                "SystemContractProxy.sol",
-                "SystemContractProxy"
-            );
-            factoryDeps[1] = BytecodeUtils.readDeployedBytecodeL1(
-                true,
-                "SystemContractProxyAdmin.sol",
-                "SystemContractProxyAdmin"
-            );
-            // The implementation the upgrade installs behind the removed trackers' proxies (see
-            // getRemovedTrackerNeutralizations) — not a CoreContract, so published here.
-            factoryDeps[2] = BytecodeUtils.readDeployedBytecodeL1(true, "EmptyContract.sol", "EmptyContract");
-            return factoryDeps;
-        }
-
-        // Note that it is *important* that these go first in this exact order,
-        // since the server will rely on it.
-        bytes[] memory basicBytecodes = new bytes[](3);
-        basicBytecodes[0] = Utils.getBatchBootloaderBytecodeHash();
-        basicBytecodes[1] = BytecodeUtils.readSystemContractsBytecode("DefaultAccount");
-        basicBytecodes[2] = Utils.getEvmEmulatorBytecodeHash();
-
-        bytes[] memory systemBytecodes = getSystemContractsBytecodes();
-        bytes[] memory eraFactoryDependencyBytecodes = getEraFactoryDependencyBytecodes();
-
-        factoryDeps = mergeBytesArrays(
-            mergeBytesArrays(basicBytecodes, systemBytecodes),
-            eraFactoryDependencyBytecodes
+    function getBaseListOfDependencies() internal view returns (bytes[] memory factoryDeps) {
+        // Baselines, none in the CoreContract enum:
+        //  - `SystemContractProxy`: every `updateZKsyncOSContract` call that needs
+        //    to materialize a proxy at a previously-empty system address force-deploys
+        //    this bytecode.
+        //  - `SystemContractProxyAdmin` (at 0x1000c): a direct-deployed ProxyAdmin present from
+        //    genesis. v31 no longer force-deploys it (see getBaseZKsyncOSForceDeployments), but its
+        //    bytecode preimage is still published as a ZKsyncOS baseline.
+        factoryDeps = new bytes[](3);
+        factoryDeps[0] = BytecodeUtils.readDeployedBytecodeL1(true, "SystemContractProxy.sol", "SystemContractProxy");
+        factoryDeps[1] = BytecodeUtils.readDeployedBytecodeL1(
+            true,
+            "SystemContractProxyAdmin.sol",
+            "SystemContractProxyAdmin"
         );
+        // The implementation the upgrade installs behind the removed trackers' proxies (see
+        // getRemovedTrackerNeutralizations) — not a CoreContract, so published here.
+        factoryDeps[2] = BytecodeUtils.readDeployedBytecodeL1(true, "EmptyContract.sol", "EmptyContract");
     }
 
     /// @notice Build the base ZKsyncOS force deployment array.
-    /// Parallel to `getBaseForceDeployments()` for Era — this is the ZKsyncOS equivalent.
     /// Loads bytecode info per contract instead of materializing one large shared cache for this path.
     function getBaseZKsyncOSForceDeployments()
         internal
@@ -484,7 +278,7 @@ library SystemContractsProcessing {
     function _buildZKsyncOSEntry(
         CoreContract _id
     ) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
-        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _id);
+        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(_id);
 
         // Note: L2WrappedBaseToken is excluded from the ZKsyncOS force-deployment list (see
         // getBaseZKsyncOSForceDeployments), so this builder only handles system-proxy upgrades.

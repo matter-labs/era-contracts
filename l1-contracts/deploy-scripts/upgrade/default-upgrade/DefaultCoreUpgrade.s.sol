@@ -121,6 +121,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             setCreate2Salt(create2FactorySalt);
         }
 
+        // Only ZKsync OS ecosystems can be upgraded onto this release.
+        require(isZKsyncOS, "Upgrading EraVM ecosystems onto this release is not supported");
         additionalConfig.isZKsyncOS = isZKsyncOS;
 
         // Optional override for pre-v32 introspection selection. Autodetection reads the protocol version of
@@ -154,8 +156,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         Governance governance = Governance(payable(coreAddresses.shared.governance));
         config.l1ChainId = block.chainid;
         config.deployerAddress = getBroadcasterAddress();
-        config.eraChainId = assetRouter.ERA_CHAIN_ID();
-        config.eraDiamondProxyAddress = bridgehub.getZKChain(assetRouter.ERA_CHAIN_ID());
+        // Read the historical ecosystem identifier off the deployed (pre-v32) asset router; the getter
+        // was removed from the v32 implementation but every upgradable ecosystem still exposes it.
+        config.eraChainId = AddressIntrospector.getEraChainId(address(assetRouter));
+        config.eraDiamondProxyAddress = bridgehub.getZKChain(config.eraChainId);
 
         config.ownerAddress = assetRouter.owner();
 
@@ -500,11 +504,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice Load protocol version from genesis config
     function loadProtocolVersionFromGenesis() internal virtual returns (uint256) {
-        string memory genesisPath = Utils.genesisConfigPath(additionalConfig.isZKsyncOS);
-        return
-            ChainCreationParamsLib
-                .getChainCreationParams(genesisPath, additionalConfig.isZKsyncOS)
-                .latestProtocolVersion;
+        string memory genesisPath = Utils.genesisConfigPath();
+        return ChainCreationParamsLib.getChainCreationParams(genesisPath).latestProtocolVersion;
     }
 
     function getBroadcasterAddress() internal view virtual returns (address) {
