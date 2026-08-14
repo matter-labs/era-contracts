@@ -310,6 +310,22 @@ function generateHtmlReport(lcovPath: string, basePortOffset = 0): void {
 }
 
 /**
+ * Records which spec files a run actually executed, beside the LCOV it produced.
+ *
+ * The CI matrix is a hardcoded list of groups, so the risk is a spec that exists on disk but appears
+ * in no group: it would simply never run, and every job would still be green. Checking the workflow
+ * against the filesystem would mean parsing YAML and would only prove what was *intended*. This
+ * proves what happened — `merge-shard-lcov.ts` unions these files across the groups and fails if
+ * their union is not exactly the specs on disk, which also catches a group that quietly skipped one.
+ */
+export function writeSpecsRun(dir: string, specs: string[], scope = ""): string {
+  const target = path.join(dir, `specs-run${scope}.json`);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(target, `${JSON.stringify({ specs: specs.map((s) => path.basename(s)).sort() }, null, 2)}\n`);
+  return target;
+}
+
+/**
  * Parent process: shard the specs across workers, then union their LCOV files.
  */
 async function runSharded(specs: string[], basePortOffset: number, passthroughArgs: string[], html: boolean) {
@@ -368,6 +384,7 @@ async function runSharded(specs: string[], basePortOffset: number, passthroughAr
   const lcovPath = path.join(coverageRootDir, `anvil-lcov${scope}.info`);
   const { stats } = mergeLcovFiles(shardLcovPaths, lcovPath);
   assertMergedCoverageUsable(stats, shardLcovPaths.length);
+  writeSpecsRun(coverageRootDir, specs, scope);
   const summary = formatMergeSummary(stats, shardLcovPaths.length);
   const summaryPath = path.join(coverageRootDir, `anvil-coverage-summary${scope}.txt`);
   fs.writeFileSync(summaryPath, summary);
@@ -432,6 +449,10 @@ async function runSingleProcess(
       l1Only,
     })
   );
+
+  // Also recorded on this path, so a --serial or single-spec run is provable the same way as a
+  // sharded one. A worker writes it into its own shard directory, which the union tolerates.
+  writeSpecsRun(coverageDir, specs);
 }
 
 async function main(): Promise<void> {

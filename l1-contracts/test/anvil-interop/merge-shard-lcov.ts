@@ -21,10 +21,12 @@
 import * as fs from "fs";
 import * as path from "path";
 import { assertMergedCoverageUsable, formatMergeSummary, mergeLcovFiles } from "./src/coverage/lcov-merge";
+import { assertEverySpecRan, discoverSpecs } from "./plan-coverage-groups";
 
 const LCOV_FILE_NAME = "anvil-lcov.info";
+const SPECS_RUN_PATTERN = /^specs-run.*\.json$/;
 
-function findShardLcovs(dir: string): string[] {
+function findFiles(dir: string, matches: (name: string) => boolean): string[] {
   const found: string[] = [];
 
   const walk = (current: string): void => {
@@ -32,7 +34,7 @@ function findShardLcovs(dir: string): string[] {
       const entryPath = path.join(current, entry.name);
       if (entry.isDirectory()) {
         walk(entryPath);
-      } else if (entry.name === LCOV_FILE_NAME) {
+      } else if (matches(entry.name)) {
         found.push(entryPath);
       }
     }
@@ -41,6 +43,29 @@ function findShardLcovs(dir: string): string[] {
   walk(dir);
   // Sort so the merged output is identical regardless of directory read order.
   return found.sort();
+}
+
+const findShardLcovs = (dir: string): string[] => findFiles(dir, (name) => name === LCOV_FILE_NAME);
+
+/** The union of what every group reported running, from the records they upload beside their LCOV. */
+function specsActuallyRun(dir: string): string[] {
+  const records = findFiles(dir, (name) => SPECS_RUN_PATTERN.test(name));
+  if (records.length === 0) {
+    throw new Error(
+      `No specs-run.json found under ${dir}. Each coverage group uploads one beside its LCOV; ` +
+        "without them there is no evidence that every spec ran."
+    );
+  }
+
+  const specs = new Set<string>();
+  for (const record of records) {
+    const parsed = JSON.parse(fs.readFileSync(record, "utf8"));
+    if (!Array.isArray(parsed?.specs)) {
+      throw new Error(`${record} has no "specs" array`);
+    }
+    for (const spec of parsed.specs) specs.add(spec);
+  }
+  return [...specs].sort();
 }
 
 function getArg(flag: string, defaultValue: string): string {
@@ -74,6 +99,15 @@ console.log(`📊 Merging ${shardPaths.length} shard LCOV report(s) from ${input
 for (const shardPath of shardPaths) {
   console.log(`   ${path.relative(inputDir, shardPath)}`);
 }
+
+// Before merging numbers, check the population they came from. The matrix in l1-contracts-ci.yaml
+// lists its groups by hand, so a spec added to the repo and not to the matrix would simply never
+// run — every job green, that spec's coverage silently gone. This compares what the groups report
+// having run against the specs on disk, which is evidence of execution rather than of intent.
+const specsRun = specsActuallyRun(inputDir);
+const specsOnDisk = discoverSpecs(path.join(__dirname, "test/hardhat"));
+assertEverySpecRan(specsOnDisk, specsRun);
+console.log(`✅ All ${specsOnDisk.length} specs were run by some group`);
 
 const { stats } = mergeLcovFiles(shardPaths, outputPath);
 

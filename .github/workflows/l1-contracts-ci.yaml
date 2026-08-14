@@ -475,35 +475,6 @@ jobs:
   # list is never duplicated in this file. Needs no build artifacts, so it runs alongside
   # `build` and adds nothing to the critical path. See plan-coverage-groups.ts for why the
   # fan-out is a couple of groups rather than one job per spec.
-  coverage-anvil-groups:
-    runs-on: ubuntu-latest
-    outputs:
-      groups: ${{ steps.plan.outputs.groups }}
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-
-      - name: Use Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: yarn
-
-      - name: Install anvil-interop dependencies
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn install
-
-      # Fails if the plan drops, duplicates or invents a spec.
-      - name: Unit-test the group planner
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn test:plan-groups
-
-      - name: Plan coverage groups
-        id: plan
-        working-directory: l1-contracts/test/anvil-interop
-        run: echo "groups=$(yarn --silent plan:groups)" >> $GITHUB_OUTPUT
-
   # A group of specs per runner, sharded in-process within the job. A runner costs the same
   # whether it uses one core or four, so the parallelism inside a job is free while extra jobs
   # are not: measured, one-spec-per-runner spent ~43 runner-minutes to reach ~7.0m wall clock,
@@ -513,14 +484,28 @@ jobs:
     # spec list would end up in the check name and required-check names would shift whenever
     # the grouping changed. Name it from the stable group label only.
     name: coverage-anvil (${{ matrix.group.name }})
-    needs: [build, coverage-anvil-groups]
+    needs: [build]
     runs-on: ubuntu-latest
     strategy:
       # One flaky group should not cancel the others; the reporting job refuses to publish a
       # partial merge anyway, since it requires every group to report.
       fail-fast: false
       matrix:
-        group: ${{ fromJSON(needs.coverage-anvil-groups.outputs.groups) }}
+        # Listed by hand rather than generated, so this file says what runs. `yarn plan:groups`
+        # prints a cost-balanced assignment to paste here when the specs or their costs change;
+        # today's split is within 5% (354s vs 337s) and `coverage-foundry` at 383s dominates both,
+        # so rebalancing cannot move the stage's wall clock anyway.
+        #
+        # A spec added here to the repo but not to this list would simply never run, with every job
+        # still green. `coverage-report` therefore checks the specs the groups report having *run*
+        # against the specs on disk, and fails naming any that no group covered — see
+        # assertEverySpecRan. That is evidence of execution, not of intent, so it also catches a
+        # group that quietly skipped one.
+        group:
+          - name: group-1
+            specs: 03-interop-transfer.spec.ts 04-gateway-setup.spec.ts 06-gateway-interop.spec.ts 09-interop-unbundle.spec.ts 13-imt-atomic-swap.spec.ts
+          - name: group-2
+            specs: 01-deployment-verification.spec.ts 02-direct-bridge.spec.ts 05-gateway-bridge.spec.ts 07-interop-bundles.spec.ts 08-interop-messages.spec.ts
 
     steps:
       - name: Checkout the repository
@@ -602,7 +587,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-anvil-${{ matrix.group.name }}
-          path: l1-contracts/coverage/anvil/anvil-lcov.info
+          # specs-run.json travels with the report: it is what `coverage-report` checks against the
+          # specs on disk to prove no spec was left out of the matrix above.
+          path: |
+            l1-contracts/coverage/anvil/anvil-lcov.info
+            l1-contracts/coverage/anvil/specs-run.json
           if-no-files-found: error
 
   # Unions the shard reports, merges them onto the Foundry baseline, and publishes the
@@ -633,9 +622,11 @@ jobs:
         run: yarn install
 
       # Guards the union below. Pure string/map logic, no chains involved, runs in seconds.
-      - name: Unit-test the shard LCOV merge
+      # The merge and the spec-completeness check both live here, so this job runs the harness
+      # suites that gate what it publishes.
+      - name: Unit-test the interop harness
         working-directory: l1-contracts/test/anvil-interop
-        run: yarn test:lcov-merge
+        run: yarn test:unit
 
       - name: Download Foundry coverage
         uses: actions/download-artifact@v4

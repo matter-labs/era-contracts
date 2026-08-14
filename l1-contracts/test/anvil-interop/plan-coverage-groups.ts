@@ -145,6 +145,35 @@ export function assertCoversAllSpecs(specs: string[], groups: SpecGroup[]): void
   }
 }
 
+/**
+ * Fails unless the specs that actually ran are exactly the specs on disk.
+ *
+ * The CI matrix is a hardcoded list of groups, which is cheap and readable but has one dangerous
+ * failure: a spec added to the repo and not to the workflow never runs, and nothing goes red. This is
+ * the check for it, and it is deliberately not a check on the workflow file — comparing a parsed
+ * matrix against the filesystem would only prove what CI *meant* to run. Each group records what it
+ * executed (see writeSpecsRun in run-coverage.ts) and the reporting job unions those records, so a
+ * group that silently skipped a spec fails here too.
+ */
+export function assertEverySpecRan(specsOnDisk: string[], specsRun: string[]): void {
+  const ran = new Set(specsRun);
+  const missing = specsOnDisk.filter((s) => !ran.has(s));
+  if (missing.length > 0) {
+    throw new Error(
+      `These specs exist but no coverage group ran them: ${missing.join(", ")}. ` +
+        "Add them to the `group` matrix in .github/workflows/l1-contracts-ci.yaml " +
+        "(`yarn plan:groups` prints a balanced assignment)."
+    );
+  }
+  const unknown = specsRun.filter((s) => !specsOnDisk.includes(s));
+  if (unknown.length > 0) {
+    throw new Error(
+      `Coverage groups ran specs that do not exist on disk: ${unknown.join(", ")}. ` +
+        "A spec was renamed or removed without updating the matrix."
+    );
+  }
+}
+
 function main(): void {
   const args = process.argv.slice(2);
   const idx = args.indexOf("--groups");
