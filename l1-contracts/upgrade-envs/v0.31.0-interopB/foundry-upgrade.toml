@@ -3,9 +3,9 @@
 # The local harness deploys at whatever `configs/genesis/era/latest.json` declares and then
 # upgrades to `new_protocol_version`, so this must stay one minor ahead of the genesis version:
 # `DefaultCTMUpgrade.initUpgrade` requires `ctmProtocolVersion != getNewProtocolVersion()`.
-# Genesis is at v32.0.0, so the fixture exercises a v32 -> v33 upgrade.
+# Genesis is at v32.0.2, so the fixture exercises a v32 -> v33 upgrade.
 
-old_protocol_version = 0x2000000000  # v32.0.0 (current genesis)
+old_protocol_version = 0x2000000002  # v32.0.2 (current genesis)
 v28_protocol_version = 0x1c00000000  # v28.0.0 (for reference)
 
 [contracts]
