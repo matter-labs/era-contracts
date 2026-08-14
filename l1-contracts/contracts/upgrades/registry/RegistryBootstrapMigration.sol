@@ -34,7 +34,7 @@ import {OutdatedProtocolVersion} from "../../state-transition/L1StateTransitionE
 ///         one: it swaps the pinned implementations, installs the provenance anchor and the genesis
 ///         release, commits the version edge, and hands CTM + ProxyAdmin authority to the bound
 ///         executors — after which every later upgrade is a `CTMTransition`, and this object is
-///         inert. See {protocol-docs/../docs/registry-driven-upgrades.md}.
+///         inert. See the Bootstrap section of {docs/registry-driven-upgrades.md}.
 /// @dev Deliberately NOT a general-purpose executor: there is no arbitrary-call surface. The
 ///      manifest pins every address it touches, and `migrate()` refuses to run unless the live
 ///      ecosystem is EXACTLY the starting state the manifest names — so the reviewable question is
