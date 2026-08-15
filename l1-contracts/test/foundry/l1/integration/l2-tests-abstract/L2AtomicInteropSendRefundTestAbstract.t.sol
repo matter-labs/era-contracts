@@ -756,8 +756,8 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         _authorizeRefundForInvalidRemoteLeg(); // leg -> Revertable, first event emitted
 
         AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
-        // The same genuine absence proof the first authorization used (still valid; reused to avoid a
-        // second real aggregation of the remote chain).
+        // The same genuine absence proof the first authorization used — still valid, and inertness must
+        // hold for ANY valid proof, so reusing it (avoiding a second real aggregation) loses nothing.
         ImtProof memory absence = _invalidRemoteAbsence;
 
         vm.recordLogs();
@@ -909,6 +909,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
 
         // Single all-local leg flow whose only leg is this predicted message bundle.
         AtomicFlowPreimage memory preimage;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](1);

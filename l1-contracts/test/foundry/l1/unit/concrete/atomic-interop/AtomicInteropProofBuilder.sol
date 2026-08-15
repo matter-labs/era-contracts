@@ -88,6 +88,11 @@ contract AtomicInteropProofWrapper {
 /// The legacy `_inclusionProof` / `_nonInclusionProof` / `_settlementProof` helpers build such minimal
 /// well-formed non-final blobs carrying a caller-chosen `(settlementLayerChainId, slBlock,
 /// l1Timestamp)` and batch-leaf path, used only by those stubbed branch-isolation cases.
+///
+/// Setup additionally stubs read-side WIRING (not proof-path logic): the L2 Bridgehub registry /
+/// chain-getter views the real aggregation oracle consults (`_ensureChainRegistered` /
+/// `_setUpAtomicFixtures`), so the canonical predeploys resolve without deploying the full bridgehub
+/// stack. None of these stubs feeds the Merkle math the proofs authenticate against.
 abstract contract AtomicInteropProofBuilder is Test {
     /// @dev The flow deadline all proofs are built against (shared with the tests so the builders
     /// can declare the honest timeout branch for a given batch timestamp).
@@ -224,7 +229,6 @@ abstract contract AtomicInteropProofBuilder is Test {
         uint256 _imtRootLeafIndex,
         bytes32 _imtBegin,
         bytes32 _imtEnd,
-        uint256 _batchNumber,
         uint256 _batchTs,
         bytes32 _genesisChainLeaf,
         uint256 _slBlock
@@ -260,7 +264,6 @@ abstract contract AtomicInteropProofBuilder is Test {
         for (uint256 i = 0; i < nShared; ++i) {
             proof[p++] = sharedSiblings[i];
         }
-        _batchNumber; // batchNumber is bound into the batch leaf via _batchTs-stamped aggregation, not re-passed here
     }
 
     /// @notice A REAL inclusion proof for the committed value at `_leafIndex`: aggregates the IMT end
@@ -286,7 +289,6 @@ abstract contract AtomicInteropProofBuilder is Test {
                     ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX,
                     imtBegin,
                     imtEnd,
-                    batchNumber,
                     _batchTs,
                     genesisChainLeaf,
                     slBlock
@@ -326,7 +328,6 @@ abstract contract AtomicInteropProofBuilder is Test {
                     ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX,
                     imtSnapshot,
                     imtSnapshot,
-                    batchNumber,
                     _batchTs,
                     genesisChainLeaf,
                     slBlock
@@ -372,7 +373,6 @@ abstract contract AtomicInteropProofBuilder is Test {
                     ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX,
                     imtSnapshot,
                     imtSnapshot,
-                    batchNumber,
                     _batchTs,
                     genesisChainLeaf,
                     slBlock
@@ -428,8 +428,8 @@ abstract contract AtomicInteropProofBuilder is Test {
 
     /// @dev Asserts that the proof library authenticates `_proof.chainImtRoot` as exactly the
     /// chain-batch-root leaf `_imtRootLeafIndex` (2 = batch begin, 3 = batch end) of the claimed
-    /// batch. The default verifier mock remains selector-wide for branch-driving; this expectation
-    /// makes the adapter boundary fail if chain id, batch, leaf index, root, or proof drift.
+    /// batch. Works over both the real verifier and a locally-stubbed one; this expectation makes the
+    /// adapter boundary fail if chain id, batch, leaf index, root, or proof drift.
     function _expectRootAuthentication(ImtProof memory _proof, uint256 _imtRootLeafIndex) internal {
         vm.expectCall(
             address(L2_MESSAGE_VERIFICATION),

@@ -18,19 +18,14 @@ import {L2_MESSAGE_VERIFICATION_ADDR} from "contracts/common/l2-helpers/L2Contra
 /// verifier mock: `AtomicInteropProof` -> the REAL `L2MessageVerification` -> a REAL imported interop
 /// root in `L2InteropRootStorage`.
 ///
-/// Every other atomic proof test selector-mocks `proveL2LeafInclusionShared` (see
-/// {AtomicInteropProofBuilder}) — appropriate for isolating the library's own branches, but it means
-/// the two-hop recursive Merkle authentication and the terminal `interopRoots` check never actually
-/// run against the library's proof bytes. Here we deploy the real verifier and build a genuine
-/// settlement proof whose two hops reconstruct, via the exact library functions the verifier uses, an
-/// aggregation root we then import for real. The proof therefore has to authenticate for the test to
-/// pass, and tampering with any authenticated word breaks it.
-///
-/// Construction is forward: we pick the Merkle siblings, compute each intermediate root with
-/// {Merkle.calculateRootMemory} / {MessageHashing} exactly as `MessageHashing._getProofData` will, and
-/// seed the terminal aggregation root — so the round trip is guaranteed by construction while the
-/// verifier's real math is what actually checks it. The chain-batch-root hop is built with the real
-/// {ChainBatchRootTree} layout, so `batchSettlementRoot` is a faithful chain batch root.
+/// The main {AtomicInteropProof} suite and the pipeline test also run un-mocked, but their proofs are
+/// read back from the LIVE MessageRoot trees ({AtomicInteropProofBuilder}'s `_real*` helpers) — so a
+/// systematic error shared by aggregation and read-back could cancel out. This suite complements them
+/// with FORWARD-computed proofs: we pick the Merkle siblings ourselves, compute each intermediate root
+/// with {Merkle.calculateRootMemory} / {MessageHashing} exactly as the verifier's parse will, and seed
+/// the terminal aggregation root — covering proof shapes the live-tree builders cannot produce (e.g. a
+/// non-leftmost chain-tree last leaf) plus per-word tamper negatives. The chain-batch-root hop is built
+/// with the real {ChainBatchRootTree} layout, so `batchSettlementRoot` is a faithful chain batch root.
 contract AtomicInteropProofRealVerificationTest is AtomicInteropProofBuilder {
     uint256 internal constant SOURCE_CHAIN_ID = 271;
     uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 1; // L1
@@ -178,22 +173,9 @@ contract AtomicInteropProofRealVerificationTest is AtomicInteropProofBuilder {
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
-    /// @notice Tampering with the metadata's chain-batch-root depth is caught before any hashing: the
-    /// leaf-to-batch-root section must be exactly {ChainBatchRootTree.TREE_DEPTH} hops.
-    function test_verifyInclusion_realVerifier_RevertWhen_depthTampered() public {
-        ImtProof memory proof = _realInclusionProof(DEADLINE - 1);
-        uint256 wrongDepth = ChainBatchRootTree.TREE_DEPTH + 1;
-        proof.settlementProof[0] = _composeMetadata({
-            _logLeafProofLen: wrongDepth,
-            _batchLeafProofLen: 0,
-            _finalProofNode: false
-        });
-
-        vm.expectRevert(
-            abi.encodeWithSelector(ProofInvalidChainBatchRootDepth.selector, ChainBatchRootTree.TREE_DEPTH, wrongDepth)
-        );
-        proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
-    }
+    // NOTE: no depth-tamper test here — {AtomicInteropProof._authenticateRoot} rejects a wrong
+    // chain-batch-root depth BEFORE consulting the verifier, so a "real verifier" fixture adds nothing;
+    // that guard is pinned by AtomicInteropProofTest.test_RevertWhen_inclusion_invalidChainBatchRootDepth.
 
     // ============ real timeout ============
 

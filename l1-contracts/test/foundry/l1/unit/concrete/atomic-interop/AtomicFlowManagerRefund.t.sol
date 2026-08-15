@@ -17,7 +17,6 @@ import {
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
     ManagerFlowIdMismatch,
-    ManagerMissingLegIndexOutOfRange,
     ManagerLegNotRevertable,
     ProofSourceChainMismatch,
     ProofImtRootInclusionFailed
@@ -157,7 +156,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
     /// @dev A genuine absence proof for the missing leg: the oracle tree's root is aggregated as a
     /// LATE batch into the real MessageRoot, imported into the real interop-root storage, and the
     /// begin-branch non-inclusion of the missing leg's commit value is verified through the real
-    /// {L2MessageVerification}. Declared on the missing leg's source chain (`block.chainid`).
+    /// {L2MessageVerification}. Declared on the missing leg's source chain (`MISSING_LEG_CHAIN`).
     /// @dev NOT `view`: real aggregation + import mutate settlement-layer state.
     function _validAbsence() internal returns (ImtProof memory) {
         return _realTimeoutBeginProof(MISSING_LEG_CHAIN, _commitValue(flowId, missingLeg), uint256(DEADLINE) + 1);
@@ -412,23 +411,9 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         );
     }
 
-    /// @notice An out-of-range `_missingLegIndex` is rejected with the typed
-    /// `ManagerMissingLegIndexOutOfRange` before the aligned `legSourceChainIds` / `legBundleHashes`
-    /// arrays are indexed — a safe revert (no state change, no fund movement); `authorizeRefund` is
-    /// permissionless, so a caller passing garbage simply fails.
-    function test_RevertWhen_MissingLegIndexOutOfRange() public {
-        ImtProof memory absence = _validAbsence();
-        uint256 outOfRangeIndex = preimage.legBundleHashes.length; // == 2, one past the last valid index
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ManagerMissingLegIndexOutOfRange.selector,
-                preimage.legBundleHashes.length,
-                outOfRangeIndex
-            )
-        );
-        manager.authorizeRefund(_flow(), outOfRangeIndex, absence);
-    }
+    // NOTE: the out-of-range `_missingLegIndex` guard (`ManagerMissingLegIndexOutOfRange`, checked
+    // before the aligned arrays are indexed) is pinned by
+    // AtomicFlowManagerInitTest.test_RevertWhen_refundMissingLegIndexOutOfRange — not repeated here.
 
     /// @notice The double-mint guard: the absence proof must be bound to the missing leg's DECLARED
     /// source chain. A proof against any other chain's tree is rejected before verification — a

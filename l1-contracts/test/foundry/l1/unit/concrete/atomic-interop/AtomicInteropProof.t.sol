@@ -601,9 +601,10 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     // ============ fuzz ============
 
-    /// @dev Across the deadline boundary, an inclusion proof passes iff `l1Timestamp <= deadline`. The
-    /// batch-leaf clock is exercised over a fixed real proof (built once) with the timestamp word
-    /// re-stamped per run; the verifier is stubbed so the fuzz does not re-aggregate each iteration.
+    /// @dev Across the deadline boundary, an inclusion proof passes iff `l1Timestamp <= deadline`. Each
+    /// run builds a synthetic well-formed blob carrying the fuzzed timestamp over the stubbed verifier
+    /// (re-aggregating a real proof per iteration would be prohibitive); the clock's binding into a REAL
+    /// authenticated proof is pinned by the non-fuzz deadline tests above.
     function testFuzz_verifyInclusion_deadlineBoundary(uint64 _l1Timestamp, uint64 _deadline) public {
         _mockVerifier(true);
         ImtProof memory proof = _inclusionProof(

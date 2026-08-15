@@ -41,11 +41,11 @@ contract AtomicPipelineExecutorHarness is ExecutorFacet {
 ///      proof, whose sibling paths are read from the LIVE MessageRoot trees (chain tree + shared
 ///      tree), against the imported root, and {AtomicInteropProof} accepts the leg.
 ///
-/// Every earlier atomic proof test either mocks the verifier or hand-computes the aggregation root and
-/// seeds it; here the aggregation, the import, the L1 import-verification, and the proof verification
-/// all execute against real contracts, and the proof is built from the real trees' own paths — so a
-/// divergence between how MessageRoot aggregates and how the proof/verifier reconstructs would be
-/// caught. Only bridgehub ACL and the source chain's genesis getters are stubbed (neither is one of the
+/// The other atomic proof suites cover steps 1, 2 and 4 (the builder's `_real*` helpers aggregate and
+/// verify for real); what only this test adds is step 3 — the L1 Executor's import double-check — and
+/// the four steps composed as ONE flow over the same root, so a divergence between how MessageRoot
+/// aggregates, what the Executor accepts, and how the proof/verifier reconstructs would be caught.
+/// Only bridgehub ACL and the source chain's genesis getters are stubbed (neither is one of the
 /// four steps).
 contract AtomicInteropProofPipelineTest is AtomicInteropProofBuilder {
     /// @dev The settlement layer (L1) — the chain the aggregation and import-verification run on, and
@@ -185,7 +185,19 @@ contract AtomicInteropProofPipelineTest is AtomicInteropProofBuilder {
 
         // ---- Step 3: run import verification on L1 (real Executor dependency-root check) ----
         // Reverts if the imported (root, timestamp) does not match the MessageRoot's historicalRoot.
-        executor.verifyDependencyInteropRoots(_depRoots(sharedRoot, rootTimestamp));
+        // The returned rolling hash is what the Executor binds into `_checkBatchData`; pin its exact
+        // (chainId, block, timestamp, sides) preimage so a broken binding cannot pass silently.
+        bytes32 rollingHash = executor.verifyDependencyInteropRoots(_depRoots(sharedRoot, rootTimestamp));
+        bytes32[] memory expectedSides = new bytes32[](1);
+        expectedSides[0] = sharedRoot;
+        assertEq(
+            rollingHash,
+            keccak256(
+                // solhint-disable-next-line func-named-parameters
+                abi.encodePacked(bytes32(0), uint256(SL_CHAIN_ID), uint256(SL_BLOCK), rootTimestamp, expectedSides)
+            ),
+            "step 3 rolling hash must bind (chainId, block, timestamp, sides)"
+        );
 
         // ---- Step 4: verify the leg against the imported root (real verifier, real-tree paths) ----
         ImtProof memory proof = _buildProofFromLiveTrees(imtEnd, imtBegin, genesisChainLeaf);

@@ -18,7 +18,8 @@ import {
     AtomicFlow,
     AtomicFlowPreimage,
     ImtProof,
-    LegState
+    LegState,
+    ATOMIC_FLOW_PREIMAGE_VERSION
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
     ManagerProofCountMismatch,
@@ -205,6 +206,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         bytes32 predicted = _predictBundleHashWithAttrs(calls, predictionAttrs);
 
         AtomicFlowPreimage memory preimage;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         preimage.deadline = DEADLINE;
         preimage.settlementLayerChainId = L1_CHAIN_ID;
         preimage.legBundleHashes = new bytes32[](2);
@@ -427,6 +429,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
 
         // A foreign flow: two constant legs, both committed in the oracle tree with valid proofs.
         AtomicFlowPreimage memory foreignPreimage;
+        foreignPreimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         foreignPreimage.deadline = DEADLINE;
         foreignPreimage.settlementLayerChainId = L1_CHAIN_ID;
         foreignPreimage.legBundleHashes = new bytes32[](2);

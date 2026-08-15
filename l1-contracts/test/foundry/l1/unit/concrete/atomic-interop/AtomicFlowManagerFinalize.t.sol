@@ -32,13 +32,13 @@ import {
 /// and the executing bundle is itself one of the flow's legs. Skipping any single leg — first, last,
 /// or the executing one — must fail the whole gate: that is the atomicity guarantee.
 ///
-/// Proof fixtures come from {AtomicInteropProofBuilder}: the builder's REAL {L2InteropCommitmentTree}
-/// serves as the per-source-chain IMT oracle (both legs' commit values are inserted through the real
-/// engine; the proofs' membership paths are genuine), and the only mock is the separately-tested
-/// cross-chain leaf verifier (`L2_MESSAGE_VERIFICATION.proveL2LeafInclusionShared`), driven true so
-/// the manager's own checks — not root authentication — decide each test's outcome. The manager is
-/// deployed at its canonical predeploy address and called from the pranked canonical InteropHandler,
-/// exercising the real `onlyInteropHandler` wiring.
+/// Proof fixtures come from {AtomicInteropProofBuilder} and run END-TO-END: the builder's REAL
+/// {L2InteropCommitmentTree} serves as the per-source-chain IMT oracle (both legs' commit values are
+/// inserted through the real engine; the membership paths are genuine), and each leg's inclusion proof
+/// is aggregated into the real {L1MessageRoot}, imported into the real interop-root storage, and
+/// authenticated through the real {L2MessageVerification} — nothing on the inclusion path is mocked
+/// (see {_finalityProofs}). The manager is deployed at its canonical predeploy address and called from
+/// the pranked canonical InteropHandler, exercising the real `onlyInteropHandler` wiring.
 contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
     uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 1; // L1
     uint256 internal constant CHAIN_A = 271;

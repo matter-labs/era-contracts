@@ -31,8 +31,9 @@ import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 ///         flow now runs to completion. The atomic finality gate is mocked in setUp, so a default
 ///         `AtomicFinalityProof` suffices and the assertions exercise the reentrancy path, not proof checks.
 /// @dev L1-context wrapper only (this abstract has never had an L2 wrapper): its EraVM lowering hits an
-///      unsupported instruction under zkFoundry. The nested execute/verify dispatch it covers is exercised
-///      on real EraVM nodes by the anvil-interop `13-imt-atomic-swap` spec's execute path.
+///      unsupported instruction under zkFoundry, so the nested execute/verify dispatch currently has
+///      L1-context foundry coverage only (the anvil-interop `13-imt-atomic-swap` spec exercises the
+///      top-level atomic execute path on real EraVM nodes, but contains no nested dispatch).
 abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropTestUtils {
     address internal bundleExecutor;
 

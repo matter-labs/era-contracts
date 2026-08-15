@@ -106,9 +106,10 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         bytes memory bundle = abi.encode(interopBundle);
 
         // Interop is atomic: the cross-chain binding is the bundle's own sourceChainId, and finality is
-        // proven via the AtomicFlowManager's IMT gate. We mock that gate to succeed here (the IMT-proof
-        // machinery is exercised end-to-end in the anvil-interop atomic-swap spec, not in these unit-level
-        // Foundry tests). A default AtomicFinalityProof suffices since the gate is mocked.
+        // proven via the AtomicFlowManager's IMT gate. We mock that gate to succeed here — the IMT-proof
+        // machinery is covered against the real contracts by the atomic foundry suites (unit + the
+        // pipeline/real-verifier tests) and end-to-end on real nodes by the anvil-interop atomic-swap
+        // spec. A default AtomicFinalityProof suffices since the gate is mocked.
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
         AtomicFinalityProof memory finality;
 
