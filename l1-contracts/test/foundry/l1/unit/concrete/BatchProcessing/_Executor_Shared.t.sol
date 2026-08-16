@@ -36,7 +36,7 @@ import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifier
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {AcceptingVerifier} from "contracts/dev-contracts/test/AcceptingVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {MessageRootBase} from "contracts/core/message-root/MessageRootBase.sol";
@@ -290,7 +290,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encode(bool(true))
         );
         DiamondInit diamondInit = new DiamondInit(isZKsyncOS());
-        EraTestnetVerifier testnetVerifier = new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
+        AcceptingVerifier testnetVerifier = new AcceptingVerifier();
         // Mock the CTM to return a verifier for protocol version 0
         vm.mockCall(
             address(chainTypeManager),
