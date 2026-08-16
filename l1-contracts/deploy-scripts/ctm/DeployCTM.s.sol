@@ -20,7 +20,6 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
-import {L2LegacySharedBridgeTestHelper} from "../dev/L2LegacySharedBridgeTestHelper.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 
@@ -157,7 +156,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         deployVerifiers();
 
-        (ctmAddresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
+        // Fresh OS CTMs register the same upgrade implementation the v31 -> v32 flow deploys,
+        // so upgraded and from-scratch ecosystems match. The PriorityOpLowerBound registry must
+        // exist first: the upgrade contract embeds its address as an immutable.
+        priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound", false);
+        (ctmAddresses.stateTransition.defaultUpgrade) = deploySimpleContract("V32UpgradeZKsyncOS", false);
         (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
         // The single owner chainAdmin does not have a separate control restriction contract.
@@ -314,6 +317,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);
+        vm.serializeAddress("state_transition", "priority_op_lower_bound_addr", priorityOpLowerBound);
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
         vm.serializeAddress(
             "state_transition",
@@ -429,7 +433,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function prepareForceDeploymentsData() internal returns (bytes memory) {
         require(ctmAddresses.admin.governance != address(0), "Governance address is not set");
 
-        address dangerousTestOnlyForcedBeacon = _getDangerousTestOnlyForcedBeacon();
+        // The dev legacy-bridge test flow was retired with EraVM support; the frozen
+        // FixedForceDeploymentsData ABI keeps the field, always zero now.
+        address dangerousTestOnlyForcedBeacon = address(0);
 
         FixedForceDeploymentsData memory data = _buildForceDeploymentsData(
             ctmAddresses.admin.governance,
@@ -437,20 +443,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         );
 
         return abi.encode(data);
-    }
-
-    function _getDangerousTestOnlyForcedBeacon() private returns (address) {
-        if (!config.supportL2LegacySharedBridgeTest) {
-            return address(0);
-        }
-
-        L1AssetRouter assetRouter = L1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
-        (address beacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
-            address(assetRouter.legacyBridge()),
-            coreAddresses.bridges.proxies.l1Nullifier,
-            ctmAddresses.admin.governance
-        );
-        return beacon;
     }
 
     /// @dev Scratch file for `_precomputeBlakeHashes`. Set by `runInner`
