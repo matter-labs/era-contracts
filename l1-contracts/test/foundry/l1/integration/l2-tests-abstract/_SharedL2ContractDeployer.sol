@@ -33,7 +33,7 @@ import {
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 
@@ -103,6 +103,9 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
 
+    /// @dev The destination chain the interop harnesses send to (`destinationChainId` in {L2InteropTestUtils}).
+    uint256 internal constant INTEROP_DESTINATION_CHAIN_ID = 271;
+
     bytes internal exampleChainCommitment;
 
     IChainTypeManager internal chainTypeManager;
@@ -121,27 +124,6 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         // shared `setUp` frees every concrete entrypoint from setUp/MRO boilerplate — the alternative
         // (an overridable hook) still triggers a diamond-override on every interop concrete.
         _mockAtomicFlowManager();
-    }
-
-    /// @notice Populates the L2 Bridgehub's chain registry view the interop flows read
-    /// (`baseTokenAssetId`). The default is a PERMISSIVE selector-wide mock — every chain id reads as
-    /// registered with the harness base token (plus the real asset id for this chain) — which is fine
-    /// for suites where registration is not part of the logic under test. Overridable so suites that
-    /// exercise the real registration gate (e.g. `AtomicFlowManager.append`'s phantom-co-leg check in
-    /// the atomic suites) can register their chains through the production
-    /// `L2Bridgehub.registerChainForInterop` path instead, leaving unregistered chains reading as 0.
-    function _registerInteropChains() internal virtual {
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
-            abi.encode(baseTokenAssetId)
-        );
-        bytes32 realBaseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeCall(IBridgehubBase.baseTokenAssetId, block.chainid),
-            abi.encode(realBaseTokenAssetId)
-        );
     }
 
     /// @notice Installs the void mocks for the AtomicFlowManager gates. Overridable so suites that deploy the
@@ -228,7 +210,12 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(uint256(1)))
         );
-        _registerInteropChains();
+        // Register this chain and the harness destination in the L2 Bridgehub's interop registry
+        // through the production entry point; every other chain id reads as unregistered (bytes32(0)).
+        vm.startPrank(SERVICE_TRANSACTION_SENDER);
+        l2Bridgehub.registerChainForInterop(block.chainid, L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID());
+        l2Bridgehub.registerChainForInterop(INTEROP_DESTINATION_CHAIN_ID, baseTokenAssetId);
+        vm.stopPrank();
 
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,

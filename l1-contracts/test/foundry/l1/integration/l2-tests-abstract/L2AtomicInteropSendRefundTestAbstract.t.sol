@@ -36,11 +36,9 @@ import {
     L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2_ASSET_ROUTER, L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
-import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
@@ -117,10 +115,9 @@ contract ReentrantRefundClaimer {
 ///   5. Reentrancy: a malicious depositor re-entering `claimRefund` from the recovery ETH push is rejected
 ///      by the CEI leg-state machine (no `nonReentrant` guard exists by design).
 ///
-/// EraVM coverage: L1-context wrapper only, by construction — the atomic predeploys and interop-root
-/// storage are installed via `deployCodeTo` / `vm.etch` (EVM-only; zkFoundry rejects `EXTCODECOPY`).
-/// The atomic send + timeout-refund flow is exercised on real EraVM nodes by the anvil-interop
-/// `13-imt-atomic-swap` spec. See {L2AtomicInteropExecuteTestAbstract} for the full rationale.
+/// L1-context wrapper only (the canonical-address `deployCodeTo`/`vm.etch` setup does not compile
+/// under zkFoundry); the send + timeout-refund flow also runs on a local node in the anvil-interop
+/// `13-imt-atomic-swap` spec.
 abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, AtomicInteropProofBuilder {
     /// @dev A remote-leg bundle hash no chain will ever commit.
     bytes32 internal constant INVALID_REMOTE_LEG = keccak256("invalid");
@@ -144,19 +141,6 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     /// void mock of `AtomicFlowManager.append`/`requireFlowFinalized` (installed in its `setUp`) is disabled
     /// here via the {_mockAtomicFlowManager} override; the real contracts are deployed below.
     function _mockAtomicFlowManager() internal virtual override {}
-
-    /// @dev Real registry instead of the harness's permissive selector-wide mock: this suite
-    /// exercises `AtomicFlowManager.append`'s registration gate, so unregistered chains must
-    /// actually read as unregistered (`bytes32(0)`). The chains the suite uses are registered
-    /// through the production `registerChainForInterop` entry point.
-    function _registerInteropChains() internal virtual override {
-        // Hoisted: an external call in the argument position would consume the prank.
-        bytes32 ownBaseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2Bridgehub.registerChainForInterop(block.chainid, ownBaseTokenAssetId);
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2Bridgehub.registerChainForInterop(destinationChainId, destinationBaseTokenAssetId);
-    }
 
     function _setUpAtomicStack() internal {
         deployCodeTo("AtomicFlowManager.sol:AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR);
@@ -509,7 +493,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     function _sendDirectValueLegWithInvalidRemotePeer(address _depositor) internal {
         AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
         bytes32 salt = keccak256("atomic direct value leg salt");
-        // The destination (`destinationChainId`) is registered in {_registerInteropChains} with this
+        // The destination (`destinationChainId`) is registered in the shared deployer's setUp with this
         // chain's base-token asset id, i.e. it shares this chain's base token, so the library builds the
         // DIRECT value-carrying starter.
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
@@ -650,8 +634,8 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         ctx.l2Token = initializeTokenByDeposit();
         IERC20(ctx.l2Token).transfer(_depositor, BRIDGED_VALUE_LEG_AMOUNT);
 
-        // Register the different-base destination through the REAL registry (see
-        // {_registerInteropChains}): the one entry whose base token differs.
+        // Register the different-base destination through the real registry: the one entry whose base
+        // token differs from this chain's.
         bytes32 differentBaseAssetId = L2_NATIVE_TOKEN_VAULT.assetId(ctx.l2Token);
         vm.prank(SERVICE_TRANSACTION_SENDER);
         l2Bridgehub.registerChainForInterop(DIFFERENT_BASE_DEST_CHAIN_ID, differentBaseAssetId);
@@ -833,11 +817,9 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).claimRefund(ctx.flowId, ctxBundleBytes);
     }
 
-    /// @notice The registration gate through the REAL registry: an atomic send whose preimage
+    /// @notice The registration gate through the real registry: an atomic send whose preimage
     /// declares a co-leg on an unregistered (phantom) chain reverts the whole send — such a leg could
-    /// neither be proven committed nor proven absent, stranding every other leg of the flow. Possible
-    /// to assert here because this suite registers chains for real (see {_registerInteropChains})
-    /// instead of inheriting the harness's permissive registry mock.
+    /// neither be proven committed nor proven absent, stranding every other leg of the flow.
     function test_atomicSend_RevertWhen_CoLegChainNotRegistered() public {
         _setUpAtomicStack();
         uint256 phantomChainId = 999_999;

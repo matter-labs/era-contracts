@@ -36,14 +36,12 @@ struct BundleExecutionResult {
 }
 
 abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
-    uint256 destinationChainId = 271;
+    uint256 destinationChainId = INTEROP_DESTINATION_CHAIN_ID;
     bytes32 destinationBaseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
 
     /// @dev The AtomicFlowManager `append`/`requireFlowFinalized` gates are mocked to succeed in
-    /// {SharedL2ContractDeployer.setUp} (installed unconditionally there, inert for non-interop suites), so
-    /// interop concretes need no setUp/MRO boilerplate. The IMT proof machinery itself is exercised
-    /// against the real contracts by the atomic foundry suites (send/refund, execute/finalize, and the
-    /// real-verifier proof composition), and end-to-end on a real node by the anvil-interop atomic-swap spec.
+    /// {SharedL2ContractDeployer.setUp}; the real gates are covered by the atomic suites and, on a
+    /// local node, by the anvil-interop atomic-swap spec.
 
     /// @notice Returns a copy of `_attrs` with the mandatory ERC-7786 `atomicBundle` attribute appended.
     /// @dev Every interop send must be atomic (see {InteropCenter}); without this attribute the send
@@ -105,11 +103,8 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         );
         bytes memory bundle = abi.encode(interopBundle);
 
-        // Interop is atomic: the cross-chain binding is the bundle's own sourceChainId, and finality is
-        // proven via the AtomicFlowManager's IMT gate. We mock that gate to succeed here — the IMT-proof
-        // machinery is covered against the real contracts by the atomic foundry suites (unit + the
-        // pipeline/real-verifier tests) and end-to-end on real nodes by the anvil-interop atomic-swap
-        // spec. A default AtomicFinalityProof suffices since the gate is mocked.
+        // Finality is proven via the AtomicFlowManager's IMT gate, mocked to succeed here (the real
+        // gate is covered by the atomic suites), so a default AtomicFinalityProof suffices.
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundle);
         AtomicFinalityProof memory finality;
 

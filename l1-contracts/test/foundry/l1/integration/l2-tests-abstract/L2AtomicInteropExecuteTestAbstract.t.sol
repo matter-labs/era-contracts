@@ -42,43 +42,23 @@ import {
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2_ASSET_ROUTER, L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
+import {L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-/// @notice The DESTINATION side of an atomic flow, exercised through the REAL execution entry point:
-/// `L2InteropHandler.executeAtomicBundle` with a finality proof for every leg. The atomic bundle is
-/// produced by a real `InteropCenter.sendBundle` (asset-router burn + IMT commit) on the source
-/// chain; the test VM then switches its chain id to the destination (`vm.chainId`, the same pattern
-/// `L2InteropTestUtils.executeBundle` uses) and executes: the atomicity gate
-/// (`AtomicFlowManager.requireFlowFinalized`) verifies every leg's IMT inclusion proof, the bundle's
-/// calls run (the destination NTV mint), and the replay guard closes behind it.
+/// @notice The DESTINATION side of an atomic flow through the real execution entry point:
+/// `L2InteropHandler.executeAtomicBundle` with a finality proof for every leg. A real
+/// `InteropCenter.sendBundle` (asset-router burn + IMT commit) produces the bundle, the VM switches to
+/// the destination chain id, and execution runs the atomicity gate
+/// (`AtomicFlowManager.requireFlowFinalized`), the bundle's calls (the destination NTV mint), and the
+/// replay guard — all real, against the real Bridgehub interop registry.
 ///
-/// The local leg's inclusion proof is built from the CANONICAL commitment tree the real send
-/// populated; the remote peer leg's from the builder's oracle tree, standing in for the peer chain's
-/// IMT. The only logic mock is the separately-tested cross-chain leaf verifier inherited from
-/// {AtomicInteropProofBuilder}; the destination-context, executor-permission, replay, and atomicity
-/// checks under test all run for real, and the Bridgehub chain registry is the REAL one (chains registered via `registerChainForInterop`, see {_registerInteropChains}).
-///
-/// Why the leaf verifier stays mocked HERE while the unit tests authenticate through the real
-/// {L2MessageVerification}: a real inclusion proof requires the leg's source chain to be aggregated as
-/// a REMOTE chain in the settlement-layer {L1MessageRoot}, but that oracle treats `block.chainid` as
-/// its own local chain (`chainRegistered` is unconditionally true for it and `addChainBatchRootV32`
-/// refuses it). This is a two-leg CROSS-chain flow that switches `block.chainid` (source -> destination
-/// via `vm.chainId`), so at every instant one of the two legs' source equals the current chain id and
-/// cannot be aggregated; a single VM cannot hold both legs' sources as remote at once. The real
-/// aggregate -> import -> L1-verify -> membership pipeline is instead covered exhaustively by the
-/// atomic unit suite ({AtomicInteropProof}, {AtomicFlowManagerFinalize}, {AtomicFlowManagerRefund},
-/// {AtomicInteropProofRealVerification}, {AtomicInteropProofPipeline}), and on real EraVM by the
-/// anvil-interop spec below.
-///
-/// EraVM coverage: this abstract has an L1-context wrapper only, by construction. Installing the atomic
-/// predeploys and the interop-root storage at their canonical addresses relies on `deployCodeTo` /
-/// `vm.etch` (via {AtomicInteropProofBuilder} and {_setUpAtomicStack}), which are EVM-only — zkFoundry
-/// rejects them (`EXTCODECOPY` is unsupported on EraVM). Running this on EraVM would require adding
-/// AtomicFlowManager + L2InteropCommitmentTree to the L2 genesis force-deployment set (a production
-/// change, out of scope for a test PR). The atomic execute/finalize flow is exercised on real EraVM
-/// nodes by the anvil-interop `13-imt-atomic-swap` spec.
+/// The only logic mock is the separately-tested cross-chain leaf verifier (from
+/// {AtomicInteropProofBuilder}): this two-leg flow switches `block.chainid` between source and
+/// destination, and the settlement-layer {L1MessageRoot} refuses to aggregate the current chain as
+/// remote — so real end-to-end authentication is covered by the atomic unit suites instead.
+/// L1-context wrapper only (the canonical-address `deployCodeTo`/`vm.etch` setup does not compile
+/// under zkFoundry); the full flow also runs on a local node in the anvil-interop
+/// `13-imt-atomic-swap` spec.
 abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, AtomicInteropProofBuilder {
     /// @dev The remote peer leg of every flow here: committed on the (Bridgehub-registered)
     /// destination chain in the happy paths, withheld in the missing-leg path.
@@ -93,19 +73,6 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     /// `AtomicFlowManager.append`/`requireFlowFinalized` (installed in its `setUp`) is disabled here;
     /// the real contracts are deployed by {_setUpAtomicStack}.
     function _mockAtomicFlowManager() internal virtual override {}
-
-    /// @dev Real registry instead of the harness's permissive selector-wide mock: this suite
-    /// exercises the atomic send (whose `append` consults the registration gate), so unregistered
-    /// chains must actually read as unregistered (`bytes32(0)`). The chains the suite uses are
-    /// registered through the production `registerChainForInterop` entry point.
-    function _registerInteropChains() internal virtual override {
-        // Hoisted: an external call in the argument position would consume the prank.
-        bytes32 ownBaseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2Bridgehub.registerChainForInterop(block.chainid, ownBaseTokenAssetId);
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2Bridgehub.registerChainForInterop(destinationChainId, destinationBaseTokenAssetId);
-    }
 
     /// @dev Deploys the atomic predeploys at their canonical addresses (the shared L2-in-L1 deployer
     /// does not include them) and the proof fixtures. Called at the start of each test rather than in

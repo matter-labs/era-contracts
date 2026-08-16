@@ -20,9 +20,7 @@ import {L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR} from "contracts/commo
 
 /// @notice Covers the AtomicFlowManager's L2 initialization (`initL2`) and the settlement-layer
 /// gate: in this release interop legs settle on L1 only, so every flow must declare
-/// `settlementLayerChainId == L1_CHAIN_ID`. The happy finalization path is covered against the real
-/// contracts by `AtomicFlowManagerFinalize.t.sol` and the execute/finalize integration suite, and
-/// end-to-end on a real node by the `13-imt-atomic-swap` hardhat spec.
+/// `settlementLayerChainId == L1_CHAIN_ID`.
 contract AtomicFlowManagerInitTest is Test {
     uint256 internal constant L1_CHAIN_ID = 5;
 

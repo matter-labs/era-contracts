@@ -48,16 +48,6 @@ contract L2AtomicInteropSendRefundL1Test is Test, SharedL2ContractL1Deployer, L2
         return super.getInitializeCalldata(contractName, isZKBytecode);
     }
 
-    /// @dev Disambiguate the diamond: use the refund abstract's override, which registers the interop
-    /// chains through the production `L2Bridgehub.registerChainForInterop` path instead of the shared
-    /// deployer's selector-wide registry mock.
-    function _registerInteropChains()
-        internal
-        override(SharedL2ContractDeployer, L2AtomicInteropSendRefundTestAbstract)
-    {
-        L2AtomicInteropSendRefundTestAbstract._registerInteropChains();
-    }
-
     function _mockAtomicFlowManager()
         internal
         override(SharedL2ContractDeployer, L2AtomicInteropSendRefundTestAbstract)
