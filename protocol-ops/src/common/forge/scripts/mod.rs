@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::common::abi::{
     AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi, ICoreUpgradeV31Abi,
     IDeployCTMAbi, IDeployL1CoreContractsAbi, IFinalizeChainInitAbi, IGatewayVotePreparationAbi,
-    IRegisterOnAllChainsAbi, ISetupLegacyBridgeAbi,
+    IRegisterOnAllChainsAbi,
 };
 
 pub mod deploy_ctm;
@@ -157,14 +157,6 @@ pub static REGISTER_CHAIN_INVOCATION: ForgeScriptParams = ForgeScriptParams::new
 .with_ffi()
 .with_rpc_url();
 
-pub static SETUP_LEGACY_BRIDGE_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
-    "script-config/setup-legacy-bridge.toml",
-    "script-out/setup-legacy-bridge.toml",
-    "deploy-scripts/dev/SetupLegacyBridge.s.sol",
-)
-.with_ffi()
-.with_rpc_url();
-
 pub static REGISTER_ON_ALL_CHAINS_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
     "script-config/register-on-all-chains.toml",
     "script-out/output-register-on-all-chains.toml",
@@ -226,7 +218,6 @@ script_calls! {
     IGatewayVotePreparationAbi::runCall                                 => GATEWAY_VOTE_PREPARATION_INVOCATION,
     IFinalizeChainInitAbi::finalizeChainInitCall                        => FINALIZE_CHAIN_INIT_INVOCATION,
     IRegisterOnAllChainsAbi::registerOnOtherChainsCall                  => REGISTER_ON_ALL_CHAINS_INVOCATION,
-    ISetupLegacyBridgeAbi::runCall                                      => SETUP_LEGACY_BRIDGE_INVOCATION,
     IDeployL1CoreContractsAbi::runInnerCall                             => DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,
     // DeployCTM
     IDeployCTMAbi::runInnerCall                                         => DEPLOY_CTM_INVOCATION,

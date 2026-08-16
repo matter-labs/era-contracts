@@ -4,9 +4,7 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::common::abi::{
-    IFinalizeChainInitAbi, IRegisterOnAllChainsAbi, IRegisterZKChainAbi, ISetupLegacyBridgeAbi,
-};
+use crate::common::abi::{IFinalizeChainInitAbi, IRegisterOnAllChainsAbi, IRegisterZKChainAbi};
 use crate::common::addresses::{ETH_ADDRESS, ZERO_ADDRESS};
 use crate::common::forge::scripts::{
     register_chain::{NewChainParams, RegisterChainL1Config, RegisterChainOutput},
@@ -101,9 +99,6 @@ pub struct ChainInitArgs {
     /// live in genesis).
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub skip_priority_txs: bool,
-    /// Enable support for legacy bridge testing
-    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
-    pub with_legacy_bridge: bool,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
@@ -115,12 +110,6 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
     let deployer = runner.prepare_sender(args.deployer_address).await?;
 
     let owner = Wallet::resolve(args.owner, None, &deployer)?;
-
-    let bridgehub_admin_addr =
-        crate::common::l1_contracts::resolve_bridgehub_admin(&runner.rpc_url, args.bridgehub)
-            .await
-            .context("resolving bridgehub.admin() from L1")?;
-    let bridgehub_admin = runner.prepare_sender(bridgehub_admin_addr).await?;
 
     // Discover CTM proxy from L1.
     let ctm_proxy =
@@ -159,13 +148,12 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         l1_da_validator: args.l1_da_validator,
         chain_params,
         l2_da_commitment_scheme: args.l2_da_commitment_scheme,
-        with_legacy_bridge: args.with_legacy_bridge,
         create2_factory_salt: None,
         pause_deposits: args.pause_deposits,
         evm_emulator: args.evm_emulator,
         make_permanent_rollup: args.make_permanent_rollup,
     };
-    let output = chain_init(&mut runner, &deployer, &owner, &bridgehub_admin, &input).await?;
+    let output = chain_init(&mut runner, &deployer, &owner, &input).await?;
 
     write_output_if_requested(
         "chain.init",
@@ -187,7 +175,6 @@ pub async fn chain_init(
     runner: &mut ForgeRunner,
     deployer: &Wallet,
     owner: &Wallet,
-    bridgehub_admin: &Wallet,
     input: &ChainInitInput,
 ) -> anyhow::Result<FullChainInitOutput> {
     // Register chain on CTM
@@ -207,7 +194,7 @@ pub async fn chain_init(
     let diamond_proxy = register_output.diamond_proxy_addr;
     let chain_admin = register_output.chain_admin_addr;
     let full_output = FullChainInitOutput::from_register(&register_output);
-    let should_unpause_deposits = !input.pause_deposits && !input.with_legacy_bridge;
+    let should_unpause_deposits = !input.pause_deposits;
     // The DA validator pair is always required for the chain to commit
     // batches.
     let should_set_da_validator_pair = true;
@@ -246,17 +233,6 @@ pub async fn chain_init(
             .with_wallet(owner),
     )?;
 
-    // Setup legacy bridge (if requested)
-    if input.with_legacy_bridge {
-        logger::step("Setting up legacy bridge...");
-        setup_legacy_bridge_step(
-            runner,
-            bridgehub_admin,
-            input.bridgehub,
-            input.chain_params.chain_id.as_u64(),
-        )?;
-    }
-
     Ok(full_output)
 }
 
@@ -277,7 +253,6 @@ pub fn register_chain(
         &input.chain_params,
         Address::ZERO,
         Some(salt),
-        input.with_legacy_bridge,
         input.evm_emulator,
     )?;
 
@@ -344,23 +319,6 @@ fn _register_on_all_chains_step(
     Ok(())
 }
 
-fn setup_legacy_bridge_step(
-    runner: &mut ForgeRunner,
-    auth: &Wallet,
-    bridgehub: Address,
-    chain_id: u64,
-) -> anyhow::Result<()> {
-    let forge = runner
-        .script_call(ISetupLegacyBridgeAbi::runCall {
-            _bridgehub: bridgehub,
-            _chainId: U256::from(chain_id),
-        })
-        .with_wallet(auth);
-
-    runner.run(forge)?;
-    Ok(())
-}
-
 // ── Internal structs ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]
@@ -370,7 +328,6 @@ pub struct ChainInitInput {
     pub l1_da_validator: Address,
     pub chain_params: NewChainParams,
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
-    pub with_legacy_bridge: bool,
     pub create2_factory_salt: Option<B256>,
     pub pause_deposits: bool,
     pub evm_emulator: bool,

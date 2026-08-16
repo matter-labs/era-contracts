@@ -43,7 +43,6 @@ impl FileConfigTrait for InitialDeploymentConfig {}
 pub struct DeployL1Config {
     pub era_chain_id: u64,
     pub owner_address: Address,
-    pub support_l2_legacy_shared_bridge_test: bool,
     pub contracts: ContractsDeployL1Config,
     pub tokens: TokensDeployL1Config,
 }
@@ -55,12 +54,10 @@ impl DeployL1Config {
         owner_address: Address,
         initial_deployment_config: &InitialDeploymentConfig,
         era_chain_id: u64,
-        support_l2_legacy_shared_bridge_test: bool,
     ) -> Self {
         Self {
             era_chain_id,
             owner_address,
-            support_l2_legacy_shared_bridge_test,
             contracts: ContractsDeployL1Config {
                 create2_factory_addr: initial_deployment_config.create2_factory_addr,
                 create2_factory_salt: initial_deployment_config.create2_factory_salt,

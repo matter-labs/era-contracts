@@ -72,12 +72,4 @@ library ContractsBytecodesLib {
         // Default: read from l1-contracts/out/ using standard naming
         return Utils.readBytecodeL1(true, string.concat(contractIdentifier, ".sol"), contractIdentifier);
     }
-
-    /// @notice EraVM (zkout) creation bytecodes are no longer built on this branch — the zksolc
-    ///         toolchain was removed together with EraVM chain support. The dev legacy-bridge flow
-    ///         (`initialize_legacy_bridge` / `support_l2_legacy_shared_bridge_test`) is the only
-    ///         remaining caller and cannot run from this tree.
-    function getCreationCodeEra(string memory) internal pure returns (bytes memory) {
-        revert("TODO(era-artifacts): EraVM (zkout) artifacts are not built on this branch");
-    }
 }

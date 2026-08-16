@@ -4,7 +4,6 @@ gateway_settlement_fee = 0
 is_zk_sync_os = true
 owner_address = "0x659468eC13BbfB044cC61DACbAfb2B30E17Bcd83"
 refund_recipient = "0x000000000000000000000000000000000000bEEF"
-support_l2_legacy_shared_bridge_test = false
 testnet_verifier = true
 zk_token_asset_id = "0x01000000000000000000000000000000000000000000000000000000000a2a6f"
 

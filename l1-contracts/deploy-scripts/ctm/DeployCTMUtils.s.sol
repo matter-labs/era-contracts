@@ -73,7 +73,6 @@ struct Config {
     address ownerAddress;
     bytes32 zkTokenAssetId;
     bool testnetVerifier;
-    bool supportL2LegacySharedBridgeTest;
     ContractsConfig contracts;
 }
 
@@ -137,7 +136,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
 
-        config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
         if (toml.keyExists("$.era_chain_id")) {
             config.eraChainId = toml.readUint("$.era_chain_id");
         }

@@ -15,7 +15,6 @@ pub use super::REGISTER_CTM_INVOCATION as REGISTER_CTM_SCRIPT_PARAMS;
 pub struct DeployCTMConfig {
     pub owner_address: Address,
     pub testnet_verifier: bool,
-    pub support_l2_legacy_shared_bridge_test: bool,
     pub contracts: ContractsDeployCTMConfig,
     pub is_zk_sync_os: bool,
     pub zk_token_asset_id: B256,
@@ -29,7 +28,6 @@ impl DeployCTMConfig {
         initial_deployment_config: &InitialDeploymentConfig,
         testnet_verifier: bool,
         zk_token_asset_id: B256,
-        support_l2_legacy_shared_bridge_test: bool,
     ) -> Self {
         Self {
             // This tooling only provisions ZKsync OS CTMs; the config key is
@@ -37,7 +35,6 @@ impl DeployCTMConfig {
             is_zk_sync_os: true,
             testnet_verifier,
             owner_address,
-            support_l2_legacy_shared_bridge_test,
             zk_token_asset_id,
             contracts: ContractsDeployCTMConfig {
                 create2_factory_addr: initial_deployment_config.create2_factory_addr,

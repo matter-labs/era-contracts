@@ -34,7 +34,6 @@ struct Config {
     address deployerAddress;
     uint256 eraChainId;
     address eraDiamondProxyAddress;
-    bool supportL2LegacySharedBridgeTest;
     uint256 legacyGatewayChainId;
     ContractsConfig contracts;
     TokensConfig tokens;
@@ -70,7 +69,6 @@ contract DeployL1CoreUtils is DeployUtils {
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.eraChainId = toml.readUint("$.era_chain_id");
         config.ownerAddress = toml.readAddress("$.owner_address");
-        config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
@@ -193,7 +191,7 @@ contract DeployL1CoreUtils is DeployUtils {
         require(!isZKBytecode, "EraVM (ZK) bytecodes are not supported");
         // L1Nullifier has a config-dependent implementation swap
         if (compareStrings(contractName, "L1Nullifier")) {
-            string memory resolved = config.supportL2LegacySharedBridgeTest ? "L1NullifierDev" : "L1Nullifier";
+            string memory resolved = "L1Nullifier";
             return ContractsBytecodesLib.getCreationCodeEVM(resolved);
         }
         return ContractsBytecodesLib.getCreationCodeEVM(contractName);

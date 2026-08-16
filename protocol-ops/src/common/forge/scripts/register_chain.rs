@@ -6,7 +6,6 @@ use crate::common::traits::FileConfigTrait;
 use crate::types::{DAValidatorType, L2ChainId};
 
 pub use super::REGISTER_CHAIN_INVOCATION as REGISTER_CHAIN_SCRIPT_PARAMS;
-pub use super::SETUP_LEGACY_BRIDGE_INVOCATION as SETUP_LEGACY_BRIDGE;
 
 // ── Input types ──────────────────────────────────────────────────────────────
 
@@ -30,7 +29,6 @@ pub struct RegisterChainL1Config {
     chain: ChainL1Config,
     owner_address: Address,
     contracts: Create2Addresses,
-    initialize_legacy_bridge: bool,
 }
 
 impl FileConfigTrait for RegisterChainL1Config {}
@@ -40,7 +38,6 @@ impl RegisterChainL1Config {
         chain_params: &NewChainParams,
         create2_factory_addr: Address,
         create2_factory_salt: Option<B256>,
-        initialize_legacy_bridge: bool,
         evm_emulator: bool,
     ) -> anyhow::Result<Self> {
         Ok(Self {
@@ -69,7 +66,6 @@ impl RegisterChainL1Config {
                 create2_factory_salt: create2_factory_salt
                     .unwrap_or_else(|| B256::from(rand::random::<[u8; 32]>())),
             },
-            initialize_legacy_bridge,
         })
     }
 }

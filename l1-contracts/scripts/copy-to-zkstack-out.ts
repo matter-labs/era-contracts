@@ -24,7 +24,6 @@ const REQUIRED_CONTRACTS = [
   "DeployGatewayTransactionFilterer.s.sol",
   "IAdminFunctions.sol",
   "IDeployCTM.sol",
-  "ISetupLegacyBridge.sol",
   "IDeployL1CoreContracts.sol",
   "IDeployGatewayTransactionFilterer.sol",
   "IGatewayUtils.sol",
