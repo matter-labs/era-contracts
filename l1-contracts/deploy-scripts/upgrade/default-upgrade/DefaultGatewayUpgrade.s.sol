@@ -284,7 +284,11 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             abi.encode(stage2Calls)
         );
 
-        vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
+        // Upstream forge's keyed `vm.writeToml(json, path, key)` silently no-ops when the key
+        // does not exist in the file yet, so append sections by re-serializing into the same
+        // "root" object and rewriting the whole file instead.
+        string memory updatedToml = vm.serializeString("root", "governance_calls", governanceCallsSerialized);
+        vm.writeToml(updatedToml, upgradeConfig.outputPath);
     }
 
     /// @notice The zeroth step of upgrade. By default it just stops gateway migrations

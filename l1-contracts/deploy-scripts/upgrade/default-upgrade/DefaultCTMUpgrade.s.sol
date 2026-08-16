@@ -487,7 +487,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             abi.encode(stage2Calls)
         );
 
-        vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
+        // Upstream forge's keyed `vm.writeToml(json, path, key)` silently no-ops when the key
+        // does not exist in the file yet, so append sections by re-serializing into the same
+        // "root" object and rewriting the whole file instead.
+        string memory updatedToml = vm.serializeString("root", "governance_calls", governanceCallsSerialized);
+        vm.writeToml(updatedToml, upgradeConfig.outputPath);
     }
 
     function prepareDefaultCTMAdminCalls() public virtual returns (Call[] memory calls) {
@@ -506,7 +510,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             abi.encode(calls)
         );
 
-        vm.writeToml(ctmAdminCallsSerialized, upgradeConfig.outputPath, ".ctm_admin_calls");
+        // See the note in prepareDefaultGovernanceCalls on why keyed writeToml is not used here.
+        string memory updatedCtmAdminToml = vm.serializeString("root", "ctm_admin_calls", ctmAdminCallsSerialized);
+        vm.writeToml(updatedCtmAdminToml, upgradeConfig.outputPath);
     }
 
     function prepareDefaultTestUpgradeCalls() public {
@@ -522,7 +528,13 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             abi.encode(testCreateChainCall)
         );
 
-        vm.writeToml(testUpgradeCallsSerialized, upgradeConfig.outputPath, ".test_upgrade_calls");
+        // See the note in prepareDefaultGovernanceCalls on why keyed writeToml is not used here.
+        string memory updatedTestCallsToml = vm.serializeString(
+            "root",
+            "test_upgrade_calls",
+            testUpgradeCallsSerialized
+        );
+        vm.writeToml(updatedTestCallsToml, upgradeConfig.outputPath);
     }
 
     function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
