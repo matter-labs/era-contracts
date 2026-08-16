@@ -85,11 +85,6 @@
             "internalType": "uint256"
           },
           {
-            "name": "initializeLegacyBridge",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
             "name": "governance",
             "type": "address",
             "internalType": "address"
@@ -108,11 +103,6 @@
             "name": "allowEvmEmulator",
             "type": "bool",
             "internalType": "bool"
-          },
-          {
-            "name": "l1Erc20Bridge",
-            "type": "address",
-            "internalType": "address"
           },
           {
             "name": "l1SharedBridgeProxy",

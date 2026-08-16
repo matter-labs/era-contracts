@@ -313,11 +313,6 @@
             "internalType": "bool"
           },
           {
-            "name": "supportL2LegacySharedBridgeTest",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
             "name": "contracts",
             "type": "tuple",
             "internalType": "struct ContractsConfig",
