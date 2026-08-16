@@ -46,12 +46,11 @@ git submodule update --init --recursive
 
 yarn
 
-# Clean and rebuild only the active ordinary-EVM artifact roots. Historical
-# L1 ZK/L2/system rows are preserved by the transitional hash merge mode.
+# Clean and rebuild the ordinary-EVM artifact roots.
 forge clean --root da-contracts
 forge clean --root l1-contracts
 
 yarn --cwd da-contracts build:foundry
 yarn --cwd l1-contracts build:foundry
 
-yarn calculate-hashes:l1-da:fix
+yarn calculate-hashes:fix

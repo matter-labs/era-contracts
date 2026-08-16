@@ -31,18 +31,18 @@
   },
   "scripts": {
     "build-all-contracts": "yarn install && yarn --cwd da-contracts build:foundry && yarn --cwd l1-contracts build:foundry",
-    "calculate-hashes:l1-da:check": "ts-node scripts/calculate-hashes.ts --check-only --l1-da-evm-only",
-    "calculate-hashes:l1-da:fix": "ts-node scripts/calculate-hashes.ts --l1-da-evm-only",
+    "calculate-hashes:check": "ts-node scripts/calculate-hashes.ts --check-only",
+    "calculate-hashes:fix": "ts-node scripts/calculate-hashes.ts",
     "calculate-hashes:rebuild-and-fix": "./recompute_hashes.sh",
+    "da": "yarn workspace da-contracts",
     "docs-anchor-lint": "ts-node scripts/docs-anchor-lint.ts --selftest && ts-node scripts/docs-anchor-lint.ts",
+    "l1": "yarn workspace l1-contracts",
     "lint:check": "yarn lint:md && yarn lint:sol && yarn lint:ts && yarn prettier:check && yarn docs-anchor-lint",
     "lint:fix": "yarn lint:md --fix && yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix",
     "lint:md": "markdownlint \"**/*.md\"",
     "lint:sol": "solhint --noPoster --disc --max-warnings 0 \"**/*.sol\"",
     "lint:ts": "eslint .",
     "prettier:check": "prettier --check --cache \"**/*.{js,json,md,sol,ts,yaml}\"",
-    "prettier:fix": "prettier --write \"**/*.{js,json,md,sol,ts,yaml}\"",
-    "l1": "yarn workspace l1-contracts",
-    "da": "yarn workspace da-contracts"
+    "prettier:fix": "prettier --write \"**/*.{js,json,md,sol,ts,yaml}\""
   }
 }

@@ -80,7 +80,7 @@ jobs:
           yarn --cwd da-contracts build:foundry
           yarn --cwd l1-contracts build:foundry
 
-          yarn calculate-hashes:l1-da:fix
+          yarn calculate-hashes:fix
 
       - name: Commit and push changes
         run: |

@@ -127,7 +127,7 @@ jobs:
             l1-contracts/out
 
       - name: Check hashes
-        run: yarn calculate-hashes:l1-da:check
+        run: yarn calculate-hashes:check
 
   check-selectors:
     needs: [build]
