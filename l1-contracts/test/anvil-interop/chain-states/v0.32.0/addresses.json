@@ -36,7 +36,7 @@
     },
     {
       "chainId": 14,
-      "diamondProxy": "0xbd7281472c5AA9877fF18afe94C9Ff64Dc6F0A81"
+      "diamondProxy": "0x9B95e1d9205af19044c5f1f1CA1a8f4581E8a576"
     }
   ],
   "testTokens": {
@@ -47,7 +47,7 @@
     "14": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
   },
   "customBaseTokens": {
-    "14": "0x7A9Ec1d04904907De0ED7b6839CcdD59c3716AC9"
+    "14": "0x49fd2BE640DB2910c2fAb69bB8531Ab6E76127ff"
   },
   "zkToken": {
     "l1Address": "0x8f86403A4DE0BB5791fa46B8e795C547942fE4Cf",
