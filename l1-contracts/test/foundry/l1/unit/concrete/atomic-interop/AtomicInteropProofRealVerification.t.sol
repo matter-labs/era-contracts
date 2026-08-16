@@ -7,12 +7,7 @@ import {ImtProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
-import {
-    ProofImtRootInclusionFailed,
-    ProofInvalidChainBatchRootDepth,
-    ProofNotLastBatchInRoot
-} from "contracts/atomic-interop/AtomicInteropErrors.sol";
-import {L2_MESSAGE_VERIFICATION_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {ProofImtRootInclusionFailed, ProofNotLastBatchInRoot} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 
 /// @notice The highest-risk integration seam of the atomic proof stack, tested end-to-end with NO
 /// verifier mock: `AtomicInteropProof` -> the REAL `L2MessageVerification` -> a REAL imported interop
@@ -37,11 +32,7 @@ contract AtomicInteropProofRealVerificationTest is AtomicInteropProofBuilder {
     uint256 internal absentValue;
 
     function setUp() public {
-        _setUpAtomicFixtures();
-        // Deploy the REAL L2MessageVerification at its canonical address — deliberately NOT calling
-        // `_mockVerifier`, so `AtomicInteropProof` authenticates through the production code path.
-        deployCodeTo("L2MessageVerification.sol:L2MessageVerification", L2_MESSAGE_VERIFICATION_ADDR);
-
+        _setUpAtomicFixtures(); // deploys the real verifier; no test here ever calls _mockVerifier
         committedValue = _commitValue(keccak256("flowA"), keccak256("bundleA"));
         committedIndex = _insertCommit(committedValue);
         absentValue = _commitValue(keccak256("flowB"), keccak256("bundleB"));

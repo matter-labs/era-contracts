@@ -72,8 +72,8 @@ contract AtomicFlowManagerInitTest is Test {
 
     function test_RevertWhen_refundSettlementLayerNotL1() public {
         AtomicFlow memory flow = _flow(L1_CHAIN_ID + 1);
+        // The settlement-layer check fires before the proof is ever read, so a default proof suffices.
         ImtProof memory absence;
-        absence.sourceChainId = flow.preimage.legSourceChainIds[0];
 
         vm.expectRevert(abi.encodeWithSelector(ManagerSettlementLayerNotL1.selector, L1_CHAIN_ID, L1_CHAIN_ID + 1));
         manager.authorizeRefund(flow, 0, absence);

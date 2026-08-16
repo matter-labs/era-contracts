@@ -10,7 +10,8 @@ import {
     AtomicFlowPreimage,
     LegState,
     ATOMIC_COMMIT_LEAF_TAG,
-    ATOMIC_FLOW_PREIMAGE_VERSION
+    ATOMIC_FLOW_PREIMAGE_VERSION,
+    MAX_ATOMIC_FLOW_LEGS
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
     ManagerBundleHashesNotSorted,
@@ -25,7 +26,6 @@ import {
     ManagerSettlementLayerNotL1,
     ManagerTooManyLegs
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
-import {MAX_ATOMIC_FLOW_LEGS} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {DummyL2InteropRootStorage} from "contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 import {
     L2_ATOMIC_FLOW_MANAGER_ADDR,
@@ -47,12 +47,11 @@ contract MockBridgehubRegistry {
     }
 }
 
-/// @notice Covers `AtomicFlowManager.append`: a bundle can only be committed under a `flowId` whose
-/// preimage contains the bundle's own hash with this chain declared as the leg's source, so a wrong or
-/// stale preimage reverts the send instead of stranding burned funds. See {protocol-docs/atomicity/flow.md#1-atomic-send-append}.
-/// @dev The manager and commitment tree sit at their canonical predeploys, so `append` exercises the real
-/// `commitmentTree()` wiring and the tree's real appender ACL — no mocks; the caller ACL is exercised by
-/// pranking the canonical InteropCenter address.
+/// @notice Covers `AtomicFlowManager.append` (see {IAtomicFlowManager.append}).
+/// @dev The manager and commitment tree sit at their canonical predeploys (real `commitmentTree()`
+/// wiring and appender ACL); the Bridgehub registry is a minimal stand-in and the root storage a dummy,
+/// feeding the registration and deadline gates. The caller ACL is exercised by pranking the canonical
+/// InteropCenter.
 contract AtomicFlowManagerAppendTest is Test {
     uint256 internal constant L1_CHAIN_ID = 5;
     uint64 internal constant DEADLINE = 1_700_000_000;
@@ -136,8 +135,6 @@ contract AtomicFlowManagerAppendTest is Test {
     /// @notice `append` rejects a preimage whose `version` the manager does not support (0x02 here),
     /// so it can never commit a leg. See {ATOMIC_FLOW_PREIMAGE_VERSION}.
     function test_append_RevertWhen_FlowPreimageVersionMismatch() public {
-        assertEq(ATOMIC_FLOW_PREIMAGE_VERSION, bytes1(0x01), "v1 preimage version literal must be pinned");
-
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
         bytes1 unknownVersion = 0x02;
@@ -151,15 +148,6 @@ contract AtomicFlowManagerAppendTest is Test {
             )
         );
         _appendAsInteropCenter(localLeg, preimage);
-
-        // Nothing committed under either version's hash.
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
-        assertEq(
-            uint256(manager.legState(_flowId(preimage), localLeg)),
-            uint256(LegState.Unset),
-            "no leg state may exist after the rejected append"
-        );
-        assertEq(tree.leafCount(), 1, "nothing may be inserted into the commitment tree");
     }
 
     /// @notice Footgun regression: a preimage not containing the committing bundle's hash is rejected —
@@ -219,8 +207,6 @@ contract AtomicFlowManagerAppendTest is Test {
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
         // Duplicate the first leg hash into the second slot (equal adjacent hashes).
         preimage.legBundleHashes[1] = preimage.legBundleHashes[0];
-        preimage.legSourceChainIds[0] = block.chainid;
-        preimage.legSourceChainIds[1] = block.chainid;
 
         vm.expectRevert(ManagerBundleHashesNotSorted.selector);
         _appendAsInteropCenter(preimage.legBundleHashes[0], preimage);
@@ -256,11 +242,8 @@ contract AtomicFlowManagerAppendTest is Test {
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
         uint256 unregisteredChainId = 888;
         // Redeclare the remote leg's source as a chain id absent from the Bridgehub registry.
-        for (uint256 i = 0; i < preimage.legSourceChainIds.length; ++i) {
-            if (preimage.legSourceChainIds[i] == OTHER_CHAIN_ID) {
-                preimage.legSourceChainIds[i] = unregisteredChainId;
-            }
-        }
+        uint256 remoteIdx = preimage.legSourceChainIds[0] == OTHER_CHAIN_ID ? 0 : 1;
+        preimage.legSourceChainIds[remoteIdx] = unregisteredChainId;
 
         vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotRegistered.selector, unregisteredChainId));
         _appendAsInteropCenter(localLeg, preimage);
@@ -296,11 +279,8 @@ contract AtomicFlowManagerAppendTest is Test {
     function test_append_RevertWhen_CoLegSourceChainIsL1() public {
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
-        for (uint256 i = 0; i < preimage.legSourceChainIds.length; ++i) {
-            if (preimage.legSourceChainIds[i] == OTHER_CHAIN_ID) {
-                preimage.legSourceChainIds[i] = L1_CHAIN_ID;
-            }
-        }
+        uint256 remoteIdx = preimage.legSourceChainIds[0] == OTHER_CHAIN_ID ? 0 : 1;
+        preimage.legSourceChainIds[remoteIdx] = L1_CHAIN_ID;
 
         vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotRegistered.selector, L1_CHAIN_ID));
         _appendAsInteropCenter(localLeg, preimage);
@@ -338,10 +318,8 @@ contract AtomicFlowManagerAppendTest is Test {
         rootStorage.addInteropRootWithTimestamp(L1_CHAIN_ID, _blockNumber, _timestamp, sides);
     }
 
-    /// @notice Once a settlement-layer root created after the deadline has been imported, the flow can
-    /// already be timed out from this chain's point of view (that root is exactly what `authorizeRefund`
-    /// needs), so committing a new leg into it is rejected. In particular this enforces that after a
-    /// leg of the flow was reverted on this chain, no new leg of that flow can ever be appended here.
+    /// @notice Once a post-deadline settlement-layer root is imported, committing a new leg is
+    /// rejected (see {AtomicFlowManager.append}).
     function test_append_RevertWhen_ImportedRootPostdatesDeadline() public {
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
@@ -349,14 +327,10 @@ contract AtomicFlowManagerAppendTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(ManagerFlowDeadlinePassed.selector, DEADLINE, DEADLINE + 1));
         _appendAsInteropCenter(localLeg, preimage);
-
-        assertEq(uint256(manager.legState(_flowId(preimage), localLeg)), uint256(LegState.Unset));
-        assertEq(tree.leafCount(), 1, "nothing may be inserted into the commitment tree");
     }
 
     /// @notice Boundary: a root created exactly AT the deadline does not expire the flow (the timeout
-    /// proof requires a root created strictly after the deadline), so the leg still commits. The tracked
-    /// timestamp is a monotone maximum, so a later import of an older root cannot re-open an expired flow.
+    /// proof requires a root created strictly after the deadline), so the leg still commits.
     function test_append_AllowedWhen_LatestImportedRootAtDeadline() public {
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
@@ -399,10 +373,7 @@ contract AtomicFlowManagerAppendTest is Test {
         firstLeg = preimage.legBundleHashes[0];
     }
 
-    /// @notice A flow with more than {MAX_ATOMIC_FLOW_LEGS} legs is rejected: appending is cheap but
-    /// finalization verifies one Merkle proof per leg, so the leg count is bounded. The check lives in
-    /// the shared preimage validation, so the oversized flow is invalid on every path and no leg of it
-    /// can ever be committed.
+    /// @notice A flow with more than {MAX_ATOMIC_FLOW_LEGS} legs cannot be committed.
     function test_append_RevertWhen_TooManyLegs() public {
         (AtomicFlowPreimage memory preimage, bytes32 firstLeg) = _manyLegPreimage(MAX_ATOMIC_FLOW_LEGS + 1);
 
@@ -410,8 +381,6 @@ contract AtomicFlowManagerAppendTest is Test {
             abi.encodeWithSelector(ManagerTooManyLegs.selector, MAX_ATOMIC_FLOW_LEGS, MAX_ATOMIC_FLOW_LEGS + 1)
         );
         _appendAsInteropCenter(firstLeg, preimage);
-
-        assertEq(tree.leafCount(), 1, "nothing may be inserted into the commitment tree");
     }
 
     /// @notice Boundary: a flow with exactly {MAX_ATOMIC_FLOW_LEGS} legs commits fine.

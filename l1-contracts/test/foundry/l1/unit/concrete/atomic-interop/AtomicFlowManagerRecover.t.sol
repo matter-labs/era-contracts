@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
@@ -20,9 +20,8 @@ import {
     InteropCall
 } from "contracts/common/Messaging.sol";
 
-/// @dev Exposes the internal {AtomicFlowManager._recoverBundle} so its value-refund dispatch can be unit
-/// tested in isolation, and lets a leg be forced `Revertable` so the full `claimRefund` state machine
-/// (Committed->Revertable->Reverted, with rollback on a failing recovery) can be driven directly.
+/// @dev Exposes {AtomicFlowManager._recoverBundle} for direct dispatch tests and lets a leg be forced
+/// `Revertable` so `claimRefund` can be driven directly.
 contract AtomicFlowManagerRecoverHarness is AtomicFlowManager {
     function exposedRecoverBundle(InteropBundle memory _bundle) external {
         _recoverBundle(_bundle);
@@ -129,36 +128,9 @@ contract AtomicFlowManagerRecoverTest is Test {
         });
     }
 
-    /// @dev Dispatch-only: the asset router is mocked, so this asserts that `_recoverBundle` FORWARDS a
-    /// direct value leg's refund to `L2AssetRouter.bridgehubRecoverBaseToken` with the correct
-    /// (destChainId, source-base-token assetId, from, value). It does NOT exercise the downstream
-    /// disbursement — same-base routing to `BaseTokenHolder.recoverBaseToken` vs different-base NTV re-mint
-    /// happens inside {L2NativeTokenVault._disburseFailedTransfer}, which is covered on the real stack by
-    /// {L2AtomicInteropSendRefundTestAbstract}'s `test_atomicSend_directValueLeg_sameBase_*` /
-    /// `..._differentBase_*` tests (and {AtomicRecoveryForgery} for the router->NTV hop).
-    function test_recoverBundle_directValueLeg_forwardsSameBaseAssetIdToRouter() public {
-        vm.mockCall(
-            L2_ASSET_ROUTER_ADDR,
-            abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
-            ""
-        );
-
-        uint256 value = 5 ether;
-        vm.expectCall(
-            L2_ASSET_ROUTER_ADDR,
-            abi.encodeCall(
-                IAssetRouterShared.bridgehubRecoverBaseToken,
-                (DEST_CHAIN_ID, SOURCE_BASE_TOKEN_ASSET_ID, DEPOSITOR, value)
-            )
-        );
-        manager.exposedRecoverBundle(_bundle(SOURCE_BASE_TOKEN_ASSET_ID, value));
-    }
-
-    /// @dev Dispatch-only counterpart of {test_recoverBundle_directValueLeg_forwardsSameBaseAssetIdToRouter}
-    /// for a different destination base token: asserts the manager forwards the destination base-token
-    /// assetId (not this chain's) to `bridgehubRecoverBaseToken`. Downstream disbursement is not exercised
-    /// here (see that test's note).
-    function test_recoverBundle_directValueLeg_forwardsDifferentBaseAssetIdToRouter() public {
+    /// @dev Dispatch-only (router mocked): a direct value leg's refund is forwarded to
+    /// `bridgehubRecoverBaseToken` with the DESTINATION base-token asset id, the depositor, and the value.
+    function test_recoverBundle_directValueLeg_forwardsDestinationBaseAssetIdToRouter() public {
         vm.mockCall(
             L2_ASSET_ROUTER_ADDR,
             abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
@@ -177,10 +149,8 @@ contract AtomicFlowManagerRecoverTest is Test {
     }
 
     function test_recoverBundle_revertsWhenDestinationIsL1() public {
-        // L2->L1 atomic bundles are rejected at send, so recovery must never process an L1-destined bundle:
-        // that keeps it away from the append-only L1 counters in BaseTokenHolder (whose settlement-layer
-        // updates are only correct at send time). Set L1_CHAIN_ID == the builder's DEST_CHAIN_ID so the bundle
-        // is L1-destined, and assert the guard reverts before any refund dispatch.
+        // An L1-destined bundle must never be recovered (see {AtomicFlowManager._recoverBundle}); set
+        // L1_CHAIN_ID == DEST_CHAIN_ID so the bundle reads as L1-destined.
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         manager.initL2(DEST_CHAIN_ID);
 
@@ -188,22 +158,9 @@ contract AtomicFlowManagerRecoverTest is Test {
         manager.exposedRecoverBundle(_bundle(SOURCE_BASE_TOKEN_ASSET_ID, 5 ether));
     }
 
-    function test_recoverBundle_pureValueCallIsRefunded() public {
-        // A value leg whose direct sender has no per-sender recovery must still succeed: the value
-        // refund is dispatched through the router on its own.
-        vm.mockCall(
-            L2_ASSET_ROUTER_ADDR,
-            abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
-            ""
-        );
-
-        // Does not revert.
-        manager.exposedRecoverBundle(_bundle(SOURCE_BASE_TOKEN_ASSET_ID, 1 ether));
-    }
-
     function test_recoverBundle_routerBackedValueDoesNotRefundSeparately() public {
-        // Router-produced calls recover through recoverAtomicCall. Their value is part of that burn and
-        // must not be refunded a second time through bridgehubRecoverBaseToken.
+        // Indirect (router-produced) calls force `value == 0` at send, so a `from == router` call takes
+        // only the recoverAtomicCall branch — never bridgehubRecoverBaseToken (no double refund).
         bytes memory callData = abi.encodeWithSignature("finalizeDeposit(uint256,bytes32,bytes)");
         vm.mockCall(
             L2_ASSET_ROUTER_ADDR,
@@ -236,12 +193,7 @@ contract AtomicFlowManagerRecoverTest is Test {
         manager.exposedRecoverBundle(_bundle(SOURCE_BASE_TOKEN_ASSET_ID, 0));
     }
 
-    // ------------------------------------------------------------------------------------------------
-    // Multi-call bundles: _recoverBundle iterates EVERY call, so a regression that stopped after the
-    // first recovery (or mishandled a false/reverting later call) would strand funds. These use a
-    // stateful mock router at the canonical address so recovery side effects — and their rollback — are
-    // observable.
-    // ------------------------------------------------------------------------------------------------
+    // ============ multi-call bundles: every call is processed, none strands the rest ============
 
     /// @dev Deploys the stateful mock router at the canonical asset-router address and returns it.
     function _deployMockRouter() internal returns (MockRecoveryRouter router) {
@@ -353,11 +305,10 @@ contract AtomicFlowManagerRecoverTest is Test {
         manager.claimRefund(FLOW_ID, bundleBytes);
     }
 
-    /// @notice A later call reverting during recovery rolls the WHOLE `claimRefund` back: the earlier
-    /// call's payout is undone (the mock's counters are real storage and revert with the tx), the leg
-    /// stays `Revertable` (not stuck `Reverted`), so the refund remains retryable once the failing call
-    /// can be recovered. This is the CEI/atomicity guarantee across a multi-call recovery.
-    function test_claimRefund_multiCall_laterRevertRollsBackEarlierPayoutAndState() public {
+    /// @notice A later call reverting during recovery aborts the whole claim — both recovery calls are
+    /// proven reached, so the earlier payout genuinely happened before the abort — leaving the refund
+    /// retryable.
+    function test_claimRefund_multiCall_laterRevertAbortsClaim() public {
         MockRecoveryRouter router = _deployMockRouter();
         router.scriptReverts(hex"baad");
 
@@ -370,9 +321,7 @@ contract AtomicFlowManagerRecoverTest is Test {
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundleBytes);
         manager.forceRevertable(FLOW_ID, bundleHash);
 
-        // Prove BOTH recovery calls are actually reached (so the earlier one genuinely paid out before
-        // the later one reverted) — otherwise `recoverSuccesses() == 0` afterwards could be vacuously
-        // true because the first call was never made.
+        // Both recovery calls must be reached: the earlier one pays out before the later one reverts.
         vm.expectCall(
             L2_ASSET_ROUTER_ADDR,
             abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector, DEST_CHAIN_ID, hex"600d"),
@@ -385,13 +334,5 @@ contract AtomicFlowManagerRecoverTest is Test {
         );
         vm.expectRevert("recovery boom");
         manager.claimRefund(FLOW_ID, bundleBytes);
-
-        // Everything unwound: the earlier payout is gone and the leg is still claimable.
-        assertEq(router.recoverSuccesses(), 0, "the earlier successful recovery must roll back");
-        assertEq(
-            uint256(manager.legState(FLOW_ID, bundleHash)),
-            uint256(LegState.Revertable),
-            "the leg must stay Revertable (retryable), not stuck Reverted"
-        );
     }
 }

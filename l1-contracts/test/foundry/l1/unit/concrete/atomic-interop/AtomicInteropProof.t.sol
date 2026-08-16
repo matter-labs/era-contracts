@@ -289,36 +289,8 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
-    /// @dev A non-last batch whose populated right sibling sits above a right-child level is still
-    /// rejected, and the revert pinpoints the offending LEVEL: mask `0b01` (right child at level 0 —
-    /// its left sibling, an earlier batch, is fine) with a populated right sibling at level 1 (a
-    /// LATER subtree — so later batches exist and the "last batch" claim is false).
-    function test_RevertWhen_timeout_inTimeBatchNotLastInRoot_atDeeperLevel() public {
-        _mockVerifier(true);
-        bytes32 populatedLaterSubtree = keccak256("populated subtree of later batches");
-        bytes32[] memory siblings = new bytes32[](2);
-        siblings[0] = keccak256("earlier batch leaf");
-        siblings[1] = populatedLaterSubtree;
-
-        ImtProof memory absence = _nonInclusionProof(
-            SOURCE_CHAIN_ID,
-            BATCH_N,
-            absentValue,
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            DEADLINE - 1
-        );
-        absence.settlementProof = _settlementProofWithMask(
-            SETTLEMENT_LAYER_CHAIN_ID,
-            SL_BLOCK,
-            DEADLINE - 1,
-            1, // 0b01: right child at level 0, left child at level 1
-            siblings
-        );
-        _expectRootAuthentication(absence, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
-        vm.expectRevert(abi.encodeWithSelector(ProofNotLastBatchInRoot.selector, 1, populatedLaterSubtree));
-        proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
-    }
+    // NOTE: the deeper-level non-last-batch rejection (mask 0b01, populated level-1 sibling) is pinned
+    // through the REAL verifier in {AtomicInteropProofRealVerification}, not repeated here.
 
     /// @dev The empty-subtree cascade is LEVEL-SPECIFIC: `zeros[0]` presented at level 1 (where
     /// `zeros[1] = keccak(zeros[0] || zeros[0])` is required) does not certify an empty right
@@ -346,8 +318,8 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     // ============ verifyTimeoutAbsence — reverts ============
 
-    /// @dev Boundary: an settlement-layer interop root created exactly AT the deadline is not strictly after it — the
-    /// stale/genesis-root guard (an in-time snapshot proves nothing about the deadline moment).
+    /// @dev Boundary: a settlement-layer interop root created exactly AT the deadline is not strictly
+    /// after it — the stale/genesis-root guard (an in-time snapshot proves nothing about the deadline).
     function test_RevertWhen_timeout_interopRootAtDeadline() public {
         _mockVerifier(true);
         uint256 staleBlock = SL_BLOCK + 1;
@@ -564,7 +536,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     /// @dev Library-level anti-double-mint: a present value's predecessor leaf has `nextValue == value`,
     /// so the bracketing (absence) claim is rejected — a leg cannot be both finalizable and refundable.
     /// Binding an absence proof to the leg's own source chain is the caller's job
-    /// (`AtomicFlowManager.authorizeRefund`) and out of scope here. See {protocol-docs/atomicity/security.md#timeout-protocol-preconditions}.
+    /// (`AtomicFlowManager.authorizeRefund`) and out of scope here. See {protocol-docs/atomicity/proofs.md#soundness}.
     /// The inclusion half runs end-to-end (real aggregation); the illegitimate absence half crafts a
     /// begin-root proof from the real tree's predecessor leaf, so its verifier is stubbed.
     function test_includedValueCannotBeProvenAbsent() public {
@@ -632,7 +604,7 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     ) public {
         _mockVerifier(true);
         vm.assume(_interopRootTimestamp != 0); // 0 == "never seeded"; covered by its own test
-        uint256 slBlock = SL_BLOCK + 10; // fresh key per run; fuzz runs revert state after each run
+        uint256 slBlock = SL_BLOCK + 10; // avoid the setUp-seeded key
         _seedSettlementLayerInteropRoot(SETTLEMENT_LAYER_CHAIN_ID, slBlock, _interopRootTimestamp);
 
         ImtProof memory absence = _nonInclusionProof(
