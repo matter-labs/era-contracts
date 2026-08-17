@@ -376,17 +376,11 @@ library AddressIntrospector {
     }
 
     function getEraChainId(address _assetRouter) public view returns (uint256 eraChainId) {
-        // Pre-v32 asset-router implementations expose the (now removed) `ERA_CHAIN_ID` immutable;
-        // the upgrade scripts still read it from live ecosystems as the historical ecosystem
-        // identifier. Routers deployed from this branch no longer have the getter — tolerate
-        // its absence and report 0 instead of reverting the whole introspection.
-        (bool ok, bytes memory data) = _assetRouter.staticcall(
-            abi.encodeCall(ILegacyAssetRouterEraChainId.ERA_CHAIN_ID, ())
-        );
-        if (ok && data.length >= 32) {
-            return abi.decode(data, (uint256));
-        }
-        return 0;
+        // Read the historical ecosystem chain id from a live pre-v32 asset router. Every caller
+        // (the v31->v32 upgrade and gateway-vote-preparation scripts) runs against an existing
+        // ecosystem whose router still exposes `ERA_CHAIN_ID`; a fresh CTM takes the value from
+        // config instead, so this getter is never invoked against a router that lacks it.
+        return ILegacyAssetRouterEraChainId(_assetRouter).ERA_CHAIN_ID();
     }
 
     function getZkChainFacetAddresses(IZKChain _zkChain) public view returns (address[] memory) {

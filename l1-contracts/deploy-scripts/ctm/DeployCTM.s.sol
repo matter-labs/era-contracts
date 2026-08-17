@@ -25,7 +25,6 @@ import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
@@ -126,6 +125,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         _blakeBatchTmpFile = string.concat(outputPath, ".blake-batch.txt");
 
         initializeConfig(inputPath, bridgehub);
+        // MailboxFacet bakes era_chain_id into an immutable at deploy time; a missing key would
+        // silently deploy with 0. Base discovered it on-chain; a fresh CTM must supply it in config.
+        require(config.eraChainId != 0, "era_chain_id must be non-zero for CTM deployment");
 
         console.log("Initializing core contracts from BH");
         // Populate discovered addresses via inspector

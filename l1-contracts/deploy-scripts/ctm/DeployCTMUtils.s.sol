@@ -10,7 +10,6 @@ import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/sta
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../utils/Utils.sol";
 
@@ -66,8 +65,9 @@ import {CTMDeployedAddresses} from "../utils/Types.sol";
 struct Config {
     uint256 l1ChainId;
     address deployerAddress;
-    // Historical/canonical ecosystem chain identifier; only consumed by the deprecated write-only
-    // `L2AssetRouter.ERA_CHAIN_ID` slot via `FixedForceDeploymentsData.eraChainId`.
+    // Historical/canonical ecosystem chain identifier. Baked into the `MailboxFacet.ERA_CHAIN_ID`
+    // immutable (legacy Era withdrawal gating) and threaded into `FixedForceDeploymentsData.eraChainId`
+    // for the deprecated write-only `L2AssetRouter.ERA_CHAIN_ID` slot.
     uint256 eraChainId;
     uint256 gatewayChainId;
     address ownerAddress;
