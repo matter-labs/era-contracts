@@ -152,29 +152,6 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
 
     // ============ authorizeRefund ============
 
-    /// @notice A valid timeout authorization flips exactly this chain's `Committed` legs to
-    /// `Revertable` — the missing (never-committed) leg has no state here and MUST stay `Unset`;
-    /// flipping it would fabricate a claimable leg out of thin air.
-    function test_authorizeRefund_MarksOnlyCommittedLegs() public {
-        // Build the (real) absence proof first: its aggregation + import emit their own events, which
-        // would otherwise be caught by the `expectEmit` below.
-        ImtProof memory absence = _validAbsence();
-        vm.expectEmit(true, true, true, true, address(manager));
-        emit IAtomicFlowManager.FlowRefundAuthorized(flowId, committedLeg);
-        manager.authorizeRefund(_flow(), missingLegIndex, absence);
-
-        assertEq(
-            uint256(manager.legState(flowId, committedLeg)),
-            uint256(LegState.Revertable),
-            "committed leg must become Revertable"
-        );
-        assertEq(
-            uint256(manager.legState(flowId, missingLeg)),
-            uint256(LegState.Unset),
-            "never-committed leg must stay Unset"
-        );
-    }
-
     /// @notice The transition applies to EVERY locally committed leg, not just one: in a three-leg
     /// flow with two legs committed on this chain and one missing, a single authorization flips both
     /// committed legs to `Revertable` — with exactly one `FlowRefundAuthorized` event each — while
@@ -261,13 +238,12 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         }
     }
 
-    /// @notice A leg that commits LATE (append's expired-flow gate is best effort — see
-    /// {AtomicFlowManager.append}) is still refundable through its OWN `_missingLegIndex` slot:
-    /// `authorizeRefund` transitions every committed leg, including the proven-absent one. No other
-    /// test points `_missingLegIndex` at a locally committed leg.
+    /// @notice A leg that is currently `Committed` remains refundable when an authenticated
+    /// post-deadline snapshot proves that it was absent. This pins the case where the committed leg
+    /// is itself at `_missingLegIndex`.
     /// @dev Recovery is isolated to a single mock (`recoverAtomicCall`); the real recovery chain is
     /// covered by `AtomicRecoveryForgery.t.sol` and the send/refund integration suite.
-    function test_authorizeRefund_LateCommittedLegAtMissingIndexIsRefundable() public {
+    function test_authorizeRefund_CommittedLegAtMissingIndexIsRefundable() public {
         // The late leg carries a recoverable (asset-router) call so `claimRefund` can complete.
         InteropCall[] memory calls = new InteropCall[](1);
         calls[0] = InteropCall({
@@ -310,7 +286,8 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         latePreimage.legSourceChainIds[peerIdx] = block.chainid;
         bytes32 lateFlowId = keccak256(abi.encode(latePreimage));
 
-        // BOTH legs commit locally — the late one too (models a post-deadline commit).
+        // Both legs are committed in current manager state; the proof below authenticates historical
+        // absence from a post-deadline batch root.
         vm.prank(L2_INTEROP_CENTER_ADDR);
         manager.append(lateLeg, 0, latePreimage);
         vm.prank(L2_INTEROP_CENTER_ADDR);

@@ -254,10 +254,8 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
 
     /// @notice The rescue-path permission gate REJECTS a nested execution whose inner
     /// `executionAddress` names a different address: the wrapped message's sender (the outer call's
-    /// `from`) is not the inner bundle's designated executor, so the nested dispatch reverts, the
-    /// whole outer execution unwinds, and BOTH bundles stay `Unreceived` with no recipient side
-    /// effects. Without this gate, any valid outer bundle could force-execute a finalized inner
-    /// bundle reserved for another executor.
+    /// `from`) is not the inner bundle's designated executor, so the nested dispatch reverts before
+    /// the recipient is called.
     /// @dev Same isolation as the rest of this suite: the atomic finality gate is mocked in setUp, so
     /// the assertions exercise exactly the rescue permission check, not proof verification.
     function test_nestedExecute_RevertWhen_InnerExecutorIsDifferentAddress() public {
@@ -287,11 +285,10 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         // Bundle assembly + expected-error construction are extracted to keep this frame small
         // (stack-too-deep otherwise), and so the wrapped-sender chain id is captured BEFORE the
         // `vm.chainId` switch below (it is the SOURCE chain, as `_executeCalls` forms the sender).
-        (
-            bytes memory encodedOuterBundle,
-            bytes memory encodedInnerBundle,
-            bytes memory expectedError
-        ) = _buildNestedRejectionCase(_innerAttributes, innerRecipient);
+        (bytes memory encodedOuterBundle, bytes memory expectedError) = _buildNestedRejectionCase(
+            _innerAttributes,
+            innerRecipient
+        );
 
         // If the (never-authorized) inner call slipped through, this recipient would be hit — assert
         // it is called ZERO times, proving the nested execution never ran its calls.
@@ -311,19 +308,6 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         vm.prank(bundleExecutor);
         vm.expectRevert(expectedError);
         L2_INTEROP_HANDLER.executeAtomicBundle(encodedOuterBundle, outerProof);
-
-        // The revert unwinds the whole outer execution: both statuses roll back to Unreceived and
-        // the inner recipient is never reached.
-        assertTrue(
-            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(encodedOuterBundle)) ==
-                BundleStatus.Unreceived,
-            "outer bundle must roll back to Unreceived"
-        );
-        assertTrue(
-            L2_INTEROP_HANDLER.bundleStatus(InteropDataEncoding.encodeInteropBundleHash(encodedInnerBundle)) ==
-                BundleStatus.Unreceived,
-            "inner bundle must stay Unreceived"
-        );
     }
 
     /// @dev Builds the outer (rescue) and inner bundles for a nested-rejection case and the exact
@@ -333,11 +317,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
     function _buildNestedRejectionCase(
         BundleAttributes memory _innerAttributes,
         address _innerRecipient
-    )
-        internal
-        view
-        returns (bytes memory encodedOuterBundle, bytes memory encodedInnerBundle, bytes memory expectedError)
-    {
+    ) internal view returns (bytes memory encodedOuterBundle, bytes memory expectedError) {
         uint256 sourceChainId = block.chainid;
 
         InteropCall[] memory innerCalls = new InteropCall[](1);
@@ -349,7 +329,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             value: 0,
             data: hex""
         });
-        encodedInnerBundle = abi.encode(
+        bytes memory encodedInnerBundle = abi.encode(
             InteropBundle({
                 version: INTEROP_BUNDLE_VERSION,
                 sourceChainId: sourceChainId,

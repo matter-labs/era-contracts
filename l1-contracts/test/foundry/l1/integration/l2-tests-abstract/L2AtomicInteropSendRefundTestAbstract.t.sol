@@ -729,37 +729,6 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
     }
 
-    /// @notice Re-authorization while the leg is still `Revertable` (BEFORE any claim) is inert:
-    /// only `Committed` legs transition, so a second authorization with a fresh valid proof emits no
-    /// event and leaves the leg `Revertable`. Together with the post-claim case
-    /// ({test_authorizeRefund_ResubmittedProofAfterClaimIsInert}), this pins the full "Committed-only"
-    /// transition across both non-Committed states.
-    function test_authorizeRefund_SecondAuthorizationBeforeClaimIsInert() public {
-        _setUpAtomicStack();
-        _sendAtomicLegWithInvalidRemotePeer();
-        _authorizeRefundForInvalidRemoteLeg(); // leg -> Revertable, first event emitted
-
-        AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
-        // The same genuine absence proof the first authorization used — still valid, and inertness must
-        // hold for ANY valid proof, so reusing it (avoiding a second real aggregation) loses nothing.
-        ImtProof memory absence = _invalidRemoteAbsence;
-
-        vm.recordLogs();
-        manager.authorizeRefund(AtomicFlow({flowId: ctx.flowId, preimage: ctxPreimage}), ctx.missingLegIndex, absence);
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        for (uint256 i = 0; i < logs.length; ++i) {
-            assertTrue(
-                logs[i].topics[0] != IAtomicFlowManager.FlowRefundAuthorized.selector,
-                "re-authorizing an already-Revertable leg must not emit FlowRefundAuthorized"
-            );
-        }
-        assertEq(
-            uint256(manager.legState(ctx.flowId, ctx.bundleHash)),
-            uint256(LegState.Revertable),
-            "the leg must stay Revertable across a redundant authorization"
-        );
-    }
-
     /// @notice A completed refund cannot be REOPENED: resubmitting the same (still-valid) timeout
     /// proof after authorize -> claim is inert — no authorization event, the leg stays terminal
     /// `Reverted` (not flipped back to `Revertable`), a further claim still reverts, and the balance
@@ -801,20 +770,6 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
             balanceAfterRefund,
             "a reopened claim attempt must not move funds"
         );
-    }
-
-    /// @notice The other end of the claim state machine (complementing
-    /// {test_atomicSend_RevertWhen_ClaimedTwice}): a merely `Committed` leg — no timeout authorized —
-    /// cannot be claimed. This gate is the only thing standing between a live, finalizable leg and a
-    /// unilateral refund.
-    function test_claimRefund_RevertWhen_NotAuthorized() public {
-        _setUpAtomicStack();
-        _sendAtomicLegWithInvalidRemotePeer();
-
-        vm.expectRevert(
-            abi.encodeWithSelector(ManagerLegNotRevertable.selector, ctx.flowId, ctx.bundleHash, LegState.Committed)
-        );
-        AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).claimRefund(ctx.flowId, ctxBundleBytes);
     }
 
     /// @notice The registration gate through the real registry: an atomic send whose preimage

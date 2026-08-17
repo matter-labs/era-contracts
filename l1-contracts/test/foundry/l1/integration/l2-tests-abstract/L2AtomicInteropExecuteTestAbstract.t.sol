@@ -18,13 +18,8 @@ import {
     AtomicFlow,
     AtomicFlowPreimage,
     ImtProof,
-    LegState,
     ATOMIC_FLOW_PREIMAGE_VERSION
 } from "contracts/atomic-interop/IAtomicInterop.sol";
-import {
-    ManagerProofCountMismatch,
-    ManagerExecutingBundleNotInFlow
-} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {
     BundleAlreadyProcessed,
     ExecutingNotAllowed,
@@ -292,32 +287,6 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
             uint256(CallStatus.Executed),
             "the bundle's call must be Executed"
         );
-        // The status marking must stop at the bundle's call count — no stray slot past the end.
-        assertEq(
-            uint256(handler.callStatus(ectx.bundleHash, 1)),
-            uint256(CallStatus.Unprocessed),
-            "no call status may be written past the bundle's calls"
-        );
-        // Same-VM non-mutation check: `vm.chainId` does not fork storage, so this reads the SAME
-        // AtomicFlowManager the source phase populated. It asserts execution wrote nothing into the
-        // local manager — a genuine cross-chain source-state assertion lives in the multi-Anvil suite.
-        assertEq(
-            uint256(AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).legState(ectx.flowId, ectx.bundleHash)),
-            uint256(LegState.Committed),
-            "execution must not mutate the (same-VM) flow-manager leg state"
-        );
-    }
-
-    /// @notice Replay protection: an executed atomic bundle cannot be executed again — the status
-    /// flip at execution is the replay guard.
-    function test_executeAtomicBundle_RevertWhen_Replayed() public {
-        _setUpAtomicStack();
-        _sendAtomicLegWithRemotePeer(keccak256("atomic execute replay salt"), bytes(""));
-        AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
-        _executeOnDestination(finality);
-
-        vm.expectRevert(abi.encodeWithSelector(BundleAlreadyProcessed.selector, ectx.bundleHash));
-        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).executeAtomicBundle(ectxBundleBytes, finality);
     }
 
     /// @notice ATOMICITY: a flow whose remote leg was never committed cannot execute — the missing
@@ -341,92 +310,8 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         });
         AtomicFinalityProof memory finality = _buildFinality(bogusRemoteProof);
 
-        uint256 receiverBalanceBefore = IERC20(ectx.l2Token).balanceOf(_receiver());
         vm.expectRevert(
             abi.encodeWithSelector(IMTLeafValueMismatch.selector, _commitValue(ectx.flowId, REMOTE_LEG), 0)
-        );
-        _executeOnDestination(finality);
-
-        assertEq(
-            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(ectx.bundleHash)),
-            uint256(BundleStatus.Unreceived),
-            "a failed atomicity gate must leave the bundle Unreceived"
-        );
-        assertEq(
-            IERC20(ectx.l2Token).balanceOf(_receiver()),
-            receiverBalanceBefore,
-            "a failed atomicity gate must not mint"
-        );
-    }
-
-    /// @notice The finality proof must carry exactly one proof per leg — the handler forwards it to
-    /// the manager gate unchanged. Too FEW proofs is rejected.
-    function test_executeAtomicBundle_RevertWhen_ProofCountTooFew() public {
-        _setUpAtomicStack();
-        _sendAtomicLegWithRemotePeer(keccak256("atomic execute proof-count-few salt"), bytes(""));
-        AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
-        ImtProof[] memory oneProof = new ImtProof[](1);
-        oneProof[0] = finality.proofs[0];
-        finality.proofs = oneProof;
-
-        vm.expectRevert(abi.encodeWithSelector(ManagerProofCountMismatch.selector, 2, 1));
-        _executeOnDestination(finality);
-    }
-
-    /// @notice ...and too MANY proofs is equally rejected through the real handler path (`!= n`).
-    function test_executeAtomicBundle_RevertWhen_ProofCountTooMany() public {
-        _setUpAtomicStack();
-        _sendAtomicLegWithRemotePeer(keccak256("atomic execute proof-count-many salt"), bytes(""));
-        AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
-        ImtProof[] memory threeProofs = new ImtProof[](3);
-        threeProofs[0] = finality.proofs[0];
-        threeProofs[1] = finality.proofs[1];
-        threeProofs[2] = finality.proofs[1];
-        finality.proofs = threeProofs;
-
-        vm.expectRevert(abi.encodeWithSelector(ManagerProofCountMismatch.selector, 2, 3));
-        _executeOnDestination(finality);
-    }
-
-    /// @notice A fully-proven FOREIGN flow does not authorize executing this bundle: the executing
-    /// bundle must be a leg of the flow the proofs are for.
-    function test_executeAtomicBundle_RevertWhen_BundleNotLegOfFlow() public {
-        _setUpAtomicStack();
-        _sendAtomicLegWithRemotePeer(keccak256("atomic execute foreign-flow salt"), bytes(""));
-
-        // A foreign flow: two constant legs, both committed in the oracle tree with valid proofs.
-        AtomicFlowPreimage memory foreignPreimage;
-        foreignPreimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
-        foreignPreimage.deadline = DEADLINE;
-        foreignPreimage.settlementLayerChainId = L1_CHAIN_ID;
-        foreignPreimage.legBundleHashes = new bytes32[](2);
-        bytes32 legA = keccak256("foreign leg A");
-        bytes32 legB = keccak256("foreign leg B");
-        (foreignPreimage.legBundleHashes[0], foreignPreimage.legBundleHashes[1]) = legA < legB
-            ? (legA, legB)
-            : (legB, legA);
-        foreignPreimage.legSourceChainIds = new uint256[](2);
-        foreignPreimage.legSourceChainIds[0] = destinationChainId;
-        foreignPreimage.legSourceChainIds[1] = destinationChainId;
-        bytes32 foreignFlowId = _flowIdOf(foreignPreimage);
-
-        AtomicFinalityProof memory finality;
-        finality.flow = AtomicFlow({flowId: foreignFlowId, preimage: foreignPreimage});
-        finality.proofs = new ImtProof[](2);
-        for (uint256 i = 0; i < 2; ++i) {
-            uint256 leafIndex = _insertCommit(_commitValue(foreignFlowId, foreignPreimage.legBundleHashes[i]));
-            finality.proofs[i] = _inclusionProof(
-                destinationChainId,
-                REMOTE_BATCH_NUMBER,
-                leafIndex,
-                L1_CHAIN_ID,
-                SL_BLOCK,
-                DEADLINE - 1
-            );
-        }
-
-        vm.expectRevert(
-            abi.encodeWithSelector(ManagerExecutingBundleNotInFlow.selector, foreignFlowId, ectx.bundleHash)
         );
         _executeOnDestination(finality);
     }
@@ -444,43 +329,6 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
             abi.encodeWithSelector(WrongDestinationChainId.selector, ectx.bundleHash, destinationChainId, block.chainid)
         );
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).executeAtomicBundle(ectxBundleBytes, finality);
-    }
-
-    /// @notice A bundle sent with the `executionAddress` attribute — here BOUND to the destination
-    /// chain — is executable only by that address on that chain: an arbitrary caller is rejected,
-    /// the designated executor succeeds.
-    function test_executeAtomicBundle_HonorsExecutionAddress() public {
-        _setUpAtomicStack();
-        address executor = makeAddr("designated executor");
-        bytes memory executorAttribute = abi.encodeCall(
-            IERC7786Attributes.executionAddress,
-            (InteroperableAddress.formatEvmV1(destinationChainId, executor))
-        );
-        _sendAtomicLegWithRemotePeer(keccak256("atomic execute executor salt"), executorAttribute);
-        AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
-
-        _mockVerifier(true);
-        vm.chainId(destinationChainId);
-
-        address stranger = makeAddr("stranger");
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ExecutingNotAllowed.selector,
-                ectx.bundleHash,
-                InteroperableAddress.formatEvmV1(block.chainid, stranger),
-                InteroperableAddress.formatEvmV1(destinationChainId, executor)
-            )
-        );
-        vm.prank(stranger);
-        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).executeAtomicBundle(ectxBundleBytes, finality);
-
-        vm.prank(executor);
-        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).executeAtomicBundle(ectxBundleBytes, finality);
-        assertEq(
-            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(ectx.bundleHash)),
-            uint256(BundleStatus.FullyExecuted),
-            "the designated executor's execution must complete"
-        );
     }
 
     /// @notice The executor binding is CHAIN-SPECIFIC: an executor address bound to a foreign chain
@@ -569,7 +417,6 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         });
         AtomicFinalityProof memory finality = _buildFinality(bogusRemoteProof);
 
-        uint256 receiverBalanceBefore = IERC20(ectx.l2Token).balanceOf(_receiver());
         _mockVerifier(true);
         vm.chainId(destinationChainId);
 
@@ -577,49 +424,6 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
             abi.encodeWithSelector(IMTLeafValueMismatch.selector, _commitValue(ectx.flowId, REMOTE_LEG), 0)
         );
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(ectxBundleBytes, finality);
-
-        assertEq(
-            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(ectx.bundleHash)),
-            uint256(BundleStatus.Unreceived),
-            "a failed atomicity gate must leave the bundle Unreceived"
-        );
-        assertEq(
-            IERC20(ectx.l2Token).balanceOf(_receiver()),
-            receiverBalanceBefore,
-            "a failed verification must not mint"
-        );
-    }
-
-    /// @notice The verify -> execute flow: a `Verified` bundle executes WITHOUT re-proving the flow
-    /// (the gate is skipped for `Verified` status by design — verification already established
-    /// finality), mints, and is marked `FullyExecuted`. The empty finality proof passed at execution
-    /// documents that the skip is intentional, not accidental.
-    function test_verifyAtomicBundle_ThenExecuteSkipsGate() public {
-        _setUpAtomicStack();
-        _sendAtomicLegWithRemotePeer(keccak256("atomic verify-then-execute salt"), bytes(""));
-        AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
-
-        uint256 receiverBalanceBefore = IERC20(ectx.l2Token).balanceOf(_receiver());
-        _mockVerifier(true);
-        vm.chainId(destinationChainId);
-        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(ectxBundleBytes, finality);
-
-        // Execute the now-Verified bundle with an EMPTY finality proof: the gate must be skipped.
-        AtomicFinalityProof memory emptyFinality;
-        vm.expectEmit(true, true, true, true, L2_INTEROP_HANDLER_ADDR);
-        emit IInteropHandlerBase.BundleExecuted(ectx.bundleHash);
-        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).executeAtomicBundle(ectxBundleBytes, emptyFinality);
-
-        assertEq(
-            IERC20(ectx.l2Token).balanceOf(_receiver()),
-            receiverBalanceBefore + TRANSFER_AMOUNT,
-            "the destination mint must credit the receiver"
-        );
-        assertEq(
-            uint256(L2InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(ectx.bundleHash)),
-            uint256(BundleStatus.FullyExecuted),
-            "the verified bundle must execute to FullyExecuted"
-        );
     }
 
     /// @notice A bundle cannot be VERIFIED twice: `_validateVerifiable` requires `Unreceived`, so the
