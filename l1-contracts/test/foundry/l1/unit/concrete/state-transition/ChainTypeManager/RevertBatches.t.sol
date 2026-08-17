@@ -9,7 +9,9 @@ import {
     DEFAULT_L2_LOGS_TREE_ROOT_HASH,
     PUBLIC_INPUT_SHIFT,
     TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
-    ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT
+    ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
+    ZKSYNC_OS_MOCK_PROOF_MAGIC,
+    ZKSYNC_OS_MOCK_VERIFICATION_TYPE
 } from "contracts/common/Config.sol";
 import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
@@ -21,9 +23,6 @@ import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Commi
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract RevertBatchesTest is ChainTypeManagerTest {
-    uint256 internal constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
-    uint256 internal constant ZKSYNC_OS_MOCK_PROOF_MARKER = 13;
-
     IExecutor.StoredBatchInfo internal genesisStoredBatchInfo;
     address internal newChainAddress;
 
@@ -194,7 +193,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
         proof = new uint256[](4);
         proof[0] = ZKSYNC_OS_MOCK_VERIFICATION_TYPE;
         proof[1] = 0;
-        proof[2] = ZKSYNC_OS_MOCK_PROOF_MARKER;
+        proof[2] = ZKSYNC_OS_MOCK_PROOF_MAGIC;
         proof[3] = publicInput;
     }
 }

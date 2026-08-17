@@ -985,17 +985,16 @@ async function deployL2Contracts(
   // Deploy the delegateTo target (L2V32Upgrade).
   await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V32Upgrade")]);
 
-  // L2BaseToken: for Era it's deployed directly as L2BaseTokenEra (not in force deployment list).
-  // For ZKsyncOS it's in the force deployment list as ZKsyncOSSystemProxyUpgrade and handled above.
+  // L2BaseToken: for ZKsyncOS it's in the force deployment list as ZKsyncOSSystemProxyUpgrade and
+  // handled above. EraVM chains are not supported by this release.
   if (!isZKsyncOS) {
-    await l2Provider.send("anvil_setCode", [L2_BASE_TOKEN_ADDR, getBytecode("L2BaseTokenEra")]);
+    throw new Error("EraVM chains are not supported by this release");
   }
 
   // L2BaseToken.initL2 (called on the genesis path of performForceDeployedContractsInit) mints an initial balance into the
-  // BaseTokenHolder. For Era it reads the pre-existing __DEPRECATED_totalSupply; for ZKsyncOS it
-  // mints via the MINT_BASE_TOKEN_HOOK system hook, which is a no-op mock in the anvil harness.
-  // In both cases L2BaseToken then transfers ETH to the holder, so it needs a non-zero balance
-  // on the anvil chain or the transfer reverts with "Address: insufficient balance".
+  // BaseTokenHolder. For ZKsyncOS it mints via the MINT_BASE_TOKEN_HOOK system hook, which is a
+  // no-op mock in the anvil harness. L2BaseToken then transfers ETH to the holder, so it needs a
+  // non-zero balance on the anvil chain or the transfer reverts with "Address: insufficient balance".
   await l2Provider.send("anvil_setBalance", [L2_BASE_TOKEN_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE]);
 
   // Seed critical storage values on L2 contracts that were deployed via anvil_setCode

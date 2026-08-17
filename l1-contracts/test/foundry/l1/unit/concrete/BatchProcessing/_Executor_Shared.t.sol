@@ -32,8 +32,6 @@ import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
-import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {AcceptingVerifier} from "contracts/dev-contracts/test/AcceptingVerifier.sol";

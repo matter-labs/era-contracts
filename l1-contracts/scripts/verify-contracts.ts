@@ -48,7 +48,7 @@ function fallbackFor(name: string): string[] {
     case "VerifierPlonk":
       return ["L1VerifierPlonk", "L2VerifierPlonk"];
     case "Verifier":
-      return ["DualVerifier", "EraTestnetVerifier"];
+      return ["ZKsyncOSVerifier", "ZKsyncOSTestnetVerifier"];
     case "MigratorFacet":
       return ["Migrator"];
     case "CommitterFacet":
