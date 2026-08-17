@@ -131,8 +131,8 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     uint256 internal constant DIFFERENT_BASE_DEST_CHAIN_ID = 373;
     /// @dev The invalid remote leg's real begin-branch absence proof, built once by
     /// {_authorizeRefundForInvalidRemoteLeg} and reused by the idempotency tests so the remote source
-    /// chain is aggregated into the MessageRoot exactly once (a second aggregation would grow its chain
-    /// tree past the two-leaf shape {_realSettlementProof} assumes).
+    /// chain is aggregated into the MessageRoot exactly once (the shared builder explicitly rejects a
+    /// second post-genesis batch because its live-tree proof path covers only the first one).
     ImtProof internal _invalidRemoteAbsence;
 
     /// @dev Deploys the atomic predeploys (not part of the shared L2-in-L1 deployer) and the proof fixtures.
@@ -382,7 +382,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         // batch into the real {L1MessageRoot}, imported post-deadline into the real interop-root
         // storage, and authenticated through the real {L2MessageVerification} — nothing mocked. Built
         // before `expectEmit` because aggregation + import emit their own events. Stored for reuse by
-        // the idempotency tests (re-aggregating the same chain would break the two-leaf proof shape).
+        // the idempotency tests (the first-post-genesis proof builder rejects a second aggregation).
         ImtProof memory absence = _realTimeoutBeginProof(
             destinationChainId,
             _commitValue(ctx.flowId, INVALID_REMOTE_LEG),

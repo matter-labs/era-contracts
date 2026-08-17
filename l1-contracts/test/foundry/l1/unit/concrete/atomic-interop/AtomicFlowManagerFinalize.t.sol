@@ -82,8 +82,8 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
     /// @dev A finality proof with a genuine in-time inclusion proof per leg; `_tsFirst`/`_tsSecond` are
     /// the settlement-layer inclusion timestamps stamped into each leg's batch.
     /// @dev NOT `view`: real aggregation + import mutate MessageRoot / interop-root storage. Each source
-    /// chain must be aggregated exactly once per call so its single batch stays the right child of a
-    /// two-leaf chain tree (matching `_realSettlementProof`); do not invoke twice for the same chains.
+    /// chain must be aggregated exactly once per fixture: the shared builder explicitly rejects a
+    /// second post-genesis batch because its live-tree proof path covers only the first one.
     function _finalityProofs(
         uint256 _tsFirst,
         uint256 _tsSecond

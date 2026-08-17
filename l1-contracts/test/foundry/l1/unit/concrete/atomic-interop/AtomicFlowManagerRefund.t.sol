@@ -157,9 +157,8 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
     /// committed legs to `Revertable` — with exactly one `FlowRefundAuthorized` event each — while
     /// the missing leg stays `Unset`.
     function test_authorizeRefund_MarksAllLocalCommittedLegs() public {
-        // A fresh all-local three-leg flow (independent of the setUp fixture): fixed strictly-ascending
-        // leg hashes, with the never-committed missing leg at slot 1 declaring a remote source so its
-        // absence can be authenticated against a real aggregation.
+        // A fresh three-leg flow (independent of the setUp fixture): two locally committed legs and a
+        // never-committed remote leg at slot 1 whose absence is authenticated by real aggregation.
         AtomicFlowPreimage memory multiPreimage;
         multiPreimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
         multiPreimage.deadline = DEADLINE;

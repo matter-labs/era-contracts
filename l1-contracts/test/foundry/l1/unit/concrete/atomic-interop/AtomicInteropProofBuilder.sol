@@ -28,6 +28,8 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 
+error AtomicProofBuilderOnlySupportsFirstPostGenesisBatch(uint256 sourceChainId, uint256 batchNumber);
+
 /// @notice Test-only external re-export of the internal {AtomicInteropProof} library so its
 /// `internal`/`view`/`pure` functions can be exercised (and `vm.expectRevert`-ed) from a test.
 /// @dev This is NOT a logic mock: every function forwards verbatim to the real library, so the real
@@ -73,6 +75,10 @@ contract AtomicInteropProofWrapper {
 ///     the shared-tree path from the live MessageRoot, import the shared root, and authenticate the
 ///     assembled proof through the real verifier. This is the DEFAULT — happy proofs are fully
 ///     un-mocked end to end.
+///   - The `_real*` builders intentionally cover only a source chain's first post-genesis batch. Their
+///     one-sibling chain-tree path is valid only for batch 1; attempting to build a later batch proof
+///     fails explicitly with {AtomicProofBuilderOnlySupportsFirstPostGenesisBatch}. Cache a proof or use
+///     a distinct source chain when a test needs more than one proof in the same fixture.
 ///
 /// The only mock, and only where a branch cannot otherwise be reached, is
 /// `L2_MESSAGE_VERIFICATION.proveL2LeafInclusionShared` via {_mockVerifier}: forced to `false` for the
@@ -112,6 +118,7 @@ abstract contract AtomicInteropProofBuilder is Test {
     address internal msgRootBridgehub = makeAddr("atomicProofBridgehub");
     /// @dev Per-source-chain next batch number (batch 0 is the genesis leaf seeded at registration).
     mapping(uint256 chainId => uint256 nextBatch) internal _nextBatch;
+    uint256 internal constant FIRST_POST_GENESIS_BATCH = 1;
     /// @dev Monotonic SL block used as each imported root's key.
     uint256 internal _slBlockCursor = 1_000;
 
@@ -183,20 +190,21 @@ abstract contract AtomicInteropProofBuilder is Test {
         slMessageRoot.addNewChain(_sourceChainId, 0);
         vm.prank(msgRootBridgehub);
         slMessageRoot.seedGenesisRoot(_sourceChainId);
-        _nextBatch[_sourceChainId] = 1;
+        _nextBatch[_sourceChainId] = FIRST_POST_GENESIS_BATCH;
     }
 
     /// @dev Aggregates a chain batch root embedding `(_imtBegin, _imtEnd)` for `_sourceChainId` at batch
     /// time `_batchTs`, through the real `addChainBatchRootV32`. Returns the batch number used and the
-    /// genesis chain-tree leaf (the left sibling of the pushed batch leaf).
+    /// chain root immediately before the new batch leaf is pushed. Unlike the `_real*` proof builders,
+    /// this low-level aggregation helper can advance a source chain beyond its first batch.
     function _aggregateBatch(
         uint256 _sourceChainId,
         bytes32 _imtBegin,
         bytes32 _imtEnd,
         uint256 _batchTs
-    ) internal returns (uint256 batchNumber, bytes32 genesisChainLeaf) {
+    ) internal returns (uint256 batchNumber, bytes32 previousChainRoot) {
         _ensureChainRegistered(_sourceChainId);
-        genesisChainLeaf = slMessageRoot.getChainRoot(_sourceChainId); // single genesis leaf, pre-push
+        previousChainRoot = slMessageRoot.getChainRoot(_sourceChainId);
         batchNumber = _nextBatch[_sourceChainId]++;
         bytes32 chainBatchRoot = ChainBatchRootTree.compute(bytes32(0), bytes32(0), _imtBegin, _imtEnd);
 
@@ -220,19 +228,25 @@ abstract contract AtomicInteropProofBuilder is Test {
         );
     }
 
-    /// @dev Assembles the real two-hop settlement proof for `_sourceChainId`'s batch, reading the
-    /// chain-tree sibling (the captured genesis leaf) and the shared-tree path/index from the LIVE
-    /// MessageRoot. `_imtRootLeafIndex` selects begin (2) / end (3); the top siblings reproduce
-    /// {ChainBatchRootTree.compute}.
-    function _realSettlementProof(
+    /// @dev Assembles the real two-hop settlement proof for `_sourceChainId`'s FIRST post-genesis
+    /// batch. The one-sibling path is valid only for batch 1: the new batch is the right child and the
+    /// pre-push chain root is the genesis leaf on its left. Later batches fail explicitly rather than
+    /// silently producing an invalid proof. `_imtRootLeafIndex` selects begin (2) / end (3); the top
+    /// siblings reproduce {ChainBatchRootTree.compute}.
+    function _realFirstPostGenesisBatchSettlementProof(
         uint256 _sourceChainId,
+        uint256 _batchNumber,
         uint256 _imtRootLeafIndex,
         bytes32 _imtBegin,
         bytes32 _imtEnd,
         uint256 _batchTs,
-        bytes32 _genesisChainLeaf,
+        bytes32 _previousChainRoot,
         uint256 _slBlock
     ) internal view returns (bytes32[] memory proof) {
+        if (_batchNumber != FIRST_POST_GENESIS_BATCH) {
+            revert AtomicProofBuilderOnlySupportsFirstPostGenesisBatch(_sourceChainId, _batchNumber);
+        }
+
         bytes32[] memory topSiblings = new bytes32[](ChainBatchRootTree.TREE_DEPTH);
         // Leaf 2 (begin): sibling at level 0 is leaf 3 (end); leaf 3 (end): sibling is leaf 2 (begin).
         topSiblings[0] = _imtRootLeafIndex == ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX ? _imtBegin : _imtEnd;
@@ -241,7 +255,7 @@ abstract contract AtomicInteropProofBuilder is Test {
 
         // Chain tree: the real batch is the right child of the 2-leaf tree (genesis leaf on the left).
         bytes32[] memory chainSiblings = new bytes32[](1);
-        chainSiblings[0] = _genesisChainLeaf;
+        chainSiblings[0] = _previousChainRoot;
 
         bytes32[] memory sharedSiblings = slMessageRoot.getMerklePathForChain(_sourceChainId);
         uint256 sharedMask = slMessageRoot.chainIndex(_sourceChainId);
@@ -256,7 +270,7 @@ abstract contract AtomicInteropProofBuilder is Test {
             proof[p++] = topSiblings[i];
         }
         proof[p++] = bytes32(_batchTs);
-        proof[p++] = bytes32(uint256(1)); // batch is the right child (mask 0b1)
+        proof[p++] = bytes32(_batchNumber); // first post-genesis batch is the right child (mask 0b1)
         proof[p++] = chainSiblings[0];
         proof[p++] = bytes32((_slBlock << 128) | sharedMask);
         proof[p++] = bytes32(builderSlChainId);
@@ -276,7 +290,7 @@ abstract contract AtomicInteropProofBuilder is Test {
     ) internal returns (ImtProof memory) {
         bytes32 imtEnd = tree.root();
         bytes32 imtBegin = ChainBatchRootTree.EMPTY_IMT_ROOT;
-        (uint256 batchNumber, bytes32 genesisChainLeaf) = _aggregateBatch(_sourceChainId, imtBegin, imtEnd, _batchTs);
+        (uint256 batchNumber, bytes32 previousChainRoot) = _aggregateBatch(_sourceChainId, imtBegin, imtEnd, _batchTs);
         (uint256 slBlock, ) = _importCurrentSharedRoot();
         return
             ImtProof({
@@ -284,13 +298,14 @@ abstract contract AtomicInteropProofBuilder is Test {
                 batchNumber: batchNumber,
                 chainImtRoot: imtEnd,
                 provesAgainstBeginRoot: false,
-                settlementProof: _realSettlementProof(
+                settlementProof: _realFirstPostGenesisBatchSettlementProof(
                     _sourceChainId,
+                    batchNumber,
                     ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX,
                     imtBegin,
                     imtEnd,
                     _batchTs,
-                    genesisChainLeaf,
+                    previousChainRoot,
                     slBlock
                 ),
                 leaf: tree.leafAt(_leafIndex),
@@ -309,7 +324,7 @@ abstract contract AtomicInteropProofBuilder is Test {
     ) internal returns (ImtProof memory) {
         require(_batchTs > DEADLINE, "begin branch needs a late batch");
         bytes32 imtSnapshot = tree.root(); // excludes the never-inserted absent value
-        (uint256 batchNumber, bytes32 genesisChainLeaf) = _aggregateBatch(
+        (uint256 batchNumber, bytes32 previousChainRoot) = _aggregateBatch(
             _sourceChainId,
             imtSnapshot,
             imtSnapshot,
@@ -323,13 +338,14 @@ abstract contract AtomicInteropProofBuilder is Test {
                 batchNumber: batchNumber,
                 chainImtRoot: imtSnapshot,
                 provesAgainstBeginRoot: true,
-                settlementProof: _realSettlementProof(
+                settlementProof: _realFirstPostGenesisBatchSettlementProof(
                     _sourceChainId,
+                    batchNumber,
                     ChainBatchRootTree.IMT_BEGIN_ROOT_LEAF_INDEX,
                     imtSnapshot,
                     imtSnapshot,
                     _batchTs,
-                    genesisChainLeaf,
+                    previousChainRoot,
                     slBlock
                 ),
                 leaf: tree.leafAt(lowIndex),
@@ -349,7 +365,7 @@ abstract contract AtomicInteropProofBuilder is Test {
     ) internal returns (ImtProof memory) {
         require(_batchTs <= DEADLINE, "end branch needs an in-time batch");
         bytes32 imtSnapshot = tree.root();
-        (uint256 batchNumber, bytes32 genesisChainLeaf) = _aggregateBatch(
+        (uint256 batchNumber, bytes32 previousChainRoot) = _aggregateBatch(
             _sourceChainId,
             imtSnapshot,
             imtSnapshot,
@@ -368,13 +384,14 @@ abstract contract AtomicInteropProofBuilder is Test {
                 batchNumber: batchNumber,
                 chainImtRoot: imtSnapshot,
                 provesAgainstBeginRoot: false,
-                settlementProof: _realSettlementProof(
+                settlementProof: _realFirstPostGenesisBatchSettlementProof(
                     _sourceChainId,
+                    batchNumber,
                     ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX,
                     imtSnapshot,
                     imtSnapshot,
                     _batchTs,
-                    genesisChainLeaf,
+                    previousChainRoot,
                     slBlock
                 ),
                 leaf: tree.leafAt(lowIndex),

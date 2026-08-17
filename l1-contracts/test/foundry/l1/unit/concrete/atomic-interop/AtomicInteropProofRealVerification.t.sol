@@ -9,9 +9,10 @@ import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {ProofNotLastBatchInRoot} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 
-/// @notice Exercises a non-leftmost batch-leaf proof through the real `L2MessageVerification` and
-/// imported `L2InteropRootStorage` root. The shared live-tree fixtures only produce mask-zero paths,
-/// so this suite forward-computes a right-child last-leaf path and its invalid counterpart.
+/// @notice Exercises a multi-level, non-leftmost batch-leaf proof through the real
+/// `L2MessageVerification` and imported `L2InteropRootStorage` root. The shared live-tree builder
+/// produces only the one-level first-post-genesis path (mask `0b1`), so this suite forward-computes a
+/// two-level right-child last-leaf path and its invalid counterpart.
 contract AtomicInteropProofRealVerificationTest is AtomicInteropProofBuilder {
     uint256 internal constant SOURCE_CHAIN_ID = 271;
     uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 1; // L1
@@ -95,8 +96,8 @@ contract AtomicInteropProofRealVerificationTest is AtomicInteropProofBuilder {
     /// @dev A batch-leaf path for a RIGHT-child last leaf at mask `0b01` in a 2-level chain tree: level
     /// 0 the leaf is a right child (its LEFT sibling is an earlier, populated batch — not checked), and
     /// level 1 it is a left child (its RIGHT sibling must be the empty-subtree cascade `zeros[1]`). This
-    /// is a genuine "last batch that is not the leftmost leaf" — the case the empty-path builder can't
-    /// express.
+    /// is a genuine "last batch that is not the leftmost leaf" with an empty right subtree above it —
+    /// the case the one-level live-tree builder cannot express.
     function _rightChildLastLeafPath() internal pure returns (uint256 mask, bytes32[] memory siblings) {
         bytes32[] memory cascade = _emptySubtreeCascade(2); // [zeros[0], zeros[1]]
         siblings = new bytes32[](2);
@@ -108,8 +109,8 @@ contract AtomicInteropProofRealVerificationTest is AtomicInteropProofBuilder {
     /// @notice The timeout END-branch through the real verifier for a right-child last leaf: an in-time
     /// batch (`t <= deadline`) that is the chain's LAST inside the aggregated root even though it is NOT
     /// the leftmost leaf. The real verifier parses the non-zero batch-leaf mask and populated left
-    /// sibling exactly as `_verifyLastBatchInRoot` expects, so the empty-path builder's blind spot
-    /// (mask == 0 only) is closed against real parsing.
+    /// sibling exactly as `_verifyLastBatchInRoot` expects, closing the one-level builder's blind spot
+    /// around left-child levels and their required empty-subtree cascade.
     function test_verifyTimeoutAbsence_realVerifier_endBranch_rightChildLastLeaf() public {
         (uint256 mask, bytes32[] memory batchSiblings) = _rightChildLastLeafPath();
         (bytes32[] memory settlementProof, bytes32 aggRoot) = _buildRealSettlementProofMasked(

@@ -53,6 +53,12 @@ contract MockRecoveryRouter {
         reverts[keccak256(_data)] = true;
     }
 
+    function scriptSucceeds(bytes calldata _data) external {
+        bytes32 dataHash = keccak256(_data);
+        delete returnsFalse[dataHash];
+        delete reverts[dataHash];
+    }
+
     function recoverAtomicCall(uint256 _destChainId, bytes calldata _data) external returns (bool) {
         _destChainId; // unused; recovery routing is not exercised by this stateful stand-in
         ++recoverAttempts;
@@ -305,9 +311,9 @@ contract AtomicFlowManagerRecoverTest is Test {
         manager.claimRefund(FLOW_ID, bundleBytes);
     }
 
-    /// @notice A later call reverting during recovery aborts the whole claim — both recovery calls are
-    /// proven reached, so the earlier payout genuinely happened before the abort — leaving the refund
-    /// retryable.
+    /// @notice A later call reverting during recovery aborts and rolls back the whole claim. Both calls
+    /// are reached before the abort; after the failing script is cleared, both are retried and the claim
+    /// completes, proving the leg remained `Revertable` and no partial recovery survived.
     function test_claimRefund_multiCall_laterRevertAbortsClaim() public {
         MockRecoveryRouter router = _deployMockRouter();
         router.scriptReverts(hex"baad");
@@ -321,18 +327,39 @@ contract AtomicFlowManagerRecoverTest is Test {
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundleBytes);
         manager.forceRevertable(FLOW_ID, bundleHash);
 
-        // Both recovery calls must be reached: the earlier one pays out before the later one reverts.
+        // Both recovery calls must be reached once in the failed claim and once in the successful retry.
         vm.expectCall(
             L2_ASSET_ROUTER_ADDR,
             abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector, DEST_CHAIN_ID, hex"600d"),
-            1
+            2
         );
         vm.expectCall(
             L2_ASSET_ROUTER_ADDR,
             abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector, DEST_CHAIN_ID, hex"baad"),
-            1
+            2
         );
         vm.expectRevert("recovery boom");
         manager.claimRefund(FLOW_ID, bundleBytes);
+
+        assertEq(router.recoverAttempts(), 0, "reverted recovery attempts must roll back");
+        assertEq(router.recoverSuccesses(), 0, "the earlier successful recovery must roll back");
+        assertEq(
+            uint256(manager.legState(FLOW_ID, bundleHash)),
+            uint256(LegState.Revertable),
+            "failed claim must leave the refund retryable"
+        );
+
+        router.scriptSucceeds(hex"baad");
+        vm.expectEmit(true, true, false, true, address(manager));
+        emit IAtomicFlowManager.FlowRefunded(FLOW_ID, bundleHash);
+        manager.claimRefund(FLOW_ID, bundleBytes);
+
+        assertEq(router.recoverAttempts(), 2, "retry must process both router-backed calls");
+        assertEq(router.recoverSuccesses(), 2, "both recoveries must succeed on retry");
+        assertEq(
+            uint256(manager.legState(FLOW_ID, bundleHash)),
+            uint256(LegState.Reverted),
+            "successful retry must finish the refund"
+        );
     }
 }

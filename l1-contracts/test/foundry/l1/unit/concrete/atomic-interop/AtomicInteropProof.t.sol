@@ -33,8 +33,8 @@ import {IMTLeafValueMismatch, IMTLowLeafNextTooSmall} from "contracts/common/L1C
 /// grown chain-batch tree with a specific mask, a wrong-level cascade sibling, etc. Those cases (and
 /// only those) keep a documented `_mockVerifier` stub over the separately-tested leaf verifier; the
 /// real `settlementProof` blob is still parsed by {MessageHashing}, so the settlement-layer / clock /
-/// last-batch / inclusion branches all run for real. The real end-to-end verifier path for every
-/// happy shape is additionally covered by {AtomicInteropProofRealVerification} and the pipeline test.
+/// last-batch / inclusion branches all run for real. The deeper non-leftmost last-batch shape is also
+/// exercised end-to-end by {AtomicInteropProofRealVerification}.
 contract AtomicInteropProofTest is AtomicInteropProofBuilder {
     uint256 internal constant SOURCE_CHAIN_ID = 271;
     uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 1; // L1
