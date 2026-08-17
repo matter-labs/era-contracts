@@ -85,7 +85,7 @@ jobs:
     needs: gate
     if: needs.gate.outputs.verify == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
 
     steps:
       - name: Checkout the repository
@@ -149,7 +149,29 @@ jobs:
             exit 1
           fi
 
-      # Only reached when the clean build agrees with everything committed, so these artifacts are
-      # the trustworthy ones to hand to PRs branching from here.
+      # The checks above only compare committed artifacts against a clean build. A stale artifact
+      # could equally have made a *test* pass, and every PR run of these suites read a warm cache —
+      # so they are re-run here against artifacts nothing was allowed to warm.
+      #
+      # Excluded on purpose: `yarn sc test` needs an anvil-zksync service, and the anvil-interop
+      # suite needs Anvil plus committed chain states, whose own determinism gate
+      # (state-generation-check) already rebuilds from scratch on every PR.
+      - name: Run l1 foundry tests
+        working-directory: l1-contracts
+        run: yarn test:foundry
+
+      - name: Run da foundry tests
+        working-directory: da-contracts
+        run: yarn test:foundry
+
+      - name: Run system-contracts foundry tests
+        run: yarn sc test:foundry
+
+      - name: Run l1 zkfoundry tests
+        working-directory: l1-contracts
+        run: yarn test:zkfoundry
+
+      # Only reached when the clean build agrees with everything committed *and* the suites pass on
+      # it, so these artifacts are the trustworthy ones to hand to PRs branching from here.
       - name: Save the verified solc build cache
         uses: ./.github/actions/save-solc-cache
