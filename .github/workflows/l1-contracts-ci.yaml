@@ -118,20 +118,8 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Restore artifacts cache
-        uses: actions/cache/restore@v4
-        with:
-          fail-on-cache-miss: true
-          key: artifacts-l1-ci-${{ github.sha }}
-          path: |
-            da-contracts/cache-forge
-            da-contracts/out
-            l1-contracts/cache-forge
-            l1-contracts/out
-            l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout
+      - name: Restore this commit's artifacts
+        uses: ./.github/actions/restore-ci-artifacts
 
       - name: Build and check zkstack-out
         working-directory: l1-contracts
@@ -163,20 +151,8 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Restore artifacts cache
-        uses: actions/cache/restore@v4
-        with:
-          fail-on-cache-miss: true
-          key: artifacts-l1-ci-${{ github.sha }}
-          path: |
-            da-contracts/cache-forge
-            da-contracts/out
-            l1-contracts/cache-forge
-            l1-contracts/out
-            l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout
+      - name: Restore this commit's artifacts
+        uses: ./.github/actions/restore-ci-artifacts
 
       - name: Check contents
         run: |
@@ -205,20 +181,8 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Restore artifacts cache
-        uses: actions/cache/restore@v4
-        with:
-          fail-on-cache-miss: true
-          key: artifacts-l1-ci-${{ github.sha }}
-          path: |
-            da-contracts/cache-forge
-            da-contracts/out
-            l1-contracts/cache-forge
-            l1-contracts/out
-            l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout
+      - name: Restore this commit's artifacts
+        uses: ./.github/actions/restore-ci-artifacts
 
       - name: Install foundry-zksync
         uses: ./.github/actions/install-zksync-foundry
@@ -248,20 +212,8 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Restore artifacts cache
-        uses: actions/cache/restore@v4
-        with:
-          fail-on-cache-miss: true
-          key: artifacts-l1-ci-${{ github.sha }}
-          path: |
-            da-contracts/cache-forge
-            da-contracts/out
-            l1-contracts/cache-forge
-            l1-contracts/out
-            l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout
+      - name: Restore this commit's artifacts
+        uses: ./.github/actions/restore-ci-artifacts
 
       - name: Run tests
         working-directory: ./l1-contracts
@@ -302,20 +254,8 @@ jobs:
       - name: Build system contract artifacts
         run: yarn sc build:foundry
 
-      - name: Restore artifacts cache
-        uses: actions/cache/restore@v4
-        with:
-          fail-on-cache-miss: true
-          key: artifacts-l1-ci-${{ github.sha }}
-          path: |
-            da-contracts/cache-forge
-            da-contracts/out
-            l1-contracts/cache-forge
-            l1-contracts/out
-            l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout
+      - name: Restore this commit's artifacts
+        uses: ./.github/actions/restore-ci-artifacts
 
       # The path list above must match `build`'s save list exactly: cache entries are versioned
       # by their paths, so a shortened list here silently stops matching the saved entry (with
@@ -399,20 +339,8 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Restore artifacts cache
-        uses: actions/cache/restore@v4
-        with:
-          fail-on-cache-miss: true
-          key: artifacts-l1-ci-${{ github.sha }}
-          path: |
-            da-contracts/cache-forge
-            da-contracts/out
-            l1-contracts/cache-forge
-            l1-contracts/out
-            l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout
+      - name: Restore this commit's artifacts
+        uses: ./.github/actions/restore-ci-artifacts
 
       # `forge coverage` runs the suite itself, and the `test-foundry` job already gates
       # on the full (unfiltered) `yarn test:foundry`, so there is no separate test run here.
@@ -508,20 +436,8 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Restore artifacts cache
-        uses: actions/cache/restore@v4
-        with:
-          fail-on-cache-miss: true
-          key: artifacts-l1-ci-${{ github.sha }}
-          path: |
-            da-contracts/cache-forge
-            da-contracts/out
-            l1-contracts/cache-forge
-            l1-contracts/out
-            l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout
+      - name: Restore this commit's artifacts
+        uses: ./.github/actions/restore-ci-artifacts
 
       # install-zksync-foundry only provides forge/cast; we need regular anvil for interop tests
       - name: Install Foundry (for Anvil)
