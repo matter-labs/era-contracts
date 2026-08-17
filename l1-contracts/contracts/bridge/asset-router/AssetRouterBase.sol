@@ -144,7 +144,9 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         bytes calldata _data,
         address _nativeTokenVault
     ) internal returns (L2TransactionRequestTwoBridgesInner memory request) {
-        (bytes32 assetId, bytes memory transferData) = _getTransferData(_data);
+        bytes1 encodingVersion = _data[0];
+
+        (bytes32 assetId, bytes memory transferData) = _getTransferData(encodingVersion, _data);
         require(_bridgehub().baseTokenAssetId(_chainId) != assetId, AssetIdNotSupported(assetId));
 
         bytes memory bridgeMintCalldata = _burn({
@@ -181,6 +183,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
     }
 
     function _getTransferData(
+        bytes1 /* _encodingVersion */,
         bytes calldata _data
     ) internal virtual returns (bytes32 assetId, bytes memory transferData) {
         // slither-disable-next-line unused-return

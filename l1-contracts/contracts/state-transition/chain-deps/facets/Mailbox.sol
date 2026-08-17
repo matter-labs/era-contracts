@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
+import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
 import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 
@@ -50,7 +50,7 @@ import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAs
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract MailboxFacet is ZKChainBase, IMailbox {
+contract MailboxFacet is ZKChainBase, IMailboxImpl {
     using UncheckedMath for uint256;
     using PriorityTree for PriorityTree.Tree;
 
@@ -109,14 +109,14 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
     }
 
-    /// @inheritdoc IMailbox
+    /// @inheritdoc IMailboxImpl
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
     ) external onlyBridgehub returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(_request);
     }
 
-    /// @inheritdoc IMailbox
+    /// @inheritdoc IMailboxImpl
     function l2TransactionBaseCost(
         uint256 _gasPrice,
         uint256 _l2GasLimit,
@@ -126,7 +126,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         return l2GasPrice * _l2GasLimit;
     }
 
-    /// @inheritdoc IMailbox
+    /// @inheritdoc IMailboxImpl
     // slither-disable-next-line reentrancy-no-eth
     function requestL2TransactionToGatewayMailbox(
         uint256 _chainId,
@@ -152,7 +152,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         canonicalTxHash = _requestL2TransactionFree(wrappedRequest);
     }
 
-    /// @inheritdoc IMailbox
+    /// @inheritdoc IMailboxImpl
     function bridgehubRequestL2TransactionOnGateway(
         bytes32 _canonicalTxHash,
         uint64
@@ -189,7 +189,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
             });
     }
 
-    /// @inheritdoc IMailbox
+    /// @inheritdoc IMailboxImpl
     function requestL2ServiceTransaction(
         address _contractL2,
         bytes calldata _l2Calldata
@@ -212,7 +212,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
 
         if (s.settlementLayer != address(0)) {
             // slither-disable-next-line unused-return
-            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
+            IMailboxImpl(s.settlementLayer).requestL2TransactionToGatewayMailbox({
                 _chainId: s.chainId,
                 _canonicalTxHash: canonicalTxHash,
                 _expirationTimestamp: 0
@@ -299,7 +299,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash);
         if (s.settlementLayer != address(0)) {
             // slither-disable-next-line unused-return
-            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
+            IMailboxImpl(s.settlementLayer).requestL2TransactionToGatewayMailbox({
                 _chainId: s.chainId,
                 _canonicalTxHash: canonicalTxHash,
                 _expirationTimestamp: 0
@@ -404,16 +404,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
     ///////////////////////////////////////////////////////
     //////// Legacy Era functions
 
-    /// @inheritdoc IMailbox
-    /// @dev Deprecated stub. The L2->L1 base-token withdrawal message is still tagged with the
-    /// `finalizeEthWithdrawal` selector, so the selector must remain part of the facet's ABI even though funds
-    /// are now finalized through the asset-router / L1Nullifier path. The entry point itself always reverts;
-    /// full removal is tracked separately (EVM-1216).
-    function finalizeEthWithdrawal(uint256, uint256, uint16, bytes calldata, bytes32[] calldata) external onlyL1 {
-        revert TransactionNotAllowed();
-    }
-
-    /// @inheritdoc IMailbox
+    /// @inheritdoc IMailboxImpl
     function requestL2Transaction(
         // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
         address _contractL2,

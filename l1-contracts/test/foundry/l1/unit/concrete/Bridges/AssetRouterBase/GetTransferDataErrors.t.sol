@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {BadTransferDataLength} from "contracts/common/L1ContractErrors.sol";
+import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
@@ -18,8 +19,8 @@ contract TestAssetRouterBase is AssetRouterBase {
     function finalizeDeposit(uint256, bytes32, bytes calldata) public payable override {}
 
     // Use a specific name that won't trigger fuzz testing
-    function callGetTransferData(bytes calldata data) external returns (bytes32, bytes memory) {
-        return _getTransferData(data);
+    function callGetTransferData(bytes1 encodingVersion, bytes calldata data) external returns (bytes32, bytes memory) {
+        return _getTransferData(encodingVersion, data);
     }
 
     function BRIDGE_HUB() external view returns (IBridgehubBase) {
@@ -61,6 +62,6 @@ contract AssetRouterBase_GetTransferDataErrors_Test is Test {
     function test_BadTransferDataLength_WhenDataTooShort() public {
         bytes memory shortData = hex"01"; // NEW_ENCODING_VERSION but only 1 byte
         vm.expectRevert(BadTransferDataLength.selector);
-        router.callGetTransferData(shortData);
+        router.callGetTransferData(NEW_ENCODING_VERSION, shortData);
     }
 }
