@@ -28,16 +28,25 @@ jobs:
           fetch-depth: 0 # We need full history to fetch PR branch
           submodules: recursive
           token: ${{ secrets.RELEASE_TOKEN }}
+          # Without this, actions/checkout writes the token into .git/config as an http.extraheader
+          # and it stays there while this job runs the target branch's own code — `yarn` lifecycle
+          # scripts, four `build:foundry` invocations, prettier. Any of those could read it. The push
+          # step below carries the token itself instead.
+          persist-credentials: false
 
       - name: Get PR branch info
         id: pr
         uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ github.event.inputs.pr_number || inputs.pr_number }}
         with:
           script: |
+            // Via env, not `${{ }}`: interpolation lands in the script text, so a dispatch input
+            // like `1'),0);/*` would be arbitrary JS in a step that has the repo checked out.
             const pr = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: parseInt(context.payload.inputs?.pr_number || '${{ inputs.pr_number }}', 10),
+              pull_number: parseInt(process.env.PR_NUMBER, 10),
             });
             core.setOutput("head_ref", pr.data.head.ref);
             core.setOutput("head_repo", pr.data.head.repo.full_name);
@@ -83,6 +92,8 @@ jobs:
           yarn calculate-hashes:fix
 
       - name: Commit and push changes
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           set -euo pipefail
           git config user.name "zksync[bot]"
@@ -93,4 +104,5 @@ jobs:
           git diff --cached --quiet && { echo "No hash changes to commit"; exit 0; }
           # Push changes otherwise
           git commit -m "chore: Updated hashes from CI"
-          git push origin HEAD
+          # The only step that needs the token, so it is the only step that sees it.
+          git push "https://x-access-token:${RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}" HEAD

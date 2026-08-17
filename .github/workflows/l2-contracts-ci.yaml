@@ -1,5 +1,9 @@
 name: L2 contracts CI
 
+# Least privilege: these workflows only build and test.
+permissions:
+  contents: read
+
 on:
   pull_request:
 
