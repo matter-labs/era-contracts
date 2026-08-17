@@ -1,14 +1,7 @@
 {
-  "extends": [
-    "@matterlabs/eslint-config-typescript"
-  ],
+  "extends": ["@matterlabs/eslint-config-typescript"],
   "rules": {
-    "no-multiple-empty-lines": [
-      "error",
-      {
-        "max": 1
-      }
-    ],
+    "no-multiple-empty-lines": ["error", { "max": 1 }],
     "@typescript-eslint/no-namespace": "off",
     "@typescript-eslint/ban-ts-comment": "off",
     "import/no-named-as-default-member": "off",
@@ -28,9 +21,7 @@
   ],
   "overrides": [
     {
-      "files": [
-        "l1-contracts/test/anvil-interop/**/*.ts"
-      ],
+      "files": ["l1-contracts/test/anvil-interop/**/*.ts"],
       "rules": {
         "no-restricted-syntax": [
           "error",
