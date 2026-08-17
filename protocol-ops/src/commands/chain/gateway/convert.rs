@@ -240,9 +240,8 @@ refund_recipient = "{refund:#x}"
 gateway_chain_id = {gw}
 force_deployments_data = "{fd}"
 
-# Not used by the gateway flow but required by the parent config parser (overridden from on-chain state)
+# Not used by the gateway flow but read by the parent config parser (overridden from on-chain state)
 owner_address = "{zero_address}"
-support_l2_legacy_shared_bridge_test = false
 zk_token_asset_id = "{default_zk_token_asset_id}"
 
 [contracts]

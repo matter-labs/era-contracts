@@ -91,8 +91,9 @@ pub struct V31PrepareOutput {
 }
 
 /// Per-CTM prepare result: where the script wrote its TOML, and the resolved
-/// `is_zk_sync_os` flag (used downstream to label per-CTM sections in the
-/// merged ecosystem TOML as `[ctms.era]` vs `[ctms.zksync_os]`).
+/// `is_zk_sync_os` flag. Only ZKsyncOS CTMs reach this point (Era CTMs are
+/// skipped in `prepare`), so the merged ecosystem TOML labels the section
+/// `[ctms.zksync_os]`.
 pub struct CtmPrepareEntry {
     pub proxy: Address,
     pub toml: PathBuf,

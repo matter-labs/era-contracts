@@ -5,8 +5,6 @@ use crate::common::forge::scripts::Create2Addresses;
 use crate::common::traits::FileConfigTrait;
 use crate::types::{DAValidatorType, L2ChainId};
 
-pub use super::REGISTER_CHAIN_INVOCATION as REGISTER_CHAIN_SCRIPT_PARAMS;
-
 // ── Input types ──────────────────────────────────────────────────────────────
 
 /// Chain parameters

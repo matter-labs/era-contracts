@@ -5,10 +5,6 @@ use crate::common::traits::FileConfigTrait;
 
 use super::deploy_ecosystem::InitialDeploymentConfig;
 
-pub use super::DEPLOY_CTM_INVOCATION as DEPLOY_CTM_SCRIPT_PARAMS;
-
-pub use super::REGISTER_CTM_INVOCATION as REGISTER_CTM_SCRIPT_PARAMS;
-
 // ── Input types ──────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -16,7 +12,6 @@ pub struct DeployCTMConfig {
     pub owner_address: Address,
     pub testnet_verifier: bool,
     pub contracts: ContractsDeployCTMConfig,
-    pub is_zk_sync_os: bool,
     pub zk_token_asset_id: B256,
 }
 
@@ -30,9 +25,6 @@ impl DeployCTMConfig {
         zk_token_asset_id: B256,
     ) -> Self {
         Self {
-            // This tooling only provisions ZKsync OS CTMs; the config key is
-            // still emitted because DeployCTM.s.sol reads it.
-            is_zk_sync_os: true,
             testnet_verifier,
             owner_address,
             zk_token_asset_id,

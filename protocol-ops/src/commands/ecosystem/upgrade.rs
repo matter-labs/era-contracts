@@ -340,9 +340,10 @@ pub struct UpgradePrepareAllArgs {
     #[clap(long)]
     pub deployer_address: Option<Address>,
 
-    /// Target CTMs to upgrade. Pass once per CTM (e.g. ZKsyncOS CTM and EraVM
-    /// CTM on stage). Each must already have at least one registered chain so
-    /// rollup-DA-manager auto-resolution works.
+    /// Target CTMs to upgrade. Pass once per CTM. Only ZKsyncOS CTMs can be
+    /// targeted on this release — the upgrade scripts reject EraVM CTMs. Each
+    /// must already have at least one registered chain so rollup-DA-manager
+    /// auto-resolution works.
     #[clap(long = "ctm-proxy", num_args = 1..)]
     pub ctm_proxies: Vec<Address>,
 
@@ -371,14 +372,14 @@ pub struct UpgradePrepareAllArgs {
     /// overrides). Mutually exclusive with the legacy single-CTM flags
     /// (`--ctm-proxy`, `--is-zk-sync-os`, `--bytecodes-supplier-address`,
     /// `--rollup-da-manager-address`); use this when upgrading more than one
-    /// CTM in a single fork (e.g. Era + Atlas/ZKsyncOS on stage/mainnet) or
-    /// when the per-CTM overrides differ.
+    /// ZKsyncOS CTM in a single fork or when the per-CTM overrides differ.
+    /// EraVM CTMs are rejected by the upgrade scripts.
     ///
     /// Schema:
     /// ```toml
     /// [[ctm]]
     /// proxy = "0x..."
-    /// is_zk_sync_os = false                  # optional
+    /// is_zk_sync_os = true                   # optional
     /// bytecodes_supplier = "0x..."           # optional
     /// rollup_da_manager  = "0x..."           # optional
     /// ```
@@ -439,10 +440,10 @@ struct UpgradePrepareAllOutput {
     /// Merged ecosystem TOML written to `<env-out>/ecosystem.toml`, when
     /// `--out` is set. Contains top-level `[governance_calls]` (merged stage
     /// 0/1/2 hex), `[core]` (the CTM-agnostic core prepare output), and one
-    /// `[ctms.<flavor>]` table per CTM (`era` or `zksync_os`, keyed off
-    /// `is_zk_sync_os`) carrying the per-CTM diamond cut + contracts config.
-    /// Downstream `upgrade-governance --env <env>` and `verify-upgrade` both
-    /// consume this single file.
+    /// `[ctms.zksync_os]` table per CTM carrying the per-CTM diamond cut +
+    /// contracts config (this release only upgrades ZKsyncOS CTMs). Downstream
+    /// `upgrade-governance --env <env>` and `verify-upgrade` both consume this
+    /// single file.
     #[serde(skip_serializing_if = "Option::is_none")]
     merged_ecosystem_toml: Option<String>,
     puh_proxy: String,
@@ -871,16 +872,12 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     Ok(())
 }
 
-/// Pick the `is_zk_sync_os` flavor the Core script will deploy under when
-/// running against a multi-CTM ecosystem (Era + Atlas). Era wins if any entry
-/// declares `is_zk_sync_os = false` — its system contracts are the strict
-/// subset, so a Core deploy targeting Era is also valid for Atlas. If no entry
-/// pins the flavor, fall back to the first entry's hint.
+/// Pick the `is_zk_sync_os` flavor the Core script will deploy under. This
+/// release only upgrades ZKsyncOS CTMs (Era CTMs are skipped during prepare),
+/// so we take the first entry's hint; when unset, auto-resolution from L1 fills
+/// it in later.
 fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> Option<bool> {
-    entries
-        .iter()
-        .find_map(|e| (e.is_zk_sync_os == Some(false)).then_some(false))
-        .or_else(|| entries.first().and_then(|e| e.is_zk_sync_os))
+    entries.first().and_then(|e| e.is_zk_sync_os)
 }
 
 /// Read each per-script governance TOML and write a single merged TOML
@@ -900,10 +897,6 @@ fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> 
 /// stage2_calls = "0x..."
 ///
 /// [test_upgrade_calls]            # optional: copied from CTM prepare output
-/// test_create_chain_era = "0x..."
-/// test_create_chain_era_caller = "0x..."
-/// test_upgrade_chain_era = "0x..."
-/// test_upgrade_chain_era_caller = "0x..."
 /// test_create_chain_zkos = "0x..."
 /// test_create_chain_zkos_caller = "0x..."
 /// test_upgrade_chain_zkos = "0x..."
@@ -912,9 +905,8 @@ fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> 
 /// [core]                          # whole core TOML minus its [governance_calls]
 /// ...
 ///
-/// [ctms.era]                      # whole CTM TOML minus its [governance_calls];
-/// ...                             # key is "era" if !is_zk_sync_os else "zksync_os".
-/// [ctms.zksync_os]                # second CTM, when present.
+/// [ctms.zksync_os]                # whole CTM TOML minus its [governance_calls];
+/// ...                             # one section per ZKsyncOS CTM.
 /// ...
 ///
 /// [new_gateway]                   # only when present: GatewayVotePreparation
@@ -985,19 +977,17 @@ fn write_merged_ecosystem_toml(
     let mut stage0: Vec<String> = vec![core_gov.stage0_calls];
     let mut stage1: Vec<String> = vec![core_gov.stage1_calls];
     let mut stage2: Vec<String> = vec![core_gov.stage2_calls];
-    let mut era_test_calls: Option<TestUpgradeCalls> = None;
     let mut zksync_os_test_calls: Option<TestUpgradeCalls> = None;
 
+    // Every CTM that reaches the merge is ZKsyncOS: `V31UpgradeInner::prepare`
+    // skips Era CTMs and bails if none remain. The merge keys per-CTM sections
+    // by the fixed `zksync_os` label, so two CTMs in one upgrade collide here.
     for entry in ctm_entries {
         let (body, gov, test_calls) = load_and_split(&entry.toml)?;
-        let label = if entry.is_zk_sync_os {
-            "zksync_os"
-        } else {
-            "era"
-        };
+        let label = "zksync_os";
         if ctms_table.contains_key(label) {
             anyhow::bail!(
-                "duplicate CTM flavor `{label}`: two CTMs cannot share the same `is_zk_sync_os` value in one upgrade"
+                "duplicate CTM section `{label}`: a single upgrade merges at most one ZKsyncOS CTM"
             );
         }
         ctms_table.insert(label.to_string(), Value::Table(body));
@@ -1006,20 +996,8 @@ fn write_merged_ecosystem_toml(
         stage2.push(gov.stage2_calls);
 
         if let Some(test_calls) = test_calls {
-            if entry.is_zk_sync_os {
-                zksync_os_test_calls = Some(test_calls);
-            } else {
-                era_test_calls = Some(test_calls);
-            }
+            zksync_os_test_calls = Some(test_calls);
         }
-    }
-
-    let has_era_ctm = ctm_entries.iter().any(|entry| !entry.is_zk_sync_os);
-    let has_zkos_ctm = ctm_entries.iter().any(|entry| entry.is_zk_sync_os);
-    if has_era_ctm && has_zkos_ctm && (era_test_calls.is_none() || zksync_os_test_calls.is_none()) {
-        anyhow::bail!(
-            "both Era and ZKOS CTMs are present, but one flavor is missing [test_upgrade_calls]"
-        );
     }
 
     if !extra_stage0.is_empty() {
@@ -1088,44 +1066,24 @@ fn write_merged_ecosystem_toml(
         "governance_calls".into(),
         Value::Table(governance_calls_table),
     );
-    if era_test_calls.is_some() || zksync_os_test_calls.is_some() {
+    if let Some(test_calls) = zksync_os_test_calls {
         let mut test_table = Table::new();
-        if let Some(test_calls) = era_test_calls {
-            test_table.insert(
-                "test_create_chain_era".into(),
-                Value::String(test_calls.test_create_chain),
-            );
-            test_table.insert(
-                "test_create_chain_era_caller".into(),
-                Value::String(test_calls.test_create_chain_caller),
-            );
-            test_table.insert(
-                "test_upgrade_chain_era".into(),
-                Value::String(test_calls.test_upgrade_chain),
-            );
-            test_table.insert(
-                "test_upgrade_chain_era_caller".into(),
-                Value::String(test_calls.test_upgrade_chain_caller),
-            );
-        }
-        if let Some(test_calls) = zksync_os_test_calls {
-            test_table.insert(
-                "test_create_chain_zkos".into(),
-                Value::String(test_calls.test_create_chain),
-            );
-            test_table.insert(
-                "test_create_chain_zkos_caller".into(),
-                Value::String(test_calls.test_create_chain_caller),
-            );
-            test_table.insert(
-                "test_upgrade_chain_zkos".into(),
-                Value::String(test_calls.test_upgrade_chain),
-            );
-            test_table.insert(
-                "test_upgrade_chain_zkos_caller".into(),
-                Value::String(test_calls.test_upgrade_chain_caller),
-            );
-        }
+        test_table.insert(
+            "test_create_chain_zkos".into(),
+            Value::String(test_calls.test_create_chain),
+        );
+        test_table.insert(
+            "test_create_chain_zkos_caller".into(),
+            Value::String(test_calls.test_create_chain_caller),
+        );
+        test_table.insert(
+            "test_upgrade_chain_zkos".into(),
+            Value::String(test_calls.test_upgrade_chain),
+        );
+        test_table.insert(
+            "test_upgrade_chain_zkos_caller".into(),
+            Value::String(test_calls.test_upgrade_chain_caller),
+        );
         doc.insert("test_upgrade_calls".into(), Value::Table(test_table));
     }
     doc.insert("core".into(), Value::Table(core_body));
@@ -1162,11 +1120,11 @@ fn write_merged_ecosystem_toml(
         "# Auto-generated by `protocol-ops ecosystem upgrade-prepare-all`.\n\
          # Merged ecosystem upgrade artifact: top-level [governance_calls] holds\n\
          # the combined stage 0/1/2 hex from {} prepare TOML(s). Optional\n\
-         # [test_upgrade_calls] is copied from per-CTM prepare output under\n\
-         # flavor-suffixed keys (`*_era`, `*_zkos`). [core] mirrors the\n\
-         # core prepare output (minus its own [governance_calls]); [ctms.<flavor>]\n\
-         # mirrors each per-CTM prepare output (one section per `is_zk_sync_os`\n\
-         # value) for downstream verification. [misc] carries shared metadata used\n\
+         # [test_upgrade_calls] is copied from the per-CTM prepare output under\n\
+         # `*_zkos` keys. [core] mirrors the\n\
+         # core prepare output (minus its own [governance_calls]); [ctms.zksync_os]\n\
+         # mirrors the ZKsyncOS CTM prepare output\n\
+         # for downstream verification. [misc] carries shared metadata used\n\
          # by verification. When [new_gateway] is present, it\n\
          # mirrors GatewayVotePreparation's output (deployed GW CTM addresses +\n\
          # diamond cut data) — its `governance_calls_to_execute` has already been\n\
@@ -1224,11 +1182,10 @@ pub(super) fn read_pre_governance_accept_ownership_calls(
 
 /// Read the multi-CTM config TOML and return per-CTM inputs + the
 /// `core_is_zk_sync_os` value to pass to the Core script. If the TOML doesn't
-/// set `core_is_zk_sync_os`, derive it from the CTM entries: prefer `false`
-/// (Era) over `true` when both flavors are present (Era's v31 ABI is a
-/// superset, so a Core deploy targeting Era is also valid for Atlas). The
-/// preference is intentionally order-independent — `[[ctm]]` ordering in the
-/// TOML must not change the resulting Core flavor.
+/// set `core_is_zk_sync_os`, derive it from the CTM entries. This release only
+/// upgrades ZKsyncOS CTMs (Era CTMs are skipped during prepare), so any pinned
+/// flavor is `true`; when no entry pins one, auto-resolution from L1 fills it
+/// in later.
 fn load_ctm_config(path: &Path) -> anyhow::Result<(Vec<CtmInputs>, Option<bool>)> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("Failed to read CTM config TOML: {}", path.display()))?;
@@ -1242,15 +1199,9 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<(Vec<CtmInputs>, Option<bool>)
         );
     }
 
-    let core_is_zk_sync_os = parsed.core_is_zk_sync_os.or_else(|| {
-        if parsed.ctms.iter().any(|c| c.is_zk_sync_os == Some(false)) {
-            Some(false)
-        } else if parsed.ctms.iter().any(|c| c.is_zk_sync_os == Some(true)) {
-            Some(true)
-        } else {
-            None
-        }
-    });
+    let core_is_zk_sync_os = parsed
+        .core_is_zk_sync_os
+        .or_else(|| parsed.ctms.iter().find_map(|c| c.is_zk_sync_os));
 
     let ctms: Vec<CtmInputs> = parsed
         .ctms
