@@ -41,7 +41,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
@@ -869,6 +869,62 @@ contract AdminFunctions is Script, IAdminFunctions {
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
+    /// @notice Sets `priorityTxMaxGasLimit` on deployed chains in one governance batch; all chains
+    ///         must share a CTM owner, since the CTM forwarder is `onlyOwner`.
+    /// @dev The limit also gates the protocol's own 72M L1->L2 txs (upgrade, genesis, Gateway relay,
+    ///      service), so raise it again before upgrading a lowered chain.
+    /// We use explicit `_shouldSend` instead of the standard `--broadcast` to ensure stable output
+    /// for the calldata
+    function setPriorityTxMaxGasLimit(
+        address _bridgehub,
+        uint256[] calldata _chainIds,
+        uint256 _newPriorityTxMaxGasLimit,
+        bool _shouldSend
+    ) public {
+        (address governance, Call[] memory calls) = _buildSetPriorityTxMaxGasLimitCalls(
+            _bridgehub,
+            _chainIds,
+            _newPriorityTxMaxGasLimit
+        );
+
+        saveAndSendGovernanceTx(governance, calls, _shouldSend);
+    }
+
+    /// @dev Resolves the calls without saving or sending, so tests can assert on them directly.
+    function _buildSetPriorityTxMaxGasLimitCalls(
+        address _bridgehub,
+        uint256[] calldata _chainIds,
+        uint256 _newPriorityTxMaxGasLimit
+    ) internal view returns (address governance, Call[] memory calls) {
+        require(_chainIds.length != 0, "No chains provided");
+        // The Admin facet enforces the same bound, but only once governance executes the batch.
+        require(
+            _newPriorityTxMaxGasLimit != 0 && _newPriorityTxMaxGasLimit <= MAX_GAS_PER_TRANSACTION,
+            "Priority tx max gas limit out of range"
+        );
+
+        calls = new Call[](_chainIds.length);
+
+        for (uint256 i = 0; i < _chainIds.length; ++i) {
+            uint256 chainId = _chainIds[i];
+            address ctm = IL1Bridgehub(_bridgehub).chainTypeManager(chainId);
+            require(ctm != address(0), string.concat("Chain is not registered: ", vm.toString(chainId)));
+
+            address ctmOwner = IOwnableSingleStep(ctm).owner();
+            if (i == 0) {
+                governance = ctmOwner;
+            } else {
+                require(ctmOwner == governance, "Chains span multiple CTM owners");
+            }
+
+            calls[i] = Call({
+                target: ctm,
+                value: 0,
+                data: abi.encodeCall(IChainTypeManager.setPriorityTxMaxGasLimit, (chainId, _newPriorityTxMaxGasLimit))
+            });
+        }
+    }
+
     function pauseDepositsBeforeInitiatingMigration(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
@@ -1325,6 +1381,18 @@ contract AdminFunctions is Script, IAdminFunctions {
 
     function saveAndSendAdminTx(address _admin, Call[] memory _calls, bool _shouldSend) internal {
         saveAndSendAdminTx(_admin, address(0), _calls, _shouldSend);
+    }
+
+    /// @notice `saveAndSendAdminTx` for governance-issued calls, which go through
+    ///         `Utils.executeCalls` since governance has no `ChainAdmin.multicall`.
+    /// @dev Saved before sending, because `_shouldSend` only drives a legacy `Governance.sol` owner;
+    ///      for a `ProtocolUpgradeHandler` replay the output with `governanceExecuteCallsDirect`.
+    function saveAndSendGovernanceTx(address _governance, Call[] memory _calls, bool _shouldSend) internal {
+        saveOutput(Output({admin: _governance, encodedData: abi.encode(_calls)}));
+
+        if (_shouldSend && _calls.length > 0) {
+            Utils.executeCalls(_governance, Utils.currentLegacyGovSalt(), 0, _calls);
+        }
     }
 
     function saveAndSendAdminTx(

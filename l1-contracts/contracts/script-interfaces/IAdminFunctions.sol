@@ -137,6 +137,13 @@ interface IAdminFunctions {
         bool shouldSend
     ) external;
 
+    function setPriorityTxMaxGasLimit(
+        address bridgehub,
+        uint256[] calldata chainIds,
+        uint256 newPriorityTxMaxGasLimit,
+        bool shouldSend
+    ) external;
+
     function pauseDepositsBeforeInitiatingMigration(address bridgehub, uint256 chainId, bool shouldSend) external;
 
     function unpauseDeposits(address bridgehub, uint256 chainId, bool shouldSend) external;
