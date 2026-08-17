@@ -26,15 +26,10 @@
         "no-restricted-syntax": [
           "error",
           {
-            "selector": "NewExpression[callee.property.name=/^(JsonRpcProvider|StaticJsonRpcProvider|WebSocketProvider|Web3Provider)$/]",
-            "message": "Construct providers via createProvider() in src/core/utils.ts, which sets the polling interval. Direct construction silently returns to ethers' 4000ms default."
-          },
-          {
-            "selector": "NewExpression[callee.name=/^(JsonRpcProvider|StaticJsonRpcProvider|WebSocketProvider|Web3Provider)$/]",
+            "selector": "NewExpression[callee.name=/^(JsonRpcProvider|StaticJsonRpcProvider|WebSocketProvider|Web3Provider)$/], NewExpression[callee.property.name=/^(JsonRpcProvider|StaticJsonRpcProvider|WebSocketProvider|Web3Provider)$/]",
             "message": "Construct providers via createProvider() in src/core/utils.ts, which sets the polling interval. Direct construction silently returns to ethers' 4000ms default."
           }
         ]
       }
     }
-  ]
-}
+  ]}
