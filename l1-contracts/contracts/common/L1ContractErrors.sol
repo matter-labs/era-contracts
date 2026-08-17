@@ -210,6 +210,8 @@ error InvalidProof();
 error InvalidProofFormat();
 // 0x48c5fa28
 error InvalidProofLengthForFinalNode();
+// 0x6b69c8c7
+error InvalidProofSystemsMask(uint8 mask);
 // 0x5428eae7
 error InvalidProtocolVersion();
 // 0x6f1cf752
@@ -360,6 +362,8 @@ error PriorityOpsRequestTimestampMissing(uint256 requestId);
 error PriorityQueueNotReady();
 // 0x1a4d284a
 error PriorityTxPubdataExceedsMaxPubDataPerBatch();
+// 0x181fd11d
+error ProofSystemDisabled(address chain, uint256 verifierType);
 // 0xa461f651
 error ProtocolIdMismatch(uint256 expectedProtocolVersion, uint256 providedProtocolId);
 // 0x64f94ec2

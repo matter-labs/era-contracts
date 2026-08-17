@@ -7,6 +7,8 @@ import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerif
 import {AirbenderVerifierPlonk} from "contracts/state-transition/verifiers/AirbenderVerifierPlonk.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {ProofSystemDisabled} from "contracts/common/L1ContractErrors.sol";
+import {ALL_PROOF_SYSTEMS} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
 
 import {AirbenderPlonkProofFixture} from "./fixtures/AirbenderPlonkProofFixture.sol";
 
@@ -64,6 +66,12 @@ contract AirbenderPlonkProofIntegrationTest is Test {
     AirbenderVerifierPlonk internal airbenderVerifier;
     EraDualVerifier internal dual;
 
+    /// This contract calls `dual.verify` directly, so the dual verifier treats it as the chain.
+    /// Exposing `getAdmin` lets it authorize itself to opt into Airbender proofs below.
+    function getAdmin() external view returns (address) {
+        return address(this);
+    }
+
     function setUp() public {
         airbenderVerifier = new AirbenderVerifierPlonk();
         dual = new EraDualVerifier(
@@ -71,6 +79,8 @@ contract AirbenderPlonkProofIntegrationTest is Test {
             IVerifier(address(new InertPlonkVerifier())),
             IVerifier(address(airbenderVerifier))
         );
+        // Airbender is off by default; these tests are about the verifier itself, so opt in.
+        dual.setEnabledProofSystems(address(this), ALL_PROOF_SYSTEMS);
     }
 
     /// Sanity-check: the airbender PLONK verifier accepts the real proof when
@@ -83,18 +93,32 @@ contract AirbenderPlonkProofIntegrationTest is Test {
         assertTrue(ok, "AirbenderVerifierPlonk should accept the airbender proof directly");
     }
 
-    /// Routing test: `DualVerifier` should dispatch a proof prefixed with
-    /// verifier-type 2 to the airbender slot, which then accepts the proof.
-    function test_dualVerifier_routesAirbenderProof() public view {
+    /// The fixture proof, prefixed with the airbender verifier-type differentiator.
+    function _airbenderTaggedProof() internal pure returns (uint256[] memory withType) {
         uint256[] memory inner = AirbenderPlonkProofFixture.serializedProof();
-        uint256[] memory withType = new uint256[](inner.length + 1);
+        withType = new uint256[](inner.length + 1);
         withType[0] = AIRBENDER_PLONK_VERIFICATION_TYPE;
         for (uint256 i = 0; i < inner.length; i++) {
             withType[i + 1] = inner[i];
         }
+    }
 
-        bool ok = dual.verify(AirbenderPlonkProofFixture.publicInputs(), withType);
+    /// Routing test: `DualVerifier` should dispatch a proof prefixed with
+    /// verifier-type 2 to the airbender slot, which then accepts the proof.
+    function test_dualVerifier_routesAirbenderProof() public view {
+        bool ok = dual.verify(AirbenderPlonkProofFixture.publicInputs(), _airbenderTaggedProof());
         assertTrue(ok, "DualVerifier should accept airbender-tagged proof");
+    }
+
+    /// The per-chain policy gates on the proof *type*, not on the proof's validity: a chain that
+    /// has not opted into Airbender must be refused even this genuinely valid proof.
+    function test_dualVerifier_rejectsValidAirbenderProofForChainOnDefaultPolicy() public {
+        address chainOnDefaults = makeAddr("chainOnDefaults");
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ProofSystemDisabled.selector, chainOnDefaults, AIRBENDER_PLONK_VERIFICATION_TYPE)
+        );
+        dual.verifyForChain(chainOnDefaults, AirbenderPlonkProofFixture.publicInputs(), _airbenderTaggedProof());
     }
 
     /// The airbender slot's VK hash, surfaced through `DualVerifier`, must

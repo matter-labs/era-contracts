@@ -169,6 +169,57 @@
   },
   {
     "type": "function",
+    "name": "buildSetEnabledProofSystemsCalls",
+    "inputs": [
+      {
+        "name": "_bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_enabledProofSystems",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "chainAdmin",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "calls",
+        "type": "tuple[]",
+        "internalType": "struct Call[]",
+        "components": [
+          {
+            "name": "target",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "chainAdminAcceptAdmin",
     "inputs": [
       {
@@ -871,6 +922,34 @@
         "name": "_refundRecipient",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "_shouldSend",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setEnabledProofSystems",
+    "inputs": [
+      {
+        "name": "_bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_enabledProofSystems",
+        "type": "uint8",
+        "internalType": "uint8"
       },
       {
         "name": "_shouldSend",

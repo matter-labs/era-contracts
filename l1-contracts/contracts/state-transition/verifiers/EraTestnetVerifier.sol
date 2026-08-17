@@ -32,7 +32,29 @@ contract EraTestnetVerifier is IVerifier, IEraDualVerifier {
             return true;
         }
 
-        return DUAL_VERIFIER.verify(_publicInputs, _proof);
+        // Forward `msg.sender` (the chain's diamond) explicitly: calling `DUAL_VERIFIER.verify`
+        // would make this wrapper the chain as far as the proof-system policy is concerned.
+        return DUAL_VERIFIER.verifyForChain(msg.sender, _publicInputs, _proof);
+    }
+
+    /// @inheritdoc IEraDualVerifier
+    /// @dev Keeps the empty-proof skip so a testnet chain's policy cannot make proof-less
+    /// verification start failing.
+    function verifyForChain(
+        address _chain,
+        uint256[] calldata _publicInputs,
+        uint256[] calldata _proof
+    ) external view override returns (bool) {
+        if (_proof.length == 0) {
+            return true;
+        }
+
+        return DUAL_VERIFIER.verifyForChain(_chain, _publicInputs, _proof);
+    }
+
+    /// @inheritdoc IEraDualVerifier
+    function enabledProofSystems(address _chain) external view override returns (uint8) {
+        return DUAL_VERIFIER.enabledProofSystems(_chain);
     }
 
     /// @inheritdoc IVerifier

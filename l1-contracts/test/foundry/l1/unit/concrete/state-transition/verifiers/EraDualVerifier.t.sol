@@ -7,6 +7,7 @@ import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerif
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {EmptyProofLength, UnknownVerifierType} from "contracts/common/L1ContractErrors.sol";
+import {ALL_PROOF_SYSTEMS} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
 
 /// @notice Mock FFLONK verifier for testing.
 contract MockFflonkVerifier is IVerifierV2 {
@@ -64,6 +65,10 @@ contract MockAirbenderPlonkVerifier is IVerifier {
 }
 
 /// @notice Unit tests for EraDualVerifier routing between Boojum FFLONK, Boojum PLONK, and Airbender PLONK verifiers.
+/// @dev These tests call `verify` directly, so this contract plays the part of the chain's diamond
+/// proxy as far as the per-chain proof-system policy is concerned. `setUp` therefore enables every
+/// proof system for itself, keeping these tests focused on routing. The policy itself is covered by
+/// `EraDualVerifierProofSystemPolicy.t.sol`.
 contract EraDualVerifierTest is Test {
     EraDualVerifier internal verifier;
     MockFflonkVerifier internal fflonkVerifier;
@@ -74,6 +79,11 @@ contract EraDualVerifierTest is Test {
     uint256 internal constant PLONK_VERIFICATION_TYPE = 1;
     uint256 internal constant AIRBENDER_PLONK_VERIFICATION_TYPE = 2;
 
+    /// Lets the verifier authorize this contract as the admin of the "chain" it is acting as.
+    function getAdmin() external view returns (address) {
+        return address(this);
+    }
+
     function setUp() public {
         fflonkVerifier = new MockFflonkVerifier();
         plonkVerifier = new MockPlonkVerifier();
@@ -83,6 +93,7 @@ contract EraDualVerifierTest is Test {
             IVerifier(address(plonkVerifier)),
             IVerifier(address(airbenderVerifier))
         );
+        verifier.setEnabledProofSystems(address(this), ALL_PROOF_SYSTEMS);
     }
 
     function _makeProof(uint256 _verifierType) internal pure returns (uint256[] memory proof) {
@@ -127,6 +138,36 @@ contract EraDualVerifierTest is Test {
         assertFalse(verifier.verify(_makePublicInputs(), _makeProof(AIRBENDER_PLONK_VERIFICATION_TYPE)));
         assertTrue(verifier.verify(_makePublicInputs(), _makeProof(FFLONK_VERIFICATION_TYPE)));
         assertTrue(verifier.verify(_makePublicInputs(), _makeProof(PLONK_VERIFICATION_TYPE)));
+    }
+
+    function test_verify_fflonkReturnsFalse() public {
+        fflonkVerifier.setShouldVerify(false);
+        assertFalse(verifier.verify(_makePublicInputs(), _makeProof(FFLONK_VERIFICATION_TYPE)));
+    }
+
+    function test_verify_plonkReturnsFalse() public {
+        plonkVerifier.setShouldVerify(false);
+        assertFalse(verifier.verify(_makePublicInputs(), _makeProof(PLONK_VERIFICATION_TYPE)));
+    }
+
+    /// A proof consisting of nothing but the type differentiator must still route (the extracted
+    /// proof is simply empty).
+    function test_verify_singleElementProofFflonk() public view {
+        uint256[] memory proof = new uint256[](1);
+        proof[0] = FFLONK_VERIFICATION_TYPE;
+        assertTrue(verifier.verify(_makePublicInputs(), proof));
+    }
+
+    function test_verify_singleElementProofPlonk() public view {
+        uint256[] memory proof = new uint256[](1);
+        proof[0] = PLONK_VERIFICATION_TYPE;
+        assertTrue(verifier.verify(_makePublicInputs(), proof));
+    }
+
+    function test_verify_singleElementProofAirbenderPlonk() public view {
+        uint256[] memory proof = new uint256[](1);
+        proof[0] = AIRBENDER_PLONK_VERIFICATION_TYPE;
+        assertTrue(verifier.verify(_makePublicInputs(), proof));
     }
 
     function test_verify_revertsOnEmptyProof() public {
@@ -186,5 +227,32 @@ contract EraDualVerifierTest is Test {
 
         vm.expectRevert(UnknownVerifierType.selector);
         verifier.verificationKeyHash(verifierType);
+    }
+
+    /// The router must not care what the proof payload after the type differentiator looks like.
+    function testFuzz_verify_fflonkWithArbitraryProof(uint256[] memory proofData) public view {
+        vm.assume(proofData.length > 0);
+        assertTrue(verifier.verify(_makePublicInputs(), _prefixType(FFLONK_VERIFICATION_TYPE, proofData)));
+    }
+
+    function testFuzz_verify_plonkWithArbitraryProof(uint256[] memory proofData) public view {
+        vm.assume(proofData.length > 0);
+        assertTrue(verifier.verify(_makePublicInputs(), _prefixType(PLONK_VERIFICATION_TYPE, proofData)));
+    }
+
+    function testFuzz_verify_airbenderPlonkWithArbitraryProof(uint256[] memory proofData) public view {
+        vm.assume(proofData.length > 0);
+        assertTrue(verifier.verify(_makePublicInputs(), _prefixType(AIRBENDER_PLONK_VERIFICATION_TYPE, proofData)));
+    }
+
+    function _prefixType(
+        uint256 _verifierType,
+        uint256[] memory _proofData
+    ) internal pure returns (uint256[] memory proof) {
+        proof = new uint256[](_proofData.length + 1);
+        proof[0] = _verifierType;
+        for (uint256 i = 0; i < _proofData.length; ++i) {
+            proof[i + 1] = _proofData[i];
+        }
     }
 }

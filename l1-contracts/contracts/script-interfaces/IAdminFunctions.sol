@@ -137,6 +137,15 @@ interface IAdminFunctions {
         bool shouldSend
     ) external;
 
+    /// @notice Set which proof systems a chain accepts on its dual verifier.
+    ///         ChainAdmin action. Mask: 1 = Boojum, 2 = Airbender, 3 = both; 0 is rejected.
+    function setEnabledProofSystems(
+        address bridgehub,
+        uint256 chainId,
+        uint8 enabledProofSystems,
+        bool shouldSend
+    ) external;
+
     function pauseDepositsBeforeInitiatingMigration(address bridgehub, uint256 chainId, bool shouldSend) external;
 
     function unpauseDeposits(address bridgehub, uint256 chainId, bool shouldSend) external;

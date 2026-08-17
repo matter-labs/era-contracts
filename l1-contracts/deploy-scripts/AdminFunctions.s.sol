@@ -31,6 +31,9 @@ import {ValidatorTimelock} from "contracts/state-transition/validators/Validator
 import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
+import {ALL_PROOF_SYSTEMS} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
+import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
+import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
@@ -867,6 +870,73 @@ contract AdminFunctions is Script, IAdminFunctions {
         });
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
+    /// @notice Generate the ChainAdmin calldata that sets which proof systems a chain accepts.
+    /// @dev The policy lives on the chain's `EraDualVerifier`, keyed by the chain's diamond proxy and
+    ///      authorized against that chain's admin — so this is a ChainAdmin action needing no
+    ///      ecosystem involvement.
+    ///
+    ///      We use explicit `_shouldSend` instead of the standard `--broadcast` to ensure stable
+    ///      output for the calldata.
+    /// @param _bridgehub The L1 bridgehub used to resolve the chain.
+    /// @param _chainId The chain to configure.
+    /// @param _enabledProofSystems Bit mask: 1 = Boojum (FFLONK and PLONK), 2 = Airbender, 3 = both.
+    /// @param _shouldSend Whether to execute the call immediately or only save the calldata.
+    function setEnabledProofSystems(
+        address _bridgehub,
+        uint256 _chainId,
+        uint8 _enabledProofSystems,
+        bool _shouldSend
+    ) public {
+        (address chainAdmin, Call[] memory calls) = buildSetEnabledProofSystemsCalls(
+            _bridgehub,
+            _chainId,
+            _enabledProofSystems
+        );
+
+        saveAndSendAdminTx(chainAdmin, calls, _shouldSend);
+    }
+
+    /// @notice Resolve the call `setEnabledProofSystems` will emit, without saving or sending it.
+    /// @dev Split out from the entrypoint so the emitted calldata can be asserted on directly.
+    /// @return chainAdmin The chain admin that must issue the call.
+    /// @return calls The single `setEnabledProofSystems` call, aimed at the chain's dual verifier.
+    function buildSetEnabledProofSystemsCalls(
+        address _bridgehub,
+        uint256 _chainId,
+        uint8 _enabledProofSystems
+    ) public view returns (address chainAdmin, Call[] memory calls) {
+        // Mirrors the verifier's own validation so governance never signs calldata that must revert.
+        require(
+            _enabledProofSystems != 0 && _enabledProofSystems <= ALL_PROOF_SYSTEMS,
+            "setEnabledProofSystems: mask must be non-zero and at most 3"
+        );
+
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+        chainAdmin = chainInfo.admin;
+
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: _resolveDualVerifier(IGetters(chainInfo.diamondProxy).getVerifier()),
+            value: 0,
+            data: abi.encodeCall(EraDualVerifier.setEnabledProofSystems, (chainInfo.diamondProxy, _enabledProofSystems))
+        });
+    }
+
+    /// @notice Resolve the contract that actually holds the proof-system policy.
+    /// @dev `EraTestnetVerifier` wraps an inner `EraDualVerifier` and cannot forward the setter (the
+    ///      inner verifier authorizes on `msg.sender`, which would be the wrapper). Unwrap it so the
+    ///      call lands where the policy is stored. Detected the same way the upgrade scripts do it.
+    function _resolveDualVerifier(address _verifier) private view returns (address) {
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool isTestnetVerifier, bytes memory data) = _verifier.staticcall(
+            abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
+        );
+        if (isTestnetVerifier && data.length == 32 && abi.decode(data, (bool))) {
+            return address(EraTestnetVerifier(_verifier).DUAL_VERIFIER());
+        }
+        return _verifier;
     }
 
     function pauseDepositsBeforeInitiatingMigration(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
