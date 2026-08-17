@@ -153,9 +153,7 @@ jobs:
       # could equally have made a *test* pass, and every PR run of these suites read a warm cache —
       # so they are re-run here against artifacts nothing was allowed to warm.
       #
-      # Excluded on purpose: `yarn sc test` needs an anvil-zksync service, and the anvil-interop
-      # suite needs Anvil plus committed chain states, whose own determinism gate
-      # (state-generation-check) already rebuilds from scratch on every PR.
+      # Excluded on purpose: `yarn sc test`, which needs an anvil-zksync service.
       - name: Run l1 foundry tests
         working-directory: l1-contracts
         run: yarn test:foundry
@@ -170,6 +168,34 @@ jobs:
       - name: Run l1 zkfoundry tests
         working-directory: l1-contracts
         run: yarn test:zkfoundry
+
+      # The interop suite needs plain Anvil, which foundry-zksync does not provide. Installed here
+      # rather than up top so it cannot shadow forge for the builds above; the specs load committed
+      # chain states, so they need no forge of their own.
+      - name: Install Foundry (for Anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Build anvil-interop dev artifacts
+        run: yarn l1 build:anvil-interop-dev-artifacts
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      - name: Run anvil interop tests
+        working-directory: l1-contracts/test/anvil-interop
+        env:
+          # Each worker runs 6 Anvil chains plus a hardhat process; more than four oversubscribes the
+          # runner and produces load-dependent RPC flakes.
+          ANVIL_INTEROP_MAX_PARALLEL_WORKERS: "4"
+        run: yarn ts-node run-hardhat-interop-test.ts
+
+      - name: Cleanup Anvil
+        if: always()
+        working-directory: l1-contracts/test/anvil-interop
+        run: bash cleanup.sh
 
       # Only reached when the clean build agrees with everything committed *and* the suites pass on
       # it, so these artifacts are the trustworthy ones to hand to PRs branching from here.
