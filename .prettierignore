@@ -1,10 +1,6 @@
 tools/verifier-gen/data
-l1-contracts/contracts/state-transition/verifiers/EraVerifierPlonk.sol
-l1-contracts/contracts/state-transition/verifiers/EraVerifierFflonk.sol
 l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
-l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol
 l1-contracts/lib
-l1-contracts-foundry/lib
 lib
 node_modules/
 system-contracts/contracts/Constants.sol
@@ -13,10 +9,7 @@ l1-contracts/cache-forge
 l1-contracts/artifacts
 l1-contracts/artifacts-forge
 l1-contracts/out
-l1-contracts/zkout
 l1-contracts/zkstack-out
-l2-contracts/zkout
-system-contracts/zkout
 configs/*
 # Plain-text RPC URL list (one per line) consumed by the anvil-interop harness.
 # Prettier tries to parse it as JSON because of the .json extension and chokes

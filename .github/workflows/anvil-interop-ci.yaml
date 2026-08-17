@@ -16,8 +16,6 @@ on:
       - "l1-contracts/hardhat.config.ts"
       - "l1-contracts/package.json"
       - "system-contracts/contracts/Constants.sol"
-      - "system-contracts/hardhat.config.ts"
-      - "system-contracts/package.json"
       - "da-contracts/contracts/**"
       - "da-contracts/lib/**"
       - "da-contracts/test/**"

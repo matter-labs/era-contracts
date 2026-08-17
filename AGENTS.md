@@ -267,7 +267,7 @@ ANVIL_INTEROP_FRESH_DEPLOY=1 yarn test:hardhat:interop
 ANVIL_INTEROP_KEEP_CHAINS=1 yarn test:hardhat:interop
 ```
 
-After modifying mock system contracts (e.g., `MockL2ToL1Messenger`, `MockMintBaseTokenHook`), regenerate chain states:
+After modifying mock system contracts (e.g., `MockL1MessengerHook`, `MockMintBaseTokenHook`), regenerate chain states:
 
 ```bash
 cd l1-contracts
@@ -289,7 +289,7 @@ npx ts-node setup-and-dump-state.ts
    ```bash
    cd l1-contracts
    forge build
-   yarn copy-to-zkstack-out.ts
+   yarn copy-to-zkstack-out
    cd ..
    yarn prettier:fix  # Required to add trailing newlines to JSON files
    ```

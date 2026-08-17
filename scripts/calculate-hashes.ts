@@ -9,7 +9,7 @@ const SOLIDITY_SOURCE_CODE_PATHS = ["l1-contracts/", "da-contracts/"];
 const OUTPUT_FILE_PATH = "AllContractsHashes.json";
 
 const SKIPPED_FOLDERS = ["l1-contracts/deploy-scripts", "l1-contracts/test", "l1-contracts/contracts/dev-contracts"];
-const FORCE_INCLUDE = ["Create2AndTransfer.sol", "L1MessageRootStageSepolia.sol"];
+const FORCE_INCLUDE = ["Create2AndTransfer.sol"];
 
 // Opens a Solidity file and returns all the contracts/libraries created inside of it.
 function parseSolFile(filePath: string): string[] {
@@ -38,7 +38,6 @@ function getCanonicalPathsFromFile(directory: string, fileName: string, fullPath
 
   for (const item of parsed) {
     res.push(`/${folderName}out/${fileName}/${item}.json`);
-    res.push(`/${folderName}zkout/${fileName}/${item}.json`);
   }
 
   return res;

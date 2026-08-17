@@ -68,7 +68,7 @@ on:
         type: boolean
         default: false
       skip_priority_txs:
-        description: "Skip L2 deployments via priority transactions"
+        description: "Deprecated no-op, kept for CLI compatibility (ZKsync OS chains never deploy L2 contracts via priority transactions)"
         required: false
         type: boolean
         default: false
