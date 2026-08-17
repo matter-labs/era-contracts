@@ -25,7 +25,9 @@ export function createSuite(name: string): { test: (title: string, fn: () => voi
         }
       }
       console.log(`\n${cases.length - failed}/${cases.length} ${name} tests passed`);
-      if (failed > 0) process.exit(1);
+      // exitCode rather than exit(): `process.exit` here skipped whatever the suite does after
+      // run(), which lost lcov-merge's temp-directory cleanup on exactly the runs that fail.
+      if (failed > 0) process.exitCode = 1;
     },
   };
 }

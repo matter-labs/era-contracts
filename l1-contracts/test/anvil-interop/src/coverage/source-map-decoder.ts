@@ -40,7 +40,6 @@ export type SourceIdMap = Record<string, string>;
  */
 export interface BuildInfo {
   file: string;
-  mtimeMs: number;
   sourceIdMap: SourceIdMap;
 }
 
@@ -61,13 +60,11 @@ export function loadBuildInfos(outDir: string): BuildInfo[] {
     throw new Error(`No build-info JSON files found in ${buildInfoDir}`);
   }
 
-  return files
-    .map((file) => {
-      const full = path.join(buildInfoDir, file);
-      const parsed = JSON.parse(fs.readFileSync(full, "utf-8"));
-      return { file, mtimeMs: fs.statSync(full).mtimeMs, sourceIdMap: parsed.source_id_to_path || {} };
-    })
-    .sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return files.map((file) => {
+    const full = path.join(buildInfoDir, file);
+    const parsed = JSON.parse(fs.readFileSync(full, "utf-8"));
+    return { file, sourceIdMap: parsed.source_id_to_path || {} };
+  });
 }
 
 /**

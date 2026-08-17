@@ -14,6 +14,9 @@
 import * as fs from "fs";
 import * as path from "path";
 
+/** LCOV `TN:` record; matches what lcov-generator.ts emits so both reports read alike. */
+const TEST_NAME = "anvil_interop";
+
 interface FileRecord {
   /** line number -> max hit count across shards */
   lines: Map<number, number>;
@@ -132,26 +135,20 @@ function serialize(files: Map<string, FileRecord>, testName: string): { content:
  * Missing paths are skipped (a shard that produced no report is reported by the
  * caller, which fails the run on a non-zero worker exit before we get here).
  */
-export function mergeLcovFiles(
-  inputPaths: string[],
-  outputPath: string,
-  testName = "anvil_interop"
-): { stats: MergeStats; mergedPaths: string[] } {
+export function mergeLcovFiles(inputPaths: string[], outputPath: string): { stats: MergeStats } {
   const files = new Map<string, FileRecord>();
-  const mergedPaths: string[] = [];
 
   for (const inputPath of inputPaths) {
     if (!fs.existsSync(inputPath)) continue;
     parseInto(fs.readFileSync(inputPath, "utf-8"), files);
-    mergedPaths.push(inputPath);
   }
 
-  const { content, stats } = serialize(files, testName);
+  const { content, stats } = serialize(files, TEST_NAME);
 
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, content);
 
-  return { stats, mergedPaths };
+  return { stats };
 }
 
 /**

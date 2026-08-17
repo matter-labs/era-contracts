@@ -173,14 +173,13 @@ test("does not sum function hit counts, and defaults undeclared hits to zero", (
 
 // The parent fails the run on a non-zero worker exit and on a missing shard report, so
 // mergeLcovFiles only has to skip absent paths rather than invent data for them.
-test("skips missing shard reports and reports which paths were merged", () => {
+test("skips missing shard reports rather than failing the merge", () => {
   const a = writeShard("present", ["SF:contracts/A.sol", "DA:1,1", "end_of_record", ""].join("\n"));
   const missing = path.join(tmpRoot, "absent", "anvil-lcov.info");
 
   const out = path.join(tmpRoot, "merged-missing.info");
-  const { stats, mergedPaths } = mergeLcovFiles([a, missing], out);
+  const { stats } = mergeLcovFiles([a, missing], out);
 
-  assert.deepEqual(mergedPaths, [a]);
   assert.equal(stats.files, 1);
   assert.equal(stats.linesHit, 1);
 });
@@ -222,9 +221,8 @@ test("summary reports shard count and percentages", () => {
 
 test("empty input produces an empty report rather than throwing", () => {
   const out = path.join(tmpRoot, "merged-empty.info");
-  const { stats, mergedPaths } = mergeLcovFiles([], out);
+  const { stats } = mergeLcovFiles([], out);
 
-  assert.deepEqual(mergedPaths, []);
   assert.equal(stats.files, 0);
   assert.equal(fs.readFileSync(out, "utf-8").trim(), "");
 });

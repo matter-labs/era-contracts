@@ -15,7 +15,6 @@ import {
   applyPortOffset,
   shouldShardRun,
   assertDisjointPortRange,
-  portRangeFor,
   resolvePortOffset,
   runScope,
   shardCoverageDir,
@@ -119,14 +118,10 @@ test("rejects a base offset that would overlap another run", () => {
   }
 });
 
-test("accepts bases a whole span apart, and their ranges do not intersect", () => {
+test("accepts bases a whole span apart", () => {
   for (const base of [0, 1000, 2000]) {
     assert.doesNotThrow(() => assertDisjointPortRange(base, 10));
   }
-  const first = portRangeFor(0, 10);
-  const second = portRangeFor(1000, 10);
-  assert.equal(first.end, 1000);
-  assert.ok(first.end <= second.start, `${JSON.stringify(first)} overlaps ${JSON.stringify(second)}`);
 });
 
 test("rejects a shard count that would outgrow its reserved range", () => {

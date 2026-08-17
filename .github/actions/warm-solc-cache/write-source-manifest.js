@@ -17,11 +17,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { execFileSync } = require("child_process");
-
-function git(args) {
-  return execFileSync("git", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-}
+const { readGitState } = require("./git-source-state");
 
 const outputPath = process.argv[2];
 if (!outputPath) {
@@ -29,47 +25,15 @@ if (!outputPath) {
   process.exit(1);
 }
 
-// `git ls-files -sz` prints: <mode> <object> <stage>\t<path>\0
-//
-// -z is load-bearing: without it git quotes non-ASCII paths, so `contracts/Ünicode.sol` arrives as
-// `"contracts/\303\234nicode.sol"` — a key matching nothing on disk that does not even end in
-// `.sol`, making such a file invisible to drift detection.
-const entries = git(["ls-files", "-sz"])
-  .split("\0")
-  .filter(Boolean)
-  .map((record) => {
-    const [meta, filePath] = record.split("\t");
-    const [mode, object] = meta.split(/\s+/);
-    return { mode, object, filePath };
-  });
+const { sources, submodules, configInputs } = readGitState();
 
-const sources = entries.filter((e) => e.mode !== "160000" && e.filePath.endsWith(".sol"));
-const submodules = entries.filter((e) => e.mode === "160000");
-
-/** Inputs that change what solc compiles without any tracked .sol changing. */
-const CONFIG_INPUT_PATTERNS = [
-  /^yarn\.lock$/,
-  /(^|\/)foundry\.toml$/,
-  /(^|\/)remappings\.txt$/,
-  /(^|\/)package\.json$/,
-];
-const configInputs = entries.filter(
-  (e) => e.mode !== "160000" && CONFIG_INPUT_PATTERNS.some((pattern) => pattern.test(e.filePath))
-);
-
-const manifest = {
-  version: 1,
-  // blob hash per tracked Solidity source
-  sources: Object.fromEntries(sources.map((e) => [e.filePath, e.object])),
-  // gitlink SHA per submodule; a change here invalidates the whole cache
-  submodules: Object.fromEntries(submodules.map((e) => [e.filePath, e.object])),
-  // lock and config inputs; a change here also invalidates the whole cache
-  configInputs: Object.fromEntries(configInputs.map((e) => [e.filePath, e.object])),
-};
+// A change to a submodule pin or a config input invalidates the whole cache; a changed source
+// invalidates only its own artifacts.
+const manifest = { version: 1, sources, submodules, configInputs };
 
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 fs.writeFileSync(outputPath, JSON.stringify(manifest));
 console.log(
-  `Recorded ${sources.length} Solidity sources, ${submodules.length} submodule pins and ` +
-    `${configInputs.length} lock/config inputs in ${outputPath}`
+  `Recorded ${Object.keys(sources).length} Solidity sources, ${Object.keys(submodules).length} ` +
+    `submodule pins and ${Object.keys(configInputs).length} lock/config inputs in ${outputPath}`
 );

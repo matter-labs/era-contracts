@@ -37,6 +37,7 @@ import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { collectCoverage } from "./src/coverage/coverage-runner";
 import { assertMergedCoverageUsable, formatMergeSummary, mergeLcovFiles } from "./src/coverage/lcov-merge";
+import { discoverSpecs } from "./plan-coverage-groups";
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");
@@ -70,11 +71,6 @@ const PORT_OFFSET_PER_WORKER = 100;
  */
 const RUN_PORT_SPAN = 1000;
 const MAX_SHARDS_PER_RUN = RUN_PORT_SPAN / PORT_OFFSET_PER_WORKER;
-
-/** The port-offset range [start, end) a run occupies. */
-export function portRangeFor(basePortOffset: number, shardCount: number): { start: number; end: number } {
-  return { start: basePortOffset, end: basePortOffset + shardCount * PORT_OFFSET_PER_WORKER };
-}
 
 /** Throws unless a run at this base cannot overlap a run at any other permitted base. */
 export function assertDisjointPortRange(basePortOffset: number, shardCount: number): void {
@@ -188,13 +184,11 @@ function parseRequestedSpecs(argv: string[]): string[] {
   return specArgs;
 }
 
+// Through discoverSpecs, not a second copy of the glob: merge-shard-lcov.ts checks what ran against
+// that function's output, so a divergent definition here would make the completeness guard compare
+// two different spec sets. It also applies the name check to the side that decides what runs.
 function discoverSpecFiles(): string[] {
-  const specDir = path.join(anvilInteropDir, "test/hardhat");
-  return fs
-    .readdirSync(specDir)
-    .filter((f) => /^\d+-.*\.spec\.ts$/.test(f))
-    .sort()
-    .map((f) => `test/anvil-interop/test/hardhat/${f}`);
+  return discoverSpecs(path.join(anvilInteropDir, "test/hardhat")).map((f) => `test/anvil-interop/test/hardhat/${f}`);
 }
 
 function readLogTail(logPath: string, maxLines = 120): string {

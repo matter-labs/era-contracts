@@ -31,52 +31,12 @@
 
 const fs = require("fs");
 const path = require("path");
+// The manifest's input definition lives in one module so this comparison cannot drift from what
+// write-source-manifest.js recorded — see git-source-state.js for why that drift is silent.
+const { readGitState } = require("./git-source-state");
 
 /** Forge's incremental-compilation bookkeeping, relative to a project directory. */
 const FRESHNESS_CACHE = path.join("cache-forge", "solidity-files-cache.json");
-
-const { execFileSync } = require("child_process");
-
-/**
- * Current blob hashes for tracked sources and submodule pins, in the manifest's shape.
- *
- * -z for the same reason write-source-manifest.js uses it: git quotes non-ASCII paths, and a quoted
- * key matches nothing on disk, so drift in such a file would be invisible here too. Both sides must
- * agree, and both must agree with the filesystem.
- */
-function currentGitState() {
-  const out = execFileSync("git", ["ls-files", "-sz"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-  const sources = {};
-  const submodules = {};
-  const blobs = {};
-  for (const record of out.split("\0")) {
-    if (!record) continue;
-    const [meta, filePath] = record.split("\t");
-    const [mode, object] = meta.split(/\s+/);
-    if (mode === "160000") submodules[filePath] = object;
-    else {
-      blobs[filePath] = object;
-      if (filePath.endsWith(".sol")) sources[filePath] = object;
-    }
-  }
-  return { sources, submodules, blobs };
-}
-
-/** Must match write-source-manifest.js, so an added config input is noticed here too. */
-const CONFIG_INPUT_PATTERNS = [
-  /^yarn\.lock$/,
-  /(^|\/)foundry\.toml$/,
-  /(^|\/)remappings\.txt$/,
-  /(^|\/)package\.json$/,
-];
-
-function currentConfigInputs(blobs) {
-  const inputs = {};
-  for (const [filePath, object] of Object.entries(blobs)) {
-    if (CONFIG_INPUT_PATTERNS.some((pattern) => pattern.test(filePath))) inputs[filePath] = object;
-  }
-  return inputs;
-}
 
 /**
  * Describes the first key that differs between two maps — added, removed or changed — or null when
@@ -92,16 +52,15 @@ function firstDifference(recorded, current, label = "") {
   return null;
 }
 
-/** Manifest versions this reader understands; anything else is not trusted. */
-const SUPPORTED_MANIFEST_VERSIONS = new Set([1]);
+/** The only shape this reader understands; write-source-manifest.js emits it. */
+const MANIFEST_VERSION = 1;
 
 const isPlainObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** Describes what is wrong with a manifest, or null when it is usable. */
 function validateManifest(manifest) {
   if (!isPlainObject(manifest)) return "is not an object";
-  if (!SUPPORTED_MANIFEST_VERSIONS.has(manifest.version))
-    return `has unsupported version ${JSON.stringify(manifest.version)}`;
+  if (manifest.version !== MANIFEST_VERSION) return `has unsupported version ${JSON.stringify(manifest.version)}`;
   for (const field of ["sources", "submodules"]) {
     if (!isPlainObject(manifest[field])) return `has no usable "${field}" map`;
   }
@@ -140,11 +99,11 @@ function staleSources(manifestPath) {
     return { changed: new Set(), invalidateAll: true };
   }
 
-  const current = currentGitState();
+  const current = readGitState();
 
   // Dependency resolution and foundry config change what solc compiles without any tracked .sol
   // changing. Compared in both directions, so an *added* config file counts as drift too.
-  const configDrift = firstDifference(manifest.configInputs || {}, currentConfigInputs(current.blobs));
+  const configDrift = firstDifference(manifest.configInputs || {}, current.configInputs);
   if (configDrift) {
     console.log(`  ${configDrift} since the cache was built — invalidating all artifacts`);
     return { changed: new Set(), invalidateAll: true };

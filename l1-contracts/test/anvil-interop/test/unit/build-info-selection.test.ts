@@ -23,15 +23,13 @@ const { test, run } = createSuite("build-info-selection");
 // Two compilations of an overlapping source set, numbered independently — the real situation.
 const newer: BuildInfo = {
   file: "newer.json",
-  mtimeMs: 2000,
   sourceIdMap: { "0": "contracts/A.sol", "1": "contracts/B.sol", "2": "test/T.t.sol" },
 };
 const older: BuildInfo = {
   file: "older.json",
-  mtimeMs: 1000,
   sourceIdMap: { "0": "contracts/B.sol", "1": "contracts/A.sol" },
 };
-const buildInfos = [newer, older]; // newest first, as loadBuildInfos returns them
+const buildInfos = [newer, older]; // order is irrelevant: lookup is by exact build id
 
 // Forge's own linkage, which is exact. The heuristic this replaced — find the build-info whose map
 // sends the artifact's source id to its compilation target — was unsound: a build-info saying

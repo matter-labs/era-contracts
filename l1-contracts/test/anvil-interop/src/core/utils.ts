@@ -33,7 +33,8 @@ import { getAbi } from "./contracts";
 export const LOCAL_POLLING_INTERVAL_MS = 100;
 export const REMOTE_POLLING_INTERVAL_MS = 4000;
 
-const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"]);
+// URL.hostname yields the bracketed form for IPv6, so "[::1]" is the only spelling reachable here.
+const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "0.0.0.0", "[::1]"]);
 
 /** True for an RPC served from this machine, where fast polling costs nothing but CPU. */
 export function isLocalRpcUrl(rpcUrl: string): boolean {
