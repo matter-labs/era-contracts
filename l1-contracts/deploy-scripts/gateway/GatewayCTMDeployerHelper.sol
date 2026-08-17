@@ -27,7 +27,6 @@ import {
 
 import {Utils} from "../utils/Utils.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
 
 import {Facets, Verifiers} from "contracts/common/StateTransitionTypes.sol";
@@ -98,7 +97,7 @@ struct CalculateAddressesIntermediate {
     Verifiers verifiersResult;
 }
 
-/// @notice Result of preparing an L1->L2 deployment (CREATE2 via Era or ZKsyncOS factory).
+/// @notice Result of preparing an L1->L2 deployment (CREATE2 via the ZKsyncOS deterministic factory).
 struct L1L2DeployPrepareResult {
     address expectedAddress;
     bytes data;
@@ -129,7 +128,6 @@ library GatewayCTMDeployerHelper {
         )
     {
         // Use Arachnid deterministic CREATE2 by default (GW path),
-        // unless the env override switches to EraVM factory mode.
         create2FactoryAddress = Utils.DETERMINISTIC_CREATE2_ADDRESS;
         (contracts, deployerCalldata, deployers, directCalldata) = _calculateAddressesInner(_create2Salt, config);
     }

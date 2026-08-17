@@ -36,7 +36,6 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
-import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";

@@ -180,14 +180,14 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         // Deploy ValidatorTimelock (implementation + proxy)
         runGatewayL1L2Transaction(create2FactoryAddress, deployerCalldata.validatorTimelockCalldata);
 
-        // Deploy Verifiers (Era or ZKsyncOS verifiers based on config)
+        // Deploy the ZKsyncOS verifiers
         runGatewayL1L2Transaction(create2FactoryAddress, deployerCalldata.verifiersCalldata);
 
         // Deploy direct contracts (AdminFacet, MailboxFacet, ExecutorFacet, GettersFacet,
         // DiamondInit, L1GenesisUpgrade, Multicall3)
         _deployDirectContracts(directCalldata, create2FactoryAddress);
 
-        // Deploy CTM and ServerNotifier (Era or ZKsyncOS CTM based on config)
+        // Deploy the ZKsyncOS CTM and ServerNotifier
         runGatewayL1L2Transaction(create2FactoryAddress, deployerCalldata.ctmCalldata);
 
         _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);

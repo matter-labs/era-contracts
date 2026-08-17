@@ -8,7 +8,6 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {Utils} from "../../utils/Utils.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
@@ -89,7 +88,6 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
         // Deploy new ChainTypeManager implementation
         // The constructor will receive the new BytecodesSupplier and PermissionlessValidator proxy addresses.
-        // Select the correct ChainTypeManager based on chain type (Era vs ZKsyncOS)
         // FIXME we never actually use deploySimpleContract or deploy TUPP with anything else than false. We need to clean this code.
         (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
         console.log("Deploying ChainTypeManager:", ctmContractName);

@@ -12,7 +12,6 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
@@ -189,11 +188,6 @@ contract DeployL1CoreUtils is DeployUtils {
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         require(!isZKBytecode, "EraVM (ZK) bytecodes are not supported");
-        // L1Nullifier has a config-dependent implementation swap
-        if (compareStrings(contractName, "L1Nullifier")) {
-            string memory resolved = "L1Nullifier";
-            return ContractsBytecodesLib.getCreationCodeEVM(resolved);
-        }
         return ContractsBytecodesLib.getCreationCodeEVM(contractName);
     }
 

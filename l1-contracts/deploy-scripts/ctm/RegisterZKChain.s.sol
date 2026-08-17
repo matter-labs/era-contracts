@@ -20,8 +20,7 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {ADDRESS_ONE, Utils} from "../utils/Utils.sol";
-import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
+import {ADDRESS_ONE} from "../utils/Utils.sol";
 import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
@@ -54,15 +53,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         return tx.origin;
     }
 
-    struct LegacySharedBridgeParams {
-        bytes implementationConstructorParams;
-        address implementationAddress;
-        bytes proxyConstructorParams;
-        address proxyAddress;
-    }
-
-    LegacySharedBridgeParams internal legacySharedBridgeParams;
-
     CTMDeployedAddresses internal ctmAddresses;
     CoreDeployedAddresses internal coreAddresses;
 
@@ -91,7 +81,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         string memory path = string.concat(root, inputPath);
         initializeConfig(path, _chainTypeManagerProxy, _chainChainId);
         loadChainCreationData(_chainTypeManagerProxy);
-        // TODO: some chains may not want to have a legacy shared bridge
         runInner(outputPath);
     }
 
@@ -502,9 +491,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
     function saveOutput(string memory outputPath) internal {
         vm.serializeAddress("root", "diamond_proxy_addr", output.diamondProxy);
         vm.serializeAddress("root", "chain_admin_addr", output.chainAdmin);
-        if (output.l2LegacySharedBridge != address(0)) {
-            vm.serializeAddress("root", "l2_legacy_shared_bridge_addr", output.l2LegacySharedBridge);
-        }
         vm.serializeAddress("root", "access_control_restriction_addr", output.accessControlRestrictionAddress);
         vm.serializeAddress("root", "chain_proxy_admin_addr", output.chainProxyAdmin);
 

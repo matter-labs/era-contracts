@@ -5,15 +5,11 @@ import {console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../utils/Utils.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {
-    L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
-    L2_BRIDGEHUB_ADDR,
-    L2_CHAIN_ASSET_HANDLER_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_INTEROP_ROOT_STORAGE,
-    L2_MESSAGE_ROOT_ADDR,
     L2_MESSAGE_VERIFICATION,
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
@@ -22,12 +18,9 @@ import {
     L2_REMOVED_GW_ASSET_TRACKER_ADDR,
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {CoreContract, ZkSyncOsSystemContract, ZKsyncOSUpgradeType} from "../ecosystem/CoreContract.sol";
+import {CoreContract, ZkSyncOsSystemContract} from "../ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 import {DeduplicateBytecodesCountMismatch} from "../ecosystem/DeployScriptErrors.sol";
 
@@ -135,28 +128,6 @@ library SystemContractsProcessing {
         ids[0] = ZkSyncOsSystemContract.L2BaseToken;
         ids[1] = ZkSyncOsSystemContract.L1Messenger;
         ids[2] = ZkSyncOsSystemContract.SystemContext;
-    }
-
-    function forceDeploymentsToHashes(
-        IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments
-    ) internal pure returns (bytes32[] memory hashes) {
-        hashes = new bytes32[](baseForceDeployments.length);
-        for (uint256 i = 0; i < baseForceDeployments.length; i++) {
-            hashes[i] = baseForceDeployments[i].bytecodeHash;
-        }
-    }
-
-    function mergeForceDeployments(
-        IL2ContractDeployer.ForceDeployment[] memory left,
-        IL2ContractDeployer.ForceDeployment[] memory right
-    ) internal pure returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
-        forceDeployments = new IL2ContractDeployer.ForceDeployment[](left.length + right.length);
-        for (uint256 i = 0; i < left.length; i++) {
-            forceDeployments[i] = left[i];
-        }
-        for (uint256 i = 0; i < right.length; i++) {
-            forceDeployments[left.length + i] = right[i];
-        }
     }
 
     function mergeBytesArrays(bytes[] memory left, bytes[] memory right) internal pure returns (bytes[] memory result) {

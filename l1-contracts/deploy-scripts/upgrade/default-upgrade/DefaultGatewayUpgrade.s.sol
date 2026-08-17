@@ -30,7 +30,6 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 
-import {ContractsBytecodesLib} from "../../utils/bytecode/ContractsBytecodesLib.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
@@ -583,15 +582,12 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        require(isZKBytecode, "Only ZK bytecodes are supported in Gateway upgrade");
-        if (compareStrings(contractName, "DefaultUpgrade")) {
-            return BytecodeUtils.readBytecodeL1(false, "DefaultUpgrade.sol", "DefaultUpgrade");
-        } else if (compareStrings(contractName, "BytecodesSupplier")) {
-            return BytecodeUtils.readBytecodeL1(false, "BytecodesSupplier.sol", "BytecodesSupplier");
-        } else if (compareStrings(contractName, "TransitionaryOwner")) {
-            return BytecodeUtils.readBytecodeL1(false, "TransitionaryOwner.sol", "TransitionaryOwner");
-        } else if (
-            compareStrings(contractName, "L2LegacySharedBridge") || compareStrings(contractName, "ValidatorTimelock")
+        if (
+            compareStrings(contractName, "DefaultUpgrade") ||
+            compareStrings(contractName, "BytecodesSupplier") ||
+            compareStrings(contractName, "TransitionaryOwner") ||
+            compareStrings(contractName, "L2LegacySharedBridge") ||
+            compareStrings(contractName, "ValidatorTimelock")
         ) {
             // TODO(gateway-os): these were deployed onto the legacy EraVM Gateway from zkout bytecodes,
             // which were removed together with EraVM support. The ZKsync-OS-based Gateway upgrade flow
