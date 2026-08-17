@@ -7,7 +7,7 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
 import {BaseTokenGasPriceDenominatorNotSet, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
-import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract MailboxBaseTests is MailboxTest {
@@ -99,6 +99,6 @@ contract MailboxBaseTests is MailboxTest {
 
         vm.prank(sender);
         vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, 0, 1));
-        IMailboxImpl(address(mailboxFacet)).requestL2TransactionToGatewayMailbox(chainId, bytes32(0), 1);
+        IMailbox(address(mailboxFacet)).requestL2TransactionToGatewayMailbox(chainId, bytes32(0), 1);
     }
 }

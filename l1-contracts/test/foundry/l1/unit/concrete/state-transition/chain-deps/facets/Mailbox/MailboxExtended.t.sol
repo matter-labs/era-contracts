@@ -9,7 +9,6 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
-import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
@@ -95,7 +94,7 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
         );
 
         vm.expectRevert(abi.encodeWithSelector(NotL1.selector, gatewayChainId));
-        IMailboxImpl(address(mailboxFacet)).requestL2ServiceTransaction(address(0x123), bytes(""));
+        IMailbox(address(mailboxFacet)).requestL2ServiceTransaction(address(0x123), bytes(""));
     }
 }
 

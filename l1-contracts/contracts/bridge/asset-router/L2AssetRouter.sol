@@ -125,11 +125,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         _;
     }
 
-    modifier onlyNTV() {
-        require(msg.sender == _nativeTokenVaultAddr(), Unauthorized(msg.sender));
-        _;
-    }
-
     /// @notice Checks that the message sender is the interop center.
     modifier onlyL2InteropCenter() {
         require(msg.sender == _interopCenterAddr(), Unauthorized(msg.sender));

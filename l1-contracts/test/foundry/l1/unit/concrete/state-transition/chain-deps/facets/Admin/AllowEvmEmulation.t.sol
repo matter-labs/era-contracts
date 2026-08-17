@@ -6,7 +6,7 @@ import {AdminTest} from "./_Admin_Shared.t.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {NotL1} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 
 contract AllowEvmEmulationTest is AdminTest {
     event EnableEvmEmulator();
@@ -36,7 +36,7 @@ contract AllowEvmEmulationTest is AdminTest {
         bytes32 expectedCanonicalTxHash = bytes32(uint256(0xabcdef));
         vm.mockCall(
             address(adminFacet),
-            abi.encodeWithSelector(IMailboxImpl.requestL2ServiceTransaction.selector),
+            abi.encodeWithSelector(IMailbox.requestL2ServiceTransaction.selector),
             abi.encode(expectedCanonicalTxHash)
         );
 

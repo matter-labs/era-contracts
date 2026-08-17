@@ -167,11 +167,8 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getMailboxSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](7);
+        bytes4[] memory selectors = new bytes4[](4);
         uint256 i = 0;
-        selectors[i++] = mailbox.proveL2MessageInclusion.selector;
-        selectors[i++] = mailbox.proveL2LogInclusion.selector;
-        selectors[i++] = mailbox.proveL1ToL2TransactionStatus.selector;
         selectors[i++] = mailbox.finalizeEthWithdrawal.selector; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
         selectors[i++] = mailbox.requestL2Transaction.selector; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
         selectors[i++] = mailbox.bridgehubRequestL2Transaction.selector;

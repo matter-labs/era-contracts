@@ -3,7 +3,13 @@
 pragma solidity 0.8.28;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
-import {L2CanonicalTransaction, L2Log, L2Message, MessageInclusionProof} from "contracts/common/Messaging.sol";
+import {
+    L2CanonicalTransaction,
+    L2Log,
+    L2Message,
+    MessageInclusionProof,
+    TxStatus
+} from "contracts/common/Messaging.sol";
 import "forge-std/Test.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/common/Config.sol";
 import {
@@ -14,7 +20,6 @@ import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {HashedLogIsDefault} from "contracts/common/L1ContractErrors.sol";
 
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
-import {TxStatus} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -35,6 +40,8 @@ contract MailboxL2LogsProve is MailboxTest {
     MerkleTreeNoSort merkleTree;
     bytes data;
     uint256 batchNumber;
+    /// @dev Cached so that proof calls made after `vm.expectRevert` do not issue an extra external call.
+    uint256 chainId;
     bool isService;
     uint8 shardId;
     L1MessageRoot messageRoot;
@@ -49,6 +56,7 @@ contract MailboxL2LogsProve is MailboxTest {
         // Use batch 2 so that we can set migrateToGWBatchNumber=1 (must be >0).
         utilsFacet.util_setTotalBatchesExecuted(2);
         batchNumber = gettersFacet.getTotalBatchesExecuted();
+        chainId = gettersFacet.getChainId();
 
         // Mock getAllZKChainChainIDs to return the test chain so v31 upgrade sets the placeholder
         uint256[] memory chainIds = new uint256[](1);
@@ -425,7 +433,14 @@ contract MailboxL2LogsProve is MailboxTest {
             );
         }
 
-        return mailboxFacet.proveL2LeafInclusion(batchNumber, proofInfo.leafProofMask, proofInfo.leaf, proof);
+        return
+            messageRoot.proveL2LeafInclusionShared(
+                chainId,
+                batchNumber,
+                proofInfo.leafProofMask,
+                proofInfo.leaf,
+                proof
+            );
     }
 
     function test_successRecursiveProof() external {
@@ -562,7 +577,7 @@ contract MailboxL2LogsProve is MailboxTest {
                 LEGACY_GW_CHAIN_ID
             )
         );
-        mailboxFacet.proveL2LeafInclusion(batchNumber, proofInfo.leafProofMask, proofInfo.leaf, proof);
+        messageRoot.proveL2LeafInclusionShared(chainId, batchNumber, proofInfo.leafProofMask, proofInfo.leaf, proof);
     }
 
     function test_RevertWhen_recursiveProofBatchAfterReturnFromSL() external {
@@ -634,7 +649,7 @@ contract MailboxL2LogsProve is MailboxTest {
                 LEGACY_GW_CHAIN_ID
             )
         );
-        mailboxFacet.proveL2LeafInclusion(batchNumber, proofInfo.leafProofMask, proofInfo.leaf, proof);
+        messageRoot.proveL2LeafInclusionShared(chainId, batchNumber, proofInfo.leafProofMask, proofInfo.leaf, proof);
     }
 
     function test_calculateRoot() public {
@@ -710,7 +725,8 @@ contract MailboxL2LogsProve is MailboxTest {
         bytes32[] memory _merkleProof,
         TxStatus _status
     ) internal returns (bool) {
-        bool retOldEncoding = mailboxFacet.proveL1ToL2TransactionStatus({
+        bool retOldEncoding = messageRoot.proveL1ToL2TransactionStatusShared({
+            _chainId: chainId,
             _l2TxHash: _l2TxHash,
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
@@ -718,7 +734,8 @@ contract MailboxL2LogsProve is MailboxTest {
             _merkleProof: _merkleProof,
             _status: _status
         });
-        bool retNewEncoding = mailboxFacet.proveL1ToL2TransactionStatus({
+        bool retNewEncoding = messageRoot.proveL1ToL2TransactionStatusShared({
+            _chainId: chainId,
             _l2TxHash: _l2TxHash,
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
@@ -743,8 +760,9 @@ contract MailboxL2LogsProve is MailboxTest {
         if (_expectedError.length > 0) {
             vm.expectRevert(_expectedError);
         }
-        bool retOldEncoding = mailboxFacet.proveL2LogInclusion({
-            _batchNumber: _batchNumber,
+        bool retOldEncoding = messageRoot.proveL2LogInclusionShared({
+            _chainId: chainId,
+            _blockOrBatchNumber: _batchNumber,
             _index: _index,
             _proof: _proof,
             _log: _log
@@ -753,8 +771,9 @@ contract MailboxL2LogsProve is MailboxTest {
         if (_expectedError.length > 0) {
             vm.expectRevert(_expectedError);
         }
-        bool retNewEncoding = mailboxFacet.proveL2LogInclusion({
-            _batchNumber: _batchNumber,
+        bool retNewEncoding = messageRoot.proveL2LogInclusionShared({
+            _chainId: chainId,
+            _blockOrBatchNumber: _batchNumber,
             _index: _index,
             _proof: _appendProofMetadata(_proof),
             _log: _log
@@ -774,8 +793,9 @@ contract MailboxL2LogsProve is MailboxTest {
         if (_expectedError.length > 0) {
             vm.expectRevert(_expectedError);
         }
-        bool retOldEncoding = mailboxFacet.proveL2MessageInclusion({
-            _batchNumber: _batchNumber,
+        bool retOldEncoding = messageRoot.proveL2MessageInclusionShared({
+            _chainId: chainId,
+            _blockOrBatchNumber: _batchNumber,
             _index: _index,
             _message: _message,
             _proof: _proof
@@ -784,8 +804,9 @@ contract MailboxL2LogsProve is MailboxTest {
         if (_expectedError.length > 0) {
             vm.expectRevert(_expectedError);
         }
-        bool retNewEncoding = mailboxFacet.proveL2MessageInclusion({
-            _batchNumber: _batchNumber,
+        bool retNewEncoding = messageRoot.proveL2MessageInclusionShared({
+            _chainId: chainId,
+            _blockOrBatchNumber: _batchNumber,
             _index: _index,
             _message: _message,
             _proof: _appendProofMetadata(_proof)
