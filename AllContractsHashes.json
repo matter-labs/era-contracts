@@ -880,22 +880,6 @@
     "evmDeployedBytecodeLength": 85
   },
   {
-    "contractName": "l1-contracts/RevertReceiveAccount",
-    "evmBytecodePath": "/l1-contracts/out/RevertReceiveAccount.sol/RevertReceiveAccount.json",
-    "evmBytecodeHash": "0xefa484e8889959bdece62d105144d4c65ebccdcb422d96dee2e663507d562429",
-    "evmDeployedBytecodeHash": "0xd0ecb1f11bb932e11cfdf72bece30495c8fb0e44284dc680d1d3a8fab35a21d6",
-    "evmDeployedBytecodeBlakeHash": "0xeb73a92735baee4fe6920a7036d807c445f75b09222d2d4328d85263d98926c9",
-    "evmDeployedBytecodeLength": 327
-  },
-  {
-    "contractName": "l1-contracts/RevertTransferERC20",
-    "evmBytecodePath": "/l1-contracts/out/RevertTransferERC20.sol/RevertTransferERC20.json",
-    "evmBytecodeHash": "0x803ec991d50c96151c6e968a8297bb87c18aea09c0925657290f6c8756f87ccd",
-    "evmDeployedBytecodeHash": "0xb85317c474689b00432ad7141810b25c175629eebede0d951ecdc8e1b0d9de24",
-    "evmDeployedBytecodeBlakeHash": "0xa86eea0b8f4276a4bc2e47c0afd155e37ad380039daf3902277863888515ac29",
-    "evmDeployedBytecodeLength": 3294
-  },
-  {
     "contractName": "l1-contracts/RollupDAManager",
     "evmBytecodePath": "/l1-contracts/out/RollupDAManager.sol/RollupDAManager.json",
     "evmBytecodeHash": "0xea74a2782e78b435e482d03acbe6b4ed912f1a4a02e72a9f7aa4a5a87c8f70f1",
