@@ -11,10 +11,10 @@ import * as assert from "assert/strict";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { assertEverySpecRan, discoverSpecs } from "../../plan-coverage-groups";
+import { assertEverySpecRan, discoverSpecs } from "../../src/core/specs";
 import { createSuite } from "./harness";
 
-const { test, run } = createSuite("plan-coverage-groups");
+const { test, run } = createSuite("specs");
 
 const realSpecs = discoverSpecs(path.join(__dirname, "../hardhat"));
 

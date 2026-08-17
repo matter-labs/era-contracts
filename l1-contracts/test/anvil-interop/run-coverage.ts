@@ -37,7 +37,7 @@ import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { collectCoverage } from "./src/coverage/coverage-runner";
 import { assertMergedCoverageUsable, formatMergeSummary, mergeLcovFiles } from "./src/coverage/lcov-merge";
-import { discoverSpecs } from "./plan-coverage-groups";
+import { discoverSpecs } from "./src/core/specs";
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");

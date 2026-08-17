@@ -1,27 +1,18 @@
-#!/usr/bin/env node
-
 /**
- * Spec discovery and the completeness guard for the `coverage-anvil` matrix.
+ * Which interop specs exist, and the check that every one of them ran.
  *
- * The matrix itself is written out in `l1-contracts-ci.yaml` — two groups of five — because a
- * generated one bought nothing: the job that produced it ran alongside `build` and cost no wall
- * clock, but the balance it computed could not help either. The groups sit within 5% of each other
- * (354s vs 337s) while `coverage-foundry` at 383s dominates both, so rebalancing cannot move the
- * stage until the foundry gate comes down. Splitting into more groups is worse still: measured, one
- * spec per runner reached ~7.0m of wall clock for ~43 runner-minutes, against ~7.5m for ~14.
- *
- * What a hardcoded matrix cannot do by itself is notice a spec that exists but is in no group — it
- * would simply never run, with every job green. `assertEverySpecRan` is that check, and it works
- * from what the groups report having executed rather than from the workflow file.
+ * The `coverage-anvil` groups are written out by hand in `l1-contracts-ci.yaml`, which a hardcoded
+ * list cannot make safe on its own: a spec added to the repo but not to a group would never run, with
+ * every job green. `assertEverySpecRan` closes that, working from what the groups report having
+ * executed rather than from the workflow file.
  */
 
 import * as fs from "fs";
 
 /**
- * What a spec file may be called. Stricter than the discovery pattern on purpose: these names are
- * emitted space-separated into a workflow matrix and expanded by a shell, so a name containing a
- * space, `;`, backtick or `$(...)` would be a command-injection primitive reachable by adding a file
- * to the repo. Nothing legitimate needs those characters.
+ * What a spec file may be called. Stricter than the discovery pattern on purpose: spec names reach a
+ * shell through the workflow matrix, so a name containing a space, `;`, backtick or `$(...)` would be
+ * a command-injection primitive reachable by adding a file to the repo.
  */
 const SAFE_SPEC_NAME = /^\d+[0-9A-Za-z._-]*\.spec\.ts$/;
 

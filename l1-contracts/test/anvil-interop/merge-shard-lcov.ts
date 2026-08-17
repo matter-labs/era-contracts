@@ -20,7 +20,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { assertMergedCoverageUsable, formatMergeSummary, mergeLcovFiles } from "./src/coverage/lcov-merge";
-import { assertEverySpecRan, discoverSpecs } from "./plan-coverage-groups";
+import { assertEverySpecRan, discoverSpecs } from "./src/core/specs";
 
 const LCOV_FILE_NAME = "anvil-lcov.info";
 const SPECS_RUN_PATTERN = /^specs-run.*\.json$/;
