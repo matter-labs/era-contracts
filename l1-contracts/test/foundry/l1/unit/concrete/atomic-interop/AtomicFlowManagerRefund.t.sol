@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Vm} from "forge-std/Vm.sol";
 
 import {AtomicInteropProofBuilder} from "./AtomicInteropProofBuilder.sol";
+import {MockRecoveryRouter} from "./AtomicFlowManagerRecover.t.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
@@ -55,6 +56,10 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
     /// @dev The missing leg's remote source chain — aggregatable in the settlement-layer MessageRoot
     /// (unlike the local chain), so its absence gets a real, unmocked authentication.
     uint256 internal constant MISSING_LEG_CHAIN = 271;
+    /// @dev Destination chain of the recovery bundles below: any chain that is not the settlement
+    /// layer, since `_recoverBundle` rejects L1-destined bundles outright.
+    uint256 internal constant RECOVERY_DEST_CHAIN_ID = 777;
+    address internal constant RECOVERY_CALL_TARGET = address(0xCA11);
 
     AtomicFlowManager internal manager;
 
@@ -409,5 +414,180 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
             abi.encodeWithSelector(ManagerLegNotRevertable.selector, unknownFlowId, committedLeg, LegState.Unset)
         );
         manager.claimRefund(unknownFlowId, committedLegBundleBytes);
+    }
+
+    // ============ multi-call recovery through the real Revertable path ============
+
+    /// @dev Drives `_bundle`'s leg to `Revertable` entirely through production entry points: a fresh
+    /// two-leg flow, a real `append` of this bundle's leg (pranked canonical InteropCenter), then a real
+    /// `authorizeRefund` against an end-to-end absence proof for the never-committed co-leg. No leg state
+    /// is ever written directly (see AGENTS.md on storage overrides).
+    /// @dev NOT `view`: aggregation + import mutate settlement-layer state. Consumes
+    /// `MISSING_LEG_CHAIN`'s single post-genesis batch, so a test calling this must not also call
+    /// {_validAbsence}. `append` must run before the post-deadline root is imported, hence this order.
+    function _revertableLegFromBundle(
+        InteropBundle memory _bundle
+    ) internal returns (bytes32 recoveryFlowId, bytes32 bundleHash, bytes memory bundleBytes) {
+        bundleBytes = abi.encode(_bundle);
+        bundleHash = InteropDataEncoding.encodeInteropBundleHash(bundleBytes);
+        bytes32 coLeg = keccak256("recovery co-leg");
+
+        AtomicFlowPreimage memory recoveryPreimage;
+        recoveryPreimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
+        recoveryPreimage.deadline = DEADLINE;
+        recoveryPreimage.settlementLayerChainId = SETTLEMENT_LAYER_CHAIN_ID;
+        recoveryPreimage.legBundleHashes = new bytes32[](2);
+        recoveryPreimage.legSourceChainIds = new uint256[](2);
+        (uint256 localIdx, uint256 coIdx) = bundleHash < coLeg ? (0, 1) : (1, 0);
+        recoveryPreimage.legBundleHashes[localIdx] = bundleHash;
+        recoveryPreimage.legBundleHashes[coIdx] = coLeg;
+        recoveryPreimage.legSourceChainIds[localIdx] = block.chainid;
+        recoveryPreimage.legSourceChainIds[coIdx] = MISSING_LEG_CHAIN;
+        recoveryFlowId = keccak256(abi.encode(recoveryPreimage));
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        manager.append(bundleHash, 0, recoveryPreimage);
+
+        ImtProof memory absence = _realTimeoutBeginProof(
+            MISSING_LEG_CHAIN,
+            _commitValue(recoveryFlowId, coLeg),
+            uint256(DEADLINE) + 1
+        );
+        manager.authorizeRefund(AtomicFlow({flowId: recoveryFlowId, preimage: recoveryPreimage}), coIdx, absence);
+        assertEq(
+            uint256(manager.legState(recoveryFlowId, bundleHash)),
+            uint256(LegState.Revertable),
+            "fixture: the leg must be Revertable through the real authorize path"
+        );
+    }
+
+    /// @dev The stateful asset-router stand-in at its canonical address (shared with
+    /// {AtomicFlowManagerRecoverTest}): unlike `vm.mockCall`, its counters are real storage, so they
+    /// roll back with a reverting `claimRefund` — which is what the abort test below proves.
+    function _deployMockRecoveryRouter() internal returns (MockRecoveryRouter router) {
+        deployCodeTo("AtomicFlowManagerRecover.t.sol:MockRecoveryRouter", L2_ASSET_ROUTER_ADDR);
+        router = MockRecoveryRouter(L2_ASSET_ROUTER_ADDR);
+    }
+
+    function _recoveryCall(
+        address _from,
+        uint256 _value,
+        bytes memory _data
+    ) internal pure returns (InteropCall memory) {
+        return
+            InteropCall({
+                version: INTEROP_CALL_VERSION,
+                shadowAccount: false,
+                to: RECOVERY_CALL_TARGET,
+                from: _from,
+                value: _value,
+                data: _data
+            });
+    }
+
+    function _recoveryBundle(InteropCall[] memory _calls) internal view returns (InteropBundle memory bundle) {
+        bundle = InteropBundle({
+            version: INTEROP_BUNDLE_VERSION,
+            sourceChainId: block.chainid,
+            destinationChainId: RECOVERY_DEST_CHAIN_ID,
+            destinationBaseTokenAssetId: keccak256("recovery destination base token"),
+            interopBundleSalt: keccak256("multi-call recovery salt"),
+            calls: _calls,
+            bundleAttributes: BundleAttributes({
+                executionAddress: bytes(""),
+                unbundlerAddress: bytes(""),
+                useFixedFee: false,
+                salt: bytes32(0)
+            })
+        });
+    }
+
+    /// @notice If EVERY router-backed recovery returns `false`, nothing is recovered — and the refund
+    /// must STILL go through: a bundle with no recoverable funds has nothing to return, but flipping the
+    /// leg to `Reverted` is meaningful on its own and must not be blocked (see
+    /// {AtomicFlowManager._recoverBundle}). All calls are attempted, no payout occurs, `FlowRefunded` is
+    /// emitted, and the leg lands terminal `Reverted` (a further claim is rejected).
+    function test_claimRefund_multiCall_allRouterFalseSucceedsWithoutPayout() public {
+        MockRecoveryRouter router = _deployMockRecoveryRouter();
+        router.scriptReturnsFalse(hex"1111");
+        router.scriptReturnsFalse(hex"2222");
+
+        InteropCall[] memory calls = new InteropCall[](2);
+        calls[0] = _recoveryCall(L2_ASSET_ROUTER_ADDR, 0, hex"1111"); // recoverAtomicCall -> false
+        calls[1] = _recoveryCall(L2_ASSET_ROUTER_ADDR, 0, hex"2222"); // recoverAtomicCall -> false
+
+        (bytes32 recoveryFlowId, bytes32 bundleHash, bytes memory bundleBytes) = _revertableLegFromBundle(
+            _recoveryBundle(calls)
+        );
+
+        vm.expectEmit(true, true, false, true, address(manager));
+        emit IAtomicFlowManager.FlowRefunded(recoveryFlowId, bundleHash);
+        manager.claimRefund(recoveryFlowId, bundleBytes);
+
+        assertEq(router.recoverAttempts(), 2, "every router-backed call is still attempted");
+        assertEq(router.recoverSuccesses(), 0, "nothing actually recovers");
+        assertEq(router.baseTokenRecoveries(), 0, "no base-token payout occurred");
+        assertEq(
+            uint256(manager.legState(recoveryFlowId, bundleHash)),
+            uint256(LegState.Reverted),
+            "the leg is terminally Reverted even though nothing was recoverable"
+        );
+
+        // Terminal: the no-op refund cannot be claimed again.
+        vm.expectRevert(
+            abi.encodeWithSelector(ManagerLegNotRevertable.selector, recoveryFlowId, bundleHash, LegState.Reverted)
+        );
+        manager.claimRefund(recoveryFlowId, bundleBytes);
+    }
+
+    /// @notice A later call reverting during recovery aborts and rolls back the whole claim. Both calls
+    /// are reached before the abort; after the failing script is cleared, both are retried and the claim
+    /// completes, proving the leg remained `Revertable` and no partial recovery survived.
+    function test_claimRefund_multiCall_laterRevertAbortsClaim() public {
+        MockRecoveryRouter router = _deployMockRecoveryRouter();
+        router.scriptReverts(hex"baad");
+
+        InteropCall[] memory calls = new InteropCall[](2);
+        calls[0] = _recoveryCall(L2_ASSET_ROUTER_ADDR, 0, hex"600d"); // would recover successfully...
+        calls[1] = _recoveryCall(L2_ASSET_ROUTER_ADDR, 0, hex"baad"); // ...but this one reverts
+
+        (bytes32 recoveryFlowId, bytes32 bundleHash, bytes memory bundleBytes) = _revertableLegFromBundle(
+            _recoveryBundle(calls)
+        );
+
+        // Both recovery calls must be reached once in the failed claim and once in the successful retry.
+        vm.expectCall(
+            L2_ASSET_ROUTER_ADDR,
+            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector, RECOVERY_DEST_CHAIN_ID, hex"600d"),
+            2
+        );
+        vm.expectCall(
+            L2_ASSET_ROUTER_ADDR,
+            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector, RECOVERY_DEST_CHAIN_ID, hex"baad"),
+            2
+        );
+        vm.expectRevert("recovery boom");
+        manager.claimRefund(recoveryFlowId, bundleBytes);
+
+        assertEq(router.recoverAttempts(), 0, "reverted recovery attempts must roll back");
+        assertEq(router.recoverSuccesses(), 0, "the earlier successful recovery must roll back");
+        assertEq(
+            uint256(manager.legState(recoveryFlowId, bundleHash)),
+            uint256(LegState.Revertable),
+            "failed claim must leave the refund retryable"
+        );
+
+        router.scriptSucceeds(hex"baad");
+        vm.expectEmit(true, true, false, true, address(manager));
+        emit IAtomicFlowManager.FlowRefunded(recoveryFlowId, bundleHash);
+        manager.claimRefund(recoveryFlowId, bundleBytes);
+
+        assertEq(router.recoverAttempts(), 2, "retry must process both router-backed calls");
+        assertEq(router.recoverSuccesses(), 2, "both recoveries must succeed on retry");
+        assertEq(
+            uint256(manager.legState(recoveryFlowId, bundleHash)),
+            uint256(LegState.Reverted),
+            "successful retry must finish the refund"
+        );
     }
 }

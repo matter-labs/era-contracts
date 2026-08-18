@@ -12,6 +12,7 @@ import {
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
     ManagerAlreadyInitialized,
+    ManagerL1ChainIdZero,
     ManagerMissingLegIndexOutOfRange,
     ManagerSettlementLayerNotL1
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
@@ -51,6 +52,19 @@ contract AtomicFlowManagerInitTest is Test {
     function test_RevertWhen_initL2NotUpgrader() public {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
         manager.initL2(L1_CHAIN_ID);
+    }
+
+    /// @notice Zero is the "not initialized" sentinel, so `initL2(0)` must be rejected — otherwise it
+    /// would appear to succeed while leaving the manager re-initializable by anyone the upgrader later
+    /// delegates to. Uses a FRESH manager, since `setUp` already initialized the shared one.
+    function test_RevertWhen_initL2ZeroChainId() public {
+        AtomicFlowManager fresh = new AtomicFlowManager();
+
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        vm.expectRevert(ManagerL1ChainIdZero.selector);
+        fresh.initL2(0);
+
+        assertEq(fresh.L1_CHAIN_ID(), 0, "a rejected init must leave the sentinel untouched");
     }
 
     function test_RevertWhen_initL2Twice() public {
