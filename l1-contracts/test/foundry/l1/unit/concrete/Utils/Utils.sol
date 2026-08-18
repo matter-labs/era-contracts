@@ -395,9 +395,8 @@ library Utils {
     }
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](6);
+        bytes4[] memory selectors = new bytes4[](5);
         uint256 i = 0;
-        selectors[i++] = MailboxFacet.requestL2Transaction.selector; // TODO(EVM-1216): remove after the legacy mailbox.requestL2Transaction is deprecated.
         selectors[i++] = MailboxFacet.bridgehubRequestL2Transaction.selector;
         selectors[i++] = MailboxFacet.bridgehubRequestL2TransactionOnGateway.selector;
         selectors[i++] = MailboxFacet.l2TransactionBaseCost.selector;

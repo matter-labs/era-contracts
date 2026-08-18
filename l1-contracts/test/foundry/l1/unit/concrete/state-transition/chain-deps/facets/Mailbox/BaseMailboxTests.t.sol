@@ -17,11 +17,6 @@ contract MailboxBaseTests is MailboxTest {
         utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(1);
     }
 
-    function test_mailboxConstructor() public {
-        DummyZKChain h = new DummyZKChain(address(0), eraChainId, block.chainid, address(0), eip7702Checker);
-        assertEq(h.getEraChainId(), eraChainId);
-    }
-
     function test_RevertWhen_badDenominatorInL2TransactionBaseCost() public {
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(0);
         vm.expectRevert(BaseTokenGasPriceDenominatorNotSet.selector);

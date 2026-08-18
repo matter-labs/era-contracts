@@ -602,7 +602,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         AdminFacet adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(
-            1,
             block.chainid,
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             IEIP7702Checker(address(1)),
