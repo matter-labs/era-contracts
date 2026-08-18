@@ -25,8 +25,6 @@ import {L2_MESSAGE_VERIFICATION} from "contracts/common/l2-helpers/L2ContractInt
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {Merkle} from "contracts/common/libraries/Merkle.sol";
-import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 
 error AtomicProofBuilderOnlySupportsFirstPostGenesisBatch(uint256 sourceChainId, uint256 batchNumber);
 

@@ -16,7 +16,6 @@ import {
     AttributeAlreadySet,
     AttributeViolatesRestriction,
     InteropBundleSaltAlreadyUsed,
-    InteropPreviewHash,
     NonAtomicSendUnsupported
 } from "contracts/interop/InteropErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";

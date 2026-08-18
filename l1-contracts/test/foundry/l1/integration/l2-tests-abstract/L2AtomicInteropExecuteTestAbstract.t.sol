@@ -9,7 +9,6 @@ import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {AtomicInteropProofBuilder} from "../../unit/concrete/atomic-interop/AtomicInteropProofBuilder.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
-import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
@@ -23,7 +22,6 @@ import {
 import {
     BundleAlreadyProcessed,
     ExecutingNotAllowed,
-    InteropPreviewHash,
     WrongDestinationChainId
 } from "contracts/interop/InteropErrors.sol";
 import {IMTLeafValueMismatch} from "contracts/common/L1ContractErrors.sol";
