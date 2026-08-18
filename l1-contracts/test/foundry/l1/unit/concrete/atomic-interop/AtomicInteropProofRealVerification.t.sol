@@ -15,8 +15,9 @@ import {ProofNotLastBatchInRoot} from "contracts/atomic-interop/AtomicInteropErr
 /// produces only the one-level first-post-genesis path (mask `0b1`), so this suite forward-computes a
 /// two-level right-child last-leaf path and its invalid counterpart.
 contract AtomicInteropProofRealVerificationTest is AtomicInteropProofBuilder {
+    /// @dev Per-suite proof fixture values. Not hoisted onto the builder: other derived suites pick
+    /// their own (the execute abstract uses a different `SL_BLOCK`).
     uint256 internal constant SOURCE_CHAIN_ID = 271;
-    uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 1; // L1
     uint256 internal constant BATCH_N = 100;
     uint256 internal constant SL_BLOCK = 555;
 
@@ -27,9 +28,7 @@ contract AtomicInteropProofRealVerificationTest is AtomicInteropProofBuilder {
         absentValue = AtomicFlowFixtures.commitValue(keccak256("flowB"), keccak256("bundleB"));
     }
 
-    // ------------------------------------------------------------------------------------------------
     // Real settlement-proof builder (forward-computed, no mocks)
-    // ------------------------------------------------------------------------------------------------
 
     /// @dev General builder: same two-hop reconstruction, but with a caller-chosen batch-leaf position
     /// (`_batchLeafMask` + `_batchLeafSiblings`) inside the chain's batch tree — used to exercise the
@@ -135,6 +134,9 @@ contract AtomicInteropProofRealVerificationTest is AtomicInteropProofBuilder {
             imtProof: tree.merklePath(lowIndex)
         });
 
+        // This suite exists to run the REAL verifier, so pin the call: `verifyTimeoutAbsence` returns
+        // nothing, so without this a no-op `_authenticateRoot` would pass.
+        _expectRootAuthentication(absence, ChainBatchRootTree.IMT_END_ROOT_LEAF_INDEX);
         proofLib.verifyTimeoutAbsence(absence, absentValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 

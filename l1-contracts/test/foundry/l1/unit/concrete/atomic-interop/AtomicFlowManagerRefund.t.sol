@@ -41,7 +41,6 @@ import {
 /// intrinsically-local late-commit case stub the leaf verifier. Real fund recovery is covered by
 /// `L2AtomicInteropSendRefundTestAbstract` and `AtomicRecoveryForgery.t.sol`.
 contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
-    uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 1; // L1
     uint256 internal constant REMOTE_BATCH_NUMBER = 7;
     uint256 internal constant SL_BLOCK = 300;
     /// @dev The missing leg's remote source chain — aggregatable in the settlement-layer MessageRoot
@@ -89,7 +88,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         preimage.legSourceChainIds[committedIdx] = block.chainid;
         preimage.legSourceChainIds[missingIdx] = MISSING_LEG_CHAIN;
         missingLegIndex = missingIdx;
-        flowId = keccak256(abi.encode(preimage));
+        flowId = AtomicFlowFixtures.flowId(preimage);
 
         // The remote missing-leg source must look interop-registered to the send-side `append` (a
         // Bridgehub registry lookup, orthogonal to the atomic proof machinery).
@@ -163,7 +162,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         multiPreimage.legSourceChainIds[0] = block.chainid;
         multiPreimage.legSourceChainIds[1] = MISSING_LEG_CHAIN;
         multiPreimage.legSourceChainIds[2] = block.chainid;
-        bytes32 multiFlowId = keccak256(abi.encode(multiPreimage));
+        bytes32 multiFlowId = AtomicFlowFixtures.flowId(multiPreimage);
 
         // Commit BOTH non-missing legs through the production send-side path.
         for (uint256 i = 0; i < 3; ++i) {
@@ -268,7 +267,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         latePreimage.legBundleHashes[peerIdx] = peerLeg;
         latePreimage.legSourceChainIds[lateIdx] = block.chainid;
         latePreimage.legSourceChainIds[peerIdx] = block.chainid;
-        bytes32 lateFlowId = keccak256(abi.encode(latePreimage));
+        bytes32 lateFlowId = AtomicFlowFixtures.flowId(latePreimage);
 
         // Both legs are committed in current manager state; the proof below authenticates historical
         // absence from a post-deadline batch root.
@@ -420,7 +419,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         recoveryPreimage.legBundleHashes[coIdx] = coLeg;
         recoveryPreimage.legSourceChainIds[localIdx] = block.chainid;
         recoveryPreimage.legSourceChainIds[coIdx] = MISSING_LEG_CHAIN;
-        recoveryFlowId = keccak256(abi.encode(recoveryPreimage));
+        recoveryFlowId = AtomicFlowFixtures.flowId(recoveryPreimage);
 
         vm.prank(L2_INTEROP_CENTER_ADDR);
         manager.append(bundleHash, 0, recoveryPreimage);

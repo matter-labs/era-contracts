@@ -37,8 +37,9 @@ import {IMTLeafValueMismatch, IMTLowLeafNextTooSmall} from "contracts/common/L1C
 /// last-batch / inclusion branches all run for real. The deeper non-leftmost last-batch shape is also
 /// exercised end-to-end by {AtomicInteropProofRealVerification}.
 contract AtomicInteropProofTest is AtomicInteropProofBuilder {
+    /// @dev Per-suite proof fixture values. Not hoisted onto the builder: other derived suites pick
+    /// their own (the execute abstract uses a different `SL_BLOCK`).
     uint256 internal constant SOURCE_CHAIN_ID = 271;
-    uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 1; // L1
     uint256 internal constant BATCH_N = 100;
     uint256 internal constant SL_BLOCK = 555;
 

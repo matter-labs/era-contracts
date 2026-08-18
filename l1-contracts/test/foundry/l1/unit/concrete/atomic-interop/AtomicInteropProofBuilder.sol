@@ -98,6 +98,8 @@ contract AtomicInteropProofWrapper {
 /// `_setUpAtomicFixtures`), so the canonical predeploys resolve without deploying the full bridgehub
 /// stack. None of these stubs feeds the Merkle math the proofs authenticate against.
 abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
+    /// @dev The settlement layer every atomic flow in these suites declares (L1).
+    uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 1;
     /// @dev The flow deadline all proofs are built against (shared with the tests so the builders
     /// can declare the honest timeout branch for a given batch timestamp).
     uint64 internal constant DEADLINE = 1_000;
@@ -105,7 +107,7 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
     /// @dev The settlement layer every real proof aggregates + imports against (L1 in this release).
     /// Defaults to 1; harnesses whose flows declare a different `settlementLayerChainId` (e.g. the
     /// integration deployment's `L1_CHAIN_ID`) override it so the baked proof word + import key align.
-    uint256 internal builderSlChainId = 1;
+    uint256 internal builderSlChainId = SETTLEMENT_LAYER_CHAIN_ID;
 
     AtomicInteropProofWrapper internal proofLib;
     L2InteropCommitmentTree internal tree;
@@ -162,10 +164,8 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
         );
     }
 
-    // ------------------------------------------------------------------------------------------------
     // Real settlement machinery: aggregate a chain batch root, import the shared root, build a proof
     // whose sibling paths come from the live MessageRoot trees. Nothing mocked in steps 1/2/4.
-    // ------------------------------------------------------------------------------------------------
 
     /// @dev Registers `_sourceChainId` in the MessageRoot and seeds its genesis (batch 0) leaf, once.
     function _ensureChainRegistered(uint256 _sourceChainId) internal {
@@ -398,9 +398,7 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
             });
     }
 
-    // ------------------------------------------------------------------------------------------------
     // Mocks / real-storage seeding
-    // ------------------------------------------------------------------------------------------------
 
     /// @dev Drives the (separately-tested) cross-chain leaf verifier to `_ok` for every call.
     function _mockVerifier(bool _ok) internal {
@@ -459,9 +457,7 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
         );
     }
 
-    // ------------------------------------------------------------------------------------------------
     // Tree helpers
-    // ------------------------------------------------------------------------------------------------
 
     /// @dev Inserts `_value` into the real tree as the canonical appender; returns its leaf index.
     function _insertCommit(uint256 _value) internal returns (uint256 index) {
@@ -496,9 +492,7 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
         revert("AtomicInteropProofBuilder: no predecessor (value absent)");
     }
 
-    // ------------------------------------------------------------------------------------------------
     // settlementProof-blob assembler
-    // ------------------------------------------------------------------------------------------------
 
     /// @dev Builds the proof-metadata word (top 4 bytes: version, logLeafProofLen, batchLeafProofLen,
     /// finalProofNode; remaining bytes zero — the format `MessageHashing.parseProofMetadata` expects).
@@ -588,9 +582,7 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
         }
     }
 
-    // ------------------------------------------------------------------------------------------------
     // ImtProof assemblers
-    // ------------------------------------------------------------------------------------------------
 
     /// @dev Inclusion proof for a value already inserted at `_leafIndex` in the real tree.
     function _inclusionProof(

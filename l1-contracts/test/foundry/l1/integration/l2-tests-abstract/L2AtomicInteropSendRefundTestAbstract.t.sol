@@ -154,16 +154,6 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     }
 
     /// @dev Single indirect asset-router call that burns `_amount` of `_l2Token` from the sender.
-    function _tokenCallStarter(address _l2Token, uint256 _amount) internal returns (InteropCallStarter[] memory calls) {
-        bytes memory secondBridgeCalldata = InteropLibrary.buildSecondBridgeCalldata(
-            L2_NATIVE_TOKEN_VAULT.assetId(_l2Token),
-            _amount,
-            makeAddr("atomic recipient"),
-            address(0)
-        );
-        calls = new InteropCallStarter[](1);
-        calls[0] = InteropLibrary.buildSecondBridgeCall(secondBridgeCalldata, L2_ASSET_ROUTER_ADDR);
-    }
 
     /// @dev Predicts the bundle hash the atomic send will produce, via the `previewBundleHash` quoter with
     /// the same calls and salt (the atomic metadata is not part of the bundle, so the hash is identical).
@@ -239,8 +229,6 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     /// @dev `abi.encode(InteropBundle)` of the sent bundle, as `claimRefund` consumes it.
     bytes internal ctxBundleBytes;
 
-    uint256 internal constant TRANSFER_AMOUNT = 100;
-
     /// @notice Atomic send whose preimage pairs the real (burned) local leg with a never-committable remote
     /// leg; after the deadline the missing leg is proven absent and the burn is refunded.
     function test_atomicSend_WithInvalidRemoteLeg_IsRefundableAfterTimeout() public {
@@ -277,7 +265,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     function test_previewBundleHash_rollsBackBurningIndirectLeg() public {
         _setUpAtomicStack();
         address l2Token = initializeTokenByDeposit();
-        InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, TRANSFER_AMOUNT);
+        InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, TRANSFER_AMOUNT, makeAddr("atomic recipient"));
         uint256 balanceBefore = IERC20(l2Token).balanceOf(address(this));
 
         bytes[] memory attrs = new bytes[](1);
@@ -311,7 +299,11 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
         ctx.l2Token = initializeTokenByDeposit();
         bytes32 salt = keccak256("atomic invalid-remote-leg salt");
-        InteropCallStarter[] memory calls = _tokenCallStarter(ctx.l2Token, TRANSFER_AMOUNT);
+        InteropCallStarter[] memory calls = _tokenCallStarter(
+            ctx.l2Token,
+            TRANSFER_AMOUNT,
+            makeAddr("atomic recipient")
+        );
 
         bytes32 predicted = _predictBundleHash(calls, salt);
         (AtomicFlowPreimage memory preimage, uint256 missingLegIndex) = _preimageWithInvalidRemoteLeg(predicted);
@@ -407,7 +399,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         address l2Token = initializeTokenByDeposit();
         uint256 amount = 100;
         bytes32 salt = keccak256("atomic not-in-preimage salt");
-        InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, amount);
+        InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, amount, makeAddr("atomic recipient"));
 
         bytes32 predicted = _predictBundleHash(calls, salt);
         // Well-formed preimage that does not contain the bundle being sent (e.g. a stale prediction).
@@ -765,7 +757,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
 
         address l2Token = initializeTokenByDeposit();
         bytes32 salt = keccak256("atomic phantom co-leg salt");
-        InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, TRANSFER_AMOUNT);
+        InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, TRANSFER_AMOUNT, makeAddr("atomic recipient"));
 
         bytes32 predicted = _predictBundleHash(calls, salt);
         (AtomicFlowPreimage memory preimage, uint256 remoteIndex) = _preimageWithInvalidRemoteLeg(predicted);
@@ -872,7 +864,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
 
         address l2Token = initializeTokenByDeposit();
         bytes32 salt = keccak256("atomic attribute-order salt");
-        InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, TRANSFER_AMOUNT);
+        InteropCallStarter[] memory calls = _tokenCallStarter(l2Token, TRANSFER_AMOUNT, makeAddr("atomic recipient"));
 
         bytes32 predicted = _predictBundleHash(calls, salt);
         (AtomicFlowPreimage memory preimage, ) = _preimageWithInvalidRemoteLeg(predicted);

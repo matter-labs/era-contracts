@@ -58,7 +58,6 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     uint256 internal constant SL_BLOCK = 401;
     uint256 internal constant LOCAL_BATCH_NUMBER = 3;
     uint256 internal constant REMOTE_BATCH_NUMBER = 9;
-    uint256 internal constant TRANSFER_AMOUNT = 100;
 
     /// @dev These tests exercise the REAL append/finalize logic, so the shared deployer's void mock of
     /// `AtomicFlowManager.append`/`requireFlowFinalized` (installed in its `setUp`) is disabled here;
@@ -84,16 +83,6 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     /// @dev The exact single-call token-transfer starter `InteropLibrary.sendToken` sends: an indirect
     /// call through the L2 AssetRouter, which burns `_amount` of `_l2Token` from the sender and mints
     /// to {_receiver} on the destination.
-    function _tokenCallStarter(address _l2Token, uint256 _amount) internal returns (InteropCallStarter[] memory calls) {
-        bytes memory secondBridgeCalldata = InteropLibrary.buildSecondBridgeCalldata(
-            L2_NATIVE_TOKEN_VAULT.assetId(_l2Token),
-            _amount,
-            _receiver(),
-            address(0)
-        );
-        calls = new InteropCallStarter[](1);
-        calls[0] = InteropLibrary.buildSecondBridgeCall(secondBridgeCalldata, L2_ASSET_ROUTER_ADDR);
-    }
 
     /// @dev Predicts the bundle hash of a send with the given full (non-atomic) bundle-attribute set,
     /// via the `previewBundleHash` quoter — it runs the real assembly but ALWAYS reverts with
@@ -132,7 +121,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     /// zero-length to skip.
     function _sendAtomicLegWithRemotePeer(bytes32 _salt, bytes memory _extraBundleAttribute) internal {
         ectx.l2Token = initializeTokenByDeposit();
-        InteropCallStarter[] memory calls = _tokenCallStarter(ectx.l2Token, TRANSFER_AMOUNT);
+        InteropCallStarter[] memory calls = _tokenCallStarter(ectx.l2Token, TRANSFER_AMOUNT, _receiver());
 
         bytes[] memory predictionAttrs;
         if (_extraBundleAttribute.length != 0) {
@@ -276,16 +265,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
 
         // The remote leg's commit value was never inserted; the best available "membership" data is
         // the oracle tree's genesis head leaf, whose value (0) is not the leg's commit value.
-        ImtProof memory bogusRemoteProof = ImtProof({
-            sourceChainId: destinationChainId,
-            batchNumber: REMOTE_BATCH_NUMBER,
-            chainImtRoot: tree.root(),
-            provesAgainstBeginRoot: false,
-            settlementProof: _settlementProof(L1_CHAIN_ID, SL_BLOCK, DEADLINE - 1, new bytes32[](0)),
-            leaf: tree.leafAt(0),
-            imtLeafIndex: 0,
-            imtProof: tree.merklePath(0)
-        });
+        ImtProof memory bogusRemoteProof = _uncommittedRemoteProof();
         AtomicFinalityProof memory finality = _buildFinality(bogusRemoteProof);
 
         vm.expectRevert(
@@ -343,9 +323,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).executeAtomicBundle(ectxBundleBytes, finality);
     }
 
-    // ------------------------------------------------------------------------------------------------
     // verifyAtomicBundle — the same atomicity gate on the verify (no-execution) path
-    // ------------------------------------------------------------------------------------------------
 
     /// @notice `verifyAtomicBundle` passes the SAME atomicity gate as execution: with every leg proven
     /// committed in time, the bundle is marked `Verified` (exact event), and NOTHING executes — no
@@ -387,16 +365,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
 
         // The remote leg's commit value was never inserted; the best available "membership" data is
         // the oracle tree's genesis head leaf, whose value (0) is not the leg's commit value.
-        ImtProof memory bogusRemoteProof = ImtProof({
-            sourceChainId: destinationChainId,
-            batchNumber: REMOTE_BATCH_NUMBER,
-            chainImtRoot: tree.root(),
-            provesAgainstBeginRoot: false,
-            settlementProof: _settlementProof(L1_CHAIN_ID, SL_BLOCK, DEADLINE - 1, new bytes32[](0)),
-            leaf: tree.leafAt(0),
-            imtLeafIndex: 0,
-            imtProof: tree.merklePath(0)
-        });
+        ImtProof memory bogusRemoteProof = _uncommittedRemoteProof();
         AtomicFinalityProof memory finality = _buildFinality(bogusRemoteProof);
 
         _mockVerifier(true);
@@ -429,5 +398,21 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         AtomicFinalityProof memory emptyFinality;
         vm.expectRevert(abi.encodeWithSelector(BundleAlreadyProcessed.selector, ectx.bundleHash));
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(ectxBundleBytes, emptyFinality);
+    }
+
+    /// @dev A proof for the remote leg that was never committed: the best available "membership" data
+    /// is the oracle tree's genesis head leaf, whose value is not the leg's commit value.
+    function _uncommittedRemoteProof() internal view returns (ImtProof memory) {
+        return
+            ImtProof({
+                sourceChainId: destinationChainId,
+                batchNumber: REMOTE_BATCH_NUMBER,
+                chainImtRoot: tree.root(),
+                provesAgainstBeginRoot: false,
+                settlementProof: _settlementProof(L1_CHAIN_ID, SL_BLOCK, DEADLINE - 1, new bytes32[](0)),
+                leaf: tree.leafAt(0),
+                imtLeafIndex: 0,
+                imtProof: tree.merklePath(0)
+            });
     }
 }

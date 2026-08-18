@@ -155,9 +155,7 @@ contract AtomicRecoveryForgeryTest is Test {
         manager.forceRevertable(flowId, bundleHash);
     }
 
-    // ---------------------------------------------------------------------------------------------
     // Recovery side (AtomicFlowManager._recoverBundle skips `from != L2_ASSET_ROUTER_ADDR`)
-    // ---------------------------------------------------------------------------------------------
 
     /// A forged, never-burned `finalizeDeposit` (its `from` is the attacker, not the router's burn path) is
     /// skipped on recovery: the NTV is never asked to release funds. The claim itself still goes through —
@@ -294,9 +292,7 @@ contract AtomicRecoveryForgeryTest is Test {
         );
     }
 
-    // ---------------------------------------------------------------------------------------------
     // L2AssetRouter.recoverAtomicCall entry-point surface (the recovery collaborator, called directly)
-    // ---------------------------------------------------------------------------------------------
 
     /// @notice `recoverAtomicCall` is gated to the atomic flow manager: any other caller is rejected
     /// with `Unauthorized`, so nobody can drive a recovery (a re-mint) outside the timeout flow.
