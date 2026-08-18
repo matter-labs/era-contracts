@@ -3,6 +3,8 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
+import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
+
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {
     AtomicFlow,
@@ -35,14 +37,12 @@ contract AtomicFlowManagerInitTest is Test {
 
     /// @dev A minimal well-formed flow (correct flowId) declaring `_settlementLayerChainId`.
     function _flow(uint256 _settlementLayerChainId) internal pure returns (AtomicFlow memory flow) {
-        flow.preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
-        flow.preimage.deadline = 123;
-        flow.preimage.settlementLayerChainId = _settlementLayerChainId;
-        flow.preimage.legBundleHashes = new bytes32[](1);
-        flow.preimage.legBundleHashes[0] = keccak256("leg");
-        flow.preimage.legSourceChainIds = new uint256[](1);
-        flow.preimage.legSourceChainIds[0] = 271;
-        flow.flowId = keccak256(abi.encode(flow.preimage));
+        bytes32[] memory legs = new bytes32[](1);
+        legs[0] = keccak256("leg");
+        uint256[] memory chains = new uint256[](1);
+        chains[0] = 271;
+        flow.preimage = AtomicFlowFixtures.nLegPreimage(legs, chains, 123, _settlementLayerChainId);
+        flow.flowId = AtomicFlowFixtures.flowId(flow.preimage);
     }
 
     function test_initL2_setsL1ChainId() public view {

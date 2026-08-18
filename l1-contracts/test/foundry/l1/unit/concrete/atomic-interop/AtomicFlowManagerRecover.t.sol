@@ -3,6 +3,8 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
+import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
+
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.sol";
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
@@ -118,12 +120,7 @@ contract AtomicFlowManagerRecoverTest is Test {
             destinationBaseTokenAssetId: _destBaseTokenAssetId,
             interopBundleSalt: bytes32(0),
             calls: calls,
-            bundleAttributes: BundleAttributes({
-                executionAddress: "",
-                unbundlerAddress: "",
-                useFixedFee: false,
-                salt: bytes32(0)
-            })
+            bundleAttributes: AtomicFlowFixtures.noBundleAttributes()
         });
     }
 
@@ -209,12 +206,7 @@ contract AtomicFlowManagerRecoverTest is Test {
             destinationBaseTokenAssetId: SOURCE_BASE_TOKEN_ASSET_ID,
             interopBundleSalt: bytes32(0),
             calls: _calls,
-            bundleAttributes: BundleAttributes({
-                executionAddress: "",
-                unbundlerAddress: "",
-                useFixedFee: false,
-                salt: bytes32(0)
-            })
+            bundleAttributes: AtomicFlowFixtures.noBundleAttributes()
         });
     }
 

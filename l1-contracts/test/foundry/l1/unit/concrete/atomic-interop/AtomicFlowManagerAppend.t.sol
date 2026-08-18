@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {AtomicFlowFixtures, AtomicPredeployFixture} from "./AtomicFlowFixtures.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
@@ -52,7 +52,7 @@ contract MockBridgehubRegistry {
 /// wiring and appender ACL); the Bridgehub registry is a minimal stand-in and the root storage a dummy,
 /// feeding the registration and deadline gates. The caller ACL is exercised by pranking the canonical
 /// InteropCenter.
-contract AtomicFlowManagerAppendTest is Test {
+contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
     uint256 internal constant L1_CHAIN_ID = 5;
     uint64 internal constant DEADLINE = 1_700_000_000;
     uint256 internal constant OTHER_CHAIN_ID = 777;
@@ -62,20 +62,12 @@ contract AtomicFlowManagerAppendTest is Test {
     DummyL2InteropRootStorage internal rootStorage;
 
     function setUp() public {
-        deployCodeTo("AtomicFlowManager.sol:AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR);
-        deployCodeTo("L2InteropCommitmentTree.sol:L2InteropCommitmentTree", L2_INTEROP_COMMITMENT_TREE_ADDR);
+        (manager, tree) = _deployAtomicPredeploys(L1_CHAIN_ID, true);
         deployCodeTo("AtomicFlowManagerAppend.t.sol:MockBridgehubRegistry", L2_BRIDGEHUB_ADDR);
         // `append`'s deadline-freshness gate reads the latest imported root timestamp from the canonical
         // root storage; the dummy mirrors the production tracking without the bootloader-only ACL.
         deployCodeTo("DummyL2InteropRootStorage.sol:DummyL2InteropRootStorage", L2_INTEROP_ROOT_STORAGE_ADDR);
         rootStorage = DummyL2InteropRootStorage(L2_INTEROP_ROOT_STORAGE_ADDR);
-        manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
-        tree = L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR);
-
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        manager.initL2(L1_CHAIN_ID);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        tree.initL2();
 
         // The canonical remote chain used by `_twoLegPreimage` is interop-registered; tests for the
         // registration gate use other, unregistered chain ids.
@@ -89,26 +81,23 @@ contract AtomicFlowManagerAppendTest is Test {
         bytes32 _localLeg,
         bytes32 _remoteLeg
     ) internal view returns (AtomicFlowPreimage memory preimage) {
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
-        preimage.deadline = DEADLINE;
-        preimage.settlementLayerChainId = L1_CHAIN_ID;
-        preimage.legBundleHashes = new bytes32[](2);
-        preimage.legSourceChainIds = new uint256[](2);
-        (uint256 localIndex, uint256 remoteIndex) = _localLeg < _remoteLeg ? (0, 1) : (1, 0);
-        preimage.legBundleHashes[localIndex] = _localLeg;
-        preimage.legBundleHashes[remoteIndex] = _remoteLeg;
-        preimage.legSourceChainIds[localIndex] = block.chainid;
-        preimage.legSourceChainIds[remoteIndex] = OTHER_CHAIN_ID;
+        (preimage, , ) = AtomicFlowFixtures.twoLegPreimage(
+            _localLeg,
+            block.chainid,
+            _remoteLeg,
+            OTHER_CHAIN_ID,
+            DEADLINE,
+            L1_CHAIN_ID
+        );
     }
 
-    /// @dev Mirrors `AtomicFlowManager._validateAndComputeFlowId`'s hash (without the shape checks).
+    /// @dev Both forward to the single shared mirrors; see {AtomicFlowFixtures}.
     function _flowId(AtomicFlowPreimage memory _preimage) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_preimage));
+        return AtomicFlowFixtures.flowId(_preimage);
     }
 
-    /// @dev Mirrors `AtomicInteropProof.commitValue`.
     function _commitValue(bytes32 _flowIdValue, bytes32 _bundleHash) internal pure returns (uint256) {
-        return uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, _flowIdValue, _bundleHash)));
+        return AtomicFlowFixtures.commitValue(_flowIdValue, _bundleHash);
     }
 
     function _appendAsInteropCenter(bytes32 _bundleHash, AtomicFlowPreimage memory _preimage) internal {
@@ -429,17 +418,15 @@ contract AtomicFlowManagerAppendTest is Test {
     function _manyLegPreimage(
         uint256 _legCount
     ) internal view returns (AtomicFlowPreimage memory preimage, bytes32 firstLeg) {
-        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
-        preimage.deadline = DEADLINE;
-        preimage.settlementLayerChainId = L1_CHAIN_ID;
-        preimage.legBundleHashes = new bytes32[](_legCount);
-        preimage.legSourceChainIds = new uint256[](_legCount);
+        bytes32[] memory legs = new bytes32[](_legCount);
+        uint256[] memory chains = new uint256[](_legCount);
         for (uint256 i = 0; i < _legCount; ++i) {
             // Strictly ascending by construction.
-            preimage.legBundleHashes[i] = bytes32(i + 1);
-            preimage.legSourceChainIds[i] = block.chainid;
+            legs[i] = bytes32(i + 1);
+            chains[i] = block.chainid;
         }
-        firstLeg = preimage.legBundleHashes[0];
+        preimage = AtomicFlowFixtures.nLegPreimage(legs, chains, DEADLINE, L1_CHAIN_ID);
+        firstLeg = legs[0];
     }
 
     /// @notice A flow with more than {MAX_ATOMIC_FLOW_LEGS} legs cannot be committed.

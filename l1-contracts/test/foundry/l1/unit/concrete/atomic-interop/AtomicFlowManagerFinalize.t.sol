@@ -50,10 +50,8 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
     uint256 internal legSecondIndex;
 
     function setUp() public {
-        deployCodeTo("AtomicFlowManager.sol:AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR);
-        manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        manager.initL2(SETTLEMENT_LAYER_CHAIN_ID);
+        // No canonical commitment tree: `requireFlowFinalized` only verifies proofs, never inserts.
+        (manager, ) = _deployAtomicPredeploys(SETTLEMENT_LAYER_CHAIN_ID, false);
 
         _setUpAtomicFixtures();
 

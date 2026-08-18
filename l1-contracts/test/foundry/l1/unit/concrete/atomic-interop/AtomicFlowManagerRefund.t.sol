@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Vm} from "forge-std/Vm.sol";
 
 import {AtomicInteropProofBuilder} from "./AtomicInteropProofBuilder.sol";
+import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
 import {MockRecoveryRouter} from "./AtomicFlowManagerRecover.t.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
@@ -73,13 +74,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
     uint256 internal missingLegIndex;
 
     function setUp() public {
-        deployCodeTo("AtomicFlowManager.sol:AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR);
-        deployCodeTo("L2InteropCommitmentTree.sol:L2InteropCommitmentTree", L2_INTEROP_COMMITMENT_TREE_ADDR);
-        manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        manager.initL2(SETTLEMENT_LAYER_CHAIN_ID);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
+        (manager, ) = _deployAtomicPredeploys(SETTLEMENT_LAYER_CHAIN_ID, true);
 
         // Builder fixtures: the oracle tree models the missing leg's source-chain state (it never
         // holds either commit value).
@@ -136,12 +131,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
             destinationBaseTokenAssetId: bytes32(uint256(1)),
             interopBundleSalt: keccak256("refund state machine salt"),
             calls: new InteropCall[](0),
-            bundleAttributes: BundleAttributes({
-                executionAddress: bytes(""),
-                unbundlerAddress: bytes(""),
-                useFixedFee: false,
-                salt: bytes32(0)
-            })
+            bundleAttributes: AtomicFlowFixtures.noBundleAttributes()
         });
     }
 
@@ -265,12 +255,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
             destinationBaseTokenAssetId: bytes32(uint256(1)),
             interopBundleSalt: keccak256("late leg salt"),
             calls: calls,
-            bundleAttributes: BundleAttributes({
-                executionAddress: bytes(""),
-                unbundlerAddress: bytes(""),
-                useFixedFee: false,
-                salt: bytes32(0)
-            })
+            bundleAttributes: AtomicFlowFixtures.noBundleAttributes()
         });
         bytes memory lateBundleBytes = abi.encode(lateBundle);
         bytes32 lateLeg = InteropDataEncoding.encodeInteropBundleHash(lateBundleBytes);
@@ -493,12 +478,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
             destinationBaseTokenAssetId: keccak256("recovery destination base token"),
             interopBundleSalt: keccak256("multi-call recovery salt"),
             calls: _calls,
-            bundleAttributes: BundleAttributes({
-                executionAddress: bytes(""),
-                unbundlerAddress: bytes(""),
-                useFixedFee: false,
-                salt: bytes32(0)
-            })
+            bundleAttributes: AtomicFlowFixtures.noBundleAttributes()
         });
     }
 

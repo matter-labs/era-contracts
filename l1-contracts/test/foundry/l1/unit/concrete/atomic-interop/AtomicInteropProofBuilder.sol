@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {AtomicFlowFixtures, AtomicPredeployFixture} from "./AtomicFlowFixtures.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {AtomicInteropProof} from "contracts/atomic-interop/libraries/AtomicInteropProof.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {L2InteropRootStorage} from "contracts/interop/L2InteropRootStorage.sol";
-import {ImtProof, ATOMIC_COMMIT_LEAF_TAG} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {ImtProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {IMTLeaf} from "contracts/common/libraries/IndexedMerkleTree.sol";
 import {InteropRoot} from "contracts/common/Messaging.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
@@ -99,7 +99,7 @@ contract AtomicInteropProofWrapper {
 /// chain-getter views the real aggregation oracle consults (`_ensureChainRegistered` /
 /// `_setUpAtomicFixtures`), so the canonical predeploys resolve without deploying the full bridgehub
 /// stack. None of these stubs feeds the Merkle math the proofs authenticate against.
-abstract contract AtomicInteropProofBuilder is Test {
+abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
     /// @dev The flow deadline all proofs are built against (shared with the tests so the builders
     /// can declare the honest timeout branch for a given batch timestamp).
     uint64 internal constant DEADLINE = 1_000;
@@ -465,8 +465,9 @@ abstract contract AtomicInteropProofBuilder is Test {
     // Tree helpers
     // ------------------------------------------------------------------------------------------------
 
+    /// @dev Forwards to the single shared mirror; see {AtomicFlowFixtures.commitValue}.
     function _commitValue(bytes32 _flowId, bytes32 _bundleHash) internal pure returns (uint256) {
-        return uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, _flowId, _bundleHash)));
+        return AtomicFlowFixtures.commitValue(_flowId, _bundleHash);
     }
 
     /// @dev Inserts `_value` into the real tree as the canonical appender; returns its leaf index.

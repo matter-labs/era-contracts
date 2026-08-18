@@ -26,6 +26,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {InteropPreviewHash} from "contracts/interop/InteropErrors.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 
 /// @notice Struct to hold bundle execution result for assertions
@@ -141,6 +142,28 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
                 1,
                 string(abi.encodePacked("Call ", vm.toString(i), " status should be Executed"))
             );
+        }
+    }
+
+    /// @dev Reads a predicted hash out of the `previewBundleHash` / `previewMessageHash` quoters. Both
+    /// ALWAYS revert with `InteropPreviewHash(bytes32)` — running the real assembly (including any
+    /// value-burning indirect leg) and unwinding it — so the hash comes out of the revert data.
+    /// @dev The predicted hash is CALLER-dependent ("for the same caller and inputs", see
+    /// {IInteropCenter.previewBundleHash}), and it feeds `flowId` on the atomic paths, so a preview taken
+    /// as the wrong sender fails much later as a proof mismatch. `_sender` is therefore never implicit:
+    /// pass `address(this)` when the matching send is unpranked.
+    function _decodePreviewHash(address _sender, bytes memory _callData) internal returns (bytes32 predicted) {
+        vm.prank(_sender);
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool ok, bytes memory ret) = address(l2InteropCenter).call(_callData);
+        require(
+            !ok && ret.length == 36 && bytes4(ret) == InteropPreviewHash.selector,
+            "preview must revert with InteropPreviewHash (quoter pattern)"
+        );
+        // ret layout: 4-byte selector followed by the abi-encoded bytes32 hash.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            predicted := mload(add(ret, 0x24))
         }
     }
 }

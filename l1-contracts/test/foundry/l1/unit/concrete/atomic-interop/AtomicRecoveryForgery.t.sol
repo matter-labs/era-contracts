@@ -3,6 +3,8 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
+import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
+
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
@@ -144,12 +146,7 @@ contract AtomicRecoveryForgeryTest is Test {
             destinationBaseTokenAssetId: bytes32(uint256(1)),
             interopBundleSalt: keccak256(abi.encodePacked("salt", _from, _to)),
             calls: calls,
-            bundleAttributes: BundleAttributes({
-                executionAddress: bytes(""),
-                unbundlerAddress: bytes(""),
-                useFixedFee: false,
-                salt: bytes32(0)
-            })
+            bundleAttributes: AtomicFlowFixtures.noBundleAttributes()
         });
     }
 

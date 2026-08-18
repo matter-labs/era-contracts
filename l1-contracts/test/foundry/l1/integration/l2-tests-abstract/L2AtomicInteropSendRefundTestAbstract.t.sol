@@ -143,12 +143,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     function _mockAtomicFlowManager() internal virtual override {}
 
     function _setUpAtomicStack() internal {
-        deployCodeTo("AtomicFlowManager.sol:AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR);
-        deployCodeTo("L2InteropCommitmentTree.sol:L2InteropCommitmentTree", L2_INTEROP_COMMITMENT_TREE_ADDR);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(L1_CHAIN_ID);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
+        _deployAtomicPredeploys(L1_CHAIN_ID, true);
         // Proof fixtures from the builder: `tree` below acts as the REMOTE chain's IMT oracle (only
         // its genesis head leaf — the invalid leg is never committed there), plus the real
         // L2InteropRootStorage etched at its canonical address for the timeout clock, and a real
@@ -193,24 +188,13 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         attrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
         // `previewBundleHash` runs the real assembly (including the burning indirect call) but ALWAYS
         // reverts with `InteropPreviewHash(bytes32)`, unwinding the burn — read the hash out of the revert.
-        vm.prank(_sender);
-        // solhint-disable-next-line avoid-low-level-calls
-        (bool ok, bytes memory ret) = address(l2InteropCenter).call(
+        predicted = _decodePreviewHash(
+            _sender,
             abi.encodeCall(
                 l2InteropCenter.previewBundleHash,
                 (InteroperableAddress.formatEvmV1(_destinationChainId), _calls, attrs)
             )
         );
-        require(!ok, "previewBundleHash must revert with InteropPreviewHash (quoter pattern)");
-        require(
-            ret.length == 36 && bytes4(ret) == InteropPreviewHash.selector,
-            "preview must revert with InteropPreviewHash"
-        );
-        // ret layout: 4-byte selector followed by the abi-encoded bytes32 hash.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            predicted := mload(add(ret, 0x24))
-        }
     }
 
     /// @dev Two-leg preimage: local leg on this chain + `INVALID_REMOTE_LEG` on the destination chain,
@@ -812,18 +796,11 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
     ) internal returns (bytes32 predicted) {
         bytes[] memory previewAttrs = new bytes[](1);
         previewAttrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (_salt));
-        // solhint-disable-next-line avoid-low-level-calls
-        (bool ok, bytes memory ret) = address(l2InteropCenter).call(
+        // The matching `sendMessage` below is unpranked, so preview as this contract.
+        predicted = _decodePreviewHash(
+            address(this),
             abi.encodeCall(l2InteropCenter.previewMessageHash, (_recipient7930, _payload, previewAttrs))
         );
-        require(
-            !ok && ret.length == 36 && bytes4(ret) == InteropPreviewHash.selector,
-            "preview must revert with InteropPreviewHash"
-        );
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            predicted := mload(add(ret, 0x24))
-        }
     }
 
     /// @notice The single-message atomic entry point `sendMessage` (distinct from `sendBundle`): it
