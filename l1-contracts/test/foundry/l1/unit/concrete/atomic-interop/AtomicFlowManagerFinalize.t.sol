@@ -32,7 +32,6 @@ import {L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAdd
 /// Proof fixtures are real end-to-end per {AtomicInteropProofBuilder}; the manager sits at its
 /// canonical predeploy and is called from the pranked canonical InteropHandler.
 contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
-    uint256 internal constant SETTLEMENT_LAYER_CHAIN_ID = 1; // L1
     uint256 internal constant CHAIN_A = 271;
     uint256 internal constant CHAIN_B = 272;
 
@@ -68,7 +67,7 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         preimage.legSourceChainIds = new uint256[](2);
         preimage.legSourceChainIds[0] = CHAIN_A;
         preimage.legSourceChainIds[1] = CHAIN_B;
-        flowId = keccak256(abi.encode(preimage));
+        flowId = AtomicFlowFixtures.flowId(preimage);
 
         legFirstIndex = _insertCommit(AtomicFlowFixtures.commitValue(flowId, legFirst));
         legSecondIndex = _insertCommit(AtomicFlowFixtures.commitValue(flowId, legSecond));

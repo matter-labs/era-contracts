@@ -162,6 +162,12 @@ contract AtomicFlowManagerRecoverTest is Test {
             "double recovery"
         );
 
+        // Pin that the router-backed branch is taken: otherwise this passes even if `_recoverBundle`
+        // skips both branches.
+        vm.expectCall(
+            L2_ASSET_ROUTER_ADDR,
+            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector, DEST_CHAIN_ID, callData)
+        );
         manager.exposedRecoverBundle(_bundleFrom(L2_ASSET_ROUTER_ADDR, SOURCE_BASE_TOKEN_ASSET_ID, 1 ether, callData));
     }
 

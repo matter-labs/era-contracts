@@ -4,6 +4,10 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {Vm} from "forge-std/Vm.sol";
+import {L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
+import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
@@ -32,6 +36,9 @@ struct BundleExecutionResult {
 }
 
 abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
+    /// @dev Token amount the atomic integration fixtures move.
+    uint256 internal constant TRANSFER_AMOUNT = 100;
+
     uint256 destinationChainId = INTEROP_DESTINATION_CHAIN_ID;
     bytes32 destinationBaseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
 
@@ -157,5 +164,21 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         assembly {
             predicted := mload(add(ret, 0x24))
         }
+    }
+
+    /// @dev One second-bridge call starter transferring `_amount` of `_l2Token` to `_receiver`.
+    function _tokenCallStarter(
+        address _l2Token,
+        uint256 _amount,
+        address _receiver
+    ) internal view returns (InteropCallStarter[] memory calls) {
+        bytes memory secondBridgeCalldata = InteropLibrary.buildSecondBridgeCalldata(
+            L2_NATIVE_TOKEN_VAULT.assetId(_l2Token),
+            _amount,
+            _receiver,
+            address(0)
+        );
+        calls = new InteropCallStarter[](1);
+        calls[0] = InteropLibrary.buildSecondBridgeCall(secondBridgeCalldata, L2_ASSET_ROUTER_ADDR);
     }
 }
