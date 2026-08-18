@@ -9,7 +9,6 @@ import {MockRecoveryRouter} from "./AtomicFlowManagerRecover.t.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
-import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {
     AtomicFlow,
     AtomicFlowPreimage,
@@ -24,21 +23,12 @@ import {
     ProofImtRootInclusionFailed
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.sol";
-import {
-    BundleAttributes,
-    INTEROP_BUNDLE_VERSION,
-    INTEROP_CALL_VERSION,
-    InteropBundle,
-    InteropCall
-} from "contracts/common/Messaging.sol";
+import {INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
-    L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_BRIDGEHUB_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR,
-    L2_INTEROP_CENTER_ADDR,
-    L2_INTEROP_COMMITMENT_TREE_ADDR
+    L2_INTEROP_CENTER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @notice Covers the refund path's guards in `AtomicFlowManager` — `authorizeRefund`'s proof and
@@ -138,7 +128,12 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
     /// @dev A genuine end-to-end absence proof for the missing leg (begin branch, declared on
     /// `MISSING_LEG_CHAIN`). NOT `view`: real aggregation + import mutate settlement-layer state.
     function _validAbsence() internal returns (ImtProof memory) {
-        return _realTimeoutBeginProof(MISSING_LEG_CHAIN, _commitValue(flowId, missingLeg), uint256(DEADLINE) + 1);
+        return
+            _realTimeoutBeginProof(
+                MISSING_LEG_CHAIN,
+                AtomicFlowFixtures.commitValue(flowId, missingLeg),
+                uint256(DEADLINE) + 1
+            );
     }
 
     function _flow() internal view returns (AtomicFlow memory) {
@@ -181,7 +176,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
 
         ImtProof memory absence = _realTimeoutBeginProof(
             MISSING_LEG_CHAIN,
-            _commitValue(multiFlowId, missingLegHash),
+            AtomicFlowFixtures.commitValue(multiFlowId, missingLegHash),
             uint256(DEADLINE) + 1
         );
 
@@ -294,7 +289,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         ImtProof memory absence = _nonInclusionProof(
             block.chainid,
             REMOTE_BATCH_NUMBER,
-            _commitValue(lateFlowId, lateLeg),
+            AtomicFlowFixtures.commitValue(lateFlowId, lateLeg),
             SETTLEMENT_LAYER_CHAIN_ID,
             SL_BLOCK,
             uint256(DEADLINE) + 1
@@ -363,7 +358,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         ImtProof memory absence = _nonInclusionProof(
             MISSING_LEG_CHAIN,
             REMOTE_BATCH_NUMBER,
-            _commitValue(flowId, missingLeg),
+            AtomicFlowFixtures.commitValue(flowId, missingLeg),
             SETTLEMENT_LAYER_CHAIN_ID,
             SL_BLOCK,
             uint256(DEADLINE) + 1
@@ -403,13 +398,10 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
 
     // ============ multi-call recovery through the real Revertable path ============
 
-    /// @dev Drives `_bundle`'s leg to `Revertable` entirely through production entry points: a fresh
-    /// two-leg flow, a real `append` of this bundle's leg (pranked canonical InteropCenter), then a real
-    /// `authorizeRefund` against an end-to-end absence proof for the never-committed co-leg. No leg state
-    /// is ever written directly (see AGENTS.md on storage overrides).
-    /// @dev NOT `view`: aggregation + import mutate settlement-layer state. Consumes
-    /// `MISSING_LEG_CHAIN`'s single post-genesis batch, so a test calling this must not also call
-    /// {_validAbsence}. `append` must run before the post-deadline root is imported, hence this order.
+    /// @dev Drives `_bundle`'s leg to `Revertable` through production entry points only: a real
+    /// `append`, then a real `authorizeRefund` against an absence proof for the never-committed co-leg.
+    /// @dev Consumes `MISSING_LEG_CHAIN`'s single post-genesis batch, so a caller must not also call
+    /// {_validAbsence}. `append` must precede the post-deadline root import, hence this order.
     function _revertableLegFromBundle(
         InteropBundle memory _bundle
     ) internal returns (bytes32 recoveryFlowId, bytes32 bundleHash, bytes memory bundleBytes) {
@@ -435,7 +427,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
 
         ImtProof memory absence = _realTimeoutBeginProof(
             MISSING_LEG_CHAIN,
-            _commitValue(recoveryFlowId, coLeg),
+            AtomicFlowFixtures.commitValue(recoveryFlowId, coLeg),
             uint256(DEADLINE) + 1
         );
         manager.authorizeRefund(AtomicFlow({flowId: recoveryFlowId, preimage: recoveryPreimage}), coIdx, absence);
@@ -446,9 +438,8 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         );
     }
 
-    /// @dev The stateful asset-router stand-in at its canonical address (shared with
-    /// {AtomicFlowManagerRecoverTest}): unlike `vm.mockCall`, its counters are real storage, so they
-    /// roll back with a reverting `claimRefund` — which is what the abort test below proves.
+    /// @dev Shared with {AtomicFlowManagerRecoverTest}: unlike `vm.mockCall` its counters are real
+    /// storage, so they roll back with a reverting `claimRefund` — what the abort test below proves.
     function _deployMockRecoveryRouter() internal returns (MockRecoveryRouter router) {
         deployCodeTo("AtomicFlowManagerRecover.t.sol:MockRecoveryRouter", L2_ASSET_ROUTER_ADDR);
         router = MockRecoveryRouter(L2_ASSET_ROUTER_ADDR);

@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {Vm} from "forge-std/Vm.sol";
+import {AtomicFlowFixtures} from "../../unit/concrete/atomic-interop/AtomicFlowFixtures.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {AtomicInteropProofBuilder} from "../../unit/concrete/atomic-interop/AtomicInteropProofBuilder.sol";
@@ -33,7 +34,6 @@ import {
     L2_ASSET_ROUTER_ADDR,
     L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
@@ -215,10 +215,6 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         missingLegIndex = remoteIndex;
     }
 
-    function _flowIdOf(AtomicFlowPreimage memory _preimage) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_preimage));
-    }
-
     function _atomicAttributes(
         AtomicFlowPreimage memory _preimage,
         bytes32 _salt
@@ -321,7 +317,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         (AtomicFlowPreimage memory preimage, uint256 missingLegIndex) = _preimageWithInvalidRemoteLeg(predicted);
         ctxPreimage = preimage;
         ctx.missingLegIndex = missingLegIndex;
-        ctx.flowId = _flowIdOf(preimage);
+        ctx.flowId = AtomicFlowFixtures.flowId(preimage);
         ctx.balanceBefore = IERC20(ctx.l2Token).balanceOf(address(this));
 
         vm.recordLogs();
@@ -353,7 +349,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
         assertEq(
             L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafAt(1).value,
-            _commitValue(ctx.flowId, ctx.bundleHash),
+            AtomicFlowFixtures.commitValue(ctx.flowId, ctx.bundleHash),
             "the leg's commit value must be inserted into the canonical IMT"
         );
     }
@@ -369,7 +365,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         // the idempotency tests (the first-post-genesis proof builder rejects a second aggregation).
         ImtProof memory absence = _realTimeoutBeginProof(
             destinationChainId,
-            _commitValue(ctx.flowId, INVALID_REMOTE_LEG),
+            AtomicFlowFixtures.commitValue(ctx.flowId, INVALID_REMOTE_LEG),
             uint256(DEADLINE) + 1
         );
         _invalidRemoteAbsence = absence;
@@ -427,7 +423,11 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         uint256 balanceBefore = IERC20(l2Token).balanceOf(address(this));
 
         vm.expectRevert(
-            abi.encodeWithSelector(ManagerCommittedBundleNotInFlow.selector, _flowIdOf(preimage), predicted)
+            abi.encodeWithSelector(
+                ManagerCommittedBundleNotInFlow.selector,
+                AtomicFlowFixtures.flowId(preimage),
+                predicted
+            )
         );
         l2InteropCenter.sendBundle(
             InteroperableAddress.formatEvmV1(destinationChainId),
@@ -441,7 +441,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
             "the burn must be unwound with the reverted send"
         );
         assertEq(
-            uint256(manager.legState(_flowIdOf(preimage), predicted)),
+            uint256(manager.legState(AtomicFlowFixtures.flowId(preimage), predicted)),
             uint256(LegState.Unset),
             "no leg state may exist after the reverted send"
         );
@@ -491,7 +491,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         (AtomicFlowPreimage memory preimage, uint256 missingLegIndex) = _preimageWithInvalidRemoteLeg(predicted);
         ctxPreimage = preimage;
         ctx.missingLegIndex = missingLegIndex;
-        ctx.flowId = _flowIdOf(preimage);
+        ctx.flowId = AtomicFlowFixtures.flowId(preimage);
 
         vm.deal(_depositor, NATIVE_VALUE_LEG_AMOUNT);
         uint256 holderBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
@@ -641,7 +641,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         (AtomicFlowPreimage memory preimage, uint256 missingLegIndex) = _preimageWithInvalidRemoteLeg(predicted);
         ctxPreimage = preimage;
         ctx.missingLegIndex = missingLegIndex;
-        ctx.flowId = _flowIdOf(preimage);
+        ctx.flowId = AtomicFlowFixtures.flowId(preimage);
 
         vm.recordLogs();
         vm.expectEmit(true, true, true, true, address(manager));
@@ -830,7 +830,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         preimage.legBundleHashes[0] = predicted;
         preimage.legSourceChainIds = new uint256[](1);
         preimage.legSourceChainIds[0] = block.chainid;
-        bytes32 flowId = _flowIdOf(preimage);
+        bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
 
         bytes[] memory attrs = new bytes[](2);
         attrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (salt));
@@ -849,7 +849,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         );
         assertEq(
             L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafAt(1).value,
-            _commitValue(flowId, predicted),
+            AtomicFlowFixtures.commitValue(flowId, predicted),
             "the leg's commit value must land in the canonical IMT"
         );
 
@@ -890,7 +890,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
 
         assertEq(bundleHash, predicted, "attribute order must not change the bundle hash");
         assertEq(
-            uint256(manager.legState(_flowIdOf(preimage), bundleHash)),
+            uint256(manager.legState(AtomicFlowFixtures.flowId(preimage), bundleHash)),
             uint256(LegState.Committed),
             "the leg must be Committed regardless of the atomic attribute's position"
         );

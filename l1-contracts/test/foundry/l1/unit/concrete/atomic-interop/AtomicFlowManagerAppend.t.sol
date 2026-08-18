@@ -9,7 +9,6 @@ import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitm
 import {
     AtomicFlowPreimage,
     LegState,
-    ATOMIC_COMMIT_LEAF_TAG,
     ATOMIC_FLOW_PREIMAGE_VERSION,
     MAX_ATOMIC_FLOW_LEGS
 } from "contracts/atomic-interop/IAtomicInterop.sol";
@@ -28,11 +27,8 @@ import {
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {DummyL2InteropRootStorage} from "contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 import {
-    L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_BRIDGEHUB_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_CENTER_ADDR,
-    L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_ROOT_STORAGE_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -91,15 +87,6 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         );
     }
 
-    /// @dev Both forward to the single shared mirrors; see {AtomicFlowFixtures}.
-    function _flowId(AtomicFlowPreimage memory _preimage) internal pure returns (bytes32) {
-        return AtomicFlowFixtures.flowId(_preimage);
-    }
-
-    function _commitValue(bytes32 _flowIdValue, bytes32 _bundleHash) internal pure returns (uint256) {
-        return AtomicFlowFixtures.commitValue(_flowIdValue, _bundleHash);
-    }
-
     function _appendAsInteropCenter(bytes32 _bundleHash, AtomicFlowPreimage memory _preimage) internal {
         vm.prank(L2_INTEROP_CENTER_ADDR);
         manager.append(_bundleHash, 0, _preimage);
@@ -114,14 +101,10 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         manager.append(_bundleHash, _lowNullifierIndex, _preimage);
     }
 
-    /// @notice Two legs of the SAME flow, both sourced on this chain, can be committed one after the
-    /// other, and the indexed tree links their commit values in value order. Every other case here
-    /// commits a single leg, so this is the only coverage of a second insert (leaf 2) and of the
-    /// low-leaf link being rewritten by it.
-    /// @dev Deliberately NOT a test of `_lowNullifierIndex` forwarding: that argument is only a hint —
-    /// {IndexedMerkleTree.insert} walks the linked list forward from it — so the head index 0 is always
-    /// accepted and no behavioural test can distinguish forwarding it from hard-coding 0. The index is
-    /// passed here in its correct form anyway, as a caller would.
+    /// @notice Two legs of the same flow commit in sequence and the tree links them in value order.
+    /// Every other case commits one leg, so this is the only coverage of a second insert and relink.
+    /// @dev NOT a test of `_lowNullifierIndex` forwarding: that argument is a hint that
+    /// {IndexedMerkleTree.insert} walks forward from, so `insert(value, 0)` is an equivalent mutant.
     function test_append_CommitsSecondLegAndLinksBothCommitValues() public {
         bytes32 legA = keccak256("nullifier leg A");
         bytes32 legB = keccak256("nullifier leg B");
@@ -136,11 +119,11 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         (preimage.legBundleHashes[0], preimage.legBundleHashes[1]) = legA < legB ? (legA, legB) : (legB, legA);
         preimage.legSourceChainIds[0] = block.chainid;
         preimage.legSourceChainIds[1] = block.chainid;
-        bytes32 flowId = _flowId(preimage);
+        bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
 
         // Insert in commit-value order: the smaller value brackets at the head, the larger at leaf 1.
-        uint256 valueFirst = _commitValue(flowId, preimage.legBundleHashes[0]);
-        uint256 valueSecond = _commitValue(flowId, preimage.legBundleHashes[1]);
+        uint256 valueFirst = AtomicFlowFixtures.commitValue(flowId, preimage.legBundleHashes[0]);
+        uint256 valueSecond = AtomicFlowFixtures.commitValue(flowId, preimage.legBundleHashes[1]);
         (bytes32 firstLeg, bytes32 secondLeg) = valueFirst < valueSecond
             ? (preimage.legBundleHashes[0], preimage.legBundleHashes[1])
             : (preimage.legBundleHashes[1], preimage.legBundleHashes[0]);
@@ -171,7 +154,7 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
     function test_append_CommitsLegAndInsertsCommitValue() public {
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
-        bytes32 flowId = _flowId(preimage);
+        bytes32 flowId = AtomicFlowFixtures.flowId(preimage);
 
         vm.expectEmit(true, true, true, true, address(manager));
         emit IAtomicFlowManager.FlowCommitted(flowId, localLeg, DEADLINE, 1);
@@ -179,13 +162,15 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
 
         assertEq(uint256(manager.legState(flowId, localLeg)), uint256(LegState.Committed), "leg must be Committed");
         assertEq(tree.leafCount(), 2, "commit value must be inserted after the seeded head leaf");
-        assertEq(tree.leafAt(1).value, _commitValue(flowId, localLeg), "inserted leaf must hold the commit value");
+        assertEq(
+            tree.leafAt(1).value,
+            AtomicFlowFixtures.commitValue(flowId, localLeg),
+            "inserted leaf must hold the commit value"
+        );
     }
 
-    /// @notice The v1 preimage version literal is pinned. `ATOMIC_FLOW_PREIMAGE_VERSION` is part of
-    /// the flow-id preimage encoding and is mirrored off-chain by hand in
-    /// `test/anvil-interop/src/helpers/imt-engine-lib.ts`, so a bump must be a deliberate, visible
-    /// change here rather than a silent constant edit caught only by the anvil suite.
+    /// @notice Pins the v1 version literal: it is mirrored off-chain by hand in
+    /// `test/anvil-interop/src/helpers/imt-engine-lib.ts`, so a bump must break something here.
     function test_atomicFlowPreimageVersion_isPinnedToV1() public {
         assertEq(ATOMIC_FLOW_PREIMAGE_VERSION, bytes1(0x01), "v1 preimage version literal must be pinned");
     }
@@ -215,7 +200,11 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         bytes32 strayBundleHash = keccak256("stale off-chain prediction");
 
         vm.expectRevert(
-            abi.encodeWithSelector(ManagerCommittedBundleNotInFlow.selector, _flowId(preimage), strayBundleHash)
+            abi.encodeWithSelector(
+                ManagerCommittedBundleNotInFlow.selector,
+                AtomicFlowFixtures.flowId(preimage),
+                strayBundleHash
+            )
         );
         _appendAsInteropCenter(strayBundleHash, preimage);
     }
@@ -229,7 +218,7 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ManagerCommittedLegSourceChainMismatch.selector,
-                _flowId(preimage),
+                AtomicFlowFixtures.flowId(preimage),
                 block.chainid,
                 OTHER_CHAIN_ID
             )
@@ -362,7 +351,7 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
 
         _appendAsInteropCenter(legA, preimage);
         assertEq(
-            uint256(manager.legState(_flowId(preimage), legA)),
+            uint256(manager.legState(AtomicFlowFixtures.flowId(preimage), legA)),
             uint256(LegState.Committed),
             "all-local leg must commit without any registry entry"
         );
@@ -396,7 +385,7 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
 
         _appendAsInteropCenter(localLeg, preimage);
 
-        assertEq(uint256(manager.legState(_flowId(preimage), localLeg)), uint256(LegState.Committed));
+        assertEq(uint256(manager.legState(AtomicFlowFixtures.flowId(preimage), localLeg)), uint256(LegState.Committed));
     }
 
     /// @notice The deadline gate keys on the flow's settlement layer only: a late root imported for some
@@ -410,7 +399,7 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
 
         _appendAsInteropCenter(localLeg, preimage);
 
-        assertEq(uint256(manager.legState(_flowId(preimage), localLeg)), uint256(LegState.Committed));
+        assertEq(uint256(manager.legState(AtomicFlowFixtures.flowId(preimage), localLeg)), uint256(LegState.Committed));
     }
 
     /// @dev Builds an all-local preimage with `_legCount` strictly ascending leg hashes; returns the
@@ -445,7 +434,7 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
 
         _appendAsInteropCenter(firstLeg, preimage);
 
-        assertEq(uint256(manager.legState(_flowId(preimage), firstLeg)), uint256(LegState.Committed));
+        assertEq(uint256(manager.legState(AtomicFlowFixtures.flowId(preimage), firstLeg)), uint256(LegState.Committed));
     }
 
     /// @notice A `(flowId, bundleHash)` leg can only be committed once.
@@ -454,7 +443,9 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
         _appendAsInteropCenter(localLeg, preimage);
 
-        vm.expectRevert(abi.encodeWithSelector(ManagerLegAlreadyCommitted.selector, _flowId(preimage), localLeg));
+        vm.expectRevert(
+            abi.encodeWithSelector(ManagerLegAlreadyCommitted.selector, AtomicFlowFixtures.flowId(preimage), localLeg)
+        );
         _appendAsInteropCenter(localLeg, preimage);
     }
 

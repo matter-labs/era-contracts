@@ -4,20 +4,17 @@ pragma solidity ^0.8.20;
 
 // solhint-disable gas-custom-errors
 
-import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
 import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_ROUTER,
@@ -42,7 +39,6 @@ import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {IL2AssetRouter} from "../../../../../contracts/bridge/asset-router/IL2AssetRouter.sol";
-import {IL1Nullifier} from "../../../../../contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "../../../../../contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {

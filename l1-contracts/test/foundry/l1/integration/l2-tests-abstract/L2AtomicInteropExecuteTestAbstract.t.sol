@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
-import {Vm} from "forge-std/Vm.sol";
+import {AtomicFlowFixtures} from "../../unit/concrete/atomic-interop/AtomicFlowFixtures.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {AtomicInteropProofBuilder} from "../../unit/concrete/atomic-interop/AtomicInteropProofBuilder.sol";
@@ -32,8 +32,6 @@ import {BundleStatus, CallStatus, InteropBundle, InteropCallStarter} from "contr
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
-    L2_ATOMIC_FLOW_MANAGER_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -118,10 +116,6 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         );
     }
 
-    function _flowIdOf(AtomicFlowPreimage memory _preimage) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_preimage));
-    }
-
     /// @dev Cross-phase context (storage rather than locals to stay under the stack limit; each test
     /// overwrites it fully).
     struct ExecCtx {
@@ -165,7 +159,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         preimage.legSourceChainIds[localIndex] = block.chainid;
         preimage.legSourceChainIds[remoteIndex] = destinationChainId;
         ectxPreimage = preimage;
-        ectx.flowId = _flowIdOf(preimage);
+        ectx.flowId = AtomicFlowFixtures.flowId(preimage);
 
         // The real send carries the atomic metadata out-of-band plus the same bundle attributes.
         bytes[] memory attrs = new bytes[](predictionAttrs.length + 1);
@@ -192,7 +186,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     /// @dev Phase 2: commit the remote peer leg in its (oracle) source tree and assemble the per-leg
     /// finality proofs, positionally aligned with the preimage. Both batches settled in time.
     function _commitRemoteLegAndBuildFinality() internal returns (AtomicFinalityProof memory finality) {
-        uint256 remoteIndex = _insertCommit(_commitValue(ectx.flowId, REMOTE_LEG));
+        uint256 remoteIndex = _insertCommit(AtomicFlowFixtures.commitValue(ectx.flowId, REMOTE_LEG));
         finality = _buildFinality(
             _inclusionProof(destinationChainId, REMOTE_BATCH_NUMBER, remoteIndex, L1_CHAIN_ID, SL_BLOCK, DEADLINE - 1)
         );
@@ -297,7 +291,11 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         AtomicFinalityProof memory finality = _buildFinality(bogusRemoteProof);
 
         vm.expectRevert(
-            abi.encodeWithSelector(IMTLeafValueMismatch.selector, _commitValue(ectx.flowId, REMOTE_LEG), 0)
+            abi.encodeWithSelector(
+                IMTLeafValueMismatch.selector,
+                AtomicFlowFixtures.commitValue(ectx.flowId, REMOTE_LEG),
+                0
+            )
         );
         _executeOnDestination(finality);
     }
@@ -407,7 +405,11 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         vm.chainId(destinationChainId);
 
         vm.expectRevert(
-            abi.encodeWithSelector(IMTLeafValueMismatch.selector, _commitValue(ectx.flowId, REMOTE_LEG), 0)
+            abi.encodeWithSelector(
+                IMTLeafValueMismatch.selector,
+                AtomicFlowFixtures.commitValue(ectx.flowId, REMOTE_LEG),
+                0
+            )
         );
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(ectxBundleBytes, finality);
     }

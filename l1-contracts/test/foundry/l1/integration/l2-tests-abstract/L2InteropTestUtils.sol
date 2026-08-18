@@ -7,12 +7,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {
-    L2_INTEROP_CENTER_ADDR,
-    L2_INTEROP_HANDLER,
-    L2_INTEROP_HANDLER_ADDR,
-    L2_NATIVE_TOKEN_VAULT_ADDR
-} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {InteropBundle} from "contracts/common/Messaging.sol";
 import {
@@ -145,13 +140,10 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         }
     }
 
-    /// @dev Reads a predicted hash out of the `previewBundleHash` / `previewMessageHash` quoters. Both
-    /// ALWAYS revert with `InteropPreviewHash(bytes32)` — running the real assembly (including any
-    /// value-burning indirect leg) and unwinding it — so the hash comes out of the revert data.
-    /// @dev The predicted hash is CALLER-dependent ("for the same caller and inputs", see
-    /// {IInteropCenter.previewBundleHash}), and it feeds `flowId` on the atomic paths, so a preview taken
-    /// as the wrong sender fails much later as a proof mismatch. `_sender` is therefore never implicit:
-    /// pass `address(this)` when the matching send is unpranked.
+    /// @dev Reads a hash out of the `previewBundleHash`/`previewMessageHash` quoters, which always
+    /// revert with `InteropPreviewHash(bytes32)` after running (and unwinding) the real assembly.
+    /// @dev The hash is caller-dependent and feeds `flowId`, so a preview taken as the wrong sender
+    /// fails much later as a proof mismatch. Pass `address(this)` when the send is unpranked.
     function _decodePreviewHash(address _sender, bytes memory _callData) internal returns (bytes32 predicted) {
         vm.prank(_sender);
         // solhint-disable-next-line avoid-low-level-calls

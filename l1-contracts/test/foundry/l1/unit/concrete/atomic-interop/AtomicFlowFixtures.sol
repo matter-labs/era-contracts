@@ -17,30 +17,22 @@ import {
     L2_INTEROP_COMMITMENT_TREE_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-/// @notice Shared fixture helpers for the atomic-interop suites.
-/// @dev These exist to keep the consensus-critical mirrors in ONE place. `commitValue` and `flowId`
-/// restate on-chain formulas; every extra copy is a chance for a test to verify against a value the
-/// production code never produces.
-///
-/// Deliberately NOT used by `AtomicInteropProof.testFuzz_commitValue_matchesSpec`: that test restates
-/// the commit-value formula on purpose, as the spec assertion. Pointing it here would make it compare
-/// {commitValue} against itself.
+/// @notice Shared fixtures for the atomic-interop suites.
+/// @dev `commitValue` and `flowId` restate on-chain formulas, so they live here once: an extra copy is
+/// a chance for a test to verify against a value production never produces. `AtomicInteropProof`'s
+/// `testFuzz_commitValue_matchesSpec` deliberately keeps its own restatement — it is the spec
+/// assertion, and routing it here would compare {commitValue} against itself.
 library AtomicFlowFixtures {
-    /// @dev Mirrors `AtomicInteropProof.commitValue`.
     function commitValue(bytes32 _flowId, bytes32 _bundleHash) internal pure returns (uint256) {
         return uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, _flowId, _bundleHash)));
     }
 
-    /// @dev Mirrors `AtomicFlowManager._validateAndComputeFlowId`'s hash (without the shape checks).
     function flowId(AtomicFlowPreimage memory _preimage) internal pure returns (bytes32) {
         return keccak256(abi.encode(_preimage));
     }
 
-    /// @dev A well-formed two-leg preimage. `append` requires `legBundleHashes` to be STRICTLY
-    /// ascending, so the legs are sorted by hash and the resulting slot of each is returned — callers
-    /// need those indices to address their own leg and would otherwise recompute the same comparison.
-    /// Negative tests that need a malformed preimage should build one explicitly, or mutate the result
-    /// here, rather than gaining a "make it invalid" flag.
+    /// @dev Legs must be strictly ascending, so they are sorted here and each leg's resulting slot is
+    /// returned — callers need those indices and were all repeating the same comparison.
     function twoLegPreimage(
         bytes32 _legA,
         uint256 _chainA,
@@ -60,8 +52,7 @@ library AtomicFlowFixtures {
         preimage = nLegPreimage(legs, chains, _deadline, _settlementLayerChainId);
     }
 
-    /// @dev A preimage over caller-ordered legs. The caller owns the ordering: this is the building
-    /// block the negative shape tests (unsorted, duplicated, length-mismatched) start from.
+    /// @dev Caller owns the leg ordering: the negative shape tests start from here and then break it.
     function nLegPreimage(
         bytes32[] memory _legBundleHashes,
         uint256[] memory _legSourceChainIds,
@@ -75,7 +66,6 @@ library AtomicFlowFixtures {
         preimage.legSourceChainIds = _legSourceChainIds;
     }
 
-    /// @dev The all-empty bundle attributes every fixture bundle that carries no attributes uses.
     function noBundleAttributes() internal pure returns (BundleAttributes memory) {
         return
             BundleAttributes({
@@ -88,10 +78,9 @@ library AtomicFlowFixtures {
 }
 
 /// @notice Stands the atomic predeploys up at their canonical addresses.
-/// @dev A contract rather than a library so it can use forge-std's `deployCodeTo`. Whether the
-/// commitment tree is deployed is an explicit argument: `requireFlowFinalized` never inserts, so the
-/// finalize suite genuinely does not need one, and making that a parameter keeps the difference
-/// visible instead of leaving it as an omission a reader has to notice.
+/// @dev A contract, not a library, so it can use forge-std's `deployCodeTo`. The tree is optional
+/// because `requireFlowFinalized` never inserts — the finalize suite needs none, and making that an
+/// argument keeps the difference visible instead of leaving it an omission.
 abstract contract AtomicPredeployFixture is Test {
     function _deployAtomicPredeploys(
         uint256 _l1ChainId,

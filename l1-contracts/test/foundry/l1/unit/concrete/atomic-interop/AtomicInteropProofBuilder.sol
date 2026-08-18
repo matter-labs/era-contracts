@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {AtomicFlowFixtures, AtomicPredeployFixture} from "./AtomicFlowFixtures.sol";
+import {AtomicPredeployFixture} from "./AtomicFlowFixtures.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -464,11 +464,6 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
     // ------------------------------------------------------------------------------------------------
     // Tree helpers
     // ------------------------------------------------------------------------------------------------
-
-    /// @dev Forwards to the single shared mirror; see {AtomicFlowFixtures.commitValue}.
-    function _commitValue(bytes32 _flowId, bytes32 _bundleHash) internal pure returns (uint256) {
-        return AtomicFlowFixtures.commitValue(_flowId, _bundleHash);
-    }
 
     /// @dev Inserts `_value` into the real tree as the canonical appender; returns its leaf index.
     function _insertCommit(uint256 _value) internal returns (uint256 index) {

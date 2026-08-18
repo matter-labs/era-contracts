@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {AtomicInteropProofBuilder} from "./AtomicInteropProofBuilder.sol";
+import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {
@@ -20,11 +21,7 @@ import {
     ProofDeadlineExceeded
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {IMTLeafValueMismatch} from "contracts/common/L1ContractErrors.sol";
-import {
-    L2_ATOMIC_FLOW_MANAGER_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR,
-    L2_INTEROP_HANDLER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @notice Covers `AtomicFlowManager.requireFlowFinalized` — the atomicity gate the InteropHandler
 /// consults before executing an atomic bundle. The property under test: the gate passes iff EVERY
@@ -73,8 +70,8 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         preimage.legSourceChainIds[1] = CHAIN_B;
         flowId = keccak256(abi.encode(preimage));
 
-        legFirstIndex = _insertCommit(_commitValue(flowId, legFirst));
-        legSecondIndex = _insertCommit(_commitValue(flowId, legSecond));
+        legFirstIndex = _insertCommit(AtomicFlowFixtures.commitValue(flowId, legFirst));
+        legSecondIndex = _insertCommit(AtomicFlowFixtures.commitValue(flowId, legSecond));
     }
 
     /// @dev A finality proof with a genuine in-time inclusion proof per leg; `_tsFirst`/`_tsSecond` are
@@ -141,9 +138,8 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         _requireFinalizedAsHandler(legFirst, finality);
     }
 
-    /// @notice ...and SURPLUS proofs are rejected too, not silently ignored. The per-leg loop only
-    /// reads `proofs[0..n)`, so without this case the count check can be weakened from `!=` to `<`
-    /// and every other finalize test still passes — the exact-shape requirement would be unpinned.
+    /// @notice ...and SURPLUS proofs too. The loop only reads `proofs[0..n)`, so without this the
+    /// count check can be weakened from `!=` to `<` and every other finalize test still passes.
     function test_RevertWhen_ProofCountTooMany() public {
         AtomicFinalityProof memory finality = _validFinality();
         ImtProof[] memory threeProofs = new ImtProof[](3);
@@ -190,8 +186,8 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IMTLeafValueMismatch.selector,
-                _commitValue(flowId, legFirst),
-                _commitValue(flowId, legSecond)
+                AtomicFlowFixtures.commitValue(flowId, legFirst),
+                AtomicFlowFixtures.commitValue(flowId, legSecond)
             )
         );
         _requireFinalizedAsHandler(legFirst, finality);
@@ -208,8 +204,8 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IMTLeafValueMismatch.selector,
-                _commitValue(flowId, legSecond),
-                _commitValue(flowId, legFirst)
+                AtomicFlowFixtures.commitValue(flowId, legSecond),
+                AtomicFlowFixtures.commitValue(flowId, legFirst)
             )
         );
         _requireFinalizedAsHandler(legFirst, finality);

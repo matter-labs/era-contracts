@@ -6,12 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
-import {
-    AtomicFlow,
-    AtomicFinalityProof,
-    ImtProof,
-    ATOMIC_FLOW_PREIMAGE_VERSION
-} from "contracts/atomic-interop/IAtomicInterop.sol";
+import {AtomicFlow, AtomicFinalityProof, ImtProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
     ManagerAlreadyInitialized,
     ManagerL1ChainIdZero,
@@ -54,9 +49,8 @@ contract AtomicFlowManagerInitTest is Test {
         manager.initL2(L1_CHAIN_ID);
     }
 
-    /// @notice Zero is the "not initialized" sentinel, so `initL2(0)` must be rejected — otherwise it
-    /// would appear to succeed while leaving the manager re-initializable by anyone the upgrader later
-    /// delegates to. Uses a FRESH manager, since `setUp` already initialized the shared one.
+    /// @notice Zero is the "not initialized" sentinel, so `initL2(0)` must be rejected rather than
+    /// appear to succeed and leave the manager re-initializable. Fresh manager: `setUp` used the other.
     function test_RevertWhen_initL2ZeroChainId() public {
         AtomicFlowManager fresh = new AtomicFlowManager();
 

@@ -10,18 +10,11 @@ import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.so
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {RecoverToL1NotSupported} from "contracts/common/L1ContractErrors.sol";
-import {
-    BundleAttributes,
-    INTEROP_BUNDLE_VERSION,
-    INTEROP_CALL_VERSION,
-    InteropBundle,
-    InteropCall
-} from "contracts/common/Messaging.sol";
+import {INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
 
-/// @dev Exposes {AtomicFlowManager._recoverBundle} so its per-call refund dispatch can be unit tested
-/// in isolation. The surrounding Committed -> Revertable -> Reverted state machine is driven through
-/// the production `append` / `authorizeRefund` / `claimRefund` path in {AtomicFlowManagerRefundTest};
-/// no test forces leg state directly (see AGENTS.md on storage overrides).
+/// @dev Exposes {AtomicFlowManager._recoverBundle} so its per-call dispatch can be tested in
+/// isolation. The Committed -> Revertable -> Reverted machine is driven through the production path in
+/// {AtomicFlowManagerRefundTest}; no test forces leg state directly.
 contract AtomicFlowManagerRecoverHarness is AtomicFlowManager {
     function exposedRecoverBundle(InteropBundle memory _bundle) external {
         _recoverBundle(_bundle);
