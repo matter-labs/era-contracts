@@ -3,8 +3,8 @@ name: Verify merged commit (clean build)
 # The per-PR workflows all warm the solc cache, so nothing built a merged commit from scratch. This
 # does: one cache-disabled build per merge, plus the checks a stale or poisoned cache could subvert
 # (they are derived from artifacts, not sources). It is also the only writer of that cache, so what a
-# PR restores comes from a clean, checked build. build-release.yaml builds cleanly too, but only for
-# release tags.
+# PR restores comes from a clean build on a branch no PR can write to. build-release.yaml builds
+# cleanly too, but only for release tags.
 
 on:
   # Every push is considered, and the `gate` job below decides. Branch protection alone would not
@@ -106,7 +106,7 @@ jobs:
         run: yarn
 
       # No warm-solc-cache step on purpose: this build is the one that must not trust a cache.
-      # It is also the only writer of one — see the save step at the end.
+      # It is also the only writer of one — see the save step after the builds.
 
       # Removed before building so the check below also catches a deleted entry, not just a changed one.
       - name: Drop the committed zkstack-out
@@ -130,6 +130,19 @@ jobs:
         run: |
           yarn install
           yarn build:foundry
+
+      # Saved here, before the checks and suites below, and deliberately so.
+      #
+      # What makes this cache trustworthy is that it came from a build with no cache at all, on a
+      # branch a PR cannot write to — not that this commit's tests were green. A failing check-hashes
+      # means the *committed* AllContractsHashes.json is stale, and a failing test means the code has
+      # a bug; neither says the artifacts misrepresent the sources they were built from, and the
+      # restore side revalidates per-source drift against the manifest anyway.
+      #
+      # Gating the save on the suites cost real time for no integrity gain: a base branch that is red
+      # for a day would hand out no cache at all, so every PR targeting it built cold in four jobs.
+      - name: Save the verified solc build cache
+        uses: ./.github/actions/save-solc-cache
 
       # The three checks whose answers come from the artifacts, so a cache could have shifted them.
       # Here they are answered by a build with no cache at all.
@@ -196,8 +209,3 @@ jobs:
         if: always()
         working-directory: l1-contracts/test/anvil-interop
         run: bash cleanup.sh
-
-      # Only reached when the clean build agrees with everything committed *and* the suites pass on
-      # it, so these artifacts are the trustworthy ones to hand to PRs branching from here.
-      - name: Save the verified solc build cache
-        uses: ./.github/actions/save-solc-cache
