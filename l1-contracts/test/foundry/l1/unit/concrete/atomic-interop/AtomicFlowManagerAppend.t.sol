@@ -116,6 +116,67 @@ contract AtomicFlowManagerAppendTest is Test {
         manager.append(_bundleHash, 0, _preimage);
     }
 
+    function _appendAsInteropCenterWithLowNullifier(
+        bytes32 _bundleHash,
+        uint256 _lowNullifierIndex,
+        AtomicFlowPreimage memory _preimage
+    ) internal {
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        manager.append(_bundleHash, _lowNullifierIndex, _preimage);
+    }
+
+    /// @notice Two legs of the SAME flow, both sourced on this chain, can be committed one after the
+    /// other, and the indexed tree links their commit values in value order. Every other case here
+    /// commits a single leg, so this is the only coverage of a second insert (leaf 2) and of the
+    /// low-leaf link being rewritten by it.
+    /// @dev Deliberately NOT a test of `_lowNullifierIndex` forwarding: that argument is only a hint —
+    /// {IndexedMerkleTree.insert} walks the linked list forward from it — so the head index 0 is always
+    /// accepted and no behavioural test can distinguish forwarding it from hard-coding 0. The index is
+    /// passed here in its correct form anyway, as a caller would.
+    function test_append_CommitsSecondLegAndLinksBothCommitValues() public {
+        bytes32 legA = keccak256("nullifier leg A");
+        bytes32 legB = keccak256("nullifier leg B");
+
+        // Both legs are local so both can be committed here; hashes must be strictly ascending.
+        AtomicFlowPreimage memory preimage;
+        preimage.version = ATOMIC_FLOW_PREIMAGE_VERSION;
+        preimage.deadline = DEADLINE;
+        preimage.settlementLayerChainId = L1_CHAIN_ID;
+        preimage.legBundleHashes = new bytes32[](2);
+        preimage.legSourceChainIds = new uint256[](2);
+        (preimage.legBundleHashes[0], preimage.legBundleHashes[1]) = legA < legB ? (legA, legB) : (legB, legA);
+        preimage.legSourceChainIds[0] = block.chainid;
+        preimage.legSourceChainIds[1] = block.chainid;
+        bytes32 flowId = _flowId(preimage);
+
+        // Insert in commit-value order: the smaller value brackets at the head, the larger at leaf 1.
+        uint256 valueFirst = _commitValue(flowId, preimage.legBundleHashes[0]);
+        uint256 valueSecond = _commitValue(flowId, preimage.legBundleHashes[1]);
+        (bytes32 firstLeg, bytes32 secondLeg) = valueFirst < valueSecond
+            ? (preimage.legBundleHashes[0], preimage.legBundleHashes[1])
+            : (preimage.legBundleHashes[1], preimage.legBundleHashes[0]);
+        (uint256 smallerValue, uint256 largerValue) = valueFirst < valueSecond
+            ? (valueFirst, valueSecond)
+            : (valueSecond, valueFirst);
+
+        _appendAsInteropCenterWithLowNullifier(firstLeg, 0, preimage);
+        // Leaf 1 now holds the smaller value and is the larger value's predecessor, so that is the index
+        // a caller would supply as the hint.
+        _appendAsInteropCenterWithLowNullifier(secondLeg, 1, preimage);
+
+        assertEq(tree.leafCount(), 3, "head leaf plus both commit values");
+        assertEq(tree.leafAt(1).value, smallerValue, "first insert holds the smaller commit value");
+        assertEq(tree.leafAt(2).value, largerValue, "second insert holds the larger commit value");
+        // The second insert must splice itself in after the first: leaf 1 now points at leaf 2.
+        assertEq(tree.leafAt(1).nextIndex, 2, "the smaller leaf must link to the larger one");
+        assertEq(tree.leafAt(1).nextValue, largerValue, "the smaller leaf must carry the larger value");
+        assertEq(
+            uint256(manager.legState(flowId, secondLeg)),
+            uint256(LegState.Committed),
+            "the second leg must be Committed"
+        );
+    }
+
     /// @notice Happy path: the leg flips `Unset -> Committed` under the recomputed `flowId` and its
     /// commit value lands in the commitment tree (leaf 1, after the genesis-seeded head).
     function test_append_CommitsLegAndInsertsCommitValue() public {

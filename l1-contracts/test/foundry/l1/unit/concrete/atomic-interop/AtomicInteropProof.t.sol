@@ -64,6 +64,14 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
 
     // ============ commitValue ============
 
+    /// @notice The domain tag's LITERAL value is pinned. {testFuzz_commitValue_matchesSpec} below
+    /// derives its expectation from `ATOMIC_COMMIT_LEAF_TAG` itself, so it stays green if the tag
+    /// preimage changes; the commit value is consensus-critical and mirrored by a hand-written
+    /// off-chain implementation, so the constant must not drift silently.
+    function test_commitValueDomainTag_isPinned() public pure {
+        assertEq(ATOMIC_COMMIT_LEAF_TAG, bytes4(0x3445134c), 'keccak("AtomicInterop.commit.v1")[0:4]');
+    }
+
     function testFuzz_commitValue_matchesSpec(bytes32 _flowId, bytes32 _bundleHash) public view {
         assertEq(
             proofLib.commitValue(_flowId, _bundleHash),
@@ -139,6 +147,30 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         });
         vm.expectRevert(
             abi.encodeWithSelector(ProofInvalidChainBatchRootDepth.selector, ChainBatchRootTree.TREE_DEPTH, wrongDepth)
+        );
+        proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
+    }
+
+    /// @dev ...and the symmetric direction: a SHORTER section is rejected too. Without this the depth
+    /// equality can be weakened to `>`, which still rejects the over-long path above while accepting
+    /// an undersized one that stops short of the chain batch root.
+    function test_RevertWhen_inclusion_chainBatchRootDepthTooShort() public {
+        ImtProof memory proof = _inclusionProof(
+            SOURCE_CHAIN_ID,
+            BATCH_N,
+            committedIndex,
+            SETTLEMENT_LAYER_CHAIN_ID,
+            SL_BLOCK,
+            DEADLINE - 1
+        );
+        uint256 shortDepth = ChainBatchRootTree.TREE_DEPTH - 1;
+        proof.settlementProof[0] = _composeMetadata({
+            _logLeafProofLen: shortDepth,
+            _batchLeafProofLen: 0,
+            _finalProofNode: false
+        });
+        vm.expectRevert(
+            abi.encodeWithSelector(ProofInvalidChainBatchRootDepth.selector, ChainBatchRootTree.TREE_DEPTH, shortDepth)
         );
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
