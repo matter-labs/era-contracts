@@ -36,7 +36,7 @@ contract MockBaseTokenAssetRouter is PausableUpgradeable {
     }
 }
 
-// TODO(EVM-1216): delete test file after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
+// TODO(EVM-1216): delete test file after the legacy mailbox.requestL2Transaction is deprecated.
 contract MailboxRequestL2TransactionTest is MailboxTest {
     address tempAddress;
     bytes[] tempBytesArr;

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
+import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 
@@ -50,7 +50,7 @@ import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAs
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract MailboxFacet is ZKChainBase, IMailboxImpl {
+contract MailboxFacet is ZKChainBase, IMailbox {
     using UncheckedMath for uint256;
     using PriorityTree for PriorityTree.Tree;
 
@@ -66,7 +66,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl {
     uint256 internal immutable L1_CHAIN_ID;
 
     /// @dev Era's chainID
-    uint256 internal immutable ERA_CHAIN_ID; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
+    uint256 internal immutable ERA_CHAIN_ID; // TODO(EVM-1216): remove after the legacy mailbox.requestL2Transaction is deprecated.
 
     /// @dev The address of the L1ChainAssetHandler system contract. Only used on L1.
     address internal immutable CHAIN_ASSET_HANDLER;
@@ -99,7 +99,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl {
         } else if (address(_eip7702Checker) != address(0) && block.chainid != _l1ChainId) {
             revert AddressNotZero();
         }
-        ERA_CHAIN_ID = _eraChainId; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
+        ERA_CHAIN_ID = _eraChainId; // TODO(EVM-1216): remove after the legacy mailbox.requestL2Transaction is deprecated.
         L1_CHAIN_ID = _l1ChainId;
         CHAIN_ASSET_HANDLER = _chainAssetHandler;
         EIP_7702_CHECKER = _eip7702Checker;
@@ -109,14 +109,14 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl {
             : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
     }
 
-    /// @inheritdoc IMailboxImpl
+    /// @inheritdoc IMailbox
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
     ) external onlyBridgehub returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(_request);
     }
 
-    /// @inheritdoc IMailboxImpl
+    /// @inheritdoc IMailbox
     function l2TransactionBaseCost(
         uint256 _gasPrice,
         uint256 _l2GasLimit,
@@ -126,7 +126,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl {
         return l2GasPrice * _l2GasLimit;
     }
 
-    /// @inheritdoc IMailboxImpl
+    /// @inheritdoc IMailbox
     // slither-disable-next-line reentrancy-no-eth
     function requestL2TransactionToGatewayMailbox(
         uint256 _chainId,
@@ -152,7 +152,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl {
         canonicalTxHash = _requestL2TransactionFree(wrappedRequest);
     }
 
-    /// @inheritdoc IMailboxImpl
+    /// @inheritdoc IMailbox
     function bridgehubRequestL2TransactionOnGateway(
         bytes32 _canonicalTxHash,
         uint64
@@ -189,7 +189,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl {
             });
     }
 
-    /// @inheritdoc IMailboxImpl
+    /// @inheritdoc IMailbox
     function requestL2ServiceTransaction(
         address _contractL2,
         bytes calldata _l2Calldata
@@ -212,7 +212,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl {
 
         if (s.settlementLayer != address(0)) {
             // slither-disable-next-line unused-return
-            IMailboxImpl(s.settlementLayer).requestL2TransactionToGatewayMailbox({
+            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
                 _chainId: s.chainId,
                 _canonicalTxHash: canonicalTxHash,
                 _expirationTimestamp: 0
@@ -299,7 +299,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl {
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash);
         if (s.settlementLayer != address(0)) {
             // slither-disable-next-line unused-return
-            IMailboxImpl(s.settlementLayer).requestL2TransactionToGatewayMailbox({
+            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
                 _chainId: s.chainId,
                 _canonicalTxHash: canonicalTxHash,
                 _expirationTimestamp: 0
@@ -404,9 +404,9 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl {
     ///////////////////////////////////////////////////////
     //////// Legacy Era functions
 
-    /// @inheritdoc IMailboxImpl
+    /// @inheritdoc IMailbox
     function requestL2Transaction(
-        // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
+        // TODO(EVM-1216): remove after the legacy mailbox.requestL2Transaction is deprecated.
         address _contractL2,
         uint256 _l2Value,
         bytes calldata _calldata,
