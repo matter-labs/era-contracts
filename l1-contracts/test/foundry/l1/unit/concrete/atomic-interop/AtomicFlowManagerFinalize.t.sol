@@ -143,6 +143,22 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         _requireFinalizedAsHandler(legFirst, finality);
     }
 
+    /// @notice ...and SURPLUS proofs are rejected too, not silently ignored. The per-leg loop only
+    /// reads `proofs[0..n)`, so without this case the count check can be weakened from `!=` to `<`
+    /// and every other finalize test still passes — the exact-shape requirement would be unpinned.
+    function test_RevertWhen_ProofCountTooMany() public {
+        AtomicFinalityProof memory finality = _validFinality();
+        ImtProof[] memory threeProofs = new ImtProof[](3);
+        threeProofs[0] = finality.proofs[0];
+        threeProofs[1] = finality.proofs[1];
+        // A third proof for a leg that does not exist: valid in isolation, surplus for this flow.
+        threeProofs[2] = finality.proofs[1];
+        finality.proofs = threeProofs;
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerProofCountMismatch.selector, 2, 3));
+        _requireFinalizedAsHandler(legFirst, finality);
+    }
+
     /// @notice Each proof must be bound to its leg's DECLARED source chain (positional match).
     /// Defense-in-depth on the finalize side, but load-bearing for the symmetric refund path — see
     /// the contract's docs. Swapped proofs (valid on the wrong legs) must not pass.

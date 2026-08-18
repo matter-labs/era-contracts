@@ -132,6 +132,14 @@ contract AtomicFlowManagerAppendTest is Test {
         assertEq(tree.leafAt(1).value, _commitValue(flowId, localLeg), "inserted leaf must hold the commit value");
     }
 
+    /// @notice The v1 preimage version literal is pinned. `ATOMIC_FLOW_PREIMAGE_VERSION` is part of
+    /// the flow-id preimage encoding and is mirrored off-chain by hand in
+    /// `test/anvil-interop/src/helpers/imt-engine-lib.ts`, so a bump must be a deliberate, visible
+    /// change here rather than a silent constant edit caught only by the anvil suite.
+    function test_atomicFlowPreimageVersion_isPinnedToV1() public {
+        assertEq(ATOMIC_FLOW_PREIMAGE_VERSION, bytes1(0x01), "v1 preimage version literal must be pinned");
+    }
+
     /// @notice `append` rejects a preimage whose `version` the manager does not support (0x02 here),
     /// so it can never commit a leg. See {ATOMIC_FLOW_PREIMAGE_VERSION}.
     function test_append_RevertWhen_FlowPreimageVersionMismatch() public {
