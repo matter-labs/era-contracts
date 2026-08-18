@@ -3,13 +3,12 @@
 pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
-import {Vm} from "forge-std/Vm.sol";
+import {AtomicFlowFixtures} from "../../unit/concrete/atomic-interop/AtomicFlowFixtures.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {AtomicInteropProofBuilder} from "../../unit/concrete/atomic-interop/AtomicInteropProofBuilder.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
-import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
@@ -23,7 +22,6 @@ import {
 import {
     BundleAlreadyProcessed,
     ExecutingNotAllowed,
-    InteropPreviewHash,
     WrongDestinationChainId
 } from "contracts/interop/InteropErrors.sol";
 import {IMTLeafValueMismatch} from "contracts/common/L1ContractErrors.sol";
@@ -32,8 +30,6 @@ import {BundleStatus, CallStatus, InteropBundle, InteropCallStarter} from "contr
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
-    L2_ATOMIC_FLOW_MANAGER_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -73,12 +69,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     /// does not include them) and the proof fixtures. Called at the start of each test rather than in
     /// `setUp` to stay independent of the deployer's own setUp chain.
     function _setUpAtomicStack() internal {
-        deployCodeTo("AtomicFlowManager.sol:AtomicFlowManager", L2_ATOMIC_FLOW_MANAGER_ADDR);
-        deployCodeTo("L2InteropCommitmentTree.sol:L2InteropCommitmentTree", L2_INTEROP_COMMITMENT_TREE_ADDR);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(L1_CHAIN_ID);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
+        _deployAtomicPredeploys(L1_CHAIN_ID, true);
         // Proof fixtures from the builder: `tree` acts as the REMOTE chain's IMT oracle, plus the
         // real L2InteropRootStorage etched at its canonical address.
         _setUpAtomicFixtures();
@@ -113,27 +104,14 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         InteropCallStarter[] memory _calls,
         bytes[] memory _predictionAttrs
     ) internal returns (bytes32 predicted) {
-        // solhint-disable-next-line avoid-low-level-calls
-        (bool ok, bytes memory ret) = address(l2InteropCenter).call(
+        // The matching send below is unpranked, so preview as this contract.
+        predicted = _decodePreviewHash(
+            address(this),
             abi.encodeCall(
                 l2InteropCenter.previewBundleHash,
                 (InteroperableAddress.formatEvmV1(destinationChainId), _calls, _predictionAttrs)
             )
         );
-        require(!ok, "previewBundleHash must revert with InteropPreviewHash (quoter pattern)");
-        require(
-            ret.length == 36 && bytes4(ret) == InteropPreviewHash.selector,
-            "preview must revert with InteropPreviewHash"
-        );
-        // ret layout: 4-byte selector followed by the abi-encoded bytes32 hash.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            predicted := mload(add(ret, 0x24))
-        }
-    }
-
-    function _flowIdOf(AtomicFlowPreimage memory _preimage) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_preimage));
     }
 
     /// @dev Cross-phase context (storage rather than locals to stay under the stack limit; each test
@@ -179,7 +157,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         preimage.legSourceChainIds[localIndex] = block.chainid;
         preimage.legSourceChainIds[remoteIndex] = destinationChainId;
         ectxPreimage = preimage;
-        ectx.flowId = _flowIdOf(preimage);
+        ectx.flowId = AtomicFlowFixtures.flowId(preimage);
 
         // The real send carries the atomic metadata out-of-band plus the same bundle attributes.
         bytes[] memory attrs = new bytes[](predictionAttrs.length + 1);
@@ -206,7 +184,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
     /// @dev Phase 2: commit the remote peer leg in its (oracle) source tree and assemble the per-leg
     /// finality proofs, positionally aligned with the preimage. Both batches settled in time.
     function _commitRemoteLegAndBuildFinality() internal returns (AtomicFinalityProof memory finality) {
-        uint256 remoteIndex = _insertCommit(_commitValue(ectx.flowId, REMOTE_LEG));
+        uint256 remoteIndex = _insertCommit(AtomicFlowFixtures.commitValue(ectx.flowId, REMOTE_LEG));
         finality = _buildFinality(
             _inclusionProof(destinationChainId, REMOTE_BATCH_NUMBER, remoteIndex, L1_CHAIN_ID, SL_BLOCK, DEADLINE - 1)
         );
@@ -311,7 +289,11 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         AtomicFinalityProof memory finality = _buildFinality(bogusRemoteProof);
 
         vm.expectRevert(
-            abi.encodeWithSelector(IMTLeafValueMismatch.selector, _commitValue(ectx.flowId, REMOTE_LEG), 0)
+            abi.encodeWithSelector(
+                IMTLeafValueMismatch.selector,
+                AtomicFlowFixtures.commitValue(ectx.flowId, REMOTE_LEG),
+                0
+            )
         );
         _executeOnDestination(finality);
     }
@@ -421,7 +403,11 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         vm.chainId(destinationChainId);
 
         vm.expectRevert(
-            abi.encodeWithSelector(IMTLeafValueMismatch.selector, _commitValue(ectx.flowId, REMOTE_LEG), 0)
+            abi.encodeWithSelector(
+                IMTLeafValueMismatch.selector,
+                AtomicFlowFixtures.commitValue(ectx.flowId, REMOTE_LEG),
+                0
+            )
         );
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(ectxBundleBytes, finality);
     }

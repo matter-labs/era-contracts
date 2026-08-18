@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {AtomicInteropProofBuilder} from "./AtomicInteropProofBuilder.sol";
+import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
 
 import {ImtProof, ATOMIC_COMMIT_LEAF_TAG} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
@@ -55,19 +56,17 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         // created strictly after the deadline, seeded through the real storage's production entry point.
         _seedSettlementLayerInteropRoot(SETTLEMENT_LAYER_CHAIN_ID, SL_BLOCK, uint256(DEADLINE) + 1);
 
-        committedValue = _commitValue(keccak256("flowA"), keccak256("bundleA"));
+        committedValue = AtomicFlowFixtures.commitValue(keccak256("flowA"), keccak256("bundleA"));
         committedIndex = _insertCommit(committedValue);
 
         // A value for a flow that was never committed on this chain (used by the timeout/absence tests).
-        absentValue = _commitValue(keccak256("flowB"), keccak256("bundleB"));
+        absentValue = AtomicFlowFixtures.commitValue(keccak256("flowB"), keccak256("bundleB"));
     }
 
     // ============ commitValue ============
 
-    /// @notice The domain tag's LITERAL value is pinned. {testFuzz_commitValue_matchesSpec} below
-    /// derives its expectation from `ATOMIC_COMMIT_LEAF_TAG` itself, so it stays green if the tag
-    /// preimage changes; the commit value is consensus-critical and mirrored by a hand-written
-    /// off-chain implementation, so the constant must not drift silently.
+    /// @notice Pins the domain tag's literal value. {testFuzz_commitValue_matchesSpec} derives its
+    /// expectation from the constant itself, so only this catches a change to the tag preimage.
     function test_commitValueDomainTag_isPinned() public pure {
         assertEq(ATOMIC_COMMIT_LEAF_TAG, bytes4(0x3445134c), 'keccak("AtomicInterop.commit.v1")[0:4]');
     }
@@ -151,9 +150,8 @@ contract AtomicInteropProofTest is AtomicInteropProofBuilder {
         proofLib.verifyInclusion(proof, committedValue, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID);
     }
 
-    /// @dev ...and the symmetric direction: a SHORTER section is rejected too. Without this the depth
-    /// equality can be weakened to `>`, which still rejects the over-long path above while accepting
-    /// an undersized one that stops short of the chain batch root.
+    /// @dev The symmetric direction: without it the depth equality can be weakened to `>`, still
+    /// rejecting the over-long path above while accepting one that stops short of the root.
     function test_RevertWhen_inclusion_chainBatchRootDepthTooShort() public {
         ImtProof memory proof = _inclusionProof(
             SOURCE_CHAIN_ID,

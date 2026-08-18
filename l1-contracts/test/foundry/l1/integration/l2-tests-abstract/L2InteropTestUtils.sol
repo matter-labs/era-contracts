@@ -7,12 +7,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {
-    L2_INTEROP_CENTER_ADDR,
-    L2_INTEROP_HANDLER,
-    L2_INTEROP_HANDLER_ADDR,
-    L2_NATIVE_TOKEN_VAULT_ADDR
-} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {InteropBundle} from "contracts/common/Messaging.sol";
 import {
@@ -26,6 +21,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {InteropPreviewHash} from "contracts/interop/InteropErrors.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 
 /// @notice Struct to hold bundle execution result for assertions
@@ -141,6 +137,25 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
                 1,
                 string(abi.encodePacked("Call ", vm.toString(i), " status should be Executed"))
             );
+        }
+    }
+
+    /// @dev Reads a hash out of the `previewBundleHash`/`previewMessageHash` quoters, which always
+    /// revert with `InteropPreviewHash(bytes32)` after running (and unwinding) the real assembly.
+    /// @dev The hash is caller-dependent and feeds `flowId`, so a preview taken as the wrong sender
+    /// fails much later as a proof mismatch. Pass `address(this)` when the send is unpranked.
+    function _decodePreviewHash(address _sender, bytes memory _callData) internal returns (bytes32 predicted) {
+        vm.prank(_sender);
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool ok, bytes memory ret) = address(l2InteropCenter).call(_callData);
+        require(
+            !ok && ret.length == 36 && bytes4(ret) == InteropPreviewHash.selector,
+            "preview must revert with InteropPreviewHash (quoter pattern)"
+        );
+        // ret layout: 4-byte selector followed by the abi-encoded bytes32 hash.
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            predicted := mload(add(ret, 0x24))
         }
     }
 }

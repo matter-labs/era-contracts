@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {AtomicInteropProofBuilder} from "./AtomicInteropProofBuilder.sol";
+import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
 
 import {ImtProof} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
@@ -23,7 +24,7 @@ contract AtomicInteropProofRealVerificationTest is AtomicInteropProofBuilder {
 
     function setUp() public {
         _setUpAtomicFixtures(); // deploys the real verifier; no test here ever calls _mockVerifier
-        absentValue = _commitValue(keccak256("flowB"), keccak256("bundleB"));
+        absentValue = AtomicFlowFixtures.commitValue(keccak256("flowB"), keccak256("bundleB"));
     }
 
     // ------------------------------------------------------------------------------------------------

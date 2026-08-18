@@ -3,6 +3,8 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
+import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
+
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
@@ -10,13 +12,7 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.sol";
 import {AssetHandlerDoesNotExist, RecoverToL1NotSupported, Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {
-    BundleAttributes,
-    INTEROP_BUNDLE_VERSION,
-    INTEROP_CALL_VERSION,
-    InteropBundle,
-    InteropCall
-} from "contracts/common/Messaging.sol";
+import {INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -144,12 +140,7 @@ contract AtomicRecoveryForgeryTest is Test {
             destinationBaseTokenAssetId: bytes32(uint256(1)),
             interopBundleSalt: keccak256(abi.encodePacked("salt", _from, _to)),
             calls: calls,
-            bundleAttributes: BundleAttributes({
-                executionAddress: bytes(""),
-                unbundlerAddress: bytes(""),
-                useFixedFee: false,
-                salt: bytes32(0)
-            })
+            bundleAttributes: AtomicFlowFixtures.noBundleAttributes()
         });
     }
 
