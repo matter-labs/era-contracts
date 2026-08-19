@@ -345,12 +345,14 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.maxNumberOfZKChains
         );
 
+        address legacySharedBridge = _getLegacySharedBridge();
+
         // solhint-disable-next-line func-named-parameters
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).updateL2(
             _fixedForceDeploymentsData.l1ChainId,
             _fixedForceDeploymentsData.eraChainId,
             IL1AssetRouter(_fixedForceDeploymentsData.l1AssetRouter),
-            IL2SharedBridgeLegacy(_getLegacySharedBridge()),
+            IL2SharedBridgeLegacy(legacySharedBridge),
             _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
             _fixedForceDeploymentsData.aliasedL1Governance
         );
@@ -362,7 +364,7 @@ library L2GenesisForceDeploymentsHelper {
             // Legacy Era chains exposed this via an immutable. After the v31 code replacement,
             // reading it back from storage returns zero, so the L1-provided value is authoritative.
             _fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
-            _getLegacySharedBridge(),
+            legacySharedBridge,
             _wrappedBaseTokenAddress,
             _additionalForceDeploymentsData.baseTokenBridgingData,
             _additionalForceDeploymentsData.baseTokenMetadata

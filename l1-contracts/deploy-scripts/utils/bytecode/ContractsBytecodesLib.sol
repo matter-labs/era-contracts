@@ -82,7 +82,7 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCodeEra.
-        string[54] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[55] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction",
             "BaseTokenHolder",
             "L2AssetTracker",
@@ -105,6 +105,7 @@ library ContractsBytecodesLib {
             "DiamondProxy",
             "DefaultUpgrade",
             "DefaultUpgradeZKsyncOS",
+            "V32UpgradeZKsyncOS",
             "InteropCenter",
             "InteropAttributeParser",
             "L2InteropHandler",

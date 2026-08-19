@@ -144,7 +144,7 @@ contract UpgradeIntegrationTest_Local is
     address private _serverNotifierProxyAdmin;
     address private _expectedServerNotifierProxyAdminOwner;
 
-    /// @notice Override to inject the mocked Core upgrade (skips setAssetTracker call).
+    /// @notice Override to inject the mocked Core upgrade (keeps only the interop-handler wiring in stage 1).
     function createCoreUpgrade() internal override returns (CoreUpgrade_v31) {
         return new CoreUpgrade_v31_Test();
     }
@@ -154,8 +154,9 @@ contract UpgradeIntegrationTest_Local is
         return new CTMUpgrade_v31_Test();
     }
 
-    /// @notice Bump the CTM's protocol version from the upgrade input TOML so the local
-    ///         genesis-at-v31 fixture exercises a v31 → v32 upgrade.
+    /// @notice Bump the CTM's protocol version from the upgrade input TOML so the local fixture
+    ///         exercises an upgrade to one minor above the genesis version (currently v32 → v33).
+    ///         See `foundry-upgrade.toml`.
     /// @dev    Replaces the former `overrideProtocolVersionForLocalTesting` hook on the
     ///         deleted `DefaultEcosystemUpgrade` orchestrator.
     function afterInitHook() internal override {

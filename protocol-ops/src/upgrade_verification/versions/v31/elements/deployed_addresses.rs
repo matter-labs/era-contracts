@@ -854,17 +854,10 @@ async fn verify_core_provenance(
         &["upgrade_addresses", "shared", "transparent_proxy_admin"],
     )?;
 
-    // L1MessageRoot has a stage-sepolia variant with the same constructor
-    // signature but different runtime bytecode. The choice is fixed by the
-    // env: stage expects `L1MessageRootStageSepolia` (it skips chain 270 in
-    // `_v31InitializeInner` because that chain is still settling on the
-    // legacy stage Gateway at v31 upgrade time); testnet and mainnet expect
-    // the canonical `L1MessageRoot`.
-    let message_root_file = if verifiers.env.is_stage() {
-        "l1-contracts/L1MessageRootStageSepolia"
-    } else {
-        "l1-contracts/L1MessageRoot"
-    };
+    // Every env deploys the canonical `L1MessageRoot`: the stage-sepolia variant (which skipped
+    // chain 270's settlement check during the v31 rollout) was removed together with the v31
+    // stage-1 initializer.
+    let message_root_file = "l1-contracts/L1MessageRoot";
 
     // ChainRegistrationSender impl args are reused for the TUPP impl check below.
     let crs_ctor_args =
@@ -1177,13 +1170,6 @@ fn verify_ctm_base_provenance(
                 "l1-contracts/ZKsyncOSTestnetVerifier",
             ),
         };
-    // Per-flavor SettlementLayerV31Upgrade variant. `default_upgrade_addr`
-    // holds the new settlement-layer upgrade contract for the CTM.
-    let default_upgrade_file = match ctm.flavor {
-        CtmFlavor::Era => "l1-contracts/EraSettlementLayerV31Upgrade",
-        CtmFlavor::ZksyncOs => "l1-contracts/ZKsyncOSSettlementLayerV31Upgrade",
-    };
-
     // No-arg CTM contracts. `eip7702_checker_addr` lives in the da-contracts
     // tree; everything else is l1-contracts.
     let no_args: &[(&[&str], &str)] = &[
@@ -1196,11 +1182,6 @@ fn verify_ctm_base_provenance(
         (
             &["state_transition", "getters_facet_addr"],
             "l1-contracts/GettersFacet",
-        ),
-        // {Era,ZKsyncOS}SettlementLayerV31Upgrade() — no ctor args.
-        (
-            &["state_transition", "default_upgrade_addr"],
-            default_upgrade_file,
         ),
         // {Era,ZKsyncOS}VerifierPlonk() — no ctor args.
         (
@@ -1234,6 +1215,39 @@ fn verify_ctm_base_provenance(
             &verifier_fflonk,
             Vec::<u8>::new(),
             verifier_fflonk_file,
+        );
+    }
+
+    // Only ZKsync OS chains can be upgraded onto this release, so the per-chain upgrade contract
+    // and its registry exist for ZKsync OS CTMs only.
+    if is_zksync_os {
+        // PriorityOpLowerBound() — no ctor args; the registry the per-chain upgrade embeds.
+        let priority_op_lower_bound = required_address(
+            &ctm.value,
+            &scope,
+            &["state_transition", "priority_op_lower_bound_addr"],
+        )?;
+        result.expect_create2_params(
+            verifiers,
+            &priority_op_lower_bound,
+            Vec::<u8>::new(),
+            "l1-contracts/PriorityOpLowerBound",
+        );
+
+        // V32UpgradeZKsyncOS(IPriorityOpLowerBound) — the per-chain upgrade contract embeds the
+        // registry address as its single constructor argument, encoded as a left-padded 32-byte word.
+        let default_upgrade = required_address(
+            &ctm.value,
+            &scope,
+            &["state_transition", "default_upgrade_addr"],
+        )?;
+        let mut default_upgrade_ctor = vec![0u8; 32];
+        default_upgrade_ctor[12..].copy_from_slice(priority_op_lower_bound.as_slice());
+        result.expect_create2_params(
+            verifiers,
+            &default_upgrade,
+            default_upgrade_ctor,
+            "l1-contracts/V32UpgradeZKsyncOS",
         );
     }
 
