@@ -236,7 +236,6 @@ async function main(): Promise<void> {
 
     let prepareDir: string;
     let upgradeHarnessInputsRef: ReturnType<typeof prepareUpgradeHarnessInputs> | null = null;
-    let scenarioIsZKsyncOS = true;
     if (envPreset) {
       // Real env preset (stage / mainnet / testnet): drive prepare-all from
       // `permanent-values/<preset>.toml` directly. No template, no synthetic
@@ -259,11 +258,9 @@ async function main(): Promise<void> {
         permanentValuesTemplatePath:
           process.env.FORK_PERMANENT_VALUES_PATH ?? "upgrade-envs/permanent-values/local.toml",
         upgradeInputTemplatePath: process.env.FORK_UPGRADE_INPUT_PATH ?? "upgrade-envs/v0.31.0-interopB/local.toml",
-        isZKsyncOS: true,
         targetRoles: ["directSettled"],
         expectedProtocolVersion: TARGET_PROTOCOL_VERSION,
       };
-      scenarioIsZKsyncOS = scenario.isZKsyncOS;
       const upgradeHarnessInputs = prepareUpgradeHarnessInputs(scenario, {
         l1Addresses: { bridgehub: cfg.bridgehubAddress, governance },
         ctmAddresses: { chainTypeManager },
@@ -382,7 +379,6 @@ async function main(): Promise<void> {
           settlementLayerUpgradeAddr,
           ctmAddr: chainTypeManager,
           upgradeChainAddresses,
-          isZKsyncOS: scenarioIsZKsyncOS,
           protocolOpsOutDir: chainsOutDir,
         });
       }

@@ -19,6 +19,7 @@ import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.s
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {InteropLibrary} from "../InteropLibrary.sol";
 import {L2_BRIDGEHUB_ADDRESS, Utils} from "../utils/Utils.sol";
+import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
@@ -342,10 +343,30 @@ contract GatewayPreparation is Script {
     function deployL2ChainAdmin() public {
         initializeConfig();
 
-        // TODO(gateway-os): the EraVM (zkout) ChainAdmin deployment path was removed together with EraVM
-        // support. The ZKsync-OS-based Gateway needs an EVM-native L1->L2 deployment path for the
-        // ChainAdmin before chain migrations are re-enabled.
-        revert("TODO(gateway-os): ChainAdmin deployment on Gateway requires an EVM-native deploy path");
+        // TODO(EVM-925): it is deployed without any restrictions.
+        // `ChainAdmin` is CREATE2-deployed like any ordinary contract, so its constructor runs
+        // normally — unlike the predeployed L2 built-ins, which are initialized via `initL2`.
+        bytes memory initCode = abi.encodePacked(
+            ContractsBytecodesLib.getCreationCode("ChainAdmin"),
+            abi.encode(new address[](0))
+        );
+
+        address l2ChainAdminAddress = Utils.getL2AddressViaDeterministicCreate2(bytes32(0), initCode);
+
+        Utils.runL1L2Transaction({
+            l2Calldata: Utils.getDeterministicCreate2FactoryCalldata(bytes32(0), initCode),
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            l2Value: 0,
+            // EVM deployment: the init code travels in the calldata, so there are no factory deps.
+            factoryDeps: new bytes[](0),
+            dstAddress: Utils.DETERMINISTIC_CREATE2_ADDRESS,
+            chainId: config.gatewayChainId,
+            bridgehubAddress: config.bridgehub,
+            l1SharedBridgeProxy: config.sharedBridgeProxy,
+            refundRecipient: msg.sender
+        });
+
+        saveOutput(l2ChainAdminAddress);
     }
 
     /// @dev Calling this function requires private key to the admin of the chain
