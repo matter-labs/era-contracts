@@ -92,7 +92,7 @@ contract ZKsyncOSOnlyContractsTest is Test {
 
         bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(new CoreContract[](0));
         bytes32 emptyContractCodeHash = keccak256(
-            BytecodeUtils.readDeployedBytecodeL1(true, "EmptyContract.sol", "EmptyContract")
+            BytecodeUtils.readDeployedBytecodeL1("EmptyContract.sol", "EmptyContract")
         );
         assertEq(
             _countBytecode(factoryDeps, emptyContractCodeHash),
@@ -133,7 +133,7 @@ contract ZKsyncOSOnlyContractsTest is Test {
     /// @dev Same accessor the factory-dependency builder uses for ZKsync OS: the deployed EVM bytecode.
     function _deployedBytecode(CoreContract _contract) private view returns (bytes memory) {
         (, string memory contractName) = CoreOnGatewayHelper.resolve(_contract);
-        return ContractsBytecodesLib.getL2DeployedBytecode(contractName, true);
+        return ContractsBytecodesLib.getL2DeployedBytecode(contractName);
     }
 
     function _countBytecode(bytes[] memory _bytecodes, bytes32 _hash) private pure returns (uint256 count) {

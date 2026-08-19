@@ -29,19 +29,9 @@ library BytecodeUtils {
         return bytecode;
     }
 
-    /// @notice Read L1 creation bytecode from the correct artifact directory.
-    ///         EVM bytecodes → out/, ZK bytecodes → zkout/.
-    /// @dev TODO(gateway-os): the ZK (zkout) arm is only reachable from retained legacy-Gateway upgrade
-    /// scripts; the EraVM artifacts it reads are no longer built.
-    function readBytecodeL1(
-        bool _isEVMBytecode,
-        string memory _fileName,
-        string memory _contractName
-    ) internal view returns (bytes memory) {
-        return
-            _isEVMBytecode
-                ? readFoundryBytecodeL1(_fileName, _contractName)
-                : readZKFoundryBytecodeL1(_fileName, _contractName);
+    /// @notice Read L1 creation bytecode from `out/`.
+    function readBytecodeL1(string memory _fileName, string memory _contractName) internal view returns (bytes memory) {
+        return readFoundryBytecodeL1(_fileName, _contractName);
     }
 
     function readFoundryBytecodeL1(
@@ -50,15 +40,6 @@ library BytecodeUtils {
     ) private view returns (bytes memory) {
         string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
         return readFoundryBytecode(path);
-    }
-
-    function readZKFoundryBytecodeL1(
-        string memory fileName,
-        string memory contractName
-    ) private view returns (bytes memory) {
-        string memory path = string.concat("/../l1-contracts/zkout/", fileName, "/", contractName, ".json");
-        bytes memory bytecode = readFoundryBytecode(path);
-        return bytecode;
     }
 
     // ======================== Deployed bytecode reading ========================
@@ -70,35 +51,28 @@ library BytecodeUtils {
         return vm.parseJsonBytes(json, ".deployedBytecode.object");
     }
 
-    /// @notice Read L1 deployed bytecode from the correct artifact directory.
-    ///         EVM bytecodes → out/ (EVM deployed bytecode), ZK bytecodes → zkout/ (ZK creation bytecode).
+    /// @notice Read L1 deployed bytecode from `out/`.
     function readDeployedBytecodeL1(
-        bool _isEVMBytecode,
         string memory _fileName,
         string memory _contractName
     ) internal view returns (bytes memory) {
-        if (_isEVMBytecode) {
-            string memory path = string.concat("/../l1-contracts/out/", _fileName, "/", _contractName, ".json");
-            return readFoundryDeployedBytecode(path);
-        }
-        return readZKFoundryBytecodeL1(_fileName, _contractName);
+        string memory path = string.concat("/../l1-contracts/out/", _fileName, "/", _contractName, ".json");
+        return readFoundryDeployedBytecode(path);
     }
 
     // ======================== Bytecode hashing ========================
 
-    /// @notice Hash EVM bytecode (keccak256).
-    function hashBytecode(bool _isEVMBytecode, bytes memory _bytecode) internal pure returns (bytes32) {
-        require(_isEVMBytecode, "EraVM (ZK) bytecode hashing is not supported");
+    /// @notice Hash bytecode (keccak256).
+    function hashBytecode(bytes memory _bytecode) internal pure returns (bytes32) {
         return keccak256(_bytecode);
     }
 
-    /// @notice Read and hash deployed EVM bytecode (keccak256) in one call.
+    /// @notice Read and hash deployed bytecode (keccak256) in one call.
     function getDeployedBytecodeHash(
-        bool _isEVMBytecode,
         string memory _fileName,
         string memory _contractName
     ) internal view returns (bytes32) {
-        return hashBytecode(_isEVMBytecode, readDeployedBytecodeL1(_isEVMBytecode, _fileName, _contractName));
+        return hashBytecode(readDeployedBytecodeL1(_fileName, _contractName));
     }
 
     function compareStrings(string memory a, string memory b) internal pure returns (bool) {

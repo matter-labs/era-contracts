@@ -83,10 +83,7 @@ contract DeployL1CoreUtils is DeployUtils {
 
     ////////////////////////////// Contract deployment modes /////////////////////////////////
 
-    function getCreationCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
+    function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
         if (compareStrings(contractName, "ProxyAdmin")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ChainRegistrationSender")) {
@@ -177,50 +174,39 @@ contract DeployL1CoreUtils is DeployUtils {
         return coreAddresses.shared.transparentProxyAdmin;
     }
 
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        require(!isZKBytecode, "EraVM (ZK) bytecodes are not supported");
+    function getCreationCode(string memory contractName) internal view virtual override returns (bytes memory) {
         return ContractsBytecodesLib.getCreationCodeEVM(contractName);
     }
 
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
-        if (!isZKBytecode) {
-            if (compareStrings(contractName, "L1Bridgehub")) {
-                return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
-            } else if (
-                compareStrings(contractName, "L1MessageRoot") || compareStrings(contractName, "DummyL1MessageRoot")
-            ) {
-                return abi.encodeCall(L1MessageRoot.initialize, ());
-            } else if (compareStrings(contractName, "ChainRegistrationSender")) {
-                return abi.encodeCall(ChainRegistrationSender.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
-                return abi.encodeCall(L1ChainAssetHandler.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
-                return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1Nullifier")) {
-                return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
-            } else if (compareStrings(contractName, "L1InteropHandler")) {
-                return abi.encodeCall(L1InteropHandler.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1AssetRouter")) {
-                return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-                return abi.encodeCall(L1ERC20Bridge.initialize, ());
-            } else if (compareStrings(contractName, "L1NativeTokenVault")) {
-                return
-                    abi.encodeCall(
-                        L1NativeTokenVault.initialize,
-                        (config.deployerAddress, coreAddresses.bridges.bridgedTokenBeacon)
-                    );
-            } else {
-                revert(string.concat("Contract ", contractName, " initialize calldata not set"));
-            }
+    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
+        if (compareStrings(contractName, "L1Bridgehub")) {
+            return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
+        } else if (
+            compareStrings(contractName, "L1MessageRoot") || compareStrings(contractName, "DummyL1MessageRoot")
+        ) {
+            return abi.encodeCall(L1MessageRoot.initialize, ());
+        } else if (compareStrings(contractName, "ChainRegistrationSender")) {
+            return abi.encodeCall(ChainRegistrationSender.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
+            return abi.encodeCall(L1ChainAssetHandler.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+            return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "L1Nullifier")) {
+            return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
+        } else if (compareStrings(contractName, "L1InteropHandler")) {
+            return abi.encodeCall(L1InteropHandler.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "L1AssetRouter")) {
+            return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+            return abi.encodeCall(L1ERC20Bridge.initialize, ());
+        } else if (compareStrings(contractName, "L1NativeTokenVault")) {
+            return
+                abi.encodeCall(
+                    L1NativeTokenVault.initialize,
+                    (config.deployerAddress, coreAddresses.bridges.bridgedTokenBeacon)
+                );
         } else {
-            revert(string.concat("Contract ", contractName, " ZK initialize calldata not set"));
+            revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }
     }
 

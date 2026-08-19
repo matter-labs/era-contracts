@@ -261,11 +261,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function deployUsedUpgradeContract() internal virtual returns (address) {
-        return deploySimpleContract("DefaultUpgrade", false);
+        return deploySimpleContract("DefaultUpgrade");
     }
 
     function deployGovernanceUpgradeTimer() internal virtual {
-        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
+        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer");
     }
 
     /// @notice Deploy everything that should be deployed
@@ -841,14 +841,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function deployUpgradeStageValidator() internal {
-        upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator", false);
+        upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator");
     }
 
-    function getCreationCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        require(!isZKBytecode, "ZK bytecodes are not supported in CTM upgrade");
+    function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
         if (compareStrings(contractName, "UpgradeStageValidator")) {
             return abi.encode(ctmAddresses.stateTransition.proxies.chainTypeManager, getNewProtocolVersion());
         } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
@@ -856,7 +852,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             uint256 maxAdditionalDelay = 2 weeks;
             return abi.encode(initialDelay, maxAdditionalDelay, config.ownerAddress, newConfig.ecosystemAdminAddress);
         } else {
-            return super.getCreationCalldata(contractName, isZKBytecode);
+            return super.getCreationCalldata(contractName);
         }
     }
 

@@ -91,16 +91,13 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     /// @notice Deploy contracts only (no side effects like setAddresses / transferOwnership).
     /// @dev Used by the test harness for idempotent re-runs where connections are already set up.
     function deployNewEcosystemContractsL1NoConnections() public virtual {
-        coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
-        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
-        coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
-        coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter", false);
-        coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault", false);
-        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract(
-            "CTMDeploymentTracker",
-            false
-        );
-        coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler", false);
+        coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub");
+        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot");
+        coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier");
+        coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter");
+        coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault");
+        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract("CTMDeploymentTracker");
+        coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler");
 
         // The sender exists since v31, and its proxy is kept: it holds the registration history, and the
         // bridgehub authorizes service transactions by that address. Only the implementation is refreshed
@@ -110,8 +107,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
             "Bridgehub has no ChainRegistrationSender registered; register it before this upgrade"
         );
         coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
-            "ChainRegistrationSender",
-            false
+            "ChainRegistrationSender"
         );
 
         // The interop handler is new in v32: a pre-v32 ecosystem has no proxy for it, so deploy one and let
@@ -120,10 +116,10 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
             (
                 coreAddresses.bridges.implementations.l1InteropHandler,
                 coreAddresses.bridges.proxies.l1InteropHandler
-            ) = deployTuppWithContract("L1InteropHandler", false);
+            ) = deployTuppWithContract("L1InteropHandler");
             deployedL1InteropHandler = true;
         } else {
-            coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler", false);
+            coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler");
         }
     }
 
@@ -142,11 +138,8 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
                           Internal functions
     //////////////////////////////////////////////////////////////*/
 
-    function getCreationCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view override returns (bytes memory) {
-        return super.getCreationCalldata(contractName, isZKBytecode);
+    function getCreationCalldata(string memory contractName) internal view override returns (bytes memory) {
+        return super.getCreationCalldata(contractName);
     }
 
     /// @notice Override to properly set deployerAddress in upgrade context

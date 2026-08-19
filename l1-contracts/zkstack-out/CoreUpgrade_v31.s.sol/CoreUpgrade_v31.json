@@ -96,11 +96,6 @@
         "name": "contractName",
         "type": "string",
         "internalType": "string"
-      },
-      {
-        "name": "isZKBytecode",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "outputs": [
@@ -120,11 +115,6 @@
         "name": "contractName",
         "type": "string",
         "internalType": "string"
-      },
-      {
-        "name": "isZKBytecode",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "outputs": [
@@ -154,11 +144,6 @@
         "name": "proxyAdmin",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "isZKBytecode",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "outputs": [
@@ -188,11 +173,6 @@
         "name": "owner",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "isZKBytecode",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "outputs": [

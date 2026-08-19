@@ -198,7 +198,7 @@ library GatewayCTMDeployerHelper {
             aliasedGovernanceAddress: config.aliasedGovernanceAddress
         });
 
-        bytes memory bytecode = BytecodeUtils.readBytecodeL1(true, "GatewayCTMDeployerDA.sol", "GatewayCTMDeployerDA");
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1("GatewayCTMDeployerDA.sol", "GatewayCTMDeployerDA");
         bytes memory constructorArgs = abi.encode(daConfig);
 
         L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(_create2Salt, bytecode, constructorArgs);
@@ -220,7 +220,6 @@ library GatewayCTMDeployerHelper {
         });
 
         bytes memory bytecode = BytecodeUtils.readBytecodeL1(
-            true,
             "GatewayCTMDeployerProxyAdmin.sol",
             "GatewayCTMDeployerProxyAdmin"
         );
@@ -247,7 +246,6 @@ library GatewayCTMDeployerHelper {
         });
 
         bytes memory bytecode = BytecodeUtils.readBytecodeL1(
-            true,
             "GatewayCTMDeployerValidatorTimelock.sol",
             "GatewayCTMDeployerValidatorTimelock"
         );
@@ -276,7 +274,7 @@ library GatewayCTMDeployerHelper {
         (string memory vdFile, string memory vdName) = DeployCTML1OrGateway.resolve(
             CTMContract.GatewayCTMDeployerVerifiers
         );
-        bytes memory bytecode = BytecodeUtils.readBytecodeL1(true, vdFile, vdName);
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1(vdFile, vdName);
         bytes memory constructorArgs = abi.encode(verifiersConfig);
 
         L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(_create2Salt, bytecode, constructorArgs);
@@ -383,7 +381,7 @@ library GatewayCTMDeployerHelper {
         string memory contractName,
         bytes memory constructorArgs
     ) internal returns (address addr, bytes memory data) {
-        bytes memory bytecode = BytecodeUtils.readBytecodeL1(true, fileName, contractName);
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1(fileName, contractName);
         L1L2DeployPrepareResult memory result = _prepareL1L2Deployment(_create2Salt, bytecode, constructorArgs);
         addr = result.expectedAddress;
         data = result.data;
@@ -737,7 +735,7 @@ library GatewayCTMDeployerHelper {
         bytes memory params,
         InnerDeployConfig memory config
     ) private returns (address addr) {
-        bytes memory bytecode = BytecodeUtils.readBytecodeL1(true, fileName, contractName);
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1(fileName, contractName);
         addr = _computeCreate2Address(config.deployerAddr, config.salt, bytecode, params);
         _logGatewayVerifyContract(addr, contractName, params);
     }

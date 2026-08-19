@@ -136,12 +136,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.chainAdmin = coreAddresses.shared.bridgehubAdmin;
             ctmAddresses.admin.transparentProxyAdmin = coreAddresses.shared.transparentProxyAdmin;
         } else {
-            (ctmAddresses.admin.governance) = deploySimpleContract("Governance", false);
-            (ctmAddresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
+            (ctmAddresses.admin.governance) = deploySimpleContract("Governance");
+            (ctmAddresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable");
             ctmAddresses.admin.transparentProxyAdmin = deployWithCreate2AndOwner(
                 "ProxyAdmin",
-                ctmAddresses.admin.governance,
-                false
+                ctmAddresses.admin.governance
             );
         }
 
@@ -152,27 +151,27 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         (
             ctmAddresses.stateTransition.implementations.bytecodesSupplier,
             ctmAddresses.stateTransition.proxies.bytecodesSupplier
-        ) = deployTuppWithContract("BytecodesSupplier", false);
+        ) = deployTuppWithContract("BytecodesSupplier");
 
         deployVerifiers();
 
         // Fresh OS CTMs register the same upgrade implementation the v31 -> v32 flow deploys,
         // so upgraded and from-scratch ecosystems match. The PriorityOpLowerBound registry must
         // exist first: the upgrade contract embeds its address as an immutable.
-        priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound", false);
-        (ctmAddresses.stateTransition.defaultUpgrade) = deploySimpleContract("V32UpgradeZKsyncOS", false);
-        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
+        priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound");
+        (ctmAddresses.stateTransition.defaultUpgrade) = deploySimpleContract("V32UpgradeZKsyncOS");
+        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
 
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
         ctmAddresses.admin.accessControlRestrictionAddress = address(0);
 
-        (, ctmAddresses.stateTransition.proxies.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
+        (, ctmAddresses.stateTransition.proxies.validatorTimelock) = deployTuppWithContract("ValidatorTimelock");
 
         (
             ctmAddresses.stateTransition.implementations.permissionlessValidator,
             ctmAddresses.stateTransition.proxies.permissionlessValidator
-        ) = deployTuppWithContract("PermissionlessValidator", false);
+        ) = deployTuppWithContract("PermissionlessValidator");
 
         (
             ctmAddresses.stateTransition.implementations.serverNotifier,
@@ -186,7 +185,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         (
             ctmAddresses.stateTransition.implementations.chainTypeManager,
             ctmAddresses.stateTransition.proxies.chainTypeManager
-        ) = deployTuppWithContract(ctmContractName, false);
+        ) = deployTuppWithContract(ctmContractName);
 
         setChainTypeManagerInServerNotifier();
 
@@ -216,8 +215,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(CTMContract.VerifierPlonk);
         (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
 
-        ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
-        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
+        ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName);
+        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName);
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -235,26 +234,25 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function deployEIP7702Checker() internal {
-        ctmAddresses.admin.eip7702Checker = deploySimpleContract("EIP7702Checker", false);
+        ctmAddresses.admin.eip7702Checker = deploySimpleContract("EIP7702Checker");
     }
 
     function deployDAValidators() internal {
         ctmAddresses.daAddresses.daContracts.rollupDAManager = deployWithCreate2AndOwner(
             "RollupDAManager",
-            getDeployerAddress(),
-            false
+            getDeployerAddress()
         );
         updateRollupDAManager();
 
         // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
-        ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = deploySimpleContract("RollupL1DAValidator", false);
-        ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS = deploySimpleContract("BlobsL1DAValidatorZKsyncOS", false);
+        ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = deploySimpleContract("RollupL1DAValidator");
+        ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS = deploySimpleContract("BlobsL1DAValidatorZKsyncOS");
 
-        ctmAddresses.daAddresses.daContracts.validiumDAValidator = deploySimpleContract("ValidiumL1DAValidator", false);
+        ctmAddresses.daAddresses.daContracts.validiumDAValidator = deploySimpleContract("ValidiumL1DAValidator");
 
         if (config.contracts.availL1DAValidator == address(0)) {
-            ctmAddresses.daAddresses.availBridge = deploySimpleContract("DummyAvailBridge", false);
-            ctmAddresses.daAddresses.availL1DAValidator = deploySimpleContract("AvailL1DAValidator", false);
+            ctmAddresses.daAddresses.availBridge = deploySimpleContract("DummyAvailBridge");
+            ctmAddresses.daAddresses.availL1DAValidator = deploySimpleContract("AvailL1DAValidator");
         } else {
             ctmAddresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
@@ -467,12 +465,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         bytes[10] memory bytecodes;
         for (uint256 i = 0; i < contracts.length; i++) {
             (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(contracts[i]);
-            bytecodes[i] = BytecodeUtils.readDeployedBytecodeL1(true, fileName, contractName);
+            bytecodes[i] = BytecodeUtils.readDeployedBytecodeL1(fileName, contractName);
             vm.writeLine(tmpFile, vm.toString(bytecodes[i]));
         }
         // Also add SystemContractProxy (used for proxy-upgrade bytecode info)
         bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
-            true,
             "SystemContractProxy.sol",
             "SystemContractProxy"
         );
@@ -521,9 +518,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         string memory _fileName,
         string memory _contractName
     ) private returns (bytes memory) {
-        bytes memory implBytecode = BytecodeUtils.readDeployedBytecodeL1(true, _fileName, _contractName);
+        bytes memory implBytecode = BytecodeUtils.readDeployedBytecodeL1(_fileName, _contractName);
         bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
-            true,
             "SystemContractProxy.sol",
             "SystemContractProxy"
         );
@@ -571,8 +567,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function deployServerNotifier() internal returns (address implementation, address proxy) {
         // We will not store the address of the ProxyAdmin as it is trivial to query if needed.
-        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", ctmAddresses.chainAdmin, false);
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin, false);
+        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", ctmAddresses.chainAdmin);
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin);
     }
 
     function saveDiamondSelectors() public {

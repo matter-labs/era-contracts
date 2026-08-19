@@ -56,7 +56,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     /// @notice Deploy everything that should be deployed
     function deployNewCTMContracts() public virtual override {
         (ctmAddresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
-        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
+        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
 
         deployVerifiers();
 
@@ -77,13 +77,9 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             ctmAddresses.stateTransition.proxies.permissionlessValidator != address(0),
             "CTM has no PermissionlessValidator registered; it is expected from v31 on"
         );
-        ctmAddresses.stateTransition.implementations.bytecodesSupplier = deploySimpleContract(
-            "BytecodesSupplier",
-            false
-        );
+        ctmAddresses.stateTransition.implementations.bytecodesSupplier = deploySimpleContract("BytecodesSupplier");
         ctmAddresses.stateTransition.implementations.permissionlessValidator = deploySimpleContract(
-            "PermissionlessValidator",
-            false
+            "PermissionlessValidator"
         );
 
         // Deploy new ChainTypeManager implementation
@@ -91,20 +87,17 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // FIXME we never actually use deploySimpleContract or deploy TUPP with anything else than false. We need to clean this code.
         (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
         console.log("Deploying ChainTypeManager:", ctmContractName);
-        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
+        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName);
 
         // Deploy new ServerNotifier implementation
-        ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier", false);
+        ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier");
 
         // v31 adds `UPGRADER_ROLE` + `upgradeChainFromVersion()` (IChainUpgrader) to ValidatorTimelock;
         // existing chains' proxy still points at the v30 impl, so swap it under the same CREATE2 flow.
         // Deploy `MultisigCommitter` (a superset of ValidatorTimelock) as the default validator impl so the
         // upgrade does NOT downgrade proxies that already run a MultisigCommitter — the v31 stage-1 upgrade
         // previously deployed plain `ValidatorTimelock` here, which silently dropped multisig-commit support.
-        ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract(
-            "MultisigCommitter",
-            false
-        );
+        ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract("MultisigCommitter");
 
         deployStateTransitionDiamondFacets();
     }
@@ -158,11 +151,11 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     /// @dev Only ZKsync OS chains can be upgraded onto this release (enforced in `initializeConfig`).
     function deployUsedUpgradeContract() internal virtual override returns (address) {
         // The registry must exist first: the v32 upgrade contract embeds its address as an immutable.
-        priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound", false);
+        priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound");
         console.log("Deployed PriorityOpLowerBound at", priorityOpLowerBound);
 
         console.log("Deploying V32UpgradeZKsyncOS");
-        return deploySimpleContract("V32UpgradeZKsyncOS", false);
+        return deploySimpleContract("V32UpgradeZKsyncOS");
     }
 
     function getV31AdditionalFactoryDependencyContracts()

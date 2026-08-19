@@ -1501,7 +1501,7 @@ library Utils {
         string memory fileName,
         string memory contractName
     ) internal returns (bytes memory bytecodeInfo) {
-        bytes memory bytecode = BytecodeUtils.readDeployedBytecodeL1(true, fileName, contractName);
+        bytes memory bytecode = BytecodeUtils.readDeployedBytecodeL1(fileName, contractName);
         bytecodeInfo = getZKOSBytecodeInfo(bytecode);
     }
 

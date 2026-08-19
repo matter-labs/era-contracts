@@ -47,9 +47,8 @@ contract L2InteropFeesL1Test is Test, SharedL2ContractL1Deployer, L2InteropFeesT
     }
 
     function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
+        string memory contractName
     ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName, isZKBytecode);
+        return super.getInitializeCalldata(contractName);
     }
 }

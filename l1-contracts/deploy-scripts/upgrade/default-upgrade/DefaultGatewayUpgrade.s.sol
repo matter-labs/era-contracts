@@ -197,9 +197,9 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function deployGWContract(string memory contractName) internal returns (address contractAddress) {
-        bytes memory creationCalldata = getCreationCalldata(contractName, true);
+        bytes memory creationCalldata = getCreationCalldata(contractName);
         contractAddress = Utils.deployThroughL1Deterministic(
-            getCreationCode(contractName, true),
+            getCreationCode(contractName),
             creationCalldata,
             0,
             newConfig.priorityTxsL2GasLimit,
@@ -208,7 +208,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             coreAddresses.bridgehub.proxies.bridgehub,
             coreAddresses.bridges.proxies.l1AssetRouter
         );
-        notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName, true);
+        notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName);
     }
 
     /// @notice Generate data required for the upgrade
@@ -612,10 +612,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         return ctmDeployedAddresses;
     }
 
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
+    function getCreationCode(string memory contractName) internal view virtual override returns (bytes memory) {
         if (
             compareStrings(contractName, "DefaultUpgrade") ||
             compareStrings(contractName, "BytecodesSupplier") ||
@@ -628,7 +625,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             // must source EVM bytecodes instead.
             revert("TODO(gateway-os): EraVM Gateway bytecodes are no longer available");
         }
-        return super.getCreationCode(contractName, isZKBytecode);
+        return super.getCreationCode(contractName);
     }
 
     function saveOutputVersionSpecific() internal virtual {}

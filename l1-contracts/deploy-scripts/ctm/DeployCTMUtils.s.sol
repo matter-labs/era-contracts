@@ -107,13 +107,13 @@ abstract contract DeployCTMUtils is DeployUtils {
 
     //slither-disable-next-line reentrancy-benign
     function deployStateTransitionDiamondFacets() internal {
-        ctmAddresses.stateTransition.facets.executorFacet = deploySimpleContract("ExecutorFacet", false);
-        ctmAddresses.stateTransition.facets.adminFacet = deploySimpleContract("AdminFacet", false);
-        ctmAddresses.stateTransition.facets.mailboxFacet = deploySimpleContract("MailboxFacet", false);
-        ctmAddresses.stateTransition.facets.gettersFacet = deploySimpleContract("GettersFacet", false);
-        ctmAddresses.stateTransition.facets.migratorFacet = deploySimpleContract("MigratorFacet", false);
-        ctmAddresses.stateTransition.facets.committerFacet = deploySimpleContract("CommitterFacet", false);
-        ctmAddresses.stateTransition.facets.diamondInit = deploySimpleContract("DiamondInit", false);
+        ctmAddresses.stateTransition.facets.executorFacet = deploySimpleContract("ExecutorFacet");
+        ctmAddresses.stateTransition.facets.adminFacet = deploySimpleContract("AdminFacet");
+        ctmAddresses.stateTransition.facets.mailboxFacet = deploySimpleContract("MailboxFacet");
+        ctmAddresses.stateTransition.facets.gettersFacet = deploySimpleContract("GettersFacet");
+        ctmAddresses.stateTransition.facets.migratorFacet = deploySimpleContract("MigratorFacet");
+        ctmAddresses.stateTransition.facets.committerFacet = deploySimpleContract("CommitterFacet");
+        ctmAddresses.stateTransition.facets.diamondInit = deploySimpleContract("DiamondInit");
     }
 
     function chainCreationParamsPath() internal virtual returns (string memory) {
@@ -208,7 +208,16 @@ abstract contract DeployCTMUtils is DeployUtils {
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
         Diamond.FacetCut[] memory facetCuts = getChainCreationFacetCuts(stateTransition);
 
-        DiamondInitializeDataNewChain memory initializeData = getInitializeData(stateTransition);
+        require(stateTransition.verifiers.verifier != address(0), "verifier is zero");
+
+        // ZKsync OS has no bootloader, default-account or EVM-emulator bytecode; `DiamondInit` skips
+        // its non-zero checks for OS chains and never reads the slots back. The audited struct keeps
+        // the fields.
+        DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
+            l2BootloaderBytecodeHash: bytes32(0),
+            l2DefaultAccountBytecodeHash: bytes32(0),
+            l2EvmEmulatorBytecodeHash: bytes32(0)
+        });
 
         diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -249,28 +258,9 @@ abstract contract DeployCTMUtils is DeployUtils {
             });
     }
 
-    function getInitializeData(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal returns (DiamondInitializeDataNewChain memory) {
-        require(stateTransition.verifiers.verifier != address(0), "verifier is zero");
-
-        return
-            // ZKsync OS has no bootloader, default-account or EVM-emulator bytecode; `DiamondInit`
-            // skips its non-zero checks for OS chains and never reads the slots back.
-            DiamondInitializeDataNewChain({
-                l2BootloaderBytecodeHash: bytes32(0),
-                l2DefaultAccountBytecodeHash: bytes32(0),
-                l2EvmEmulatorBytecodeHash: bytes32(0)
-            });
-    }
-
     ////////////////////////////// Contract deployment modes /////////////////////////////////
 
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        require(!isZKBytecode, "EraVM (ZK) bytecodes are not supported");
+    function getCreationCode(string memory contractName) internal view virtual override returns (bytes memory) {
         return ContractsBytecodesLib.getCreationCodeEVM(contractName);
     }
 
@@ -278,10 +268,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         return ROLLUP_L2_DA_COMMITMENT_SCHEME;
     }
 
-    function getCreationCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
+    function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
         if (compareStrings(contractName, "BridgedStandardERC20")) {
             return abi.encode();
         } else if (compareStrings(contractName, "EIP7702Checker")) {
@@ -364,10 +351,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             });
     }
 
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
+    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
         if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
             return
                 abi.encodeCall(

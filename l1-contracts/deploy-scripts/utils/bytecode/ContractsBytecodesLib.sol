@@ -7,15 +7,10 @@ import {BytecodeUtils as Utils} from "./BytecodeUtils.s.sol";
 /// @notice Library providing functions to read bytecodes of L2 contracts individually.
 ///         Handles special-case filename/contract-name mismatches (e.g. Admin.sol → AdminFacet).
 library ContractsBytecodesLib {
-    /// @notice Get L2 deployed bytecode for factory deps.
-    ///         EVM bytecodes: EVM deployed bytecode from out/.
-    ///         ZK bytecodes: ZK creation code from zkout/.
-    function getL2DeployedBytecode(
-        string memory _contractName,
-        bool _isEVMBytecode
-    ) internal view returns (bytes memory) {
+    /// @notice Get L2 deployed bytecode for factory deps, from `out/`.
+    function getL2DeployedBytecode(string memory _contractName) internal view returns (bytes memory) {
         string memory fileName = string.concat(_contractName, ".sol");
-        return Utils.readDeployedBytecodeL1(_isEVMBytecode, fileName, _contractName);
+        return Utils.readDeployedBytecodeL1(fileName, _contractName);
     }
 
     /// @notice Reads the bytecode of the specified contract using a unique identifier.
@@ -25,14 +20,12 @@ library ContractsBytecodesLib {
     /// @return The bytecode of the contract.
     /// @dev Reverts if the contractIdentifier is unknown or unsupported.
 
-    function getCreationCode(string memory contractIdentifier, bool isZKBytecode) internal view returns (bytes memory) {
-        require(!isZKBytecode, "EraVM (ZK) bytecodes are not supported");
+    function getCreationCode(string memory contractIdentifier) internal view returns (bytes memory) {
         return getCreationCodeEVM(contractIdentifier);
     }
 
-    /// @notice Reads L2 bytecode (EVM bytecodes from out/).
-    function getL2Bytecode(string memory contractIdentifier, bool isEVMBytecode) internal view returns (bytes memory) {
-        require(isEVMBytecode, "EraVM (ZK) bytecodes are not supported");
+    /// @notice Reads L2 bytecode from `out/`.
+    function getL2Bytecode(string memory contractIdentifier) internal view returns (bytes memory) {
         return getCreationCodeEVM(contractIdentifier);
     }
 
@@ -54,22 +47,22 @@ library ContractsBytecodesLib {
 
         // Special cases: contracts where filename differs from contract name
         if (Utils.compareStrings(contractIdentifier, "AdminFacet")) {
-            return Utils.readBytecodeL1(true, "Admin.sol", "AdminFacet");
+            return Utils.readBytecodeL1("Admin.sol", "AdminFacet");
         } else if (Utils.compareStrings(contractIdentifier, "MailboxFacet")) {
-            return Utils.readBytecodeL1(true, "Mailbox.sol", "MailboxFacet");
+            return Utils.readBytecodeL1("Mailbox.sol", "MailboxFacet");
         } else if (Utils.compareStrings(contractIdentifier, "ExecutorFacet")) {
-            return Utils.readBytecodeL1(true, "Executor.sol", "ExecutorFacet");
+            return Utils.readBytecodeL1("Executor.sol", "ExecutorFacet");
         } else if (Utils.compareStrings(contractIdentifier, "GettersFacet")) {
-            return Utils.readBytecodeL1(true, "Getters.sol", "GettersFacet");
+            return Utils.readBytecodeL1("Getters.sol", "GettersFacet");
         } else if (Utils.compareStrings(contractIdentifier, "MigratorFacet")) {
-            return Utils.readBytecodeL1(true, "Migrator.sol", "MigratorFacet");
+            return Utils.readBytecodeL1("Migrator.sol", "MigratorFacet");
         } else if (Utils.compareStrings(contractIdentifier, "CommitterFacet")) {
-            return Utils.readBytecodeL1(true, "Committer.sol", "CommitterFacet");
+            return Utils.readBytecodeL1("Committer.sol", "CommitterFacet");
         } else if (Utils.compareStrings(contractIdentifier, "BridgedTokenBeacon")) {
-            return Utils.readBytecodeL1(true, "UpgradeableBeacon.sol", "UpgradeableBeacon");
+            return Utils.readBytecodeL1("UpgradeableBeacon.sol", "UpgradeableBeacon");
         }
 
         // Default: read from l1-contracts/out/ using standard naming
-        return Utils.readBytecodeL1(true, string.concat(contractIdentifier, ".sol"), contractIdentifier);
+        return Utils.readBytecodeL1(string.concat(contractIdentifier, ".sol"), contractIdentifier);
     }
 }

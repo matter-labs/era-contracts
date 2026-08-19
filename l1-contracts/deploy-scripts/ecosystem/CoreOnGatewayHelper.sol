@@ -60,7 +60,7 @@ library CoreOnGatewayHelper {
     /// @dev Note, that it is NOT suitable for force deployments as these require bytecode info.
     function getDeployedBytecodeHash(CoreContract _c) internal view returns (bytes32) {
         (string memory fileName, string memory contractName) = resolve(_c);
-        return BytecodeUtils.getDeployedBytecodeHash(true, fileName, contractName);
+        return BytecodeUtils.getDeployedBytecodeHash(fileName, contractName);
     }
 
     // ======================== Factory dependencies ========================
@@ -120,7 +120,7 @@ library CoreOnGatewayHelper {
 
         for (uint256 i; i < _dependencyContracts.length; i++) {
             (, string memory contractName) = resolve(_dependencyContracts[i]);
-            dependencyBytecodes[i] = ContractsBytecodesLib.getL2DeployedBytecode(contractName, true);
+            dependencyBytecodes[i] = ContractsBytecodesLib.getL2DeployedBytecode(contractName);
         }
     }
 
@@ -132,7 +132,7 @@ library CoreOnGatewayHelper {
         out = new bytes[](ids.length);
         for (uint256 i = 0; i < ids.length; i++) {
             string memory contractName = _resolveZkOsSystemContractName(ids[i]);
-            out[i] = ContractsBytecodesLib.getL2DeployedBytecode(contractName, true);
+            out[i] = ContractsBytecodesLib.getL2DeployedBytecode(contractName);
         }
     }
 

@@ -149,15 +149,14 @@ library SystemContractsProcessing {
         //    genesis. v31 no longer force-deploys it (see getBaseZKsyncOSForceDeployments), but its
         //    bytecode preimage is still published as a ZKsyncOS baseline.
         factoryDeps = new bytes[](3);
-        factoryDeps[0] = BytecodeUtils.readDeployedBytecodeL1(true, "SystemContractProxy.sol", "SystemContractProxy");
+        factoryDeps[0] = BytecodeUtils.readDeployedBytecodeL1("SystemContractProxy.sol", "SystemContractProxy");
         factoryDeps[1] = BytecodeUtils.readDeployedBytecodeL1(
-            true,
             "SystemContractProxyAdmin.sol",
             "SystemContractProxyAdmin"
         );
         // The implementation the upgrade installs behind the removed trackers' proxies (see
         // getRemovedTrackerNeutralizations) — not a CoreContract, so published here.
-        factoryDeps[2] = BytecodeUtils.readDeployedBytecodeL1(true, "EmptyContract.sol", "EmptyContract");
+        factoryDeps[2] = BytecodeUtils.readDeployedBytecodeL1("EmptyContract.sol", "EmptyContract");
     }
 
     /// @notice Build the base ZKsyncOS force deployment array.

@@ -62,10 +62,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         ctmAddresses.admin.transparentProxyAdmin = makeAddr("transparentProxyAdmin");
         ctmAddresses.admin.governance = makeAddr("governance");
         ctmAddresses.chainAdmin = makeAddr("chainAdmin");
-        ctmAddresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
+        ctmAddresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade");
         (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
-        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, true);
-        ctmAddresses.stateTransition.proxies.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
+        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName);
+        ctmAddresses.stateTransition.proxies.validatorTimelock = deploySimpleContract("ValidatorTimelock");
         (
             ctmAddresses.stateTransition.implementations.serverNotifier,
             ctmAddresses.stateTransition.proxies.serverNotifier
@@ -77,7 +77,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         (
             ctmAddresses.stateTransition.implementations.chainTypeManager,
             ctmAddresses.stateTransition.proxies.chainTypeManager
-        ) = deployTuppWithContract(ctmContractName, true);
+        ) = deployTuppWithContract(ctmContractName);
     }
 
     // add this to be excluded from coverage report
@@ -109,9 +109,8 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     }
 
     function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
+        string memory contractName
     ) internal virtual override(DeployIntegrationUtils, DeployCTMUtils) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName, isZKBytecode);
+        return super.getInitializeCalldata(contractName);
     }
 }
