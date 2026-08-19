@@ -568,6 +568,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
             // Dropping the finality flag here is a deliberate trade-off: the request struct cannot carry it,
             // see {protocol-docs/bridging.md} for the double-alias caveat this leaves open.
+            // slither-disable-next-line unused-return
             (address refundRecipient, ) = AddressAliasHelper.actualRefundRecipient(_refundRecipient, _originalCaller);
 
             L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
