@@ -79,6 +79,33 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
   handler but records nothing, because a failed transaction refunds the base token to the L2
   `refundRecipient` rather than being claimable on L1.
 
+### Refund-recipient resolution
+
+A priority transaction's `refundRecipient` names the L2 account credited if the transaction fails (and
+with any gas refund). Resolution is split between two helpers in `AddressAliasHelper`:
+
+- `actualRefundRecipient` resolves only the **default** (unset) case to the caller's L2 identity: an EOA
+  caller stays as is; a caller with deployed code is deferred to the Mailbox; a codeless non-`tx.origin`
+  caller (a contract calling from its own constructor) is aliased. The returned `aliasingFinalized` flag
+  marks whether the result is final — the constructor case must not be aliased again even if code happens
+  to exist at the aliased address.
+- `applyRefundRecipientAlias` (Mailbox-only) aliases a non-finalized recipient if it has deployed code,
+  exempting EIP-7702 accounts — only the Mailbox can detect those (via `EIP_7702_CHECKER`, L1 only),
+  which is why deployed-code callers and all explicit recipients are finished there. An explicit EOA
+  recipient is left unaliased; an explicit recipient that is a contract still in construction is
+  indistinguishable from an EOA and is likewise left unaliased (such callers must pass their aliased
+  address themselves).
+
+The legacy `Mailbox.requestL2Transaction` path composes both helpers in one place, so the
+`aliasingFinalized` flag fully protects it from double aliasing. On the Bridgehub / L1AssetRouter paths
+the default is resolved early (the Mailbox never sees the original caller) and the flag is deliberately
+dropped — carrying it would require extending `BridgehubL2TransactionRequest` and the Bridgehub <-> chain
+interface. The theoretical double-alias caveat — a contract deployed at exactly the alias of a
+constructor caller would be aliased a second time by the Mailbox — therefore applies to those paths
+only. Triggering it requires any contract to exist at exactly the alias of the constructor caller (a
+~2^160 grind unless one party deliberately deploys both); stealing the refund additionally requires
+controlling the doubly-aliased address on L2.
+
 ### Finalization (destination side)
 
 `finalizeDeposit(sourceChainId, assetId, transferData)` is the new-format finalization entry point. It

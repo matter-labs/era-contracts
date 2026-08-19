@@ -404,7 +404,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     function prepareGatewaySpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
         if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
 
-        Call[][] memory allCalls = new Call[][](5);
+        Call[][] memory allCalls = new Call[][](6);
 
         // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
         uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
@@ -413,8 +413,9 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         allCalls[0] = provideSetNewVersionUpgradeCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
         allCalls[1] = prepareNewChainCreationParamsCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
         allCalls[2] = prepareCTMImplementationUpgrade(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-        allCalls[3] = prepareDAValidatorCallGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-        allCalls[4] = prepareVersionSpecificStage1GovernanceCallsGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        allCalls[3] = prepareSetDefaultUpgradeCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        allCalls[4] = prepareDAValidatorCallGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        allCalls[5] = prepareVersionSpecificStage1GovernanceCallsGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
 
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
@@ -500,6 +501,34 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         bytes memory l2Calldata = abi.encodeCall(
             IChainTypeManager.setChainCreationParams,
             (getChainCreationParams(gatewayConfig.gatewayStateTransition))
+        );
+
+        calls = _prepareL1ToGatewayCall(
+            l2Calldata,
+            l2GasLimit,
+            l1GasPrice,
+            gatewayConfig.gatewayStateTransition.proxies.chainTypeManager
+        );
+    }
+
+    /// @dev Must be executed after `prepareCTMImplementationUpgrade`, as `setDefaultUpgrade` is only present
+    /// starting from v32.
+    function prepareSetDefaultUpgradeCallForGateway(
+        uint256 l2GasLimit,
+        uint256 l1GasPrice
+    ) public virtual returns (Call[] memory calls) {
+        require(
+            gatewayConfig.gatewayStateTransition.proxies.chainTypeManager != address(0),
+            "chainTypeManager on gateway is zero in newConfig"
+        );
+        require(
+            gatewayConfig.gatewayStateTransition.defaultUpgrade != address(0),
+            "defaultUpgrade on gateway is zero in newConfig"
+        );
+
+        bytes memory l2Calldata = abi.encodeCall(
+            IChainTypeManager.setDefaultUpgrade,
+            (gatewayConfig.gatewayStateTransition.defaultUpgrade)
         );
 
         calls = _prepareL1ToGatewayCall(

@@ -567,20 +567,22 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](7);
+        Call[][] memory allCalls = new Call[][](8);
 
         allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
         allCalls[1] = prepareCheckMigrationsPausedCalls();
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
         allCalls[2] = prepareUpgradeCTMCalls();
+        console.log("prepareStage1GovernanceCalls: prepareSetDefaultUpgradeCall");
+        allCalls[3] = prepareSetDefaultUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareNewChainCreationParamsCall");
-        allCalls[3] = prepareNewChainCreationParamsCall();
+        allCalls[4] = prepareNewChainCreationParamsCall();
         console.log("prepareStage1GovernanceCalls: provideSetNewVersionUpgradeCall");
-        allCalls[4] = provideSetNewVersionUpgradeCall();
+        allCalls[5] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
-        allCalls[5] = prepareDAValidatorCall();
+        allCalls[6] = prepareDAValidatorCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
-        allCalls[6] = prepareVersionSpecificStage1GovernanceCallsL1();
+        allCalls[7] = prepareVersionSpecificStage1GovernanceCallsL1();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
@@ -678,6 +680,25 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             target: upgradeAddresses.upgradeTimer,
             // Double checking that the deadline has passed.
             data: abi.encodeCall(GovernanceUpgradeTimer.checkDeadline, ()),
+            value: 0
+        });
+    }
+
+    /// @notice Points the CTM at the upgrade contract deployed by this release, so that later upgrades that need
+    /// no custom upgrade logic (e.g. verifier-only ones) can reuse it.
+    /// @dev Must be executed after the CTM implementation upgrade, as `setDefaultUpgrade` is only present
+    /// starting from v32.
+    function prepareSetDefaultUpgradeCall() public virtual returns (Call[] memory calls) {
+        require(
+            ctmAddresses.stateTransition.proxies.chainTypeManager != address(0),
+            "stateTransitionManagerAddress is zero in newConfig"
+        );
+        require(ctmAddresses.stateTransition.defaultUpgrade != address(0), "defaultUpgrade is zero in newConfig");
+        calls = new Call[](1);
+
+        calls[0] = Call({
+            target: ctmAddresses.stateTransition.proxies.chainTypeManager,
+            data: abi.encodeCall(IChainTypeManager.setDefaultUpgrade, (ctmAddresses.stateTransition.defaultUpgrade)),
             value: 0
         });
     }
