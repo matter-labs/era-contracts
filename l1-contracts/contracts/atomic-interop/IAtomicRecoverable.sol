@@ -3,9 +3,11 @@ pragma solidity 0.8.28;
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Implemented by a local contract that produces atomic-interop bundle calls (`InteropCall.from`,
-/// e.g. the asset router's burn path) and knows how to reverse them when the flow times out.
-/// See {protocol-docs/atomicity/recovery.md} (timeout / refund).
+/// @notice Implemented by a local contract that produces atomic-interop bundle calls (`InteropCall.from`
+/// — the asset router's burn path) and knows how to reverse them when the flow times out.
+/// See {protocol-docs/atomicity/recovery.md} (timeout / refund). The manager dispatches this hook only
+/// to the L2 asset router, which send-time validation (`IndirectCallOnlyToAssetRouter`) makes the only
+/// possible indirect call sender — see {protocol-docs/interop.md#restrictions}.
 interface IAtomicRecoverable {
     /// @notice Reverses a single atomic-bundle call whose flow timed out, re-crediting the original depositor.
     /// @dev Implementations MUST restrict this to the canonical {AtomicFlowManager} and MUST return

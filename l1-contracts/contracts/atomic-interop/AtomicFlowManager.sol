@@ -281,16 +281,9 @@ contract AtomicFlowManager is IAtomicFlowManager {
         return L2_INTEROP_HANDLER_ADDR;
     }
 
-    /// @dev Reverses every recoverable call embedded in `_bundle` (best-effort timeout refund — see
-    /// {protocol-docs/atomicity/recovery.md}), re-crediting the original depositor.
-    /// @dev Each call's local sender (`InteropCall.from`) owns its own reversal via
-    /// {IAtomicRecoverable.recoverAtomicCall}: the manager is agnostic to the call/encoding format and
-    /// simply forwards `(destinationChainId, data)`. Senders MUST return `false` (not revert) for calls
-    /// they do not recognise.
-    /// @dev Native base-token `value` is reversed separately. Router-produced calls (`from == asset
-    /// router`) never carry it (indirect calls force `interopCallValue == 0`) and take only the
-    /// `recoverAtomicCall` branch. A direct call's `value` routes through the asset router/NTV base-token
-    /// recovery path (reusing the existing accounting) back to its `from`.
+    /// @dev Reverses every recoverable call embedded in `_bundle`, re-crediting the original depositor.
+    /// Dispatch rationale and the two mechanisms:
+    /// {protocol-docs/atomicity/recovery.md#_recoverbundle-reversing-the-burns}.
     /// @dev A bundle where no call is recoverable has no source funds to return: the refund then simply
     /// flips the leg to `Reverted` without moving anything — the state transition must not be blocked.
     function _recoverBundle(InteropBundle memory _bundle) internal {
@@ -305,11 +298,14 @@ contract AtomicFlowManager is IAtomicFlowManager {
         uint256 callsLen = _bundle.calls.length;
         for (uint256 i = 0; i < callsLen; ++i) {
             InteropCall memory c = _bundle.calls[i];
-            // Only ask burn-producing calls (from == asset router, as set by `initiateIndirectCall`) to
-            // reverse themselves. A direct call never burned through a recoverable sender, so its `from`
-            // (possibly an EOA) is skipped here; any base-token value it carried is handled below.
-            // The sender reports via the return value whether it recognised (and reversed) the call;
-            // nothing is done with the answer — an unrecognised call simply has nothing to recover.
+            // Indirect calls are restricted to the asset router at send (`IndirectCallOnlyToAssetRouter`),
+            // so `from == L2_ASSET_ROUTER_ADDR` selects the burn-producing indirect calls (assuming the
+            // router never itself initiates a direct send — true today), and any other `from` is a
+            // direct call's sender (possibly an EOA, which must not be probed — the revert would take
+            // down the whole claim); its `value`, if any, is handled below. The
+            // sender reports via the return value whether it recognised (and reversed) the call; nothing
+            // is done with the answer — an unrecognised call simply has nothing to recover (see known
+            // issue 1 in {protocol-docs/atomicity/security.md#known-issues-to-be-fixed-in-this-release}).
             if (c.from == L2_ASSET_ROUTER_ADDR) {
                 // slither-disable-next-line unused-return
                 IAtomicRecoverable(c.from).recoverAtomicCall(destChainId, c.data);
