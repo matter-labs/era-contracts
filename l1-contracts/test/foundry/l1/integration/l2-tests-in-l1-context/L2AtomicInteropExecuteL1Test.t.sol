@@ -7,14 +7,14 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 
 import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
-import {L2AtomicInteropSendRefundTestAbstract} from "../l2-tests-abstract/L2AtomicInteropSendRefundTestAbstract.t.sol";
+import {L2AtomicInteropExecuteTestAbstract} from "../l2-tests-abstract/L2AtomicInteropExecuteTestAbstract.t.sol";
 
 import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
 import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-contract L2AtomicInteropSendRefundL1Test is Test, SharedL2ContractL1Deployer, L2AtomicInteropSendRefundTestAbstract {
+contract L2AtomicInteropExecuteL1Test is Test, SharedL2ContractL1Deployer, L2AtomicInteropExecuteTestAbstract {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
 
     function initSystemContracts(
@@ -30,28 +30,25 @@ contract L2AtomicInteropSendRefundL1Test is Test, SharedL2ContractL1Deployer, L2
     }
 
     function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
+        StateTransitionDeployedAddresses memory _stateTransition
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getChainCreationFacetCuts(stateTransition);
+        return super.getChainCreationFacetCuts(_stateTransition);
     }
 
     function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
+        StateTransitionDeployedAddresses memory _stateTransition
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getUpgradeAddedFacetCuts(stateTransition);
+        return super.getUpgradeAddedFacetCuts(_stateTransition);
     }
 
     function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
+        string memory _contractName,
+        bool _isZKBytecode
     ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName, isZKBytecode);
+        return super.getInitializeCalldata(_contractName, _isZKBytecode);
     }
 
-    function _mockAtomicFlowManager()
-        internal
-        override(SharedL2ContractDeployer, L2AtomicInteropSendRefundTestAbstract)
-    {
-        L2AtomicInteropSendRefundTestAbstract._mockAtomicFlowManager();
+    function _mockAtomicFlowManager() internal override(SharedL2ContractDeployer, L2AtomicInteropExecuteTestAbstract) {
+        L2AtomicInteropExecuteTestAbstract._mockAtomicFlowManager();
     }
 }

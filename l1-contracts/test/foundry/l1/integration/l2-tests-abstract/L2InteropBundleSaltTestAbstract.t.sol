@@ -16,7 +16,6 @@ import {
     AttributeAlreadySet,
     AttributeViolatesRestriction,
     InteropBundleSaltAlreadyUsed,
-    InteropPreviewHash,
     NonAtomicSendUnsupported
 } from "contracts/interop/InteropErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
@@ -133,20 +132,10 @@ abstract contract L2InteropBundleSaltTestAbstract is L2InteropTestUtils {
         InteropCallStarter[] memory calls = _buildSimpleCall();
         bytes memory destination = InteroperableAddress.formatEvmV1(destinationChainId);
 
-        vm.prank(sender);
-        // Low-level call so we can read the hash out of the quoter revert (see {previewBundleHash}).
-        (bool ok, bytes memory ret) = address(l2InteropCenter).call(
+        bytes32 predicted = _decodePreviewHash(
+            sender,
             abi.encodeCall(l2InteropCenter.previewBundleHash, (destination, calls, attrs))
         );
-        assertFalse(ok, "previewBundleHash must revert with InteropPreviewHash (quoter pattern)");
-        assertEq(ret.length, 36, "revert reason must be InteropPreviewHash(bytes32)");
-        assertEq(bytes4(ret), InteropPreviewHash.selector, "unexpected preview revert selector");
-        bytes32 predicted;
-        // ret layout: 4-byte selector followed by the abi-encoded bytes32 hash.
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            predicted := mload(add(ret, 0x24))
-        }
 
         (, bytes32 emitted) = _sendAndDecodeBundle(sender, attrs);
         assertEq(predicted, emitted, "previewBundleHash must equal the emitted bundleHash");
