@@ -13,8 +13,8 @@ import {CTMUpgrade_v31} from "deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 ///         anymore — callers run Core and CTM scripts directly (or via `protocol-ops
 ///         upgrade-prepare-all` with `--core-script-path` / `--ctm-script-path`).
 
-/// @dev CTM upgrade for tests: skips factory-deps validation (zkout bytecodes are
-///      not available) and writes only the minimal output the test harness needs
+/// @dev CTM upgrade for tests: skips factory-deps validation (the harness puts the L2
+///      bytecodes in place itself) and writes only the minimal output the test harness needs
 ///      (`chain_upgrade_diamond_cut` + `state_transition.default_upgrade_addr`)
 ///      so accumulated `vm.serialize*` JSON does not blow forge's 128 MB EVM memory.
 contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
@@ -61,7 +61,7 @@ contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
         }
     }
 
-    /// @dev Skip loading zkout bytecodes — they are already on L2 via `anvil_setCode`.
+    /// @dev Skip loading the L2 bytecodes — they are already on L2 via `anvil_setCode`.
     function publishBytecodes() public override {
         // no-op
     }

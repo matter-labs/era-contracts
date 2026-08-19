@@ -54,7 +54,7 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
     }
 
     /// @notice Override to skip bytecode-heavy force deployment generation in getProposedUpgrade.
-    /// The base implementation reads all zkout bytecodes, causing MemoryOOG.
+    /// The base implementation reads every force-deployment bytecode, causing MemoryOOG.
     /// We return an empty upgrade instead.
     function getProposedUpgrade(
         StateTransitionDeployedAddresses memory stateTransition,
