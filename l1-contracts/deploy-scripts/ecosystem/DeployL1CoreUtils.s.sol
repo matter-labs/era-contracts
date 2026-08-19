@@ -66,7 +66,9 @@ contract DeployL1CoreUtils is DeployUtils {
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
-        config.eraChainId = toml.readUint("$.era_chain_id");
+        // `config.eraChainId` stays zero: see the field's comment in `DeployCTMUtils`. It reaches the
+        // `L1Nullifier` / `L1AssetRouter` / `L1ERC20Bridge` immutables, whose Era-legacy branches then
+        // key off a chain id that can never be registered.
         config.ownerAddress = toml.readAddress("$.owner_address");
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(

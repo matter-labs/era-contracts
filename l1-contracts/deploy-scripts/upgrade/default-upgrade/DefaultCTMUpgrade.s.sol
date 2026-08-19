@@ -218,9 +218,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
-        if (toml.keyExists("$.era_chain_id")) {
-            config.eraChainId = toml.readUint("$.era_chain_id");
-        }
+        // No `era_chain_id` read: `setAddressesBasedOnCTM` resolves it from the live asset router,
+        // which is authoritative for the ecosystems this flow upgrades.
 
         PermanentCTMConfig memory permanentConfig = PermanentCTMConfig({
             ctmProxy: ctmProxy,

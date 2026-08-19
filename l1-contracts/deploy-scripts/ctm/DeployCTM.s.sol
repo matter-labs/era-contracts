@@ -125,9 +125,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         _blakeBatchTmpFile = string.concat(outputPath, ".blake-batch.txt");
 
         initializeConfig(inputPath, bridgehub);
-        // MailboxFacet bakes era_chain_id into an immutable at deploy time; a missing key would
-        // silently deploy with 0. Base discovered it on-chain; a fresh CTM must supply it in config.
-        require(config.eraChainId != 0, "era_chain_id must be non-zero for CTM deployment");
 
         console.log("Initializing core contracts from BH");
         // Populate discovered addresses via inspector

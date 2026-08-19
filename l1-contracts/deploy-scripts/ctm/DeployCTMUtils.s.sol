@@ -65,9 +65,14 @@ import {CTMDeployedAddresses} from "../utils/Types.sol";
 struct Config {
     uint256 l1ChainId;
     address deployerAddress;
-    // Historical/canonical ecosystem chain identifier. Baked into the `MailboxFacet.ERA_CHAIN_ID`
-    // immutable (legacy Era withdrawal gating) and threaded into `FixedForceDeploymentsData.eraChainId`
-    // for the deprecated write-only `L2AssetRouter.ERA_CHAIN_ID` slot.
+    // Historical/canonical ecosystem chain identifier, baked into the `MailboxFacet.ERA_CHAIN_ID`
+    // immutable and threaded into `FixedForceDeploymentsData.eraChainId` (the deprecated write-only
+    // `L2AssetRouter.ERA_CHAIN_ID` slot). Left at zero for anything this release deploys: an
+    // ecosystem created here has no Era chain, and `Bridgehub` rejects chain id 0
+    // (`ZeroChainId`), so a zero `ERA_CHAIN_ID` permanently reverts `MailboxFacet`'s two legacy
+    // Era entrypoints for every chain instead of unlocking them for whichever chain happens to
+    // hold a made-up id. Upgrades of ecosystems that really contain Era read the live value from
+    // the asset router instead — see `AddressIntrospector.getEraChainId`.
     uint256 eraChainId;
     uint256 gatewayChainId;
     address ownerAddress;
@@ -136,9 +141,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
 
-        if (toml.keyExists("$.era_chain_id")) {
-            config.eraChainId = toml.readUint("$.era_chain_id");
-        }
         if (toml.keyExists("$.zk_token_asset_id")) {
             config.zkTokenAssetId = toml.readBytes32("$.zk_token_asset_id");
         }

@@ -1,4 +1,3 @@
-era_chain_id = 6565
 is_zk_sync_os = true
 
 # Dummy ZK token asset ID for test fixtures. On mainnet this would be
