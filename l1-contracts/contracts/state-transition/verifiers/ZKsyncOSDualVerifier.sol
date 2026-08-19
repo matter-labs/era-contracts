@@ -10,6 +10,7 @@ import {
     UnknownVerifierType,
     MockVerifierNotSupported,
     InvalidProofFormat,
+    NonZeroCarriedHash,
     ZeroAddress,
     AddressAlreadySet,
     EmptyPublicInputsLength
@@ -174,14 +175,13 @@ contract ZKsyncOSDualVerifier is Ownable2Step, IVerifier, IZKsyncOSDualVerifier 
         //   N >= 2: keccak(H_1 || ... || H_N)
         // A rolling fold (`keccak(keccak(H_1, H_2), H_3)`) coincides for N <= 2 but diverges
         // from N == 3 on, so it must not be used here.
-        if (initialHash == 0) {
-            result = _publicInputs.length == 1
-                ? _publicInputs[0]
-                : uint256(keccak256(abi.encodePacked(_publicInputs)));
-        } else {
-            // Partial ranges: the carried hash is the first element of the concatenation.
-            result = uint256(keccak256(abi.encodePacked(initialHash, _publicInputs)));
+        // The carried hash (`_proof[1]`) is a pre-V8 OhBender concept; the V8 unified layer
+        // has no continuation input, so no proof for a non-zero carry can exist. The wire
+        // slot is kept as reserved, must-be-zero.
+        if (initialHash != 0) {
+            revert NonZeroCarriedHash();
         }
+        result = _publicInputs.length == 1 ? _publicInputs[0] : uint256(keccak256(abi.encodePacked(_publicInputs)));
         result = result >> PUBLIC_INPUT_SHIFT;
     }
 }
