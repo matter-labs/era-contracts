@@ -373,6 +373,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         // in the BH, as the Mailbox won't have msg.sender. Dropping the finality flag here is a deliberate
         // trade-off: the request struct cannot carry it, see {protocol-docs/bridging.md} for the
         // double-alias caveat this leaves open.
+        // slither-disable-next-line unused-return
         (address refundRecipient, ) = AddressAliasHelper.actualRefundRecipient(_refundRecipient, msg.sender);
         _request.refundRecipient = refundRecipient;
         address zkChain = zkChainMap.get(_chainId);
