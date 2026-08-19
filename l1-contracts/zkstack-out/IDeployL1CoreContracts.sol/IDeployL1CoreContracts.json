@@ -234,16 +234,6 @@
             "internalType": "address"
           },
           {
-            "name": "eraChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "eraDiamondProxyAddress",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
             "name": "legacyGatewayChainId",
             "type": "uint256",
             "internalType": "uint256"
