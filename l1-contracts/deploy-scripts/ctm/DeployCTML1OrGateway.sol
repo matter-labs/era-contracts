@@ -8,7 +8,6 @@ import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZK
 struct CTMCoreDeploymentConfig {
     bool isZKsyncOS;
     bool testnetVerifier;
-    uint256 eraChainId; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
     uint256 l1ChainId;
     address bridgehubProxy;
     address interopCenterProxy;
@@ -81,7 +80,6 @@ library DeployCTML1OrGateway {
         } else if (_contractName == CTMContract.MailboxFacet) {
             return
                 abi.encode(
-                    _config.eraChainId,
                     _config.l1ChainId,
                     _config.chainAssetHandler,
                     _config.eip7702Checker,

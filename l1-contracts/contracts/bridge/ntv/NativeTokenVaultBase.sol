@@ -181,8 +181,6 @@ abstract contract NativeTokenVaultBase is
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused {
         address receiver;
         uint256 amount;
-        // we set all originChainId for all already bridged tokens with the setLegacyTokenAssetId and updateChainBalancesFromSharedBridge functions.
-        // for tokens that are bridged for the first time, the originChainId will be 0.
         (receiver, amount) = _bridgeMintToken(_chainId, _assetId, _data);
         // solhint-disable-next-line func-named-parameters
         emit BridgeMint(_chainId, _assetId, receiver, amount);

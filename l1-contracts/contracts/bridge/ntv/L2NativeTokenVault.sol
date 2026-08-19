@@ -197,27 +197,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         L2_ASSET_TRACKER.registerNewTokenIfNeeded(_assetId, _originChainId);
     }
 
-    /// @notice Ensures that the token is deployed.
-    /// @param _assetId The asset ID.
-    /// @param _originToken The origin token address.
-    /// @param _erc20Data The ERC20 data.
-    /// @return expectedToken The token address.
-    function _ensureAndSaveTokenDeployed(
-        bytes32 _assetId,
-        address _originToken,
-        bytes memory _erc20Data
-    ) internal override returns (address expectedToken) {
-        uint256 tokenOriginChainId;
-        (expectedToken, tokenOriginChainId) = _calculateExpectedTokenAddress(_originToken, _erc20Data);
-        super._ensureAndSaveTokenDeployedInner({
-            _tokenOriginChainId: tokenOriginChainId,
-            _assetId: _assetId,
-            _originToken: _originToken,
-            _erc20Data: _erc20Data,
-            _expectedToken: expectedToken
-        });
-    }
-
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
     /// @dev This function uses raw call to ContractDeployer to make sure that exactly `L2_TOKEN_PROXY_BYTECODE_HASH` is used
     /// for the code of the proxy.
@@ -345,10 +324,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             _tokenOriginChainId: originChainId[_assetId],
             _tokenAddress: tokenAddress[_assetId]
         });
-    }
-
-    function _registerToken(address _nativeToken) internal override returns (bytes32) {
-        return super._registerToken(_nativeToken);
     }
 
     /*//////////////////////////////////////////////////////////////
