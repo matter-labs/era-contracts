@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT, PUBLIC_INPUT_SHIFT} from "contracts/common/Config.sol";
+import {ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT} from "contracts/common/Config.sol";
 
 contract ExecutorZKsyncOSPublicInputHarness is ExecutorFacet {
     function util_setZKsyncOSChainConfig(uint256 _chainId, uint64 _maxTxGasLimit) external {
@@ -62,7 +62,7 @@ contract ZKsyncOSPublicInputTest is Test {
             BATCH_OUTPUT_HASH_GOLDEN
         );
 
-        assertEq(publicInput, uint256(PUBLIC_INPUT_HASH_GOLDEN) >> PUBLIC_INPUT_SHIFT);
+        assertEq(publicInput, uint256(PUBLIC_INPUT_HASH_GOLDEN));
     }
 
     function test_publicInput_unsetMaxTxGasLimitFallsBackToDefault() public {
@@ -75,7 +75,7 @@ contract ZKsyncOSPublicInputTest is Test {
             BATCH_OUTPUT_HASH_GOLDEN
         );
 
-        assertEq(publicInput, uint256(PUBLIC_INPUT_HASH_GOLDEN) >> PUBLIC_INPUT_SHIFT);
+        assertEq(publicInput, uint256(PUBLIC_INPUT_HASH_GOLDEN));
     }
 
     function test_publicInput_commitsToChainConfig() public {

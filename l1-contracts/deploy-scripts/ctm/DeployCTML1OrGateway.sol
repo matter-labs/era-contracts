@@ -160,7 +160,9 @@ library DeployCTML1OrGateway {
     // ======================== Verifier helpers ========================
 
     // TODO: pass this value from zkstack_cli
-    uint32 internal constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 6;
+    // 8 = the proving-V8 (zksync-os 0.4.0 / protocol v32) verifier version the server
+    // encodes in `_proof[0]`; the in-tree ZKsyncOSVerifierPlonk carries the matching VK.
+    uint32 internal constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 8;
 
     /// @notice Encode constructor arguments for the main verifier.
     ///         ZKsyncOS verifiers require an extra `_owner` argument.
