@@ -223,7 +223,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             config.l1ChainId,
             config.ownerAddress,
             factoryDepsResult,
-            discoveredEraZkChain.zkChainProxy
+            discoveredRepresentativeZkChain.zkChainProxy
         );
         gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
         upgradeConfig.upgradeCutPrepared = true;
