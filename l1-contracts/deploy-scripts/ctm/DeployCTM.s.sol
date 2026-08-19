@@ -194,6 +194,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         setChainTypeManagerInServerNotifier();
 
+        setDefaultUpgradeInChainTypeManager();
+
         updateOwners();
 
         saveOutput(outputPath);
@@ -234,6 +236,13 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.broadcast(getDeployerAddress());
         serverNotifier.setChainTypeManager(IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager));
         console.log("ChainTypeManager set in ServerNotifier");
+    }
+
+    function setDefaultUpgradeInChainTypeManager() internal {
+        IChainTypeManager ctm = IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager);
+        vm.broadcast(getDeployerAddress());
+        ctm.setDefaultUpgrade(ctmAddresses.stateTransition.defaultUpgrade);
+        console.log("DefaultUpgrade set in ChainTypeManager");
     }
 
     function deployEIP7702Checker() internal {
