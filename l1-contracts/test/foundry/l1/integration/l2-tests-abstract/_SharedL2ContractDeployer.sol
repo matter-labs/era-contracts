@@ -264,7 +264,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         );
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, ERA_CHAIN_ID + 1),
+            abi.encodeCall(IBridgehubBase.baseToken, (ERA_CHAIN_ID + 1)),
             abi.encode(address(uint160(1)))
         );
         vm.mockCall(

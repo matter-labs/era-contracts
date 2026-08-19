@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
 import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
 
@@ -150,10 +151,10 @@ contract AtomicFlowManagerRecoverTest is Test {
     function test_recoverBundle_routerBackedValueDoesNotRefundSeparately() public {
         // Indirect (router-produced) calls force `value == 0` at send, so a `from == router` call takes
         // only the recoverAtomicCall branch — never bridgehubRecoverBaseToken (no double refund).
-        bytes memory callData = abi.encodeWithSignature("finalizeDeposit(uint256,bytes32,bytes)");
+        bytes memory callData = abi.encodeWithSelector(AssetRouterBase.finalizeDeposit.selector);
         vm.mockCall(
             L2_ASSET_ROUTER_ADDR,
-            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector, DEST_CHAIN_ID, callData),
+            abi.encodeCall(IAtomicRecoverable.recoverAtomicCall, (DEST_CHAIN_ID, callData)),
             abi.encode(true)
         );
         vm.mockCallRevert(
@@ -166,7 +167,7 @@ contract AtomicFlowManagerRecoverTest is Test {
         // skips both branches.
         vm.expectCall(
             L2_ASSET_ROUTER_ADDR,
-            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector, DEST_CHAIN_ID, callData)
+            abi.encodeCall(IAtomicRecoverable.recoverAtomicCall, (DEST_CHAIN_ID, callData))
         );
         manager.exposedRecoverBundle(_bundleFrom(L2_ASSET_ROUTER_ADDR, SOURCE_BASE_TOKEN_ASSET_ID, 1 ether, callData));
     }
