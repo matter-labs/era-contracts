@@ -41,7 +41,6 @@ impl FileConfigTrait for InitialDeploymentConfig {}
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DeployL1Config {
-    pub era_chain_id: u64,
     pub owner_address: Address,
     pub contracts: ContractsDeployL1Config,
     pub tokens: TokensDeployL1Config,
@@ -53,10 +52,8 @@ impl DeployL1Config {
     pub fn new(
         owner_address: Address,
         initial_deployment_config: &InitialDeploymentConfig,
-        era_chain_id: u64,
     ) -> Self {
         Self {
-            era_chain_id,
             owner_address,
             contracts: ContractsDeployL1Config {
                 create2_factory_addr: initial_deployment_config.create2_factory_addr,
@@ -95,7 +92,6 @@ pub struct TokensDeployL1Config {
 pub struct DeployL1CoreContractsOutput {
     pub contracts: Create2Addresses,
     pub deployer_addr: Address,
-    pub era_chain_id: u32,
     pub l1_chain_id: u32,
     pub owner_address: Address,
     pub deployed_addresses: DeployL1CoreContractsDeployedAddressesOutput,

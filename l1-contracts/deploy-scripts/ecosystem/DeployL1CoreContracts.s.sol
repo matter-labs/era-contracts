@@ -331,7 +331,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
 
         vm.serializeString("root", "contracts", contracts);
         vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
-        vm.serializeUint("root", "era_chain_id", ERA_CHAIN_ID_UNUSED);
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);

@@ -28,9 +28,6 @@ pub struct HubInitArgs {
     pub shared: SharedRunArgs,
 
     // Advanced input
-    /// Era chain ID
-    #[clap(long, default_value_t = 270, help_heading = "Advanced input")]
-    pub era_chain_id: u64,
     /// CREATE2 factory salt
     #[clap(long, help_heading = "Advanced input")]
     pub create2_factory_salt: Option<B256>,
@@ -45,7 +42,6 @@ pub async fn run(args: HubInitArgs) -> anyhow::Result<()> {
 
     let input = HubInitInput {
         owner: owner.address,
-        era_chain_id: args.era_chain_id,
         create2_factory_salt: args.create2_factory_salt,
     };
     let output = hub_init(&mut runner, &sender, &owner, &input).await?;
@@ -62,7 +58,6 @@ pub async fn run(args: HubInitArgs) -> anyhow::Result<()> {
 #[derive(Debug, Clone, Serialize)]
 pub struct HubInitInput {
     pub owner: Address,
-    pub era_chain_id: u64,
     pub create2_factory_salt: Option<B256>,
 }
 
@@ -76,7 +71,6 @@ pub async fn hub_init(
     logger::step("Deploying Bridgehub contracts...");
     let deploy_input = DeployInput {
         owner: input.owner,
-        era_chain_id: input.era_chain_id,
         create2_factory_salt: input.create2_factory_salt,
     };
     let t = std::time::Instant::now();

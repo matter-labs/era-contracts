@@ -15,7 +15,6 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize)]
 pub struct DeployInput {
     pub owner: Address,
-    pub era_chain_id: u64,
     pub create2_factory_salt: Option<B256>,
 }
 
@@ -31,7 +30,7 @@ pub fn deploy(
         initial_config.create2_factory_salt = salt;
     }
 
-    let deploy_config = DeployL1Config::new(input.owner, &initial_config, input.era_chain_id);
+    let deploy_config = DeployL1Config::new(input.owner, &initial_config);
 
     let input_path = runner.input_path(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION)?;
     deploy_config.save(&input_path)?;
