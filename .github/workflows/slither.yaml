@@ -28,9 +28,9 @@ jobs:
           python-version: 3.8
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: ./.github/actions/install-foundry
         with:
-          version: v1.3.5
+          role: build
 
       - name: Install Slither
         run: |

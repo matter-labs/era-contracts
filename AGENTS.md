@@ -222,12 +222,22 @@ When debugging Solidity compilation or script failures:
 
 ### Installing Foundry
 
-The repository builds and tests with upstream Foundry v1.3.5 (ordinary EVM, no `--zksync`). Install the version used in CI:
+The repository builds and tests with upstream Foundry (ordinary EVM, no `--zksync`). Every pinned
+version lives in [`.github/foundry-versions.env`](.github/foundry-versions.env) — CI installs them
+through `.github/actions/install-foundry` (`role: build | anvil | scripts`), `recompute_hashes.sh`
+reads the same file, and the Docker base image takes them as build args. Install the build pin CI
+uses:
 
 ```bash
 curl -L https://foundry.paradigm.xyz | bash
-foundryup --install v1.3.5
+foundryup --install "$(. .github/foundry-versions.env && echo "$FOUNDRY_BUILD_VERSION")"
 ```
+
+The interop and v31->v32 upgrade suites additionally need the `anvil` pin (`FOUNDRY_ANVIL_VERSION`),
+which must stay trace-schema compatible with the committed chain states. Never bump a pin in a
+workflow directly — change it in `.github/foundry-versions.env` and regenerate whatever it
+invalidates (`AllContractsHashes.json` + `zkstack-out` for the build pin, the anvil-interop chain
+states for the anvil pin).
 
 ### Building Artifacts
 

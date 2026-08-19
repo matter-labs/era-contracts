@@ -39,9 +39,9 @@ jobs:
           submodules: true
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: ./.github/actions/install-foundry
         with:
-          version: v1.5.1
+          role: anvil
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -95,20 +95,20 @@ jobs:
         with:
           submodules: true
 
-      # The committed v31 state uses the v1.5 Anvil trace schema, while the
-      # release bytecode is reproduced with the repository-era v1.3.5 Forge.
-      - name: Install Foundry v1.5.1 for state-compatible Anvil
-        uses: foundry-rs/foundry-toolchain@v1
+      # The committed v31 state uses the newer Anvil trace schema, while the
+      # release bytecode is reproduced with the `build` Forge pin.
+      - name: Install Anvil toolchain (state-compatible with committed states)
+        uses: ./.github/actions/install-foundry
         with:
-          version: v1.5.1
+          role: anvil
 
-      - name: Preserve Anvil v1.5.1
-        run: cp "$(command -v anvil)" "$RUNNER_TEMP/anvil-v1.5.1"
+      - name: Preserve the pinned Anvil before switching to the build toolchain
+        run: cp "$(command -v anvil)" "$RUNNER_TEMP/anvil-pinned"
 
       - name: Install foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: ./.github/actions/install-foundry
         with:
-          version: v1.3.5
+          role: build
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -132,7 +132,7 @@ jobs:
       - name: Run V31 to V32 upgrade test
         working-directory: l1-contracts/test/anvil-interop
         env:
-          ANVIL_BIN: ${{ runner.temp }}/anvil-v1.5.1
+          ANVIL_BIN: ${{ runner.temp }}/anvil-pinned
         run: |
           echo "Running V31 -> V32 upgrade test..."
           yarn ts-node run-v31-to-v32-upgrade-test.ts
@@ -166,10 +166,10 @@ jobs:
         with:
           submodules: true
 
-      - name: Install Foundry (no foundry-zksync — deterministic bytecode)
-        uses: foundry-rs/foundry-toolchain@v1
+      - name: Install Anvil toolchain (deterministic bytecode)
+        uses: ./.github/actions/install-foundry
         with:
-          version: v1.5.1
+          role: anvil
 
       - name: Use Node.js
         uses: actions/setup-node@v4

@@ -19,9 +19,9 @@ jobs:
           submodules: recursive
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: ./.github/actions/install-foundry
         with:
-          version: v1.3.5
+          role: build
 
       - name: Use Node.js
         uses: actions/setup-node@v6
@@ -72,9 +72,9 @@ jobs:
           submodules: recursive
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: ./.github/actions/install-foundry
         with:
-          version: v1.3.5
+          role: build
 
       - name: Use Node.js
         uses: actions/setup-node@v6
@@ -148,9 +148,9 @@ jobs:
         run: yarn
 
       - name: Install foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: ./.github/actions/install-foundry
         with:
-          version: v1.3.5
+          role: build
 
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
@@ -183,9 +183,9 @@ jobs:
           cache: yarn
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: ./.github/actions/install-foundry
         with:
-          version: v1.3.5
+          role: build
 
       - name: Install dependencies
         run: yarn
@@ -259,9 +259,9 @@ jobs:
           cache: yarn
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: ./.github/actions/install-foundry
         with:
-          version: v1.3.5
+          role: build
 
       - name: Install dependencies
         run: yarn
@@ -319,12 +319,12 @@ jobs:
 
       # --- 2. Anvil interop coverage + merged report ---
 
-      # Committed chain states use the v1.5 Anvil trace schema. Foundry
-      # coverage above remains pinned to v1.3.5 for reproducible bytecode.
-      - name: Install Foundry v1.5.1 for Anvil coverage
-        uses: foundry-rs/foundry-toolchain@v1
+      # Committed chain states use the newer Anvil trace schema, while the
+      # coverage build above stays on the `build` pin for reproducible bytecode.
+      - name: Install Anvil toolchain for interop coverage
+        uses: ./.github/actions/install-foundry
         with:
-          version: v1.5.1
+          role: anvil
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
@@ -414,7 +414,9 @@ jobs:
   #         submodules: recursive
 
   #     - name: Use Foundry
-  #       uses: foundry-rs/foundry-toolchain@v1
+  #       uses: ./.github/actions/install-foundry
+  #       with:
+  #         role: build
 
   #     - name: Use Node.js
   #       uses: actions/setup-node@v6

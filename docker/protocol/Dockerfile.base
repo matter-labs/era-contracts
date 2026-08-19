@@ -4,8 +4,8 @@
 # change between era-contracts code revisions:
 #   - Debian + apt build deps
 #   - Node + Yarn
-#   - upstream foundry (forge + cast, v1.3.5 for ordinary-EVM builds)
-#   - foundry vanilla anvil (v1.5.1, state-compatible with committed chain states)
+#   - upstream foundry (forge + cast) for ordinary-EVM builds
+#   - foundry vanilla anvil, state-compatible with committed chain states
 #   - Rust toolchain (rustup + target + cargo-chef)
 #
 # Rebuilt on `Dockerfile.base` change, weekly cron, or manual dispatch
@@ -18,6 +18,9 @@
 # base-image workflow will rebuild + tag `:latest`. Subsequent main builds
 # pick it up automatically.
 
+# The two foundry pins mirror `.github/foundry-versions.env`, which is the single
+# source of truth; `build-docker-base.yaml` passes them in as build args. The
+# defaults below only serve local `docker build` invocations - keep them in sync.
 ARG FOUNDRY_ARCH=linux_amd64
 ARG FOUNDRY_FORGE_VERSION=v1.3.5
 ARG FOUNDRY_VANILLA_VERSION=v1.5.1
@@ -55,7 +58,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
  && npm cache clean --force \
  && rm -rf /var/lib/apt/lists/*
 
-# Upstream foundry (forge + cast) — v1.3.5, the pinned ordinary-EVM toolchain
+# Upstream foundry (forge + cast) — the pinned ordinary-EVM toolchain
 RUN curl -L -o /tmp/foundry.tgz https://github.com/foundry-rs/foundry/releases/download/${FOUNDRY_FORGE_VERSION}/foundry_${FOUNDRY_FORGE_VERSION}_${FOUNDRY_ARCH}.tar.gz \
  && tar zxf /tmp/foundry.tgz -C /tmp/ forge cast \
  && mv /tmp/forge /tmp/cast /usr/local/bin/ \

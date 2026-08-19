@@ -1,0 +1,43 @@
+name: Install Foundry
+description: >
+  Installs the Foundry toolchain pinned for a given role. Every version lives in
+  .github/foundry-versions.env so CI, local scripts and the Docker images cannot
+  drift apart.
+
+inputs:
+  role:
+    description: >
+      Which pin to install: `build` (artifact + hash builds), `anvil` (interop /
+      upgrade suites, state-compatible with the committed chain states) or
+      `scripts` (the deploy-script job). See .github/foundry-versions.env.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve pinned Foundry version
+      id: resolve
+      shell: bash
+      env:
+        ROLE: ${{ inputs.role }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        set -euo pipefail
+        # shellcheck source=/dev/null
+        . "${ACTION_PATH}/../../foundry-versions.env"
+        case "${ROLE}" in
+          build) version="${FOUNDRY_BUILD_VERSION}" ;;
+          anvil) version="${FOUNDRY_ANVIL_VERSION}" ;;
+          scripts) version="${FOUNDRY_SCRIPTS_VERSION}" ;;
+          *)
+            echo "::error::install-foundry: unknown role '${ROLE}' (expected: build | anvil | scripts)"
+            exit 1
+            ;;
+        esac
+        echo "version=${version}" >> "$GITHUB_OUTPUT"
+        echo "Foundry role '${ROLE}' -> ${version}"
+
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: ${{ steps.resolve.outputs.version }}
