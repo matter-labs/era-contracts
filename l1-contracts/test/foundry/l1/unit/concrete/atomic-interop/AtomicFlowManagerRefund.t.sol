@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Vm} from "forge-std/Vm.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {AtomicInteropProofBuilder} from "./AtomicInteropProofBuilder.sol";
 import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
@@ -104,7 +105,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
     function _registerRemoteLegSource(uint256 _chainId) internal {
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSignature("baseTokenAssetId(uint256)", _chainId),
+            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (_chainId)),
             abi.encode(keccak256(abi.encode("remote base token asset id", _chainId)))
         );
     }
@@ -528,12 +529,12 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         // Both recovery calls must be reached once in the failed claim and once in the successful retry.
         vm.expectCall(
             L2_ASSET_ROUTER_ADDR,
-            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector, RECOVERY_DEST_CHAIN_ID, hex"600d"),
+            abi.encodeCall(IAtomicRecoverable.recoverAtomicCall, (RECOVERY_DEST_CHAIN_ID, hex"600d")),
             2
         );
         vm.expectCall(
             L2_ASSET_ROUTER_ADDR,
-            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector, RECOVERY_DEST_CHAIN_ID, hex"baad"),
+            abi.encodeCall(IAtomicRecoverable.recoverAtomicCall, (RECOVERY_DEST_CHAIN_ID, hex"baad")),
             2
         );
         vm.expectRevert("recovery boom");
