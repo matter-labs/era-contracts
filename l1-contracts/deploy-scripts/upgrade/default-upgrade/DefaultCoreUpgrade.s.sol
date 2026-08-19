@@ -156,11 +156,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         Governance governance = Governance(payable(coreAddresses.shared.governance));
         config.l1ChainId = block.chainid;
         config.deployerAddress = getBroadcasterAddress();
-        // Read the historical ecosystem identifier off the deployed (pre-v32) asset router; the getter
-        // was removed from the v32 implementation but every upgradable ecosystem still exposes it.
-        config.eraChainId = AddressIntrospector.getEraChainId(address(assetRouter));
-        config.eraDiamondProxyAddress = bridgehub.getZKChain(config.eraChainId);
-
         config.ownerAddress = assetRouter.owner();
 
         config.contracts.governanceSecurityCouncilAddress = governance.securityCouncil();

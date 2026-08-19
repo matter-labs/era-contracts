@@ -95,7 +95,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
 
     AdditionalConfig internal newConfig;
     Gateway internal gatewayConfig;
-    ZkChainAddresses internal discoveredEraZkChain;
+    ZkChainAddresses internal discoveredRepresentativeZkChain;
     L1Bridgehub internal bridgehub;
     CTMDeployedAddresses internal ctmDeployedAddresses;
 
@@ -110,10 +110,14 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
+    /// @dev Any registered chain of the ecosystem being upgraded; used only to resolve the CTM and
+    /// read the ecosystem's rollup L1 DA validator off a live chain.
+    uint256 internal representativeChainId;
+
     function initializeWithArgs(
         bool _isZKsyncOS,
         bytes32 _create2FactorySalt,
-        uint256 _eraChainId,
+        uint256 _representativeChainId,
         uint256 _priorityTxsL2GasLimit,
         uint256 _maxExpectedL1GasPrice,
         Gateway memory _gatewayConfig,
@@ -128,7 +132,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             _create2FactorySalt,
             _isZKsyncOS,
             getChainCreationParamsConfig(Utils.genesisConfigPath()),
-            _eraChainId,
+            _representativeChainId,
             _priorityTxsL2GasLimit,
             _maxExpectedL1GasPrice,
             _gatewayConfig,
@@ -144,7 +148,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         bytes32 _create2FactorySalt,
         bool _isZKsyncOS,
         ChainCreationParamsConfig memory _chainCreationParams,
-        uint256 _eraChainId,
+        uint256 _representativeChainId,
         uint256 _priorityTxsL2GasLimit,
         uint256 _maxExpectedL1GasPrice,
         Gateway memory _gatewayConfig,
@@ -155,7 +159,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             setCreate2Salt(_create2FactorySalt);
         }
         config.l1ChainId = block.chainid;
-        config.eraChainId = _eraChainId;
+        representativeChainId = _representativeChainId;
         setAddressesBasedOnBridgehub();
         // Only ZKsync-OS-based Gateways are supported on this release.
         require(_isZKsyncOS, "EraVM Gateway upgrades are not supported");
@@ -242,13 +246,14 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     function setAddressesBasedOnBridgehub() internal virtual {
         coreAddresses = AddressIntrospector.getCoreDeployedAddresses(address(bridgehub));
         config.ownerAddress = coreAddresses.shared.governance;
-        address ctm = bridgehub.chainTypeManager(config.eraChainId);
+        address ctm = bridgehub.chainTypeManager(representativeChainId);
         ctmDeployedAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
-        discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(
-            IZKChain(bridgehub.getZKChain(config.eraChainId))
+        discoveredRepresentativeZkChain = AddressIntrospector.getZkChainAddresses(
+            IZKChain(bridgehub.getZKChain(representativeChainId))
         );
 
-        ctmDeployedAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredEraZkChain.l1DAValidator;
+        ctmDeployedAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredRepresentativeZkChain
+            .l1DAValidator;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         newConfig.oldProtocolVersion = ctmProtocolVersion;
         require(

@@ -23,7 +23,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
-import {CoreDeployedAddresses} from "../utils/Types.sol";
+import {CoreDeployedAddresses, ERA_CHAIN_ID_UNUSED, ERA_DIAMOND_PROXY_UNUSED} from "../utils/Types.sol";
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 
 // solhint-disable-next-line gas-struct-packing
@@ -31,8 +31,6 @@ struct Config {
     uint256 l1ChainId;
     address ownerAddress;
     address deployerAddress;
-    uint256 eraChainId;
-    address eraDiamondProxyAddress;
     uint256 legacyGatewayChainId;
     ContractsConfig contracts;
     TokensConfig tokens;
@@ -66,9 +64,6 @@ contract DeployL1CoreUtils is DeployUtils {
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
-        // `config.eraChainId` stays zero: see the field's comment in `DeployCTMUtils`. It reaches the
-        // `L1Nullifier` / `L1AssetRouter` / `L1ERC20Bridge` immutables, whose Era-legacy branches then
-        // key off a chain id that can never be registered.
         config.ownerAddress = toml.readAddress("$.owner_address");
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
@@ -77,9 +72,6 @@ contract DeployL1CoreUtils is DeployUtils {
         config.contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
         config.contracts.maxNumberOfChains = toml.readUint("$.contracts.max_number_of_chains");
 
-        if (vm.keyExistsToml(toml, "$.contracts.era_diamond_proxy_addr")) {
-            config.eraDiamondProxyAddress = toml.readAddress("$.contracts.era_diamond_proxy_addr");
-        }
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
         // Legacy Era gateway chain ID, baked into L1MessageRoot as immutable
         // ERA_GATEWAY_CHAIN_ID and used by L1ChainAssetHandler.setHistoricalMigrationInterval
@@ -132,8 +124,8 @@ contract DeployL1CoreUtils is DeployUtils {
                 abi.encode(
                     coreAddresses.bridgehub.proxies.bridgehub,
                     coreAddresses.bridgehub.proxies.messageRoot,
-                    config.eraChainId,
-                    config.eraDiamondProxyAddress
+                    ERA_CHAIN_ID_UNUSED,
+                    ERA_DIAMOND_PROXY_UNUSED
                 );
         } else if (compareStrings(contractName, "L1InteropHandler")) {
             return abi.encode(coreAddresses.bridgehub.proxies.messageRoot, coreAddresses.bridges.proxies.l1AssetRouter);
@@ -145,8 +137,8 @@ contract DeployL1CoreUtils is DeployUtils {
                     config.tokens.tokenWethAddress,
                     coreAddresses.bridgehub.proxies.bridgehub,
                     coreAddresses.bridges.proxies.l1Nullifier,
-                    config.eraChainId,
-                    config.eraDiamondProxyAddress
+                    ERA_CHAIN_ID_UNUSED,
+                    ERA_DIAMOND_PROXY_UNUSED
                 );
         } else if (compareStrings(contractName, "L1ERC20Bridge")) {
             return
@@ -154,7 +146,7 @@ contract DeployL1CoreUtils is DeployUtils {
                     coreAddresses.bridges.proxies.l1Nullifier,
                     coreAddresses.bridges.proxies.l1AssetRouter,
                     coreAddresses.bridges.proxies.l1NativeTokenVault,
-                    config.eraChainId
+                    ERA_CHAIN_ID_UNUSED
                 );
         } else if (compareStrings(contractName, "L1NativeTokenVault")) {
             return

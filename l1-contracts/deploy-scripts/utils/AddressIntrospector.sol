@@ -50,12 +50,6 @@ import {
 } from "./Types.sol";
 import {DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
 
-/// @notice Getter that existed on pre-v32 `L1AssetRouter` implementations.
-interface ILegacyAssetRouterEraChainId {
-    // solhint-disable-next-line func-name-mixedcase
-    function ERA_CHAIN_ID() external view returns (uint256);
-}
-
 library AddressIntrospector {
     error NoUptoDateZkChainFound();
 
@@ -267,10 +261,7 @@ library AddressIntrospector {
             defaultUpgrade: address(0),
             chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr)
         });
-        info.l1Specific = L1SpecificStateTransitionAddresses({
-            legacyValidatorTimelock: ctm.validatorTimelock(),
-            eraDiamondProxy: address(0)
-        });
+        info.l1Specific = L1SpecificStateTransitionAddresses({legacyValidatorTimelock: ctm.validatorTimelock()});
         info.admin = CTMAdminAddresses({
             transparentProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr),
             governance: IOwnable(_ctmAddr).owner(),
@@ -375,12 +366,17 @@ library AddressIntrospector {
         });
     }
 
-    function getEraChainId(address _assetRouter) public view returns (uint256 eraChainId) {
-        // Read the historical ecosystem chain id from a live pre-v32 asset router. Every caller
-        // (the v31->v32 upgrade and gateway-vote-preparation scripts) runs against an existing
-        // ecosystem whose router still exposes `ERA_CHAIN_ID`; a fresh CTM takes the value from
-        // config instead, so this getter is never invoked against a router that lacks it.
-        return ILegacyAssetRouterEraChainId(_assetRouter).ERA_CHAIN_ID();
+    /// @notice A registered chain to read ecosystem-wide values off (its rollup L1 DA validator and
+    /// chain admin). Any registered chain will do; the first is taken, matching
+    /// {shouldUsePreV32Introspection}. Returns `address(0)` for a chainless ecosystem.
+    function getRepresentativeZkChain(address _bridgehubProxy) public view returns (address) {
+        require(_bridgehubProxy != address(0) && _bridgehubProxy.code.length > 0, "Bridgehub contract does not exist");
+
+        address[] memory zkChains = IL1Bridgehub(_bridgehubProxy).getAllZKChains();
+        if (zkChains.length == 0) {
+            return address(0);
+        }
+        return zkChains[0];
     }
 
     function getZkChainFacetAddresses(IZKChain _zkChain) public view returns (address[] memory) {

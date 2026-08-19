@@ -3,13 +3,11 @@
 pragma solidity 0.8.28;
 
 import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
+import {ERA_CHAIN_ID_UNUSED} from "../utils/Types.sol";
 
 struct CTMCoreDeploymentConfig {
     bool testnetVerifier;
     uint256 l1ChainId;
-    // Historical ecosystem chain identifier baked into deployed-contract immutables
-    // (e.g. MailboxFacet) - not an EraVM execution-mode switch.
-    uint256 eraChainId;
     address bridgehubProxy;
     address interopCenterProxy;
     address rollupDAManager;
@@ -74,7 +72,7 @@ library DeployCTML1OrGateway {
         } else if (_contractName == CTMContract.MailboxFacet) {
             return
                 abi.encode(
-                    _config.eraChainId,
+                    ERA_CHAIN_ID_UNUSED,
                     _config.l1ChainId,
                     _config.chainAssetHandler,
                     _config.eip7702Checker,

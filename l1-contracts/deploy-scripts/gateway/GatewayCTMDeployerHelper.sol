@@ -44,6 +44,7 @@ import {
     GatewayCTMFinalConfig,
     GatewayCTMFinalResult
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {ERA_CHAIN_ID_UNUSED} from "../utils/Types.sol";
 
 // solhint-disable gas-custom-errors
 
@@ -303,7 +304,7 @@ library GatewayCTMDeployerHelper {
 
         // MailboxFacet
         bytes memory mailboxFacetArgs = abi.encode(
-            config.eraChainId,
+            ERA_CHAIN_ID_UNUSED,
             config.l1ChainId,
             L2_CHAIN_ASSET_HANDLER_ADDR,
             address(0), // eip7702Checker
@@ -699,7 +700,6 @@ library GatewayCTMDeployerHelper {
             CTMCoreDeploymentConfig({
                 testnetVerifier: _config.testnetVerifier,
                 l1ChainId: _config.l1ChainId,
-                eraChainId: _config.eraChainId,
                 bridgehubProxy: L2_BRIDGEHUB_ADDR,
                 interopCenterProxy: L2_INTEROP_CENTER_ADDR,
                 rollupDAManager: _deployedContracts.daContracts.rollupDAManager,

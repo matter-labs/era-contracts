@@ -119,7 +119,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     GatewayConfig internal gatewayConfig;
 
     // Discovered addresses
-    ZkChainAddresses internal discoveredEraZkChain;
+    ZkChainAddresses internal discoveredRepresentativeZkChain;
     ZkChainAddresses internal upToDateZkChain;
     L1Bridgehub internal bridgehub;
 
@@ -402,16 +402,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         }
 
         config.ownerAddress = ctmAddresses.admin.governance;
-        config.eraChainId = AddressIntrospector.getEraChainId(coreAddresses.bridges.proxies.l1AssetRouter);
 
-        address eraChainAddress = bridgehub.getZKChain(config.eraChainId);
-        if (eraChainAddress != address(0)) {
-            // ERA chain exists, discover its addresses
-            discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(IZKChain(eraChainAddress));
-            ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredEraZkChain.l1DAValidator;
+        address representativeChain = AddressIntrospector.getRepresentativeZkChain(bridgehubAddr);
+        if (representativeChain != address(0)) {
+            discoveredRepresentativeZkChain = AddressIntrospector.getZkChainAddresses(IZKChain(representativeChain));
+            ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredRepresentativeZkChain.l1DAValidator;
         } else {
-            // ERA chain doesn't exist yet (fresh deployment), use up-to-date addresses
-            console.log("ERA chain not found in bridgehub, using up-to-date addresses");
+            // Chainless ecosystem (fresh deployment), use up-to-date addresses
+            console.log("No registered chain in bridgehub, using up-to-date addresses");
         }
 
         upToDateZkChain = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManagerBase(ctm));
@@ -928,10 +926,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         );
 
         // Serialize newly deployed upgrade addresses
-        vm.serializeAddress("deployed_addresses", "chain_admin", discoveredEraZkChain.chainAdmin);
+        vm.serializeAddress("deployed_addresses", "chain_admin", discoveredRepresentativeZkChain.chainAdmin);
         vm.serializeAddress("deployed_addresses", "access_control_restriction_addr", address(0));
         vm.serializeAddress("deployed_addresses", "transparent_proxy_admin", ctmAddresses.admin.transparentProxyAdmin);
-        vm.serializeAddress("deployed_addresses", "rollup_l1_da_validator_addr", discoveredEraZkChain.l1DAValidator);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "rollup_l1_da_validator_addr",
+            discoveredRepresentativeZkChain.l1DAValidator
+        );
         vm.serializeAddress("deployed_addresses", "validium_l1_da_validator_addr", address(0));
         vm.serializeAddress(
             "deployed_addresses",

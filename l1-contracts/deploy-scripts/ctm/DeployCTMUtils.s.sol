@@ -65,15 +65,6 @@ import {CTMDeployedAddresses} from "../utils/Types.sol";
 struct Config {
     uint256 l1ChainId;
     address deployerAddress;
-    // Historical/canonical ecosystem chain identifier, baked into the `MailboxFacet.ERA_CHAIN_ID`
-    // immutable and threaded into `FixedForceDeploymentsData.eraChainId` (the deprecated write-only
-    // `L2AssetRouter.ERA_CHAIN_ID` slot). Left at zero for anything this release deploys: an
-    // ecosystem created here has no Era chain, and `Bridgehub` rejects chain id 0
-    // (`ZeroChainId`), so a zero `ERA_CHAIN_ID` permanently reverts `MailboxFacet`'s two legacy
-    // Era entrypoints for every chain instead of unlocking them for whichever chain happens to
-    // hold a made-up id. Upgrades of ecosystems that really contain Era read the live value from
-    // the asset router instead — see `AddressIntrospector.getEraChainId`.
-    uint256 eraChainId;
     uint256 gatewayChainId;
     address ownerAddress;
     bytes32 zkTokenAssetId;
@@ -361,7 +352,6 @@ abstract contract DeployCTMUtils is DeployUtils {
             CTMCoreDeploymentConfig({
                 testnetVerifier: _config.testnetVerifier,
                 l1ChainId: _config.l1ChainId,
-                eraChainId: _config.eraChainId,
                 bridgehubProxy: coreAddresses.bridgehub.proxies.bridgehub,
                 interopCenterProxy: L2_INTEROP_CENTER_ADDR,
                 rollupDAManager: ctmAddresses.daAddresses.daContracts.rollupDAManager,

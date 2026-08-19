@@ -10,6 +10,18 @@ import {
     DAContracts
 } from "contracts/common/StateTransitionTypes.sol";
 
+/// @dev Value passed for the `eraChainId` parameter that several audited constructors and structs
+/// still carry (`MailboxFacet`, `L1Nullifier`, `L1AssetRouter`, `L1ERC20Bridge`,
+/// `FixedForceDeploymentsData`, `GatewayCTMDeployerConfig`). Nothing this release deploys has an
+/// Era chain, and `Bridgehub` rejects chain id 0 (`ZeroChainId`), so every Era-legacy branch keyed
+/// off it is unreachable — whereas a made-up non-zero id would unlock those branches for whichever
+/// chain happened to hold it.
+uint256 constant ERA_CHAIN_ID_UNUSED = 0;
+
+/// @dev Companion to {ERA_CHAIN_ID_UNUSED} for the `eraDiamondProxy` constructor parameter: with no
+/// Era chain there is no Era diamond, and `msg.sender` can never be `address(0)`.
+address constant ERA_DIAMOND_PROXY_UNUSED = address(0);
+
 struct BridgehubContracts {
     address bridgehub;
     address messageRoot;
@@ -93,7 +105,6 @@ struct DataAvailabilityDeployedAddresses {
 /// @notice L1-specific state transition addresses that are not used in the Gateway context.
 struct L1SpecificStateTransitionAddresses {
     address legacyValidatorTimelock;
-    address eraDiamondProxy;
 }
 
 struct CTMAdminAddresses {

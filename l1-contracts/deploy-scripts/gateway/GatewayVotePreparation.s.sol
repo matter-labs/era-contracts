@@ -28,7 +28,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
-import {CTMDeployedAddresses, StateTransitionDeployedAddresses} from "../utils/Types.sol";
+import {CTMDeployedAddresses, StateTransitionDeployedAddresses, ERA_CHAIN_ID_UNUSED} from "../utils/Types.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
 import {
@@ -78,8 +78,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     /// (v30.1) and Era (older) CTM on Sepolia). Drop with the version branch.
     bytes32 constant SERVER_NOTIFIER_ADDRESS_SLOT = bytes32(uint256(164));
 
-    uint256 internal eraChainId;
-
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
 
@@ -103,15 +101,12 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
 
         setAddressesBasedOnBridgehub(ctmRepresentativeChainId, bridgehubProxy);
-        // Get eraChainId from AssetRouter
-        address assetRouter = address(IL1Bridgehub(bridgehubProxy).assetRouter());
-        eraChainId = AddressIntrospector.getEraChainId(assetRouter);
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: aliasedGovernor,
             salt: toml.readBytes32("$.contracts.create2_factory_salt"),
-            eraChainId: eraChainId,
+            eraChainId: ERA_CHAIN_ID_UNUSED,
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
             // Only ZKsync-OS-based gateway CTMs are supported on this release.

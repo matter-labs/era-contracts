@@ -52,6 +52,7 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
+import {ERA_CHAIN_ID_UNUSED} from "../utils/Types.sol";
 
 contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
@@ -539,7 +540,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
-            eraChainId: config.eraChainId,
+            eraChainId: ERA_CHAIN_ID_UNUSED,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
             l2TokenProxyBytecodeHash: CoreOnGatewayHelper.getDeployedBytecodeHash(CoreContract.BeaconProxy),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(_governance),
