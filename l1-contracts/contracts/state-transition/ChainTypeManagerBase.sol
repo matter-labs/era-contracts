@@ -35,7 +35,7 @@ import {
     Unauthorized,
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
-import {SemVer, SEMVER_MINOR_OFFSET} from "../common/libraries/SemVer.sol";
+import {SemVer} from "../common/libraries/SemVer.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 
@@ -404,16 +404,20 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         if (upgradeContract == address(0)) {
             revert ZeroAddress();
         }
+        // slither-disable-next-line unused-return
+        (uint32 oldMajor, uint32 oldMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_oldProtocolVersion));
+        // slither-disable-next-line unused-return
+        (uint32 newMajor, uint32 newMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_newProtocolVersion));
         // The version must grow, the major part must stay the same, and the minor jump must respect the same
         // limit the per-chain upgrade enforces, so that an upgrade accepted here cannot fail on the chain level.
-        // All three hold exactly when the packed versions are at most `MAX_ALLOWED_MINOR_VERSION_DELTA` minors
-        // apart: a major change moves the packed value by at least `1 << SEMVER_MAJOR_OFFSET`, which is orders
-        // of magnitude above that distance.
+        // The minor versions are compared unpacked, just like `BaseZkSyncUpgrade` does, since the packed
+        // versions also carry the patch part and their difference would mix the two deltas.
         // Note: Non-sequential minor/patch jumps are allowed (e.g., 0.25.1 -> 0.25.4) to support
         // skipping intermediate versions when needed.
         if (
             _newProtocolVersion <= _oldProtocolVersion ||
-            _newProtocolVersion - _oldProtocolVersion > (MAX_ALLOWED_MINOR_VERSION_DELTA << SEMVER_MINOR_OFFSET)
+            newMajor != oldMajor ||
+            newMinor > oldMinor + MAX_ALLOWED_MINOR_VERSION_DELTA
         ) {
             revert NotAVerifierOnlyUpgrade(_oldProtocolVersion, _newProtocolVersion);
         }

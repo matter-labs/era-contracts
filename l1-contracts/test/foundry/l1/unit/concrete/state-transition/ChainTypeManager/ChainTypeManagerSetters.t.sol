@@ -310,8 +310,9 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
     // createNewVerifierOnlyUpgrade - revert when the minor version jump exceeds the per-chain limit
     function test_RevertWhen_CreateNewVerifierOnlyUpgradeMinorDeltaTooBig() public {
         uint32 oldMinor = 25;
-        uint256 oldProtocolVersion = SemVer.packSemVer(0, oldMinor, 0);
-        uint256 newProtocolVersion = SemVer.packSemVer(0, oldMinor + uint32(MAX_ALLOWED_MINOR_VERSION_DELTA) + 1, 0);
+        uint32 tooFarMinor = oldMinor + uint32(MAX_ALLOWED_MINOR_VERSION_DELTA) + 1;
+        uint256 oldProtocolVersion = SemVer.packSemVer(0, oldMinor, 1);
+        uint256 newProtocolVersion = SemVer.packSemVer(0, tooFarMinor, 1);
         uint256 oldProtocolVersionDeadline = block.timestamp + 1 days;
         address newVerifier = makeAddr("verifierOnlyVerifier");
         _setDefaultUpgrade();
@@ -326,27 +327,31 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
             newProtocolVersion,
             newVerifier
         );
+
+        // The same minor jump is still too big when the patch part goes backwards, which brings the packed
+        // versions closer together.
+        uint256 lowerPatchProtocolVersion = SemVer.packSemVer(0, tooFarMinor, 0);
+        vm.prank(governor);
+        vm.expectRevert(
+            abi.encodeWithSelector(NotAVerifierOnlyUpgrade.selector, oldProtocolVersion, lowerPatchProtocolVersion)
+        );
+        chainContractAddress.createNewVerifierOnlyUpgrade(
+            oldProtocolVersion,
+            oldProtocolVersionDeadline,
+            lowerPatchProtocolVersion,
+            newVerifier
+        );
     }
 
     // createNewVerifierOnlyUpgrade - the largest minor jump the per-chain upgrade allows still goes through
     function test_SuccessfulCreateNewVerifierOnlyUpgradeWithMaximalMinorDelta() public {
-        uint32 oldMinor = 25;
-        uint256 oldProtocolVersion = SemVer.packSemVer(0, oldMinor, 0);
-        uint256 newProtocolVersion = SemVer.packSemVer(0, oldMinor + uint32(MAX_ALLOWED_MINOR_VERSION_DELTA), 0);
-        address newVerifier = makeAddr("verifierOnlyVerifier");
-        _setDefaultUpgrade();
+        _successfulMaximalMinorDeltaUpgrade(0);
+    }
 
-        _advanceProtocolVersionTo(oldProtocolVersion);
-
-        vm.prank(governor);
-        chainContractAddress.createNewVerifierOnlyUpgrade(
-            oldProtocolVersion,
-            block.timestamp + 1 days,
-            newProtocolVersion,
-            newVerifier
-        );
-
-        assertEq(chainContractAddress.protocolVersion(), newProtocolVersion);
+    // createNewVerifierOnlyUpgrade - the largest minor jump is allowed whatever the patch part does, as the
+    // per-chain upgrade only bounds the minor delta
+    function test_SuccessfulCreateNewVerifierOnlyUpgradeWithMaximalMinorDeltaAndPatchBump() public {
+        _successfulMaximalMinorDeltaUpgrade(1);
     }
 
     // createNewVerifierOnlyUpgrade - revert when the new version does not increase
@@ -416,6 +421,32 @@ contract ChainTypeManagerSetters is ChainTypeManagerTest {
             newProtocolVersion,
             newVerifier
         );
+    }
+
+    /// @dev Runs a verifier-only upgrade that jumps the largest number of minor versions the per-chain upgrade
+    /// allows and lands on patch `_newPatch`, and asserts that it goes through.
+    function _successfulMaximalMinorDeltaUpgrade(uint32 _newPatch) private {
+        uint32 oldMinor = 25;
+        uint256 oldProtocolVersion = SemVer.packSemVer(0, oldMinor, 0);
+        uint256 newProtocolVersion = SemVer.packSemVer(
+            0,
+            oldMinor + uint32(MAX_ALLOWED_MINOR_VERSION_DELTA),
+            _newPatch
+        );
+        address newVerifier = makeAddr("verifierOnlyVerifier");
+        _setDefaultUpgrade();
+
+        _advanceProtocolVersionTo(oldProtocolVersion);
+
+        vm.prank(governor);
+        chainContractAddress.createNewVerifierOnlyUpgrade(
+            oldProtocolVersion,
+            block.timestamp + 1 days,
+            newProtocolVersion,
+            newVerifier
+        );
+
+        assertEq(chainContractAddress.protocolVersion(), newProtocolVersion);
     }
 
     /// @dev Deploys an upgrade contract and stores it in the CTM as the default one.
