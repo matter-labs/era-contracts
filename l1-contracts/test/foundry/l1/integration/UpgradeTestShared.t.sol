@@ -343,10 +343,9 @@ contract UpgradeIntegrationTestBase is Test {
         address bytecodesSupplier = outputDeployCTMToml.readAddress(
             "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
         );
-        bool isZKsyncOs = outputDeployCTMToml.readBool("$.is_zk_sync_os");
-        address rollupDAManager = isZKsyncOs
-            ? outputDeployCTMToml.readAddress("$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr")
-            : outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
+        address rollupDAManager = outputDeployCTMToml.readAddress(
+            "$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr"
+        );
         address governance = outputDeployL1Toml.readAddress("$.deployed_addresses.governance_addr");
 
         return
@@ -355,7 +354,9 @@ contract UpgradeIntegrationTestBase is Test {
                 ctmProxy: ctmProxy,
                 bytecodesSupplier: bytecodesSupplier,
                 rollupDAManager: rollupDAManager,
-                isZKsyncOS: isZKsyncOs,
+                // Only ZKsync OS ecosystems are upgradable onto this release; the upgrade script
+                // `require`s it.
+                isZKsyncOS: true,
                 create2FactorySalt: bytes32(0),
                 upgradeInputPath: ECOSYSTEM_UPGRADE_INPUT,
                 ecosystemOutputPath: ECOSYSTEM_OUTPUT,

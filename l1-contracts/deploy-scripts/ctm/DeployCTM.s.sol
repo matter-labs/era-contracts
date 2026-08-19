@@ -415,9 +415,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts", contracts);
-        // Always true on this release; the key is kept because downstream tooling (zkstack_cli,
-        // upgrade scripts) still reads it from the output.
-        vm.serializeBool("root", "is_zk_sync_os", true);
         string memory toml = vm.serializeString("root", "contracts_config", contractsConfig);
         vm.writeToml(toml, outputPath);
     }
