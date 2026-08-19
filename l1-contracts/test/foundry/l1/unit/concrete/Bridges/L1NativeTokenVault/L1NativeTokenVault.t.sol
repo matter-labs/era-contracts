@@ -29,7 +29,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {OriginChainIdNotFound, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {AssetNotNativeToL1, OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
-import {InsufficientChainBalance} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {InsufficientChainBalance} from "contracts/common/L1ContractErrors.sol";
 import {ILegacyL1AssetTracker} from "contracts/bridge/asset-tracker/ILegacyL1AssetTracker.sol";
 import {MockLegacyL1AssetTracker} from "../../_shared/MockLegacyL1AssetTracker.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/common/Config.sol";

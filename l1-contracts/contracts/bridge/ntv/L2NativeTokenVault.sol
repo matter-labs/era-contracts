@@ -359,6 +359,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         address _originToken,
         bytes memory _erc20Data
     ) internal override {
+        L2_ASSET_TRACKER.assertRecoveryIsAccountingNeutral(_assetId, _chainId);
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             L2_BASE_TOKEN_HOLDER.recoverBaseToken(_receiver, _amount, _chainId);
             return;
