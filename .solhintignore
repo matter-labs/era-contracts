@@ -12,6 +12,6 @@ l1-contracts/snapshots/*
 l1-contracts/deploy-scripts
 !l1-contracts/deploy-scripts/ctm/DeployCTM.s.sol
 
-# system-contracts
-system-contracts/contracts/Constants.sol
+# frozen system constants (historical `system-contracts` workspace; do not reformat)
+l1-contracts/frozen-system-constants/Constants.sol
 lib/*

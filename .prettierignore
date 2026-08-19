@@ -3,7 +3,7 @@ l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
 l1-contracts/lib
 lib
 node_modules/
-system-contracts/contracts/Constants.sol
+l1-contracts/frozen-system-constants/Constants.sol
 l1-contracts/cache
 l1-contracts/cache-forge
 l1-contracts/artifacts

@@ -5,6 +5,20 @@ pragma solidity ^0.8.20;
 /// @notice This file contains pure value constants and enums.
 /// Interface-typed constants (e.g. IContractDeployer constant DEPLOYER_SYSTEM_CONTRACT) are in Contracts.sol.
 
+/// @dev Historical location: this file was the only survivor of the deleted `system-contracts`
+/// workspace, which is why the audited L1 sources below still import it by its old
+/// `system-contracts/contracts/Constants.sol` path (see the remapping in `l1-contracts/foundry.toml`).
+/// Importers: `common/Config.sol`, `common/l2-helpers/{L2ContractAddresses,L2ContractHelper,
+/// SystemContractsCaller}.sol`, `state-transition/chain-interfaces/IExecutor.sol`,
+/// `state-transition/data-availability/CalldataDA.sol`.
+///
+/// @dev Frozen. Most declarations here are unreachable from this ZKsync OS-only branch (EraVM
+/// bootloader/precompile addresses, state-diff compression layout, ...) and three duplicate
+/// constants that `common/l2-helpers/L2ContractAddresses.sol` also defines. They are kept anyway:
+/// this file sits in the import closure of nearly every audited L1 contract, so removing a
+/// declaration reorders solc's output for all of them and needs a re-audit window - the same
+/// reasoning as the `FROZEN_UNUSED_ERRORS` allowlist in `errors-lint`. Do not trim or reformat.
+
 /// @dev All the system contracts introduced by ZKsync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15

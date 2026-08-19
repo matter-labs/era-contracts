@@ -1,7 +1,5 @@
 # syntax=docker/dockerfile:1.6
 
-ARG FOUNDRY_ARCH=linux_amd64
-ARG FOUNDRY_VANILLA_VERSION=v1.5.1
 ARG NODE_MAJOR=20
 ARG RUST_TARGET=x86_64-unknown-linux-gnu
 ARG RUST_TOOLCHAIN=nightly-2025-09-19
@@ -216,9 +214,6 @@ WORKDIR /contracts
 COPY --from=forge-builder /contracts/configs /contracts/configs
 COPY --from=forge-builder /contracts/l1-contracts /contracts/l1-contracts
 COPY --from=forge-builder /contracts/da-contracts /contracts/da-contracts
-# l1-contracts still compiles against system-contracts/contracts/Constants.sol at runtime
-# (foundry source-graph resolution needs it on disk); the workspace is now just that one file.
-COPY --from=forge-builder /contracts/system-contracts /contracts/system-contracts
 COPY --from=forge-builder /contracts/lib /contracts/lib
 COPY --from=forge-builder /contracts/node_modules /contracts/node_modules
 COPY --from=forge-builder /contracts/package.json /contracts/package.json

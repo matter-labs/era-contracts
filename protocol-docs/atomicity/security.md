@@ -180,7 +180,7 @@ log region is part of every batch's committed pubdata, so this does not depend o
 configuration — neither on the commitment _mechanism_ (`L2DACommitmentScheme`: calldata-keccak vs blobs)
 nor on the committed _scope_ (`PubdataContent`). Even a chain running `PubdataContent.LOGS_ONLY`, which
 commits only the log region and leaves state diffs and message preimages to the operator's discretion,
-keeps its full leaf set on L1. Both enums live in `system-contracts/contracts/Constants.sol` (re-exported
+keeps its full leaf set on L1. Both enums live in `l1-contracts/frozen-system-constants/Constants.sol` (re-exported
 from `l1-contracts/contracts/common/Config.sol`); `pubdataContent` is held in the chain's diamond storage
 and committed into the ZKsync OS batch public input via the chain-config hash, so the settlement layer
 enforces the configured mode rather than trusting the operator.

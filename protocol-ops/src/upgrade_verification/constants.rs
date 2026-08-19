@@ -80,7 +80,7 @@ pub const L2_BASE_TOKEN_HOLDER_ADDR: Address = l2_addr(0x11);
 
 /// L2 system contract addresses (`SYSTEM_CONTRACTS_OFFSET + <offset>`).
 /// Sourced from `L2ContractAddresses.sol` where available; the rest live in
-/// `system-contracts/contracts/Constants.sol`.
+/// `l1-contracts/frozen-system-constants/Constants.sol`.
 pub const L2_BOOTLOADER_ADDRESS: Address = system_contract_addr(0x01);
 pub const L2_ACCOUNT_CODE_STORAGE_ADDR: Address = system_contract_addr(0x02);
 pub const L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR: Address = system_contract_addr(0x04);
@@ -98,11 +98,11 @@ pub const CODE_ORACLE_SYSTEM_CONTRACT: Address = system_contract_addr(0x12);
 pub const EVM_GAS_MANAGER: Address = system_contract_addr(0x13);
 pub const EVM_PREDEPLOYS_MANAGER: Address = system_contract_addr(0x14);
 /// Solidity hardcodes this as `address(0x8010)` rather than the offset form;
-/// see the comment in `system-contracts/Constants.sol`. The value is still
+/// see the comment in `frozen-system-constants/Constants.sol`. The value is still
 /// `SYSTEM_CONTRACTS_OFFSET + 0x10`.
 pub const KECCAK256_SYSTEM_CONTRACT: Address = literal_addr(0x8010);
 
-/// EVM precompile addresses. Sourced from `system-contracts/Constants.sol`
+/// EVM precompile addresses. Sourced from `frozen-system-constants/Constants.sol`
 /// where they're declared as `address(0xNN)` literals (no offset).
 pub const ECRECOVER_SYSTEM_CONTRACT: Address = literal_addr(0x01);
 pub const SHA256_SYSTEM_CONTRACT: Address = literal_addr(0x02);
@@ -215,7 +215,7 @@ mod tests {
             "../../../l1-contracts/contracts/common/l2-helpers/L2ContractAddresses.sol"
         );
         const SYSTEM_CONSTANTS: &str =
-            include_str!("../../../system-contracts/contracts/Constants.sol");
+            include_str!("../../../l1-contracts/frozen-system-constants/Constants.sol");
 
         let mut addrs = parse_solidity_addresses(L2_CONTRACT_ADDRESSES);
         // Later inserts overwrite — fine because any duplicate names across
