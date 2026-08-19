@@ -71,6 +71,8 @@ library DeployCTML1OrGateway {
             return abi.encode(_config.l1ChainId, _config.rollupDAManager);
         } else if (_contractName == CTMContract.MailboxFacet) {
             return
+                // TODO: drop the `_eraChainId` parameter from `MailboxFacet` in the next release; it
+                // cannot change here without re-auditing the frozen contract.
                 abi.encode(
                     ERA_CHAIN_ID_UNUSED,
                     _config.l1ChainId,
@@ -88,6 +90,8 @@ library DeployCTML1OrGateway {
             return abi.encode(_config.l1ChainId);
         } else if (_contractName == CTMContract.DiamondInit) {
             // `DiamondInit(bool _isZKOS)` — always ZKsync OS.
+            // TODO: drop the `_isZKOS` constructor input in the next release; it cannot change here
+            // without re-auditing the frozen contract.
             return abi.encode(true);
         } else if (_contractName == CTMContract.DualVerifier || _contractName == CTMContract.TestnetVerifier) {
             return abi.encode(_config.verifierPlonk);

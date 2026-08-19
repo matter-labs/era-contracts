@@ -535,6 +535,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     ) internal virtual returns (FixedForceDeploymentsData memory data) {
         _precomputeBlakeHashes();
 
+        // TODO: drop `eraChainId` from `FixedForceDeploymentsData` in the next release; its only
+        // destination is the write-only `L2AssetRouter.ERA_CHAIN_ID` slot, but the struct is part of
+        // the frozen L2 genesis ABI.
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             eraChainId: ERA_CHAIN_ID_UNUSED,

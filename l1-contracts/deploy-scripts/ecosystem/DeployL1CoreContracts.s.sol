@@ -29,7 +29,6 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
 import {Config, CoreDeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
 import {IDeployL1CoreContracts} from "contracts/script-interfaces/IDeployL1CoreContracts.sol";
-import {ERA_CHAIN_ID_UNUSED} from "../utils/Types.sol";
 
 contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1CoreContracts {
     using stdToml for string;
@@ -154,7 +153,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         IL1Bridgehub bridgehub = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
         L1ChainAssetHandler chainAssetHandler = L1ChainAssetHandler(coreAddresses.bridgehub.proxies.chainAssetHandler);
         vm.startBroadcast(getDeployerAddress());
-        bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(ERA_CHAIN_ID_UNUSED));
         BridgehubBase(address(bridgehub)).setAddresses(
             coreAddresses.bridges.proxies.l1AssetRouter,
             ICTMDeploymentTracker(coreAddresses.bridgehub.proxies.ctmDeploymentTracker),

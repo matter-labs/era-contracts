@@ -116,10 +116,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         ctmAddresses.stateTransition.facets.diamondInit = deploySimpleContract("DiamondInit");
     }
 
-    function chainCreationParamsPath() internal virtual returns (string memory) {
-        return Utils.genesisConfigPath();
-    }
-
     function initializeConfig(string memory configPath, address bridgehub) internal virtual {
         string memory toml = vm.readFile(configPath);
 
@@ -211,8 +207,9 @@ abstract contract DeployCTMUtils is DeployUtils {
         require(stateTransition.verifiers.verifier != address(0), "verifier is zero");
 
         // ZKsync OS has no bootloader, default-account or EVM-emulator bytecode; `DiamondInit` skips
-        // its non-zero checks for OS chains and never reads the slots back. The audited struct keeps
-        // the fields.
+        // its non-zero checks for OS chains and never reads the slots back.
+        // TODO: drop these three fields from `InitializeDataNewChain` in the next release; the struct
+        // is part of the frozen `DiamondInit` ABI, so they cannot go here.
         DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
             l2BootloaderBytecodeHash: bytes32(0),
             l2DefaultAccountBytecodeHash: bytes32(0),
