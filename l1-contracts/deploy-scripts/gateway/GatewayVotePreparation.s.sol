@@ -122,9 +122,10 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
             migratorSelectors: Utils.getAllSelectorsForFacet("Migrator"),
             committerSelectors: Utils.getAllSelectorsForFacet("Committer"),
-            bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
-            defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
-            evmEmulatorHash: config.contracts.chainCreationParams.evmEmulatorHash,
+            // ZKsync OS has no bootloader, default-account or EVM-emulator bytecode.
+            bootloaderHash: bytes32(0),
+            defaultAccountHash: bytes32(0),
+            evmEmulatorHash: bytes32(0),
             genesisRoot: config.contracts.chainCreationParams.genesisRoot,
             genesisRollupLeafIndex: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,

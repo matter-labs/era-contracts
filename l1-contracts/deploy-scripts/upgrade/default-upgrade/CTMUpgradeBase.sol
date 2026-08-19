@@ -150,9 +150,11 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
 
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: composeUpgradeTx(deployments, _factoryDepsResult, _protocolUpgradeNonce),
-            bootloaderHash: _chainCreationParams.bootloaderHash,
-            defaultAccountHash: _chainCreationParams.defaultAAHash,
-            evmEmulatorHash: _chainCreationParams.evmEmulatorHash,
+            // ZKsync OS has no bootloader, default-account or EVM-emulator bytecode; the audited
+            // struct keeps the fields and requires them to be zero.
+            bootloaderHash: bytes32(0),
+            defaultAccountHash: bytes32(0),
+            evmEmulatorHash: bytes32(0),
             // Verifier is resolved from CTM; keep zeroed fields for calldata compatibility.
             verifier: address(0),
             verifierParams: ProposedUpgradeLib.emptyVerifierParams(),

@@ -262,10 +262,12 @@ abstract contract DeployCTMUtils is DeployUtils {
         require(stateTransition.verifiers.verifier != address(0), "verifier is zero");
 
         return
+            // ZKsync OS has no bootloader, default-account or EVM-emulator bytecode; `DiamondInit`
+            // skips its non-zero checks for OS chains and never reads the slots back.
             DiamondInitializeDataNewChain({
-                l2BootloaderBytecodeHash: config.contracts.chainCreationParams.bootloaderHash,
-                l2DefaultAccountBytecodeHash: config.contracts.chainCreationParams.defaultAAHash,
-                l2EvmEmulatorBytecodeHash: config.contracts.chainCreationParams.evmEmulatorHash
+                l2BootloaderBytecodeHash: bytes32(0),
+                l2DefaultAccountBytecodeHash: bytes32(0),
+                l2EvmEmulatorBytecodeHash: bytes32(0)
             });
     }
 

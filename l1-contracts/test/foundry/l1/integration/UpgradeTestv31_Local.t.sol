@@ -43,10 +43,8 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
 
         factoryDepsResult.factoryDepsHashes = new uint256[](45);
 
-        factoryDepsResult.factoryDepsHashes[0] = uint256(config.contracts.chainCreationParams.bootloaderHash);
-        factoryDepsResult.factoryDepsHashes[1] = uint256(config.contracts.chainCreationParams.defaultAAHash);
-        factoryDepsResult.factoryDepsHashes[2] = uint256(config.contracts.chainCreationParams.evmEmulatorHash);
-
+        // Slots 0-2 are the bootloader / default-account / EVM-emulator hashes, which ZKsync OS
+        // leaves at zero.
         bytes32 dummyHash = bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001));
         for (uint256 i = 3; i < 45; i++) {
             factoryDepsResult.factoryDepsHashes[i] = uint256(dummyHash);
@@ -72,9 +70,9 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
                 _factoryDepsResult,
                 protocolUpgradeNonce
             ),
-            bootloaderHash: chainCreationParams.bootloaderHash,
-            defaultAccountHash: chainCreationParams.defaultAAHash,
-            evmEmulatorHash: chainCreationParams.evmEmulatorHash,
+            bootloaderHash: bytes32(0),
+            defaultAccountHash: bytes32(0),
+            evmEmulatorHash: bytes32(0),
             verifier: address(0),
             verifierParams: ProposedUpgradeLib.emptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),

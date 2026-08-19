@@ -391,21 +391,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "latest_protocol_version",
             config.contracts.chainCreationParams.latestProtocolVersion
         );
-        vm.serializeBytes32(
-            "chain_creation_params",
-            "bootloader_hash",
-            config.contracts.chainCreationParams.bootloaderHash
-        );
-        vm.serializeBytes32(
-            "chain_creation_params",
-            "default_aa_hash",
-            config.contracts.chainCreationParams.defaultAAHash
-        );
-        vm.serializeBytes32(
-            "chain_creation_params",
-            "evm_emulator_hash",
-            config.contracts.chainCreationParams.evmEmulatorHash
-        );
+        // Always zero on ZKsync OS. Emitted anyway because zkstack consumes this output and
+        // dropping keys from it is a breaking change for an out-of-repo reader.
+        vm.serializeBytes32("chain_creation_params", "bootloader_hash", bytes32(0));
+        vm.serializeBytes32("chain_creation_params", "default_aa_hash", bytes32(0));
+        vm.serializeBytes32("chain_creation_params", "evm_emulator_hash", bytes32(0));
         vm.serializeBytes32("chain_creation_params", "genesis_root", config.contracts.chainCreationParams.genesisRoot);
         vm.serializeUint(
             "chain_creation_params",
