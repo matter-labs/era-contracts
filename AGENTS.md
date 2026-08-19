@@ -236,8 +236,9 @@ foundryup --install "$(. .github/foundry-versions.env && echo "$FOUNDRY_BUILD_VE
 The interop and v31->v32 upgrade suites additionally need the `anvil` pin (`FOUNDRY_ANVIL_VERSION`),
 which must stay trace-schema compatible with the committed chain states. Never bump a pin in a
 workflow directly — change it in `.github/foundry-versions.env` and regenerate whatever it
-invalidates (`AllContractsHashes.json` + `zkstack-out` for the build pin, the anvil-interop chain
-states for the anvil pin).
+invalidates: `AllContractsHashes.json` for the build pin (it records bytecode, which carries solc
+metadata; `zkstack-out` and `selectors` are ABI-derived and unaffected), and the anvil-interop
+chain states for the anvil pin.
 
 ### Building Artifacts
 
