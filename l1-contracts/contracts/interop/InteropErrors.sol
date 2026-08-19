@@ -29,6 +29,8 @@ error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executi
 error FeeWithdrawalFailed();
 // 0x4afc3319
 error IndirectCallCannotCarryValue(uint256 value);
+// 0x8014ad84
+error IndirectCallOnlyToAssetRouter(address target);
 // 0x62d214aa
 error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 // 0xbfa9bcca

@@ -121,8 +121,10 @@ tree's appender and the manager's tree / interop center / interop handler are co
 asset router recognises the manager via `_atomicFlowManagerAddr()`. For recovery the manager calls
 `IAtomicRecoverable.recoverAtomicCall` on a bundle call's **local sender** (`InteropCall.from`), and only
 when that sender is the canonical L2 asset router (`from == L2_ASSET_ROUTER_ADDR`) — the interface is not
-dispatched generically, and not to the call's target. Supporting another `IAtomicRecoverable` sender would
-require changing the manager (see [recovery.md](./recovery.md)).
+dispatched generically, and not to the call's target. Send-time validation makes the asset router the
+only possible indirect call sender (`IndirectCallOnlyToAssetRouter`, see
+{protocol-docs/interop.md#restrictions}), so the pinned dispatch reaches every indirect burn — see
+[recovery.md](./recovery.md) for the recovery mechanisms.
 
 ## Off-chain tooling
 
