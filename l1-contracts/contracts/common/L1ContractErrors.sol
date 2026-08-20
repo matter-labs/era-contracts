@@ -300,6 +300,8 @@ error NonSequentialBatch();
 error NonSequentialVersion();
 // 0x0e0ff4d9
 error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
+// 0x31967fc6
+error NonZeroCarriedHash();
 // 0xfa5cd00f
 error NotAllowed(address addr);
 // 0x64846fe4
@@ -490,6 +492,12 @@ error ZeroChainId();
 error ZeroUpgradeTimestamp();
 // 0x601b6882
 error ZKChainLimitReached();
+// 0xb2cabab5
+error ZKsyncOSChainConfigUpdateWithUnverifiedBatches(uint256 batchesVerified, uint256 batchesCommitted);
+// 0x1df14b10
+error ZKsyncOSMaxTxGasLimitTooHigh();
+// 0x7e34baaf
+error ZKsyncOSMaxTxGasLimitTooLow();
 // 0x646ac57e
 error ZKsyncOSNotForceDeployForExistingContract(address);
 // 0xb24b1ccb

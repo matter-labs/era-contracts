@@ -6,7 +6,12 @@ import {Test} from "forge-std/Test.sol";
 import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
-import {EmptyProofLength, MockVerifierNotSupported, UnknownVerifierType} from "contracts/common/L1ContractErrors.sol";
+import {
+    EmptyProofLength,
+    MockVerifierNotSupported,
+    NonZeroCarriedHash,
+    UnknownVerifierType
+} from "contracts/common/L1ContractErrors.sol";
 import {UnknownVerifierVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 /// @notice Mock FFLONK verifier for testing
@@ -267,73 +272,49 @@ contract ZKsyncOSDualVerifierTest is Test {
 
     // ============ computeZKsyncOSHash Tests ============
 
-    function test_computeZKsyncOSHash_withNonZeroInitialHash() public view {
-        uint256 initialHash = 12345;
+    function test_computeZKsyncOSHash_multipleInputs() public view {
         uint256[] memory publicInputs = new uint256[](2);
         publicInputs[0] = 100;
         publicInputs[1] = 200;
 
-        uint256 result = verifier.computeZKsyncOSHash(initialHash, publicInputs);
+        uint256 result = verifier.computeZKsyncOSHash(0, publicInputs);
 
-        // Manually compute expected hash
-        uint256 expected = initialHash;
-        expected = uint256(keccak256(abi.encodePacked(expected, publicInputs[0]))) >> 32;
-        expected = uint256(keccak256(abi.encodePacked(expected, publicInputs[1]))) >> 32;
-
-        assertEq(result, expected);
-    }
-
-    function test_computeZKsyncOSHash_withZeroInitialHash() public view {
-        uint256 initialHash = 0;
-        uint256[] memory publicInputs = new uint256[](2);
-        publicInputs[0] = 100;
-        publicInputs[1] = 200;
-
-        uint256 result = verifier.computeZKsyncOSHash(initialHash, publicInputs);
-
-        // When initial hash is 0, it takes the first public input as the starting hash
-        uint256 expected = publicInputs[0];
-        expected = uint256(keccak256(abi.encodePacked(expected, publicInputs[1]))) >> 32;
+        // The concatenation of all per-batch hashes is hashed once, then truncated.
+        uint256 expected = uint256(keccak256(abi.encodePacked(publicInputs[0], publicInputs[1]))) >> 32;
 
         assertEq(result, expected);
     }
 
     function test_computeZKsyncOSHash_singleInput() public view {
-        uint256 initialHash = 12345;
         uint256[] memory publicInputs = new uint256[](1);
         publicInputs[0] = 100;
 
-        uint256 result = verifier.computeZKsyncOSHash(initialHash, publicInputs);
+        uint256 result = verifier.computeZKsyncOSHash(0, publicInputs);
 
-        uint256 expected = uint256(keccak256(abi.encodePacked(initialHash, publicInputs[0]))) >> 32;
-
-        assertEq(result, expected);
+        // A single-batch range is the bare hash, truncated, with no keccak over it.
+        assertEq(result, publicInputs[0] >> 32);
     }
 
-    function test_computeZKsyncOSHash_singleInputWithZeroInitial() public view {
-        uint256 initialHash = 0;
-        uint256[] memory publicInputs = new uint256[](1);
+    function testFuzz_computeZKsyncOSHash_revertsOnNonZeroCarriedHash(uint256 initialHash) public {
+        vm.assume(initialHash != 0);
+        uint256[] memory publicInputs = new uint256[](2);
         publicInputs[0] = 100;
+        publicInputs[1] = 200;
 
-        uint256 result = verifier.computeZKsyncOSHash(initialHash, publicInputs);
-
-        // When initial is 0 and there's only one input, result is that input
-        assertEq(result, publicInputs[0]);
+        // The V8 unified layer has no continuation input, so `_proof[1]` must be zero.
+        vm.expectRevert(NonZeroCarriedHash.selector);
+        verifier.computeZKsyncOSHash(initialHash, publicInputs);
     }
 
     // ============ Fuzz Tests ============
 
-    function testFuzz_computeZKsyncOSHash_deterministicResults(
-        uint256 initialHash,
-        uint256 input1,
-        uint256 input2
-    ) public view {
+    function testFuzz_computeZKsyncOSHash_deterministicResults(uint256 input1, uint256 input2) public view {
         uint256[] memory publicInputs = new uint256[](2);
         publicInputs[0] = input1;
         publicInputs[1] = input2;
 
-        uint256 result1 = verifier.computeZKsyncOSHash(initialHash, publicInputs);
-        uint256 result2 = verifier.computeZKsyncOSHash(initialHash, publicInputs);
+        uint256 result1 = verifier.computeZKsyncOSHash(0, publicInputs);
+        uint256 result2 = verifier.computeZKsyncOSHash(0, publicInputs);
 
         assertEq(result1, result2);
     }
