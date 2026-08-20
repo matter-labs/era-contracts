@@ -7,13 +7,15 @@ import {
     EmptyProofLength,
     UnknownVerifierType,
     MockVerifierNotSupported,
-    EmptyPublicInputsLength
+    EmptyPublicInputsLength,
+    NonZeroCarriedHash
 } from "../../common/L1ContractErrors.sol";
 import {IZKsyncOSVerifier} from "../chain-interfaces/IZKsyncOSVerifier.sol";
 import {
     ZKSYNC_OS_MOCK_VERIFICATION_TYPE,
     ZKSYNC_OS_PLONK_VERIFICATION_TYPE,
-    ZKSYNC_OS_PROOF_METADATA_LENGTH
+    ZKSYNC_OS_PROOF_METADATA_LENGTH,
+    PUBLIC_INPUT_SHIFT
 } from "../../common/Config.sol";
 
 /// @title ZKsync OS Verifier
@@ -109,18 +111,14 @@ contract ZKsyncOSVerifier is IVerifier, IZKsyncOSVerifier {
         uint256 _initialHash,
         uint256[] calldata _publicInputs
     ) public pure returns (uint256 result) {
-        uint256 publicInputsLength = _publicInputs.length;
-        result = _initialHash;
-
-        uint256 i = 0;
-
-        if (result == 0) {
-            result = _publicInputs[0];
-            i = 1;
+        // The prover hashes the concatenation of all per-batch hashes once. A rolling fold
+        // coincides for at most two batches but diverges starting with the third batch.
+        // The second proof word is a pre-V8 continuation input. The V8 unified layer does not
+        // support continuation proofs, so the reserved wire slot must remain zero.
+        if (_initialHash != 0) {
+            revert NonZeroCarriedHash();
         }
-
-        for (; i < publicInputsLength; ++i) {
-            result = uint256(keccak256(abi.encodePacked(result, _publicInputs[i]))) >> 32;
-        }
+        result = _publicInputs.length == 1 ? _publicInputs[0] : uint256(keccak256(abi.encodePacked(_publicInputs)));
+        result = result >> PUBLIC_INPUT_SHIFT;
     }
 }
