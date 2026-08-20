@@ -2,7 +2,6 @@
 pragma solidity 0.8.28;
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
@@ -33,9 +32,5 @@ library UpgradeHelperLib {
 
     function emptyUpgradeTx() internal pure returns (L2CanonicalTransaction memory) {
         return ProposedUpgradeLib.emptyL2CanonicalTransaction();
-    }
-
-    function getUpgradeTxType() internal pure returns (uint256) {
-        return ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
     }
 }

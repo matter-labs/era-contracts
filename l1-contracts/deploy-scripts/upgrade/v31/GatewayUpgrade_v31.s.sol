@@ -45,7 +45,7 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
         return abi.encodeCall(IL2V32Upgrade.upgrade, (true, address(0), "", ""));
     }
 
-    function getZKsyncOSL2UpgradeTargetAndData(
+    function getL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal view override returns (address, bytes memory) {
         return

@@ -136,10 +136,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
                           Internal functions
     //////////////////////////////////////////////////////////////*/
 
-    function getCreationCalldata(string memory contractName) internal view override returns (bytes memory) {
-        return super.getCreationCalldata(contractName);
-    }
-
     /// @notice Override to properly set deployerAddress in upgrade context
     /// @dev In upgrade scripts, msg.sender is the script address, not the broadcast address
     ///      We need to use tx.origin which is the actual transaction sender (private key holder)

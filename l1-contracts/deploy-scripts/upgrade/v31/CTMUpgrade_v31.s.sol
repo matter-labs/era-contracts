@@ -210,7 +210,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         });
     }
 
-    function getZKsyncOSL2UpgradeTargetAndData(
+    function getL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual override returns (address, bytes memory) {
         // For ZKsyncOS, the delegateTo address is a derived address (not the constant
