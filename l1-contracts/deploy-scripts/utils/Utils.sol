@@ -326,47 +326,6 @@ library Utils {
         return contractAddress;
     }
 
-    /**
-     * @dev Deploy l2 contracts through l1.
-     * TODO(gateway-os): this helper CREATE2-deploys EraVM-format (zkout) bytecode via the EraVM deployer
-     * system contract and only works against the legacy EraVM-based Gateway. The future ZKsync-OS-based
-     * Gateway needs an EVM-native deployment path; replace the remaining consumers when it lands.
-     */
-    function deployThroughL1(
-        bytes memory bytecode,
-        bytes memory constructorargs,
-        bytes32 create2salt,
-        uint256 l2GasLimit,
-        bytes[] memory factoryDeps,
-        uint256 chainId,
-        address bridgehubAddress,
-        address l1SharedBridgeProxy
-    ) internal returns (address) {
-        (bytes32 bytecodeHash, bytes memory deployData) = getDeploymentCalldata(create2salt, bytecode, constructorargs);
-
-        address contractAddress = L2ContractHelper.computeCreate2Address(
-            msg.sender,
-            create2salt,
-            bytecodeHash,
-            keccak256(constructorargs)
-        );
-
-        bytes[] memory _factoryDeps = appendArray(factoryDeps, bytecode);
-
-        runL1L2Transaction({
-            l2Calldata: deployData,
-            l2GasLimit: l2GasLimit,
-            l2Value: 0,
-            factoryDeps: _factoryDeps,
-            dstAddress: L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-            chainId: chainId,
-            bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy,
-            refundRecipient: msg.sender
-        });
-        return contractAddress;
-    }
-
     function getL2AddressViaCreate2Factory(
         bytes32 create2Salt,
         bytes32 bytecodeHash,
@@ -410,6 +369,37 @@ library Utils {
     /// @return The computed CREATE2 address.
     function getL2AddressViaDeterministicCreate2(bytes32 salt, bytes memory initCode) internal view returns (address) {
         return vm.computeCreate2Address(salt, keccak256(initCode), DETERMINISTIC_CREATE2_ADDRESS);
+    }
+
+    /// @notice Deploys an L2 contract from L1 through the deterministic CREATE2 factory.
+    /// @dev The EVM-native counterpart to {deployThroughL1Deterministic}: the init code travels in the
+    /// calldata (`salt ++ initCode`) rather than as a factory dep, and the address uses standard EVM
+    /// CREATE2 derivation. Contracts deployed this way run their constructors normally — only the
+    /// predeployed L2 built-ins are constructor-less and initialized via `initL2`.
+    function deployThroughL1ViaDeterministicCreate2(
+        bytes memory bytecode,
+        bytes memory constructorArgs,
+        bytes32 create2Salt,
+        uint256 l2GasLimit,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy
+    ) internal returns (address) {
+        bytes memory initCode = abi.encodePacked(bytecode, constructorArgs);
+        address contractAddress = getL2AddressViaDeterministicCreate2(create2Salt, initCode);
+
+        runL1L2Transaction({
+            l2Calldata: getDeterministicCreate2FactoryCalldata(create2Salt, initCode),
+            l2GasLimit: l2GasLimit,
+            l2Value: 0,
+            factoryDeps: new bytes[](0),
+            dstAddress: DETERMINISTIC_CREATE2_ADDRESS,
+            chainId: chainId,
+            bridgehubAddress: bridgehubAddress,
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            refundRecipient: msg.sender
+        });
+        return contractAddress;
     }
 
     function appendArray(bytes[] memory array, bytes memory element) internal pure returns (bytes[] memory) {

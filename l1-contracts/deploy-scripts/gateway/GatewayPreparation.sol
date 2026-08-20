@@ -346,24 +346,14 @@ contract GatewayPreparation is Script {
         // TODO(EVM-925): it is deployed without any restrictions.
         // `ChainAdmin` is CREATE2-deployed like any ordinary contract, so its constructor runs
         // normally — unlike the predeployed L2 built-ins, which are initialized via `initL2`.
-        bytes memory initCode = abi.encodePacked(
-            ContractsBytecodesLib.getCreationCodeEVM("ChainAdmin"),
-            abi.encode(new address[](0))
-        );
-
-        address l2ChainAdminAddress = Utils.getL2AddressViaDeterministicCreate2(bytes32(0), initCode);
-
-        Utils.runL1L2Transaction({
-            l2Calldata: Utils.getDeterministicCreate2FactoryCalldata(bytes32(0), initCode),
+        address l2ChainAdminAddress = Utils.deployThroughL1ViaDeterministicCreate2({
+            bytecode: ContractsBytecodesLib.getCreationCodeEVM("ChainAdmin"),
+            constructorArgs: abi.encode(new address[](0)),
+            create2Salt: bytes32(0),
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-            l2Value: 0,
-            // EVM deployment: the init code travels in the calldata, so there are no factory deps.
-            factoryDeps: new bytes[](0),
-            dstAddress: Utils.DETERMINISTIC_CREATE2_ADDRESS,
             chainId: config.gatewayChainId,
             bridgehubAddress: config.bridgehub,
-            l1SharedBridgeProxy: config.sharedBridgeProxy,
-            refundRecipient: msg.sender
+            l1SharedBridgeProxy: config.sharedBridgeProxy
         });
 
         saveOutput(l2ChainAdminAddress);
