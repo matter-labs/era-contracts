@@ -22,8 +22,8 @@ dependencies = [
 
 [[package]]
 name = "airbender-crypto"
-version = "0.2.2"
-source = "git+https://github.com/matter-labs/airbender-platform?rev=80c0541f6#80c0541f62414dc7f21c200218686c4bef9458d4"
+version = "0.2.4"
+source = "git+https://github.com/matter-labs/airbender-platform?tag=v0.2.4#a350ee3e08bef4cbe2b7bc968966bee45bc98a17"
 dependencies = [
  "ark-bls12-381",
  "ark-bn254",
@@ -57,17 +57,17 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "alloy"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7bdf7932042b511ad4ad67f7eeac896df62439ac91a8c516d678b79cbe3f9c27"
+checksum = "9867f85f660948ddbef071ae484027654c04b62c7decd5b61464a7ed1f8931a0"
 dependencies = [
- "alloy-consensus 2.2.0",
+ "alloy-consensus 2.4.1",
  "alloy-core",
- "alloy-eips 2.2.0",
+ "alloy-eips 2.4.1",
  "alloy-network",
  "alloy-provider",
  "alloy-rpc-types",
- "alloy-serde 2.2.0",
+ "alloy-serde 2.4.1",
  "alloy-signer",
  "alloy-signer-aws",
  "alloy-signer-gcp",
@@ -117,16 +117,16 @@ dependencies = [
 
 [[package]]
 name = "alloy-consensus"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f0f42ee16e9eaffa4df5aa3a17b1df88dd222310d13152ab91357a2551fd054"
+checksum = "12a542fe1e6a48cfd010a9e8eba1235436de58ee0f1415e588c27d5d556e98df"
 dependencies = [
- "alloy-eips 2.2.0",
+ "alloy-eips 2.4.1",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde 2.2.0",
+ "alloy-serde 2.4.1",
  "alloy-trie",
- "alloy-tx-macros 2.2.0",
+ "alloy-tx-macros 2.4.1",
  "auto_impl",
  "borsh",
  "c-kzg",
@@ -144,15 +144,15 @@ dependencies = [
 
 [[package]]
 name = "alloy-consensus-any"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db388e804269d977d60fa7530ccfefe9184ca48d4055dad3ec7e649a29186a06"
+checksum = "05ac1559726a5e71d6dbab59cbd8ad0988c762105d2ae41ae4f3241a3166262d"
 dependencies = [
- "alloy-consensus 2.2.0",
- "alloy-eips 2.2.0",
+ "alloy-consensus 2.4.1",
+ "alloy-eips 2.4.1",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde 2.2.0",
+ "alloy-serde 2.4.1",
  "serde",
 ]
 
@@ -276,9 +276,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-eips"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52010e7c255f45b0ef3ca18144cbfbe0c044b055fe53f59323f3df5d95f265b1"
+checksum = "d40246adf7468b430fce87945ece8a54ef27fa760dd9f670f5162a412007bdb2"
 dependencies = [
  "alloy-eip2124",
  "alloy-eip2930",
@@ -286,7 +286,7 @@ dependencies = [
  "alloy-eip7928 0.4.5",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde 2.2.0",
+ "alloy-serde 2.4.1",
  "auto_impl",
  "borsh",
  "c-kzg",
@@ -311,9 +311,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-json-rpc"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24d7ff4d7f1503d12edda9b241904a309d6e1d5bcee3f0ffdc4d3d3f16f366b8"
+checksum = "7e5722ea29a9a85ecdba2516c58f50d71e77cd25f8ce7e9f4ee8570ddeee6df1"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -326,19 +326,19 @@ dependencies = [
 
 [[package]]
 name = "alloy-network"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44ff1439d901b44f6ff840545f82d65e66830ee33fb33cae495a566d66e0ccc8"
+checksum = "e2e4d278913f00ab611f5367448a3a800fed173ab791c3cc67b7a1b0d7afd305"
 dependencies = [
- "alloy-consensus 2.2.0",
+ "alloy-consensus 2.4.1",
  "alloy-consensus-any",
- "alloy-eips 2.2.0",
+ "alloy-eips 2.4.1",
  "alloy-json-rpc",
  "alloy-network-primitives",
  "alloy-primitives",
  "alloy-rpc-types-any",
  "alloy-rpc-types-eth",
- "alloy-serde 2.2.0",
+ "alloy-serde 2.4.1",
  "alloy-signer",
  "alloy-sol-types",
  "async-trait",
@@ -352,14 +352,14 @@ dependencies = [
 
 [[package]]
 name = "alloy-network-primitives"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb920286c4a71fb0ff3bbb207a640a531a42fceef5b43d4a943f7d5265789876"
+checksum = "e4e52ae56d1acaa6b46e9d7015b8ae6c10f3d1c213a32ae70b17426a03ae6729"
 dependencies = [
- "alloy-consensus 2.2.0",
- "alloy-eips 2.2.0",
+ "alloy-consensus 2.4.1",
+ "alloy-eips 2.4.1",
  "alloy-primitives",
- "alloy-serde 2.2.0",
+ "alloy-serde 2.4.1",
  "serde",
 ]
 
@@ -394,13 +394,13 @@ dependencies = [
 
 [[package]]
 name = "alloy-provider"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "329375f50202cc6b2dcc8c6b1e53b716cbbebbeea54e931befc4f3b628dfc469"
+checksum = "386124639a5c386329b9f2ef2b42969badbf7bba40422b513e3e5739c516dc34"
 dependencies = [
  "alloy-chains",
- "alloy-consensus 2.2.0",
- "alloy-eips 2.2.0",
+ "alloy-consensus 2.4.1",
+ "alloy-eips 2.4.1",
  "alloy-json-rpc",
  "alloy-network",
  "alloy-network-primitives",
@@ -453,9 +453,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-client"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52bffef2c5714f578f267bb959b47908b95728f1f3e2073a96d928f4441c148d"
+checksum = "3dfd3ebc1756426a6a9e17979d4467632aff01f359136c50e5320ac6e32d6b8d"
 dependencies = [
  "alloy-json-rpc",
  "alloy-primitives",
@@ -473,45 +473,45 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a64449cae1cf37c4907b10ccca1613b71809f9a1f3ad6e2b4cc14d08e2e4947f"
+checksum = "417dc664965e36fc43a4f9c8eb8b2d14067a29c430e23470d2c923c1c977bac7"
 dependencies = [
  "alloy-primitives",
  "alloy-rpc-types-eth",
  "alloy-rpc-types-trace",
- "alloy-serde 2.2.0",
+ "alloy-serde 2.4.1",
  "serde",
 ]
 
 [[package]]
 name = "alloy-rpc-types-any"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fe7fa70c3af4b2de7f670b50d680700e0f979ce3a0ab7725958b51ffc3b16c2"
+checksum = "cd0a6cce3f97e5d9c0048081b5d173e0e406c2056c52c012e578a1d451ff0cdc"
 dependencies = [
  "alloy-consensus-any",
  "alloy-network-primitives",
  "alloy-primitives",
  "alloy-rpc-types-eth",
- "alloy-serde 2.2.0",
+ "alloy-serde 2.4.1",
  "serde",
  "serde_json",
 ]
 
 [[package]]
 name = "alloy-rpc-types-eth"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04f60a196df184facc9acbb61bd765a36cfb3c9d27eb6b43d5bd26340df1b96a"
+checksum = "1eb4c87dfdde83cd97e03a8c0c5e986b52e14075e02266e322ac6c7eb02e7399"
 dependencies = [
- "alloy-consensus 2.2.0",
+ "alloy-consensus 2.4.1",
  "alloy-consensus-any",
- "alloy-eips 2.2.0",
+ "alloy-eips 2.4.1",
  "alloy-network-primitives",
  "alloy-primitives",
  "alloy-rlp",
- "alloy-serde 2.2.0",
+ "alloy-serde 2.4.1",
  "alloy-sol-types",
  "itertools 0.14.0",
  "serde",
@@ -522,13 +522,13 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types-trace"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a12cafc0ee2290122ec4e069bb0f2389a356f4b5414f2e82de8288049c2bc98a"
+checksum = "7d45ae3eadb97bf7933086205b4be0fef82c208bfc3007759e9afdcb6efa74c5"
 dependencies = [
  "alloy-primitives",
  "alloy-rpc-types-eth",
- "alloy-serde 2.2.0",
+ "alloy-serde 2.4.1",
  "serde",
  "serde_json",
  "thiserror 2.0.19",
@@ -547,9 +547,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-serde"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07758cbde42596b66da52bb661d77e253c3f7f9b3f553faf07adbadeb6419502"
+checksum = "2ff89f75b8a9d00f659750e9220c31b42d67c69ffc43b2ac8911dfd0506eb4a6"
 dependencies = [
  "alloy-primitives",
  "serde",
@@ -558,9 +558,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-signer"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc43a73bc1bf7044898e1b0dcefaba45d0cfac3e379bb5ca29cc3e3a04c61451"
+checksum = "69e1f6fae3ade809daa4c32bee35a30a439bb307209d7b42f3995988b5cc74b8"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
@@ -575,11 +575,11 @@ dependencies = [
 
 [[package]]
 name = "alloy-signer-aws"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc1a457df25c6f8cec9cf3fd15db7864780c19c24e372cd4fff66e2bf1cff1c8"
+checksum = "495d56d8b67d1d656d50053cf6263e4191bd626952f0401197eeb755b390924e"
 dependencies = [
- "alloy-consensus 2.2.0",
+ "alloy-consensus 2.4.1",
  "alloy-network",
  "alloy-primitives",
  "alloy-signer",
@@ -594,11 +594,11 @@ dependencies = [
 
 [[package]]
 name = "alloy-signer-gcp"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46d9d231dc021653db081a6ec8f2c84f06d7b61c9585a437ab3febe9b7f33f35"
+checksum = "85c81d27fc6d869e0a1c1bd2c69d072d56c3b4f4aae0670ad85f4b6d373df064"
 dependencies = [
- "alloy-consensus 2.2.0",
+ "alloy-consensus 2.4.1",
  "alloy-network",
  "alloy-primitives",
  "alloy-signer",
@@ -612,11 +612,11 @@ dependencies = [
 
 [[package]]
 name = "alloy-signer-ledger"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c32c516c9f3153b83cb6b006b5ff26a651dc2868fef970b62b70f61b63c6701c"
+checksum = "29eedbaa8de81b8c204572a783ac90eeaf7ae6e67fe2f8c2cc3c13c53eb1f1e0"
 dependencies = [
- "alloy-consensus 2.2.0",
+ "alloy-consensus 2.4.1",
  "alloy-dyn-abi",
  "alloy-network",
  "alloy-primitives",
@@ -632,11 +632,11 @@ dependencies = [
 
 [[package]]
 name = "alloy-signer-local"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "372ff9be2b61c2cd6d33cfcef9bd5865962c0628c932767f5154443aba2c9746"
+checksum = "621cc39c34b85875858ef149598f3d5f9797dff9a3247f3606fcc06f9b20acc8"
 dependencies = [
- "alloy-consensus 2.2.0",
+ "alloy-consensus 2.4.1",
  "alloy-network",
  "alloy-primitives",
  "alloy-signer",
@@ -648,11 +648,11 @@ dependencies = [
 
 [[package]]
 name = "alloy-signer-turnkey"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61a2b89298ef96b1682c8698cc11269549c1e125163b35140ebca7b124edb772"
+checksum = "e7b419b363fa02d29365da1cbbed8c0c8c8561ed257ac498017625e758f516e3"
 dependencies = [
- "alloy-consensus 2.2.0",
+ "alloy-consensus 2.4.1",
  "alloy-network",
  "alloy-primitives",
  "alloy-signer",
@@ -734,9 +734,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-transport"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "830c87b05870c80c8d2cfb9245feaff36468893f19fc124c7ff563cabda6386c"
+checksum = "06f4ca8484d6295d5165f67de8fdb00ae630ba585efb606f003171286b56441c"
 dependencies = [
  "alloy-json-rpc",
  "auto_impl",
@@ -785,9 +785,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-tx-macros"
-version = "2.2.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e50185b84799c8b5f016a0c9da74309fe28d1c70fbe590a4e8d9cae6df3eebb0"
+checksum = "1d0626c4f3b2028f7e8db32f53c22d9ecd5939f772317b7c4b6fe5219cb0589a"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1662,7 +1662,7 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 [[package]]
 name = "basic_bootloader"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=dev-20260724-atomic-interop#358eff280d40051fc2934180c2367882ab703cb0"
+source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.0#20fdb610f8a29655dff3b87fc5eeb16340cd8a7b"
 dependencies = [
  "airbender-crypto",
  "arrayvec",
@@ -1681,7 +1681,7 @@ dependencies = [
 [[package]]
 name = "basic_system"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=dev-20260724-atomic-interop#358eff280d40051fc2934180c2367882ab703cb0"
+source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.0#20fdb610f8a29655dff3b87fc5eeb16340cd8a7b"
 dependencies = [
  "airbender-crypto",
  "arrayvec",
@@ -1907,7 +1907,7 @@ dependencies = [
 [[package]]
 name = "callable_oracles"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=dev-20260724-atomic-interop#358eff280d40051fc2934180c2367882ab703cb0"
+source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.0#20fdb610f8a29655dff3b87fc5eeb16340cd8a7b"
 dependencies = [
  "airbender-crypto",
  "basic_bootloader",
@@ -1953,7 +1953,7 @@ dependencies = [
 [[package]]
 name = "cc-traits"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=dev-20260724-atomic-interop#358eff280d40051fc2934180c2367882ab703cb0"
+source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.0#20fdb610f8a29655dff3b87fc5eeb16340cd8a7b"
 
 [[package]]
 name = "cfg-if"
@@ -2279,7 +2279,7 @@ dependencies = [
 [[package]]
 name = "cycle_marker"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=dev-20260724-atomic-interop#358eff280d40051fc2934180c2367882ab703cb0"
+source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.0#20fdb610f8a29655dff3b87fc5eeb16340cd8a7b"
 
 [[package]]
 name = "darling"
@@ -2333,7 +2333,7 @@ dependencies = [
 [[package]]
 name = "delegated_u256"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=dev-20260724-atomic-interop#358eff280d40051fc2934180c2367882ab703cb0"
+source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.0#20fdb610f8a29655dff3b87fc5eeb16340cd8a7b"
 dependencies = [
  "ruint",
  "serde",
@@ -2562,7 +2562,7 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 [[package]]
 name = "evm_interpreter"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=dev-20260724-atomic-interop#358eff280d40051fc2934180c2367882ab703cb0"
+source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.0#20fdb610f8a29655dff3b87fc5eeb16340cd8a7b"
 dependencies = [
  "airbender-crypto",
  "arrayvec",
@@ -2685,7 +2685,7 @@ dependencies = [
 [[package]]
 name = "forward_system"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=dev-20260724-atomic-interop#358eff280d40051fc2934180c2367882ab703cb0"
+source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.0#20fdb610f8a29655dff3b87fc5eeb16340cd8a7b"
 dependencies = [
  "airbender-crypto",
  "alloy",
@@ -2950,21 +2950,12 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
-dependencies = [
- "allocator-api2",
- "equivalent",
- "foldhash",
-]
-
-[[package]]
-name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
+ "allocator-api2",
+ "equivalent",
  "foldhash",
  "serde",
  "serde_core",
@@ -3632,11 +3623,11 @@ checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
 name = "lru"
-version = "0.16.4"
+version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f66e8d5d03f609abc3a39e6f08e4164ebf1447a732906d39eb9b99b7919ef39"
+checksum = "5d2f2f9b4ba7e6b24d95e7e899329d35be83bcded72c8540cdd5368932d1d90a"
 dependencies = [
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
 ]
 
 [[package]]
@@ -3726,7 +3717,7 @@ dependencies = [
 [[package]]
 name = "modexp"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=dev-20260724-atomic-interop#358eff280d40051fc2934180c2367882ab703cb0"
+source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.0#20fdb610f8a29655dff3b87fc5eeb16340cd8a7b"
 
 [[package]]
 name = "nix"
@@ -3836,7 +3827,7 @@ checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 [[package]]
 name = "oracle_provider"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=dev-20260724-atomic-interop#358eff280d40051fc2934180c2367882ab703cb0"
+source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.0#20fdb610f8a29655dff3b87fc5eeb16340cd8a7b"
 dependencies = [
  "riscv_transpiler",
  "zk_ee",
@@ -4631,9 +4622,9 @@ dependencies = [
 
 [[package]]
 name = "ruint"
-version = "1.19.0"
+version = "1.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45caf26f647c19115bf9c453c70ffe4a4a3a6390dceebd942610584f99b8ddce"
+checksum = "f5e99bff0393163bb25029a6af25d3d8d202ba5b5438a74d1bd8789f5c822970"
 dependencies = [
  "alloy-rlp",
  "ark-ff 0.3.0",
@@ -5225,7 +5216,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "storage_models"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=dev-20260724-atomic-interop#358eff280d40051fc2934180c2367882ab703cb0"
+source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.0#20fdb610f8a29655dff3b87fc5eeb16340cd8a7b"
 dependencies = [
  "zk_ee",
 ]
@@ -5352,7 +5343,7 @@ dependencies = [
 [[package]]
 name = "system_hooks"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=dev-20260724-atomic-interop#358eff280d40051fc2934180c2367882ab703cb0"
+source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.0#20fdb610f8a29655dff3b87fc5eeb16340cd8a7b"
 dependencies = [
  "arrayvec",
  "cycle_marker",
@@ -5750,7 +5741,7 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 [[package]]
 name = "u256"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=dev-20260724-atomic-interop#358eff280d40051fc2934180c2367882ab703cb0"
+source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.0#20fdb610f8a29655dff3b87fc5eeb16340cd8a7b"
 dependencies = [
  "delegated_u256",
  "ruint",
@@ -6382,7 +6373,7 @@ dependencies = [
 [[package]]
 name = "zk_ee"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=dev-20260724-atomic-interop#358eff280d40051fc2934180c2367882ab703cb0"
+source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.0#20fdb610f8a29655dff3b87fc5eeb16340cd8a7b"
 dependencies = [
  "airbender-crypto",
  "arrayvec",
@@ -6415,7 +6406,7 @@ dependencies = [
 [[package]]
 name = "zksync_os_api"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-os?tag=dev-20260724-atomic-interop#358eff280d40051fc2934180c2367882ab703cb0"
+source = "git+https://github.com/matter-labs/zksync-os?tag=v0.5.0#20fdb610f8a29655dff3b87fc5eeb16340cd8a7b"
 dependencies = [
  "airbender-crypto",
  "alloy",
