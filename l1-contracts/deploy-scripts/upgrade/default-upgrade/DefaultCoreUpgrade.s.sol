@@ -41,7 +41,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     struct AdditionalConfigParams {
         uint256 newProtocolVersion;
-        bool isZKsyncOS;
         bool hasPreV32IntrospectionOverride;
         bool usePreV32IntrospectionOverride;
     }
@@ -51,7 +50,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     function initializeWithArgs(
         address bridgehubProxyAddress,
-        bool isZKsyncOS,
         bytes32 create2FactorySalt,
         string memory upgradeInputPath,
         string memory _outputPath
@@ -59,7 +57,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         string memory root = vm.projectRoot();
         upgradeInputPath = string.concat(root, upgradeInputPath);
 
-        initializeConfigWithArgs(bridgehubProxyAddress, isZKsyncOS, create2FactorySalt, upgradeInputPath);
+        initializeConfigWithArgs(bridgehubProxyAddress, create2FactorySalt, upgradeInputPath);
 
         upgradeConfig.outputPath = string.concat(root, _outputPath);
         upgradeConfig.initialized = true;
@@ -109,7 +107,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     function initializeConfigWithArgs(
         address bridgehubProxyAddress,
-        bool isZKsyncOS,
         bytes32 create2FactorySalt,
         string memory upgradeInputPath
     ) public virtual {
@@ -122,8 +119,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         }
 
         // Only ZKsync OS ecosystems can be upgraded onto this release.
-        require(isZKsyncOS, "Upgrading EraVM ecosystems onto this release is not supported");
-        additionalConfig.isZKsyncOS = isZKsyncOS;
 
         // Optional override for pre-v32 introspection selection. Autodetection reads the protocol version of
         // a registered chain, which lags the L1 contracts: an ecosystem whose core contracts are already v32

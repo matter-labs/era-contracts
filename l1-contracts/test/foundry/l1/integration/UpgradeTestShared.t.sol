@@ -72,7 +72,6 @@ contract UpgradeIntegrationTestBase is Test {
         console.log("setupUpgrade: Initializing core upgrade");
         coreUpgrade.initializeWithArgs(
             params.bridgehubProxyAddress,
-            params.isZKsyncOS,
             params.create2FactorySalt,
             params.upgradeInputPath,
             CORE_OUTPUT
@@ -81,7 +80,6 @@ contract UpgradeIntegrationTestBase is Test {
         ctmUpgrade.initializeWithArgs(
             params.ctmProxy,
             params.bytecodesSupplier,
-            params.isZKsyncOS,
             params.rollupDAManager,
             params.create2FactorySalt,
             params.upgradeInputPath,
@@ -354,9 +352,6 @@ contract UpgradeIntegrationTestBase is Test {
                 ctmProxy: ctmProxy,
                 bytecodesSupplier: bytecodesSupplier,
                 rollupDAManager: rollupDAManager,
-                // Only ZKsync OS ecosystems are upgradable onto this release; the upgrade script
-                // `require`s it.
-                isZKsyncOS: true,
                 create2FactorySalt: bytes32(0),
                 upgradeInputPath: ECOSYSTEM_UPGRADE_INPUT,
                 ecosystemOutputPath: ECOSYSTEM_OUTPUT,

@@ -565,11 +565,6 @@
         "internalType": "address"
       },
       {
-        "name": "isZKsyncOS",
-        "type": "bool",
-        "internalType": "bool"
-      },
-      {
         "name": "create2FactorySalt",
         "type": "bytes32",
         "internalType": "bytes32"
@@ -591,11 +586,6 @@
         "name": "bridgehubProxyAddress",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "isZKsyncOS",
-        "type": "bool",
-        "internalType": "bool"
       },
       {
         "name": "create2FactorySalt",
@@ -629,11 +619,6 @@
             "name": "bridgehubProxyAddress",
             "type": "address",
             "internalType": "address"
-          },
-          {
-            "name": "isZKsyncOS",
-            "type": "bool",
-            "internalType": "bool"
           },
           {
             "name": "create2FactorySalt",

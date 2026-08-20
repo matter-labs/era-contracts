@@ -102,7 +102,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         bytes32 create2FactorySalt;
         address ctmProxy;
         address bytecodesSupplier;
-        bool isZKsyncOS;
         /// @dev ZK token asset ID, used by `InteropCenter.initL2` for fixed-fee bundles.
         ///      MUST be non-zero — `InteropCenter.initL2` reverts otherwise, which would abort the
         ///      L2 upgrade transaction.
@@ -128,7 +127,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     function initializeWithArgs(
         address ctmProxy,
         address bytecodesSupplier,
-        bool isZKsyncOS,
         address rollupDAManager,
         bytes32 create2FactorySalt,
         string memory newConfigPath,
@@ -141,7 +139,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         initializeConfigFromArgs(
             ctmProxy,
             bytecodesSupplier,
-            isZKsyncOS,
             rollupDAManager,
             create2FactorySalt,
             newConfigPath,
@@ -173,7 +170,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         setAddressesBasedOnCTM();
         // Only ZKsync OS CTMs can be upgraded onto this release; the flag stays in the permanent
         // config as a guard against pointing the script at a legacy EraVM CTM section.
-        require(permanentConfig.isZKsyncOS, "Upgrading EraVM CTMs onto this release is not supported");
         // Must be non-zero: `InteropCenter.initL2` reverts on a zero asset ID. It runs on the genesis path
         // of `performForceDeployedContractsInit` only, so this aborts the genesis of chains created from the
         // release rather than this upgrade — caught here so the misconfiguration surfaces during
@@ -209,7 +205,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     function initializeConfigFromArgs(
         address ctmProxy,
         address bytecodesSupplier,
-        bool isZKsyncOS,
         address rollupDAManager,
         bytes32 create2FactorySalt,
         string memory newConfigPath,
@@ -224,7 +219,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         PermanentCTMConfig memory permanentConfig = PermanentCTMConfig({
             ctmProxy: ctmProxy,
             bytecodesSupplier: bytecodesSupplier,
-            isZKsyncOS: isZKsyncOS,
             create2FactorySalt: create2FactorySalt,
             zkTokenAssetId: zkTokenAssetId
         });

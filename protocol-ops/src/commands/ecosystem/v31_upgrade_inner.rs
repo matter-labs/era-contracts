@@ -65,11 +65,6 @@ pub struct V31PrepareInputs {
     pub core_script_path: String,
     /// `CTMUpgrade_v31` script path (relative to `l1-contracts/`).
     pub ctm_script_path: String,
-    /// Override for `isZKsyncOS` used by the CORE prepare (separate from
-    /// per-CTM overrides because Core itself is CTM-agnostic but the script
-    /// signature still needs the flag). When `None`, auto-resolved from any
-    /// registered CTM via `ctm.isZKsyncOS()` (v31+ getter).
-    pub core_is_zk_sync_os_override: Option<bool>,
     /// ZK token asset ID used by CTM prepare. For named envs this comes from
     /// `upgrade-envs/permanent-values/<env>.toml`; otherwise it is explicitly
     /// supplied or falls back only for networks with a canonical value.
@@ -196,33 +191,6 @@ impl<'a> V31UpgradeInner<'a> {
     ) -> anyhow::Result<PathBuf> {
         ensure_script_exists(self.contracts_path, &inputs.core_script_path)?;
 
-        // CTM is needed only to resolve `isZKsyncOS` — Core itself is
-        // CTM-agnostic. Pick the first registered CTM as a witness, or skip
-        // entirely if the caller supplied an explicit override (required on
-        // pre-v31 ecosystems where the `ctm.isZKsyncOS()` getter does not exist).
-        let is_zk_sync_os = match inputs.core_is_zk_sync_os_override {
-            Some(v) => {
-                logger::info(format!("ZKsync OS (override): {v}"));
-                v
-            }
-            None => {
-                let any_ctm = crate::common::l1_contracts::discover_ctm_proxy(
-                    &runner.rpc_url,
-                    self.bridgehub,
-                )
-                .await
-                .context("Failed to discover any CTM on bridgehub")?;
-                let resolved =
-                    crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, any_ctm)
-                        .await
-                        .context("Failed to resolve isZKsyncOS from CTM")?;
-                logger::info(format!(
-                    "ZKsync OS (auto-resolved via CTM {any_ctm:#x}): {resolved}"
-                ));
-                resolved
-            }
-        };
-
         let upgrade_input = self
             .contracts_path
             .join(inputs.upgrade_input_path.trim_start_matches('/'));
@@ -248,7 +216,6 @@ impl<'a> V31UpgradeInner<'a> {
                 ICoreUpgradeV31Abi::noGovernancePrepareCall {
                     _params: ICoreUpgradeV31Abi::CoreUpgradeParams {
                         bridgehubProxyAddress: self.bridgehub,
-                        isZKsyncOS: is_zk_sync_os,
                         create2FactorySalt: create2_salt,
                         upgradeInputPath: inputs.upgrade_input_path.clone(),
                         outputPath: inputs.core_output_path.clone(),
@@ -423,7 +390,6 @@ impl<'a> V31UpgradeInner<'a> {
                     _params: ICTMUpgradeV31Abi::CTMUpgradeParams {
                         ctmProxy: ctm_proxy,
                         bytecodesSupplier: bytecodes_supplier,
-                        isZKsyncOS: is_zk_sync_os,
                         rollupDAManager: rollup_da_manager,
                         create2FactorySalt: create2_salt,
                         upgradeInputPath: inputs.upgrade_input_path.clone(),

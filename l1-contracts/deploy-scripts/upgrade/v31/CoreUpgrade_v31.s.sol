@@ -60,7 +60,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     function noGovernancePrepare(CoreUpgradeParams memory _params) public {
         initializeWithArgs(
             _params.bridgehubProxyAddress,
-            _params.isZKsyncOS,
             _params.create2FactorySalt,
             _params.upgradeInputPath,
             _params.outputPath
@@ -74,13 +73,12 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     ///         can re-read the optional `[legacy_gateway]` section.
     function initializeWithArgs(
         address bridgehubProxyAddress,
-        bool isZKsyncOS,
         bytes32 create2FactorySalt,
         string memory upgradeInputPath,
         string memory _outputPath
     ) public virtual override {
         v31UpgradeInputRelPath = upgradeInputPath;
-        super.initializeWithArgs(bridgehubProxyAddress, isZKsyncOS, create2FactorySalt, upgradeInputPath, _outputPath);
+        super.initializeWithArgs(bridgehubProxyAddress, create2FactorySalt, upgradeInputPath, _outputPath);
     }
 
     function deployNewEcosystemContractsL1() public virtual override {

@@ -414,12 +414,6 @@ pub struct UpgradePrepareAllArgs {
 struct CtmConfigFile {
     #[serde(rename = "ctm", default)]
     ctms: Vec<CtmConfigEntry>,
-    /// Override `isZKsyncOS` for the core prepare. The Core script is
-    /// CTM-agnostic but its signature still takes the flag, so we need a
-    /// value. Defaults to the value of the first CTM entry's `is_zk_sync_os`
-    /// field if absent (and required if no per-CTM value is set either).
-    #[serde(default)]
-    core_is_zk_sync_os: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -613,7 +607,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     })?;
 
     // ── CTM list resolution ─────────────────────────────────────────
-    let (ctms, core_is_zk_sync_os_override) = if let Some(cfg_path) = &args.ctm_config {
+    let ctms = if let Some(cfg_path) = &args.ctm_config {
         load_ctm_config(cfg_path)?
     } else if !args.ctm_proxies.is_empty() {
         // Legacy single-CTM mode: the global `--is-zk-sync-os` /
@@ -629,7 +623,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 rollup_da_manager: args.rollup_da_manager_address,
             })
             .collect::<Vec<_>>();
-        (ctms, args.is_zk_sync_os)
+        ctms
     } else if let Some(ref cfg) = env_cfg {
         let entries = cfg.ctms();
         if entries.is_empty() {
@@ -658,7 +652,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 rollup_da_manager: e.rollup_da_manager,
             })
             .collect::<Vec<_>>();
-        (ctms, infer_core_is_zk_sync_os(entries))
+        ctms
     } else {
         anyhow::bail!(
             "either --ctm-config, --ctm-proxy, or --env <name> (with [[ctm_contracts.ctms]] in permanent-values) must be provided"
@@ -707,7 +701,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         core_output_path: args.core_output_path.clone(),
         core_script_path: args.core_script_path.clone(),
         ctm_script_path: args.ctm_script_path.clone(),
-        core_is_zk_sync_os_override,
         zk_token_asset_id,
     };
     let proxies: Vec<crate::common::env_config::OwnableProxyEntry> = env_cfg
@@ -870,14 +863,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 
     logger::success("upgrade-prepare-all completed");
     Ok(())
-}
-
-/// Pick the `is_zk_sync_os` flavor the Core script will deploy under. This
-/// release only upgrades ZKsyncOS CTMs (Era CTMs are skipped during prepare),
-/// so we take the first entry's hint; when unset, auto-resolution from L1 fills
-/// it in later.
-fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> Option<bool> {
-    entries.first().and_then(|e| e.is_zk_sync_os)
 }
 
 /// Read each per-script governance TOML and write a single merged TOML
@@ -1184,9 +1169,7 @@ pub(super) fn read_pre_governance_accept_ownership_calls(
 /// `core_is_zk_sync_os` value to pass to the Core script. If the TOML doesn't
 /// set `core_is_zk_sync_os`, derive it from the CTM entries. This release only
 /// upgrades ZKsyncOS CTMs (Era CTMs are skipped during prepare), so any pinned
-/// flavor is `true`; when no entry pins one, auto-resolution from L1 fills it
-/// in later.
-fn load_ctm_config(path: &Path) -> anyhow::Result<(Vec<CtmInputs>, Option<bool>)> {
+fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("Failed to read CTM config TOML: {}", path.display()))?;
     let parsed: CtmConfigFile = toml::from_str(&content)
@@ -1199,10 +1182,6 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<(Vec<CtmInputs>, Option<bool>)
         );
     }
 
-    let core_is_zk_sync_os = parsed
-        .core_is_zk_sync_os
-        .or_else(|| parsed.ctms.iter().find_map(|c| c.is_zk_sync_os));
-
     let ctms: Vec<CtmInputs> = parsed
         .ctms
         .into_iter()
@@ -1214,5 +1193,5 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<(Vec<CtmInputs>, Option<bool>)
         })
         .collect();
 
-    Ok((ctms, core_is_zk_sync_os))
+    Ok(ctms)
 }

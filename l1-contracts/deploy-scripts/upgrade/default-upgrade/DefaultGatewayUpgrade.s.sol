@@ -115,7 +115,6 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     uint256 internal representativeChainId;
 
     function initializeWithArgs(
-        bool _isZKsyncOS,
         bytes32 _create2FactorySalt,
         uint256 _representativeChainId,
         uint256 _priorityTxsL2GasLimit,
@@ -130,7 +129,6 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
 
         initializeConfig(
             _create2FactorySalt,
-            _isZKsyncOS,
             getChainCreationParamsConfig(Utils.genesisConfigPath()),
             _representativeChainId,
             _priorityTxsL2GasLimit,
@@ -146,7 +144,6 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
 
     function initializeConfig(
         bytes32 _create2FactorySalt,
-        bool _isZKsyncOS,
         ChainCreationParamsConfig memory _chainCreationParams,
         uint256 _representativeChainId,
         uint256 _priorityTxsL2GasLimit,
@@ -162,7 +159,6 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         representativeChainId = _representativeChainId;
         setAddressesBasedOnBridgehub();
         // Only ZKsync-OS-based Gateways are supported on this release.
-        require(_isZKsyncOS, "EraVM Gateway upgrades are not supported");
         config.contracts.chainCreationParams = _chainCreationParams;
         if (_governance != address(0)) {
             config.ownerAddress = _governance;

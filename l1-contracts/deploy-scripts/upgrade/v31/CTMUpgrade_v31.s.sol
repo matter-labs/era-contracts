@@ -32,7 +32,6 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         initializeWithArgs(
             _params.ctmProxy,
             _params.bytecodesSupplier,
-            _params.isZKsyncOS,
             _params.rollupDAManager,
             _params.create2FactorySalt,
             _params.upgradeInputPath,
