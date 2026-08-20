@@ -941,6 +941,17 @@
   },
   {
     "type": "error",
+    "name": "IndirectCallOnlyToAssetRouter",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "IndirectCallValueMismatch",
     "inputs": [
       {
