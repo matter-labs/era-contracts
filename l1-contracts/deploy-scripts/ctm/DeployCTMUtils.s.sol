@@ -257,10 +257,6 @@ abstract contract DeployCTMUtils is DeployUtils {
 
     ////////////////////////////// Contract deployment modes /////////////////////////////////
 
-    function getCreationCode(string memory contractName) internal view virtual override returns (bytes memory) {
-        return ContractsBytecodesLib.getCreationCodeEVM(contractName);
-    }
-
     function getRollupL2DACommitmentScheme() internal returns (L2DACommitmentScheme) {
         return ROLLUP_L2_DA_COMMITMENT_SCHEME;
     }

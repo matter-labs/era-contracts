@@ -20,10 +20,6 @@ library ContractsBytecodesLib {
     /// @return The bytecode of the contract.
     /// @dev Reverts if the contractIdentifier is unknown or unsupported.
 
-    function getCreationCode(string memory contractIdentifier) internal view returns (bytes memory) {
-        return getCreationCodeEVM(contractIdentifier);
-    }
-
     /// @notice Reads L2 bytecode from `out/`.
     function getL2Bytecode(string memory contractIdentifier) internal view returns (bytes memory) {
         return getCreationCodeEVM(contractIdentifier);

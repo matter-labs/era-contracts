@@ -347,7 +347,7 @@ contract GatewayPreparation is Script {
         // `ChainAdmin` is CREATE2-deployed like any ordinary contract, so its constructor runs
         // normally — unlike the predeployed L2 built-ins, which are initialized via `initL2`.
         bytes memory initCode = abi.encodePacked(
-            ContractsBytecodesLib.getCreationCode("ChainAdmin"),
+            ContractsBytecodesLib.getCreationCodeEVM("ChainAdmin"),
             abi.encode(new address[](0))
         );
 

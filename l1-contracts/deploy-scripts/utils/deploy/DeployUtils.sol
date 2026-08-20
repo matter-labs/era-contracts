@@ -2,6 +2,7 @@
 pragma solidity ^0.8.10;
 
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
+import {ContractsBytecodesLib} from "../bytecode/ContractsBytecodesLib.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 abstract contract DeployUtils is Create2FactoryUtils {
@@ -29,7 +30,11 @@ abstract contract DeployUtils is Create2FactoryUtils {
         return (implementation, proxy);
     }
 
-    function getCreationCode(string memory contractName) internal view virtual returns (bytes memory);
+    /// @notice Creation code for `contractName`, read from `l1-contracts/out/`. Deployers that
+    /// read from elsewhere (e.g. the Gateway upgrade, which resolves GW artifacts) override this.
+    function getCreationCode(string memory contractName) internal view virtual returns (bytes memory) {
+        return ContractsBytecodesLib.getCreationCodeEVM(contractName);
+    }
 
     function getCreationCalldata(string memory contractName) internal view virtual returns (bytes memory);
 

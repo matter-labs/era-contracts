@@ -174,10 +174,6 @@ contract DeployL1CoreUtils is DeployUtils {
         return coreAddresses.shared.transparentProxyAdmin;
     }
 
-    function getCreationCode(string memory contractName) internal view virtual override returns (bytes memory) {
-        return ContractsBytecodesLib.getCreationCodeEVM(contractName);
-    }
-
     function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
         if (compareStrings(contractName, "L1Bridgehub")) {
             return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
