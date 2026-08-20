@@ -118,9 +118,7 @@ contract ZKsyncOSVerifier is IVerifier, IZKsyncOSVerifier {
         if (_initialHash != 0) {
             revert NonZeroCarriedHash();
         }
-        result = _publicInputs.length == 1
-            ? _publicInputs[0]
-            : uint256(keccak256(abi.encodePacked(_publicInputs)));
+        result = _publicInputs.length == 1 ? _publicInputs[0] : uint256(keccak256(abi.encodePacked(_publicInputs)));
         result = result >> PUBLIC_INPUT_SHIFT;
     }
 }

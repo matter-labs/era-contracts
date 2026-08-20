@@ -294,10 +294,7 @@ contract ZKsyncOSVerifierTest is Test {
 
     // ============ Fuzz Tests ============
 
-    function testFuzz_computeZKsyncOSHash_deterministicResults(
-        uint256 _input1,
-        uint256 _input2
-    ) public view {
+    function testFuzz_computeZKsyncOSHash_deterministicResults(uint256 _input1, uint256 _input2) public view {
         uint256[] memory publicInputs = new uint256[](2);
         publicInputs[0] = _input1;
         publicInputs[1] = _input2;
