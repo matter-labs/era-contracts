@@ -3,6 +3,8 @@
 pragma solidity 0.8.28;
 
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
+import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
+import {IZKsyncOSDualVerifier} from "../chain-interfaces/IZKsyncOSDualVerifier.sol";
 
 /// @title Generic Testnet Verifier (multi-proof lane)
 /// @author Matter Labs
@@ -13,7 +15,7 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 ///         - All other proofs: delegated to the inner verifier.
 /// @dev Can wrap DualVerifier, MultiProofVerifier, or any other IVerifier implementation.
 ///      Named distinctly from the DualVerifier-based `TestnetVerifier` upstream ships.
-contract MultiProofTestnetVerifier is IVerifier {
+contract MultiProofTestnetVerifier is IVerifier, IZKsyncOSDualVerifier {
     uint256 internal constant MOCK_PROOF_TYPE = 3;
 
     IVerifier public immutable innerVerifier;
@@ -47,6 +49,20 @@ contract MultiProofTestnetVerifier is IVerifier {
     /// @inheritdoc IVerifier
     function verificationKeyHash() external view override returns (bytes32) {
         return innerVerifier.verificationKeyHash();
+    }
+
+    /// @notice The FFLONK sub-verifier registered for `_version`.
+    /// @dev The chain's verifier is this wrapper, and deployment and upgrade
+    ///      tooling introspects the sub-verifier registry through it. The
+    ///      registry itself stays in the one dual verifier at the end of the
+    ///      wrapping chain.
+    function fflonkVerifiers(uint32 _version) external view returns (IVerifierV2) {
+        return IZKsyncOSDualVerifier(address(innerVerifier)).fflonkVerifiers(_version);
+    }
+
+    /// @notice The PLONK sub-verifier registered for `_version`.
+    function plonkVerifiers(uint32 _version) external view returns (IVerifier) {
+        return IZKsyncOSDualVerifier(address(innerVerifier)).plonkVerifiers(_version);
     }
 
     /// @dev Mock verification: proof = [type=3, prevHash, magic(13), publicInput].

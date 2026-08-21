@@ -250,8 +250,13 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     /// @notice Deploy the multi-proof verifier lane, which requires BOTH an
     ///         Airbender proof and a ZiSK proof for each state transition.
-    ///         The Airbender side reuses the PLONK verifier deployed above.
+    ///         The Airbender side is the ZKsync OS dual verifier, which holds
+    ///         the versioned FFLONK and PLONK sub-verifier registry that the
+    ///         deployment and upgrade tooling introspects.
     function deployMultiProofVerifiers() internal {
+        // The Airbender proof is a ZKsync OS proof, so the lane needs the
+        // ZKsync OS verifiers.
+        require(config.isZKsyncOS, "multi_proof_verifier requires is_zk_sync_os");
         // ZiskVerifier wraps a pre-deployed standalone snarkJS Plonk verifier
         // (see verifiers/README.md for its generation and deployment) passed
         // in by address.
@@ -259,11 +264,21 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             config.ziskPlonkVerifierAddr != address(0),
             "set zisk_plonk_verifier_addr to the deployed snarkJS Plonk verifier"
         );
+        (, string memory dualVerifierName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.DualVerifier);
+        multiProofAddresses.airbenderVerifier = deploySimpleContract(dualVerifierName, false);
         multiProofAddresses.ziskVerifier = deploySimpleContract("ZiskVerifier", false);
         multiProofAddresses.multiProofVerifier = deploySimpleContract("MultiProofVerifier", false);
 
         // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
         vm.startBroadcast(getDeployerAddress());
+        // Called as library (not through vms) to preserve msg.sender
+        DeployCTML1OrGateway.initializeVerifier(
+            multiProofAddresses.airbenderVerifier,
+            ctmAddresses.stateTransition.verifiers.verifierFflonk,
+            ctmAddresses.stateTransition.verifiers.verifierPlonk,
+            config.ownerAddress,
+            config.isZKsyncOS
+        );
         // Single-VK lane: every proof, single batch or many, verifies through
         // the range verifier, which reconstructs the ZiSK public values from
         // its own pinned VKs. Default it to the ZiskVerifier just deployed; an
@@ -366,9 +381,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         IOwnable(ctmAddresses.stateTransition.proxies.serverNotifier).transferOwnership(ctmAddresses.chainAdmin);
         IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
 
-        // The multi-proof lane owns its verifier handover: it transfers
-        // MultiProofVerifier to config.ownerAddress at deploy time, and the
-        // testnet wrapper it may sit behind holds no owner at all.
+        // The multi-proof lane owns its verifier handover: the deploy transfers
+        // both the dual verifier and MultiProofVerifier to config.ownerAddress,
+        // and the testnet wrapper they sit behind holds no owner at all.
         if (!config.multiProofVerifier) {
             // Called as library (not through vms) to preserve msg.sender
             DeployCTML1OrGateway.transferVerifierOwnership(

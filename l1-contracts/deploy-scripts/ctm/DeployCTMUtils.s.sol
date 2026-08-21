@@ -87,6 +87,7 @@ struct Config {
 ///         them: the Gateway CTM deployer has no ZiSK lane.
 // solhint-disable-next-line gas-struct-packing
 struct MultiProofAddresses {
+    address airbenderVerifier;
     address ziskVerifier;
     address multiProofVerifier;
 }
@@ -354,7 +355,9 @@ abstract contract DeployCTMUtils is DeployUtils {
             // beforehand (see verifiers/README.md) and passed by address.
             return abi.encode(config.ziskPlonkVerifierAddr);
         } else if (compareStrings(contractName, "MultiProofVerifier")) {
-            return abi.encode(ctmAddresses.stateTransition.verifiers.verifierPlonk, getBroadcasterAddress());
+            // The Airbender side is the ZKsync OS dual verifier, so the
+            // sub-verifier registry has one home.
+            return abi.encode(multiProofAddresses.airbenderVerifier, getBroadcasterAddress());
         } else if (compareStrings(contractName, "MultiProofTestnetVerifier")) {
             return abi.encode(multiProofAddresses.multiProofVerifier);
         } else if (compareStrings(contractName, "DefaultUpgrade")) {

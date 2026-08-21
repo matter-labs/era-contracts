@@ -3,8 +3,11 @@ pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol";
+import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
+import {DeployCTML1OrGateway} from "deploy-scripts/ctm/DeployCTML1OrGateway.sol";
 
 /// @dev Mock verifier that always returns true.
 contract MockPassVerifier is IVerifier {
@@ -237,6 +240,44 @@ contract MultiProofVerifierTest is Test {
         // A nonzero previous_hash must NOT reach the ZiSK side: it gets the raw
         // batch inputs, unchanged by the Airbender continuation.
         assertTrue(verifier.verify(pis, _type5Proof(uint256(keccak256("prev")) >> 32, 2)));
+    }
+
+    // --- Sub-verifier registry seen by the deployment tooling ---
+
+    /// @dev The chain's verifier is a multi-proof wrapper, and the deployment
+    ///      and upgrade tooling reads the versioned sub-verifier registry off
+    ///      it. Both wrappers must answer with the registry of the one dual
+    ///      verifier at the end of the wrapping chain, so this drives the real
+    ///      tooling helper rather than the getters directly.
+    function test_deployTooling_readsSubVerifiersThroughWrappers() public {
+        address fflonk = address(new MockPassVerifier());
+        address plonk = address(new MockPassVerifier());
+        ZKsyncOSDualVerifier dualVerifier = new ZKsyncOSDualVerifier(
+            IVerifierV2(fflonk),
+            IVerifier(plonk),
+            address(this)
+        );
+        MultiProofVerifier multiProof = new MultiProofVerifier(IVerifier(address(dualVerifier)), address(this));
+        MultiProofTestnetVerifier testnetWrapper = new MultiProofTestnetVerifier(IVerifier(address(multiProof)));
+
+        (address readFflonk, address readPlonk) = DeployCTML1OrGateway.getSubVerifiers(address(multiProof), true);
+        assertEq(readFflonk, fflonk, "fflonk through MultiProofVerifier");
+        assertEq(readPlonk, plonk, "plonk through MultiProofVerifier");
+
+        (readFflonk, readPlonk) = DeployCTML1OrGateway.getSubVerifiers(address(testnetWrapper), true);
+        assertEq(readFflonk, fflonk, "fflonk through MultiProofTestnetVerifier");
+        assertEq(readPlonk, plonk, "plonk through MultiProofTestnetVerifier");
+    }
+
+    /// @dev An Airbender inner verifier that holds no registry has no answer to
+    ///      give, so the read reverts rather than reporting a zero address the
+    ///      tooling would treat as an unregistered sub-verifier.
+    function test_subVerifierRead_revertsWithoutRegistry() public {
+        vm.expectRevert();
+        verifier.fflonkVerifiers(0);
+
+        vm.expectRevert();
+        verifier.plonkVerifiers(0);
     }
 
     // --- MultiProofTestnetVerifier(MultiProofVerifier) composition ---

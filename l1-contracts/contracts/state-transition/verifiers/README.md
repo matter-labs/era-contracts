@@ -89,6 +89,23 @@ To rotate the Plonk verifier after a circuit regeneration, repeat both
 steps and redeploy `ZiskVerifier` with the new address (its own pins are
 constants baked at generation time by the `tools/verifier-gen/` flow).
 
+## The Airbender side
+
+The same `multi_proof_verifier = true` deploy also deploys the ZKsync OS dual
+verifier and wires it as the Airbender inner verifier of
+`MultiProofVerifier`. The lane therefore needs `is_zk_sync_os = true`. That
+dual verifier holds the versioned FFLONK and PLONK sub-verifier registry, and
+both multi-proof wrappers expose the registry getters through it, so the
+deployment and upgrade tooling reads a single registry.
+
+The dual verifier parses its own header, so the Airbender sub-proof at
+`proof[3 .. 3+N]` is the envelope that verifier expects: `proof[3]` is
+`2 | (verifier_version << 8)` for a version the dual verifier holds a
+sub-verifier for, `proof[4]` is zero, and `proof[5 .. 3+N]` are the Airbender
+Plonk proof words. `proof[4]` seeds a chain over the single already-chained
+value `MultiProofVerifier` hands over, so only zero keeps that chaining the
+identity.
+
 ## Tests
 
 `ZiskVerifierRealProofTest` drives a real aggregated cargo-zisk proof through

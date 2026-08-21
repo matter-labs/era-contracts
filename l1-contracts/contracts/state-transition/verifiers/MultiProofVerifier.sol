@@ -3,6 +3,8 @@
 pragma solidity 0.8.28;
 
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
+import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
+import {IZKsyncOSDualVerifier} from "../chain-interfaces/IZKsyncOSDualVerifier.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 /// @title Multi-Proof Verifier
@@ -18,7 +20,18 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 ///
 ///      For type 5 (MULTI_PROOF):
 ///      proof[2]              = N  (number of Airbender proof elements)
-///      proof[3 .. 3+N]       = Airbender SNARK proof elements
+///      proof[3 .. 3+N]       = Airbender sub-proof, in the envelope that
+///                              `airbenderVerifier` parses:
+///                                [3]        = 2 | (verifier_version << 8),
+///                                             the ZKsync OS PLONK type and a
+///                                             version the dual verifier holds
+///                                             a sub-verifier for
+///                                [4]        = 0. The dual verifier chains the
+///                                             single already-chained value it
+///                                             receives, seeded from this word,
+///                                             so only zero keeps that chaining
+///                                             the identity.
+///                                [5 .. 3+N] = Airbender PLONK proof words
 ///      proof[3+N .. 3+N+24]  = ZiSK SNARK proof (24 uint256 = 768 bytes)
 ///
 ///      The ZiSK public values are NOT carried in the proof. Every range,
@@ -30,10 +43,12 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 ///      attested to a different state transition would reconstruct a different
 ///      SNARK signal and fail — there is no separately submitted commitment
 ///      left to forget to check.
-contract MultiProofVerifier is Ownable2Step, IVerifier {
+contract MultiProofVerifier is Ownable2Step, IVerifier, IZKsyncOSDualVerifier {
     uint256 internal constant MULTI_PROOF_TYPE = 5;
 
-    /// @notice Inner verifier for Airbender proofs (implements IVerifier).
+    /// @notice Inner verifier for Airbender proofs. It is the ZKsync OS dual
+    ///         verifier, which owns the versioned FFLONK and PLONK sub-verifier
+    ///         registry that this contract exposes.
     IVerifier public airbenderVerifier;
     /// @notice Verifier for the aggregated ZiSK proof. It reconstructs the
     ///         ZiSK public values from its own pinned VKs and checks the SNARK
@@ -82,6 +97,18 @@ contract MultiProofVerifier is Ownable2Step, IVerifier {
     /// @inheritdoc IVerifier
     function verificationKeyHash() external view override returns (bytes32) {
         return airbenderVerifier.verificationKeyHash();
+    }
+
+    /// @notice The FFLONK sub-verifier registered for `_version`.
+    /// @dev The registry lives in the wrapped dual verifier, so deployment and
+    ///      upgrade tooling that introspects this contract reads that one copy.
+    function fflonkVerifiers(uint32 _version) external view returns (IVerifierV2) {
+        return IZKsyncOSDualVerifier(address(airbenderVerifier)).fflonkVerifiers(_version);
+    }
+
+    /// @notice The PLONK sub-verifier registered for `_version`.
+    function plonkVerifiers(uint32 _version) external view returns (IVerifier) {
+        return IZKsyncOSDualVerifier(address(airbenderVerifier)).plonkVerifiers(_version);
     }
 
     /// @dev Verify a multi-proof containing both Airbender and ZiSK sub-proofs.
