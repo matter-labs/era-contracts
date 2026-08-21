@@ -56,7 +56,7 @@ contract ExpectSignalPlonkVerifier is ISnarkPlonkVerifier {
 contract MultiProofRangeVectorTest is Test {
     /// @dev Inner state-transition guest programVK: the first field of the
     ///      binding digest. It is NOT the aggregated proof's wire [0..32].
-    bytes32 internal constant INNER_PROGRAM_VK = 0x1d16f620e2bc7e58044df7ee8d4284422a0dd37cf151cf79ecf324c131e50468;
+    bytes32 internal constant INNER_PROGRAM_VK = 0x44e3d132399c8f3a03ce9672ba0ca00c6503db918731c7ab46d6faea445236ec;
     /// @dev Aggregator guest programVK: the aggregated proof's wire
     ///      public-values bytes [0..32].
     bytes32 internal constant AGGREGATOR_PROGRAM_VK =
@@ -67,16 +67,16 @@ contract MultiProofRangeVectorTest is Test {
 
     /// @dev The four per-batch commitments (wire bytes [32..64] of each
     ///      per-batch ZiSK proof), in batch order.
-    bytes32 internal constant COMMITMENT_1 = 0x6c41981c6fd0bd9a9262fe3dcc9fe4f0d8e142651f80316a8846d6922b5214ea;
-    bytes32 internal constant COMMITMENT_2 = 0x1f56fcbd24636dc0a635bc51808d7db9eabf3914f66611c93cf37ea440a5fe27;
-    bytes32 internal constant COMMITMENT_3 = 0x9d909d7416f29633c361bfc00073a9004423f0e1cc46105cdd24550543c0e41c;
-    bytes32 internal constant COMMITMENT_4 = 0x6ca5ada4916397cfb1b07a2f115f21fedf7e4a14a827995b3c5b392966532ad6;
+    bytes32 internal constant COMMITMENT_1 = 0x5aa9a30847d37bb20955cfe6a65c916d4d0c504c8e5bb0965db8a90aba1e9938;
+    bytes32 internal constant COMMITMENT_2 = 0x167bf6f9edbe48835b6b60e98af53552b0126765a804b86a3d7749daf05a5f4e;
+    bytes32 internal constant COMMITMENT_3 = 0x8f03a8b3b8b78ef7ab5004817c9ebf211b09533b9a0ad86440396f4605ab794b;
+    bytes32 internal constant COMMITMENT_4 = 0x3db0606d441cb57e9c621be9052e759db43e7c5c608c6e810ce673d9a4503c45;
 
     /// @dev `_computeZKsyncOSHash(0, PIs)` over the four public inputs.
-    bytes32 internal constant CHAINED_PI = 0x00000000aef7dc22681088617d4cefece2e7afcc23e776dd7694c967ad5e5603;
+    bytes32 internal constant CHAINED_PI = 0x0000000076b405f665d8b8b9c069b298656c9ef179632673523db317aeaa88b6;
     /// @dev keccak256(INNER_PROGRAM_VK || ROOT_C_VADCOP_FINAL || CHAINED_PI):
     ///      the aggregated proof's public-values bytes [32..64].
-    bytes32 internal constant DIGEST = 0x7eabba6c7a68150706e10101195be54eaf3b39f699bc8da5f34c8033eedec13e;
+    bytes32 internal constant DIGEST = 0x8d3dc379548b65d0ed7df762dc646bf46fdbdf628cfe483479392ea8159e405b;
 
     /// @dev BN254 scalar field modulus (must equal ZiskVerifier._RFIELD).
     uint256 internal constant RFIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
