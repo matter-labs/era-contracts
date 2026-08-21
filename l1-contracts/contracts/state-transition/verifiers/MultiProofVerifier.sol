@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IZKsyncOSDualVerifier} from "../chain-interfaces/IZKsyncOSDualVerifier.sol";
+import {InvalidProofFormat} from "../../common/L1ContractErrors.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 /// @title Multi-Proof Verifier
@@ -15,7 +16,8 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 ///         Single-system proofs (type 2) and mock proofs (type 3) are rejected.
 ///
 /// @dev Proof encoding received from the Executor:
-///      proof[0] = proof_type | (verifier_version << 8)
+///      proof[0] = proof_type. This format holds no verifier version, so bits
+///                 8-255 are reserved and must be zero.
 ///      proof[1] = previous_hash (used by computeZKsyncOSHash)
 ///
 ///      For type 5 (MULTI_PROOF):
@@ -85,6 +87,11 @@ contract MultiProofVerifier is Ownable2Step, IVerifier, IZKsyncOSDualVerifier {
     ) public view virtual override returns (bool) {
         if (_proof.length == 0) revert EmptyProof();
 
+        // The header word carries the proof type and nothing else. Bits 8-255
+        // are reserved, so a payload that sets any of them is rejected rather
+        // than read as a bare type.
+        if (_proof[0] >> 8 != 0) revert InvalidProofFormat();
+
         uint256 proofType = _proof[0] & 255;
 
         if (proofType == MULTI_PROOF_TYPE) {
@@ -116,7 +123,7 @@ contract MultiProofVerifier is Ownable2Step, IVerifier, IZKsyncOSDualVerifier {
         uint256[] calldata _publicInputs,
         uint256[] calldata _proof
     ) internal view returns (bool) {
-        // proof[0] = type | version, proof[1] = previous_hash, proof[2] = N
+        // proof[0] = type, proof[1] = previous_hash, proof[2] = N
         if (_proof.length < 3) revert ProofTooShort();
 
         uint256 airbenderLen = _proof[2];

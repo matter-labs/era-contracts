@@ -7,6 +7,7 @@ import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifier
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol";
 import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
+import {InvalidProofFormat} from "contracts/common/L1ContractErrors.sol";
 import {DeployCTML1OrGateway} from "deploy-scripts/ctm/DeployCTML1OrGateway.sol";
 
 /// @dev Mock verifier that always returns true.
@@ -171,6 +172,17 @@ contract MultiProofVerifierTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, 2));
         verifier.verify(publicInputs, proof);
+    }
+
+    /// @dev The header word carries the proof type alone: this format holds no
+    ///      verifier version, so every bit above the type field is reserved. A
+    ///      payload that sets one would otherwise read as a plain type 5.
+    function test_headerReservedBitsSet_rejected() public {
+        uint256[] memory proof = _type5Proof(0, 2);
+        proof[0] = (1 << 8) | 5;
+
+        vm.expectRevert(InvalidProofFormat.selector);
+        verifier.verify(_singlePublicInputs(), proof);
     }
 
     function test_proofTooShort_reverts() public {
