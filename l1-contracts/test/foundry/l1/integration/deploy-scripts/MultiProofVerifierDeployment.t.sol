@@ -75,7 +75,7 @@ contract MultiProofVerifierDeploymentTest is Test {
 
         assertGt(chainVerifier.code.length, 0, "chain verifier code");
         assertEq(
-            address(MultiProofTestnetVerifier(chainVerifier).innerVerifier()),
+            address(MultiProofTestnetVerifier(chainVerifier).INNER_VERIFIER()),
             multiProof,
             "testnet wrapper wraps MultiProofVerifier"
         );

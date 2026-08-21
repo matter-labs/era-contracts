@@ -13,8 +13,5 @@ pragma solidity 0.8.28;
 ///      generate, deploy and wire the implementation.
 interface ISnarkPlonkVerifier {
     /// @notice Verify a snarkJS Plonk proof against its public signals.
-    function verifyProof(
-        uint256[24] calldata _proof,
-        uint256[1] calldata _pubSignals
-    ) external view returns (bool);
+    function verifyProof(uint256[24] calldata _proof, uint256[1] calldata _pubSignals) external view returns (bool);
 }

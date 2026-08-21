@@ -8,6 +8,9 @@
 // Usage: node render_plonk_verifier.js <verification_key.json> <output.sol>
 // Run `npm install` in this directory first.
 
+/* eslint-env node */
+/* eslint-disable @typescript-eslint/no-var-requires */
+
 const fs = require("fs");
 const path = require("path");
 const ejs = require("ejs");

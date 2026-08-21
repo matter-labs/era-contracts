@@ -65,6 +65,7 @@ holds the same key.
    The adapted verifier lands at
    `l1-contracts/contracts/dev-contracts/generated/ZiskSnarkPlonkVerifier.sol`
    (a gitignored path that `forge build` compiles when present).
+
 3. Validate the result. For the cargo-zisk v0.18.0 key the adapted source's
    SHA-256 is
    `e21103887543396795edef162cbcba38c1c4cc0522686f6e109885f93e065735`. The

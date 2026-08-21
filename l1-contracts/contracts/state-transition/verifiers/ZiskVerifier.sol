@@ -39,6 +39,8 @@ contract ZiskVerifier is IZiskVerifier {
     ///         `verifiers/README.md` for the generation and deployment flow.
     ISnarkPlonkVerifier public immutable PLONK_VERIFIER;
 
+    error ProofTooShort();
+
     constructor(ISnarkPlonkVerifier _plonkVerifier) {
         PLONK_VERIFIER = _plonkVerifier;
     }
@@ -68,15 +70,13 @@ contract ZiskVerifier is IZiskVerifier {
     uint64 private constant _ROOT_CV_ADCOP_FINAL_2 = 8191503835439821522;
     uint64 private constant _ROOT_CV_ADCOP_FINAL_3 = 363572921032801149;
     /// @notice BN254 scalar field modulus.
-    uint256 private constant _RFIELD =
-        21888242871839275222246405745257275088548364400416034343698204186575808495617;
+    uint256 private constant _RFIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
     /// @notice Hash over the three pins above, in the order inner programVK,
     /// aggregator programVK, vadcop-final root. The server derives the ZiSK
     /// verification key hash of the protocol version the same way, so a
     /// rotation of any pin is visible on both sides.
-    bytes32 private constant _VK_HASH =
-        0x718bdb59530514f9a62f16b2ba912de17188615d82aa31ec681be4b9cd332888;
+    bytes32 private constant _VK_HASH = 0x718bdb59530514f9a62f16b2ba912de17188615d82aa31ec681be4b9cd332888;
 
     /// @inheritdoc IZiskVerifier
     function innerProgramVK() public pure override returns (bytes32) {
@@ -117,15 +117,12 @@ contract ZiskVerifier is IZiskVerifier {
     ///        value the aggregator guest committed to.
     /// @param _proof The 24-word (768-byte) BN254 PLONK SNARK proof. Nothing
     ///        else is read from it: the public values are reconstructed below.
-    function verify(
-        uint256[] calldata _publicInputs,
-        uint256[] calldata _proof
-    ) external view override returns (bool) {
-        require(_proof.length >= 24, "ZiskVerifier: proof too short");
+    function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) external view override returns (bool) {
+        if (_proof.length < 24) revert ProofTooShort();
 
         // Extract the 24-element ZiSK SNARK proof.
         uint256[24] memory ziskProof;
-        for (uint256 i = 0; i < 24; i++) {
+        for (uint256 i = 0; i < 24; ++i) {
             ziskProof[i] = _proof[i];
         }
 
@@ -182,11 +179,10 @@ contract ZiskVerifier is IZiskVerifier {
     ///      the first input enters unhashed, then each is folded in with
     ///      keccak256 truncated to 224 bits. An aggregated range always opens
     ///      its own chain (seed 0), independent of the Airbender previous_hash.
-    function _selfContainedChain(
-        uint256[] calldata _publicInputs
-    ) private pure returns (uint256 result) {
+    function _selfContainedChain(uint256[] calldata _publicInputs) private pure returns (uint256 result) {
         result = _publicInputs[0];
-        for (uint256 i = 1; i < _publicInputs.length; ++i) {
+        uint256 inputCount = _publicInputs.length;
+        for (uint256 i = 1; i < inputCount; ++i) {
             result = uint256(keccak256(abi.encodePacked(result, _publicInputs[i]))) >> 32;
         }
     }

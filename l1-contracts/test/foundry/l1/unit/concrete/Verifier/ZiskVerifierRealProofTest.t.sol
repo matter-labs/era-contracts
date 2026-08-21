@@ -45,18 +45,13 @@ contract ZiskVerifierRealProofTest is Test {
 
     /// @dev The four batch commitments the aggregated proof ingested, in batch
     ///      order. MultiProofRangeVectorTest pins the same vector.
-    bytes32 internal constant COMMITMENT_1 =
-        0x6c41981c6fd0bd9a9262fe3dcc9fe4f0d8e142651f80316a8846d6922b5214ea;
-    bytes32 internal constant COMMITMENT_2 =
-        0x1f56fcbd24636dc0a635bc51808d7db9eabf3914f66611c93cf37ea440a5fe27;
-    bytes32 internal constant COMMITMENT_3 =
-        0x9d909d7416f29633c361bfc00073a9004423f0e1cc46105cdd24550543c0e41c;
-    bytes32 internal constant COMMITMENT_4 =
-        0x6ca5ada4916397cfb1b07a2f115f21fedf7e4a14a827995b3c5b392966532ad6;
+    bytes32 internal constant COMMITMENT_1 = 0x6c41981c6fd0bd9a9262fe3dcc9fe4f0d8e142651f80316a8846d6922b5214ea;
+    bytes32 internal constant COMMITMENT_2 = 0x1f56fcbd24636dc0a635bc51808d7db9eabf3914f66611c93cf37ea440a5fe27;
+    bytes32 internal constant COMMITMENT_3 = 0x9d909d7416f29633c361bfc00073a9004423f0e1cc46105cdd24550543c0e41c;
+    bytes32 internal constant COMMITMENT_4 = 0x6ca5ada4916397cfb1b07a2f115f21fedf7e4a14a827995b3c5b392966532ad6;
 
     /// @dev BN254 scalar field modulus (must equal ZiskVerifier._RFIELD).
-    uint256 internal constant RFIELD =
-        21888242871839275222246405745257275088548364400416034343698204186575808495617;
+    uint256 internal constant RFIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
     ZiskVerifier internal ziskVerifier;
     bool internal plonkVerifierAvailable;
@@ -136,20 +131,12 @@ contract ZiskVerifierRealProofTest is Test {
         // [0..32] holds the inner pin; the aggregated proof attests to the
         // aggregator ELF, so its wire [0..32] holds the aggregator pin.
         assertEq(ziskVerifier.innerProgramVK(), _word(BATCH_PUBLIC_VALUES, 0), "innerProgramVK");
-        assertEq(
-            ziskVerifier.aggregatorProgramVK(),
-            _word(AGGREGATED_PUBLIC_VALUES, 0),
-            "aggregatorProgramVK"
-        );
+        assertEq(ziskVerifier.aggregatorProgramVK(), _word(AGGREGATED_PUBLIC_VALUES, 0), "aggregatorProgramVK");
 
         // One cargo-zisk setup produces both proofs, so both wires end with
         // the same vadcop-final root.
         assertEq(ziskVerifier.rootCVadcopFinal(), _word(BATCH_PUBLIC_VALUES, 9), "batch rootCVadcopFinal");
-        assertEq(
-            ziskVerifier.rootCVadcopFinal(),
-            _word(AGGREGATED_PUBLIC_VALUES, 9),
-            "aggregated rootCVadcopFinal"
-        );
+        assertEq(ziskVerifier.rootCVadcopFinal(), _word(AGGREGATED_PUBLIC_VALUES, 9), "aggregated rootCVadcopFinal");
 
         // Reconstruction leaves bytes [64..288] (words 2..8) zero; the
         // aggregated fixture confirms that region is zero in a real output.
@@ -191,12 +178,7 @@ contract ZiskVerifierRealProofTest is Test {
     ///      signal — anchoring the pairing, the sha256 field-reduction and the
     ///      320-byte preimage byte order on the per-batch side too.
     function test_realProof_fixtureSignal_accepts() public requiresPlonkVerifier {
-        assertTrue(
-            ziskVerifier.PLONK_VERIFIER().verifyProof(
-                _proof24(BATCH_PROOF),
-                [_signal(BATCH_PUBLIC_VALUES)]
-            )
-        );
+        assertTrue(ziskVerifier.PLONK_VERIFIER().verifyProof(_proof24(BATCH_PROOF), [_signal(BATCH_PUBLIC_VALUES)]));
     }
 
     /// @dev Corrupting a proof scalar (an opening evaluation, still a valid
@@ -204,9 +186,7 @@ contract ZiskVerifierRealProofTest is Test {
     function test_realProof_tamperedSnark_rejected() public requiresPlonkVerifier {
         uint256[24] memory words = _proof24(BATCH_PROOF);
         words[23] ^= 1;
-        assertFalse(
-            ziskVerifier.PLONK_VERIFIER().verifyProof(words, [_signal(BATCH_PUBLIC_VALUES)])
-        );
+        assertFalse(ziskVerifier.PLONK_VERIFIER().verifyProof(words, [_signal(BATCH_PUBLIC_VALUES)]));
     }
 
     /// @dev Changing the public values changes the signal, so the proof is no
@@ -214,8 +194,6 @@ contract ZiskVerifierRealProofTest is Test {
     function test_realProof_tamperedPublicValues_rejected() public requiresPlonkVerifier {
         bytes memory tampered = BATCH_PUBLIC_VALUES;
         tampered[32] ^= 0x01; // flip a bit of word 1 (the commitment)
-        assertFalse(
-            ziskVerifier.PLONK_VERIFIER().verifyProof(_proof24(BATCH_PROOF), [_signal(tampered)])
-        );
+        assertFalse(ziskVerifier.PLONK_VERIFIER().verifyProof(_proof24(BATCH_PROOF), [_signal(tampered)]));
     }
 }

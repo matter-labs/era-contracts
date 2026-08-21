@@ -18,20 +18,18 @@ import {IZKsyncOSDualVerifier} from "../chain-interfaces/IZKsyncOSDualVerifier.s
 contract MultiProofTestnetVerifier is IVerifier, IZKsyncOSDualVerifier {
     uint256 internal constant MOCK_PROOF_TYPE = 3;
 
-    IVerifier public immutable innerVerifier;
+    IVerifier public immutable INNER_VERIFIER;
 
     error InvalidMockProof();
+    error MockProofTooShort();
 
     constructor(IVerifier _innerVerifier) {
         assert(block.chainid != 1);
-        innerVerifier = _innerVerifier;
+        INNER_VERIFIER = _innerVerifier;
     }
 
     /// @inheritdoc IVerifier
-    function verify(
-        uint256[] calldata _publicInputs,
-        uint256[] calldata _proof
-    ) public view override returns (bool) {
+    function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) public view override returns (bool) {
         // Empty proof: skip verification entirely (testnet convenience).
         if (_proof.length == 0) {
             return true;
@@ -43,12 +41,12 @@ contract MultiProofTestnetVerifier is IVerifier, IZKsyncOSDualVerifier {
         }
 
         // Everything else: delegate to the real verifier.
-        return innerVerifier.verify(_publicInputs, _proof);
+        return INNER_VERIFIER.verify(_publicInputs, _proof);
     }
 
     /// @inheritdoc IVerifier
     function verificationKeyHash() external view override returns (bytes32) {
-        return innerVerifier.verificationKeyHash();
+        return INNER_VERIFIER.verificationKeyHash();
     }
 
     /// @notice The FFLONK sub-verifier registered for `_version`.
@@ -57,20 +55,17 @@ contract MultiProofTestnetVerifier is IVerifier, IZKsyncOSDualVerifier {
     ///      registry itself stays in the one dual verifier at the end of the
     ///      wrapping chain.
     function fflonkVerifiers(uint32 _version) external view returns (IVerifierV2) {
-        return IZKsyncOSDualVerifier(address(innerVerifier)).fflonkVerifiers(_version);
+        return IZKsyncOSDualVerifier(address(INNER_VERIFIER)).fflonkVerifiers(_version);
     }
 
     /// @notice The PLONK sub-verifier registered for `_version`.
     function plonkVerifiers(uint32 _version) external view returns (IVerifier) {
-        return IZKsyncOSDualVerifier(address(innerVerifier)).plonkVerifiers(_version);
+        return IZKsyncOSDualVerifier(address(INNER_VERIFIER)).plonkVerifiers(_version);
     }
 
     /// @dev Mock verification: proof = [type=3, prevHash, magic(13), publicInput].
-    function _mockVerify(
-        uint256[] calldata _publicInputs,
-        uint256[] calldata _proof
-    ) internal pure returns (bool) {
-        require(_proof.length >= 4, "mock proof too short");
+    function _mockVerify(uint256[] calldata _publicInputs, uint256[] calldata _proof) internal pure returns (bool) {
+        if (_proof.length < 4) revert MockProofTooShort();
 
         // Compute hash the same way as production verifiers.
         uint256 result = _proof[1]; // previous hash
@@ -79,7 +74,8 @@ contract MultiProofTestnetVerifier is IVerifier, IZKsyncOSDualVerifier {
             result = _publicInputs[0];
             i = 1;
         }
-        for (; i < _publicInputs.length; ++i) {
+        uint256 inputCount = _publicInputs.length;
+        for (; i < inputCount; ++i) {
             result = uint256(keccak256(abi.encodePacked(result, _publicInputs[i]))) >> 32;
         }
 

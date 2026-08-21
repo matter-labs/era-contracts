@@ -137,7 +137,7 @@ contract MultiProofVerifier is Ownable2Step, IVerifier, IZKsyncOSDualVerifier {
         uint256[] memory args = new uint256[](1);
         args[0] = _computeZKsyncOSHash(_proof[1], _publicInputs);
         uint256[] memory airbenderProof = new uint256[](airbenderLen);
-        for (uint256 i = 0; i < airbenderLen; i++) {
+        for (uint256 i = 0; i < airbenderLen; ++i) {
             airbenderProof[i] = _proof[3 + i];
         }
         if (!airbenderVerifier.verify(args, airbenderProof)) {
@@ -159,7 +159,7 @@ contract MultiProofVerifier is Ownable2Step, IVerifier, IZKsyncOSDualVerifier {
         }
         uint256 ziskStart = 3 + airbenderLen;
         uint256[] memory ziskProof = new uint256[](24);
-        for (uint256 i = 0; i < 24; i++) {
+        for (uint256 i = 0; i < 24; ++i) {
             ziskProof[i] = _proof[ziskStart + i];
         }
         if (!ziskProofVerifier.verify(_publicInputs, ziskProof)) {
@@ -180,7 +180,8 @@ contract MultiProofVerifier is Ownable2Step, IVerifier, IZKsyncOSDualVerifier {
             result = _publicInputs[0];
             i = 1;
         }
-        for (; i < _publicInputs.length; ++i) {
+        uint256 inputCount = _publicInputs.length;
+        for (; i < inputCount; ++i) {
             result = uint256(keccak256(abi.encodePacked(result, _publicInputs[i]))) >> 32;
         }
     }
