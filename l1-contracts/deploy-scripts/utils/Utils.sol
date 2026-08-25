@@ -414,7 +414,9 @@ library Utils {
 
     /**
      * @dev Deploy l2 contracts through l1, while using built-in L2 Create2Factory contract.
-     * TODO(gateway-os): EraVM-format bytecode only; see {deployThroughL1}.
+     * TODO(gateway-os): EraVM-format bytecode only — the bytecode ships as a factory dep and is
+     * hashed with the EraVM scheme, so an EVM creation code deployed this way would not run. Use
+     * {deployThroughL1ViaDeterministicCreate2} for ZKsync OS targets.
      */
     function deployThroughL1Deterministic(
         bytes memory bytecode,
