@@ -21,12 +21,12 @@ A release is reusable chain state: everything a chain _runs_ belongs to it, incl
 the version edge and the schedule are the transition's, and one release can serve several versions.
 
 **A transition's facet cuts and hash changes are not authored.** They are derived from its
-`(fromRelease, newRelease)` pair at initialization and stored. Governance reviews two releases plus
+`(fromRelease, newRelease)` pair in the constructor and stored. Governance reviews two releases plus
 the transition's own fields; the delta between them is computed, not written.
 
 ## Objects
 
-All are storage-backed, initialized exactly once from a manifest, and commit
+All are storage-backed, built once from a manifest they take in the constructor, and commit
 `manifestHash = keccak256(abi.encode(manifest))`.
 
 | Contract                     | Holds                                                                                                                                                                                                 |
@@ -48,27 +48,20 @@ Supporting libraries:
 
 ## Contract map
 
-Who deploys what, who reads what. Solid = writes or drives; dashed = reads.
+Who holds what, who reads what. Solid = writes or drives; dashed = reads.
 
 ```mermaid
 flowchart TB
-    subgraph fac["Factories — CREATE2, salt = manifest hash"]
-      RF["CTMReleaseFactory"]
-      TF["CTMTransitionFactory"]
-      CF["CoreRegistryFactory"]
-      BF["RegistryBootstrapMigrationFactory"]
-    end
-
-    subgraph obj["Write-once objects"]
+    subgraph obj["Write-once objects — manifest fixed in the constructor"]
       REL["CTMRelease<br/>routing + pins, verifier,<br/>system hashes, genesis params"]
       TRA["CTMTransition<br/>version edge, engine, schedule,<br/>L2 plan + DERIVED cuts"]
       CR["CoreRegistry<br/>source-checked proxy rows"]
       BOOT["RegistryBootstrapMigration<br/>pre-registry entry edge"]
     end
 
-    subgraph exe["Bound executors"]
-      CE["CTMUpgradeExecutor"]
-      EE["EcosystemUpgradeExecutor"]
+    subgraph exe["Bound executors — immutable target + immutable object codehash"]
+      CE["CTMUpgradeExecutor<br/>CTM · TRANSITION_CODEHASH"]
+      EE["EcosystemUpgradeExecutor<br/>PROXY_ADMIN · CORE_REGISTRY_CODEHASH"]
     end
 
     subgraph lib["Libraries"]
@@ -79,27 +72,22 @@ flowchart TB
       CPL["CodehashPinLib"]
     end
 
-    CTM["ChainTypeManager<br/>currentRelease · releaseFactory<br/>upgradeTransition · upgradeCutHash"]
+    CTM["ChainTypeManager<br/>currentRelease · releaseCodehash<br/>upgradeTransition · upgradeCutHash"]
     DI["DiamondInit — genesis"]
     BZU["BaseZkSyncUpgrade — upgrade"]
 
-    RF --> REL
-    TF --> TRA
-    CF --> CR
-    BF --> BOOT
-
     GML --> REL
-    TRA -. "derive cuts + hash delta" .-> TDL
+    TRA -. "derive cuts + hash delta<br/>(in the constructor)" .-> TDL
     TDL -. "reads both releases" .-> REL
 
     CE -- "applyCTMUpgrade / upgradeChain" --> CTM
-    CE -. "factory-attest + validate" .-> TRA
-    EE -. "factory-attest + validate" .-> CR
+    CE -. "codehash-check + validate" .-> TRA
+    EE -. "codehash-check + validate" .-> CR
     BOOT -- "one-time: anchors, then hands over" --> CE
     BOOT --> EE
 
     CTM -. currentRelease .-> REL
-    CTM -. "attestation" .-> RF
+    CTM -. "codehash-check on setCurrentRelease" .-> REL
     CTM -- "compose cut" --> CUC
     CE -- "compose cut" --> CUC
     CUC -. "engine, schedule, L2 plan" .-> TRA
@@ -133,13 +121,13 @@ flowchart LR
     ECOEXE -->|owns| PA
 ```
 
-Each executor is **bound at construction** to the contracts it governs and to the factory whose
-objects it accepts — both immutable.
+Each executor is **bound at construction** to the contracts it governs and to the codehash of the
+object type it accepts — both immutable.
 
-| Executor                   | Bound to                                           | Entrypoints                                             |
-| -------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
-| `CTMUpgradeExecutor`       | one `ChainTypeManager`, one `CTMTransitionFactory` | `applyCTMUpgrade`, `upgradeChain`, `acceptCTMOwnership` |
-| `EcosystemUpgradeExecutor` | one `ProxyAdmin`, one `CoreRegistryFactory`        | `applyL1Upgrade`                                        |
+| Executor                   | Bound to                                             | Entrypoints                                             |
+| -------------------------- | ---------------------------------------------------- | ------------------------------------------------------- |
+| `CTMUpgradeExecutor`       | one `ChainTypeManager`, the `CTMTransition` codehash | `applyCTMUpgrade`, `upgradeChain`, `acceptCTMOwnership` |
+| `EcosystemUpgradeExecutor` | one `ProxyAdmin`, the `CoreRegistry` codehash        | `applyL1Upgrade`                                        |
 
 CTM authority and ecosystem authority are separate: each CTM is governed by its own executor and
 upgrades on its own cadence.
@@ -154,20 +142,23 @@ auditability.
 
 Three mechanisms, applied everywhere:
 
-**Factory attestation.** Each object type has one factory that deploys and initializes it in a single
-transaction (`deployOrGetRelease` / `deployOrGetTransition` / `deployOrGetCoreRegistry` /
-`deployOrGetMigration`), using CREATE2 with `salt = keccak256(abi.encode(manifest))`, and records
-`manifestHash -> instance` in `deployedFor`. The address is therefore a commitment to the manifest
-and is predictable before deployment, independent of factory nonce. Requesting an
-already-deployed manifest returns the existing instance rather than reverting.
+**Type provenance by codehash.** Each object takes its whole manifest as a constructor argument, so
+it has no initializer and no state-mutating function at all — write-once is structural, not a runtime
+guard. Consumers therefore establish provenance by checking the object's `EXTCODEHASH` against the
+audited one: executors hold `TRANSITION_CODEHASH` / `CORE_REGISTRY_CODEHASH` as immutables, and the
+CTM holds `releaseCodehash` as state, checked in `setCurrentRelease`.
 
-Executors reject objects their bound factory did not attest. Releases are attested by the CTM
-itself: `releaseFactory` is CTM state, and `setCurrentRelease` rejects any release that factory did
-not deploy. A transition carries no factory pointer, so there is nothing to spoof.
+What this proves is that the address runs the audited, write-once code — not _which_ manifest it
+holds. Nothing gates content on-chain, and nothing ever did: governance approving the address is what
+gates content. Because the manifest lives in the initcode, a CREATE2 address also commits to it.
+
+For this to hold, manifest data must live in **storage**, never in immutables: immutables are patched
+into runtime code, which would give every instance a different codehash and make the check
+impossible.
 
 **Inline codehash pins.** Every executable address an object names carries its expected
 `EXTCODEHASH` beside it — facets in their rows, `DiamondInit`, the verifier, the genesis upgrade, the
-upgrade engine, each `implNew`. Pins are checked at initialization and re-checked by `validate()`.
+upgrade engine, each `implNew`. Pins are checked in the constructor and re-checked by `validate()`.
 There is no detached, optional pin list. A pin holds only against an account that **has code**, so an
 empty account can never satisfy one.
 
@@ -181,7 +172,7 @@ The CTM stores one release pointer and derives genesis data from it:
 
 - `currentRelease` — the release every new chain is created at. `storedBatchZero()` and
   `l1GenesisUpgrade()` are views over `ICTMRelease(currentRelease).genesisParams()`.
-- `releaseFactory` — the provenance anchor every pinned release is checked against.
+- `releaseCodehash` — the provenance anchor every pinned release is checked against.
 - `upgradeTransition[oldProtocolVersion]` — the transition committed for chains departing from that
   version. `upgradeCutHash` remains the authority on what a chain may execute; this pointer is what
   lets tooling (and a chain admin driving its own upgrade) recompose that cut without being handed
@@ -230,7 +221,7 @@ sequenceDiagram
     participant D as Chain diamond
 
     G->>E: applyCTMUpgrade(transition)
-    Note over E: factory-attest, validate,<br/>check release + version edges
+    Note over E: codehash-check, validate,<br/>check release + version edges
     E->>C: setNewVersionUpgradeFromTransition(transition)
     E->>C: setCurrentRelease(newRelease)
     G->>E: upgradeChain(transition, chainId)
@@ -283,11 +274,11 @@ base-system hashes an existing chain ends up with are byte-for-byte what a fresh
 they cannot drift. There is no second mechanism for any part of installed chain state.
 
 The **L2 side is reviewed-and-pinned data, not proven**. L1 cannot verify L2 execution effects. The
-`L2UpgradePlan` is shape-validated at initialization — a plan whose data the composed transaction
+`L2UpgradePlan` is shape-validated in the constructor — a plan whose data the composed transaction
 would never execute is rejected — but what the delegate call _does_ on L2 is covered by review of the
 pinned payload, not by an on-chain proof.
 
-## Rules enforced at initialization
+## Rules enforced at construction
 
 **Release shape.** Nonempty facet array; every facet row has selectors; exactly one row per facet
 address (`Diamond._addOneFunction` requires uniform freezability per facet); a selector appears in at
@@ -323,14 +314,14 @@ reviewed edge and the executed edge could differ.
 
 ## Bootstrap
 
-A pre-registry CTM has neither `currentRelease` nor `releaseFactory`, and transitions never accept a
+A pre-registry CTM has neither `currentRelease` nor `releaseCodehash`, and transitions never accept a
 zero `fromRelease`. It must therefore cross into the model once, through one-time migration code —
 never through an accommodation inside the transition model. Fresh CTMs pin both at genesis and need
 no bootstrap.
 
 `RegistryBootstrapMigration` expresses that crossing as a single pinned object. Its manifest carries
 the CTM and its departing version, the `ProxyAdmin`, the source-checked implementation swaps (the
-CTM's own implementation among them), the `releaseFactory` anchor, the genesis `currentRelease`
+CTM's own implementation among them), the `releaseCodehash` anchor, the genesis `currentRelease`
 (which carries the verifier), the version edge and deadline, the upgrade cut, and the two executors
 that receive authority. Every address carries an inline pin.
 
@@ -340,7 +331,7 @@ acquires nothing it does not pass on before the call returns.
 
 `validate()` runs on the execution path and requires that the migration already holds both
 ownerships, that the CTM sits at the departing version, that every proxy is still at its
-`expectedOldImpl`, that every pin holds, that the release is attested by the factory being installed,
+`expectedOldImpl`, that every pin holds, that the release runs the codehash being installed as the anchor,
 and that **each executor is bound to the contract it is about to receive**. The edge is one-shot, so
 an executor bound elsewhere would take ownership its fixed entrypoints cannot drive, leaving
 break-glass as the only recovery.
@@ -359,20 +350,22 @@ CTM ownership is transferred, not forced: `migrate()` nominates the executor, an
 
 ## Deployment determinism
 
-Registry objects have unauthenticated one-shot initializers, so deploying and initializing in
-separate transactions would leave a front-runnable instance. The factories do both in one
-transaction. A same-manifest front-run merely does the caller's work; a different manifest has a
-different salt and cannot displace the approved address.
+Objects take their manifest as a constructor argument, so the manifest is part of the initcode and a
+CREATE2 address commits to it. There is no separate salt to reproduce and no window in which a
+deployed-but-uninitialized instance exists.
 
 CREATE2 derivation is VM-specific, so off-chain address prediction must use the EVM or EraVM formula
 for the deploying chain, with the exact creation code.
 
-On Gateway, the CTM deployer calls a directly deployed `CTMReleaseFactory`, since embedding release
-creation code would exceed the EIP-3860 initcode cap. There is one factory per object type because
-combining their embedded creation code exceeds EIP-170 on L1.
+**Gateway.** EraVM has no constructors, so these objects cannot be constructed there. A Gateway CTM
+therefore cannot deploy its own `CTMRelease` in-flow; the Gateway deployer takes a pre-deployed
+release address instead, and the deployers carry TODOs describing what restoring in-flow deployment
+needs — an EraVM-deployable factory that deploys and initializes atomically, which is what the
+now-removed `CTMRegistryFactory` did.
 
-Codehash pins depend on reproducible bytecode: pinned implementations are built with a
-CBOR-metadata-free profile so hashes are byte-identical across platforms.
+Codehash checks depend on reproducible bytecode: pinned implementations are built with a
+CBOR-metadata-free profile so hashes are byte-identical across platforms. For the same reason,
+manifest data stays in storage rather than immutables — see [Provenance and pinning](#provenance-and-pinning).
 
 ## Related
 
