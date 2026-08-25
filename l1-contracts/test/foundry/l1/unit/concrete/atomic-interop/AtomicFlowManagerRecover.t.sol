@@ -43,8 +43,8 @@ contract AtomicFlowManagerRecoverTest is Test {
         manager = new AtomicFlowManagerRecoverHarness();
     }
 
-    /// @dev Builds a single direct-call bundle. `destBaseTokenAssetId` selects the refund path; `value`
-    /// marks it as a value-carrying leg.
+    /// @dev Builds a single direct-call bundle (non-router sender). `destBaseTokenAssetId` selects the
+    /// refund path; `value` marks it as a value-carrying leg.
     function _bundle(bytes32 _destBaseTokenAssetId, uint256 _value) internal view returns (InteropBundle memory b) {
         b = _bundleFrom(DEPOSITOR, _destBaseTokenAssetId, _value, "");
     }
@@ -173,7 +173,8 @@ contract AtomicFlowManagerRecoverTest is Test {
     function test_recoverBundle_succeedsWhenNothingRecoverable() public {
         // No value and a direct, non-asset-router sender: nothing to reverse. The refund must still go
         // through (flipping the leg to Reverted is meaningful on its own) and must not touch the asset
-        // router at all — both router entry points are set to revert, so any dispatch would fail the test.
+        // router at all — both router entry points are set to revert, so any dispatch would fail the
+        // test.
         vm.mockCallRevert(
             L2_ASSET_ROUTER_ADDR,
             abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),

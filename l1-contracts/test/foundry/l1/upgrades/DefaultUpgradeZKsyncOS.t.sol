@@ -121,6 +121,16 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         assertTrue(recorded != placeholderHash, "rewrite produced the placeholder");
     }
 
+    /// @notice A verifier-only upgrade carries no L2 upgrade transaction, so there is nothing to substitute and
+    ///         the rewrite — which would reject the empty transaction data — must be skipped.
+    function test_upgradeWithoutAnL2TransactionSkipsTheRewrite() public {
+        assertEq(upgradeContract.upgradeVerifierOnly(protocolVersion), Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
+
+        assertEq(upgradeContract.getProtocolVersion(), protocolVersion);
+        assertEq(upgradeContract.getVerifier(), mockVerifier);
+        assertEq(upgradeContract.getL2SystemContractsUpgradeTxHash(), bytes32(0), "an upgrade tx was recorded");
+    }
+
     /// @dev The generic upgrade installs the new protocol version's verifier, a freshly deployed contract in
     ///      this release, so batches still awaiting proof under the old one would stop being provable.
     function test_revertWhen_aCommittedBatchIsNotProcessed() public {
