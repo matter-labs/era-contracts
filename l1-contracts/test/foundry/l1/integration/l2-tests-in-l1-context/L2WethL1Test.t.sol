@@ -6,53 +6,99 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
-
+import {BridgeMintNotImplemented, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {SharedL2ContractL1Deployer} from "./_SharedL2ContractL1Deployer.sol";
 
-import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
-
-import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
-
-import {L2WethTestAbstract} from "../l2-tests-abstract/L2WethTestAbstract.t.sol";
-
-import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-
-contract L2WethL1Test is Test, SharedL2ContractL1Deployer, L2WethTestAbstract {
-    function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
-
-    function initSystemContracts(
-        SystemContractsArgs memory _args
-    ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {
-        super.initSystemContracts(_args);
+contract L2WethL1Test is Test, SharedL2ContractL1Deployer {
+    function test_shouldDepositWethByCallingDeposit() public {
+        uint256 amount = 100;
+        weth.deposit{value: amount}();
+        assertEq(weth.balanceOf(address(this)), amount);
     }
 
-    function deployL2Contracts(
-        uint256 _l1ChainId
-    ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {
-        super.deployL2Contracts(_l1ChainId);
+    function test_shouldDepositWethBySendingEth() public {
+        uint256 amount = 100;
+        address(weth).call{value: amount}("");
+        assertEq(weth.balanceOf(address(this)), amount);
     }
 
-    function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getChainCreationFacetCuts(stateTransition);
+    function test_revertWhenDepositingWithRandomCalldata() public {
+        (bool success, ) = address(weth).call{value: 100}(hex"00000000");
+        assertEq(success, false);
     }
 
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getUpgradeAddedFacetCuts(stateTransition);
+    function test_shouldWithdrawWethToL2Eth() public {
+        address sender = makeAddr("sender");
+        uint256 amount = 100;
+
+        vm.deal(sender, amount);
+
+        vm.prank(sender);
+        weth.deposit{value: amount}();
+
+        vm.prank(sender);
+        weth.withdraw(amount);
+
+        assertEq(weth.balanceOf(sender), 0);
+        assertEq(address(sender).balance, amount);
     }
 
-    function getInitializeCalldata(
-        string memory contractName
-    ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName);
+    function test_shouldDepositWethToAnotherAccount() public {
+        address sender = makeAddr("sender");
+        address receiver = makeAddr("receiver");
+
+        uint256 amount = 100;
+
+        vm.deal(sender, amount);
+
+        vm.prank(sender);
+        weth.depositTo{value: amount}(receiver);
+
+        assertEq(weth.balanceOf(receiver), amount);
+        assertEq(weth.balanceOf(sender), 0);
+    }
+
+    function test_shouldWithdrawWethToAnotherAccount() public {
+        address sender = makeAddr("sender");
+        address receiver = makeAddr("receiver");
+
+        uint256 amount = 100;
+
+        vm.deal(sender, amount);
+
+        vm.prank(sender);
+        weth.deposit{value: amount}();
+
+        vm.prank(sender);
+        weth.withdrawTo(receiver, amount);
+
+        assertEq(receiver.balance, amount);
+        assertEq(sender.balance, 0);
+    }
+
+    function test_revertWhenWithdrawingMoreThanBalance() public {
+        vm.expectRevert("ERC20: burn amount exceeds balance");
+        weth.withdraw(1);
+    }
+
+    function test_revertWhenCallingBridgeMint() public {
+        vm.expectRevert(abi.encodeWithSelector(BridgeMintNotImplemented.selector));
+        vm.prank(L2_ASSET_ROUTER_ADDR);
+        weth.bridgeMint(address(1), 1);
+    }
+
+    function test_revertWhenCallingBridgeMintDirectly() public {
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+        weth.bridgeMint(address(1), 1);
+    }
+
+    function test_revertWhenCallingBridgeBurnDirectly() public {
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+        weth.bridgeBurn(address(1), 1);
     }
 }

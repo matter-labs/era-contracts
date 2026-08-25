@@ -4,52 +4,91 @@ pragma solidity ^0.8.20;
 
 // solhint-disable gas-custom-errors
 
-import {Test} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {TokenIsLegacy, TokenNotLegacy} from "contracts/common/L1ContractErrors.sol";
+import {SharedL2ContractL1Deployer} from "./_SharedL2ContractL1Deployer.sol";
 
-import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
+contract L2NativeTokenVaultLegacyTokenL1Test is Test, SharedL2ContractL1Deployer {
+    using stdStorage for StdStorage;
 
-import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
-
-import {L2NativeTokenVaultLegacyTokenTestAbstract} from "../l2-tests-abstract/L2NativeTokenVaultLegacyTokenTestAbstract.t.sol";
-
-import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-
-contract L2NativeTokenVaultLegacyTokenL1Test is
-    Test,
-    SharedL2ContractL1Deployer,
-    L2NativeTokenVaultLegacyTokenTestAbstract
-{
-    function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
-
-    function initSystemContracts(
-        SystemContractsArgs memory _args
-    ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {
-        super.initSystemContracts(_args);
+    function _setLegacyBridgeMapping(address _l2Token, address _l1Token) internal {
+        stdstore.target(sharedBridgeLegacy).sig("l1TokenAddress(address)").with_key(_l2Token).checked_write(_l1Token);
     }
 
-    function deployL2Contracts(
-        uint256 _l1ChainId
-    ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {
-        super.deployL2Contracts(_l1ChainId);
+    function test_registerLegacyToken() external {
+        address l2Token = address(new TestnetERC20Token("LegacyToken", "LGC", 18));
+        address l1Token = makeAddr("l1Token");
+        L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+
+        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
+
+        // Verify token is not registered before
+        assertEq(l2NativeTokenVault.assetId(l2Token), bytes32(0), "Asset ID should be zero before registration");
+
+        _setLegacyBridgeMapping(l2Token, l1Token);
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(l2Token);
+
+        // Verify token is registered after
+        assertEq(l2NativeTokenVault.assetId(l2Token), expectedAssetId, "Asset ID should be set after registration");
+        assertEq(
+            l2NativeTokenVault.tokenAddress(expectedAssetId),
+            l2Token,
+            "Token address should be mapped to asset ID"
+        );
+        assertEq(l2NativeTokenVault.originChainId(expectedAssetId), L1_CHAIN_ID, "Origin chain ID should be L1");
     }
 
-    function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getChainCreationFacetCuts(stateTransition);
+    function test_registerLegacyToken_IncorrectConfiguration() external {
+        address l2Token = address(new TestnetERC20Token("LegacyToken", "LGC", 18));
+        address l1Token = makeAddr("l1Token");
+        L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
+
+        assertEq(l2NativeTokenVault.originChainId(assetId), 0);
+        assertEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+        assertEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
+
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig(INativeTokenVaultBase.tokenAddress.selector)
+            .with_key(assetId)
+            .checked_write(l2Token);
+
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig(INativeTokenVaultBase.assetId.selector)
+            .with_key(l2Token)
+            .checked_write(assetId);
+
+        assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+        assertNotEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
+
+        _setLegacyBridgeMapping(l2Token, l1Token);
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(l2Token);
+
+        assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);
+        assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+        assertNotEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
     }
 
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getUpgradeAddedFacetCuts(stateTransition);
+    function test_registerLegacyTokenRevertNotLegacy() external {
+        address l2Token = makeAddr("l2Token");
+        vm.expectRevert(TokenNotLegacy.selector);
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(l2Token);
     }
 
-    function getInitializeCalldata(
-        string memory contractName
-    ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName);
+    function test_registerTokenRevertIsLegacy() external {
+        address l2Token = makeAddr("l2Token");
+        address l1Token = makeAddr("l1Token");
+        _setLegacyBridgeMapping(l2Token, l1Token);
+
+        vm.expectRevert(TokenIsLegacy.selector);
+        INativeTokenVaultBase(L2_NATIVE_TOKEN_VAULT_ADDR).registerToken(l2Token);
     }
 }

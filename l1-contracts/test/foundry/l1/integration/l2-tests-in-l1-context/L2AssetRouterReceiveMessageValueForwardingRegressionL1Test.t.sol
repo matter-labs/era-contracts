@@ -6,58 +6,212 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
-
-import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
-import {L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstract} from "../l2-tests-abstract/L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstract.t.sol";
-
-import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
-import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
-import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_INTEROP_HANDLER_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
+import {SharedL2ContractL1Deployer} from "./_SharedL2ContractL1Deployer.sol";
 
 /// @title L2AssetRouterReceiveMessageValueForwardingRegressionL1Test
 /// @notice Concrete test for receiveMessage value forwarding regression tests in L1 context
-contract L2AssetRouterReceiveMessageValueForwardingRegressionL1Test is
-    Test,
-    SharedL2ContractL1Deployer,
-    L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstract
-{
-    function setUp()
-        public
-        override(SharedL2ContractDeployer, L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstract)
-    {
-        L2AssetRouterReceiveMessageValueForwardingRegressionTestAbstract.setUp();
+contract L2AssetRouterReceiveMessageValueForwardingRegressionL1Test is Test, SharedL2ContractL1Deployer {
+    // Custom asset handler that tracks received msg.value
+    MockValueTrackingAssetHandler internal mockAssetHandler;
+
+    // Test asset ID for the mock handler
+    bytes32 internal testAssetId;
+
+    // Source chain for interop messages (must be different from L1 and current chain)
+    uint256 internal sourceChainId;
+
+    function setUp() public virtual override {
+        super.setUp();
+
+        // Deploy a mock asset handler that tracks msg.value
+        mockAssetHandler = new MockValueTrackingAssetHandler();
+
+        // Create a test asset ID
+        testAssetId = keccak256(abi.encodePacked("test-asset-for-value-forwarding"));
+
+        // Source chain must be different from L1_CHAIN_ID and current chain for interop flow
+        sourceChainId = block.chainid + 100;
+
+        // Register the mock asset handler for our test asset ID
+        // We need to do this via the aliased L1 asset router (simulating a cross-chain setup message)
+        vm.prank(aliasedL1AssetRouter);
+        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).setAssetHandlerAddress(
+            L1_CHAIN_ID,
+            testAssetId,
+            address(mockAssetHandler)
+        );
     }
 
-    function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
+    function test_regression_receiveMessageForwardsValueToBridgeMint() public {
+        uint256 valueToSend = 1 ether;
 
-    function initSystemContracts(
-        SystemContractsArgs memory _args
-    ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {
-        super.initSystemContracts(_args);
+        // Prepare a valid finalizeDeposit payload
+        bytes memory transferData = abi.encode(
+            address(this), // sender
+            address(this), // receiver
+            address(0), // token (not used by mock)
+            uint256(1000), // amount
+            bytes("") // extra data
+        );
+
+        bytes memory payload = abi.encodeWithSelector(
+            AssetRouterBase.finalizeDeposit.selector,
+            sourceChainId, // originChainId (different from L1 and current chain for interop)
+            testAssetId,
+            transferData
+        );
+
+        // Create sender bytes (ERC-7930 format) - L2AssetRouter on another L2 chain
+        bytes memory sender = InteroperableAddress.formatEvmV1(sourceChainId, L2_ASSET_ROUTER_ADDR);
+
+        // Fund the L2InteropHandler so it can send value
+        vm.deal(L2_INTEROP_HANDLER_ADDR, valueToSend);
+
+        // Reset the mock handler's recorded value
+        mockAssetHandler.resetRecordedValue();
+
+        // L2InteropHandler calls receiveMessage with value
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage{value: valueToSend}(
+            bytes32(0), // receiveId
+            sender,
+            payload
+        );
+
+        // Verify that bridgeMint received the correct msg.value
+        assertEq(mockAssetHandler.lastReceivedValue(), valueToSend, "bridgeMint should receive the full msg.value");
+
+        // Verify the asset router doesn't have stranded ETH
+        assertEq(L2_ASSET_ROUTER_ADDR.balance, 0, "Asset router should not have stranded ETH after forwarding");
     }
 
-    function deployL2Contracts(
-        uint256 _l1ChainId
-    ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {
-        super.deployL2Contracts(_l1ChainId);
+    /// @notice Test that zero value calls still work correctly
+    /// @dev Ensures the fix doesn't break the zero-value case
+    function test_regression_receiveMessageWorksWithZeroValue() public {
+        // Prepare a valid finalizeDeposit payload
+        bytes memory transferData = abi.encode(address(this), address(this), address(0), uint256(1000), bytes(""));
+
+        bytes memory payload = abi.encodeWithSelector(
+            AssetRouterBase.finalizeDeposit.selector,
+            sourceChainId,
+            testAssetId,
+            transferData
+        );
+
+        bytes memory sender = InteroperableAddress.formatEvmV1(sourceChainId, L2_ASSET_ROUTER_ADDR);
+
+        mockAssetHandler.resetRecordedValue();
+
+        // L2InteropHandler calls receiveMessage without value
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage(bytes32(0), sender, payload);
+
+        // Verify bridgeMint received zero value
+        assertEq(mockAssetHandler.lastReceivedValue(), 0, "bridgeMint should receive zero when no value is sent");
     }
 
-    function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getChainCreationFacetCuts(stateTransition);
+    /// @notice Test that various ETH amounts are correctly forwarded
+    /// @dev Fuzz test to ensure the fix works for any amount
+    function testFuzz_regression_receiveMessageForwardsAnyValue(uint256 valueToSend) public {
+        // Bound the value to reasonable range (avoid overflow issues)
+        valueToSend = bound(valueToSend, 0, 100 ether);
+
+        bytes memory transferData = abi.encode(address(this), address(this), address(0), uint256(1000), bytes(""));
+
+        bytes memory payload = abi.encodeWithSelector(
+            AssetRouterBase.finalizeDeposit.selector,
+            sourceChainId,
+            testAssetId,
+            transferData
+        );
+
+        bytes memory sender = InteroperableAddress.formatEvmV1(sourceChainId, L2_ASSET_ROUTER_ADDR);
+
+        vm.deal(L2_INTEROP_HANDLER_ADDR, valueToSend);
+        mockAssetHandler.resetRecordedValue();
+
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage{value: valueToSend}(bytes32(0), sender, payload);
+
+        assertEq(mockAssetHandler.lastReceivedValue(), valueToSend, "bridgeMint should receive the exact value sent");
     }
 
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getUpgradeAddedFacetCuts(stateTransition);
+    /// @notice Test that value is forwarded even when the asset handler doesn't use it
+    /// @dev The value should still be forwarded to maintain correct semantics
+    function test_regression_valueForwardedEvenIfHandlerIgnoresIt() public {
+        uint256 valueToSend = 0.5 ether;
+
+        bytes memory transferData = abi.encode(address(this), address(this), address(0), uint256(500), bytes(""));
+
+        bytes memory payload = abi.encodeWithSelector(
+            AssetRouterBase.finalizeDeposit.selector,
+            sourceChainId,
+            testAssetId,
+            transferData
+        );
+
+        bytes memory sender = InteroperableAddress.formatEvmV1(sourceChainId, L2_ASSET_ROUTER_ADDR);
+
+        vm.deal(L2_INTEROP_HANDLER_ADDR, valueToSend);
+        mockAssetHandler.resetRecordedValue();
+
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage{value: valueToSend}(bytes32(0), sender, payload);
+
+        // The mock handler received the value
+        assertEq(mockAssetHandler.lastReceivedValue(), valueToSend);
+
+        // Since our mock handler accepts the ETH, verify it has the balance
+        assertEq(address(mockAssetHandler).balance, valueToSend);
+    }
+}
+
+/// @notice Mock asset handler that tracks the msg.value received in bridgeMint
+/// @dev Used to verify that value is correctly forwarded through the call chain
+contract MockValueTrackingAssetHandler is IAssetHandler {
+    uint256 private _lastReceivedValue;
+    bool private _valueRecorded;
+
+    function lastReceivedValue() external view returns (uint256) {
+        return _lastReceivedValue;
     }
 
-    function getInitializeCalldata(
-        string memory contractName
-    ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName);
+    function resetRecordedValue() external {
+        _lastReceivedValue = 0;
+        _valueRecorded = false;
     }
+
+    /// @notice Records the msg.value received during bridgeMint
+    function bridgeMint(
+        uint256 /* _chainId */,
+        bytes32 /* _assetId */,
+        bytes calldata /* _data */
+    ) external payable override {
+        _lastReceivedValue = msg.value;
+        _valueRecorded = true;
+    }
+
+    /// @notice Not used in this test, but required by interface
+    function bridgeBurn(
+        uint256 /* _chainId */,
+        uint256 /* _msgValue */,
+        bytes32 /* _assetId */,
+        address /* _originalCaller */,
+        bytes calldata /* _data */
+    ) external payable override returns (bytes memory) {
+        return "";
+    }
+
+    /// @notice Accept ETH transfers
+    receive() external payable {}
 }

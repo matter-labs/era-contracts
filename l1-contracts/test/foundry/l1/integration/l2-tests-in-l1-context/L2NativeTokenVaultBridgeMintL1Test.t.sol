@@ -4,52 +4,63 @@ pragma solidity ^0.8.20;
 
 // solhint-disable gas-custom-errors
 
-import {Test} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
+import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
+import {SharedL2ContractL1Deployer} from "./_SharedL2ContractL1Deployer.sol";
 
-import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
+contract L2NativeTokenVaultBridgeMintL1Test is Test, SharedL2ContractL1Deployer {
+    using stdStorage for StdStorage;
 
-import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
+    function test_bridgeMint_CorrectlyConfiguresL2LegacyToken() external {
+        L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
-import {L2NativeTokenVaultBridgeMintTestAbstract} from "../l2-tests-abstract/L2NativeTokenVaultBridgeMintTestAbstract.t.sol";
+        uint256 originChainId = L1_CHAIN_ID;
+        address originToken = makeAddr("l1Token");
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(originChainId, originToken);
 
-import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
+        address expectedL2TokenAddress = l2NativeTokenVault.calculateCreate2TokenAddress(originChainId, originToken);
 
-contract L2NativeTokenVaultBridgeMintL1Test is
-    Test,
-    SharedL2ContractL1Deployer,
-    L2NativeTokenVaultBridgeMintTestAbstract
-{
-    function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
+        address depositor = makeAddr("depositor");
+        address receiver = makeAddr("receiver");
+        uint256 amount = 100;
+        bytes memory erc20Metadata = DataEncoding.encodeTokenData(
+            originChainId,
+            abi.encode("Token"),
+            abi.encode("T"),
+            abi.encode(18)
+        );
+        bytes memory data = DataEncoding.encodeBridgeMintData(depositor, receiver, originToken, amount, erc20Metadata);
 
-    function initSystemContracts(
-        SystemContractsArgs memory _args
-    ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {
-        super.initSystemContracts(_args);
-    }
+        assertNotEq(block.chainid, originChainId);
 
-    function deployL2Contracts(
-        uint256 _l1ChainId
-    ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {
-        super.deployL2Contracts(_l1ChainId);
-    }
+        assertEq(l2NativeTokenVault.originChainId(assetId), 0);
+        assertEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+        assertEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), bytes32(0));
 
-    function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getChainCreationFacetCuts(stateTransition);
-    }
+        // this `mockCall` ensures the branch for legacy tokens is chosen
+        vm.mockCall(
+            sharedBridgeLegacy,
+            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (expectedL2TokenAddress)),
+            abi.encode(originToken)
+        );
+        // fails on the following line without this `mockCall`
+        // https://github.com/matter-labs/era-contracts/blob/cebfe26a41f3b83039a7d36558bf4e0401b154fc/l1-contracts/contracts/bridge/ntv/NativeTokenVault.sol#L163
+        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IBridgedStandardToken.bridgeMint, (receiver, amount)), "");
+        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(amount));
+        vm.prank(L2_ASSET_ROUTER_ADDR);
+        IAssetHandler(address(l2NativeTokenVault)).bridgeMint(originChainId, assetId, data);
 
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getUpgradeAddedFacetCuts(stateTransition);
-    }
-
-    function getInitializeCalldata(
-        string memory contractName
-    ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName);
+        assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);
+        assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+        assertNotEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), bytes32(0));
+        assertEq(l2NativeTokenVault.originChainId(assetId), originChainId);
+        assertEq(l2NativeTokenVault.tokenAddress(assetId), expectedL2TokenAddress);
+        assertEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), assetId);
     }
 }
