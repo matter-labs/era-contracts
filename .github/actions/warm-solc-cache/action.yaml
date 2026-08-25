@@ -52,7 +52,7 @@ runs:
     # duplicated basenames, and one directory can therefore hold artifacts from different sources
     # (out/L1NativeTokenVault.sol/ holds both the production contract and the test file's
     # contracts). A basename comparison keeps such a directory alive and its stale artifacts with
-    # it. Measured at ~1.5s over 994 artifacts.
+    # it.
     #
     # Only the directories this action actually restores are scanned. zkout is never restored
     # here — zksolc output is not reproducible across builds — and zksolc artifacts carry no

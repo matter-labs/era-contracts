@@ -64,7 +64,7 @@ jobs:
       # earlier runs saved, so a PR could plant a forged artifact plus a manifest vouching for it and
       # have check-hashes attest to bytecode that never came from its sources. Constraining the writer
       # is the only fix: verify-merged-commit.yaml builds clean and saves only after those checks pass.
-      # Costs a PR ~11s — its own incremental recompile — since it still warms from the base's cache.
+      # A PR pays only its own incremental recompile, since it still warms from the base's cache.
       - name: Create cache
         uses: actions/cache/save@v4
         with:
@@ -94,8 +94,8 @@ jobs:
             system-contracts/zkout
 
   # Kept as its own job rather than folded into `build` so a stale zkstack-out does not block
-  # every downstream job — but it now reuses `build`'s artifacts instead of repeating the same
-  # full compile from cold, which was ~7m of the ~9m it took.
+  # every downstream job — but it now reuses `build`'s artifacts instead of repeating that whole
+  # compile from cold, which was most of what the job spent.
   check-zkstack-out:
     needs: [build]
     runs-on: ubuntu-latest
@@ -392,8 +392,9 @@ jobs:
 
   # A group of specs per runner, sharded in-process within the job. A runner costs the same
   # whether it uses one core or four, so the parallelism inside a job is free while extra jobs
-  # are not: measured, one-spec-per-runner spent ~43 runner-minutes to reach ~7.0m wall clock,
-  # while two groups reach ~7.5m for ~14.
+  # are not: measured, one spec per runner spent roughly three times the runner minutes to save
+  # well under a minute of wall clock, because each job pays its own fixed setup and the leg cannot
+  # beat its longest single spec.
   coverage-anvil:
     # Without an explicit name, GitHub builds the job name from every matrix value, so the
     # spec list would end up in the check name and required-check names would shift whenever
@@ -406,8 +407,8 @@ jobs:
       # partial merge anyway, since it requires every group to report.
       fail-fast: false
       matrix:
-        # Listed by hand, so this file says what runs. Today's split is within 5% (354s vs 337s)
-        # while coverage-foundry at 383s dominates both, so rebalancing cannot move the stage.
+        # Listed by hand, so this file says what runs. The split is within a few percent, and
+        # coverage-foundry outlasts both groups, so rebalancing cannot move the stage's wall clock.
         #
         # A spec missing from these lists would never run, with every job green — so coverage-report
         # checks the specs the groups report having *run* against the specs on disk
