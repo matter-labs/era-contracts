@@ -1740,6 +1740,26 @@
     "evmDeployedBytecodeLength": 9911
   },
   {
+    "contractName": "l1-contracts/MultiProofTestnetVerifier",
+    "zkBytecodeHash": "0x010000b307c1a0b9bcc2828455eafbef495a21b3f9cd621f96ebd1bacb5e3c5f",
+    "zkBytecodePath": "/l1-contracts/zkout/MultiProofTestnetVerifier.sol/MultiProofTestnetVerifier.json",
+    "evmBytecodeHash": "0x7141985e8f80aceeb1a8c73201546d3998422127b026bcda359e80f9b8124c03",
+    "evmBytecodePath": "/l1-contracts/out/MultiProofTestnetVerifier.sol/MultiProofTestnetVerifier.json",
+    "evmDeployedBytecodeHash": "0x250c8b2ccadd933546912d7c6c1d12ebf45f2e2ab5ce29cb7b50e273a737f0a5",
+    "evmDeployedBytecodeBlakeHash": "0x5cb24e111e94e0358cd33b74dc3d8c1f6ecd002aca202ce6c7bcf6af09d849a7",
+    "evmDeployedBytecodeLength": 1660
+  },
+  {
+    "contractName": "l1-contracts/MultiProofVerifier",
+    "zkBytecodeHash": "0x0100012f427a77e0d7ceaa59d8218dc14dd90c0653705bafa5f01106a3b863ec",
+    "zkBytecodePath": "/l1-contracts/zkout/MultiProofVerifier.sol/MultiProofVerifier.json",
+    "evmBytecodeHash": "0xf29d781d7a4f5b1134b360890f684c9629a09edbff0c6ec45be55a1fc8c76c1e",
+    "evmBytecodePath": "/l1-contracts/out/MultiProofVerifier.sol/MultiProofVerifier.json",
+    "evmDeployedBytecodeHash": "0x0133d4ec7fd515f18972a5dd0eb96f7c5a0d5029cbf6c0264968157d7c027375",
+    "evmDeployedBytecodeBlakeHash": "0xf13fba1c6e3da904abcb2518f20c714b87a1f8d125ff29ae10f9eca104cd0772",
+    "evmDeployedBytecodeLength": 3860
+  },
+  {
     "contractName": "l1-contracts/MultisigCommitter",
     "zkBytecodeHash": "0x01000eb99fc75baafe5ab27a2cc1db66882af54927fea6a9500c1a66bf574307",
     "zkBytecodePath": "/l1-contracts/zkout/MultisigCommitter.sol/MultisigCommitter.json",
@@ -2298,6 +2318,16 @@
     "evmDeployedBytecodeHash": "0xad7e7b5f08e69ca1a01c611beccfc6a9633f59ca867a2443b5a64cf20c092712",
     "evmDeployedBytecodeBlakeHash": "0x1fea58b93ea846ce2cc2cab577b5af24419874d32a05fd56763ba3934284adbc",
     "evmDeployedBytecodeLength": 17229
+  },
+  {
+    "contractName": "l1-contracts/ZiskVerifier",
+    "zkBytecodeHash": "0x010000c5af6b1be9e4e23215d5450b09bf46d9811131404dedba1a2ad8a6dbb2",
+    "zkBytecodePath": "/l1-contracts/zkout/ZiskVerifier.sol/ZiskVerifier.json",
+    "evmBytecodeHash": "0x815633d7e6a88174fabde711469b1803745c4060bf4feab5b0abf905ee5810a4",
+    "evmBytecodePath": "/l1-contracts/out/ZiskVerifier.sol/ZiskVerifier.json",
+    "evmDeployedBytecodeHash": "0x9fac3adbde2b358c2f8e6bcb0790fdc7d03d8dc8b85f8789acb2fd840142a5db",
+    "evmDeployedBytecodeBlakeHash": "0x2c2693596817c5ca89f0245bd14db69a478a88d1a78630942e1536b3bfdc21db",
+    "evmDeployedBytecodeLength": 1815
   },
   {
     "contractName": "l1-contracts/console",
