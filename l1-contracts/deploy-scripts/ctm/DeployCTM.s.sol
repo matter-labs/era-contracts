@@ -27,7 +27,6 @@ import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
@@ -161,7 +160,13 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         deployVerifiers();
 
-        (ctmAddresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
+        // The CTM stores this contract and runs it for upgrades that need no custom upgrade logic — e.g.
+        // the verifier-only ones — so it has to match the VM of the ecosystem being deployed.
+        (, string memory defaultUpgradeName) = DeployCTML1OrGateway.resolve(
+            config.isZKsyncOS,
+            CTMContract.DefaultUpgrade
+        );
+        (ctmAddresses.stateTransition.defaultUpgrade) = deploySimpleContract(defaultUpgradeName, false);
         (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
         // The single owner chainAdmin does not have a separate control restriction contract.
