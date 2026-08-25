@@ -452,6 +452,13 @@ async function main() {
       // internal code ordering in every importing compilation unit (same-length,
       // different-bytes bytecode drift across ~93 contracts — measured, not
       // hypothetical). Remove entries here only together with a re-audit.
+      //
+      // TODO: drop this allowlist, and the nine declarations it covers, in the next
+      // release. It is cheapest to do together with the rest of the audited Era cut
+      // rather than on its own: touching `L1ContractErrors.sol` alone already moves
+      // 93 of 157 frozen hash rows, while the entire 33-file cut moves 95 — the churn
+      // unions rather than adds, so splitting it out multiplies the regeneration and
+      // re-audit work without making any single change cheaper.
       const FROZEN_UNUSED_ERRORS = new Set([
         "GenesisBatchCommitmentZero()",
         "GenesisIndexStorageZero()",
