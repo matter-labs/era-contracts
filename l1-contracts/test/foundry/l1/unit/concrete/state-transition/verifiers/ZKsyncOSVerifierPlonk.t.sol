@@ -34,8 +34,11 @@ contract ZKsyncOSVerifierPlonkTest is Test {
     uint256 constant Q_MOD = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
     uint256 constant R_MOD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
-    /// @dev The verification key hash recorded in the generated contract's header comment.
-    bytes32 constant EXPECTED_VK_HASH = 0xa81dc850a0724bcd62b7e5fbe60c62be32b4b45e33dd0d950f9c313e4684605a;
+    /// @dev The verification key hash recorded in the generated contract's header comment. Asserting
+    /// it here ties the key the contract actually loads to the one its header claims. A rotation of
+    /// the committed key is expected to fail this test: update the constant as part of that change,
+    /// deliberately, rather than treating the failure as flaky.
+    bytes32 constant EXPECTED_VK_HASH = 0x11acc8a8a687378c6fa8bb4198512e9a4a35c64c02c46195fb681f35558a511c;
 
     uint256[] public publicInputs;
     uint256[] public serializedProof;
