@@ -46,6 +46,74 @@ Supporting libraries:
 | `GenesisManifestLib` | `GenesisConfig` → genesis `ReleaseManifest`, capturing routing and pins at build time |
 | `CodehashPinLib`     | `requirePin` (reverts) / `pinHolds` (bool)                                            |
 
+## Contract map
+
+Who deploys what, who reads what. Solid = writes or drives; dashed = reads.
+
+```mermaid
+flowchart TB
+    subgraph fac["Factories — CREATE2, salt = manifest hash"]
+      RF["CTMReleaseFactory"]
+      TF["CTMTransitionFactory"]
+      CF["CoreRegistryFactory"]
+      BF["RegistryBootstrapMigrationFactory"]
+    end
+
+    subgraph obj["Write-once objects"]
+      REL["CTMRelease<br/>routing + pins, verifier,<br/>system hashes, genesis params"]
+      TRA["CTMTransition<br/>version edge, engine, schedule,<br/>L2 plan + DERIVED cuts"]
+      CR["CoreRegistry<br/>source-checked proxy rows"]
+      BOOT["RegistryBootstrapMigration<br/>pre-registry entry edge"]
+    end
+
+    subgraph exe["Bound executors"]
+      CE["CTMUpgradeExecutor"]
+      EE["EcosystemUpgradeExecutor"]
+    end
+
+    subgraph lib["Libraries"]
+      TDL["TransitionDeltaLib"]
+      RFR["ReleaseFacetReader"]
+      CUC["CTMUpgradeComposer"]
+      GML["GenesisManifestLib"]
+      CPL["CodehashPinLib"]
+    end
+
+    CTM["ChainTypeManager<br/>currentRelease · releaseFactory<br/>upgradeTransition · upgradeCutHash"]
+    DI["DiamondInit — genesis"]
+    BZU["BaseZkSyncUpgrade — upgrade"]
+
+    RF --> REL
+    TF --> TRA
+    CF --> CR
+    BF --> BOOT
+
+    GML --> REL
+    TRA -. "derive cuts + hash delta" .-> TDL
+    TDL -. "reads both releases" .-> REL
+
+    CE -- "applyCTMUpgrade / upgradeChain" --> CTM
+    CE -. "factory-attest + validate" .-> TRA
+    EE -. "factory-attest + validate" .-> CR
+    BOOT -- "one-time: anchors, then hands over" --> CE
+    BOOT --> EE
+
+    CTM -. currentRelease .-> REL
+    CTM -. "attestation" .-> RF
+    CTM -- "compose cut" --> CUC
+    CE -- "compose cut" --> CUC
+    CUC -. "engine, schedule, L2 plan" .-> TRA
+
+    DI -. "routing, verifier, hashes" .-> REL
+    DI --> RFR
+    BZU -. "derived cuts + proposal" .-> TRA
+    BZU --> CUC
+
+    REL -.-> CPL
+    TRA -.-> CPL
+    CR -.-> CPL
+```
+
 ## Authority
 
 ```mermaid
