@@ -57,6 +57,9 @@ interface IGetters is IZKChainBase {
     // @return Address of transaction filterer
     function getTransactionFilterer() external view returns (address);
 
+    /// @return Whether the chain settles on the Airbender proof alone, without a ZiSK proof.
+    function ziskVerificationDisabled() external view returns (bool);
+
     /// @return The total number of priority operations that were added to the priority queue, including all processed ones
     function getTotalPriorityTxs() external view returns (uint256);
 

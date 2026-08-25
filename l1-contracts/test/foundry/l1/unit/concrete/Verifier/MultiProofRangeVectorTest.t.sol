@@ -87,6 +87,15 @@ contract MultiProofRangeVectorTest is Test {
     MultiProofVerifier internal verifier;
     ZiskVerifier internal ziskVerifier;
 
+    /// @dev The verifier reads the requirement from its caller, which in
+    ///      production is the chain's diamond. The test contract calls it
+    ///      directly, so it stands in for that chain.
+    bool internal ziskDisabled;
+
+    function ziskVerificationDisabled() external view returns (bool) {
+        return ziskDisabled;
+    }
+
     function setUp() public {
         // The range verifier is the REAL ZiskVerifier. It reconstructs the ZiSK
         // public values from its own pins; the Plonk stand-in accepts iff the
