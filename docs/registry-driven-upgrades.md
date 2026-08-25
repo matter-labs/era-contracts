@@ -83,8 +83,8 @@ flowchart TB
     CE -- "applyCTMUpgrade / upgradeChain" --> CTM
     CE -. "codehash-check + validate" .-> TRA
     EE -. "codehash-check + validate" .-> CR
-    BOOT -- "one-time: anchors, then hands over" --> CE
-    BOOT --> EE
+    BOOT -- "one-time: hands over CTM ownership" --> CE
+    BOOT -- "one-time: hands over ProxyAdmin ownership" --> EE
 
     CTM -. currentRelease .-> REL
     CTM -. "codehash-check on setCurrentRelease" .-> REL

@@ -71,6 +71,6 @@ struct StateTransitionDeployedAddresses {
     /// @notice The bootstrap `CTMRelease` that defines chain genesis.
     address currentRelease;
     /// @notice The canonical `CTMReleaseFactory` that deployed (and attests) `currentRelease`.
-    ///         Transitions departing from this release pin it as their `releaseFactory`.
-    address releaseFactory;
+    ///         The CTM pins this as `releaseCodehash`: every release it accepts must run this code.
+    bytes32 releaseCodehash;
 }

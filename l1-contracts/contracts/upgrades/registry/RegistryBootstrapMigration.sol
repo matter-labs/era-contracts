@@ -132,8 +132,32 @@ contract RegistryBootstrapMigration {
             }
         }
 
-        manifest = _manifest;
         manifestHash = keccak256(abi.encode(_manifest));
+
+        // Field-by-field, not `manifest = _manifest`: the legacy codegen pipeline cannot copy a
+        // struct ARRAY from memory to storage, which a wholesale assignment would require for
+        // `proxyRows` and for the cut's `facetCuts`.
+        manifest.ctm = _manifest.ctm;
+        manifest.expectedProtocolVersion = _manifest.expectedProtocolVersion;
+        manifest.ctmProxyAdmin = _manifest.ctmProxyAdmin;
+        for (uint256 i = 0; i < rowsLength; ++i) {
+            manifest.proxyRows.push(_manifest.proxyRows[i]);
+        }
+        manifest.releaseCodehash = _manifest.releaseCodehash;
+        manifest.currentRelease = _manifest.currentRelease;
+        manifest.newProtocolVersion = _manifest.newProtocolVersion;
+        manifest.oldProtocolVersionDeadline = _manifest.oldProtocolVersionDeadline;
+        uint256 cutsLength = _manifest.upgradeCut.facetCuts.length;
+        for (uint256 i = 0; i < cutsLength; ++i) {
+            manifest.upgradeCut.facetCuts.push(_manifest.upgradeCut.facetCuts[i]);
+        }
+        manifest.upgradeCut.initAddress = _manifest.upgradeCut.initAddress;
+        manifest.upgradeCut.initCalldata = _manifest.upgradeCut.initCalldata;
+        manifest.upgradeCutInitCodehash = _manifest.upgradeCutInitCodehash;
+        manifest.ctmExecutor = _manifest.ctmExecutor;
+        manifest.ctmExecutorCodehash = _manifest.ctmExecutorCodehash;
+        manifest.ecosystemExecutor = _manifest.ecosystemExecutor;
+        manifest.ecosystemExecutorCodehash = _manifest.ecosystemExecutorCodehash;
     }
 
     /// @notice Reverts unless the live ecosystem is exactly the starting state the manifest names.

@@ -9,7 +9,6 @@ import {ChainTypeManagerInitializeData, IChainTypeManager} from "../../IChainTyp
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
-import {CTMReleaseFactory} from "../../../upgrades/registry/CTMRegistryFactory.sol";
 import {GenesisManifestLib} from "../../../upgrades/registry/GenesisManifestLib.sol";
 import {GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
 
@@ -96,13 +95,12 @@ abstract contract GatewayCTMDeployerCTMBase {
         // manifest (salt = manifest hash), so the off-chain prediction depends only on
         // (factory, manifest, creation code) — a front-runner cannot displace it by bumping
         // the factory's nonce.
-        address currentRelease = _deployCurrentRelease({
-            _releaseFactory: _config.bootstrapReleaseFactory,
-            _genesisUpgrade: _config.genesisUpgrade,
-            _baseConfig: baseConfig,
-            _facets: facets,
-            _verifier: _config.verifier
-        });
+        // TODO(gateway): a `CTMRelease` takes its manifest as a CONSTRUCTOR argument, and EraVM has
+        // no constructors — so it cannot be built as part of this flow and is supplied pre-deployed.
+        // Restoring in-flow deployment needs an EraVM-deployable factory that deploys and
+        // initializes atomically; that is what the removed `CTMRegistryFactory` did. Until then this
+        // deployer cannot stand up a Gateway CTM on its own.
+        address currentRelease = _config.currentRelease;
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
@@ -115,7 +113,7 @@ abstract contract GatewayCTMDeployerCTMBase {
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
             owner: baseConfig.aliasedGovernanceAddress,
             validatorTimelock: _config.validatorTimelockProxy,
-            releaseFactory: _config.bootstrapReleaseFactory,
+            releaseCodehash: _config.currentRelease.codehash,
             currentRelease: currentRelease,
             protocolVersion: baseConfig.protocolVersion,
             serverNotifier: _result.serverNotifierProxy
@@ -132,40 +130,6 @@ abstract contract GatewayCTMDeployerCTMBase {
         );
     }
 
-    /// @notice Deploys + initializes the bootstrap release with the genesis manifest, in ONE
-    ///         transaction, through the directly-deployed release factory. The facet order and
-    ///         freezability mirror the diamond's installed set.
-    /// @param _releaseFactory The pre-deployed `CTMReleaseFactory` address.
-    /// @param _genesisUpgrade The L1 genesis upgrade contract new chains run at creation.
-    /// @param _baseConfig The deployment config (base system hashes, genesis params).
-    /// @param _facets The deployed diamond facet addresses.
-    /// @param _verifier The verifier a chain at this release runs.
-    /// @return release The initialized bootstrap release.
-    /// @dev A release is version-INDEPENDENT: no protocol version is pinned here; the CTM holds it.
-    function _deployCurrentRelease(
-        address _releaseFactory,
-        address _genesisUpgrade,
-        GatewayCTMDeployerConfig memory _baseConfig,
-        Facets memory _facets,
-        address _verifier
-    ) internal returns (address release) {
-        release = CTMReleaseFactory(_releaseFactory).deployOrGetRelease(
-            GenesisManifestLib.buildGenesisManifest(
-                GenesisManifestLib.GenesisConfig({
-                    facets: _facets,
-                    verifier: _verifier,
-                    bootloaderHash: _baseConfig.bootloaderHash,
-                    defaultAccountHash: _baseConfig.defaultAccountHash,
-                    evmEmulatorHash: _baseConfig.evmEmulatorHash,
-                    genesisUpgrade: _genesisUpgrade,
-                    genesisBatchHash: _baseConfig.genesisRoot,
-                    genesisBatchCommitment: _baseConfig.genesisBatchCommitment,
-                    genesisIndexRepeatedStorageChanges: uint64(_baseConfig.genesisRollupLeafIndex),
-                    fixedForceDeploymentsData: _baseConfig.forceDeploymentsData
-                })
-            )
-        );
-    }
 
     /// @notice Sets the previously deployed CTM inside the ServerNotifier and transfers ownership.
     /// @param _aliasedGovernanceAddress The aliased address of the governance.

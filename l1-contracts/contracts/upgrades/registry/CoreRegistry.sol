@@ -33,11 +33,12 @@ contract CoreRegistry is ICoreRegistry {
                               STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice `keccak256(abi.encode(manifest))` of the pinned manifest — a single 32-byte
-    ///         commitment to every value this registry serves.
+    /// @notice `keccak256(abi.encode(manifest))`. No contract reads this — it is a review aid, a
+    ///         single value to compare against the audited manifest. Provenance is the codehash.
     bytes32 public manifestHash;
 
-    EcosystemContractRow[] internal contractRows;
+    /// @dev THE manifest; the getters read out of this rather than a transcribed copy.
+    CoreRegistryManifest internal manifest;
 
     /*//////////////////////////////////////////////////////////////
                              CONSTRUCTION
@@ -70,8 +71,10 @@ contract CoreRegistry is ICoreRegistry {
         }
         manifestHash = keccak256(abi.encode(_manifest));
 
+        // Field-by-field: the legacy codegen pipeline cannot copy a struct ARRAY from memory to
+        // storage, so `manifest = _manifest` is not available here.
         for (uint256 i = 0; i < length; ++i) {
-            contractRows.push(_manifest.contractRows[i]);
+            manifest.contractRows.push(_manifest.contractRows[i]);
         }
     }
 
@@ -81,14 +84,14 @@ contract CoreRegistry is ICoreRegistry {
 
     /// @inheritdoc ICoreRegistry
     function ecosystemRows() external view returns (EcosystemContractRow[] memory) {
-        return contractRows;
+        return manifest.contractRows;
     }
 
     /// @inheritdoc ICoreRegistry
     function verifyAll() external view returns (bool) {
-        uint256 length = contractRows.length;
+        uint256 length = manifest.contractRows.length;
         for (uint256 i = 0; i < length; ++i) {
-            if (!CodehashPinLib.pinHolds(contractRows[i].implNew, contractRows[i].implNewCodehash)) {
+            if (!CodehashPinLib.pinHolds(manifest.contractRows[i].implNew, manifest.contractRows[i].implNewCodehash)) {
                 return false;
             }
         }
@@ -97,9 +100,9 @@ contract CoreRegistry is ICoreRegistry {
 
     /// @inheritdoc ICoreRegistry
     function validate() external view {
-        uint256 length = contractRows.length;
+        uint256 length = manifest.contractRows.length;
         for (uint256 i = 0; i < length; ++i) {
-            _requirePin(contractRows[i].implNew, contractRows[i].implNewCodehash);
+            _requirePin(manifest.contractRows[i].implNew, manifest.contractRows[i].implNewCodehash);
         }
     }
 

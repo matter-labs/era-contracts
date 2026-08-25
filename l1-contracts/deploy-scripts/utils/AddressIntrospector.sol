@@ -262,7 +262,7 @@ library AddressIntrospector {
             // zero; from v32 on the live pointers are read, otherwise callers that merely
             // introspect (rather than deploy) would silently see an unanchored CTM.
             currentRelease: _isPreV32 ? address(0) : ctm.currentRelease(),
-            releaseFactory: _isPreV32 ? address(0) : ctm.releaseFactory()
+            releaseCodehash: _isPreV32 ? bytes32(0) : ctm.releaseCodehash()
         });
         info.l1Specific = L1SpecificStateTransitionAddresses({
             legacyValidatorTimelock: ctm.validatorTimelock(),

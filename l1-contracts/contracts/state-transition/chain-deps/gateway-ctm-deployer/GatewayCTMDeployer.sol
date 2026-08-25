@@ -149,7 +149,7 @@ struct GatewayCTMFinalConfig {
     ///         uninitialized, front-runnable instance ever exists on Gateway. The factory (not
     ///         the release contract) is embedded directly because embedding the release's
     ///         creation code here would push the deployer's initcode past the EIP-3860 cap.
-    address bootstrapReleaseFactory;
+    address currentRelease;
 }
 
 /// @notice Result from CTM deployer.

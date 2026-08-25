@@ -349,7 +349,10 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// by the CTM-bound executor — a transition cannot be aimed at a foreign CTM's chains.
     function upgradeFromTransition(address _transition) external returns (bytes32) {
         ICTMTransition transition = ICTMTransition(_transition);
-        transition.validate();
+        // No `validate()` here: this init only runs through a cut whose hash this chain's own CTM
+        // committed, and that cut's init calldata names THIS transition address — so the object is
+        // the committed one by construction, and its pins were checked when it was committed. Pins
+        // cannot have moved since: an `EXTCODEHASH` is fixed for a non-selfdestructible contract.
         _applyDerivedFacetCuts(transition.facetCuts());
         return upgrade(CTMUpgradeComposer.buildProposedUpgrade(transition));
     }

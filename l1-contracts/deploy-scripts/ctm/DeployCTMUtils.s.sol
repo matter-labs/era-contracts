@@ -10,7 +10,6 @@ import {ChainTypeManagerInitializeData} from "contracts/state-transition/IChainT
 import {ChainCreationParams} from "contracts/state-transition/ILegacyChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
-import {CTMReleaseFactory} from "contracts/upgrades/registry/CTMRegistryFactory.sol";
 import {GenesisManifestLib} from "contracts/upgrades/registry/GenesisManifestLib.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
@@ -133,7 +132,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     /// canonical factory's address a function of the broadcaster's NONCE — un-replayable from
     /// recorded governance bundles and impossible to predict for stage calldata; the CTM pins
     /// this address as its release-provenance anchor, so it must be a commitment, not an accident.
-    /// @dev Deploy + initialize happen atomically inside {CTMReleaseFactory.deployOrGetRelease} (one
+    /// @dev The manifest is a constructor argument, so there is no deployed-but-uninitialized window (one
     /// transaction), so the release is already initialized when its address is returned — there is
     /// no uninitialized, front-runnable window on the unauthenticated `initialize`.
     function deployCurrentRelease() internal returns (address) {
@@ -162,11 +161,9 @@ abstract contract DeployCTMUtils is DeployUtils {
             })
         );
 
-        CTMReleaseFactory factory = CTMReleaseFactory(deployViaCreate2(type(CTMReleaseFactory).creationCode));
-        ctmAddresses.stateTransition.releaseFactory = address(factory);
-
         vm.broadcast(getBroadcasterAddress());
-        address release = factory.deployOrGetRelease(manifest);
+        address release = address(new CTMRelease(manifest));
+        ctmAddresses.stateTransition.releaseCodehash = release.codehash;
 
         // Deploy + initialize ran in one transaction inside the factory, so the release is already
         // initialized here with no front-runnable window; this is now a pure sanity assertion.
@@ -266,7 +263,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             ChainTypeManagerInitializeData({
                 owner: getBroadcasterAddress(),
                 validatorTimelock: stateTransition.proxies.validatorTimelock,
-                releaseFactory: stateTransition.releaseFactory,
+                releaseCodehash: stateTransition.releaseCodehash,
                 currentRelease: stateTransition.currentRelease,
                 protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
                 serverNotifier: stateTransition.proxies.serverNotifier

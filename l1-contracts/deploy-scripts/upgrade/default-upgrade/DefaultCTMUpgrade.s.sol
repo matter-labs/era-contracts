@@ -666,12 +666,12 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         // revert the whole bundle.
         address ctmProxy = ctmAddresses.stateTransition.proxies.chainTypeManager;
         address release = ctmAddresses.stateTransition.currentRelease;
-        address releaseFactory = ctmAddresses.stateTransition.releaseFactory;
         require(release != address(0), "current release not deployed");
-        require(releaseFactory != address(0), "release factory not deployed");
+        bytes32 releaseCodehash = release.codehash;
+        require(releaseCodehash != bytes32(0), "current release has no code");
 
         // The anchor call is emitted unconditionally. It cannot be decided from a live read: the
-        // CTM only gained `releaseFactory()` in v32, so querying the pre-registry implementation
+        // CTM only gained `releaseCodehash()` in v32, so querying the pre-registry implementation
         // this bundle is about to replace would revert during calldata GENERATION. Emitting it
         // always is safe because the setter is idempotent for an identical value and rejects only
         // a genuine re-point — which would mean the pinned release is not attested anyway.
@@ -679,7 +679,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         calls[0] = ctmCall;
         calls[1] = Call({
             target: ctmProxy,
-            data: abi.encodeCall(IChainTypeManager.setReleaseFactory, (releaseFactory)),
+            data: abi.encodeCall(IChainTypeManager.setReleaseCodehash, (releaseCodehash)),
             value: 0
         });
         calls[2] = Call({

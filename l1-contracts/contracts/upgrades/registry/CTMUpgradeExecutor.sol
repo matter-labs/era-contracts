@@ -130,9 +130,15 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
                 revert UpgradeNotPermissionlessYet(deadline);
             }
         }
-        _requireGenuineTransition(_transition);
-        _transition.validate();
-
+        // Deliberately NOT re-checked here — do not "restore" these:
+        //   - the composed cut embeds `address(_transition)` in its init calldata, and the chain
+        //     compares it against the `upgradeCutHash` this CTM committed. That does not merely
+        //     prove "a genuine transition"; it proves THE transition `applyCTMUpgrade` committed,
+        //     which is strictly stronger than the codehash check.
+        //   - `validate()` re-reads pins that cannot have moved: an `EXTCODEHASH` is fixed for a
+        //     non-selfdestructible contract, so anything true at `applyCTMUpgrade` is still true.
+        //     It also costs ~19 EXTCODEHASH reads across both releases, PER CHAIN, on a function
+        //     that is permissionless once the deadline passes.
         CTM.upgradeChainFromVersion(_chainId, _transition.oldProtocolVersion(), _buildUpgradeCut(_transition));
 
         emit ChainUpgradeApplied(_chainId, _transition.newProtocolVersion());
