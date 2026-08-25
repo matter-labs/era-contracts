@@ -26,6 +26,9 @@ import "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
 import "contracts/l2-upgrades/ISystemContractProxy.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
+import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
+import {L2GenesisUpgrade} from "contracts/l2-upgrades/L2GenesisUpgrade.sol";
+import {InvalidChainId} from "contracts/common/L1ContractErrors.sol";
 
 /**
  * @title L2GenesisForceDeploymentsHelperTest
@@ -396,6 +399,66 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             L1_CHAIN_ID,
             "flow manager not initialized"
         );
+    }
+
+    /// @dev Exercises the `L2GenesisUpgrade` entry point the way genesis actually reaches it: the force
+    /// deployer calls the complex upgrader, which delegatecalls into the genesis upgrade. The tests above
+    /// call `performForceDeployedContractsInit` directly, so they do not cover this wrapper.
+    function test_SuccessfulGenesisUpgrade() public {
+        _setUpGenesisUpgradeEntryPoint();
+
+        bytes memory genesisUpgradeCalldata = abi.encodeWithSelector(
+            IL2GenesisUpgrade.genesisUpgrade.selector,
+            true, // _isZKsyncOS
+            ERA_CHAIN_ID,
+            ctmDeployerAddress,
+            abi.encode(_createFixedForceDeploymentsData(true)),
+            abi.encode(_createAdditionalForceDeploymentsData())
+        );
+
+        // The genesis upgrade is delegatecalled, so it emits from the complex upgrader's address.
+        vm.expectEmit(true, false, false, true, L2_COMPLEX_UPGRADER_ADDR);
+        emit IL2GenesisUpgrade.UpgradeComplete(ERA_CHAIN_ID);
+
+        vm.recordLogs();
+        vm.prank(L2_FORCE_DEPLOYER_ADDR);
+        L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(L2_GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata);
+
+        // The wrapper must actually drive the force-deployment init, not just emit.
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(_countLogs(logs, FORCE_DEPLOYED_CONTRACTS_INITIALIZED_SIG), 1);
+        _assertAtomicInteropInitialized();
+    }
+
+    function test_RevertWhen_GenesisUpgradeChainIdZero() public {
+        _setUpGenesisUpgradeEntryPoint();
+
+        bytes memory genesisUpgradeCalldata = abi.encodeWithSelector(
+            IL2GenesisUpgrade.genesisUpgrade.selector,
+            true, // _isZKsyncOS
+            uint256(0),
+            ctmDeployerAddress,
+            abi.encode(_createFixedForceDeploymentsData(true)),
+            abi.encode(_createAdditionalForceDeploymentsData())
+        );
+
+        vm.expectRevert(InvalidChainId.selector);
+        vm.prank(L2_FORCE_DEPLOYER_ADDR);
+        L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(L2_GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata);
+    }
+
+    /// @dev Places the real upgrader/genesis-upgrade bytecode at their canonical addresses. Under the
+    /// delegatecall the helper sees `address(this)` as the complex upgrader, so the proxy admin owner
+    /// must be mocked to that address rather than to the test contract.
+    function _setUpGenesisUpgradeEntryPoint() internal {
+        vm.etch(L2_COMPLEX_UPGRADER_ADDR, address(new L2ComplexUpgrader()).code);
+        vm.etch(L2_GENESIS_UPGRADE_ADDR, address(new L2GenesisUpgrade()).code);
+        vm.mockCall(
+            L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
+            abi.encodeWithSignature("owner()"),
+            abi.encode(L2_COMPLEX_UPGRADER_ADDR)
+        );
+        _etchAllDeferredContracts();
     }
 }
 
