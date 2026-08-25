@@ -8,7 +8,6 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 
 import {EcosystemContractRow} from "./ICoreRegistry.sol";
 import {CodehashPinLib} from "./CodehashPinLib.sol";
-import {CTMReleaseFactory} from "./CTMRegistryFactory.sol";
 import {CTMUpgradeExecutor} from "./CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "./EcosystemUpgradeExecutor.sol";
 import {ICTMRelease} from "./ICTMRelease.sol";
@@ -52,8 +51,8 @@ contract RegistryBootstrapMigration {
     /// @param proxyRows Source-checked implementation swaps: each row applies only if the proxy
     ///        currently points at `expectedOldImpl`, and each `implNew` carries an inline pin. The
     ///        CTM's own implementation swap is one of these rows.
-    /// @param releaseFactory The canonical provenance anchor installed on the CTM.
-    /// @param releaseFactoryCodehash Inline pin of `releaseFactory`.
+    /// @param releaseCodehash The canonical provenance anchor installed on the CTM: the
+    ///        `EXTCODEHASH` every release this CTM pins must run.
     /// @param currentRelease The genesis release pinned as `currentRelease`; must be attested by
     ///        `releaseFactory`, which the CTM re-checks itself.
     /// @param newProtocolVersion The version the CTM moves to.
@@ -76,8 +75,7 @@ contract RegistryBootstrapMigration {
         uint256 expectedProtocolVersion;
         ProxyAdmin ctmProxyAdmin;
         EcosystemContractRow[] proxyRows;
-        address releaseFactory;
-        bytes32 releaseFactoryCodehash;
+        bytes32 releaseCodehash;
         address currentRelease;
         uint256 newProtocolVersion;
         uint256 oldProtocolVersionDeadline;
@@ -92,9 +90,6 @@ contract RegistryBootstrapMigration {
     /// @notice Commitment to the pinned manifest — the 32 bytes governance approves.
     bytes32 public manifestHash;
 
-    /// @notice Set once `initialize` has run; the manifest is immutable afterwards.
-    bool public initialized;
-
     /// @notice Set once `migrate` has run. The edge is one-shot: replaying it would re-check a
     ///         starting state that no longer exists anyway, but failing loudly is clearer.
     bool public executed;
@@ -104,15 +99,11 @@ contract RegistryBootstrapMigration {
     /// @notice Emitted once the ecosystem has crossed into the registry-driven model.
     event EcosystemBootstrapped(address indexed ctm, address indexed currentRelease, uint256 newProtocolVersion);
 
-    /// @notice One-shot initialization from the audited manifest.
-    function initialize(BootstrapManifest calldata _manifest) external {
-        if (initialized) {
-            revert RegistryAlreadyInitialized();
-        }
+    /// @notice Pins the audited manifest at construction; the manifest is immutable afterwards.
+    constructor(BootstrapManifest memory _manifest) {
         if (
             _manifest.ctm == address(0) ||
             address(_manifest.ctmProxyAdmin) == address(0) ||
-            _manifest.releaseFactory == address(0) ||
             _manifest.currentRelease == address(0) ||
             _manifest.ctmExecutor == address(0) ||
             _manifest.ecosystemExecutor == address(0)
@@ -130,7 +121,7 @@ contract RegistryBootstrapMigration {
         // against the same pre-migration implementation) and the last one would silently win — so
         // the edge governance reviewed would not be the edge that executes.
         for (uint256 i = 0; i < rowsLength; ++i) {
-            EcosystemContractRow calldata row = _manifest.proxyRows[i];
+            EcosystemContractRow memory row = _manifest.proxyRows[i];
             if (row.proxy == address(0) || row.expectedOldImpl == address(0) || row.implNew == address(0)) {
                 revert ZeroAddress();
             }
@@ -143,7 +134,6 @@ contract RegistryBootstrapMigration {
 
         manifest = _manifest;
         manifestHash = keccak256(abi.encode(_manifest));
-        initialized = true;
     }
 
     /// @notice Reverts unless the live ecosystem is exactly the starting state the manifest names.
@@ -153,9 +143,6 @@ contract RegistryBootstrapMigration {
     ///      than ecosystem state this object pins. A migration that passes here can still revert
     ///      inside `migrate` if it is run outside that window.
     function validate() public view {
-        if (!initialized) {
-            revert RegistryUnknownKey();
-        }
         BootstrapManifest storage m = manifest;
 
         // Authority must already rest here, or `migrate` could not perform any of the work.
@@ -202,16 +189,12 @@ contract RegistryBootstrapMigration {
             row.implNew.requirePin(row.implNewCodehash);
         }
 
-        m.releaseFactory.requirePin(m.releaseFactoryCodehash);
         m.upgradeCut.initAddress.requirePin(m.upgradeCutInitCodehash);
 
-        // The release must be attested by the very factory this migration installs, so the anchor
+        // The release must run the very code this migration installs as the anchor, so the anchor
         // and the release it vouches for cannot be mismatched at the moment of installation.
         ICTMRelease(m.currentRelease).validate();
-        if (
-            CTMReleaseFactory(m.releaseFactory).deployedFor(ICTMRelease(m.currentRelease).manifestHash()) !=
-            m.currentRelease
-        ) {
+        if (m.currentRelease.codehash != m.releaseCodehash) {
             revert NotFactoryDeployed(m.currentRelease);
         }
     }
@@ -256,7 +239,7 @@ contract RegistryBootstrapMigration {
             _newProtocolVersion: m.newProtocolVersion
         });
         // The anchor first: `setCurrentRelease` checks the release against it.
-        ctm.setReleaseFactory(m.releaseFactory);
+        ctm.setReleaseCodehash(m.releaseCodehash);
         ctm.setCurrentRelease(m.currentRelease);
 
         // Authority leaves in the same transaction it arrived. The ProxyAdmin is plain `Ownable`,

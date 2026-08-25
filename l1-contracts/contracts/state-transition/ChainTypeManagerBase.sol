@@ -16,7 +16,6 @@ import {ICTMRelease} from "../upgrades/registry/ICTMRelease.sol";
 import {ICTMTransition} from "../upgrades/registry/ICTMTransition.sol";
 import {CTMUpgradeComposer} from "../upgrades/registry/CTMUpgradeComposer.sol";
 import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
-import {CTMReleaseFactory} from "../upgrades/registry/CTMRegistryFactory.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
@@ -27,7 +26,8 @@ import {
     ChainAlreadyLive,
     MigrationsNotPaused,
     NotFactoryDeployed,
-    RegistryReleaseFactoryAlreadySet,
+    EmptyBytes32,
+    RegistryReleaseCodehashAlreadySet,
     Unauthorized,
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
@@ -124,9 +124,9 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// unanswerable.
     address public currentRelease;
 
-    /// @notice The canonical `CTMReleaseFactory` — every release this CTM pins must be attested
-    ///         by it (see `_storeCurrentRelease`). Set once at initialization.
-    address public releaseFactory;
+    /// @notice `EXTCODEHASH` of the audited `CTMRelease`. Every release this CTM pins must run
+    ///         exactly that code (see `_storeCurrentRelease`). Set once at initialization.
+    bytes32 public releaseCodehash;
 
     /// @notice The transition committed for chains departing from a given protocol version — the
     ///         SAME object the cut's init calldata names, so a chain can rebuild that cut instead of
@@ -235,11 +235,11 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         validatorTimelockPostV29 = _initializeData.validatorTimelock;
         serverNotifierAddress = _initializeData.serverNotifier;
 
-        if (_initializeData.releaseFactory == address(0)) {
-            revert ZeroAddress();
+        if (_initializeData.releaseCodehash == bytes32(0)) {
+            revert EmptyBytes32();
         }
-        releaseFactory = _initializeData.releaseFactory;
-        emit NewReleaseFactory(_initializeData.releaseFactory);
+        releaseCodehash = _initializeData.releaseCodehash;
+        emit NewReleaseCodehash(_initializeData.releaseCodehash);
         _setCurrentRelease(_initializeData.currentRelease);
     }
 
@@ -250,7 +250,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         _setCurrentRelease(_release);
     }
 
-    /// @notice One-shot migration setter for the canonical release factory. Freshly initialized
+    /// @notice One-shot migration setter for the canonical release codehash. Freshly initialized
     ///         CTMs receive it in `initialize`; CTMs MIGRATED from pre-registry versions (whose
     ///         storage predates the field) set it during their migration, BEFORE the first
     ///         `setCurrentRelease` — release provenance cannot be checked against a zero factory.
@@ -262,19 +262,19 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev Re-setting the anchor to the value it already holds is a no-op rather than a revert, so
     ///      one upgrade bundle works against both a migrated CTM (anchor still zero) and an
     ///      already-anchored one without the calldata having to predict which it is.
-    function setReleaseFactory(address _releaseFactory) external onlyOwner {
-        if (_releaseFactory == address(0)) {
-            revert ZeroAddress();
+    function setReleaseCodehash(bytes32 _releaseCodehash) external onlyOwner {
+        if (_releaseCodehash == bytes32(0)) {
+            revert EmptyBytes32();
         }
-        address currentFactory = releaseFactory;
-        if (currentFactory == _releaseFactory) {
+        bytes32 current = releaseCodehash;
+        if (current == _releaseCodehash) {
             return;
         }
-        if (currentFactory != address(0)) {
-            revert RegistryReleaseFactoryAlreadySet(currentFactory);
+        if (current != bytes32(0)) {
+            revert RegistryReleaseCodehashAlreadySet(current);
         }
-        releaseFactory = _releaseFactory;
-        emit NewReleaseFactory(_releaseFactory);
+        releaseCodehash = _releaseCodehash;
+        emit NewReleaseCodehash(_releaseCodehash);
     }
 
     function _storeCurrentRelease(address _release) internal {
@@ -285,7 +285,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         // passes through (bootstrap initialize and every later transition alike). The canonical
         // factory is CTM state, never authored inside permissionless transition manifests, so a
         // fake factory cannot attest an arbitrary (possibly mutable) ICTMRelease implementation.
-        if (CTMReleaseFactory(releaseFactory).deployedFor(ICTMRelease(_release).manifestHash()) != _release) {
+        if (_release.codehash != releaseCodehash) {
             revert NotFactoryDeployed(_release);
         }
         currentRelease = _release;

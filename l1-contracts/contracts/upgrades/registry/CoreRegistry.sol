@@ -33,9 +33,6 @@ contract CoreRegistry is ICoreRegistry {
                               STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice One-shot guard: false until {initialize} runs, true forever after.
-    bool public initialized;
-
     /// @notice `keccak256(abi.encode(manifest))` of the pinned manifest — a single 32-byte
     ///         commitment to every value this registry serves.
     bytes32 public manifestHash;
@@ -43,23 +40,21 @@ contract CoreRegistry is ICoreRegistry {
     EcosystemContractRow[] internal contractRows;
 
     /*//////////////////////////////////////////////////////////////
-                              INITIALIZE
+                             CONSTRUCTION
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Pins the full manifest. Callable exactly once; there is no other state-mutating
-    ///         function on this contract.
+    /// @notice Pins the full manifest. This contract has NO state-mutating function at all — the
+    ///         manifest is written once, at construction, so write-once is structural rather than
+    ///         a runtime guard, and `manifestHash` can never describe a stale object.
     /// @param _manifest The manifest to pin.
-    function initialize(CoreRegistryManifest calldata _manifest) external {
-        if (initialized) {
-            revert RegistryAlreadyInitialized();
-        }
+    constructor(CoreRegistryManifest memory _manifest) {
         // Sentinel against pinning an empty manifest.
         uint256 length = _manifest.contractRows.length;
         if (length == 0) {
             revert RegistryUnknownKey();
         }
         for (uint256 i = 0; i < length; ++i) {
-            EcosystemContractRow calldata row = _manifest.contractRows[i];
+            EcosystemContractRow memory row = _manifest.contractRows[i];
             // Every row is a REAL, unique edge: known source, pinned target, one row per proxy.
             // Placeholder rows (zero implNew) are refused — a contract not participating in the
             // upgrade simply has no row.
@@ -73,7 +68,6 @@ contract CoreRegistry is ICoreRegistry {
                 }
             }
         }
-        initialized = true;
         manifestHash = keccak256(abi.encode(_manifest));
 
         for (uint256 i = 0; i < length; ++i) {
@@ -92,10 +86,6 @@ contract CoreRegistry is ICoreRegistry {
 
     /// @inheritdoc ICoreRegistry
     function verifyAll() external view returns (bool) {
-        // An uninitialized registry has nothing pinned — it must not read as verified.
-        if (!initialized) {
-            return false;
-        }
         uint256 length = contractRows.length;
         for (uint256 i = 0; i < length; ++i) {
             if (!CodehashPinLib.pinHolds(contractRows[i].implNew, contractRows[i].implNewCodehash)) {
@@ -107,9 +97,6 @@ contract CoreRegistry is ICoreRegistry {
 
     /// @inheritdoc ICoreRegistry
     function validate() external view {
-        if (!initialized) {
-            revert RegistryUnknownKey();
-        }
         uint256 length = contractRows.length;
         for (uint256 i = 0; i < length; ++i) {
             _requirePin(contractRows[i].implNew, contractRows[i].implNewCodehash);

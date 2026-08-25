@@ -415,7 +415,7 @@ error RegistryMissingBaseSystemHash();
 // 0xa0c88a92
 error RegistryPinTargetHasNoCode(address target);
 // 0x9aae4ff8
-error RegistryReleaseFactoryAlreadySet(address current);
+error RegistryReleaseCodehashAlreadySet(bytes32 current);
 // 0x1f20dafa
 error RegistryUnknownKey();
 // 0x3ea1345a

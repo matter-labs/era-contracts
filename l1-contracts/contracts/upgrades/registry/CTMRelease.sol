@@ -38,7 +38,6 @@ contract CTMRelease is ICTMRelease {
         uint64 genesisIndexRepeatedStorageChanges;
     }
 
-    bool public initialized;
     bytes32 public manifestHash;
 
     address internal releaseDiamondInit;
@@ -56,10 +55,10 @@ contract CTMRelease is ICTMRelease {
     bytes32 internal genesisBatchCommitment;
     uint64 internal genesisIndexRepeatedStorageChanges;
 
-    function initialize(ReleaseManifest calldata _manifest) external {
-        if (initialized) {
-            revert RegistryAlreadyInitialized();
-        }
+    /// @notice Pins the full manifest. There is NO state-mutating function on this contract: the
+    ///         manifest is written once, at construction, so write-once is structural rather than a
+    ///         runtime guard and `manifestHash` can never describe a stale object.
+    constructor(ReleaseManifest memory _manifest) {
         if (
             _manifest.diamondInit == address(0) ||
             _manifest.genesisUpgrade == address(0) ||
@@ -113,7 +112,6 @@ contract CTMRelease is ICTMRelease {
             }
         }
 
-        initialized = true;
         manifestHash = keccak256(abi.encode(_manifest));
         releaseDiamondInit = _manifest.diamondInit;
         diamondInitCodehash = _manifest.diamondInitCodehash;
@@ -158,9 +156,6 @@ contract CTMRelease is ICTMRelease {
     }
 
     function validate() external view {
-        if (!initialized) {
-            revert RegistryUnknownKey();
-        }
         _requirePin(releaseDiamondInit, diamondInitCodehash);
         _requirePin(genesisUpgrade, genesisUpgradeCodehash);
         _requirePin(releaseVerifier, verifierCodehash);
@@ -171,9 +166,6 @@ contract CTMRelease is ICTMRelease {
     }
 
     function verifyAll() external view returns (bool) {
-        if (!initialized) {
-            return false;
-        }
         if (
             !CodehashPinLib.pinHolds(releaseDiamondInit, diamondInitCodehash) ||
             !CodehashPinLib.pinHolds(genesisUpgrade, genesisUpgradeCodehash) ||

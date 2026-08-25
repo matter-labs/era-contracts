@@ -51,7 +51,6 @@ contract CTMTransition is ICTMTransition {
         L2UpgradePlan l2Plan;
     }
 
-    bool public initialized;
     bytes32 public manifestHash;
 
     uint256 internal transitionOldProtocolVersion;
@@ -71,10 +70,9 @@ contract CTMTransition is ICTMTransition {
     bytes32 internal derivedDefaultAccountChange;
     bytes32 internal derivedEvmEmulatorChange;
 
-    function initialize(TransitionManifest calldata _manifest) external {
-        if (initialized) {
-            revert RegistryAlreadyInitialized();
-        }
+    /// @notice Pins the manifest and DERIVES the delta. No state-mutating function exists on this
+    ///         contract: everything is written once, at construction.
+    constructor(TransitionManifest memory _manifest) {
         // `fromRelease` is MANDATORY: every transition departs from a real, pinned release.
         // Bootstrapping a pre-registry CTM is one-time migration code, never an accommodation
         // here; see the Bootstrap section of {docs/registry-driven-upgrades.md}.
@@ -159,7 +157,6 @@ contract CTMTransition is ICTMTransition {
             revert SameReleaseTransitionHasPayload();
         }
 
-        initialized = true;
         manifestHash = keccak256(abi.encode(_manifest));
         transitionOldProtocolVersion = _manifest.oldProtocolVersion;
         transitionNewProtocolVersion = _manifest.newProtocolVersion;
@@ -232,18 +229,12 @@ contract CTMTransition is ICTMTransition {
     }
 
     function validate() external view {
-        if (!initialized) {
-            revert RegistryUnknownKey();
-        }
         ICTMRelease(transitionNewRelease).validate();
         ICTMRelease(transitionFromRelease).validate();
         _requirePin(transitionUpgradeEngine, upgradeEngineCodehash);
     }
 
     function verifyAll() external view returns (bool) {
-        if (!initialized) {
-            return false;
-        }
         if (!ICTMRelease(transitionNewRelease).verifyAll() || !ICTMRelease(transitionFromRelease).verifyAll()) {
             return false;
         }

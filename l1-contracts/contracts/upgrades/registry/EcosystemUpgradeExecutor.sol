@@ -6,9 +6,8 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {ICoreRegistry, EcosystemContractRow} from "./ICoreRegistry.sol";
-import {CoreRegistryFactory} from "./CTMRegistryFactory.sol";
 import {UpgradeExecutorBase} from "../../governance/UpgradeExecutorBase.sol";
-import {EcosystemImplMismatch, NotFactoryDeployed, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {EcosystemImplMismatch, EmptyBytes32, NotFactoryDeployed, ZeroAddress} from "../../common/L1ContractErrors.sol";
 
 /// @title EcosystemUpgradeExecutor
 /// @author Matter Labs
@@ -25,10 +24,9 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
     ///         admin pointer; the binding is this immutable.
     ProxyAdmin public immutable PROXY_ADMIN;
 
-    /// @notice The one trusted core-registry factory. Every registry this executor accepts must
-    ///         have been deployed (atomically initialized, write-once, audited code) by THIS
-    ///         factory — see `CTMUpgradeExecutor.TRANSITION_FACTORY` for the provenance model.
-    CoreRegistryFactory public immutable CORE_REGISTRY_FACTORY;
+    /// @notice `EXTCODEHASH` of the audited `CoreRegistry` — see
+    ///         `CTMUpgradeExecutor.TRANSITION_CODEHASH` for the provenance model.
+    bytes32 public immutable CORE_REGISTRY_CODEHASH;
 
     /// @notice Emitted for every ecosystem proxy pointed at its new implementation. The proxy
     ///         ADDRESS is the row identity (human labels live in the off-chain manifest).
@@ -38,13 +36,16 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
         address _initialOwner,
         address _breakGlassGovernor,
         ProxyAdmin _proxyAdmin,
-        CoreRegistryFactory _coreRegistryFactory
+        bytes32 _coreRegistryCodehash
     ) UpgradeExecutorBase(_initialOwner, _breakGlassGovernor) {
-        if (address(_proxyAdmin) == address(0) || address(_coreRegistryFactory) == address(0)) {
+        if (address(_proxyAdmin) == address(0)) {
             revert ZeroAddress();
         }
+        if (_coreRegistryCodehash == bytes32(0)) {
+            revert EmptyBytes32();
+        }
         PROXY_ADMIN = _proxyAdmin;
-        CORE_REGISTRY_FACTORY = _coreRegistryFactory;
+        CORE_REGISTRY_CODEHASH = _coreRegistryCodehash;
     }
 
     /// @notice Points every ecosystem proxy at its new implementation, as pinned by the registry.
@@ -57,7 +58,7 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
     ///      in one atomic transaction.
     /// @param _coreRegistry The pinned core-registry implementation approved by governance.
     function applyL1Upgrade(ICoreRegistry _coreRegistry) external onlyOwner {
-        if (CORE_REGISTRY_FACTORY.deployedFor(_coreRegistry.manifestHash()) != address(_coreRegistry)) {
+        if (address(_coreRegistry).codehash != CORE_REGISTRY_CODEHASH) {
             revert NotFactoryDeployed(address(_coreRegistry));
         }
         _coreRegistry.validate();

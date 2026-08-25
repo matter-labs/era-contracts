@@ -25,7 +25,6 @@ enum L2EcosystemContract {
     L2InteropRootStorage,
     BeaconProxy,
     L2V32Upgrade,
-    L2SharedBridgeLegacy,
     BridgedStandardERC20,
     DiamondProxy,
     ProxyAdmin,
