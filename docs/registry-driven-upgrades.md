@@ -114,6 +114,10 @@ The CTM stores one release pointer and derives genesis data from it:
 - `currentRelease` — the release every new chain is created at. `storedBatchZero()` and
   `l1GenesisUpgrade()` are views over `ICTMRelease(currentRelease).genesisParams()`.
 - `releaseFactory` — the provenance anchor every pinned release is checked against.
+- `upgradeTransition[oldProtocolVersion]` — the transition committed for chains departing from that
+  version. `upgradeCutHash` remains the authority on what a chain may execute; this pointer is what
+  lets tooling (and a chain admin driving its own upgrade) recompose that cut without being handed
+  its bytes.
 
 Nothing else about a chain's installed state is keyed by protocol version on the CTM. The verifier in
 particular is not: a chain several versions behind resolves it from the release its own transition
@@ -159,11 +163,12 @@ sequenceDiagram
 
     G->>E: applyCTMUpgrade(transition)
     Note over E: factory-attest, validate,<br/>check release + version edges
-    E->>C: setNewVersionUpgrade(cut, oldV, deadline, newV)
+    E->>C: setNewVersionUpgradeFromTransition(transition)
     E->>C: setCurrentRelease(newRelease)
     G->>E: upgradeChain(transition, chainId)
     E->>C: upgradeChainFromVersion(chainId, oldV, cut)
     C->>D: cut (init = upgradeEngine.upgradeFromTransition)
+    Note over D: apply derived facetCuts verbatim,<br/>then run composed ProposedUpgrade
     Note over D: apply derived facetCuts verbatim,<br/>then run composed ProposedUpgrade
 ```
 
@@ -176,13 +181,24 @@ A proposal is a sequence of fixed-signature executor calls:
 - **`CTMUpgradeExecutor.applyCTMUpgrade(transition)`** asserts both edges before any mutation:
   the **release edge** (`ctm.currentRelease() == transition.fromRelease()`) and the **version edge**
   (`ctm.protocolVersion() == transition.oldProtocolVersion()`). Because the call moves
-  `currentRelease`, the release edge also rejects replays. Schedule comes from the transition, not
-  from call arguments.
+  `currentRelease`, the release edge also rejects replays. It then commits the transition with
+  `setNewVersionUpgradeFromTransition` — one argument, so the version edge, the schedule and the cut
+  are read from the same object and cannot be passed inconsistently.
 
-- **`CTMUpgradeExecutor.upgradeChain(transition, chainId)`** per chain. Owner-driven during the
-  upgrade window; permissionless once the old-version deadline passes, at which point the upgrade is
-  operationally mandatory and execution carries no discretionary inputs. Chain admins retain their
-  own direct path on the chain diamond.
+- **`CTMUpgradeExecutor.upgradeChain(transition, chainId)`** per chain. The owner may upgrade any
+  chain at any time; a chain's **own admin** may upgrade **that** chain at any time — upgrading is
+  the chain's decision, and the check is scoped per chain because `chainId` is an argument; anyone
+  else only once the old-version deadline passes, at which point the upgrade is operationally
+  mandatory and execution carries no discretionary inputs. Chain admins additionally retain their own
+  direct path on the chain diamond.
+
+**Where the cut is composed.** The cut is a pure function of the transition — an
+`upgradeEngine.upgradeFromTransition(transition)` init over no facet cuts. The CTM derives it when
+the transition is committed, so it never travels in governance calldata; the executor derives it
+again when driving a chain, and the chain checks the bytes it receives against `upgradeCutHash`.
+Composition lives in those two callers only: the chain diamond stays unaware of transitions and
+treats the cut as opaque bytes, which is why `upgradeTransition` is a pointer for tooling rather than
+something the chain reads.
 
 On the chain, `BaseZkSyncUpgrade.upgradeFromTransition` validates the transition, applies
 `transition.facetCuts()` verbatim, and runs the `ProposedUpgrade` composed from the same object.

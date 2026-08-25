@@ -5,12 +5,12 @@ pragma solidity 0.8.28;
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {ICTMTransition} from "./ICTMTransition.sol";
-import {CTMTransitionFactory} from "./CTMRegistryFactory.sol";
 import {CTMUpgradeComposer} from "./CTMUpgradeComposer.sol";
+import {CTMTransitionFactory} from "./CTMRegistryFactory.sol";
 import {UpgradeExecutorBase} from "../../governance/UpgradeExecutorBase.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
-import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {IDefaultUpgrade} from "../IDefaultUpgrade.sol";
+import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {
     NotFactoryDeployed,
     TransitionReleaseMismatch,
@@ -100,12 +100,9 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
             revert OutdatedProtocolVersion(currentProtocolVersion, oldProtocolVersion);
         }
 
-        CTM.setNewVersionUpgrade({
-            _cutData: _buildUpgradeCut(_transition),
-            _oldProtocolVersion: oldProtocolVersion,
-            _oldProtocolVersionDeadline: _transition.oldProtocolVersionDeadline(),
-            _newProtocolVersion: newProtocolVersion
-        });
+        // One argument, not four plus a cut: the CTM reads the version edge, the schedule and the
+        // cut from the same pinned object, so they cannot be passed inconsistently.
+        CTM.setNewVersionUpgradeFromTransition(_transition);
         CTM.setCurrentRelease(_transition.newRelease());
 
         emit CTMUpgradeApplied(address(_transition), oldProtocolVersion, newProtocolVersion);
@@ -113,16 +110,19 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
 
     /// @notice Upgrades a single chain diamond to the transition's new protocol version with the
     ///         same composed cut that `applyCTMUpgrade` committed to.
-    /// @dev Execution policy: owner-driven during the upgrade window, PERMISSIONLESS once the
-    ///      old-version deadline has passed — at that point the upgrade is operationally
-    ///      mandatory and execution carries no discretionary inputs (the cut is recomposed from
-    ///      the pinned transition and checked against the committed `upgradeCutHash`; the
-    ///      chain-side `upgradeTimestamp` gate still applies). Chain admins additionally retain
-    ///      their own direct execution path on the chain diamond, independent of this executor.
+    /// @dev Execution policy, in order of precedence:
+    ///      - the OWNER may upgrade any chain at any time;
+    ///      - a CHAIN'S OWN ADMIN may upgrade that chain at any time — upgrading is the chain's
+    ///        decision to make, and the check is scoped per chain because `_chainId` is an
+    ///        argument: an unscoped admin check would let any chain's admin upgrade every other
+    ///        chain on this CTM, including ones deliberately waiting to finalize batches first;
+    ///      - ANYONE ELSE only once the old-version deadline has passed, at which point the
+    ///        upgrade is operationally mandatory and execution carries no discretionary inputs.
+    ///      The chain-side `upgradeTimestamp` gate applies to non-admin callers regardless.
     /// @param _transition The same transition committed by `applyCTMUpgrade`.
     /// @param _chainId The chain to upgrade.
     function upgradeChain(ICTMTransition _transition, uint256 _chainId) external {
-        if (msg.sender != owner()) {
+        if (msg.sender != owner() && msg.sender != CTM.getChainAdmin(_chainId)) {
             uint256 deadline = CTM.protocolVersionDeadline(_transition.oldProtocolVersion());
             if (block.timestamp <= deadline) {
                 revert UpgradeNotPermissionlessYet(deadline);
@@ -138,8 +138,9 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
 
     /// @dev Composes the upgrade cut: an `upgradeEngine.upgradeFromTransition(transition)` init
     ///      delegatecall (no outer `facetCuts` — the engine applies the DERIVED facet swaps,
-    ///      reading them from the same transition). The cut is chain-independent, so a single
-    ///      cut is committed once and applied to every chain.
+    ///      reading them from the same transition). Composing HERE keeps the executor the single
+    ///      contract that turns a transition into a cut; the chain sees opaque bytes it checks
+    ///      against the hash its CTM committed.
     function _buildUpgradeCut(ICTMTransition _transition) private view returns (Diamond.DiamondCutData memory) {
         return
             CTMUpgradeComposer.buildUpgradeCutData(

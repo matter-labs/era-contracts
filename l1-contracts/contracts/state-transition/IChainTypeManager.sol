@@ -3,6 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {Diamond} from "./libraries/Diamond.sol";
+import {ICTMTransition} from "../upgrades/registry/ICTMTransition.sol";
 import {L2CanonicalTransaction, TxStatus} from "../common/Messaging.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 
@@ -63,6 +64,9 @@ interface IChainTypeManager {
 
     /// @notice New UpgradeCutHash
     event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
+
+    /// @notice The transition committed for chains departing from `oldProtocolVersion`.
+    event NewUpgradeTransition(uint256 indexed oldProtocolVersion, address indexed transition);
 
     /// @notice New UpgradeCutData
     event NewUpgradeCutData(uint256 indexed protocolVersion, Diamond.DiamondCutData diamondCutData);
@@ -139,6 +143,12 @@ interface IChainTypeManager {
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external;
+
+    function setNewVersionUpgradeFromTransition(ICTMTransition _transition) external;
+
+    /// @notice The transition committed for chains departing from `_oldProtocolVersion` — the
+    ///         machine-readable pointer tooling composes that version's upgrade cut from.
+    function upgradeTransition(uint256 _oldProtocolVersion) external view returns (address);
 
     function setUpgradeDiamondCut(Diamond.DiamondCutData calldata _cutData, uint256 _oldProtocolVersion) external;
 

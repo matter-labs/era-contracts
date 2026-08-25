@@ -245,6 +245,10 @@ contract RegistryBootstrapMigration {
         }
 
         IChainTypeManager ctm = IChainTypeManager(m.ctm);
+        // The cut-taking form, not `setNewVersionUpgradeFromTransition`: there is no transition for
+        // this edge to derive from. Chains crossing it therefore use the cut-taking chain-side
+        // entrypoint too — `upgradeTransition` stays zero for the departing version, and only
+        // registry-driven hops after this one populate it.
         ctm.setNewVersionUpgrade({
             _cutData: m.upgradeCut,
             _oldProtocolVersion: m.expectedProtocolVersion,

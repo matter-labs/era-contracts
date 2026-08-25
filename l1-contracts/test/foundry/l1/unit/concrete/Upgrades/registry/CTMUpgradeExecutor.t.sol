@@ -283,6 +283,18 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         ctmExecutor.applyCTMUpgrade(ICTMTransition(address(staleVersionTransition)));
     }
 
+    /// @dev The chain needs the transition itself, not just its cut hash, to rebuild the cut.
+    function test_applyCTMUpgrade_recordsTheCommittedTransition() public {
+        uint256 oldVersion = chainContractAddress.protocolVersion();
+        _applyCTMUpgrade();
+
+        assertEq(
+            chainContractAddress.upgradeTransition(oldVersion),
+            address(transition),
+            "the CTM must record the transition chains rebuild their cut from"
+        );
+    }
+
     function test_upgradeChain_rejectsDifferentTransition() public {
         _applyCTMUpgrade();
         // Same edges as the committed transition, but a different timestamp -> a different

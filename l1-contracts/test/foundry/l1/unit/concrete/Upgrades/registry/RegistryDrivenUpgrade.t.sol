@@ -366,6 +366,20 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         assertEq(IGetters(chainAddress).getProtocolVersion(), V32, "keeper-executed upgrade must land");
         assertEq(address(IGetters(chainAddress).getVerifier()), verifierV32);
     }
+
+    /// @dev Upgrading is the chain's own decision, so its admin may execute the committed hop at
+    ///      any point in the window — a stranger still has to wait for the deadline
+    ///      (`test_revertWhen_strangerUpgradesChainBeforeDeadline` in CTMUpgradeExecutor.t.sol).
+    function test_chainAdminUpgradesTheirOwnChainBeforeTheDeadline() public {
+        vm.prank(governor);
+        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(transitionV32)));
+
+        vm.warp(999);
+        vm.prank(IGetters(chainAddress).getAdmin());
+        ctmExecutor.upgradeChain(ICTMTransition(address(transitionV32)), chainId);
+
+        assertEq(IGetters(chainAddress).getProtocolVersion(), V32, "admin-executed upgrade must land");
+    }
 }
 
 /// @notice The registry-driven upgrade run against an Era CTM and chain: the chain commits a

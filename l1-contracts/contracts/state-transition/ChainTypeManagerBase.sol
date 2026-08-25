@@ -13,6 +13,9 @@ import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {ChainTypeManagerInitializeData, IChainTypeManager} from "./IChainTypeManager.sol";
 import {ICTMRelease} from "../upgrades/registry/ICTMRelease.sol";
+import {ICTMTransition} from "../upgrades/registry/ICTMTransition.sol";
+import {CTMUpgradeComposer} from "../upgrades/registry/CTMUpgradeComposer.sol";
+import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
 import {CTMReleaseFactory} from "../upgrades/registry/CTMRegistryFactory.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
@@ -125,9 +128,11 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     ///         by it (see `_storeCurrentRelease`). Set once at initialization.
     address public releaseFactory;
 
-    /// @dev Retained only to preserve the upgradeable storage layout. Transitions are committed
-    /// directly in the upgrade cut and are never looked up through CTM storage.
-    mapping(uint256 protocolVersion => address transition) internal __DEPRECATED_upgradeRegistryForVersion;
+    /// @notice The transition committed for chains departing from a given protocol version — the
+    ///         SAME object the cut's init calldata names, so a chain can rebuild that cut instead of
+    ///         being handed its bytes. Written beside `upgradeCutHash`, which stays the authority on
+    ///         what a chain may execute.
+    mapping(uint256 oldProtocolVersion => address transition) public upgradeTransition;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -373,11 +378,39 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         emit NewServerNotifier(oldServerNotifier, _serverNotifier);
     }
 
+    /// @notice Commits one registry-driven transition: the version edge, the schedule and the
+    ///         upgrade cut all come from the pinned object, so they cannot disagree with each other.
+    /// @param _transition The write-once transition governance approved.
+    /// @dev The cut is DERIVED here rather than supplied: it is a pure function of the transition
+    ///      (`upgradeEngine.upgradeFromTransition(transition)` over no facet cuts), so passing it
+    ///      would only add a second, unverifiable copy of data this contract can compute.
+    /// @dev No factory attestation is performed here. The caller is the owner, which under the
+    ///      registry model is the bound `CTMUpgradeExecutor` that already rejects transitions its
+    ///      immutable factory did not deploy. This is strictly narrower than the cut-taking
+    ///      entrypoint below, which accepts arbitrary calldata from the same owner.
+    function setNewVersionUpgradeFromTransition(ICTMTransition _transition) external onlyOwner {
+        uint256 oldProtocolVersion = _transition.oldProtocolVersion();
+        _setNewVersionUpgrade({
+            _cutData: CTMUpgradeComposer.buildUpgradeCutData(
+                _transition.upgradeEngine(),
+                abi.encodeCall(IDefaultUpgrade.upgradeFromTransition, (address(_transition)))
+            ),
+            _oldProtocolVersion: oldProtocolVersion,
+            _oldProtocolVersionDeadline: _transition.oldProtocolVersionDeadline(),
+            _newProtocolVersion: _transition.newProtocolVersion()
+        });
+        upgradeTransition[oldProtocolVersion] = address(_transition);
+        emit NewUpgradeTransition(oldProtocolVersion, address(_transition));
+    }
+
     /// @dev set New Version with upgrade from old version
     /// @param _cutData the new diamond cut data
     /// @param _oldProtocolVersion the old protocol version
     /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
     /// @param _newProtocolVersion the new protocol version
+    /// @dev Kept for edges whose cut cannot be derived — the pre-registry bootstrap, whose departing
+    ///      version has no `fromRelease` to diff against. Registry-driven upgrades use
+    ///      {setNewVersionUpgradeFromTransition}.
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
