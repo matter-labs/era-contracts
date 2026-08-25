@@ -93,6 +93,15 @@ contract MultiProofVerifierTest is Test {
     MockPassVerifier passVerifier;
     MockFailVerifier failVerifier;
 
+    /// @dev The verifier reads the requirement from its caller, which in
+    ///      production is the chain's diamond. The test contract calls it
+    ///      directly, so it stands in for that chain.
+    bool internal ziskDisabled;
+
+    function ziskVerificationDisabled() external view returns (bool) {
+        return ziskDisabled;
+    }
+
     function setUp() public {
         passVerifier = new MockPassVerifier();
         failVerifier = new MockFailVerifier();
@@ -210,6 +219,21 @@ contract MultiProofVerifierTest is Test {
 
         vm.expectRevert(MultiProofVerifier.ZiskVerificationFailed.selector);
         failing.verify(_singlePublicInputs(), _type5Proof(0, 2));
+    }
+
+    /// @dev A chain that turns the requirement off settles on the Airbender
+    ///      proof alone: a ZiSK verifier that rejects everything is not reached.
+    function test_ziskDisabled_settlesOnAirbenderAlone() public {
+        MultiProofVerifier lane = new MultiProofVerifier(
+            IVerifier(address(passVerifier)),
+            IVerifier(address(failVerifier))
+        );
+
+        vm.expectRevert(MultiProofVerifier.ZiskVerificationFailed.selector);
+        lane.verify(_rangePublicInputs(), _type5Proof(0, 2));
+
+        ziskDisabled = true;
+        assertTrue(lane.verify(_rangePublicInputs(), _type5Proof(0, 2)));
     }
 
     // --- Forwarding to the sub-verifiers ---

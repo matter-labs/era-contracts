@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IZKsyncOSVerifier} from "../chain-interfaces/IZKsyncOSVerifier.sol";
+import {IGetters} from "../chain-interfaces/IGetters.sol";
 import {NonZeroCarriedHash} from "../../common/L1ContractErrors.sol";
 
 /// @title Multi-Proof Verifier
@@ -144,13 +145,20 @@ contract MultiProofVerifier is IVerifier, IZKsyncOSVerifier {
         // inherent: a ZiSK proof attesting to a different transition would
         // reconstruct a different signal and fail here. Only the 24-word SNARK
         // is passed through.
-        uint256 ziskStart = 3 + airbenderLen;
-        uint256[] memory ziskProof = new uint256[](24);
-        for (uint256 i = 0; i < 24; ++i) {
-            ziskProof[i] = _proof[ziskStart + i];
-        }
-        if (!ZISK_RANGE_VERIFIER.verify(_publicInputs, ziskProof)) {
-            revert ZiskVerificationFailed();
+        //
+        // One verifier serves every chain of a protocol version
+        // (`ChainTypeManager.protocolVersionVerifier`), so the requirement is
+        // read from the calling chain rather than held here. The caller is that
+        // chain's diamond.
+        if (!IGetters(msg.sender).ziskVerificationDisabled()) {
+            uint256 ziskStart = 3 + airbenderLen;
+            uint256[] memory ziskProof = new uint256[](24);
+            for (uint256 i = 0; i < 24; ++i) {
+                ziskProof[i] = _proof[ziskStart + i];
+            }
+            if (!ZISK_RANGE_VERIFIER.verify(_publicInputs, ziskProof)) {
+                revert ZiskVerificationFailed();
+            }
         }
 
         return true;

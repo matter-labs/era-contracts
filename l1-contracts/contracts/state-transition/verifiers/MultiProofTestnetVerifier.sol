@@ -43,6 +43,16 @@ contract MultiProofTestnetVerifier is IVerifier, IZKsyncOSVerifier {
         return INNER_VERIFIER.verify(_publicInputs, _proof);
     }
 
+    /// @notice Whether a chain behind this wrapper settles without a ZiSK proof.
+    /// @dev The wrapper stands between the chain and the inner verifier, so the inner verifier reads
+    ///      this contract rather than the chain. It answers false: the mock proof route is the bypass
+    ///      this wrapper provides, and it is the one a test chain uses. The switch that trades the
+    ///      second proof system for liveness belongs to production chains, which reach the inner
+    ///      verifier directly.
+    function ziskVerificationDisabled() external pure returns (bool) {
+        return false;
+    }
+
     /// @inheritdoc IVerifier
     function verificationKeyHash() external view override returns (bytes32) {
         return INNER_VERIFIER.verificationKeyHash();

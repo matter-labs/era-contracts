@@ -323,19 +323,26 @@
             "internalType": "bool"
           },
           {
-            "name": "multiProofVerifier",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "ziskPlonkVerifierAddr",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "ziskRangeVerifierAddr",
-            "type": "address",
-            "internalType": "address"
+            "name": "multiProof",
+            "type": "tuple",
+            "internalType": "struct MultiProofConfig",
+            "components": [
+              {
+                "name": "enabled",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "ziskPlonkVerifierAddr",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "ziskRangeVerifierAddr",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
           },
           {
             "name": "contracts",

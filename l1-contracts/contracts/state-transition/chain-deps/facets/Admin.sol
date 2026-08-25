@@ -405,6 +405,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
+    function setZiskVerificationDisabled(bool _disabled) external onlyAdmin onlyZKsyncOS {
+        // No drained-queue requirement, unlike the chain-config setters: the switch exists for the
+        // case where committed batches cannot be proved, so it has to take effect while they wait.
+        s.ziskVerificationDisabled = _disabled;
+        emit ZiskVerificationDisabledSet(_disabled);
+    }
+
+    /// @inheritdoc IAdmin
     function makePermanentRollup() external onlyAdmin onlySettlementLayer {
         if (s.isPermanentRollup) {
             revert AlreadyPermanentRollup();
