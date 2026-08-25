@@ -27,6 +27,13 @@ import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsync
 /// TODO: restore those five once a proof for this verifier's 2**25 domain is available — generated
 /// for the committed key, or captured from a `proveBatches` call on a live ZKsync OS chain.
 contract ZKsyncOSVerifierPlonkTest is Test {
+    /// @dev The BN254 base and scalar field moduli the verifier operates over. It declares both
+    /// itself, but as `internal constant`, so they cannot be read from here. Currently unused:
+    /// they are the offsets the two reduction tests named in the TODO above apply, and are kept
+    /// so restoring those tests needs only the proof fixture.
+    uint256 constant Q_MOD = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+    uint256 constant R_MOD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
+
     /// @dev The verification key hash recorded in the generated contract's header comment.
     bytes32 constant EXPECTED_VK_HASH = 0xa81dc850a0724bcd62b7e5fbe60c62be32b4b45e33dd0d950f9c313e4684605a;
 
