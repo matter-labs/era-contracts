@@ -601,10 +601,6 @@ export async function runEcosystemUpgradeScripts(params: {
       params.upgradeHarnessInputs.bytecodesSupplierAddress,
       "--rollup-da-manager-address",
       params.upgradeHarnessInputs.rollupDaManagerAddress,
-      // This release upgrades ZKsync OS ecosystems only; protocol-ops cross-checks the flag
-      // against what the CTM reports on-chain.
-      "--is-zk-sync-os",
-      "true",
       "--create2-factory-salt",
       params.upgradeHarnessInputs.create2FactorySalt,
       "--upgrade-input-path",
