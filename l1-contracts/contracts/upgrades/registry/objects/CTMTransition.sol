@@ -20,7 +20,6 @@ import {
 import {
     MalformedL2UpgradePlan,
     PatchMustReuseRelease,
-    RegistryUnknownKey,
     SameReleaseTransitionHasPayload,
     TransitionDeadlineBeforeUpgrade,
     ZeroAddress
@@ -38,7 +37,6 @@ import {L2UpgradePlan, TransitionManifest} from "../RegistryTypes.sol";
 ///      mechanism as facet routing. The L2 plan is reviewed-and-pinned data (L1 cannot verify L2
 ///      execution effects); the on-chain convergence guarantee covers L1 state only.
 contract CTMTransition is ICTMTransition {
-
     /// @notice `keccak256(abi.encode(manifest))`. No contract reads this — it is a review aid, a
     ///         single value to compare against the audited manifest. Provenance is the codehash.
     bytes32 public manifestHash;

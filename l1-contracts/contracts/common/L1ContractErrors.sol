@@ -296,6 +296,8 @@ error NewDeadlineExceedsMaxDeadline();
 error NewDeadlineNotGreaterThanCurrent();
 // 0x79cc2d22
 error NoCallsProvided();
+// 0x88dfa474
+error NoCommittedUpgradeCutForVersion(uint256 protocolVersion);
 // 0xce63ce17
 error NoCTMForAssetId(bytes32 assetId);
 // 0xa6fef710
@@ -336,7 +338,6 @@ error NotCurrentSettlementLayer();
 error NotDangerousContract(address);
 // 0x230f9d11
 error NotEnoughSigners(uint256 provided, uint256 expected);
-// 0x8464be6c
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
 // 0xecb34449
@@ -395,7 +396,6 @@ error QueueIsEmpty();
 error RecoverToL1NotSupported();
 // 0xab143c06
 error Reentrancy();
-// 0xe45872b6
 // 0xfc83be31
 error RegistryCodehashMismatch(address target, bytes32 expected, bytes32 actual);
 // 0xcb530847
@@ -412,10 +412,8 @@ error RegistryHashChangeToZero();
 error RegistryMissingBaseSystemHash();
 // 0xa0c88a92
 error RegistryPinTargetHasNoCode(address target);
-// 0x9aae4ff8
+// 0x0d122829
 error RegistryReleaseCodehashAlreadySet(bytes32 current);
-error NoCommittedUpgradeCutForVersion(uint256 protocolVersion);
-error TransitionNotCommitted(address named, address committed);
 // 0x1f20dafa
 error RegistryUnknownKey();
 // 0x3ea1345a
@@ -484,6 +482,8 @@ error TooMuchGas();
 error TransactionNotAllowed();
 // 0x1b7def5a
 error TransitionDeadlineBeforeUpgrade(uint256 deadline, uint256 upgradeTimestamp);
+// 0x8d905e8b
+error TransitionNotCommitted(address named, address committed);
 // 0x01a7d6aa
 error TransitionReleaseMismatch(address expected, address actual);
 // 0x4c991078
@@ -552,6 +552,8 @@ error ZKsyncOSNotForceDeployForExistingContract(address);
 error ZKsyncOSNotForceDeployToPrecompileAddress(address);
 // 0x3d9d4821
 error ZKsyncOSPrecommitsNotSupported();
+// 0x8464be6c
+// 0xe45872b6
 // @dev An ecosystem row's live implementation matches neither its source nor its target —
 
 enum SharedBridgeKey {

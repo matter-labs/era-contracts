@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {CTMRelease} from "../objects/CTMRelease.sol";
-
 import {Facets} from "../../../common/StateTransitionTypes.sol";
 import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {GenesisConfig, GenesisFacet, ReleaseManifest} from "../RegistryTypes.sol";
@@ -21,9 +19,7 @@ import {GenesisConfig, GenesisFacet, ReleaseManifest} from "../RegistryTypes.sol
 library GenesisManifestLib {
     uint256 internal constant GENESIS_FACET_COUNT = 6;
 
-    function buildGenesisManifest(
-        GenesisConfig memory _cfg
-    ) internal view returns (ReleaseManifest memory manifest) {
+    function buildGenesisManifest(GenesisConfig memory _cfg) internal view returns (ReleaseManifest memory manifest) {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](GENESIS_FACET_COUNT);
 
         // The canonical facet set of a new chain diamond, with explicit routing and inline pins

@@ -274,19 +274,19 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         CTMRelease release = new CTMRelease(
             GenesisManifestLib.buildGenesisManifest(
                 GenesisConfig({
-                facets: contracts.stateTransition.facets,
-                verifier: contracts.stateTransition.verifiers.verifier,
-                genesisUpgrade: contracts.stateTransition.genesisUpgrade,
-                genesis: ReleaseGenesisData({
-                    bootloaderHash: config.bootloaderHash,
-                    defaultAccountHash: config.defaultAccountHash,
-                    evmEmulatorHash: config.evmEmulatorHash,
-                    fixedForceDeploymentsData: config.forceDeploymentsData,
-                    genesisBatchHash: config.genesisRoot,
-                    genesisBatchCommitment: config.genesisBatchCommitment,
-                    genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex)
+                    facets: contracts.stateTransition.facets,
+                    verifier: contracts.stateTransition.verifiers.verifier,
+                    genesisUpgrade: contracts.stateTransition.genesisUpgrade,
+                    genesis: ReleaseGenesisData({
+                        bootloaderHash: config.bootloaderHash,
+                        defaultAccountHash: config.defaultAccountHash,
+                        evmEmulatorHash: config.evmEmulatorHash,
+                        fixedForceDeploymentsData: config.forceDeploymentsData,
+                        genesisBatchHash: config.genesisRoot,
+                        genesisBatchCommitment: config.genesisBatchCommitment,
+                        genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex)
+                    })
                 })
-            })
             )
         );
         return address(release);

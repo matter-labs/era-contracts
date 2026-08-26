@@ -10,7 +10,10 @@ import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/Ec
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
 import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
 import {EcosystemImplMismatch, RegistryCodehashMismatch} from "contracts/common/L1ContractErrors.sol";
-import {CoreRegistryManifest, EcosystemContractRow} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    CoreRegistryManifest,
+    EcosystemContractRow
+} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @dev Not a `CoreRegistry`: exercises the executor's codehash provenance check.
 contract NotACoreRegistry {

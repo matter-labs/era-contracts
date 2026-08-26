@@ -419,8 +419,7 @@ contract MailboxFacet is ZKChainBase, IMailbox, ISelfDescribingFacet {
     ///      0xeb672419 requestL2Transaction(address,uint256,bytes,uint256,uint256,bytes[],address)
     ///      0xd0772551 requestL2TransactionToGatewayMailbox(uint256,bytes32,uint64)
     function selectors() public pure returns (bytes4[] memory result) {
-        bytes
-            memory packed = hex"12f43dabddcc9eec60da3e83b473318ed07b90d1d0772551";
+        bytes memory packed = hex"12f43dabddcc9eec60da3e83b473318ed07b90d1d0772551";
         uint256 count = packed.length / 4;
         result = new bytes4[](count);
         for (uint256 i = 0; i < count; ++i) {

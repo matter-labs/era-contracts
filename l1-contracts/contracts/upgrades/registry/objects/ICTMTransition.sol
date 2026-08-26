@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {L2UpgradePlan} from "../RegistryTypes.sol";
 

@@ -46,7 +46,12 @@ import {
     GatewayCTMFinalConfig,
     GatewayCTMFinalResult
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
-import {GenesisConfig, GenesisFacet, ReleaseGenesisData, ReleaseManifest} from "../../contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    GenesisConfig,
+    GenesisFacet,
+    ReleaseGenesisData,
+    ReleaseManifest
+} from "../../contracts/upgrades/registry/RegistryTypes.sol";
 
 // solhint-disable gas-custom-errors
 
@@ -655,19 +660,19 @@ library GatewayCTMDeployerHelper {
         return
             GenesisManifestLib.buildGenesisManifestFromRows(
                 GenesisConfig({
-                facets: _direct.facets,
-                verifier: _direct.verifier,
-                genesisUpgrade: _direct.genesisUpgrade,
-                genesis: ReleaseGenesisData({
-                    bootloaderHash: _baseConfig.bootloaderHash,
-                    defaultAccountHash: _baseConfig.defaultAccountHash,
-                    evmEmulatorHash: _baseConfig.evmEmulatorHash,
-                    fixedForceDeploymentsData: _baseConfig.forceDeploymentsData,
-                    genesisBatchHash: _baseConfig.genesisRoot,
-                    genesisBatchCommitment: _baseConfig.genesisBatchCommitment,
-                    genesisIndexRepeatedStorageChanges: uint64(_baseConfig.genesisRollupLeafIndex)
-                })
-            }),
+                    facets: _direct.facets,
+                    verifier: _direct.verifier,
+                    genesisUpgrade: _direct.genesisUpgrade,
+                    genesis: ReleaseGenesisData({
+                        bootloaderHash: _baseConfig.bootloaderHash,
+                        defaultAccountHash: _baseConfig.defaultAccountHash,
+                        evmEmulatorHash: _baseConfig.evmEmulatorHash,
+                        fixedForceDeploymentsData: _baseConfig.forceDeploymentsData,
+                        genesisBatchHash: _baseConfig.genesisRoot,
+                        genesisBatchCommitment: _baseConfig.genesisBatchCommitment,
+                        genesisIndexRepeatedStorageChanges: uint64(_baseConfig.genesisRollupLeafIndex)
+                    })
+                }),
                 rows,
                 _direct.diamondInitCodehash,
                 _direct.verifierCodehash,

@@ -5,10 +5,7 @@ pragma solidity 0.8.28;
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {ICTMTransition} from "../objects/ICTMTransition.sol";
-import {CTMUpgradeComposer} from "../libraries/CTMUpgradeComposer.sol";
 import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
-import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
-import {IDefaultUpgrade} from "../../IDefaultUpgrade.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {
     EmptyBytes32,

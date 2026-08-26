@@ -525,9 +525,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev Nothing is stored and nothing is handed to the chain by its caller: the transition is
     ///      the only commitment, and the cut is recomputed from it here — the same derivation
     ///      {setNewVersionUpgradeFromTransition} hashed at commit time.
-    function upgradeCutForVersion(
-        uint256 _oldProtocolVersion
-    ) public view returns (Diamond.DiamondCutData memory) {
+    function upgradeCutForVersion(uint256 _oldProtocolVersion) public view returns (Diamond.DiamondCutData memory) {
         address transition = upgradeTransition[_oldProtocolVersion];
         if (transition == address(0)) {
             revert NoCommittedUpgradeCutForVersion(_oldProtocolVersion);
@@ -537,9 +535,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
     /// @dev The cut is a pure function of the transition: no facet cuts of its own, just the
     ///      engine-init pointing back at the transition.
-    function _transitionUpgradeCut(
-        ICTMTransition _transition
-    ) internal view returns (Diamond.DiamondCutData memory) {
+    function _transitionUpgradeCut(ICTMTransition _transition) internal view returns (Diamond.DiamondCutData memory) {
         return
             CTMUpgradeComposer.buildUpgradeCutData(
                 _transition.upgradeEngine(),

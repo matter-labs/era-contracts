@@ -32,7 +32,13 @@ import {
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {ProtocolIdMismatch} from "contracts/common/L1ContractErrors.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {GenesisFacet, L2UpgradePlan, ReleaseGenesisData, ReleaseManifest, TransitionManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    GenesisFacet,
+    L2UpgradePlan,
+    ReleaseGenesisData,
+    ReleaseManifest,
+    TransitionManifest
+} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice The first full registry-driven upgrade, end to end: a real chain diamond is taken
 ///         v32 -> v33 entirely through the CTM-bound `CTMUpgradeExecutor`, with the facet/hash
@@ -172,10 +178,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     ///      `_adminFacet` when nonzero), the verifier, carried base-system hashes, genesis params.
     ///      Hop 1 changes only the verifier, so its target release differs from genesis in that
     ///      one field and the DERIVED facet/hash delta is empty — an L1-only upgrade.
-    function _releaseManifest(
-        address _adminFacet,
-        address _verifier
-    ) internal returns (ReleaseManifest memory) {
+    function _releaseManifest(address _adminFacet, address _verifier) internal returns (ReleaseManifest memory) {
         return
             ReleaseManifest({
                 diamondInit: diamondInit,

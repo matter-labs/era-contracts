@@ -92,7 +92,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
         utilsFacet.util_setProtocolVersion(oldProtocolVersion + 1);
         utilsFacet.util_setChainTypeManager(chainTypeManager);
 
-                vm.mockCall(
+        vm.mockCall(
             chainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.upgradeCutForVersion.selector, oldProtocolVersion),
             abi.encode(diamondCutData)
@@ -117,7 +117,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
         utilsFacet.util_setProtocolVersion(oldProtocolVersion);
         utilsFacet.util_setChainTypeManager(chainTypeManager);
 
-                vm.mockCall(
+        vm.mockCall(
             chainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.upgradeCutForVersion.selector, oldProtocolVersion),
             abi.encode(diamondCutData)
@@ -145,7 +145,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
         utilsFacet.util_setChainTypeManager(chainTypeManager);
         utilsFacet.util_setValidator(validatorAddr, true);
 
-                vm.mockCall(
+        vm.mockCall(
             chainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.upgradeCutForVersion.selector, oldProtocolVersion),
             abi.encode(diamondCutData)
@@ -176,7 +176,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
         utilsFacet.util_setChainTypeManager(chainTypeManager);
         utilsFacet.util_setValidator(validatorAddr, true);
 
-                vm.mockCall(
+        vm.mockCall(
             chainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.upgradeCutForVersion.selector, oldProtocolVersion),
             abi.encode(diamondCutData)
@@ -213,7 +213,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
         utilsFacet.util_setChainTypeManager(chainTypeManager);
         utilsFacet.util_setValidator(validatorAddr, true);
 
-                vm.mockCall(
+        vm.mockCall(
             chainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.upgradeCutForVersion.selector, oldProtocolVersion),
             abi.encode(diamondCutData)
@@ -244,7 +244,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
         utilsFacet.util_setProtocolVersion(oldProtocolVersion);
         utilsFacet.util_setChainTypeManager(chainTypeManager);
 
-                vm.mockCall(
+        vm.mockCall(
             chainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.upgradeCutForVersion.selector, oldProtocolVersion),
             abi.encode(diamondCutData)
@@ -274,7 +274,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
         utilsFacet.util_setProtocolVersion(oldProtocolVersion);
         utilsFacet.util_setChainTypeManager(chainTypeManager);
 
-                vm.mockCall(
+        vm.mockCall(
             chainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.upgradeCutForVersion.selector, oldProtocolVersion),
             abi.encode(diamondCutData)

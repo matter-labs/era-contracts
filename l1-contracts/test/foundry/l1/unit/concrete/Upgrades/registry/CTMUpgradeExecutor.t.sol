@@ -25,7 +25,13 @@ import {
     UpgradeNotPermissionlessYet
 } from "contracts/common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {GenesisFacet, L2UpgradePlan, ReleaseGenesisData, ReleaseManifest, TransitionManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    GenesisFacet,
+    L2UpgradePlan,
+    ReleaseGenesisData,
+    ReleaseManifest,
+    TransitionManifest
+} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Exercises the CTM-BOUND executor against real write-once release and transition
 ///         objects. Release data describes new-chain genesis; transition data describes the one
@@ -152,22 +158,22 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
 
         result = new CTMTransition(
             TransitionManifest({
-                    oldProtocolVersion: _oldProtocolVersion,
-                    newProtocolVersion: newVersion,
-                    // The default transition departs from whatever release the fixture CTM was
-                    // genesis'd with (its current release), as the executor's release-edge pin requires.
-                    fromRelease: _fromRelease,
-                    newRelease: address(release),
-                    upgradeEngine: upgradeEngineAddr,
-                    upgradeEngineCodehash: upgradeEngineAddr.codehash,
-                    oldProtocolVersionDeadline: 1000,
-                    upgradeTimestamp: _upgradeTimestamp,
-                    l2Plan: L2UpgradePlan({
-                        deployments: deployments,
-                        delegateTo: makeAddr("l2UpgradeDelegate"),
-                        delegateCalldata: hex"beef",
-                        factoryDepHashes: factoryDeps
-                    })
+                oldProtocolVersion: _oldProtocolVersion,
+                newProtocolVersion: newVersion,
+                // The default transition departs from whatever release the fixture CTM was
+                // genesis'd with (its current release), as the executor's release-edge pin requires.
+                fromRelease: _fromRelease,
+                newRelease: address(release),
+                upgradeEngine: upgradeEngineAddr,
+                upgradeEngineCodehash: upgradeEngineAddr.codehash,
+                oldProtocolVersionDeadline: 1000,
+                upgradeTimestamp: _upgradeTimestamp,
+                l2Plan: L2UpgradePlan({
+                    deployments: deployments,
+                    delegateTo: makeAddr("l2UpgradeDelegate"),
+                    delegateCalldata: hex"beef",
+                    factoryDepHashes: factoryDeps
+                })
             })
         );
     }
@@ -295,11 +301,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         CTMTransition differentTransition = _deployTransitionFrom(778, transition.fromRelease(), 0);
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                TransitionNotCommitted.selector,
-                address(differentTransition),
-                address(transition)
-            )
+            abi.encodeWithSelector(TransitionNotCommitted.selector, address(differentTransition), address(transition))
         );
         vm.prank(governor);
         ctmExecutor.upgradeChain(ICTMTransition(address(differentTransition)), chainId);

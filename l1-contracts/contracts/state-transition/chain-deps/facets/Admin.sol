@@ -39,7 +39,6 @@ import {
     DiamondAlreadyFrozen,
     DiamondNotFrozen,
     FeeParamsChangeTooLarge,
-    HashMismatch,
     InvalidDAForPermanentRollup,
     InvalidL2DACommitmentScheme,
     InvalidPubdataPricingMode,

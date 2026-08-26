@@ -30,7 +30,13 @@ import {
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {BootstrapManifest, EcosystemContractRow, GenesisFacet, ReleaseGenesisData, ReleaseManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    BootstrapManifest,
+    EcosystemContractRow,
+    GenesisFacet,
+    ReleaseGenesisData,
+    ReleaseManifest
+} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @dev Two distinct implementations so a proxy row is a real `expectedOldImpl -> implNew` edge.
 contract ImplV31 {

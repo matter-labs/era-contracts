@@ -31,7 +31,10 @@ contract OwnedTarget {
 /// @dev Minimal concrete executor: exercises the shared `UpgradeExecutorBase` (ownership +
 ///      break-glass `forward` + `receive`) without any domain entrypoints.
 contract TestUpgradeExecutor is UpgradeExecutorBase {
-    constructor(address _initialOwner, address _emergencyUpgradeBoard) UpgradeExecutorBase(_initialOwner, _emergencyUpgradeBoard) {}
+    constructor(
+        address _initialOwner,
+        address _emergencyUpgradeBoard
+    ) UpgradeExecutorBase(_initialOwner, _emergencyUpgradeBoard) {}
 }
 
 /// @notice Tests the shared authority base: ownership, the SEPARATELY GOVERNED break-glass

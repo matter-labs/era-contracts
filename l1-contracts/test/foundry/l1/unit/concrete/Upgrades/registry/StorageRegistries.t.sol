@@ -43,7 +43,15 @@ import {
     ProtocolVersionMinorDeltaTooBig,
     ProtocolVersionTooSmall
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
-import {CoreRegistryManifest, EcosystemContractRow, GenesisFacet, L2UpgradePlan, ReleaseGenesisData, ReleaseManifest, TransitionManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    CoreRegistryManifest,
+    EcosystemContractRow,
+    GenesisFacet,
+    L2UpgradePlan,
+    ReleaseGenesisData,
+    ReleaseManifest,
+    TransitionManifest
+} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Unit tests for the write-once upgrade objects in the DERIVED model: releases carry
 ///         explicit routing + inline mandatory pins; transitions derive their facet/hash delta

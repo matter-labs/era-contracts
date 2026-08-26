@@ -13,6 +13,7 @@ import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgr
 import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {L2_GENESIS_UPGRADE_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../../../deploy-scripts/utils/Types.sol";
 import {PublishFactoryDepsResult} from "../../../../deploy-scripts/utils/bytecode/BytecodePublisher.s.sol";
@@ -24,6 +25,10 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
+import {L2UpgradePlan, TransitionManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {UpgradeHelperLib} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeHelperLib.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 
@@ -31,6 +36,48 @@ import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 ///         as the v31 mock — the heavy JSON/zkout reads live on the shared base both versions
 ///         extend, so the overrides carry over.
 contract CTMUpgrade_v32_Test is CTMUpgrade_v32 {
+    /// @notice Commit the local edge as a transition instead of the cut-taking setter. The local
+    ///         baseline chain already runs the v32 (no-cut) Admin facet, which reads its cut from
+    ///         `upgradeCutForVersion` — derived from the committed transition. The cut-taking
+    ///         setter (used on the real bootstrap edge, whose chains still run v31 facets)
+    ///         registers no transition, so the chain leg could never execute.
+    function provideSetNewVersionUpgradeCall() public override returns (Call[] memory calls) {
+        calls = super.provideSetNewVersionUpgradeCall();
+
+        address ctmProxy = ctmAddresses.stateTransition.proxies.chainTypeManager;
+        address engine = ctmAddresses.stateTransition.defaultUpgrade;
+        // The same wrapped payload the legacy cut carried: `SettlementLayerV32Upgrade` requires
+        // the `forceDeployAndUpgradeUniversal(…, genesisUpgrade(...))` shape to rewrite the
+        // per-chain placeholders, so the plan mirrors `getV32L2UpgradeCalldata`.
+        CTMTransition transition = new CTMTransition(
+            TransitionManifest({
+                oldProtocolVersion: getOldProtocolVersion(),
+                newProtocolVersion: getNewProtocolVersion(),
+                fromRelease: IChainTypeManager(ctmProxy).currentRelease(),
+                newRelease: ctmAddresses.stateTransition.currentRelease,
+                upgradeEngine: engine,
+                upgradeEngineCodehash: engine.codehash,
+                oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
+                upgradeTimestamp: 0,
+                l2Plan: L2UpgradePlan({
+                    deployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
+                    delegateTo: L2_GENESIS_UPGRADE_ADDR,
+                    delegateCalldata: getV32L2UpgradeCalldata(),
+                    factoryDepHashes: factoryDepsResult.factoryDepsHashes
+                })
+            })
+        );
+        // Keep the base's release-anchor calls; only the commit itself changes shape.
+        calls[0] = Call({
+            target: ctmProxy,
+            data: abi.encodeCall(
+                IChainTypeManager.setNewVersionUpgradeFromTransition,
+                (ICTMTransition(address(transition)))
+            ),
+            value: 0
+        });
+    }
+
     /// @notice v32 deploys its genesis registry inside `deployNewCTMContracts` (before
     ///         `publishBytecodes`), and that requires a non-empty force-deployments blob. This
     ///         mocked flow never generates one, so seed a dummy before the base deploy runs.

@@ -74,7 +74,11 @@ import {
     DeployedContractsComparator,
     GatewayCTMDeployerTestUtils
 } from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
-import {GenesisFacet, ReleaseGenesisData, ReleaseManifest} from "../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    GenesisFacet,
+    ReleaseGenesisData,
+    ReleaseManifest
+} from "../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 // We need to use contract the zkfoundry consistently uses
 // zk environment only within a deployed contract
@@ -334,7 +338,6 @@ contract GatewayCTMDeployerTest is Test {
             isZKsyncOS: deployerConfig.isZKsyncOS
         });
         new GatewayCTMDeployerVerifiers(verifiersConfig);
-
     }
 
     function _deployAllDeployers(

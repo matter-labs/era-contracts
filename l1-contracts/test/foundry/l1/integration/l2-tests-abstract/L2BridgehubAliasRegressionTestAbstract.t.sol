@@ -117,6 +117,9 @@ abstract contract L2BridgehubAliasRegressionTestAbstract is Test, SharedL2Contra
         vm.assume(testChainId > 0);
         // Keep the storage assertion observable rather than accepting the mapping's default value.
         vm.assume(testBaseTokenAssetId != bytes32(0));
+        // The fixture keeps a chain-scoped `vm.mockCall` on `baseTokenAssetId(ERA_CHAIN_ID + 1)`
+        // (see `_SharedL2ContractDeployer`), so reads for that id never observe storage writes.
+        vm.assume(testChainId != ERA_CHAIN_ID + 1);
 
         vm.prank(aliasedChainRegistrationSender);
         L2Bridgehub(L2_BRIDGEHUB_ADDR).registerChainForInterop(testChainId, testBaseTokenAssetId);

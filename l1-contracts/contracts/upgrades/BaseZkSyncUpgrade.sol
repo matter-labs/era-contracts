@@ -344,15 +344,16 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
 
     /// @notice Executes one committed transition. The transition address is the sole source for
     /// both facet changes (DERIVED from its release pair) and proposal composition.
-    /// @dev CTM binding is commitment-based: this init only runs through a cut whose hash the
-    /// chain's own CTM committed (`upgradeCutHash`), and that commitment is written exclusively
-    /// by the CTM-bound executor — a transition cannot be aimed at a foreign CTM's chains.
+    /// @dev CTM binding is commitment-based: this init only runs through the cut the chain reads
+    /// from its own CTM (`upgradeCutForVersion`), which derives it from the transition that CTM
+    /// committed — a transition cannot be aimed at a foreign CTM's chains.
     function upgradeFromTransition(address _transition) external returns (bytes32) {
         ICTMTransition transition = ICTMTransition(_transition);
-        // No `validate()` here: this init only runs through a cut whose hash this chain's own CTM
-        // committed, and that cut's init calldata names THIS transition address — so the object is
-        // the committed one by construction, and its pins were checked when it was committed. Pins
-        // cannot have moved since: an `EXTCODEHASH` is fixed for a non-selfdestructible contract.
+        // No `validate()` here: this init only runs through the cut the chain's own CTM derives
+        // from its committed transition, and that cut's init calldata names THIS transition
+        // address — so the object is the committed one by construction, and its pins were checked
+        // when it was committed. Pins cannot have moved since: an `EXTCODEHASH` is fixed for a
+        // non-selfdestructible contract.
         _applyDerivedFacetCuts(transition.facetCuts());
         return upgrade(CTMUpgradeComposer.buildProposedUpgrade(transition));
     }

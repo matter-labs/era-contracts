@@ -9,7 +9,12 @@ import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {GenesisManifestLib} from "contracts/upgrades/registry/libraries/GenesisManifestLib.sol";
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
-import {GenesisConfig, GenesisFacet, ReleaseGenesisData, ReleaseManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    GenesisConfig,
+    GenesisFacet,
+    ReleaseGenesisData,
+    ReleaseManifest
+} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Unit tests for `CTMRegistry` in its BOOTSTRAP (genesis) mode: a freshly deployed CTM
 ///         (L1 deploy scripts or the Gateway CTM deployer) points at one of these so
@@ -68,19 +73,19 @@ contract CTMRegistryBootstrapTest is Test {
         return
             GenesisManifestLib.buildGenesisManifest(
                 GenesisConfig({
-                facets: facets,
-                verifier: VERIFIER,
-                genesisUpgrade: GENESIS_UPGRADE,
-                genesis: ReleaseGenesisData({
-                    bootloaderHash: BOOTLOADER_HASH,
-                    defaultAccountHash: DEFAULT_ACCOUNT_HASH,
-                    evmEmulatorHash: EVM_EMULATOR_HASH,
-                    fixedForceDeploymentsData: bytes(""),
-                    genesisBatchHash: bytes32(uint256(1)),
-                    genesisBatchCommitment: bytes32(uint256(1)),
-                    genesisIndexRepeatedStorageChanges: 1
+                    facets: facets,
+                    verifier: VERIFIER,
+                    genesisUpgrade: GENESIS_UPGRADE,
+                    genesis: ReleaseGenesisData({
+                        bootloaderHash: BOOTLOADER_HASH,
+                        defaultAccountHash: DEFAULT_ACCOUNT_HASH,
+                        evmEmulatorHash: EVM_EMULATOR_HASH,
+                        fixedForceDeploymentsData: bytes(""),
+                        genesisBatchHash: bytes32(uint256(1)),
+                        genesisBatchCommitment: bytes32(uint256(1)),
+                        genesisIndexRepeatedStorageChanges: 1
+                    })
                 })
-            })
             );
     }
 
@@ -138,19 +143,19 @@ contract CTMRegistryBootstrapTest is Test {
         CTMRelease release = new CTMRelease(
             GenesisManifestLib.buildGenesisManifest(
                 GenesisConfig({
-                facets: facets,
-                verifier: VERIFIER,
-                genesisUpgrade: GENESIS_UPGRADE,
-                genesis: ReleaseGenesisData({
-                    bootloaderHash: 0,
-                    defaultAccountHash: 0,
-                    evmEmulatorHash: 0,
-                    fixedForceDeploymentsData: bytes(""),
-                    genesisBatchHash: bytes32(uint256(1)),
-                    genesisBatchCommitment: bytes32(uint256(1)),
-                    genesisIndexRepeatedStorageChanges: 1
+                    facets: facets,
+                    verifier: VERIFIER,
+                    genesisUpgrade: GENESIS_UPGRADE,
+                    genesis: ReleaseGenesisData({
+                        bootloaderHash: 0,
+                        defaultAccountHash: 0,
+                        evmEmulatorHash: 0,
+                        fixedForceDeploymentsData: bytes(""),
+                        genesisBatchHash: bytes32(uint256(1)),
+                        genesisBatchCommitment: bytes32(uint256(1)),
+                        genesisIndexRepeatedStorageChanges: 1
+                    })
                 })
-            })
             )
         );
 

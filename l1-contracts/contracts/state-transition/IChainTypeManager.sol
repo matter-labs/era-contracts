@@ -173,9 +173,7 @@ interface IChainTypeManager {
     /// @notice The upgrade cut committed for chains departing from `_oldProtocolVersion`, composed
     ///         from the transition this CTM pinned for that edge. Chains read it here instead of
     ///         being handed cut bytes.
-    function upgradeCutForVersion(
-        uint256 _oldProtocolVersion
-    ) external view returns (Diamond.DiamondCutData memory);
+    function upgradeCutForVersion(uint256 _oldProtocolVersion) external view returns (Diamond.DiamondCutData memory);
 
     function upgradeChainFromVersion(uint256 _chainId, uint256 _oldProtocolVersion) external;
 

@@ -8,7 +8,6 @@ import {
     RegistryDuplicateFacetRow,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
-    RegistryUnknownKey,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 import {GenesisFacet, ReleaseManifest} from "../RegistryTypes.sol";
@@ -20,7 +19,6 @@ import {GenesisFacet, ReleaseManifest} from "../RegistryTypes.sol";
 ///      `validate()` / `verifyAll()` re-check the same pins afterwards. There is no optional,
 ///      detached pin list: what the release names, the release pins.
 contract CTMRelease is ICTMRelease {
-
     /// @notice `keccak256(abi.encode(manifest))`. No contract reads this — it is a review aid, a
     ///         single value to compare against the audited manifest. Provenance is the codehash.
     bytes32 public manifestHash;

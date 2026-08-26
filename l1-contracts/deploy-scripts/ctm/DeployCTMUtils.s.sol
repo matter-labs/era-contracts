@@ -153,7 +153,9 @@ abstract contract DeployCTMUtils is DeployUtils {
                     fixedForceDeploymentsData: generatedData.forceDeploymentsData,
                     genesisBatchHash: config.contracts.chainCreationParams.genesisRoot,
                     genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
-                    genesisIndexRepeatedStorageChanges: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex)
+                    genesisIndexRepeatedStorageChanges: uint64(
+                        config.contracts.chainCreationParams.genesisRollupLeafIndex
+                    )
                 })
             })
         );
