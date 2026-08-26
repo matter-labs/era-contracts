@@ -128,6 +128,7 @@ library DeployCTML1OrGateway {
             return CTMContract.DualVerifier;
         } else if (
             _compareStrings(_contractName, "DefaultUpgrade") ||
+            _compareStrings(_contractName, "DefaultUpgradeZKsyncOS") ||
             _compareStrings(_contractName, "SettlementLayerV32Upgrade")
         ) {
             // The per-version default-upgrade contract (v32's is `SettlementLayerV32Upgrade`).
@@ -169,6 +170,9 @@ library DeployCTML1OrGateway {
         if (_c == CTMContract.ChainTypeManager) {
             return _isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         }
+        if (_c == CTMContract.DefaultUpgrade) {
+            return _isZKsyncOS ? "DefaultUpgradeZKsyncOS" : "DefaultUpgrade";
+        }
         if (_c == CTMContract.VerifierFflonk) {
             if (_isZKsyncOS) revert("DeployCTML1OrGateway: ZKsync OS does not use FFLONK");
             return "EraVerifierFflonk";
@@ -191,6 +195,9 @@ library DeployCTML1OrGateway {
         if (_c == CTMContract.CommitterFacet) return "CommitterFacet";
         if (_c == CTMContract.DiamondInit) return "DiamondInit";
         if (_c == CTMContract.ValidatorTimelock) return "ValidatorTimelock";
+        if (_c == CTMContract.DefaultUpgrade) {
+            return _isZKsyncOS ? "DefaultUpgradeZKsyncOS" : "DefaultUpgrade";
+        }
         if (_c == CTMContract.BlobsL1DAValidatorZKsyncOS) return "BlobsL1DAValidatorZKsyncOS";
 
         revert("DeployCTML1OrGateway: unknown CTMContract");
