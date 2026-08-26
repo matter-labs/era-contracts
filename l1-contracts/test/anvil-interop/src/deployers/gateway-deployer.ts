@@ -1,4 +1,4 @@
-import { providers } from "ethers";
+import type { providers } from "ethers";
 import {
   L2_BRIDGEHUB_ADDR,
   L2_ASSET_ROUTER_ADDR,
@@ -11,7 +11,7 @@ import {
   L2_INTEROP_HANDLER_ADDR,
   L2_MESSAGE_VERIFICATION_ADDR,
 } from "../core/const";
-import { assertContractDeployed } from "../core/utils";
+import { assertContractDeployed, createProvider } from "../core/utils";
 
 /**
  * Pre-deploy Gateway CTM contracts on the GW chain via anvil_setCode.
@@ -31,7 +31,7 @@ export class GatewayDeployer {
   private gwChainId: number;
 
   constructor(gwRpcUrl: string, gwChainId: number) {
-    this.gwProvider = new providers.JsonRpcProvider(gwRpcUrl);
+    this.gwProvider = createProvider(gwRpcUrl);
     this.gwChainId = gwChainId;
   }
 

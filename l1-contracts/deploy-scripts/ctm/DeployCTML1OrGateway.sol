@@ -32,6 +32,7 @@ enum CTMContract {
     // ---- Infrastructure ----
     ValidatorTimelock,
     ChainTypeManager,
+    DefaultUpgrade,
     // ---- Verifiers ----
     VerifierPlonk,
     DualVerifier,

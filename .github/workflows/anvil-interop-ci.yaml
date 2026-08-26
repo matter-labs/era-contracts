@@ -63,6 +63,11 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn tsc --noEmit
 
+      # Each suite covers something an ordinary run cannot fail on; see their headers.
+      - name: Unit-test the interop harness
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn test:unit
+
       - name: Run interop tests (preloaded state)
         working-directory: l1-contracts/test/anvil-interop
         env:
@@ -118,6 +123,12 @@ jobs:
 
       - name: Install dependencies
         run: yarn
+
+      # Reuses the artifacts l1-contracts-ci built for this commit rather than compiling them again.
+      # Via the action, not a bare cache restore: the prefix key can land a previous commit's `out`,
+      # and without the pruning a deleted contract's stale ABI would reach the upgrade harness.
+      - name: Warm solc build cache
+        uses: ./.github/actions/warm-solc-cache
 
       - name: Build da-contracts artifacts
         run: yarn da build:foundry

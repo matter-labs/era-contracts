@@ -40,7 +40,7 @@ import {
 import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
 import { forceBatchExecutedEqualsCommitted, modelV31BackfillPrerequisite, transferOwnable2Step } from "./harness-shims";
-import { impersonateAndRun } from "../core/utils";
+import { impersonateAndRun, createProvider } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
 
@@ -116,7 +116,7 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     if (!l1Chain) {
       throw new Error("L1 chain not started");
     }
-    const l1Provider = new ethers.providers.JsonRpcProvider(l1Chain.rpcUrl);
+    const l1Provider = createProvider(l1Chain.rpcUrl);
     const defaultSigner = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
 
     // ── Transfer L1 contract ownership to governance ──
@@ -380,7 +380,7 @@ async function executeSafeBundles(outDir: string, rpcUrl: string): Promise<void>
   if (safeBundles.length === 0) {
     throw new Error(`No protocol-ops Safe bundles found in ${outDir}`);
   }
-  const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+  const provider = createProvider(rpcUrl);
 
   for (const bundle of safeBundles) {
     const safeFile = JSON.parse(fs.readFileSync(bundle.file, "utf8")) as {
@@ -541,7 +541,7 @@ async function fundDeployerZkForBundleReplay(params: {
     throw new Error(`Cannot fund bundle senders ZK: no usable bundle targets in ${params.prepareOutDir}/manifest.json`);
   }
 
-  const provider = new ethers.providers.JsonRpcProvider(params.rpcUrl);
+  const provider = createProvider(params.rpcUrl);
   const bridgehub = new ethers.Contract(params.bridgehubAddress, getAbi("L1Bridgehub"), provider);
   const assetRouterAddr: string = await bridgehub.assetRouter();
   const assetRouter = new ethers.Contract(assetRouterAddr, getAbi("L1AssetRouter"), provider);
@@ -750,7 +750,7 @@ export async function runChainUpgradesAndRelayL2(params: {
     if (!l2Chain) {
       throw new Error(`Missing running L2 chain ${chain.chainId}`);
     }
-    const l2Provider = new ethers.providers.JsonRpcProvider(l2Chain.rpcUrl);
+    const l2Provider = createProvider(l2Chain.rpcUrl);
 
     const l2TxHash = await prepareAndRelayL2Upgrade(l2Provider, rewrittenUpgradeTxData);
     console.log(`  ✅ L2 upgrade relay tx: ${l2TxHash}`);

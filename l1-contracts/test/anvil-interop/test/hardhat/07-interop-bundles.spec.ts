@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { BigNumber, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getChainIdsByRole, getL2Chain } from "../../src/core/utils";
+import { getChainIdsByRole, getL2Chain, createProvider } from "../../src/core/utils";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
 import {
   getInteropRecipientAddress,
@@ -118,8 +118,8 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
     const sourceChain = getL2Chain(state.chains!, sourceChainId);
     const destChain = getL2Chain(state.chains!, destChainId);
-    sourceProvider = new ethers.providers.JsonRpcProvider(sourceChain.rpcUrl);
-    destProvider = new ethers.providers.JsonRpcProvider(destChain.rpcUrl);
+    sourceProvider = createProvider(sourceChain.rpcUrl);
+    destProvider = createProvider(destChain.rpcUrl);
 
     const gatewayChainIds = getChainIdsByRole(state.chains.config, "gateway");
     if (gatewayChainIds.length !== 1) {

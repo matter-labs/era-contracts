@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 
-import type { BigNumber } from "ethers";
-import { ethers, providers, Wallet, ContractFactory } from "ethers";
+import type { BigNumber, providers } from "ethers";
+import { ethers, Wallet, ContractFactory } from "ethers";
 import { DeploymentRunner } from "../deployment-runner";
 import { ANVIL_DEFAULT_PRIVATE_KEY, TEST_TOKEN_DECIMALS, TEST_TOKEN_MINT_AMOUNT_UNITS } from "../core/const";
 import { getAbi, getCreationBytecode } from "../core/contracts";
 import { getInteropSourcePrivateKey } from "../core/accounts";
 import * as fs from "fs";
 import * as path from "path";
+import { createProvider } from "../core/utils";
 
 export interface DeployL2NativeTokenParams {
   provider: providers.JsonRpcProvider;
@@ -69,7 +70,7 @@ export async function deployTestTokens(): Promise<void> {
   await Promise.all(
     state.chains.l2.map(async (chain) => {
       console.log(`🚀 Deploying TestToken on chain ${chain.chainId}...`);
-      const provider = new providers.JsonRpcProvider(chain.rpcUrl);
+      const provider = createProvider(chain.rpcUrl);
       const wallet = new Wallet(privateKey, provider);
 
       try {

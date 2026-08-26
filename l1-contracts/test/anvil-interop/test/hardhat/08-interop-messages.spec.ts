@@ -2,7 +2,7 @@ import { expect } from "chai";
 import type { BigNumber } from "ethers";
 import { ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getChainIdsByRole, getL2Chain } from "../../src/core/utils";
+import { getChainIdsByRole, getL2Chain, createProvider } from "../../src/core/utils";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
 import { getInteropRecipientAddress, getInteropSourceAddress, isLiveInteropMode } from "../../src/core/accounts";
 import {
@@ -110,8 +110,8 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
 
     const sourceChain = getL2Chain(state.chains, sourceChainId);
     const destChain = getL2Chain(state.chains, destChainId);
-    sourceProvider = new ethers.providers.JsonRpcProvider(sourceChain.rpcUrl);
-    destProvider = new ethers.providers.JsonRpcProvider(destChain.rpcUrl);
+    sourceProvider = createProvider(sourceChain.rpcUrl);
+    destProvider = createProvider(destChain.rpcUrl);
 
     if (!isLiveInteropMode()) {
       await setInteropProtocolFee(sourceProvider, ANVIL_INTEROP_PROTOCOL_FEE);
@@ -165,7 +165,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     if (customBaseTokenConfig) {
       customBaseTokenChainId = customBaseTokenConfig.chainId;
       const customChain = getL2Chain(state.chains!, customBaseTokenChainId);
-      customBaseTokenProvider = new ethers.providers.JsonRpcProvider(customChain.rpcUrl);
+      customBaseTokenProvider = createProvider(customChain.rpcUrl);
       if (!isLiveInteropMode()) {
         await setInteropProtocolFee(customBaseTokenProvider, ANVIL_INTEROP_PROTOCOL_FEE);
       }

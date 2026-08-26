@@ -1,0 +1,20 @@
+{
+  // These scripts run as bare `node script.js` from a composite action, in workflows that have not
+  // installed dependencies yet (some callers warm the cache before their `yarn`), so they
+  // cannot be TypeScript: that would need ts-node fetched over the network in every job. Node 20
+  // also predates `--experimental-strip-types`. They are still checked, via `// @ts-check` and this
+  // config, which `yarn lint:check` runs.
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "es2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "types": ["node"],
+    "skipLibCheck": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true
+  },
+  "include": ["*.js"]
+}
