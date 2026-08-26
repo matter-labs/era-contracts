@@ -163,9 +163,9 @@
                 "internalType": "address"
               },
               {
-                "name": "releaseFactory",
-                "type": "address",
-                "internalType": "address"
+                "name": "releaseCodehash",
+                "type": "bytes32",
+                "internalType": "bytes32"
               }
             ]
           },
