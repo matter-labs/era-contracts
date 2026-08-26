@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {ProtocolIdNotGreater} from "contracts/common/L1ContractErrors.sol";
+import {NoCommittedUpgradeCutForVersion} from "contracts/common/L1ContractErrors.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 contract ProtocolVersion is ChainTypeManagerTest {
@@ -103,7 +103,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
     }
 
     // upgradeChainFromVersion
-    function test_SuccessfulUpgradeChainFromVersion() public {
+    function test_RevertWhen_UpgradeChainFromVersionWithoutCommittedTransition() public {
         address chainAddress = createNewChain(getDiamondCutData(diamondInit));
 
         Diamond.FacetCut[] memory customFacetCuts = new Diamond.FacetCut[](1);
@@ -125,7 +125,10 @@ contract ProtocolVersion is ChainTypeManagerTest {
             1
         );
 
-        vm.expectRevert(ProtocolIdNotGreater.selector);
+        // The edge above was committed via the legacy cut-taking setter, which registers no
+        // transition — and a v32 chain derives its cut from the committed transition, so the
+        // read fails before the chain's own version check would.
+        vm.expectRevert(abi.encodeWithSelector(NoCommittedUpgradeCutForVersion.selector, 0));
         chainContractAddress.upgradeChainFromVersion(chainId, 0);
     }
 }

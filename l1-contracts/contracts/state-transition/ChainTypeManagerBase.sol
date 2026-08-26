@@ -89,11 +89,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev The stored cutData for upgrade diamond cut. protocolVersion => cutHash
     mapping(uint256 protocolVersion => bytes32 cutHash) public upgradeCutHash;
 
-    /// @dev The committed cut itself, abi-encoded, keyed by the version chains depart FROM. Read
-    ///      by {upgradeCutForVersion}; `upgradeCutHash` above stays for chains still on protocol
-    ///      versions whose Admin facet is handed the cut.
-    mapping(uint256 protocolVersion => bytes cutData) internal committedUpgradeCut;
-
     /// @dev The address used to manage non critical updates
     address public admin;
 
@@ -136,10 +131,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     ///         exactly that code (see `_storeCurrentRelease`). Set once at initialization.
     bytes32 public releaseCodehash;
 
-    /// @notice The transition committed for chains departing from a given protocol version — the
-    ///         SAME object the cut's init calldata names, so a chain can rebuild that cut instead of
-    ///         being handed its bytes. Written beside `upgradeCutHash`, which stays the authority on
-    ///         what a chain may execute.
+    /// @notice The transition committed for chains departing from a given protocol version. The
+    ///         ONLY commitment for registry-driven edges: {upgradeCutForVersion} derives the cut
+    ///         from it, so chains are never handed cut bytes. `upgradeCutHash` remains only for
+    ///         chains on pre-v32 Admin facets, whose handed-cut path verifies against it.
     mapping(uint256 oldProtocolVersion => address transition) public upgradeTransition;
 
     /// @dev Contract is expected to be used as proxy implementation.
@@ -404,10 +399,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     function setNewVersionUpgradeFromTransition(ICTMTransition _transition) external onlyOwner {
         uint256 oldProtocolVersion = _transition.oldProtocolVersion();
         _setNewVersionUpgrade({
-            _cutData: CTMUpgradeComposer.buildUpgradeCutData(
-                _transition.upgradeEngine(),
-                abi.encodeCall(IDefaultUpgrade.upgradeFromTransition, (address(_transition)))
-            ),
+            _cutData: _transitionUpgradeCut(_transition),
             _oldProtocolVersion: oldProtocolVersion,
             _oldProtocolVersionDeadline: _transition.oldProtocolVersionDeadline(),
             _newProtocolVersion: _transition.newProtocolVersion()
@@ -501,11 +493,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @param _cutData the new diamond cut data
     /// @param _oldProtocolVersion the old protocol version
     function setUpgradeDiamondCutInner(Diamond.DiamondCutData memory _cutData, uint256 _oldProtocolVersion) internal {
-        bytes memory encoded = abi.encode(_cutData);
-        // Stored, not just hashed: chains read the cut back out of here instead of being handed
-        // bytes to check against the hash.
-        committedUpgradeCut[_oldProtocolVersion] = encoded;
-        bytes32 newCutHash = keccak256(encoded);
+        bytes32 newCutHash = keccak256(abi.encode(_cutData));
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
         upgradeCutDataBlock[_oldProtocolVersion] = block.number;
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
@@ -532,19 +520,31 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         IZKChain(zkChainAddr).revertBatchesSharedBridge(zkChainAddr, _newLastBatch);
     }
 
-    /// @notice The upgrade cut committed for chains departing from `_oldProtocolVersion`.
-    /// @dev THE single source of the cut. Chains no longer receive cut bytes from their caller —
-    ///      they read this — so there is nothing for a chain admin to substitute. It is stored at
-    ///      commit time rather than recomposed here, so the registry-driven and the legacy
-    ///      {setNewVersionUpgrade} paths serve chains through exactly the same read.
+    /// @notice The upgrade cut for chains departing from `_oldProtocolVersion`, derived from the
+    ///         transition committed for that edge ({upgradeTransition}).
+    /// @dev Nothing is stored and nothing is handed to the chain by its caller: the transition is
+    ///      the only commitment, and the cut is recomputed from it here — the same derivation
+    ///      {setNewVersionUpgradeFromTransition} hashed at commit time.
     function upgradeCutForVersion(
         uint256 _oldProtocolVersion
     ) public view returns (Diamond.DiamondCutData memory) {
-        bytes memory committed = committedUpgradeCut[_oldProtocolVersion];
-        if (committed.length == 0) {
+        address transition = upgradeTransition[_oldProtocolVersion];
+        if (transition == address(0)) {
             revert NoCommittedUpgradeCutForVersion(_oldProtocolVersion);
         }
-        return abi.decode(committed, (Diamond.DiamondCutData));
+        return _transitionUpgradeCut(ICTMTransition(transition));
+    }
+
+    /// @dev The cut is a pure function of the transition: no facet cuts of its own, just the
+    ///      engine-init pointing back at the transition.
+    function _transitionUpgradeCut(
+        ICTMTransition _transition
+    ) internal view returns (Diamond.DiamondCutData memory) {
+        return
+            CTMUpgradeComposer.buildUpgradeCutData(
+                _transition.upgradeEngine(),
+                abi.encodeCall(IDefaultUpgrade.upgradeFromTransition, (address(_transition)))
+            );
     }
 
     /// @dev execute predefined upgrade
