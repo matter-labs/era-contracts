@@ -174,9 +174,9 @@ The CTM stores one release pointer and derives genesis data from it:
   `l1GenesisUpgrade()` are views over `ICTMRelease(currentRelease).genesisParams()`.
 - `releaseCodehash` — the provenance anchor every pinned release is checked against.
 - `upgradeTransition[oldProtocolVersion]` — the transition committed for chains departing from that
-  version. `upgradeCutHash` remains the authority on what a chain may execute; this pointer is what
-  lets tooling (and a chain admin driving its own upgrade) recompose that cut without being handed
-  its bytes.
+  version. This is the ONLY commitment for registry-driven edges: `upgradeCutForVersion` derives the
+  cut from it on read, so a chain is never handed cut bytes. `upgradeCutHash` remains only for
+  chains still on pre-v32 Admin facets, whose handed-cut path verifies against it.
 
 Nothing else about a chain's installed state is keyed by protocol version on the CTM. The verifier in
 particular is not: a chain several versions behind resolves it from the release its own transition
@@ -225,9 +225,9 @@ sequenceDiagram
     E->>C: setNewVersionUpgradeFromTransition(transition)
     E->>C: setCurrentRelease(newRelease)
     G->>E: upgradeChain(transition, chainId)
-    E->>C: upgradeChainFromVersion(chainId, oldV, cut)
-    C->>D: cut (init = upgradeEngine.upgradeFromTransition)
-    Note over D: apply derived facetCuts verbatim,<br/>then run composed ProposedUpgrade
+    E->>C: upgradeChainFromVersion(chainId, oldV)
+    C->>D: upgradeChainFromVersion(oldV)
+    D->>C: upgradeCutForVersion(oldV) — cut derived from upgradeTransition[oldV]
     Note over D: apply derived facetCuts verbatim,<br/>then run composed ProposedUpgrade
 ```
 
@@ -252,12 +252,12 @@ A proposal is a sequence of fixed-signature executor calls:
   direct path on the chain diamond.
 
 **Where the cut is composed.** The cut is a pure function of the transition — an
-`upgradeEngine.upgradeFromTransition(transition)` init over no facet cuts. The CTM derives it when
-the transition is committed, so it never travels in governance calldata; the executor derives it
-again when driving a chain, and the chain checks the bytes it receives against `upgradeCutHash`.
-Composition lives in those two callers only: the chain diamond stays unaware of transitions and
-treats the cut as opaque bytes, which is why `upgradeTransition` is a pointer for tooling rather than
-something the chain reads.
+`upgradeEngine.upgradeFromTransition(transition)` init over no facet cuts — and the CTM is the only
+place that composes it: hashed at commit time (`setNewVersionUpgradeFromTransition`) and re-derived
+on read (`upgradeCutForVersion`). It never travels in calldata at all: not in governance calls, and
+not to the chain — the chain's Admin facet takes only the departing version and reads the cut from
+its CTM, so no caller can substitute one. The chain diamond still treats the cut it reads as opaque
+bytes and stays unaware of transitions.
 
 On the chain, `BaseZkSyncUpgrade.upgradeFromTransition` validates the transition, applies
 `transition.facetCuts()` verbatim, and runs the `ProposedUpgrade` composed from the same object.

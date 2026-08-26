@@ -21,6 +21,10 @@ import {EcosystemContractRow} from "../RegistryTypes.sol";
 /// @dev Fixed logic, no generic delegatecall. The break-glass `forward` (base) is gated by a
 ///      SEPARATE governor. The registry address is a *pinned implementation address* — the exact
 ///      generated contract governance approved — never a proxy.
+/// @dev There is deliberately no separate executor for the CTM *implementation*: the CTM proxy
+///      sits under the same ecosystem `ProxyAdmin`, so swapping its implementation is just
+///      another {EcosystemContractRow} here. `CTMUpgradeExecutor` owns only what the CTM does
+///      (version schedule, releases, chain upgrades), not what the CTM is.
 contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
     using CodehashPinLib for address;
 
