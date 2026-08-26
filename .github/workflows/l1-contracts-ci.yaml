@@ -20,8 +20,6 @@ jobs:
 
       - name: Install Foundry
         uses: ./.github/actions/install-foundry
-        with:
-          role: build
 
       - name: Use Node.js
         uses: actions/setup-node@v6
@@ -91,8 +89,6 @@ jobs:
 
       - name: Install Foundry
         uses: ./.github/actions/install-foundry
-        with:
-          role: build
 
       - name: Use Node.js
         uses: actions/setup-node@v6
@@ -162,8 +158,6 @@ jobs:
 
       - name: Install foundry
         uses: ./.github/actions/install-foundry
-        with:
-          role: build
 
       - name: Restore this commit's artifacts
         uses: ./.github/actions/restore-ci-artifacts
@@ -189,8 +183,6 @@ jobs:
 
       - name: Install Foundry
         uses: ./.github/actions/install-foundry
-        with:
-          role: build
 
       - name: Install dependencies
         run: yarn
@@ -265,8 +257,6 @@ jobs:
 
       - name: Install Foundry
         uses: ./.github/actions/install-foundry
-        with:
-          role: build
 
       - name: Install dependencies
         run: yarn
@@ -375,8 +365,6 @@ jobs:
       # coverage build above stays on the `build` pin for reproducible bytecode.
       - name: Install Anvil toolchain for interop coverage
         uses: ./.github/actions/install-foundry
-        with:
-          role: anvil
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
@@ -554,8 +542,6 @@ jobs:
 
   #     - name: Use Foundry
   #       uses: ./.github/actions/install-foundry
-  #       with:
-  #         role: build
 
   #     - name: Use Node.js
   #       uses: actions/setup-node@v6

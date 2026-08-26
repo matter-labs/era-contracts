@@ -57,21 +57,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
 # layers) so a version bump only invalidates the foundry layers below.
 COPY .github/foundry-versions.env /usr/local/share/foundry-versions.env
 
-# Upstream foundry (forge + cast) — the pinned ordinary-EVM toolchain
+# Foundry (forge + cast + anvil). One pinned version, so one download.
 RUN . /usr/local/share/foundry-versions.env \
- && curl -L -o /tmp/foundry.tgz "https://github.com/foundry-rs/foundry/releases/download/${FOUNDRY_BUILD_VERSION}/foundry_${FOUNDRY_BUILD_VERSION}_${FOUNDRY_ARCH}.tar.gz" \
- && tar zxf /tmp/foundry.tgz -C /tmp/ forge cast \
- && mv /tmp/forge /tmp/cast /usr/local/bin/ \
- && chmod +x /usr/local/bin/forge /usr/local/bin/cast \
+ && curl -L -o /tmp/foundry.tgz "https://github.com/foundry-rs/foundry/releases/download/${FOUNDRY_VERSION}/foundry_${FOUNDRY_VERSION}_${FOUNDRY_ARCH}.tar.gz" \
+ && tar zxf /tmp/foundry.tgz -C /tmp/ forge cast anvil \
+ && mv /tmp/forge /tmp/cast /tmp/anvil /usr/local/bin/ \
+ && chmod +x /usr/local/bin/forge /usr/local/bin/cast /usr/local/bin/anvil \
  && rm /tmp/foundry.tgz
-
-# Foundry vanilla (anvil)
-RUN . /usr/local/share/foundry-versions.env \
- && curl -L -o /tmp/foundry-vanilla.tgz "https://github.com/foundry-rs/foundry/releases/download/${FOUNDRY_ANVIL_VERSION}/foundry_${FOUNDRY_ANVIL_VERSION}_${FOUNDRY_ARCH}.tar.gz" \
- && tar zxf /tmp/foundry-vanilla.tgz -C /tmp/ anvil \
- && mv /tmp/anvil /usr/local/bin/anvil \
- && chmod +x /usr/local/bin/anvil \
- && rm /tmp/foundry-vanilla.tgz
 
 # === Install Rust ===
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \

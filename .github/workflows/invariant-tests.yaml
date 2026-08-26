@@ -36,8 +36,6 @@ jobs:
 
       - name: Install Foundry
         uses: ./.github/actions/install-foundry
-        with:
-          role: build
 
       - name: Show forge version
         shell: bash

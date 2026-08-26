@@ -30,6 +30,7 @@ import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
+import {MultisigCommitter} from "contracts/state-transition/validators/MultisigCommitter.sol";
 import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -357,6 +358,15 @@ abstract contract DeployCTMUtils is DeployUtils {
             return
                 abi.encodeCall(
                     ValidatorTimelock.initialize,
+                    (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
+                );
+        } else if (compareStrings(contractName, "MultisigCommitter")) {
+            // `initializeV2`, not the inherited `initialize`: a fresh proxy has to land at
+            // `_initialized = 2` with the EIP-712 domain set, matching one that got there via
+            // `reinitializeV2` during the v31 upgrade.
+            return
+                abi.encodeCall(
+                    MultisigCommitter.initializeV2,
                     (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
                 );
         } else if (compareStrings(contractName, "BytecodesSupplier")) {

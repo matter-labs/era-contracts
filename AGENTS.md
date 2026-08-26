@@ -222,23 +222,26 @@ When debugging Solidity compilation or script failures:
 
 ### Installing Foundry
 
-The repository builds and tests with upstream Foundry (ordinary EVM, no `--zksync`). Every pinned
-version lives in [`.github/foundry-versions.env`](.github/foundry-versions.env) — CI installs them
-through `.github/actions/install-foundry` (`role: build | anvil | scripts`), `recompute_hashes.sh`
-reads the same file, and the Docker base image takes them as build args. Install the build pin CI
-uses:
+The repository builds and tests with upstream Foundry (ordinary EVM, no `--zksync`). One pinned
+version covers forge, cast and anvil alike, and it lives in
+[`.github/foundry-versions.env`](.github/foundry-versions.env) — CI installs it through
+`.github/actions/install-foundry`, `recompute_hashes.sh` reads the same file, and the Docker base
+image takes it as a build arg. Install it with:
 
 ```bash
 curl -L https://foundry.paradigm.xyz | bash
-foundryup --install "$(. .github/foundry-versions.env && echo "$FOUNDRY_BUILD_VERSION")"
+foundryup --install "$(. .github/foundry-versions.env && echo "$FOUNDRY_VERSION")"
 ```
 
-The interop and v31->v32 upgrade suites additionally need the `anvil` pin (`FOUNDRY_ANVIL_VERSION`),
-which must stay trace-schema compatible with the committed chain states. Never bump a pin in a
-workflow directly — change it in `.github/foundry-versions.env` and regenerate whatever it
-invalidates: `AllContractsHashes.json` for the build pin (it records bytecode, which carries solc
-metadata; `zkstack-out` and `selectors` are ABI-derived and unaffected), and the anvil-interop
-chain states for the anvil pin.
+Note the version must be upstream Foundry, not the `foundry-zksync` fork: both report a `1.x.y`
+version, and building or generating `selectors` with the fork mismatches CI in both directions
+without saying so.
+
+Never bump the pin in a workflow directly — change it in `.github/foundry-versions.env` and
+regenerate whatever it invalidates. A bump changes solc metadata in every artifact, so
+`AllContractsHashes.json` always needs regenerating (`zkstack-out` and `selectors` are ABI-derived
+and unaffected — measured, not assumed). Anvil's trace schema must stay compatible with the
+committed anvil-interop chain states; regenerate those too if a bump changes it.
 
 ### Building Artifacts
 

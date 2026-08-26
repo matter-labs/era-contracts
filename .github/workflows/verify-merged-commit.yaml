@@ -95,8 +95,6 @@ jobs:
 
       - name: Install Foundry
         uses: ./.github/actions/install-foundry
-        with:
-          role: build
 
       - name: Use Node.js
         uses: actions/setup-node@v6
@@ -171,8 +169,6 @@ jobs:
       # shadow forge for those builds.
       - name: Install Anvil toolchain
         uses: ./.github/actions/install-foundry
-        with:
-          role: anvil
 
       - name: Build anvil-interop dev artifacts
         run: yarn l1 build:anvil-interop-dev-artifacts

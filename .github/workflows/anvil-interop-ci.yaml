@@ -40,8 +40,6 @@ jobs:
 
       - name: Install Foundry
         uses: ./.github/actions/install-foundry
-        with:
-          role: anvil
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -104,16 +102,12 @@ jobs:
       # release bytecode is reproduced with the `build` Forge pin.
       - name: Install Anvil toolchain (state-compatible with committed states)
         uses: ./.github/actions/install-foundry
-        with:
-          role: anvil
 
       - name: Preserve the pinned Anvil before switching to the build toolchain
         run: cp "$(command -v anvil)" "$RUNNER_TEMP/anvil-pinned"
 
       - name: Install foundry
         uses: ./.github/actions/install-foundry
-        with:
-          role: build
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -179,8 +173,6 @@ jobs:
 
       - name: Install Anvil toolchain (deterministic bytecode)
         uses: ./.github/actions/install-foundry
-        with:
-          role: anvil
 
       - name: Use Node.js
         uses: actions/setup-node@v4

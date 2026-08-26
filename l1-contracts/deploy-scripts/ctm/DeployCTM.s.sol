@@ -155,18 +155,21 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         deployVerifiers();
 
-        // Fresh OS CTMs register the same upgrade implementation the v31 -> v32 flow deploys,
-        // so upgraded and from-scratch ecosystems match. The PriorityOpLowerBound registry must
-        // exist first: the upgrade contract embeds its address as an immutable.
+        // The CTM keeps this implementation and reuses it for every upgrade that needs no bespoke
+        // logic — a verifier or VK swap, say — so it has to be the reusable one. A one-shot migration
+        // like `V32UpgradeZKsyncOS` would be replayed by those later upgrades.
         priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound");
-        (ctmAddresses.stateTransition.defaultUpgrade) = deploySimpleContract("V32UpgradeZKsyncOS");
+        (ctmAddresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgradeZKsyncOS");
         (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
 
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
         ctmAddresses.admin.accessControlRestrictionAddress = address(0);
 
-        (, ctmAddresses.stateTransition.proxies.validatorTimelock) = deployTuppWithContract("ValidatorTimelock");
+        // `MultisigCommitter` derives from `ValidatorTimelock` and the v31 upgrade installs it as the
+        // validator implementation, so deploying the plain timelock here would leave a fresh ecosystem
+        // without the multisig-commit support an upgraded one has.
+        (, ctmAddresses.stateTransition.proxies.validatorTimelock) = deployTuppWithContract("MultisigCommitter");
 
         (
             ctmAddresses.stateTransition.implementations.permissionlessValidator,

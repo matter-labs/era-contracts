@@ -1,9 +1,10 @@
 {
-  // These scripts run as bare `node script.js` from a composite action, in workflows that have not
-  // installed dependencies yet (some callers warm the cache before their `yarn`), so they
-  // cannot be TypeScript: that would need ts-node fetched over the network in every job. Node 20
-  // also predates `--experimental-strip-types`. They are still checked, via `// @ts-check` and this
-  // config, which `yarn lint:check` runs.
+  // These scripts run as bare `node script.js` from a composite action, so they cannot be
+  // TypeScript: that would need ts-node fetched over the network in every job, and Node 20 predates
+  // `--experimental-strip-types`. Every caller today happens to run `yarn` first — the workflow that
+  // warmed the cache beforehand was system-contracts-ci, now deleted — but a composite action is
+  // callable from any workflow, so it should not depend on the caller having installed node_modules.
+  // They are still checked, via `// @ts-check` and this config, which `yarn lint:check` runs.
   "compilerOptions": {
     "allowJs": true,
     "checkJs": true,

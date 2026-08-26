@@ -60,8 +60,6 @@ jobs:
 
       - name: Install Foundry
         uses: ./.github/actions/install-foundry
-        with:
-          role: build
 
       - name: Install dependencies
         run: yarn

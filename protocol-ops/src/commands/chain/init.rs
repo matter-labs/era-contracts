@@ -94,11 +94,6 @@ pub struct ChainInitArgs {
     /// Make the chain a permanent rollup (irreversible)
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub make_permanent_rollup: bool,
-    /// Deprecated no-op, kept for CLI compatibility: ZKsync OS chains never
-    /// deploy L2 contracts via priority transactions (L2 system contracts
-    /// live in genesis).
-    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
-    pub skip_priority_txs: bool,
     /// Register the chain for interop with every other chain of the ecosystem (and vice versa) once it
     /// is initialized. Permissionless and once-per-ordered-pair; pairs that are not registrable yet are
     /// skipped, see `RegisterOnAllChains.s.sol`.

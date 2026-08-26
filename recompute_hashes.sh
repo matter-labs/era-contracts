@@ -3,8 +3,8 @@
 
 set -e
 
-# Expected upstream Foundry version and commit for ordinary-EVM artifacts, read
-# from the single source of truth shared with CI and the Docker images.
+# Expected Foundry version and commit, read from the single source of truth
+# shared with CI and the Docker images.
 VERSIONS_FILE="$(dirname "${BASH_SOURCE[0]:-$0}")/.github/foundry-versions.env"
 if [ ! -f "$VERSIONS_FILE" ]; then
   echo "error: cannot find $VERSIONS_FILE" >&2
@@ -12,13 +12,13 @@ if [ ! -f "$VERSIONS_FILE" ]; then
 fi
 # shellcheck source=.github/foundry-versions.env
 . "$VERSIONS_FILE"
-BUILD_VERSION="${FOUNDRY_BUILD_VERSION#v}"
-EXPECTED_VERSION="forge Version: ${BUILD_VERSION}-${FOUNDRY_BUILD_VERSION}"
-EXPECTED_COMMIT="${FOUNDRY_BUILD_COMMIT}"
+BARE_VERSION="${FOUNDRY_VERSION#v}"
+EXPECTED_VERSION="forge Version: ${BARE_VERSION}-${FOUNDRY_VERSION}"
+EXPECTED_COMMIT="${FOUNDRY_COMMIT}"
 
 # Check if Foundry is installed
 if ! command -V forge &> /dev/null; then
-  echo "Foundry is not installed. Please install upstream Foundry ${FOUNDRY_BUILD_VERSION}."
+  echo "Foundry is not installed. Please install upstream Foundry ${FOUNDRY_VERSION}."
   exit 1
 fi
 
@@ -31,7 +31,7 @@ if [[ "$FORGE_VERSION" != "$EXPECTED_VERSION" ]]; then
   echo "Incorrect Foundry version."
   echo "Expected: ${EXPECTED_VERSION}"
   echo "Found:    ${FORGE_VERSION}"
-  echo "Install upstream Foundry ${FOUNDRY_BUILD_VERSION}."
+  echo "Install upstream Foundry ${FOUNDRY_VERSION}."
   exit 1
 fi
 
@@ -41,7 +41,7 @@ if [[ "$FORGE_COMMIT" != "$EXPECTED_COMMIT" && "$FORGE_COMMIT" != "VERGEN_ID" ]]
   echo "Incorrect Foundry commit."
   echo "Expected: ${EXPECTED_COMMIT}"
   echo "Found:    ${FORGE_COMMIT}"
-  echo "Install upstream Foundry ${FOUNDRY_BUILD_VERSION}."
+  echo "Install upstream Foundry ${FOUNDRY_VERSION}."
   exit 1
 fi
 
