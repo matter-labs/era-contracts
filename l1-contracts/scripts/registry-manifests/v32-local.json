@@ -125,7 +125,11 @@
             "address": "0x5D42EBdBBa61412295D7b0302d6F50aC449Ddb4F",
             "codehash": "0x0ed2d27c5eb4f05c9abdd5a57d0c9b619e6e087e7dabe55fe59d422a615d62f2",
             "isFreezable": true,
-            "selectors": ["0xa085344d", "0x9271e450", "0x7ca4eff7"]
+            "selectors": [
+              "0xa085344d",
+              "0x9271e450",
+              "0x7ca4eff7"
+            ]
           },
           {
             "name": "MigratorFacet",
@@ -147,14 +151,24 @@
             "address": "0xB06c856C8eaBd1d8321b687E188204C1018BC4E5",
             "codehash": "0x395bb8514ef1e5929f5d0116b53947f6416efb30ad2a94b7714c7835714ebefb",
             "isFreezable": true,
-            "selectors": ["0x0db9eb87", "0x0b6db820"]
+            "selectors": [
+              "0x0db9eb87",
+              "0x0b6db820"
+            ]
           },
           {
             "name": "MailboxFacet",
             "address": "0x39455De9C82531cA77450792AFFd43CA265aB094",
             "codehash": "0x61057b58deb2b9f70dfcaeaea448426e7dd31344ef23b98e36b7dd44e0293c8c",
             "isFreezable": true,
-            "selectors": ["0x12f43dab", "0xddcc9eec", "0x60da3e83", "0xb473318e", "0xd07b90d1", "0xd0772551"]
+            "selectors": [
+              "0x12f43dab",
+              "0xddcc9eec",
+              "0x60da3e83",
+              "0xb473318e",
+              "0xd07b90d1",
+              "0xd0772551"
+            ]
           }
         ],
         "baseSystemContracts": {
