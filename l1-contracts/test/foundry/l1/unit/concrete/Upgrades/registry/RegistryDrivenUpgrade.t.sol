@@ -6,7 +6,6 @@ import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_Cha
 import {ZKsyncOSChainTypeManagerSharedTest} from "../../state-transition/ChainTypeManager/_ZKsyncOSChainTypeManager_Shared.t.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/CTMUpgradeExecutor.sol";
-import {CTMReleaseFactory, CTMTransitionFactory} from "contracts/upgrades/registry/CTMRegistryFactory.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
@@ -55,8 +54,6 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 ///      the real `DefaultUpgrade`, real verifier contracts.
 abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     CTMUpgradeExecutor internal ctmExecutor;
-    CTMReleaseFactory internal releaseFactory;
-    CTMTransitionFactory internal transitionFactory;
     CTMTransition internal transitionV32;
     CTMTransition internal transitionV33;
 
@@ -113,13 +110,11 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         _mockGetZKChainFromBridgehub(chainAddress);
         _mockMigrationPausedFromBridgehub();
 
-        releaseFactory = new CTMReleaseFactory();
-        transitionFactory = new CTMTransitionFactory();
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
             makeAddr("breakGlass"),
             IChainTypeManager(address(chainContractAddress)),
-            transitionFactory
+            Utils.transitionCodehash()
         );
 
         // Real v33 artifacts: a fresh AdminFacet implementation (same selectors, new address)
@@ -133,14 +128,10 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         genesisUpgradeAddr = makeAddr("genesisUpgrade");
         vm.etch(genesisUpgradeAddr, hex"600042");
 
-        // Transitions require factory-attested releases on BOTH edges, so the fixture CTM's
-        // mocked genesis release is replaced by a REAL factory-deployed one describing the
-        // chain's current routing — hop 1 then departs from (and, being facet-neutral, also
-        // targets) exactly that release.
-        address genesisRelease = releaseFactory.deployOrGetRelease(
-            _releaseManifest(address(0), address(testnetVerifier))
-        );
-        _attestReleaseOnFixtureFactory(genesisRelease);
+        // Transitions require real releases on BOTH edges, so the fixture CTM's mocked genesis
+        // release is replaced by a real one describing the chain's current routing — hop 1 then
+        // departs from (and, being facet-neutral, also targets) exactly that release.
+        address genesisRelease = address(new CTMRelease(_releaseManifest(address(0), address(testnetVerifier))));
 
         // Hand CTM ownership to the executor through its fixed entrypoint, then perform two raw
         // one-off admin actions through break-glass (exactly what the separately governed hatch
@@ -174,17 +165,6 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         // transitions from the V32 release the first hop pinned.
         transitionV32 = _makeTransition(0, V32, verifierV32, chainContractAddress.currentRelease(), address(0));
         transitionV33 = _makeTransition(V32, V33, verifierV33, transitionV32.newRelease(), newAdminFacet);
-    }
-
-    /// @dev The fixture CTM's canonical release factory is mocked (`Utils.TEST_RELEASE_FACTORY`);
-    ///      attest a REAL release on it so the CTM's provenance check accepts it as currentRelease
-    ///      (both the bootstrap re-point and every applied transition's target pass through it).
-    function _attestReleaseOnFixtureFactory(address _release) internal {
-        vm.mockCall(
-            Utils.TEST_RELEASE_FACTORY,
-            abi.encodeWithSelector(bytes4(keccak256("deployedFor(bytes32)")), CTMRelease(_release).manifestHash()),
-            abi.encode(_release)
-        );
     }
 
     /// @dev One release's full manifest: the fixture's routing (AdminFacet swapped for
@@ -251,8 +231,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         address _fromRelease,
         address _newAdminFacet
     ) internal returns (CTMTransition transition) {
-        address release = releaseFactory.deployOrGetRelease(_releaseManifest(_newAdminFacet, _verifier));
-        _attestReleaseOnFixtureFactory(release);
+        address release = address(new CTMRelease(_releaseManifest(_newAdminFacet, _verifier)));
 
         bool hasL2Side = _newAdminFacet != address(0);
         IComplexUpgrader.UniversalContractUpgradeInfo[]
@@ -274,20 +253,18 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             l2Plan.delegateCalldata = hex"beef";
         }
 
-        transition = CTMTransition(
-            transitionFactory.deployOrGetTransition(
-                CTMTransition.TransitionManifest({
-                    oldProtocolVersion: _oldVersion,
-                    newProtocolVersion: _newVersion,
-                    fromRelease: _fromRelease,
-                    newRelease: release,
-                    upgradeEngine: defaultUpgrade,
-                    upgradeEngineCodehash: defaultUpgrade.codehash,
-                    oldProtocolVersionDeadline: 1000,
-                    upgradeTimestamp: 0,
-                    l2Plan: l2Plan
-                })
-            )
+        transition = new CTMTransition(
+            CTMTransition.TransitionManifest({
+                oldProtocolVersion: _oldVersion,
+                newProtocolVersion: _newVersion,
+                fromRelease: _fromRelease,
+                newRelease: release,
+                upgradeEngine: defaultUpgrade,
+                upgradeEngineCodehash: defaultUpgrade.codehash,
+                oldProtocolVersionDeadline: 1000,
+                upgradeTimestamp: 0,
+                l2Plan: l2Plan
+            })
         );
     }
 

@@ -31,8 +31,8 @@ A `GovernanceUpgradeExecutor` analogous to the CTM and ecosystem ones does not f
 
 A **write-once `GovernanceMigration` object** — the same data discipline applied to succession:
 
-- factory-deployed (`deployOrGet`, CREATE3-compatible), write-once, `validate()` reverting,
-  `manifestHash` as the 32-byte commitment;
+- constructor-initialized (the manifest is the constructor argument), write-once by construction,
+  `manifestHash` as the 32-byte commitment, provenance by pinned codehash;
 - pins the new PUH implementation and each new multisig with inline codehashes;
 - carries **source-checked ownership edges** — `(target, expectedCurrentOwner -> newOwner)` plus the
   analogous proxy-admin edges — so a stale or replayed migration cannot re-point ownership backwards.

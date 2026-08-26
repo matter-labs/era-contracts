@@ -127,14 +127,8 @@ abstract contract DeployCTMUtils is DeployUtils {
     /// set plus the base system contract hashes into it. The chain-creation params point at it
     /// (the CTM's `currentRelease`), and `DiamondInit` reads everything chain-independent
     /// from there — the committed genesis cut carries no facets and no init payload.
-    /// @dev The factory itself deploys through the deterministic CREATE2 factory (deployOrGet:
-    /// an existing instance at the predicted address is reused). A plain CREATE would make the
-    /// canonical factory's address a function of the broadcaster's NONCE — un-replayable from
-    /// recorded governance bundles and impossible to predict for stage calldata; the CTM pins
-    /// this address as its release-provenance anchor, so it must be a commitment, not an accident.
-    /// @dev The manifest is a constructor argument, so there is no deployed-but-uninitialized window (one
-    /// transaction), so the release is already initialized when its address is returned — there is
-    /// no uninitialized, front-runnable window on the unauthenticated `initialize`.
+    /// @dev The manifest is a constructor argument, so the release is fully initialized the moment
+    /// it exists — there is no deployed-but-uninitialized window to front-run.
     function deployCurrentRelease() internal returns (address) {
         if (!config.isZKsyncOS) {
             require(config.contracts.chainCreationParams.bootloaderHash != bytes32(0), "bootloader hash is zero");

@@ -194,7 +194,10 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         _simulateCreate2(create2Factory, directCalldata.diamondInitCalldata, "DiamondInit");
         _simulateCreate2(create2Factory, directCalldata.genesisUpgradeCalldata, "GenesisUpgrade");
         _simulateCreate2(create2Factory, directCalldata.multicall3Calldata, "Multicall3");
-        _simulateCreate2(create2Factory, directCalldata.bootstrapReleaseFactoryCalldata, "CTMReleaseFactory");
+        // The bootstrap release is deliberately NOT replayed here: its constructor pins the
+        // verifier, which comes from the verifiers deployer this fixture does not simulate. Its
+        // create2 deployment is covered by the Gateway CTM deployer tests; this one builds an
+        // equivalent release below and only exercises the diamond cut.
 
         // Mock the CTM calls that DiamondInit.initialize() makes. The CTM is `msg.sender`
         // during the proxy construction, so the deploy below pranks as this mock.
@@ -255,9 +258,8 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         new DiamondProxy(GATEWAY_CHAIN_ID, diamondCut);
     }
 
-    /// @notice Deploys and initializes a real bootstrap `CTMRegistry` pinning the computed
-    /// Gateway facet set and base system hashes, mirroring
-    /// GatewayCTMDeployerCTMBase._deployGenesisRegistry.
+    /// @notice Deploys a real bootstrap `CTMRelease` pinning the computed Gateway facet set and
+    /// base system hashes — the object the Gateway deployer takes pre-deployed.
     function _deployGatewayGenesisRegistry(
         DeployedContracts memory contracts,
         GatewayCTMDeployerConfig memory config
@@ -268,8 +270,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         // the verifier's own behaviour is out of scope here; only the diamond cut is under test.
         vm.etch(contracts.stateTransition.verifiers.verifier, hex"600160005500");
 
-        CTMRelease release = new CTMRelease();
-        release.initialize(
+        CTMRelease release = new CTMRelease(
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
                     facets: contracts.stateTransition.facets,

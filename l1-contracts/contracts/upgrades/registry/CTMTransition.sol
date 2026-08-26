@@ -20,7 +20,6 @@ import {
 import {
     MalformedL2UpgradePlan,
     PatchMustReuseRelease,
-    RegistryAlreadyInitialized,
     RegistryUnknownKey,
     SameReleaseTransitionHasPayload,
     TransitionDeadlineBeforeUpgrade,
@@ -95,12 +94,11 @@ contract CTMTransition is ICTMTransition {
         }
 
         _requirePin(_manifest.upgradeEngine, _manifest.upgradeEngineCodehash);
-        // Live validation of both edges. RELEASE PROVENANCE is deliberately NOT checked here: a
-        // permissionless manifest could name any "factory", so the attestation that both edges
-        // are genuine write-once CTMRelease instances comes from the CTM itself — its canonical
-        // `releaseFactory` is enforced in `_storeCurrentRelease`, which every pinned release
-        // (bootstrap and every transition target) passes through, and the executor's release
-        // edge check ties `fromRelease` to that same attested `currentRelease`.
+        // Live validation of both edges. RELEASE PROVENANCE is deliberately NOT checked here: the
+        // attestation that both edges are genuine write-once CTMRelease instances comes from the
+        // CTM itself — its canonical `releaseCodehash` is enforced in `_storeCurrentRelease`, which
+        // every pinned release (bootstrap and every transition target) passes through, and the
+        // executor's release edge check ties `fromRelease` to that same pinned `currentRelease`.
         ICTMRelease(_manifest.newRelease).validate();
         ICTMRelease(_manifest.fromRelease).validate();
 

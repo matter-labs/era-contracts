@@ -46,8 +46,9 @@ import {ValidatorTimelock} from "contracts/state-transition/validators/Validator
 
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {CTMReleaseFactory} from "contracts/upgrades/registry/CTMRegistryFactory.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
+import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
+import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
@@ -170,11 +171,52 @@ contract GatewayCTMDeployerTest is Test {
         new MigratorFacet(1, false);
         new DiamondInit(false);
         new L1GenesisUpgrade();
-        new CTMRelease();
+        _predeployCTMRelease();
         new Multicall3();
 
         // This call will likely fail due to various checks, but we just need to get the bytecode published
         try new TransparentUpgradeableProxy(address(0), address(0), hex"") {} catch {}
+    }
+
+    /// @dev Publishes `CTMRelease`'s bytecode, which the test later deploys through the L2 CREATE2
+    ///      factory by bytecode HASH (`create2` reverts with `UnknownCodeHash` otherwise). A
+    ///      release validates its whole manifest in its constructor, so this builds a genuine
+    ///      single-facet one against contracts deployed right here rather than an all-zero stub.
+    function _predeployCTMRelease() internal {
+        DiamondInit diamondInit = new DiamondInit(false);
+        L1GenesisUpgrade genesisUpgrade = new L1GenesisUpgrade();
+        GettersFacet getters = new GettersFacet();
+        EraTestnetVerifier verifier = new EraTestnetVerifier(
+            EraVerifierFflonk(address(0)),
+            EraVerifierPlonk(address(0))
+        );
+
+        GenesisFacet[] memory facets = new GenesisFacet[](1);
+        facets[0] = GenesisFacet({
+            facet: address(getters),
+            isFreezable: false,
+            selectors: ISelfDescribingFacet(address(getters)).selectors(),
+            codehash: address(getters).codehash
+        });
+
+        new CTMRelease(
+            CTMRelease.ReleaseManifest({
+                diamondInit: address(diamondInit),
+                diamondInitCodehash: address(diamondInit).codehash,
+                verifier: address(verifier),
+                verifierCodehash: address(verifier).codehash,
+                genesisFacets: facets,
+                bootloaderHash: bytes32(uint256(1)),
+                defaultAccountHash: bytes32(uint256(2)),
+                evmEmulatorHash: bytes32(uint256(3)),
+                fixedForceDeploymentsData: hex"",
+                genesisUpgrade: address(genesisUpgrade),
+                genesisUpgradeCodehash: address(genesisUpgrade).codehash,
+                genesisBatchHash: bytes32(uint256(4)),
+                genesisBatchCommitment: bytes32(uint256(5)),
+                genesisIndexRepeatedStorageChanges: 1
+            })
+        );
     }
 
     function setUp() external {
@@ -233,11 +275,10 @@ contract GatewayCTMDeployerTest is Test {
         tester.deployDirect(directCalldata.genesisUpgradeCalldata);
         tester.deployDirect(directCalldata.multicall3Calldata);
 
-        // The bootstrap release FACTORY is a direct deployment too; the release itself is deployed
-        // (and initialized) by the CTM deployer through it, landing at the factory's first
-        // CREATE — asserted against the helper's prediction after the deployers run.
-        address bootstrapReleaseFactory = tester.deployDirect(directCalldata.bootstrapReleaseFactoryCalldata);
-        require(bootstrapReleaseFactory.code.length != 0, "bootstrap release factory not deployed");
+        // The bootstrap release is a direct deployment: its manifest is a constructor argument,
+        // so it cannot be produced from inside the CTM deployer.
+        address currentRelease = tester.deployDirect(directCalldata.currentReleaseCalldata);
+        require(currentRelease.code.length != 0, "bootstrap release not deployed");
 
         // Deploy all deployers and collect results
         AllDeployerResults memory results = _deployAllDeployers(
@@ -291,11 +332,6 @@ contract GatewayCTMDeployerTest is Test {
         });
         new GatewayCTMDeployerVerifiers(verifiersConfig);
 
-        // The bootstrap release factory is deployed straight through the L2 CREATE2 factory (by
-        // bytecode HASH) before any deployer runs, so its bytecode has to be known to the
-        // ContractDeployer by then — otherwise `create2` reverts with `UnknownCodeHash`. The
-        // CTM-deployer publish step also instantiates one, but that happens too late.
-        new CTMReleaseFactory();
     }
 
     function _deployAllDeployers(
@@ -346,10 +382,9 @@ contract GatewayCTMDeployerTest is Test {
             facets: calculatedContracts.stateTransition.facets,
             genesisUpgrade: calculatedContracts.stateTransition.genesisUpgrade,
             verifier: results.verifiersResult.verifier,
-            // This publish-run actually EXECUTES the deployer constructor, which deploys +
-            // initializes a release through whatever factory the config points at — so point it
-            // at a throwaway factory instance.
-            bootstrapReleaseFactory: address(new CTMReleaseFactory())
+            // This publish-run actually EXECUTES the deployer constructor, which only pins the
+            // release the config points at — so any non-zero address will do.
+            currentRelease: address(1)
         });
         new GatewayCTMDeployerCTM(ctmConfig);
     }

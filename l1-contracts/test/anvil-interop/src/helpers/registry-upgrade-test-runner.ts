@@ -76,6 +76,7 @@ import { DeploymentRunner } from "../deployment-runner";
 import { ANVIL_DEFAULT_PRIVATE_KEY, L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR } from "../core/const";
 import {
   getAbi,
+  getBytecode,
   getCreationBytecode,
   getDeterministicBytecode,
   getDeterministicCreationBytecode,
@@ -248,7 +249,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
         live,
         deployed,
         ctmAddresses.chainTypeManager,
-        ctmAddresses.releaseFactory
+        ctmAddresses.releaseCodehash
       );
       fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
       fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
@@ -260,14 +261,14 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
         live,
         deployed,
         ctmAddresses.chainTypeManager,
-        ctmAddresses.releaseFactory
+        ctmAddresses.releaseCodehash
       );
     }
     const objects = await deployUpgradeObjectsFromManifest(
       deployer,
       manifestPath,
       deployed,
-      ctmAddresses.releaseFactory
+      ctmAddresses.releaseCodehash
     );
     console.log(`  CTM release:    ${objects.release}`);
     console.log(`  CTM transition: ${objects.transition}`);
@@ -590,8 +591,8 @@ async function readLiveUpgradeInputs(
 // ── Deployment ───────────────────────────────────────────────────────
 
 type DeployedMachinery = {
-  transitionFactory: string;
-  coreRegistryFactory: string;
+  transitionCodehash: string;
+  coreRegistryCodehash: string;
   ctmExecutor: string;
   ecoExecutor: string;
   composerHarness: string;
@@ -642,27 +643,27 @@ async function deployUpgradeMachinery(
   // function of its position in this sequence. Reordering/inserting deploys invalidates the
   // committed manifest (rerun with REGEN_REGISTRIES=1).
   const newVerifierPlonk = await deployPinned("ZKsyncOSVerifierPlonk", []);
-  // The trusted factories deploy FIRST: each executor is BOUND to its factory (and its
-  // authority target) at construction — factory provenance is what it enforces on every
-  // transition / core registry it accepts.
-  const transitionFactory = await deploy("CTMTransitionFactory", []);
-  const coreRegistryFactory = await deploy("CoreRegistryFactory", []);
+  // Type provenance is a CODEHASH: each executor is bound at construction to the audited code
+  // every transition / core registry it accepts must run. Neither object has immutables, so the
+  // artifact's runtime bytecode IS what they carry once deployed.
+  const transitionCodehash = ethers.utils.keccak256(getBytecode("CTMTransition"));
+  const coreRegistryCodehash = ethers.utils.keccak256(getBytecode("CoreRegistry"));
   return {
-    transitionFactory,
-    coreRegistryFactory,
+    transitionCodehash,
+    coreRegistryCodehash,
     // The deployer plays the role of protocol governance AND (for this harness) the break-glass
     // governor; each executor is BOUND to its immutable authority targets at construction.
     ctmExecutor: await deploy("CTMUpgradeExecutor", [
       deployer.address,
       deployer.address,
       params.ctm,
-      transitionFactory,
+      transitionCodehash,
     ]),
     ecoExecutor: await deploy("EcosystemUpgradeExecutor", [
       deployer.address,
       deployer.address,
       params.ecosystemProxyAdmin,
-      coreRegistryFactory,
+      coreRegistryCodehash,
     ]),
     composerHarness: await deploy("RegistryComposerHarness", []),
     // The synthetic v-bump's "changed facet": a fresh AdminFacet built from the same source,
@@ -700,7 +701,7 @@ async function buildRegistryManifest(
   live: LiveUpgradeInputs,
   deployed: DeployedMachinery,
   ctmProxy: string,
-  releaseFactoryAddr: string
+  releaseCodehashAnchor: string
 ): Promise<Record<string, unknown>> {
   const codehash = async (addr: string) => ethers.utils.keccak256(await l1Provider.getCode(addr));
 
@@ -802,8 +803,8 @@ async function buildRegistryManifest(
         // CTMRelease address (nonce-deterministic, passed by the runner at initialization);
         // `fromRelease` is the CTM's live current release.
         transition: {
-          // The canonical factory attesting BOTH release edges (the chain states' factory).
-          releaseFactory: releaseFactoryAddr,
+          // The audited release code BOTH edges must run (the CTM's own provenance anchor).
+          releaseCodehash: releaseCodehashAnchor,
           fromRelease: live.fromRelease,
           upgradeEngine: {
             address: deployed.newDefaultUpgrade,
@@ -863,7 +864,7 @@ function assertCommittedManifestMatchesLiveDeployment(
   live: LiveUpgradeInputs,
   deployed: DeployedMachinery,
   ctmProxy: string,
-  releaseFactoryAddr: string
+  releaseCodehashAnchor: string
 ): void {
   if (!fs.existsSync(manifestPath)) {
     throw new Error(`Committed registry manifest not found at ${manifestPath}.\n\n${STALE_REGISTRIES_HINT}`);
@@ -890,7 +891,7 @@ function assertCommittedManifestMatchesLiveDeployment(
     ],
     ["ctm.ctmProxy", ctm?.ctmProxy, ctmProxy],
     ["ctm.transition.fromRelease", ctm?.transition?.fromRelease, live.fromRelease],
-    ["ctm.transition.releaseFactory", ctm?.transition?.releaseFactory, releaseFactoryAddr],
+    ["ctm.transition.releaseCodehash", ctm?.transition?.releaseCodehash, releaseCodehashAnchor],
     ["ctm.release.verifier.address", ctm?.release?.verifier?.address, deployed.newVerifier],
     ["ctm.transition.upgradeEngine.address", ctm?.transition?.upgradeEngine?.address, deployed.newDefaultUpgrade],
     // No facet swaps in the manifest at all: the delta is DERIVED on-chain from the release
@@ -918,19 +919,18 @@ function assertCommittedManifestMatchesLiveDeployment(
 }
 
 /**
- * Deploy the fixed release/transition/core-registry implementations and initialize them
- * (write-once) from the committed manifest, THROUGH the atomic deploy-and-initialize factories
- * — the production surface (`new <Type>Factory()` then `factory.deploy<Type>(manifest)` in one
- * transaction, so no uninitialized, front-runnable instance ever exists). The release deploys
- * first — transition initialization validates its target release, so the ordering is
- * functional, not stylistic. Artifacts come from the regular forge build; the incremental
- * build below makes sure they are present and current.
+ * Deploy the release/transition/core-registry objects from the committed manifest — the
+ * production surface, since each takes its manifest as a constructor argument. The release
+ * deploys first: the transition's constructor validates its target release and derives the
+ * facet/hash delta from the release pair, so the ordering is functional, not stylistic.
+ * Artifacts come from the regular forge build; the incremental build below makes sure they are
+ * present and current.
  */
 async function deployUpgradeObjectsFromManifest(
   deployer: ethers.Wallet,
   manifestPath: string,
   deployed: DeployedMachinery,
-  releaseFactoryAddr: string
+  releaseCodehashAnchor: string
 ): Promise<{ release: string; transition: string; coreRegistry: string }> {
   execSync(`forge build ${REGISTRY_CONTRACTS_DIR_REL}`, { cwd: l1ContractsDir, stdio: "inherit" });
 
@@ -940,44 +940,33 @@ async function deployUpgradeObjectsFromManifest(
     throw new Error(`manifest has no "${CTM_REGISTRY_NAME}" CTM entry`);
   }
 
-  // Atomic, idempotent deployOrGet through PRE-DEPLOYED factory instances: the release goes
-  // through the CHAIN-STATE factory (the one that attested the genesis release — the
-  // transition's `releaseFactory` must attest BOTH edges), the transition and core registry
-  // through the executor-bound factories.
-  const callFactory = async (
-    factoryName: "CTMReleaseFactory" | "CTMTransitionFactory" | "CoreRegistryFactory",
-    factoryAddr: string,
-    method: string,
-    initArgs: unknown
+  // The manifest IS the constructor argument, so each object is fully formed the moment it
+  // exists — no factory in the path and no deployed-but-uninitialized window. What the CTM and
+  // the executors check is that the deployed code matches the anchored codehash.
+  const deployObject = async (
+    name: "CTMRelease" | "CTMTransition" | "CoreRegistry",
+    manifestArg: unknown,
+    expectedCodehash: string
   ): Promise<string> => {
-    const factory = new ethers.Contract(factoryAddr, getAbi(factoryName), deployer);
-    // callStatic yields the instance address for BOTH branches (fresh deploy and deployOrGet
-    // hit); the real transaction then lands the state.
-    const instance = (await factory.callStatic[method](initArgs)) as string;
-    await (await factory[method](initArgs)).wait();
-    return instance;
+    const factory = new ethers.ContractFactory(getAbi(name), getCreationBytecode(name), deployer);
+    const contract = await factory.deploy(manifestArg);
+    await contract.deployed();
+    const actual = ethers.utils.keccak256(await contract.provider.getCode(contract.address));
+    if (actual !== expectedCodehash) {
+      throw new Error(`${name} deployed with codehash ${actual}, anchored ${expectedCodehash}`);
+    }
+    return contract.address;
   };
 
-  const release = await callFactory(
-    "CTMReleaseFactory",
-    releaseFactoryAddr,
-    "deployOrGetRelease",
-    releaseInitArgs(ctm)
-  );
+  const release = await deployObject("CTMRelease", releaseInitArgs(ctm), releaseCodehashAnchor);
   return {
     release,
-    transition: await callFactory(
-      "CTMTransitionFactory",
-      deployed.transitionFactory,
-      "deployOrGetTransition",
-      transitionInitArgs(manifest, ctm, release)
+    transition: await deployObject(
+      "CTMTransition",
+      transitionInitArgs(manifest, ctm, release),
+      deployed.transitionCodehash
     ),
-    coreRegistry: await callFactory(
-      "CoreRegistryFactory",
-      deployed.coreRegistryFactory,
-      "deployOrGetCoreRegistry",
-      coreInitArgs(manifest)
-    ),
+    coreRegistry: await deployObject("CoreRegistry", coreInitArgs(manifest), deployed.coreRegistryCodehash),
   };
 }
 

@@ -15,12 +15,6 @@ import {
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/EcosystemUpgradeExecutor.sol";
-import {
-    CTMReleaseFactory,
-    CTMTransitionFactory,
-    CoreRegistryFactory,
-    RegistryBootstrapMigrationFactory
-} from "contracts/upgrades/registry/CTMRegistryFactory.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/RegistryBootstrapMigration.sol";
 import {EcosystemContractRow} from "contracts/upgrades/registry/ICoreRegistry.sol";
 import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
@@ -32,7 +26,6 @@ import {
     BootstrapAuthorityNotHeld,
     BootstrapExecutorNotBound,
     EcosystemImplMismatch,
-    NotFactoryDeployed,
     RegistryCodehashMismatch,
     RegistryDuplicateProxyRow,
     ZeroAddress
@@ -59,9 +52,7 @@ contract ImplV32 {
 ///      contracts whose ownership the migration actually needs — rather than mocks, because the
 ///      property under test IS the authority movement.
 contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
-    RegistryBootstrapMigrationFactory internal migrationFactory;
     RegistryBootstrapMigration internal migration;
-    CTMReleaseFactory internal releaseFactory;
     CTMUpgradeExecutor internal ctmExecutor;
     EcosystemUpgradeExecutor internal ecoExecutor;
     ProxyAdmin internal ecosystemProxyAdmin;
@@ -91,31 +82,27 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         upgradeCutInit = makeAddr("upgradeCutInit");
         vm.etch(upgradeCutInit, hex"600043");
 
-        releaseFactory = new CTMReleaseFactory();
-        migrationFactory = new RegistryBootstrapMigrationFactory();
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
             makeAddr("breakGlass"),
             IChainTypeManager(address(chainContractAddress)),
-            new CTMTransitionFactory()
+            Utils.transitionCodehash()
         );
         ecoExecutor = new EcosystemUpgradeExecutor(
             governor,
             makeAddr("breakGlass"),
             ecosystemProxyAdmin,
-            new CoreRegistryFactory()
+            Utils.coreRegistryCodehash()
         );
 
         newVersion = SemVer.packSemVer(0, 1, 0);
-        genesisRelease = _deployAttestedRelease();
-        migration = RegistryBootstrapMigration(migrationFactory.deployOrGetMigration(_manifest()));
+        genesisRelease = _deployGenesisRelease();
+        migration = new RegistryBootstrapMigration(_manifest());
     }
 
     // ─────────────────────────────── fixtures ───────────────────────────────
 
-    /// @dev Deploys the genesis release through the real factory AND attests it on the CTM's
-    ///      canonical (mocked) factory, so the CTM accepts it at `setCurrentRelease`.
-    function _deployAttestedRelease() internal returns (CTMRelease result) {
+    function _deployGenesisRelease() internal returns (CTMRelease result) {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
             genesisFacets[i] = GenesisFacet({
@@ -125,30 +112,23 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 codehash: facetCuts[i].facet.codehash
             });
         }
-        result = CTMRelease(
-            releaseFactory.deployOrGetRelease(
-                CTMRelease.ReleaseManifest({
-                    diamondInit: diamondInit,
-                    diamondInitCodehash: diamondInit.codehash,
-                    verifier: address(testnetVerifier),
-                    verifierCodehash: address(testnetVerifier).codehash,
-                    genesisFacets: genesisFacets,
-                    bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                    defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                    evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                    fixedForceDeploymentsData: hex"f1f2",
-                    genesisUpgrade: genesisUpgradeAddr,
-                    genesisUpgradeCodehash: genesisUpgradeAddr.codehash,
-                    genesisBatchHash: bytes32(uint256(1)),
-                    genesisBatchCommitment: bytes32(uint256(7)),
-                    genesisIndexRepeatedStorageChanges: 54
-                })
-            )
-        );
-        vm.mockCall(
-            Utils.TEST_RELEASE_FACTORY,
-            abi.encodeWithSelector(bytes4(keccak256("deployedFor(bytes32)")), result.manifestHash()),
-            abi.encode(address(result))
+        result = new CTMRelease(
+            CTMRelease.ReleaseManifest({
+                diamondInit: diamondInit,
+                diamondInitCodehash: diamondInit.codehash,
+                verifier: address(testnetVerifier),
+                verifierCodehash: address(testnetVerifier).codehash,
+                genesisFacets: genesisFacets,
+                bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                fixedForceDeploymentsData: hex"f1f2",
+                genesisUpgrade: genesisUpgradeAddr,
+                genesisUpgradeCodehash: genesisUpgradeAddr.codehash,
+                genesisBatchHash: bytes32(uint256(1)),
+                genesisBatchCommitment: bytes32(uint256(7)),
+                genesisIndexRepeatedStorageChanges: 54
+            })
         );
     }
 
@@ -167,8 +147,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 expectedProtocolVersion: chainContractAddress.protocolVersion(),
                 ctmProxyAdmin: ecosystemProxyAdmin,
                 proxyRows: rows,
-                releaseFactory: Utils.TEST_RELEASE_FACTORY,
-                releaseFactoryCodehash: Utils.TEST_RELEASE_FACTORY.codehash,
+                releaseCodehash: Utils.releaseCodehash(),
                 currentRelease: address(genesisRelease),
                 newProtocolVersion: newVersion,
                 oldProtocolVersionDeadline: type(uint256).max,
@@ -213,7 +192,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             "proxy must point at the pinned implementation"
         );
         // The registry anchors are installed and the version edge committed.
-        assertEq(chainContractAddress.releaseFactory(), Utils.TEST_RELEASE_FACTORY, "anchor must be installed");
+        assertEq(chainContractAddress.releaseCodehash(), Utils.releaseCodehash(), "anchor must be installed");
         assertEq(chainContractAddress.currentRelease(), address(genesisRelease), "release must be pinned");
         assertEq(chainContractAddress.protocolVersion(), newVersion, "version must be bumped");
         assertTrue(chainContractAddress.upgradeCutHash(oldVersion) != bytes32(0), "upgrade cut must be committed");
@@ -262,15 +241,13 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             governor,
             makeAddr("breakGlass2"),
             IChainTypeManager(foreignCtm),
-            new CTMTransitionFactory()
+            Utils.transitionCodehash()
         );
         RegistryBootstrapMigration.BootstrapManifest memory manifest = _manifest();
         manifest.ctmExecutor = address(foreignExecutor);
         manifest.ctmExecutorCodehash = address(foreignExecutor).codehash;
 
-        RegistryBootstrapMigration mismatched = RegistryBootstrapMigration(
-            migrationFactory.deployOrGetMigration(manifest)
-        );
+        RegistryBootstrapMigration mismatched = new RegistryBootstrapMigration(manifest);
         vm.prank(governor);
         chainContractAddress.transferOwnership(address(mismatched));
         ecosystemProxyAdmin.transferOwnership(address(mismatched));
@@ -293,15 +270,13 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             governor,
             makeAddr("breakGlass2"),
             foreignProxyAdmin,
-            new CoreRegistryFactory()
+            Utils.coreRegistryCodehash()
         );
         RegistryBootstrapMigration.BootstrapManifest memory manifest = _manifest();
         manifest.ecosystemExecutor = address(foreignExecutor);
         manifest.ecosystemExecutorCodehash = address(foreignExecutor).codehash;
 
-        RegistryBootstrapMigration mismatched = RegistryBootstrapMigration(
-            migrationFactory.deployOrGetMigration(manifest)
-        );
+        RegistryBootstrapMigration mismatched = new RegistryBootstrapMigration(manifest);
         vm.prank(governor);
         chainContractAddress.transferOwnership(address(mismatched));
         ecosystemProxyAdmin.transferOwnership(address(mismatched));
@@ -356,7 +331,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         manifest.proxyRows = rows;
 
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateProxyRow.selector, address(ecosystemProxy)));
-        migrationFactory.deployOrGetMigration(manifest);
+        new RegistryBootstrapMigration(manifest);
     }
 
     function test_revertWhen_manifestCarriesAZeroRowField() public {
@@ -371,15 +346,13 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         manifest.proxyRows = rows;
 
         vm.expectRevert(ZeroAddress.selector);
-        migrationFactory.deployOrGetMigration(manifest);
+        new RegistryBootstrapMigration(manifest);
     }
 
     function test_revertWhen_departingVersionIsNotTheExpectedOne() public {
         // A migration pinned for one ecosystem must refuse a differently-versioned one.
-        RegistryBootstrapMigration staleMigration = RegistryBootstrapMigration(
-            migrationFactory.deployOrGetMigration(
-                _manifestWithExpectedVersion(chainContractAddress.protocolVersion() + 1)
-            )
+        RegistryBootstrapMigration staleMigration = new RegistryBootstrapMigration(
+            _manifestWithExpectedVersion(chainContractAddress.protocolVersion() + 1)
         );
         vm.prank(governor);
         chainContractAddress.transferOwnership(address(staleMigration));
@@ -419,29 +392,26 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         migration.migrate();
     }
 
-    function test_revertWhen_releaseIsNotAttestedByTheInstalledFactory() public {
-        // A release the pinned anchor never attested must not become `currentRelease`.
-        vm.mockCall(
-            Utils.TEST_RELEASE_FACTORY,
-            abi.encodeWithSelector(bytes4(keccak256("deployedFor(bytes32)")), genesisRelease.manifestHash()),
-            abi.encode(address(0))
-        );
+    function test_revertWhen_releaseDoesNotRunTheAnchoredCode() public {
+        // The anchor this edge installs and the release it vouches for cannot be mismatched:
+        // replacing the release's code makes the migration refuse before spending itself.
+        bytes32 anchoredCodehash = address(genesisRelease).codehash;
+        vm.etch(address(genesisRelease), hex"600045");
         _handOverAuthority();
 
-        vm.expectRevert(abi.encodeWithSelector(NotFactoryDeployed.selector, address(genesisRelease)));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryCodehashMismatch.selector,
+                address(genesisRelease),
+                anchoredCodehash,
+                address(genesisRelease).codehash
+            )
+        );
         migration.migrate();
     }
 
-    // ─────────────────────────────── factory ───────────────────────────────
-
-    function test_factoryIsIdempotentPerManifest() public {
-        address again = migrationFactory.deployOrGetMigration(_manifest());
-        assertEq(again, address(migration), "same manifest must resolve to the same instance");
-        assertEq(
-            migration.manifestHash(),
-            keccak256(abi.encode(_manifest())),
-            "manifest hash must commit to the pinned edge"
-        );
+    function test_manifestHashCommitsToThePinnedEdge() public view {
+        assertEq(migration.manifestHash(), keccak256(abi.encode(_manifest())));
     }
 
     /// @dev The proxy `Upgraded` events fire first, so the bootstrap event is located by scanning

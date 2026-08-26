@@ -127,7 +127,7 @@ export class ForgeDeployer {
 
     return {
       chainTypeManager: stateTransition.state_transition_proxy_addr as string,
-      releaseFactory: stateTransition.release_factory_addr as string,
+      releaseCodehash: stateTransition.release_codehash as string,
       chainAdmin: (deployedAddresses.chain_admin || output.chain_admin_addr) as string,
       diamondProxy: (output.diamond_proxy_addr || output.diamond_proxy) as string,
       adminFacet: (stateTransition.admin_facet_addr || output.admin_facet) as string,

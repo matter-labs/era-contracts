@@ -15,10 +15,14 @@ import {ICTMRelease, GenesisFacet} from "contracts/upgrades/registry/ICTMRelease
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 
 // solhint-enable max-line-length
 
 contract UtilsCallMockerTest is Test {
+    /// @dev Sentinel for the selector-only (any chain id) shape of the bridgehub mocks.
+    uint256 internal constant ANY_CHAIN_ID = 0;
+
     address private constant DEFAULT_CHAIN_TYPE_MANAGER = address(0x1234567890876543567890);
     uint256 private constant DEFAULT_PROTOCOL_VERSION = 0;
 
@@ -31,6 +35,24 @@ contract UtilsCallMockerTest is Test {
         // Default chainTypeManager address from Utils.makeInitializeData
         address defaultChainTypeManager = address(0x1234567890876543567890);
         mockDiamondInitInteropCenterCallsWithAddress(bridgehub, assetRouter, baseTokenAssetId, defaultChainTypeManager);
+    }
+
+    /// @notice The backward-compatible shape, with the bridgehub's `baseTokenAssetId` mock scoped
+    ///         to ONE chain id (see the six-argument overload for why that matters).
+    function mockDiamondInitInteropCenterCallsForChain(
+        address bridgehub,
+        address assetRouter,
+        bytes32 baseTokenAssetId,
+        uint256 baseTokenAssetIdChainId
+    ) public {
+        mockDiamondInitInteropCenterCallsWithAddress(
+            bridgehub,
+            assetRouter,
+            baseTokenAssetId,
+            address(0x1234567890876543567890),
+            makeAddr("permissionlessValidator"),
+            baseTokenAssetIdChainId
+        );
     }
 
     // Overloaded version that accepts chainTypeManager address
@@ -58,6 +80,28 @@ contract UtilsCallMockerTest is Test {
         address chainTypeManager,
         address permissionlessValidator
     ) public {
+        mockDiamondInitInteropCenterCallsWithAddress(
+            bridgehub,
+            assetRouter,
+            baseTokenAssetId,
+            chainTypeManager,
+            permissionlessValidator,
+            ANY_CHAIN_ID
+        );
+    }
+
+    /// @notice As above, but scopes the bridgehub's `baseTokenAssetId` mock to ONE chain id.
+    /// @dev Fixtures whose bridgehub is REAL must pass the chain being created: a selector-only
+    ///      mock would make every chain id read as registered, and tests that assert an
+    ///      unregistered chain reads `bytes32(0)` would silently pass against the mock.
+    function mockDiamondInitInteropCenterCallsWithAddress(
+        address bridgehub,
+        address assetRouter,
+        bytes32 baseTokenAssetId,
+        address chainTypeManager,
+        address permissionlessValidator,
+        uint256 baseTokenAssetIdChainId
+    ) public {
         // DiamondInit derives everything but (chainId, admin) from the CTM (= the proxy
         // deployer) and the bridgehub; some fixtures pass a zero asset id, which DiamondInit
         // rejects, so substitute the shared test constant.
@@ -69,7 +113,8 @@ contract UtilsCallMockerTest is Test {
             bridgehub,
             baseTokenAssetId,
             Utils.TEST_VALIDATOR_TIMELOCK,
-            bytes32(0)
+            bytes32(0),
+            baseTokenAssetIdChainId
         );
 
         address nativeTokenVault = makeAddr("nativeTokenVault");
@@ -109,6 +154,7 @@ contract UtilsCallMockerTest is Test {
     ///         CTM is `msg.sender` during the diamond proxy construction, so direct-diamond
     ///         fixtures prank as `chainTypeManager` and mock these on it. Also mocks the
     ///         bridgehub's `baseTokenAssetId` lookup (selector-only: any chain id).
+    /// @dev `ANY_CHAIN_ID` selects that selector-only shape; a real chain id scopes the mock.
     /// @dev Call again with different values to override (later mocks win).
     function mockCtmDerivedInitValues(
         address chainTypeManager,
@@ -116,6 +162,25 @@ contract UtilsCallMockerTest is Test {
         bytes32 baseTokenAssetId,
         address validatorTimelock,
         bytes32 storedBatchZero
+    ) public {
+        mockCtmDerivedInitValues(
+            chainTypeManager,
+            bridgehub,
+            baseTokenAssetId,
+            validatorTimelock,
+            storedBatchZero,
+            ANY_CHAIN_ID
+        );
+    }
+
+    /// @notice As above, with the bridgehub's `baseTokenAssetId` mock scoped to one chain id.
+    function mockCtmDerivedInitValues(
+        address chainTypeManager,
+        address bridgehub,
+        bytes32 baseTokenAssetId,
+        address validatorTimelock,
+        bytes32 storedBatchZero,
+        uint256 baseTokenAssetIdChainId
     ) public {
         vm.mockCall(
             chainTypeManager,
@@ -137,11 +202,19 @@ contract UtilsCallMockerTest is Test {
             abi.encodeWithSelector(IChainTypeManager.storedBatchZero.selector),
             abi.encode(storedBatchZero)
         );
-        vm.mockCall(
-            bridgehub,
-            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
-            abi.encode(baseTokenAssetId)
-        );
+        if (baseTokenAssetIdChainId == ANY_CHAIN_ID) {
+            vm.mockCall(
+                bridgehub,
+                abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
+                abi.encode(baseTokenAssetId)
+            );
+        } else {
+            vm.mockCall(
+                bridgehub,
+                abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, baseTokenAssetIdChainId),
+                abi.encode(baseTokenAssetId)
+            );
+        }
     }
 
     /// @notice Mocks the CTM's genesis registry pointer and the registry itself for DiamondInit.
@@ -163,18 +236,14 @@ contract UtilsCallMockerTest is Test {
     ///      only serves the base system contract hashes DiamondInit reads at genesis.
     function mockGenesisRegistryContract() public {
         address genesisRegistry = Utils.TEST_GENESIS_REGISTRY;
+        // Release provenance is a codehash check, so the mocked release must actually CARRY the
+        // audited `CTMRelease` runtime code; its behaviour is then mocked on top.
+        vm.etch(genesisRegistry, type(CTMRelease).runtimeCode);
         vm.mockCall(genesisRegistry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
         vm.mockCall(
             genesisRegistry,
             abi.encodeWithSelector(ICTMRelease.manifestHash.selector),
             abi.encode(bytes32("mock-genesis-manifest"))
-        );
-        // The mocked canonical release factory attests the mocked genesis release for ANY hash;
-        // tests pinning REAL releases add specific-argument mocks (precedence) per release.
-        vm.mockCall(
-            Utils.TEST_RELEASE_FACTORY,
-            abi.encodeWithSelector(bytes4(keccak256("deployedFor(bytes32)"))),
-            abi.encode(genesisRegistry)
         );
         vm.mockCall(genesisRegistry, abi.encodeWithSelector(ICTMRelease.verifyAll.selector), abi.encode(true));
         // VM identity is read from the release's DiamondInit immutable; the mocked registry's

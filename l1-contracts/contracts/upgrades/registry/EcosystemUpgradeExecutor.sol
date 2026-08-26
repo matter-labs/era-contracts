@@ -7,7 +7,8 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 
 import {ICoreRegistry, EcosystemContractRow} from "./ICoreRegistry.sol";
 import {UpgradeExecutorBase} from "../../governance/UpgradeExecutorBase.sol";
-import {EcosystemImplMismatch, EmptyBytes32, NotFactoryDeployed, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {EcosystemImplMismatch, EmptyBytes32, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {CodehashPinLib} from "./CodehashPinLib.sol";
 
 /// @title EcosystemUpgradeExecutor
 /// @author Matter Labs
@@ -20,6 +21,8 @@ import {EcosystemImplMismatch, EmptyBytes32, NotFactoryDeployed, ZeroAddress} fr
 ///      SEPARATE governor. The registry address is a *pinned implementation address* — the exact
 ///      generated contract governance approved — never a proxy.
 contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
+    using CodehashPinLib for address;
+
     /// @notice The one ecosystem `ProxyAdmin` this executor governs. Registries carry no proxy
     ///         admin pointer; the binding is this immutable.
     ProxyAdmin public immutable PROXY_ADMIN;
@@ -58,9 +61,7 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
     ///      in one atomic transaction.
     /// @param _coreRegistry The pinned core-registry implementation approved by governance.
     function applyL1Upgrade(ICoreRegistry _coreRegistry) external onlyOwner {
-        if (address(_coreRegistry).codehash != CORE_REGISTRY_CODEHASH) {
-            revert NotFactoryDeployed(address(_coreRegistry));
-        }
+        address(_coreRegistry).requirePin(CORE_REGISTRY_CODEHASH);
         _coreRegistry.validate();
 
         // One call returns complete typed rows; no per-key rescans of the registry.

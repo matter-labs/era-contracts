@@ -8,9 +8,15 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/EcosystemUpgradeExecutor.sol";
 import {CoreRegistry} from "contracts/upgrades/registry/CoreRegistry.sol";
-import {CoreRegistryFactory} from "contracts/upgrades/registry/CTMRegistryFactory.sol";
 import {ICoreRegistry, EcosystemContractRow} from "contracts/upgrades/registry/ICoreRegistry.sol";
-import {EcosystemImplMismatch, NotFactoryDeployed} from "contracts/common/L1ContractErrors.sol";
+import {EcosystemImplMismatch, RegistryCodehashMismatch} from "contracts/common/L1ContractErrors.sol";
+
+/// @dev Not a `CoreRegistry`: exercises the executor's codehash provenance check.
+contract NotACoreRegistry {
+    function manifestHash() external pure returns (bytes32) {
+        return bytes32(uint256(1));
+    }
+}
 
 /// @dev Minimal implementation contracts for proxy-upgrade tests.
 contract DummyImplA {
@@ -38,8 +44,8 @@ contract EcosystemUpgradeExecutorTest is Test {
     address internal ecosystemGovernor = makeAddr("ecosystemGovernor");
 
     EcosystemUpgradeExecutor internal ecosystemExecutor;
-    CoreRegistryFactory internal coreRegistryFactory;
     ICoreRegistry internal coreRegistry;
+    bytes32 internal coreRegistryCodehash;
     ProxyAdmin internal proxyAdmin;
 
     DummyImplA internal implOld;
@@ -51,18 +57,7 @@ contract EcosystemUpgradeExecutorTest is Test {
         implOld = new DummyImplA();
         implNew = new DummyImplB();
 
-        // The ecosystem executor is BOUND to (and owns) one immutable ecosystem ProxyAdmin and
-        // one immutable registry factory, mirroring the production ownership chain (and nothing
-        // else — no CTM authority).
         proxyAdmin = new ProxyAdmin();
-        coreRegistryFactory = new CoreRegistryFactory();
-        ecosystemExecutor = new EcosystemUpgradeExecutor(
-            ecosystemGovernor,
-            makeAddr("breakGlass"),
-            proxyAdmin,
-            coreRegistryFactory
-        );
-        proxyAdmin.transferOwnership(address(ecosystemExecutor));
         bridgehubProxy = new TransparentUpgradeableProxy(address(implOld), address(proxyAdmin), hex"");
         messageRootProxy = new TransparentUpgradeableProxy(address(implOld), address(proxyAdmin), hex"");
 
@@ -73,6 +68,18 @@ contract EcosystemUpgradeExecutorTest is Test {
         rows[0] = _row(address(bridgehubProxy), address(implOld), address(implNew));
         rows[1] = _row(address(messageRootProxy), address(implOld), address(implOld));
         coreRegistry = _deployRegistry(rows);
+        coreRegistryCodehash = address(coreRegistry).codehash;
+
+        // The ecosystem executor is BOUND to (and owns) one immutable ecosystem ProxyAdmin and
+        // pins the audited `CoreRegistry` codehash, mirroring the production ownership chain (and
+        // nothing else — no CTM authority).
+        ecosystemExecutor = new EcosystemUpgradeExecutor(
+            ecosystemGovernor,
+            makeAddr("breakGlass"),
+            proxyAdmin,
+            coreRegistryCodehash
+        );
+        proxyAdmin.transferOwnership(address(ecosystemExecutor));
     }
 
     function _row(
@@ -89,13 +96,8 @@ contract EcosystemUpgradeExecutorTest is Test {
             });
     }
 
-    /// @dev The production deployment surface: atomic deploy + initialize through the bound
-    ///      factory, which is what makes the instance acceptable to the executor.
     function _deployRegistry(EcosystemContractRow[] memory _rows) internal returns (ICoreRegistry) {
-        return
-            ICoreRegistry(
-                coreRegistryFactory.deployOrGetCoreRegistry(CoreRegistry.CoreRegistryManifest({contractRows: _rows}))
-            );
+        return ICoreRegistry(address(new CoreRegistry(CoreRegistry.CoreRegistryManifest({contractRows: _rows}))));
     }
 
     function _applyL1Upgrade() internal {
@@ -139,31 +141,36 @@ contract EcosystemUpgradeExecutorTest is Test {
         ecosystemExecutor.applyL1Upgrade(coreRegistry);
     }
 
-    function test_revertWhen_registryNotFactoryDeployed() public {
-        // A hand-deployed registry — genuine CoreRegistry code, correctly initialized, but NOT
-        // deployed through the bound factory — must be rejected: factory provenance is what
-        // turns "canonical write-once object" into an on-chain invariant.
-        EcosystemContractRow[] memory rows = new EcosystemContractRow[](1);
-        rows[0] = _row(address(bridgehubProxy), address(implOld), address(implNew));
-        CoreRegistry handDeployed = new CoreRegistry();
-        handDeployed.initialize(CoreRegistry.CoreRegistryManifest({contractRows: rows}));
+    function test_revertWhen_registryIsNotTheAuditedCode() public {
+        // Type provenance is a codehash check: an object that does not run the audited
+        // `CoreRegistry` code is rejected before any row is read, whatever it claims to be.
+        NotACoreRegistry impostor = new NotACoreRegistry();
 
-        vm.expectRevert(abi.encodeWithSelector(NotFactoryDeployed.selector, address(handDeployed)));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryCodehashMismatch.selector,
+                address(impostor),
+                coreRegistryCodehash,
+                address(impostor).codehash
+            )
+        );
         vm.prank(ecosystemGovernor);
-        ecosystemExecutor.applyL1Upgrade(ICoreRegistry(address(handDeployed)));
+        ecosystemExecutor.applyL1Upgrade(ICoreRegistry(address(impostor)));
     }
 
-    function test_factoryDeployOrGetIsIdempotentPerManifest() public {
-        // Same manifest -> the existing instance is returned (a same-manifest front-run merely
-        // does the caller's work); a different manifest lands in a different instance.
+    function test_manifestHashCommitsToTheRows() public {
+        // Provenance pins the CODE; the manifest hash is what distinguishes two instances of it.
         EcosystemContractRow[] memory rows = new EcosystemContractRow[](1);
         rows[0] = _row(address(bridgehubProxy), address(implOld), address(implNew));
-        address first = address(_deployRegistry(rows));
-        address second = address(_deployRegistry(rows));
-        assertEq(first, second, "same manifest must resolve to the same instance");
+        ICoreRegistry first = _deployRegistry(rows);
+        assertEq(
+            first.manifestHash(),
+            _deployRegistry(rows).manifestHash(),
+            "same manifest must produce the same commitment"
+        );
 
         rows[0] = _row(address(messageRootProxy), address(implOld), address(implNew));
-        assertTrue(address(_deployRegistry(rows)) != first, "a different manifest must land elsewhere");
+        assertTrue(_deployRegistry(rows).manifestHash() != first.manifestHash(), "a different manifest must differ");
     }
 
     function test_revertWhen_replayingStaleRegistryWouldDowngrade() public {

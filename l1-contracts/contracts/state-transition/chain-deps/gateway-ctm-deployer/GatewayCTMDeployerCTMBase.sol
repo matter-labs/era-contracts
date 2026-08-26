@@ -9,7 +9,6 @@ import {ChainTypeManagerInitializeData, IChainTypeManager} from "../../IChainTyp
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
-import {GenesisManifestLib} from "../../../upgrades/registry/GenesisManifestLib.sol";
 import {GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
 
 /// @title GatewayCTMDeployerCTMBase
@@ -89,17 +88,12 @@ abstract contract GatewayCTMDeployerCTMBase {
         // Gateway pins a genesis release, exactly like L1: the committed cut carries NO facet
         // addresses (empty `facetCuts`) and NO init payload (empty `initCalldata`). `DiamondInit`
         // installs the release's explicit facet routing and reads the base system contract
-        // hashes from it. The release is deployed AND initialized ATOMICALLY here through the
-        // directly-deployed `CTMReleaseFactory` — the same deployer flow governance approved,
-        // with no uninitialized window. Its address is a CREATE2 commitment to the genesis
-        // manifest (salt = manifest hash), so the off-chain prediction depends only on
-        // (factory, manifest, creation code) — a front-runner cannot displace it by bumping
-        // the factory's nonce.
-        // TODO(gateway): a `CTMRelease` takes its manifest as a CONSTRUCTOR argument, and EraVM has
-        // no constructors — so it cannot be built as part of this flow and is supplied pre-deployed.
-        // Restoring in-flow deployment needs an EraVM-deployable factory that deploys and
-        // initializes atomically; that is what the removed `CTMRegistryFactory` did. Until then this
-        // deployer cannot stand up a Gateway CTM on its own.
+        // hashes from it.
+        // TODO(gateway): a `CTMRelease` takes its manifest as a CONSTRUCTOR argument and EraVM has
+        // no constructors, so the release cannot be built inside this deployer's transaction — it
+        // is supplied pre-deployed and merely pinned here. Making this deployer stand up a Gateway
+        // CTM on its own needs an EraVM-deployable release that takes its manifest through an
+        // atomic post-deployment initialization.
         address currentRelease = _config.currentRelease;
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({

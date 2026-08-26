@@ -12,6 +12,7 @@ import {
     GenesisUpgradeZero
 } from "contracts/common/L1ContractErrors.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
+import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 
 contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
     function setUp() public {
@@ -45,7 +46,7 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            releaseFactory: Utils.TEST_RELEASE_FACTORY,
+            releaseCodehash: Utils.releaseCodehash(),
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             serverNotifier: serverNotifier

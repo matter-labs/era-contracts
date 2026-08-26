@@ -385,6 +385,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         gatewayConfig.gatewayStateTransition.facets.migratorFacet = deployGWContract("MigratorFacet");
         gatewayConfig.gatewayStateTransition.facets.committerFacet = deployGWContract("CommitterFacet");
         gatewayConfig.gatewayStateTransition.facets.diamondInit = deployGWContract("DiamondInit");
+        gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
         (, string memory gwCtmContractName) = DeployCTML1OrGateway.resolve(
@@ -403,7 +404,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     function prepareGatewaySpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
         if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
 
-        Call[][] memory allCalls = new Call[][](6);
+        Call[][] memory allCalls = new Call[][](5);
 
         // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
         uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
@@ -412,9 +413,8 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         allCalls[0] = provideSetNewVersionUpgradeCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
         allCalls[1] = prepareNewChainCreationParamsCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
         allCalls[2] = prepareCTMImplementationUpgrade(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-        allCalls[3] = prepareSetDefaultUpgradeCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-        allCalls[4] = prepareDAValidatorCallGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-        allCalls[5] = prepareVersionSpecificStage1GovernanceCallsGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        allCalls[3] = prepareDAValidatorCallGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        allCalls[4] = prepareVersionSpecificStage1GovernanceCallsGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
 
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
@@ -504,7 +504,6 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             gatewayConfig.gatewayStateTransition.proxies.chainTypeManager
         );
     }
-
 
     function prepareCTMImplementationUpgrade(
         uint256 l2GasLimit,
@@ -659,6 +658,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         vm.serializeAddress(
             "gateway_state_transition",
             "default_upgrade_addr",
+            gatewayConfig.gatewayStateTransition.defaultUpgrade
         );
         vm.serializeAddress(
             "gateway_state_transition",

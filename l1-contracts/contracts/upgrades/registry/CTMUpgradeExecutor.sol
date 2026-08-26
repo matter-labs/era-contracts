@@ -12,12 +12,12 @@ import {IDefaultUpgrade} from "../IDefaultUpgrade.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {
     EmptyBytes32,
-    NotFactoryDeployed,
     TransitionReleaseMismatch,
     UpgradeNotPermissionlessYet,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "../../state-transition/L1StateTransitionErrors.sol";
+import {CodehashPinLib} from "./CodehashPinLib.sol";
 
 /// @title CTMUpgradeExecutor
 /// @author Matter Labs
@@ -31,6 +31,8 @@ import {OutdatedProtocolVersion} from "../../state-transition/L1StateTransitionE
 ///      SEPARATE governor. The transition each entrypoint takes is a *pinned implementation
 ///      address* — the exact generated contract governance approved — never a proxy.
 contract CTMUpgradeExecutor is UpgradeExecutorBase {
+    using CodehashPinLib for address;
+
     /// @notice The one ChainTypeManager this executor governs. Transitions carry no CTM pointer;
     ///         the binding is this immutable, so a transition cannot be aimed at a foreign CTM.
     IChainTypeManager public immutable CTM;
@@ -67,9 +69,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
 
     /// @dev Type provenance: the object at `_transition` must run the audited `CTMTransition` code.
     function _requireGenuineTransition(ICTMTransition _transition) private view {
-        if (address(_transition).codehash != TRANSITION_CODEHASH) {
-            revert NotFactoryDeployed(address(_transition));
-        }
+        address(_transition).requirePin(TRANSITION_CODEHASH);
     }
 
     /// @notice Completes the two-step ownership handover of the bound CTM to this executor.

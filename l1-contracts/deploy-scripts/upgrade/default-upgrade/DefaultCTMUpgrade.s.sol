@@ -594,22 +594,20 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](8);
+        Call[][] memory allCalls = new Call[][](7);
 
         allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
         allCalls[1] = prepareCheckMigrationsPausedCalls();
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
         allCalls[2] = prepareUpgradeCTMCalls();
-        console.log("prepareStage1GovernanceCalls: prepareSetDefaultUpgradeCall");
-        allCalls[3] = prepareSetDefaultUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareNewChainCreationParamsCall");
-        allCalls[4] = prepareNewChainCreationParamsCall();
+        allCalls[3] = prepareNewChainCreationParamsCall();
         console.log("prepareStage1GovernanceCalls: provideSetNewVersionUpgradeCall");
-        allCalls[5] = provideSetNewVersionUpgradeCall();
+        allCalls[4] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
-        allCalls[6] = prepareDAValidatorCall();
+        allCalls[5] = prepareDAValidatorCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
-        allCalls[7] = prepareVersionSpecificStage1GovernanceCallsL1();
+        allCalls[6] = prepareVersionSpecificStage1GovernanceCallsL1();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
@@ -963,6 +961,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
+            ctmAddresses.stateTransition.defaultUpgrade
         );
 
         // Serialize newly deployed upgrade addresses

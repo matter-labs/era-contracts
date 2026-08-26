@@ -38,17 +38,13 @@ const ARTIFACTS = {
   ZKsyncOSVerifierPlonk: "ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",
   ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
   L1MessageRoot: "L1MessageRoot.sol/L1MessageRoot.json",
-  // Fixed write-once release/transition/core-registry implementations
-  // (contracts/upgrades/registry). They compile with the regular forge build; the committed
-  // manifest they are initialized from regenerates via `yarn regen:v32-registries` (emit mode
-  // of the registry upgrade runner).
+  // Write-once release/transition/core-registry objects (contracts/upgrades/registry). Each
+  // takes its manifest as a CONSTRUCTOR argument, so a plain deployment is the whole creation
+  // step. The committed manifest they are built from regenerates via
+  // `yarn regen:v32-registries` (emit mode of the registry upgrade runner).
   CTMRelease: "CTMRelease.sol/CTMRelease.json",
   CTMTransition: "CTMTransition.sol/CTMTransition.json",
   CoreRegistry: "CoreRegistry.sol/CoreRegistry.json",
-  // Atomic deploy-and-initialize factories (one per type — see CTMRegistryFactory.sol).
-  CTMReleaseFactory: "CTMRegistryFactory.sol/CTMReleaseFactory.json",
-  CTMTransitionFactory: "CTMRegistryFactory.sol/CTMTransitionFactory.json",
-  CoreRegistryFactory: "CTMRegistryFactory.sol/CoreRegistryFactory.json",
   BridgedStandardERC20: "BridgedStandardERC20.sol/BridgedStandardERC20.json",
   ChainAdminOwnable: "ChainAdminOwnable.sol/ChainAdminOwnable.json",
   ChainRegistrationSender: "ChainRegistrationSender.sol/ChainRegistrationSender.json",

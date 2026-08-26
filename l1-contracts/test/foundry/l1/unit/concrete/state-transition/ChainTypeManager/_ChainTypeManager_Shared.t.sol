@@ -204,7 +204,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         ChainTypeManagerInitializeData memory ctmInitializeDataNoGovernor = ChainTypeManagerInitializeData({
             owner: address(0),
             validatorTimelock: validator,
-            releaseFactory: Utils.TEST_RELEASE_FACTORY,
+            releaseCodehash: Utils.releaseCodehash(),
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             serverNotifier: serverNotifier
@@ -220,7 +220,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            releaseFactory: Utils.TEST_RELEASE_FACTORY,
+            releaseCodehash: Utils.releaseCodehash(),
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             serverNotifier: serverNotifier

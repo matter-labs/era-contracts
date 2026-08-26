@@ -18,8 +18,6 @@ import {
     BootstrapAuthorityNotHeld,
     BootstrapExecutorNotBound,
     EcosystemImplMismatch,
-    NotFactoryDeployed,
-    RegistryAlreadyInitialized,
     RegistryDuplicateProxyRow,
     RegistryUnknownKey,
     ZeroAddress
@@ -53,8 +51,8 @@ contract RegistryBootstrapMigration {
     ///        CTM's own implementation swap is one of these rows.
     /// @param releaseCodehash The canonical provenance anchor installed on the CTM: the
     ///        `EXTCODEHASH` every release this CTM pins must run.
-    /// @param currentRelease The genesis release pinned as `currentRelease`; must be attested by
-    ///        `releaseFactory`, which the CTM re-checks itself.
+    /// @param currentRelease The genesis release pinned as `currentRelease`; must run
+    ///        `releaseCodehash`, which the CTM re-checks itself.
     /// @param newProtocolVersion The version the CTM moves to.
     /// @param oldProtocolVersionDeadline Until when the departing version stays usable.
     /// @param upgradeCut The diamond cut committed for chains upgrading across this edge. It cannot
@@ -218,9 +216,7 @@ contract RegistryBootstrapMigration {
         // The release must run the very code this migration installs as the anchor, so the anchor
         // and the release it vouches for cannot be mismatched at the moment of installation.
         ICTMRelease(m.currentRelease).validate();
-        if (m.currentRelease.codehash != m.releaseCodehash) {
-            revert NotFactoryDeployed(m.currentRelease);
-        }
+        m.currentRelease.requirePin(m.releaseCodehash);
     }
 
     /// @notice Performs the whole edge, then hands authority to the bound executors.

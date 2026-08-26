@@ -118,9 +118,9 @@ export function releaseInitArgs(ctm: any): any {
  * initialization validates it and derives the facet/hash delta from the release pair).
  */
 export function transitionInitArgs(manifest: any, ctm: any, newRelease: string): any {
-  // Release provenance is enforced by the CTM's stored canonical factory (`releaseFactory`) at
-  // `setCurrentRelease` time, not by the transition manifest — which is why the runner deploys
-  // the new release through the SAME factory instance the chain states were deployed with.
+  // Release provenance is enforced by the CTM's stored `releaseCodehash` at `setCurrentRelease`
+  // time, not by the transition manifest — which is why the runner checks the freshly deployed
+  // release against that same anchor.
   const upgradeType = parseSolidityEnum(COMPLEX_UPGRADER_SOL, "ContractUpgradeType");
   const transition = ctm.transition;
 

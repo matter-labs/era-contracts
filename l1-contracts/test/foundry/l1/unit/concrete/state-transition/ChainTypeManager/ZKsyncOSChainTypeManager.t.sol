@@ -34,6 +34,7 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
+import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 
 /// @notice From v32 the ZKsyncOS CTM validates genesis params by reading them from the genesis
 ///         `CTMRegistry` it is initialized with (not from an inline `ChainCreationParams`). These
@@ -145,16 +146,13 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             abi.encode(true)
         );
         // From v32 the CTM enforces release provenance via its canonical (mocked) factory during
-        // initialization: give the genesis release a manifest hash and attest it on the factory.
+        // initialization: the genesis release must carry the audited `CTMRelease` runtime code,
+        // which is what the CTM's provenance check compares against.
+        vm.etch(Utils.TEST_GENESIS_REGISTRY, type(CTMRelease).runtimeCode);
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
             abi.encodeWithSelector(ICTMRelease.manifestHash.selector),
             abi.encode(bytes32("mock-genesis-manifest"))
-        );
-        vm.mockCall(
-            Utils.TEST_RELEASE_FACTORY,
-            abi.encodeWithSelector(bytes4(keccak256("deployedFor(bytes32)"))),
-            abi.encode(Utils.TEST_GENESIS_REGISTRY)
         );
     }
 
@@ -163,7 +161,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            releaseFactory: Utils.TEST_RELEASE_FACTORY,
+            releaseCodehash: Utils.releaseCodehash(),
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             serverNotifier: serverNotifier
@@ -183,7 +181,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            releaseFactory: Utils.TEST_RELEASE_FACTORY,
+            releaseCodehash: Utils.releaseCodehash(),
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             serverNotifier: serverNotifier

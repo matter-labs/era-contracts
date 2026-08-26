@@ -57,7 +57,6 @@ contract FacetSelfDescriptionTest is Test {
     function test_mailboxFacetSelfDescription() public {
         _assertSelfDescription(
             new MailboxFacet(
-                9,
                 block.chainid,
                 makeAddr("chainAssetHandler"),
                 IEIP7702Checker(makeAddr("eip7702Checker")),

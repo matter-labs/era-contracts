@@ -360,8 +360,8 @@ for the deploying chain, with the exact creation code.
 **Gateway.** EraVM has no constructors, so these objects cannot be constructed there. A Gateway CTM
 therefore cannot deploy its own `CTMRelease` in-flow; the Gateway deployer takes a pre-deployed
 release address instead, and the deployers carry TODOs describing what restoring in-flow deployment
-needs — an EraVM-deployable factory that deploys and initializes atomically, which is what the
-now-removed `CTMRegistryFactory` did.
+needs: an EraVM-deployable release that takes its manifest through an atomic post-deployment
+initialization.
 
 Codehash checks depend on reproducible bytecode: pinned implementations are built with a
 CBOR-metadata-free profile so hashes are byte-identical across platforms. For the same reason,

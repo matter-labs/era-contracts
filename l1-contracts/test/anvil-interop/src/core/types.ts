@@ -33,8 +33,8 @@ export interface BalanceSnapshot {
 
 export interface CTMDeployedAddresses {
   chainTypeManager: string;
-  /** Canonical CTMReleaseFactory that deployed (and attests) the genesis release. */
-  releaseFactory: string;
+  /** `EXTCODEHASH` every release this CTM accepts must run — the provenance anchor. */
+  releaseCodehash: string;
   chainAdmin: string;
   diamondProxy: string;
   adminFacet: string;

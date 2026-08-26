@@ -37,6 +37,9 @@ import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundr
 import {Utils as DeployUtils} from "deploy-scripts/utils/Utils.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
+import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
+import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
+import {CoreRegistry} from "contracts/upgrades/registry/CoreRegistry.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -56,10 +59,21 @@ library Utils {
     /// @dev The genesis-registry address the mocked CTM fixtures return; the registry itself is
     ///      mocked too (see `UtilsCallMocker`), pinning no facets and these base system hashes.
     address internal constant TEST_GENESIS_REGISTRY = address(0x9E8E5157A9);
-    /// @dev Mocked canonical CTMReleaseFactory the fixture CTMs are initialized with; its
-    ///      `deployedFor` is mocked to attest the mocked genesis release generically, and tests
-    ///      that pin REAL releases add specific-argument mocks on top (which take precedence).
-    address internal constant TEST_RELEASE_FACTORY = address(0x9E8E5157FA);
+    /// @dev The audited `CTMRelease` / `CTMTransition` codehashes: THE provenance anchors a CTM
+    ///      and a `CTMUpgradeExecutor` pin. `TEST_GENESIS_REGISTRY` is etched with the release
+    ///      runtime code (see `UtilsCallMocker`) so the mocked genesis release passes the same
+    ///      check a real one does.
+    function releaseCodehash() internal pure returns (bytes32) {
+        return keccak256(type(CTMRelease).runtimeCode);
+    }
+
+    function transitionCodehash() internal pure returns (bytes32) {
+        return keccak256(type(CTMTransition).runtimeCode);
+    }
+
+    function coreRegistryCodehash() internal pure returns (bytes32) {
+        return keccak256(type(CoreRegistry).runtimeCode);
+    }
     bytes32 internal constant TEST_BASE_SYSTEM_CONTRACT_HASH =
         0x0100000000000000000000000000000000000000000000000000000000000000;
 

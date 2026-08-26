@@ -23,10 +23,8 @@ import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIAL
 import {AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
 import {ProtocolVersionTooSmall} from "../upgrades/ZkSyncUpgradeErrors.sol";
 import {
-    AddressHasNoCode,
     ChainAlreadyLive,
     MigrationsNotPaused,
-    NotFactoryDeployed,
     EmptyBytes32,
     RegistryReleaseCodehashAlreadySet,
     Unauthorized,
@@ -38,12 +36,15 @@ import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHan
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TxStatus} from "../common/Messaging.sol";
+import {CodehashPinLib} from "../upgrades/registry/CodehashPinLib.sol";
 
 /// @title Chain Type Manager Base contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Base contract for Chain Type Managers with common functionality
 abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
+    using CodehashPinLib for address;
+
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /// @notice Address of the bridgehub
@@ -134,7 +135,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     ///         being handed its bytes. Written beside `upgradeCutHash`, which stays the authority on
     ///         what a chain may execute.
     mapping(uint256 oldProtocolVersion => address transition) public upgradeTransition;
-
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -279,17 +279,22 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         emit NewReleaseCodehash(_releaseCodehash);
     }
 
+    /// @dev The pinned codehash is CTM state, never authored inside permissionless transition
+    ///      manifests, so a manifest cannot smuggle in an arbitrary (possibly mutable)
+    ///      `ICTMRelease` implementation. Callers check this BEFORE reading anything out of the
+    ///      candidate: a non-release answers those reads with an empty revert.
+    function _requireGenuineRelease(address _release) internal view {
+        _release.requirePin(releaseCodehash);
+    }
+
     function _storeCurrentRelease(address _release) internal {
         if (_release == address(0)) {
             revert ZeroAddress();
         }
-        // Release provenance is enforced HERE — the single authoritative point every release
-        // passes through (bootstrap initialize and every later transition alike). The canonical
-        // factory is CTM state, never authored inside permissionless transition manifests, so a
-        // fake factory cannot attest an arbitrary (possibly mutable) ICTMRelease implementation.
-        if (_release.codehash != releaseCodehash) {
-            revert NotFactoryDeployed(_release);
-        }
+        // The single authoritative point every release passes through (bootstrap initialize and
+        // every later transition alike), so provenance holds even for a path that skipped the
+        // fail-fast check in `_setCurrentRelease`.
+        _requireGenuineRelease(_release);
         currentRelease = _release;
         newChainCreationParamsBlock[protocolVersion] = block.number;
         emit NewCurrentRelease(protocolVersion, _release);

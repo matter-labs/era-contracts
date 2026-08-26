@@ -25,7 +25,8 @@ contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
         // batches still awaiting proof under the old verifier would stop being provable.
         require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 
-        // Upgrades that carry no L2 upgrade transaction, e.g. the verifier-only ones created by
+        // A transition whose derived delta carries no L2 upgrade transaction leaves the tx all-zero;
+        // rewriting its data would turn that empty slot into a real, unintended upgrade tx.
         if (_proposedUpgrade.l2ProtocolUpgradeTx.txType != 0) {
             _proposedUpgrade.l2ProtocolUpgradeTx.data = getL2UpgradeTxData(
                 s.bridgehub,

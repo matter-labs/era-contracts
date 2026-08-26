@@ -9,7 +9,6 @@ import {Call} from "contracts/governance/Common.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/CTMUpgradeExecutor.sol";
-import {CTMReleaseFactory, CTMTransitionFactory} from "contracts/upgrades/registry/CTMRegistryFactory.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
 import {ICTMTransition, L2UpgradePlan} from "contracts/upgrades/registry/ICTMTransition.sol";
 import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
@@ -20,7 +19,7 @@ import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
     HashMismatch,
-    NotFactoryDeployed,
+    RegistryCodehashMismatch,
     TransitionReleaseMismatch,
     Unauthorized,
     UpgradeNotPermissionlessYet
@@ -34,8 +33,6 @@ import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransit
 ///         exercised end-to-end by RegistryDrivenUpgrade.t.sol).
 contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
     CTMUpgradeExecutor internal ctmExecutor;
-    CTMReleaseFactory internal releaseFactory;
-    CTMTransitionFactory internal transitionFactory;
     CTMRelease internal fromRelease;
     CTMRelease internal release;
     CTMTransition internal transition;
@@ -53,13 +50,11 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         _mockMigrationPausedFromBridgehub();
 
         breakGlass = makeAddr("breakGlass");
-        releaseFactory = new CTMReleaseFactory();
-        transitionFactory = new CTMTransitionFactory();
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
             breakGlass,
             IChainTypeManager(address(chainContractAddress)),
-            transitionFactory
+            Utils.transitionCodehash()
         );
 
         // Handover through the fixed entrypoint — no break-glass involved.
@@ -77,11 +72,10 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         vm.etch(genesisUpgradeAddr, hex"600042");
         upgradeEngineAddr = makeAddr("upgradeEngine");
         vm.etch(upgradeEngineAddr, hex"600043");
-        // Transitions require factory-attested releases on BOTH edges, so the fixture CTM's
-        // mocked genesis release is replaced by a REAL factory-deployed one — through the
-        // break-glass raw-call surface, which is exactly the production escape hatch for
-        // out-of-band CTM state (the routine executor entrypoints cannot set currentRelease
-        // directly, by design).
+        // Transitions require real releases on BOTH edges, so the fixture CTM's mocked genesis
+        // release is replaced by a real one — through the break-glass raw-call surface, which is
+        // exactly the production escape hatch for out-of-band CTM state (the routine executor
+        // entrypoints cannot set currentRelease directly, by design).
         fromRelease = _deployRelease(1);
         Call[] memory repoint = new Call[](1);
         repoint[0] = Call({
@@ -97,8 +91,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         transition = _deployTransition(777);
     }
 
-    /// @param _commitmentNonce Differentiates otherwise-identical release manifests (the factory
-    ///        is deployOrGet per manifest hash, so identical manifests resolve to ONE instance).
+    /// @param _commitmentNonce Differentiates otherwise-identical release manifests.
     /// @dev The release describes the complete chain state after the (facet-neutral) hop this
     ///      suite drives: the fixture's full facet routing (explicit selectors, inline pins) and
     ///      the carried base-system hashes — the transition derives an EMPTY delta from it.
@@ -131,18 +124,8 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
             });
     }
 
-    /// @dev Deploys a release through the real factory AND attests it on the CTM's mocked
-    ///      canonical factory (`Utils.TEST_RELEASE_FACTORY`), so the CTM's provenance check accepts
-    ///      it once it becomes `currentRelease` (bootstrap re-point and applied-transition target
-    ///      alike). Use `releaseFactory.deployOrGetRelease(_releaseManifest(...))` directly to get
-    ///      a valid but UNATTESTED release.
     function _deployRelease(uint256 _commitmentNonce) internal returns (CTMRelease result) {
-        result = CTMRelease(releaseFactory.deployOrGetRelease(_releaseManifest(_commitmentNonce)));
-        vm.mockCall(
-            Utils.TEST_RELEASE_FACTORY,
-            abi.encodeWithSelector(bytes4(keccak256("deployedFor(bytes32)")), result.manifestHash()),
-            abi.encode(address(result))
-        );
+        result = new CTMRelease(_releaseManifest(_commitmentNonce));
     }
 
     function _deployTransition(uint256 _upgradeTimestamp) internal returns (CTMTransition result) {
@@ -164,9 +147,8 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         uint256[] memory factoryDeps = new uint256[](1);
         factoryDeps[0] = 1;
 
-        result = CTMTransition(
-            transitionFactory.deployOrGetTransition(
-                CTMTransition.TransitionManifest({
+        result = new CTMTransition(
+            CTMTransition.TransitionManifest({
                     oldProtocolVersion: _oldProtocolVersion,
                     newProtocolVersion: newVersion,
                     // The default transition departs from whatever release the fixture CTM was
@@ -183,8 +165,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                         delegateCalldata: hex"beef",
                         factoryDepHashes: factoryDeps
                     })
-                })
-            )
+            })
         );
     }
 
@@ -251,19 +232,27 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         ctmExecutor.applyCTMUpgrade(ICTMTransition(address(transition)));
     }
 
-    function test_revertWhen_setCurrentReleaseNotFactoryDeployed() public {
+    function test_revertWhen_setCurrentReleaseIsNotTheAuditedCode() public {
         // Release provenance is the CTM's own invariant — the transition deliberately delegates it
-        // upward. A real, valid release the CTM's canonical factory never attested is refused when
-        // set as `currentRelease`. Deploy one but do NOT attest it on the mocked factory.
-        address unattested = releaseFactory.deployOrGetRelease(_releaseManifest(99));
+        // upward. An object that does not run the audited `CTMRelease` code is refused when set as
+        // `currentRelease`, however well-formed it otherwise looks.
+        address impostor = makeAddr("notARelease");
+        vm.etch(impostor, hex"600044");
         Call[] memory repoint = new Call[](1);
         repoint[0] = Call({
             target: address(chainContractAddress),
             value: 0,
-            data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (unattested))
+            data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (impostor))
         });
 
-        vm.expectRevert(abi.encodeWithSelector(NotFactoryDeployed.selector, unattested));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryCodehashMismatch.selector,
+                impostor,
+                Utils.releaseCodehash(),
+                impostor.codehash
+            )
+        );
         vm.prank(breakGlass);
         ctmExecutor.forward(repoint);
     }

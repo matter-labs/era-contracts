@@ -120,12 +120,15 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         assertTrue(recorded != placeholderHash, "rewrite produced the placeholder");
     }
 
-    /// @notice A verifier-only upgrade carries no L2 upgrade transaction, so there is nothing to substitute and
-    ///         the rewrite — which would reject the empty transaction data — must be skipped.
+    /// @notice A transition whose derived delta carries no L2 upgrade transaction leaves the tx all-zero, so
+    ///         there is nothing to substitute and the rewrite — which would reject the empty transaction data —
+    ///         must be skipped.
     function test_upgradeWithoutAnL2TransactionSkipsTheRewrite() public {
-        assertEq(upgradeContract.upgradeVerifierOnly(protocolVersion), Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
+        delete proposedUpgrade.l2ProtocolUpgradeTx;
 
-        assertEq(upgradeContract.getProtocolVersion(), protocolVersion);
+        assertEq(upgradeContract.upgrade(proposedUpgrade), Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
+
+        assertEq(upgradeContract.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
         assertEq(upgradeContract.getVerifier(), mockVerifier);
         assertEq(upgradeContract.getL2SystemContractsUpgradeTxHash(), bytes32(0), "an upgrade tx was recorded");
     }

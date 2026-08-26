@@ -56,6 +56,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
     /// @notice Deploy everything that should be deployed
     function deployNewCTMContracts() public virtual override {
+        (ctmAddresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
         (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
         deployVerifiers();

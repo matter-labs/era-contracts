@@ -10,9 +10,11 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
 import {
     RegistryMissingBaseSystemHash,
-    RegistryReleaseFactoryAlreadySet,
-    ZeroAddress
+    RegistryReleaseCodehashAlreadySet,
+    ZeroAddress,
+    EmptyBytes32
 } from "contracts/common/L1ContractErrors.sol";
+import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
 
 /// @notice From v32 the CTM no longer stores chain-creation params directly; it stores a pointer
 ///         to a genesis release and derives all genesis data from it. This exercises
@@ -50,15 +52,13 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
         // diamondInit placeholder is the registry itself, so mock the flag there.
         vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.diamondInit.selector), abi.encode(_registry));
         vm.mockCall(_registry, abi.encodeWithSelector(IDiamondInit.IS_ZKSYNC_OS.selector), abi.encode(false));
-        // From v32 the CTM enforces release provenance via its canonical (mocked) factory: give the
-        // release a manifest hash and attest it on `TEST_RELEASE_FACTORY` so a repoint is accepted
-        // (the shared fixture's generic mock attests only the genesis release).
-        bytes32 manifestHash = keccak256(abi.encode(_registry));
-        vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.manifestHash.selector), abi.encode(manifestHash));
+        // From v32 the CTM enforces release provenance by CODEHASH, so a mocked release has to
+        // carry the audited `CTMRelease` runtime code to be accepted as `currentRelease`.
+        vm.etch(_registry, type(CTMRelease).runtimeCode);
         vm.mockCall(
-            Utils.TEST_RELEASE_FACTORY,
-            abi.encodeWithSelector(bytes4(keccak256("deployedFor(bytes32)")), manifestHash),
-            abi.encode(_registry)
+            _registry,
+            abi.encodeWithSelector(ICTMRelease.manifestHash.selector),
+            abi.encode(keccak256(abi.encode(_registry)))
         );
     }
 
@@ -122,7 +122,7 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
         chainContractAddress.setCurrentRelease(newRegistry);
     }
 
-    // `setReleaseFactory` is the migration path for CTMs whose storage predates the field
+    // `setReleaseCodehash` is the migration path for CTMs whose storage predates the field
     // (upgraded proxies never re-run `initialize`); v32 stage calldata invokes it right before
     // the first `setCurrentRelease`.
 
@@ -148,39 +148,39 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
     /// @dev Re-setting the anchor to the value it ALREADY holds is a no-op, so one upgrade bundle
     ///      works against both a migrated CTM (anchor zero) and an already-anchored one without the
     ///      calldata predicting which it is.
-    function test_SettingReleaseFactoryToSameValueIsNoop() public {
-        address configured = chainContractAddress.releaseFactory();
-        assertTrue(configured != address(0), "fixture CTM should already be anchored");
+    function test_SettingReleaseCodehashToSameValueIsNoop() public {
+        bytes32 configured = chainContractAddress.releaseCodehash();
+        assertTrue(configured != bytes32(0), "fixture CTM should already be anchored");
 
         vm.prank(governor);
-        chainContractAddress.setReleaseFactory(configured);
+        chainContractAddress.setReleaseCodehash(configured);
 
-        assertEq(chainContractAddress.releaseFactory(), configured, "anchor must be unchanged");
+        assertEq(chainContractAddress.releaseCodehash(), configured, "anchor must be unchanged");
     }
 
-    /// @dev But the anchor can never be RE-POINTED: every pinned release is attested against it, so
-    ///      changing it would retroactively change what "factory-attested" means. The migration path
-    ///      itself (anchor still zero) is exercised by the v32 integration test.
-    function test_RevertWhen_ReplacingConfiguredReleaseFactory() public {
-        address configured = chainContractAddress.releaseFactory();
-        assertTrue(configured != address(0), "fixture CTM should already be anchored");
+    /// @dev But the anchor can never be RE-POINTED: every pinned release is checked against it, so
+    ///      changing it would retroactively change which code counts as a genuine release. The
+    ///      migration path itself (anchor still zero) is exercised by the v32 integration test.
+    function test_RevertWhen_ReplacingConfiguredReleaseCodehash() public {
+        bytes32 configured = chainContractAddress.releaseCodehash();
+        assertTrue(configured != bytes32(0), "fixture CTM should already be anchored");
 
-        vm.expectRevert(abi.encodeWithSelector(RegistryReleaseFactoryAlreadySet.selector, configured));
+        vm.expectRevert(abi.encodeWithSelector(RegistryReleaseCodehashAlreadySet.selector, configured));
         vm.prank(governor);
-        chainContractAddress.setReleaseFactory(makeAddr("newReleaseFactory"));
+        chainContractAddress.setReleaseCodehash(keccak256("otherRelease"));
 
-        assertEq(chainContractAddress.releaseFactory(), configured, "anchor must be unchanged");
+        assertEq(chainContractAddress.releaseCodehash(), configured, "anchor must be unchanged");
     }
 
-    function test_RevertWhen_SettingZeroReleaseFactory() public {
-        vm.expectRevert(ZeroAddress.selector);
+    function test_RevertWhen_SettingZeroReleaseCodehash() public {
+        vm.expectRevert(EmptyBytes32.selector);
         vm.prank(governor);
-        chainContractAddress.setReleaseFactory(address(0));
+        chainContractAddress.setReleaseCodehash(bytes32(0));
     }
 
-    function test_RevertWhen_SettingReleaseFactoryNotOwner() public {
+    function test_RevertWhen_SettingReleaseCodehashNotOwner() public {
         vm.expectRevert();
         vm.prank(makeAddr("notOwner"));
-        chainContractAddress.setReleaseFactory(makeAddr("newReleaseFactory"));
+        chainContractAddress.setReleaseCodehash(keccak256("otherRelease"));
     }
 }

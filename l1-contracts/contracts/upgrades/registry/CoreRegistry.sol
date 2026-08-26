@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {ICoreRegistry, EcosystemContractRow} from "./ICoreRegistry.sol";
 import {CodehashPinLib} from "./CodehashPinLib.sol";
 import {
-    RegistryAlreadyInitialized,
     RegistryDuplicateProxyRow,
     RegistryUnknownKey,
     ZeroAddress

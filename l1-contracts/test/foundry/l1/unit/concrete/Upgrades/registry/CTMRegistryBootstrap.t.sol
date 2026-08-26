@@ -9,16 +9,13 @@ import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
 import {GenesisManifestLib} from "contracts/upgrades/registry/GenesisManifestLib.sol";
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
-import {RegistryUnknownKey, RegistryAlreadyInitialized} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Unit tests for `CTMRegistry` in its BOOTSTRAP (genesis) mode: a freshly deployed CTM
 ///         (L1 deploy scripts or the Gateway CTM deployer) points at one of these so
 ///         `DiamondInit` installs a new chain's facet set and reads the base system contract
 ///         hashes from it. Exercises the getter surface `RegistryFacetReader` / `DiamondInit`
-///         read, the one-shot init guard, and the manifest-hash commitment.
+///         read and the manifest-hash commitment.
 contract CTMRegistryBootstrapTest is Test {
-    CTMRelease internal release;
-
     uint256 internal constant VERSION = 42;
     bytes32 internal constant BOOTLOADER_HASH = bytes32(uint256(0xB001));
     bytes32 internal constant DEFAULT_ACCOUNT_HASH = bytes32(uint256(0xDEFA));
@@ -38,7 +35,6 @@ contract CTMRegistryBootstrapTest is Test {
         });
 
     function setUp() public {
-        release = new CTMRelease();
         // The bootstrap manifest builder reads each facet's explicit routing from its own
         // self-description at BUILD time; mock it on the synthetic facet addresses. Every pinned
         // target must also carry real code — the registry's codehash pin rejects a codeless
@@ -87,11 +83,10 @@ contract CTMRegistryBootstrapTest is Test {
 
     // ---- Happy path ----
 
-    function test_initializePinsGenesisManifest() public {
+    function test_constructorPinsGenesisManifest() public {
         CTMRelease.ReleaseManifest memory manifest = _genesisManifest();
-        release.initialize(manifest);
+        CTMRelease release = new CTMRelease(manifest);
 
-        assertTrue(release.initialized(), "initialized");
         assertEq(release.manifestHash(), keccak256(abi.encode(manifest)), "manifest hash");
 
         GenesisFacet[] memory list = release.genesisFacets();
@@ -123,35 +118,21 @@ contract CTMRegistryBootstrapTest is Test {
 
     // ---- Unhappy path ----
 
-    function test_initializeRevertsOnSecondCall() public {
+    function test_constructorRevertsOnZeroGenesisUpgrade() public {
+        // Version validation moved to the transition; a release still rejects a zero genesisUpgrade.
         // Build the manifest BEFORE arming expectRevert: the builder itself makes (mocked)
         // external self-description calls that would otherwise consume the expectation.
-        CTMRelease.ReleaseManifest memory manifest = _genesisManifest();
-        release.initialize(manifest);
-
-        vm.expectRevert(RegistryAlreadyInitialized.selector);
-        release.initialize(manifest);
-    }
-
-    function test_initializeRevertsOnZeroGenesisUpgrade() public {
-        // Version validation moved to the transition; a release still rejects a zero genesisUpgrade.
         CTMRelease.ReleaseManifest memory manifest = _genesisManifest();
         manifest.genesisUpgrade = address(0);
 
         vm.expectRevert();
-        release.initialize(manifest);
-    }
-
-    function test_validateRevertsBeforeInitialization() public {
-        vm.expectRevert(RegistryUnknownKey.selector);
-        release.validate();
-        assertFalse(release.verifyAll(), "uninitialized release must not verify");
+        new CTMRelease(manifest);
     }
 
     /// @dev ZKsync OS pins all-zero hashes; the registry must store and serve them as-is (the
     ///      zero-check lives in DiamondInit and is skipped for ZKsync OS chains).
     function test_zeroHashesAreServedForPinnedVersion() public {
-        release.initialize(
+        CTMRelease release = new CTMRelease(
             GenesisManifestLib.buildGenesisManifest(
                 GenesisManifestLib.GenesisConfig({
                     facets: facets,

@@ -216,7 +216,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         // Deploy Multicall3
         runGatewayL1L2Transaction(targetAddr, directCalldata.multicall3Calldata);
 
-        runGatewayL1L2Transaction(targetAddr, directCalldata.bootstrapReleaseFactoryCalldata);
+        runGatewayL1L2Transaction(targetAddr, directCalldata.currentReleaseCalldata);
     }
 
     function runGatewayL1L2TransactionWithFactoryDeps(
@@ -403,6 +403,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         vm.serializeAddress(
             "gateway_state_transition",
             "default_upgrade_addr",
+            output.gatewayStateTransition.defaultUpgrade
         );
         vm.serializeAddress(
             "gateway_state_transition",

@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {GenesisFacet, ICTMRelease} from "./ICTMRelease.sol";
 import {CodehashPinLib} from "./CodehashPinLib.sol";
 import {
-    RegistryAlreadyInitialized,
     RegistryDuplicateFacetRow,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,

@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
-import {ProposedUpgradeLib} from "../state-transition/libraries/ProposedUpgradeLib.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -15,5 +14,4 @@ contract DefaultUpgrade is BaseZkSyncUpgrade {
         super.upgrade(_proposedUpgrade);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
-
 }

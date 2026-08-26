@@ -36,6 +36,7 @@ contract EraChainTypeManager is ChainTypeManagerBase {
         if (_release == address(0)) {
             revert ZeroAddress();
         }
+        _requireGenuineRelease(_release);
         ICTMRelease release = ICTMRelease(_release);
         release.validate();
         // VM identity is single-sourced from the release's pinned DiamondInit immutable —

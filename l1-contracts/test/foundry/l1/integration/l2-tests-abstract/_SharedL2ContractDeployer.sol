@@ -273,7 +273,14 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             abi.encode(block.chainid)
         );
         vm.prank(L2_BRIDGEHUB_ADDR);
-        mockDiamondInitInteropCenterCallsWithAddress(L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, baseTokenAssetId);
+        // The bridgehub here is REAL, so scope the `baseTokenAssetId` mock to the chain about to
+        // be created — a selector-only mock would make every chain id read as registered.
+        mockDiamondInitInteropCenterCallsForChain(
+            L2_BRIDGEHUB_ADDR,
+            L2_ASSET_ROUTER_ADDR,
+            baseTokenAssetId,
+            ERA_CHAIN_ID + 1
+        );
         uint256 currentChainId = block.chainid;
         vm.chainId(L1_CHAIN_ID);
         address chainAddress = chainTypeManager.createNewChain(ERA_CHAIN_ID + 1, chainAdmin);

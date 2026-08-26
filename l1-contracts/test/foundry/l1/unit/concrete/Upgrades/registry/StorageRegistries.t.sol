@@ -7,7 +7,6 @@ import {Test} from "forge-std/Test.sol";
 import {CoreRegistry} from "contracts/upgrades/registry/CoreRegistry.sol";
 import {EcosystemContractRow} from "contracts/upgrades/registry/ICoreRegistry.sol";
 import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
-import {CTMReleaseFactory} from "contracts/upgrades/registry/CTMRegistryFactory.sol";
 import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
 import {ICTMTransition, L2UpgradePlan} from "contracts/upgrades/registry/ICTMTransition.sol";
 import {ICTMRelease, GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
@@ -28,7 +27,6 @@ import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
     MalformedL2UpgradePlan,
     PatchMustReuseRelease,
-    RegistryAlreadyInitialized,
     RegistryCodehashMismatch,
     RegistryDuplicateFacetRow,
     RegistryDuplicateProxyRow,
@@ -51,7 +49,6 @@ import {
 ///         from the `(fromRelease, newRelease)` pair at initialization.
 contract StorageRegistriesTest is Test {
     CoreRegistry internal coreRegistry;
-    CTMReleaseFactory internal releaseFactory;
     CTMRelease internal fromRelease;
     CTMRelease internal newRelease;
     CTMTransition internal transition;
@@ -87,15 +84,12 @@ contract StorageRegistriesTest is Test {
         // A real DiamondInit: VM identity is read from its IS_ZKSYNC_OS immutable.
         diamondInit = address(new DiamondInit(true));
 
-        coreRegistry = new CoreRegistry();
-        coreRegistry.initialize(_coreManifest());
+        coreRegistry = new CoreRegistry(_coreManifest());
         // Releases deploy through the canonical factory: transition initialization enforces
         // factory provenance on BOTH edges.
-        releaseFactory = new CTMReleaseFactory();
-        fromRelease = CTMRelease(releaseFactory.deployOrGetRelease(_fromReleaseManifest()));
-        newRelease = CTMRelease(releaseFactory.deployOrGetRelease(_newReleaseManifest()));
-        transition = new CTMTransition();
-        transition.initialize(_transitionManifest());
+        fromRelease = new CTMRelease(_fromReleaseManifest());
+        newRelease = new CTMRelease(_newReleaseManifest());
+        transition = new CTMTransition(_transitionManifest());
     }
 
     /// @dev Deploys a distinct-bytecode stand-in at a labelled address so EXTCODEHASH pins are
@@ -224,15 +218,10 @@ contract StorageRegistriesTest is Test {
 
     // ─────────────────────────── write-once + lookups ───────────────────────────
 
-    function test_manifestsAreWriteOnceAndCommitted() public {
+    function test_manifestsAreCommitted() public view {
         assertEq(coreRegistry.manifestHash(), keccak256(abi.encode(_coreManifest())));
         assertEq(newRelease.manifestHash(), keccak256(abi.encode(_newReleaseManifest())));
         assertEq(transition.manifestHash(), keccak256(abi.encode(_transitionManifest())));
-
-        vm.expectRevert(RegistryAlreadyInitialized.selector);
-        newRelease.initialize(_newReleaseManifest());
-        vm.expectRevert(RegistryAlreadyInitialized.selector);
-        transition.initialize(_transitionManifest());
     }
 
     function test_releasePinsPostUpgradeGenesis() public view {
@@ -308,8 +297,7 @@ contract StorageRegistriesTest is Test {
         CTMTransition.TransitionManifest memory manifest = _transitionManifest();
         manifest.l2Plan.deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
         manifest.l2Plan.factoryDepHashes = new uint256[](0);
-        CTMTransition delegateOnly = new CTMTransition();
-        delegateOnly.initialize(manifest);
+        CTMTransition delegateOnly = new CTMTransition(manifest);
 
         L2CanonicalTransaction memory transaction = CTMUpgradeComposer.buildL2UpgradeTx(
             ICTMTransition(address(delegateOnly))
@@ -342,8 +330,7 @@ contract StorageRegistriesTest is Test {
     }
 
     function test_patchTransitionVerifierOnlyInitializes() public {
-        CTMTransition patchTransition = new CTMTransition();
-        patchTransition.initialize(_patchManifest());
+        CTMTransition patchTransition = new CTMTransition(_patchManifest());
         assertEq(patchTransition.fromRelease(), patchTransition.newRelease());
         // The derived delta of a same-release hop is empty by construction.
         assertEq(patchTransition.facetCuts().length, 0);
@@ -358,20 +345,18 @@ contract StorageRegistriesTest is Test {
         CTMTransition.TransitionManifest memory manifest = _patchManifest();
         manifest.l2Plan.delegateTo = address(0x10004);
 
-        CTMTransition sameReleaseTransition = new CTMTransition();
         vm.expectRevert(SameReleaseTransitionHasPayload.selector);
-        sameReleaseTransition.initialize(manifest);
+        new CTMTransition(manifest);
     }
 
     function test_revertWhen_patchTargetsDifferentRelease() public {
         CTMTransition.TransitionManifest memory manifest = _patchManifest();
         manifest.fromRelease = address(fromRelease);
 
-        CTMTransition patchTransition = new CTMTransition();
         vm.expectRevert(
             abi.encodeWithSelector(PatchMustReuseRelease.selector, address(fromRelease), address(newRelease))
         );
-        patchTransition.initialize(manifest);
+        new CTMTransition(manifest);
     }
 
     // ─────────────────────────── schedule / version guards ───────────────────────────
@@ -380,9 +365,8 @@ contract StorageRegistriesTest is Test {
         CTMTransition.TransitionManifest memory manifest = _transitionManifest();
         manifest.newProtocolVersion = manifest.oldProtocolVersion;
 
-        CTMTransition staleTransition = new CTMTransition();
         vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, OLD_VERSION, OLD_VERSION));
-        staleTransition.initialize(manifest);
+        new CTMTransition(manifest);
     }
 
     /// @dev Regression: two rows for the SAME facet address are rejected. `Diamond._addOneFunction`
@@ -395,9 +379,8 @@ contract StorageRegistriesTest is Test {
         manifest.genesisFacets[2].facet = facetShared;
         manifest.genesisFacets[2].codehash = facetShared.codehash;
 
-        CTMRelease splitRelease = new CTMRelease();
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateFacetRow.selector, facetShared));
-        splitRelease.initialize(manifest);
+        new CTMRelease(manifest);
     }
 
     /// @dev Regression: the transition must enforce the SAME version shape chains enforce at
@@ -408,9 +391,8 @@ contract StorageRegistriesTest is Test {
         // major = 1 — rejected per-chain, so it must be rejected at pin time too.
         manifest.newProtocolVersion = SemVer.packSemVer(1, 0, 0);
 
-        CTMTransition majorTransition = new CTMTransition();
         vm.expectRevert(NewProtocolMajorVersionNotZero.selector);
-        majorTransition.initialize(manifest);
+        new CTMTransition(manifest);
     }
 
     function test_revertWhen_transitionMinorDeltaTooBig() public {
@@ -419,7 +401,6 @@ contract StorageRegistriesTest is Test {
         uint32 tooFar = oldMinor + uint32(MAX_ALLOWED_MINOR_VERSION_DELTA) + 1;
         manifest.newProtocolVersion = SemVer.packSemVer(0, tooFar, 0);
 
-        CTMTransition farTransition = new CTMTransition();
         vm.expectRevert(
             abi.encodeWithSelector(
                 ProtocolVersionMinorDeltaTooBig.selector,
@@ -427,7 +408,7 @@ contract StorageRegistriesTest is Test {
                 uint256(tooFar - oldMinor)
             )
         );
-        farTransition.initialize(manifest);
+        new CTMTransition(manifest);
     }
 
     /// @dev Regression: a plan carrying more factory deps than `BaseZkSyncUpgrade` accepts must be
@@ -441,9 +422,8 @@ contract StorageRegistriesTest is Test {
         }
         manifest.l2Plan.factoryDepHashes = tooManyDeps;
 
-        CTMTransition oversizedTransition = new CTMTransition();
         vm.expectRevert(MalformedL2UpgradePlan.selector);
-        oversizedTransition.initialize(manifest);
+        new CTMTransition(manifest);
     }
 
     /// @dev Regression: a target release that blanks a base-system hash (nonzero -> zero) cannot be
@@ -457,14 +437,13 @@ contract StorageRegistriesTest is Test {
             _selectors2(bytes4(uint32(2)), bytes4(uint32(3))),
             bytes32(0)
         );
-        CTMRelease blankingRelease = CTMRelease(releaseFactory.deployOrGetRelease(blankingManifest));
+        CTMRelease blankingRelease = new CTMRelease(blankingManifest);
 
         CTMTransition.TransitionManifest memory manifest = _transitionManifest();
         manifest.newRelease = address(blankingRelease);
 
-        CTMTransition blankingTransition = new CTMTransition();
         vm.expectRevert(RegistryHashChangeToZero.selector);
-        blankingTransition.initialize(manifest);
+        new CTMTransition(manifest);
     }
 
     function test_revertWhen_deadlineBeforeUpgradeTimestamp() public {
@@ -473,7 +452,6 @@ contract StorageRegistriesTest is Test {
         CTMTransition.TransitionManifest memory manifest = _transitionManifest();
         manifest.oldProtocolVersionDeadline = manifest.upgradeTimestamp - 1;
 
-        CTMTransition bricked = new CTMTransition();
         vm.expectRevert(
             abi.encodeWithSelector(
                 TransitionDeadlineBeforeUpgrade.selector,
@@ -481,7 +459,7 @@ contract StorageRegistriesTest is Test {
                 manifest.upgradeTimestamp
             )
         );
-        bricked.initialize(manifest);
+        new CTMTransition(manifest);
     }
 
     function test_revertWhen_fromReleaseZero() public {
@@ -490,9 +468,8 @@ contract StorageRegistriesTest is Test {
         CTMTransition.TransitionManifest memory manifest = _transitionManifest();
         manifest.fromRelease = address(0);
 
-        CTMTransition migrationish = new CTMTransition();
         vm.expectRevert(ZeroAddress.selector);
-        migrationish.initialize(manifest);
+        new CTMTransition(manifest);
     }
 
     // ─────────────────────────── L2 plan shape ───────────────────────────
@@ -502,9 +479,8 @@ contract StorageRegistriesTest is Test {
         manifest.l2Plan.delegateTo = address(0);
         // delegateCalldata stays "beef" — data the composed tx would never execute.
 
-        CTMTransition malformed = new CTMTransition();
         vm.expectRevert(MalformedL2UpgradePlan.selector);
-        malformed.initialize(manifest);
+        CTMTransition malformed = new CTMTransition(manifest);
     }
 
     function test_revertWhen_factoryDepsWithoutL2Side() public {
@@ -514,9 +490,8 @@ contract StorageRegistriesTest is Test {
         manifest.l2Plan.delegateCalldata = "";
         // factoryDepHashes stay non-empty with no transaction to ride in.
 
-        CTMTransition malformed = new CTMTransition();
         vm.expectRevert(MalformedL2UpgradePlan.selector);
-        malformed.initialize(manifest);
+        CTMTransition malformed = new CTMTransition(manifest);
     }
 
     function test_revertWhen_deploymentsWithoutDelegateTarget() public {
@@ -527,9 +502,8 @@ contract StorageRegistriesTest is Test {
         manifest.l2Plan.delegateTo = address(0);
         manifest.l2Plan.delegateCalldata = "";
 
-        CTMTransition malformed = new CTMTransition();
         vm.expectRevert(MalformedL2UpgradePlan.selector);
-        malformed.initialize(manifest);
+        new CTMTransition(manifest);
     }
 
     // ─────────────────────────── routing hygiene ───────────────────────────
@@ -538,9 +512,8 @@ contract StorageRegistriesTest is Test {
         CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets[1].selectors = new bytes4[](0);
 
-        CTMRelease sparse = new CTMRelease();
         vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, facetShared));
-        sparse.initialize(manifest);
+        new CTMRelease(manifest);
     }
 
     function test_revertWhen_releaseHasNoFacets() public {
@@ -549,9 +522,8 @@ contract StorageRegistriesTest is Test {
         CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets = new GenesisFacet[](0);
 
-        CTMRelease empty = new CTMRelease();
         vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, address(0)));
-        empty.initialize(manifest);
+        CTMRelease empty = new CTMRelease(manifest);
     }
 
     function test_revertWhen_releasePinsCodelessFacet() public {
@@ -562,9 +534,8 @@ contract StorageRegistriesTest is Test {
         manifest.genesisFacets[0].facet = codeless;
         manifest.genesisFacets[0].codehash = codeless.codehash;
 
-        CTMRelease pinless = new CTMRelease();
         vm.expectRevert(abi.encodeWithSelector(RegistryPinTargetHasNoCode.selector, codeless));
-        pinless.initialize(manifest);
+        new CTMRelease(manifest);
     }
 
     function test_revertWhen_releaseRoutesSelectorTwice() public {
@@ -573,9 +544,8 @@ contract StorageRegistriesTest is Test {
         CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets[1].selectors[0] = bytes4(uint32(0x20)); // collides with facetFrozen
 
-        CTMRelease duplicated = new CTMRelease();
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateSelector.selector, bytes4(uint32(0x20))));
-        duplicated.initialize(manifest);
+        new CTMRelease(manifest);
     }
 
     // ─────────────────────────── factory provenance ───────────────────────────
@@ -586,14 +556,12 @@ contract StorageRegistriesTest is Test {
         // leaves attestation to the CTM's canonical `releaseFactory` (enforced when the release
         // becomes `currentRelease` — see the CTM-level provenance test). So a hand-deployed but
         // VALID release is accepted here and derives a normal delta.
-        CTMRelease handDeployed = new CTMRelease();
-        handDeployed.initialize(_newReleaseManifest());
+        CTMRelease handDeployed = new CTMRelease(_newReleaseManifest());
 
         CTMTransition.TransitionManifest memory manifest = _transitionManifest();
         manifest.newRelease = address(handDeployed);
 
-        CTMTransition deferred = new CTMTransition();
-        deferred.initialize(manifest);
+        CTMTransition deferred = new CTMTransition(manifest);
         assertEq(deferred.newRelease(), address(handDeployed), "transition accepts a valid hand-deployed release");
     }
 
@@ -603,7 +571,6 @@ contract StorageRegistriesTest is Test {
         CTMTransition.TransitionManifest memory manifest = _transitionManifest();
         manifest.upgradeEngineCodehash = keccak256("not the engine's code");
 
-        CTMTransition mispinned = new CTMTransition();
         vm.expectRevert(
             abi.encodeWithSelector(
                 RegistryCodehashMismatch.selector,
@@ -612,7 +579,7 @@ contract StorageRegistriesTest is Test {
                 upgradeEngine.codehash
             )
         );
-        mispinned.initialize(manifest);
+        CTMTransition mispinned = new CTMTransition(manifest);
     }
 
     /// @dev The verifier pin moved to the release along with the verifier itself.
@@ -620,7 +587,6 @@ contract StorageRegistriesTest is Test {
         CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.verifierCodehash = keccak256("not the verifier's code");
 
-        CTMRelease mispinned = new CTMRelease();
         vm.expectRevert(
             abi.encodeWithSelector(
                 RegistryCodehashMismatch.selector,
@@ -629,7 +595,7 @@ contract StorageRegistriesTest is Test {
                 verifier.codehash
             )
         );
-        mispinned.initialize(manifest);
+        new CTMRelease(manifest);
     }
 
     function test_validateRejectsCodehashDrift() public {
@@ -658,20 +624,13 @@ contract StorageRegistriesTest is Test {
 
     // ─────────────────────────── core registry rows ───────────────────────────
 
-    function test_uninitializedCoreRegistryDoesNotVerify() public {
-        // An uninitialized registry has nothing pinned — it must never read as verified.
-        CoreRegistry blankRegistry = new CoreRegistry();
-        assertFalse(blankRegistry.verifyAll());
-    }
-
     function test_revertWhen_upgradingRowMissingSource() public {
         // A row that upgrades must be a full edge: known source implementation.
         CoreRegistry.CoreRegistryManifest memory manifest = _coreManifest();
         manifest.contractRows[0].expectedOldImpl = address(0);
 
-        CoreRegistry sourceless = new CoreRegistry();
         vm.expectRevert(ZeroAddress.selector);
-        sourceless.initialize(manifest);
+        new CoreRegistry(manifest);
     }
 
     function test_revertWhen_coreRegistryRowHasNoImplementation() public {
@@ -681,9 +640,8 @@ contract StorageRegistriesTest is Test {
         manifest.contractRows[0].implNew = address(0);
         manifest.contractRows[0].implNewCodehash = bytes32(0);
 
-        CoreRegistry placeholder = new CoreRegistry();
         vm.expectRevert(ZeroAddress.selector);
-        placeholder.initialize(manifest);
+        new CoreRegistry(manifest);
     }
 
     function test_revertWhen_coreRegistryHasDuplicateProxyRow() public {
@@ -694,8 +652,7 @@ contract StorageRegistriesTest is Test {
         rows[1] = manifest.contractRows[0]; // same proxy again
         manifest.contractRows = rows;
 
-        CoreRegistry duped = new CoreRegistry();
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateProxyRow.selector, rows[0].proxy));
-        duped.initialize(manifest);
+        new CoreRegistry(manifest);
     }
 }

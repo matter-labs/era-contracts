@@ -56,7 +56,7 @@ contract ZKsyncOSChainTypeManagerSharedTest is ChainTypeManagerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            releaseFactory: Utils.TEST_RELEASE_FACTORY,
+            releaseCodehash: Utils.releaseCodehash(),
             currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
             serverNotifier: serverNotifier

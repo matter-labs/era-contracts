@@ -285,10 +285,9 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         deployed = tester.deployDirect(directCalldata.multicall3Calldata);
         assertEq(deployed, calculatedContracts.multicall3, "Multicall3 address mismatch");
 
-        // Bootstrap release FACTORY (deployed directly); the release itself is CREATE2-deployed
-        // through it inside the CTM deployer's transaction — its prediction is asserted against
-        // the LIVE deployment after `deployCTM` runs.
-        deployed = tester.deployDirect(directCalldata.bootstrapReleaseFactoryCalldata);
-        assertTrue(deployed.code.length != 0, "bootstrap release factory must be deployed");
+        // Bootstrap release: a direct CREATE2 deployment whose salt commits to the genesis
+        // manifest it takes as a constructor argument.
+        deployed = tester.deployDirect(directCalldata.currentReleaseCalldata);
+        assertEq(deployed, calculatedContracts.stateTransition.currentRelease, "bootstrap release address mismatch");
     }
 }

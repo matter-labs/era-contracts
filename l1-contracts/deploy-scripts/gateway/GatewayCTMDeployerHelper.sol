@@ -77,7 +77,11 @@ struct DirectDeployedAddresses {
     Facets facets;
     address genesisUpgrade;
     address multicall3;
-    address bootstrapReleaseFactory;
+    /// @dev The bootstrap `CTMRelease`. It is a direct CREATE2 deployment like the facets: a
+    ///      release takes its manifest as a CONSTRUCTOR argument, so its address is a commitment
+    ///      to that manifest and cannot be produced from inside the CTM deployer.
+    address currentRelease;
+    bytes32 currentReleaseCodehash;
     /// @dev Predicted LIVE codehashes (EXTCODEHASH after deployment) in genesisFacetSlots order:
     ///      admin, getters, mailbox, executor, migrator, committer. On an EVM-equivalent Gateway
     ///      these come from a local simulated deployment (immutables get patched into runtime
@@ -109,7 +113,7 @@ struct DirectCreate2Calldata {
     bytes diamondInitCalldata;
     bytes genesisUpgradeCalldata;
     bytes multicall3Calldata;
-    bytes bootstrapReleaseFactoryCalldata;
+    bytes currentReleaseCalldata;
 }
 
 struct CalculateAddressesIntermediate {
@@ -195,6 +199,12 @@ library GatewayCTMDeployerHelper {
         (directAddresses, directCalldata) = _calculateDirectDeployments(_create2Salt, config, im.daResult);
         directAddresses.verifier = im.verifiersResult.verifier;
         directAddresses.verifierCodehash = _mainVerifierCodehash(config, im.verifiersResult);
+        // Last, because the manifest it commits to names every facet AND the verifier.
+        (
+            directAddresses.currentRelease,
+            directAddresses.currentReleaseCodehash,
+            directCalldata.currentReleaseCalldata
+        ) = _calculateBootstrapRelease(_create2Salt, config, directAddresses);
 
         GatewayCTMFinalResult memory ctmResult;
         (deployers.ctmDeployer, deployerCalldata.ctmCalldata, ctmResult) = _calculateCTMDeployer(
@@ -215,7 +225,7 @@ library GatewayCTMDeployerHelper {
             ctmResult
         );
         // Assigned after assembly to keep this function's call-site stack flat.
-        contracts.stateTransition.currentRelease = _predictBootstrapReleaseFromDirect(directAddresses, config);
+        contracts.stateTransition.currentRelease = directAddresses.currentRelease;
     }
 
     // ============ DA Deployer ============
@@ -496,19 +506,6 @@ library GatewayCTMDeployerHelper {
             config.isZKsyncOS,
             true
         );
-
-        // Bootstrap release FACTORY — deployed directly (embedding the release's ~12KB creation
-        // code in the CTM deployer would push its initcode past the EIP-3860 cap). The CTM
-        // deployer calls its atomic `deployOrGetRelease`, so the release itself is deployed AND
-        // initialized within the deployer's transaction — no uninitialized window on Gateway.
-        (addresses.bootstrapReleaseFactory, data.bootstrapReleaseFactoryCalldata) = _calculateCreate2AddressAndCalldata(
-            _create2Salt,
-            "CTMRegistryFactory.sol",
-            "CTMReleaseFactory",
-            hex"",
-            config.isZKsyncOS,
-            true
-        );
     }
 
     function _calculateCreate2AddressAndCalldata(
@@ -578,7 +575,8 @@ library GatewayCTMDeployerHelper {
             deployer,
             ctmConfig,
             config.isZKsyncOS,
-            _predictBootstrapReleaseFromDirect(directAddresses, config)
+            directAddresses.currentRelease,
+            directAddresses.currentReleaseCodehash
         );
     }
 
@@ -597,36 +595,37 @@ library GatewayCTMDeployerHelper {
                 facets: directAddresses.facets,
                 genesisUpgrade: directAddresses.genesisUpgrade,
                 verifier: verifiersResult.verifier,
-                bootstrapReleaseFactory: directAddresses.bootstrapReleaseFactory
+                currentRelease: directAddresses.currentRelease
             });
     }
 
-    /// @dev The bootstrap release is CREATE2-deployed by the factory with
-    ///      `salt = keccak256(abi.encode(genesis manifest))`, so its address depends only on
-    ///      (factory, manifest, creation code) — NEVER on the factory's nonce. A front-runner
-    ///      calling the permissionless factory first cannot displace the predicted address: the
-    ///      same manifest lands (and is returned) at the same address, a different manifest
-    ///      lands elsewhere. This rebuilds the exact manifest the CTM deployer builds
-    ///      (`GatewayCTMDeployerCTMBase._deployCurrentRelease`) and applies the VM-appropriate
-    ///      CREATE2 formula.
-    function _predictBootstrapReleaseFromDirect(
-        DirectDeployedAddresses memory _direct,
-        GatewayCTMDeployerConfig memory _config
-    ) internal returns (address) {
-        bytes32 manifestSalt = keccak256(abi.encode(_reconstructGenesisManifest(_direct, _config)));
-        bytes memory bytecode = BytecodeUtils.readBytecodeL1(_config.isZKsyncOS, "CTMRelease.sol", "CTMRelease");
-        return
-            _computeCreate2Address(
-                _isGatewayEvmEquivalentInCurrentContext(),
-                _direct.bootstrapReleaseFactory,
-                manifestSalt,
-                bytecode,
-                hex""
-            );
+    /// @dev The manifest is the release's constructor argument, so the CREATE2 address is itself a
+    ///      commitment to it: a different manifest lands at a different address, and the release
+    ///      that lands at the predicted one can only be the audited manifest.
+    function _calculateBootstrapRelease(
+        bytes32 _create2Salt,
+        GatewayCTMDeployerConfig memory _config,
+        DirectDeployedAddresses memory _direct
+    ) internal returns (address releaseAddr, bytes32 releaseCodehash, bytes memory calldataOut) {
+        bytes memory manifestArgs = abi.encode(_reconstructGenesisManifest(_direct, _config));
+        (releaseAddr, calldataOut) = _calculateCreate2AddressAndCalldata(
+            _create2Salt,
+            "CTMRelease.sol",
+            "CTMRelease",
+            manifestArgs,
+            _config.isZKsyncOS,
+            true
+        );
+        // NOT `_simulatedCodehash`: a release validates its manifest's pins against LIVE code in
+        // its constructor, and none of the pinned targets exist at prediction time. A release has
+        // no immutables either, so its runtime code is exactly the artifact's.
+        releaseCodehash = _isGatewayEvmEquivalentInCurrentContext()
+            ? keccak256(BytecodeUtils.readDeployedBytecodeL1(_config.isZKsyncOS, "CTMRelease.sol", "CTMRelease"))
+            : L2ContractHelper.hashL2Bytecode(BytecodeUtils.readBytecodeL1(false, "CTMRelease.sol", "CTMRelease"));
     }
 
     /// @dev Rebuilds — from build artifacts and simulated deployments, byte-identically — the
-    ///      genesis manifest the CTM deployer builds on Gateway with live calls
+    ///      genesis manifest the bootstrap release is constructed with
     ///      (`GenesisManifestLib.buildGenesisManifest`). The facets do not exist at prediction
     ///      time, so selectors come from each facet's EVM build artifact via `cast selectors`
     ///      (the same drift-guarded source the facets' own `ISelfDescribingFacet.selectors()`
@@ -868,7 +867,8 @@ library GatewayCTMDeployerHelper {
         address deployerAddr,
         GatewayCTMFinalConfig memory config,
         bool isZKsyncOS,
-        address predictedRelease
+        address predictedRelease,
+        bytes32 predictedReleaseCodehash
     ) internal returns (GatewayCTMFinalResult memory result) {
         GatewayCTMDeployerConfig memory baseConfig = config.baseConfig;
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: baseConfig.salt});
@@ -907,17 +907,13 @@ library GatewayCTMDeployerHelper {
         );
 
         {
-            // The bootstrap release's address is a CREATE2 commitment to the genesis manifest,
-            // deterministic off-chain even though it is deployed inside the CTM deployer's
-            // transaction (through the directly-deployed factory) — predicted by the caller via
-            // _predictBootstrapReleaseFromDirect.
-            address genesisRegistry = predictedRelease;
             bytes memory proxyConstructorArgs = _buildCTMProxyConstructorArgs(
                 config,
                 baseConfig,
                 result.chainTypeManagerImplementation,
                 result.serverNotifierProxy,
-                genesisRegistry
+                predictedRelease,
+                predictedReleaseCodehash
             );
             result.diamondCutData = _buildDiamondCutDataEncoded(config.facets, baseConfig);
             result.chainTypeManagerProxy = _deployInternalWithParams(
@@ -953,12 +949,13 @@ library GatewayCTMDeployerHelper {
         GatewayCTMDeployerConfig memory baseConfig,
         address ctmImplementation,
         address serverNotifierProxy,
-        address currentRelease
+        address currentRelease,
+        bytes32 currentReleaseCodehash
     ) private pure returns (bytes memory) {
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
             owner: baseConfig.aliasedGovernanceAddress,
             validatorTimelock: config.validatorTimelockProxy,
-            releaseFactory: config.bootstrapReleaseFactory,
+            releaseCodehash: currentReleaseCodehash,
             currentRelease: currentRelease,
             protocolVersion: baseConfig.protocolVersion,
             serverNotifier: serverNotifierProxy
@@ -1082,7 +1079,7 @@ library GatewayCTMDeployerHelper {
     /// @notice Bytecodes required for Gateway CTM deployers on Era.
     // solhint-disable-next-line code-complexity
     function _gatewayCTMEraFactoryDependencies() private returns (bytes[] memory dependencies) {
-        uint256 totalDependencies = 29;
+        uint256 totalDependencies = 28;
         dependencies = new bytes[](totalDependencies);
         uint256 idx = 0;
 
@@ -1127,9 +1124,6 @@ library GatewayCTMDeployerHelper {
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Committer.sol", "CommitterFacet");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondInit.sol", "DiamondInit");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "L1GenesisUpgrade.sol", "L1GenesisUpgrade");
-        // The factory is itself DIRECT-deployed (by bytecode hash on an EraVM Gateway), so its own
-        // bytecode must be published too — not just the `CTMRelease` it later creates.
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "CTMRegistryFactory.sol", "CTMReleaseFactory");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "CTMRelease.sol", "CTMRelease");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Multicall3.sol", "Multicall3");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondProxy.sol", "DiamondProxy");

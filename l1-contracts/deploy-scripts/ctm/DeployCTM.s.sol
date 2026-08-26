@@ -159,6 +159,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         deployVerifiers();
 
+        (ctmAddresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
         (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
         // The single owner chainAdmin does not have a separate control restriction contract.
@@ -190,7 +191,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ) = deployTuppWithContract(ctmContractName, false);
 
         setChainTypeManagerInServerNotifier();
-
 
         updateOwners();
 
@@ -233,7 +233,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         serverNotifier.setChainTypeManager(IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager));
         console.log("ChainTypeManager set in ServerNotifier");
     }
-
 
     function deployEIP7702Checker() internal {
         ctmAddresses.admin.eip7702Checker = deploySimpleContract("EIP7702Checker", false);
@@ -333,6 +332,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "current_release_addr", ctmAddresses.stateTransition.currentRelease);
         vm.serializeBytes32("state_transition", "release_codehash", ctmAddresses.stateTransition.releaseCodehash);
+        vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
         vm.serializeAddress(
             "state_transition",

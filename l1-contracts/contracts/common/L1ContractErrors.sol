@@ -337,7 +337,6 @@ error NotDangerousContract(address);
 // 0x230f9d11
 error NotEnoughSigners(uint256 provided, uint256 expected);
 // 0x8464be6c
-error NotFactoryDeployed(address instance);
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
 // 0xecb34449
@@ -397,7 +396,6 @@ error RecoverToL1NotSupported();
 // 0xab143c06
 error Reentrancy();
 // 0xe45872b6
-error RegistryAlreadyInitialized();
 // 0xfc83be31
 error RegistryCodehashMismatch(address target, bytes32 expected, bytes32 actual);
 // 0xcb530847
