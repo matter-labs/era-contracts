@@ -48,7 +48,9 @@ contract RegistryBootstrapMigration {
     ///         starting state that no longer exists anyway, but failing loudly is clearer.
     bool public executed;
 
-    BootstrapManifest internal manifest;
+    /// @dev THE manifest, stored as its own ABI encoding — see {CTMRelease} for why the struct is
+    ///      not transcribed into structured storage.
+    bytes internal encodedManifest;
 
     /// @notice Emitted once the ecosystem has crossed into the registry-driven model.
     event EcosystemBootstrapped(address indexed ctm, address indexed currentRelease, uint256 newProtocolVersion);
@@ -86,32 +88,13 @@ contract RegistryBootstrapMigration {
             }
         }
 
-        manifestHash = keccak256(abi.encode(_manifest));
+        encodedManifest = abi.encode(_manifest);
+        manifestHash = keccak256(encodedManifest);
+    }
 
-        // Field-by-field, not `manifest = _manifest`: the legacy codegen pipeline cannot copy a
-        // struct ARRAY from memory to storage, which a wholesale assignment would require for
-        // `proxyRows` and for the cut's `facetCuts`.
-        manifest.ctm = _manifest.ctm;
-        manifest.expectedProtocolVersion = _manifest.expectedProtocolVersion;
-        manifest.ctmProxyAdmin = _manifest.ctmProxyAdmin;
-        for (uint256 i = 0; i < rowsLength; ++i) {
-            manifest.proxyRows.push(_manifest.proxyRows[i]);
-        }
-        manifest.releaseCodehash = _manifest.releaseCodehash;
-        manifest.currentRelease = _manifest.currentRelease;
-        manifest.newProtocolVersion = _manifest.newProtocolVersion;
-        manifest.oldProtocolVersionDeadline = _manifest.oldProtocolVersionDeadline;
-        uint256 cutsLength = _manifest.upgradeCut.facetCuts.length;
-        for (uint256 i = 0; i < cutsLength; ++i) {
-            manifest.upgradeCut.facetCuts.push(_manifest.upgradeCut.facetCuts[i]);
-        }
-        manifest.upgradeCut.initAddress = _manifest.upgradeCut.initAddress;
-        manifest.upgradeCut.initCalldata = _manifest.upgradeCut.initCalldata;
-        manifest.upgradeCutInitCodehash = _manifest.upgradeCutInitCodehash;
-        manifest.ctmExecutor = _manifest.ctmExecutor;
-        manifest.ctmExecutorCodehash = _manifest.ctmExecutorCodehash;
-        manifest.ecosystemExecutor = _manifest.ecosystemExecutor;
-        manifest.ecosystemExecutorCodehash = _manifest.ecosystemExecutorCodehash;
+    /// @notice The whole manifest, exactly as it was pinned.
+    function getManifest() public view returns (BootstrapManifest memory) {
+        return abi.decode(encodedManifest, (BootstrapManifest));
     }
 
     /// @notice Reverts unless the live ecosystem is exactly the starting state the manifest names.
@@ -121,7 +104,7 @@ contract RegistryBootstrapMigration {
     ///      than ecosystem state this object pins. A migration that passes here can still revert
     ///      inside `migrate` if it is run outside that window.
     function validate() public view {
-        BootstrapManifest storage m = manifest;
+        BootstrapManifest memory m = getManifest();
 
         // Authority must already rest here, or `migrate` could not perform any of the work.
         address ctmOwner = Ownable2Step(m.ctm).owner();
@@ -159,7 +142,7 @@ contract RegistryBootstrapMigration {
         // against an ecosystem someone already moved, cannot silently re-point a proxy.
         uint256 rowsLength = m.proxyRows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {
-            EcosystemContractRow storage row = m.proxyRows[i];
+            EcosystemContractRow memory row = m.proxyRows[i];
             address liveImpl = m.ctmProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(row.proxy));
             if (liveImpl != row.expectedOldImpl) {
                 revert EcosystemImplMismatch(row.proxy, row.expectedOldImpl, liveImpl);
@@ -187,16 +170,15 @@ contract RegistryBootstrapMigration {
         if (executed) {
             revert BootstrapAlreadyExecuted();
         }
+        BootstrapManifest memory m = getManifest();
         // The CTM is `Ownable2Step`: governance's `transferOwnership` only nominated this contract,
         // so claim it here. Doing it inside `migrate` keeps the whole edge — claim, mutate, hand on
         // — in ONE transaction, which is what stops authority resting here between operations.
-        if (Ownable2Step(manifest.ctm).pendingOwner() == address(this)) {
-            Ownable2Step(manifest.ctm).acceptOwnership();
+        if (Ownable2Step(m.ctm).pendingOwner() == address(this)) {
+            Ownable2Step(m.ctm).acceptOwnership();
         }
         validate();
         executed = true;
-
-        BootstrapManifest storage m = manifest;
 
         uint256 rowsLength = m.proxyRows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {
@@ -228,10 +210,5 @@ contract RegistryBootstrapMigration {
         m.ctmProxyAdmin.transferOwnership(m.ecosystemExecutor);
 
         emit EcosystemBootstrapped(m.ctm, m.currentRelease, m.newProtocolVersion);
-    }
-
-    /// @notice The pinned starting state and target, for off-chain review tooling.
-    function getManifest() external view returns (BootstrapManifest memory) {
-        return manifest;
     }
 }
