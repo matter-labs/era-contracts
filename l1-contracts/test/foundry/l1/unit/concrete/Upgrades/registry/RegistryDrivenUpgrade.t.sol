@@ -113,7 +113,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
 
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
-            makeAddr("breakGlass"),
+            makeAddr("emergencyUpgradeBoard"),
             IChainTypeManager(address(chainContractAddress)),
             Utils.transitionCodehash()
         );
@@ -153,7 +153,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             value: 0,
             data: abi.encodeCall(IChainTypeManager.setPriorityTxMaxGasLimit, (chainId, PRIORITY_TX_MAX_GAS_LIMIT))
         });
-        vm.prank(makeAddr("breakGlass"));
+        vm.prank(makeAddr("emergencyUpgradeBoard"));
         ctmExecutor.forward(calls);
 
         // The chain's genesis upgrade transaction is still pending: on a real chain the server

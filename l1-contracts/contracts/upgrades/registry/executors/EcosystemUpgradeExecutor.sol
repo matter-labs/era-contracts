@@ -38,10 +38,10 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
 
     constructor(
         address _initialOwner,
-        address _breakGlassGovernor,
+        address _emergencyUpgradeBoard,
         ProxyAdmin _proxyAdmin,
         bytes32 _coreRegistryCodehash
-    ) UpgradeExecutorBase(_initialOwner, _breakGlassGovernor) {
+    ) UpgradeExecutorBase(_initialOwner, _emergencyUpgradeBoard) {
         if (address(_proxyAdmin) == address(0)) {
             revert ZeroAddress();
         }

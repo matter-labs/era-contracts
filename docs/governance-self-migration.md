@@ -44,7 +44,7 @@ A **write-once `GovernanceMigration` object** — the same data discipline appli
 
 ## Coupling to era-contracts
 
-The executor fleet's `owner` and `breakGlassGovernor` pointers (`CTMUpgradeExecutor`,
+The executor fleet's `owner` and `emergencyUpgradeBoard` pointers (`CTMUpgradeExecutor`,
 `EcosystemUpgradeExecutor`) are themselves edges such a migration must move, so the
 source-checked-edge row shape should be shared through a small extracted library rather than
 reimplemented on each side.

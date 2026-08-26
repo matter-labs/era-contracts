@@ -18,48 +18,54 @@ import {Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 /// @dev Two distinct roles, deliberately:
 ///      - `owner` (Ownable2Step) drives the fixed domain entrypoints — the normal upgrade path,
 ///        whose inputs are pinned write-once objects and whose invariants cannot be bypassed;
-///      - `breakGlassGovernor` alone can `forward` raw calls, which CAN bypass every transition
-///        invariant through direct CTM / ProxyAdmin calls. With the same holder for both roles
-///        the separation is only auditability; its value is realized by giving break-glass to a
-///        differently-governed holder (e.g. a security council with its own process).
+///      - `emergencyUpgradeBoard` alone can `forward` raw calls, which CAN bypass every transition
+///        invariant through direct CTM / ProxyAdmin calls.
+/// @dev In the ZKsync ecosystem `owner` is the `ProtocolUpgradeHandler` and `emergencyUpgradeBoard`
+///      is the `EmergencyUpgradeBoard` — NOT the Security Council on its own, which cannot act
+///      unilaterally: the board's `executeEmergencyUpgrade` requires the Security Council, the
+///      Guardians and the Foundation multisig to sign the same upgrade. That is the point of the
+///      split: the escape hatch must not share a failure mode with the standard path, so a
+///      Governance that is stuck, captured or holding a bad queue still leaves a differently
+///      governed route to the CTM. Pointing both roles at the same holder collapses the
+///      separation to mere auditability.
 abstract contract UpgradeExecutorBase is Ownable2Step {
-    /// @notice The only authority allowed to forward raw calls (break-glass).
-    address public breakGlassGovernor;
-    /// @notice Two-step handover guard for the break-glass role.
-    address public pendingBreakGlassGovernor;
+    /// @notice The only authority allowed to forward raw calls — the break-glass hatch.
+    address public emergencyUpgradeBoard;
+    /// @notice Two-step handover guard for the emergency upgrade board role.
+    address public pendingEmergencyUpgradeBoard;
 
     /// @notice Emitted for every raw call forwarded through the break-glass hatch.
     event CallForwarded(address indexed target, uint256 value, bytes data);
-    /// @notice Emitted when the break-glass role is offered to a new holder.
-    event BreakGlassGovernorTransferStarted(address indexed current, address indexed pending);
-    /// @notice Emitted when the break-glass role changes holder.
-    event BreakGlassGovernorTransferred(address indexed previous, address indexed current);
+    /// @notice Emitted when the emergency upgrade board role is offered to a new holder.
+    event EmergencyUpgradeBoardTransferStarted(address indexed current, address indexed pending);
+    /// @notice Emitted when the emergency upgrade board role changes holder.
+    event EmergencyUpgradeBoardTransferred(address indexed previous, address indexed current);
 
-    modifier onlyBreakGlass() {
-        if (msg.sender != breakGlassGovernor) {
+    modifier onlyEmergencyUpgradeBoard() {
+        if (msg.sender != emergencyUpgradeBoard) {
             revert Unauthorized(msg.sender);
         }
         _;
     }
 
     /// @param _initialOwner The governance executor that drives the fixed domain entrypoints.
-    /// @param _breakGlassGovernor The separately governed break-glass authority.
-    constructor(address _initialOwner, address _breakGlassGovernor) {
+    /// @param _emergencyUpgradeBoard The separately governed break-glass authority (see the contract docs).
+    constructor(address _initialOwner, address _emergencyUpgradeBoard) {
         // A zero owner would permanently disable every fixed upgrade entrypoint (Ownable2Step
         // cannot hand ownership out of address(0)), leaving break-glass as the only authority.
-        if (_initialOwner == address(0) || _breakGlassGovernor == address(0)) {
+        if (_initialOwner == address(0) || _emergencyUpgradeBoard == address(0)) {
             revert ZeroAddress();
         }
         _transferOwnership(_initialOwner);
-        breakGlassGovernor = _breakGlassGovernor;
-        emit BreakGlassGovernorTransferred(address(0), _breakGlassGovernor);
+        emergencyUpgradeBoard = _emergencyUpgradeBoard;
+        emit EmergencyUpgradeBoardTransferred(address(0), _emergencyUpgradeBoard);
     }
 
     /// @notice Break-glass: forwards raw calls so the authority this executor holds (CTM /
     ///         ProxyAdmin ownership) never becomes unreachable — emergency paths and one-off
     ///         administrative actions outside the fixed upgrade entrypoints.
     /// @param _calls The calls to forward, executed in order; reverts on the first failure.
-    function forward(Call[] calldata _calls) external payable onlyBreakGlass {
+    function forward(Call[] calldata _calls) external payable onlyEmergencyUpgradeBoard {
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _calls.length; ++i) {
@@ -76,19 +82,19 @@ abstract contract UpgradeExecutorBase is Ownable2Step {
     }
 
     /// @notice Offers the break-glass role to `_newGovernor` (two-step, like ownership).
-    function transferBreakGlassGovernor(address _newGovernor) external onlyBreakGlass {
-        pendingBreakGlassGovernor = _newGovernor;
-        emit BreakGlassGovernorTransferStarted(breakGlassGovernor, _newGovernor);
+    function transferEmergencyUpgradeBoard(address _newGovernor) external onlyEmergencyUpgradeBoard {
+        pendingEmergencyUpgradeBoard = _newGovernor;
+        emit EmergencyUpgradeBoardTransferStarted(emergencyUpgradeBoard, _newGovernor);
     }
 
     /// @notice Accepts the break-glass role.
-    function acceptBreakGlassGovernor() external {
-        if (msg.sender != pendingBreakGlassGovernor) {
+    function acceptEmergencyUpgradeBoard() external {
+        if (msg.sender != pendingEmergencyUpgradeBoard) {
             revert Unauthorized(msg.sender);
         }
-        emit BreakGlassGovernorTransferred(breakGlassGovernor, msg.sender);
-        breakGlassGovernor = msg.sender;
-        pendingBreakGlassGovernor = address(0);
+        emit EmergencyUpgradeBoardTransferred(emergencyUpgradeBoard, msg.sender);
+        emergencyUpgradeBoard = msg.sender;
+        pendingEmergencyUpgradeBoard = address(0);
     }
 
     /// @notice The executor may need to hold ETH, e.g. to fund governance-initiated priority

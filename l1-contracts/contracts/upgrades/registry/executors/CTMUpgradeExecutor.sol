@@ -53,10 +53,10 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
 
     constructor(
         address _initialOwner,
-        address _breakGlassGovernor,
+        address _emergencyUpgradeBoard,
         IChainTypeManager _ctm,
         bytes32 _transitionCodehash
-    ) UpgradeExecutorBase(_initialOwner, _breakGlassGovernor) {
+    ) UpgradeExecutorBase(_initialOwner, _emergencyUpgradeBoard) {
         if (address(_ctm) == address(0)) {
             revert ZeroAddress();
         }

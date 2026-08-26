@@ -38,7 +38,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
     CTMRelease internal release;
     CTMTransition internal transition;
 
-    address internal breakGlass;
+    address internal emergencyUpgradeBoard;
     uint256 internal newVersion;
     address internal chainAddress;
     address internal genesisUpgradeAddr;
@@ -50,10 +50,10 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         _mockGetZKChainFromBridgehub(chainAddress);
         _mockMigrationPausedFromBridgehub();
 
-        breakGlass = makeAddr("breakGlass");
+        emergencyUpgradeBoard = makeAddr("emergencyUpgradeBoard");
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
-            breakGlass,
+            emergencyUpgradeBoard,
             IChainTypeManager(address(chainContractAddress)),
             Utils.transitionCodehash()
         );
@@ -84,7 +84,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
             value: 0,
             data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (address(fromRelease)))
         });
-        vm.prank(breakGlass);
+        vm.prank(emergencyUpgradeBoard);
         ctmExecutor.forward(repoint);
         assertEq(chainContractAddress.currentRelease(), address(fromRelease));
 
@@ -210,14 +210,14 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         ctmExecutor.forward(calls);
     }
 
-    function test_forwardExecutesForBreakGlassGovernor() public {
+    function test_forwardExecutesForEmergencyUpgradeBoard() public {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: address(chainContractAddress),
             value: 0,
             data: abi.encodeCall(IChainTypeManager.setPriorityTxMaxGasLimit, (chainId, 80_000_000))
         });
-        vm.prank(breakGlass);
+        vm.prank(emergencyUpgradeBoard);
         ctmExecutor.forward(calls);
     }
 
@@ -254,7 +254,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                 impostor.codehash
             )
         );
-        vm.prank(breakGlass);
+        vm.prank(emergencyUpgradeBoard);
         ctmExecutor.forward(repoint);
     }
 

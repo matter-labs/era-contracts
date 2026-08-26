@@ -133,7 +133,7 @@ CTM authority and ecosystem authority are separate: each CTM is governed by its 
 upgrades on its own cadence.
 
 `UpgradeExecutorBase` gives both two roles. `owner` (`Ownable2Step`) drives the fixed entrypoints,
-whose inputs are write-once objects and whose invariants cannot be bypassed. `breakGlassGovernor`
+whose inputs are write-once objects and whose invariants cannot be bypassed. `emergencyUpgradeBoard`
 alone can `forward` raw calls, which **can** bypass every transition invariant. The separation is
 realized by giving break-glass to a differently-governed holder; with one holder for both it is only
 auditability.

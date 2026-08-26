@@ -84,13 +84,13 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
-            makeAddr("breakGlass"),
+            makeAddr("emergencyUpgradeBoard"),
             IChainTypeManager(address(chainContractAddress)),
             Utils.transitionCodehash()
         );
         ecoExecutor = new EcosystemUpgradeExecutor(
             governor,
-            makeAddr("breakGlass"),
+            makeAddr("emergencyUpgradeBoard"),
             ecosystemProxyAdmin,
             Utils.coreRegistryCodehash()
         );
@@ -239,7 +239,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         address foreignCtm = makeAddr("foreignCtm");
         CTMUpgradeExecutor foreignExecutor = new CTMUpgradeExecutor(
             governor,
-            makeAddr("breakGlass2"),
+            makeAddr("emergencyUpgradeBoard2"),
             IChainTypeManager(foreignCtm),
             Utils.transitionCodehash()
         );
@@ -268,7 +268,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         ProxyAdmin foreignProxyAdmin = new ProxyAdmin();
         EcosystemUpgradeExecutor foreignExecutor = new EcosystemUpgradeExecutor(
             governor,
-            makeAddr("breakGlass2"),
+            makeAddr("emergencyUpgradeBoard2"),
             foreignProxyAdmin,
             Utils.coreRegistryCodehash()
         );

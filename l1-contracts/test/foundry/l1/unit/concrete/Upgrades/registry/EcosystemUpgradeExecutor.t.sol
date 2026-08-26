@@ -76,7 +76,7 @@ contract EcosystemUpgradeExecutorTest is Test {
         // nothing else — no CTM authority).
         ecosystemExecutor = new EcosystemUpgradeExecutor(
             ecosystemGovernor,
-            makeAddr("breakGlass"),
+            makeAddr("emergencyUpgradeBoard"),
             proxyAdmin,
             coreRegistryCodehash
         );
