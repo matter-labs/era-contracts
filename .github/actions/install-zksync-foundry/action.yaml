@@ -20,7 +20,11 @@ runs:
         INSTALL_DIR: "foundry-zksync"
       run: |
         mkdir "${INSTALL_DIR}"
-        curl -LO ${ZKSYNC_FOUNDRY_URL}/foundry-zksync-${VERSION}/foundry_zksync_${VERSION}_linux_amd64.tar.gz
+        # Every job in the repo installs through this action, so a single dropped connection
+        # fails an entire run — as it did with `curl: (35) Recv failure: Connection reset by peer`,
+        # with nothing built. Retry instead.
+        curl -LO --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 30 \
+          ${ZKSYNC_FOUNDRY_URL}/foundry-zksync-${VERSION}/foundry_zksync_${VERSION}_linux_amd64.tar.gz
         tar zxf foundry_zksync_${VERSION}_linux_amd64.tar.gz -C ./${INSTALL_DIR}
         chmod +x ./${INSTALL_DIR}/forge ./${INSTALL_DIR}/cast
         echo "${PWD}/${INSTALL_DIR}" >> "${GITHUB_PATH}"

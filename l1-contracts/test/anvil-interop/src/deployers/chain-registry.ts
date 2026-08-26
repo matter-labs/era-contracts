@@ -1,5 +1,6 @@
 import * as path from "path";
-import { ethers, providers, Wallet } from "ethers";
+import type { providers } from "ethers";
+import { ethers, Wallet } from "ethers";
 import type {
   ChainConfig,
   ChainAddresses,
@@ -7,7 +8,7 @@ import type {
   CTMDeployedAddresses,
   PriorityRequestData,
 } from "../core/types";
-import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig } from "../core/utils";
+import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig, createProvider } from "../core/utils";
 import { L2GenesisUpgradeDeployer } from "./l2-genesis-upgrade-deployer";
 import { InteropChainRegistrar } from "./interop-chain-registrar";
 import { runForgeScript } from "../core/forge";
@@ -37,7 +38,7 @@ export class ChainRegistry {
   ) {
     this.l1RpcUrl = l1RpcUrl;
     this.privateKey = privateKey;
-    this.l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
+    this.l1Provider = createProvider(l1RpcUrl);
     this.wallet = new Wallet(privateKey, this.l1Provider);
     this.projectRoot = path.resolve(__dirname, "../../../..");
     this.outputDir = path.join(__dirname, "../../outputs");

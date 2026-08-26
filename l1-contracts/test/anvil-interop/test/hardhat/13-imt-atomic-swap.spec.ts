@@ -9,7 +9,7 @@
 import { expect } from "chai";
 import { BigNumber, Contract, Wallet, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getChainIdsByRole, getL2Chain, impersonateAndRun } from "../../src/core/utils";
+import { getChainIdsByRole, getL2Chain, impersonateAndRun, createProvider } from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
@@ -223,7 +223,7 @@ describe("13 - IMT atomic swap A <-> B (bundle model)", function () {
     const ctxs = await Promise.all(
       [aId, bId].map(async (chainId) => {
         const rpcUrl = getL2Chain(state.chains!, chainId).rpcUrl;
-        const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+        const provider = createProvider(rpcUrl);
         const user = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
         const tokenAddress = state.testTokens![chainId];
         if (!tokenAddress) throw new Error(`No test token registered for chain ${chainId}`);
