@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.28;
 
-import {CTMRelease} from "./CTMRelease.sol";
-import {GenesisFacet} from "./ICTMRelease.sol";
-import {Facets} from "../../common/StateTransitionTypes.sol";
-import {ISelfDescribingFacet} from "../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
+import {CTMRelease} from "../objects/CTMRelease.sol";
+import {GenesisFacet} from "../objects/ICTMRelease.sol";
+import {Facets} from "../../../common/StateTransitionTypes.sol";
+import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
 /// @title Genesis (bootstrap) manifest builder.
 /// @author Matter Labs

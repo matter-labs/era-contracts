@@ -10,7 +10,7 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
-import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 
 /// @notice Reusable fixture for tests that need a `ZKsyncOSChainTypeManager` together with the
 ///         full chain-creation plumbing (`createNewChain`, bridgehub mocks, real facet cuts) of

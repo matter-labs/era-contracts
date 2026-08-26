@@ -6,13 +6,13 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {EcosystemContractRow} from "./ICoreRegistry.sol";
-import {CodehashPinLib} from "./CodehashPinLib.sol";
-import {CTMUpgradeExecutor} from "./CTMUpgradeExecutor.sol";
-import {EcosystemUpgradeExecutor} from "./EcosystemUpgradeExecutor.sol";
-import {ICTMRelease} from "./ICTMRelease.sol";
-import {Diamond} from "../../state-transition/libraries/Diamond.sol";
-import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
+import {EcosystemContractRow} from "../objects/ICoreRegistry.sol";
+import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
+import {CTMUpgradeExecutor} from "../executors/CTMUpgradeExecutor.sol";
+import {EcosystemUpgradeExecutor} from "../executors/EcosystemUpgradeExecutor.sol";
+import {ICTMRelease} from "../objects/ICTMRelease.sol";
+import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
+import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {
     BootstrapAlreadyExecuted,
     BootstrapAuthorityNotHeld,
@@ -21,8 +21,8 @@ import {
     RegistryDuplicateProxyRow,
     RegistryUnknownKey,
     ZeroAddress
-} from "../../common/L1ContractErrors.sol";
-import {OutdatedProtocolVersion} from "../../state-transition/L1StateTransitionErrors.sol";
+} from "../../../common/L1ContractErrors.sol";
+import {OutdatedProtocolVersion} from "../../../state-transition/L1StateTransitionErrors.sol";
 
 /// @title RegistryBootstrapMigration
 /// @author Matter Labs
@@ -184,7 +184,7 @@ contract RegistryBootstrapMigration {
         // break-glass, the one authority this design exists to avoid depending on.
         m.ctmExecutor.requirePin(m.ctmExecutorCodehash);
         m.ecosystemExecutor.requirePin(m.ecosystemExecutorCodehash);
-        address boundCtm = address(CTMUpgradeExecutor(payable(m.ctmExecutor)).CTM());
+        address boundCtm = address(CTMUpgradeExecutor(payable(m.ctmExecutor)).CHAIN_TYPE_MANAGER());
         if (boundCtm != m.ctm) {
             revert BootstrapExecutorNotBound(m.ctmExecutor, m.ctm, boundCtm);
         }

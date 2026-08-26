@@ -131,9 +131,9 @@ const DETERMINISTIC_SOURCES = [
   "contracts/dev-contracts/MockContractDeployer.sol",
   // The objects themselves: the CTM's `releaseCodehash` anchor and the executors' type pins are
   // codehashes of THIS build, so they have to be deployed from it too.
-  "contracts/upgrades/registry/CTMRelease.sol",
-  "contracts/upgrades/registry/CTMTransition.sol",
-  "contracts/upgrades/registry/CoreRegistry.sol",
+  "contracts/upgrades/registry/objects/CTMRelease.sol",
+  "contracts/upgrades/registry/objects/CTMTransition.sol",
+  "contracts/upgrades/registry/objects/CoreRegistry.sol",
 ];
 
 // Fixed L2 address the transition pins for the upgrade's L2 delegate target (and its unsafe

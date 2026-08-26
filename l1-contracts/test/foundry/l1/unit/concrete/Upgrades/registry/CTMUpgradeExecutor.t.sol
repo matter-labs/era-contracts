@@ -6,12 +6,12 @@ import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_Cha
 import {Utils} from "../../Utils/Utils.sol";
 
 import {Call} from "contracts/governance/Common.sol";
-import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
-import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
-import {CTMUpgradeExecutor} from "contracts/upgrades/registry/CTMUpgradeExecutor.sol";
-import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
-import {ICTMTransition, L2UpgradePlan} from "contracts/upgrades/registry/ICTMTransition.sol";
-import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
+import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
+import {ICTMTransition, L2UpgradePlan} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {GenesisFacet} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";

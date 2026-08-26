@@ -3,14 +3,14 @@
 pragma solidity 0.8.28;
 
 import {GenesisFacet, ICTMRelease} from "./ICTMRelease.sol";
-import {CodehashPinLib} from "./CodehashPinLib.sol";
+import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {
     RegistryDuplicateFacetRow,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
     RegistryUnknownKey,
     ZeroAddress
-} from "../../common/L1ContractErrors.sol";
+} from "../../../common/L1ContractErrors.sol";
 
 /// @notice Storage-backed, write-once description of one CTM release.
 /// @dev Every pinned address carries its expected `EXTCODEHASH` INLINE and MANDATORILY — the
@@ -41,9 +41,12 @@ contract CTMRelease is ICTMRelease {
     ///         single value to compare against the audited manifest. Provenance is the codehash.
     bytes32 public manifestHash;
 
-    /// @dev THE manifest. The contract does not keep a second, transcribed copy of its own shape;
-    ///      the getters below read out of this.
-    ReleaseManifest internal manifest;
+    /// @dev THE manifest, stored as its own ABI encoding. Structured storage would need the
+    ///      constructor to transcribe the struct field by field — the legacy codegen pipeline
+    ///      cannot copy a struct ARRAY from memory to storage — which is exactly the second,
+    ///      drift-prone copy of the shape this object is supposed to BE. One blob, one
+    ///      assignment, and `manifestHash` is its hash by construction.
+    bytes internal encodedManifest;
 
     /// @notice Pins the full manifest. There is NO state-mutating function on this contract: the
     ///         manifest is written once, at construction, so write-once is structural rather than a
@@ -103,78 +106,64 @@ contract CTMRelease is ICTMRelease {
             }
         }
 
-        manifestHash = keccak256(abi.encode(_manifest));
+        encodedManifest = abi.encode(_manifest);
+        manifestHash = keccak256(encodedManifest);
+    }
 
-        // Field-by-field: the legacy codegen pipeline cannot copy a struct ARRAY from memory to
-        // storage, so `manifest = _manifest` is not available for `genesisFacets`.
-        manifest.diamondInit = _manifest.diamondInit;
-        manifest.diamondInitCodehash = _manifest.diamondInitCodehash;
-        manifest.verifier = _manifest.verifier;
-        manifest.verifierCodehash = _manifest.verifierCodehash;
-        for (uint256 i = 0; i < length; ++i) {
-            manifest.genesisFacets.push(_manifest.genesisFacets[i]);
-        }
-        manifest.bootloaderHash = _manifest.bootloaderHash;
-        manifest.defaultAccountHash = _manifest.defaultAccountHash;
-        manifest.evmEmulatorHash = _manifest.evmEmulatorHash;
-        manifest.fixedForceDeploymentsData = _manifest.fixedForceDeploymentsData;
-        manifest.genesisUpgrade = _manifest.genesisUpgrade;
-        manifest.genesisUpgradeCodehash = _manifest.genesisUpgradeCodehash;
-        manifest.genesisBatchHash = _manifest.genesisBatchHash;
-        manifest.genesisBatchCommitment = _manifest.genesisBatchCommitment;
-        manifest.genesisIndexRepeatedStorageChanges = _manifest.genesisIndexRepeatedStorageChanges;
+    /// @notice The whole manifest, exactly as it was pinned.
+    function getManifest() public view returns (ReleaseManifest memory) {
+        return abi.decode(encodedManifest, (ReleaseManifest));
     }
 
     function diamondInit() external view returns (address) {
-        return manifest.diamondInit;
+        return getManifest().diamondInit;
     }
 
     function verifier() external view returns (address) {
-        return manifest.verifier;
+        return getManifest().verifier;
     }
 
     function genesisFacets() external view returns (GenesisFacet[] memory) {
-        return manifest.genesisFacets;
+        return getManifest().genesisFacets;
     }
 
     function baseSystemContractHashes() external view returns (bytes32, bytes32, bytes32) {
-        return (manifest.bootloaderHash, manifest.defaultAccountHash, manifest.evmEmulatorHash);
+        ReleaseManifest memory m = getManifest();
+        return (m.bootloaderHash, m.defaultAccountHash, m.evmEmulatorHash);
     }
 
     function fixedForceDeploymentsData() external view returns (bytes memory) {
-        return manifest.fixedForceDeploymentsData;
+        return getManifest().fixedForceDeploymentsData;
     }
 
     function genesisParams() external view returns (address, bytes32, bytes32, uint64) {
-        return (
-            manifest.genesisUpgrade,
-            manifest.genesisBatchHash,
-            manifest.genesisBatchCommitment,
-            manifest.genesisIndexRepeatedStorageChanges
-        );
+        ReleaseManifest memory m = getManifest();
+        return (m.genesisUpgrade, m.genesisBatchHash, m.genesisBatchCommitment, m.genesisIndexRepeatedStorageChanges);
     }
 
     function validate() external view {
-        _requirePin(manifest.diamondInit, manifest.diamondInitCodehash);
-        _requirePin(manifest.genesisUpgrade, manifest.genesisUpgradeCodehash);
-        _requirePin(manifest.verifier, manifest.verifierCodehash);
-        uint256 length = manifest.genesisFacets.length;
+        ReleaseManifest memory m = getManifest();
+        _requirePin(m.diamondInit, m.diamondInitCodehash);
+        _requirePin(m.genesisUpgrade, m.genesisUpgradeCodehash);
+        _requirePin(m.verifier, m.verifierCodehash);
+        uint256 length = m.genesisFacets.length;
         for (uint256 i = 0; i < length; ++i) {
-            _requirePin(manifest.genesisFacets[i].facet, manifest.genesisFacets[i].codehash);
+            _requirePin(m.genesisFacets[i].facet, m.genesisFacets[i].codehash);
         }
     }
 
     function verifyAll() external view returns (bool) {
+        ReleaseManifest memory m = getManifest();
         if (
-            !CodehashPinLib.pinHolds(manifest.diamondInit, manifest.diamondInitCodehash) ||
-            !CodehashPinLib.pinHolds(manifest.genesisUpgrade, manifest.genesisUpgradeCodehash) ||
-            !CodehashPinLib.pinHolds(manifest.verifier, manifest.verifierCodehash)
+            !CodehashPinLib.pinHolds(m.diamondInit, m.diamondInitCodehash) ||
+            !CodehashPinLib.pinHolds(m.genesisUpgrade, m.genesisUpgradeCodehash) ||
+            !CodehashPinLib.pinHolds(m.verifier, m.verifierCodehash)
         ) {
             return false;
         }
-        uint256 length = manifest.genesisFacets.length;
+        uint256 length = m.genesisFacets.length;
         for (uint256 i = 0; i < length; ++i) {
-            if (!CodehashPinLib.pinHolds(manifest.genesisFacets[i].facet, manifest.genesisFacets[i].codehash)) {
+            if (!CodehashPinLib.pinHolds(m.genesisFacets[i].facet, m.genesisFacets[i].codehash)) {
                 return false;
             }
         }

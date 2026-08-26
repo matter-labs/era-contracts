@@ -7,7 +7,7 @@ import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 
 contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {
     function setUp() public {

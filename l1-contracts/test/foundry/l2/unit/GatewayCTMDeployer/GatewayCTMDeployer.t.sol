@@ -46,8 +46,8 @@ import {ValidatorTimelock} from "contracts/state-transition/validators/Validator
 
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
-import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {GenesisFacet} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";

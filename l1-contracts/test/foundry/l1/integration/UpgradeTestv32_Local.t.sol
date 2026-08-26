@@ -23,7 +23,7 @@ import {UpgradeIntegrationTestBase} from "./UpgradeTestShared.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 

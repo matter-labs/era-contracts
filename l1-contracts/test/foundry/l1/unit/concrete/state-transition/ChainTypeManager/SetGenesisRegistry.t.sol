@@ -5,7 +5,7 @@ import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
 import {
@@ -14,7 +14,7 @@ import {
     ZeroAddress,
     EmptyBytes32
 } from "contracts/common/L1ContractErrors.sol";
-import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 
 /// @notice From v32 the CTM no longer stores chain-creation params directly; it stores a pointer
 ///         to a genesis release and derives all genesis data from it. This exercises

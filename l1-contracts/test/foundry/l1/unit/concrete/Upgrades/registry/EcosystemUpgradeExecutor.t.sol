@@ -6,9 +6,9 @@ import {Test} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/EcosystemUpgradeExecutor.sol";
-import {CoreRegistry} from "contracts/upgrades/registry/CoreRegistry.sol";
-import {ICoreRegistry, EcosystemContractRow} from "contracts/upgrades/registry/ICoreRegistry.sol";
+import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
+import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
+import {ICoreRegistry, EcosystemContractRow} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
 import {EcosystemImplMismatch, RegistryCodehashMismatch} from "contracts/common/L1ContractErrors.sol";
 
 /// @dev Not a `CoreRegistry`: exercises the executor's codehash provenance check.

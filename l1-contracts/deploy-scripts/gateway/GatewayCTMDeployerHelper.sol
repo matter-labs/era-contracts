@@ -28,9 +28,9 @@ import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAdd
 import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
 
 import {Facets, Verifiers} from "contracts/common/StateTransitionTypes.sol";
-import {GenesisManifestLib} from "contracts/upgrades/registry/GenesisManifestLib.sol";
-import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
-import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
+import {GenesisManifestLib} from "contracts/upgrades/registry/libraries/GenesisManifestLib.sol";
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {GenesisFacet} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
 import {DAContracts} from "contracts/common/StateTransitionTypes.sol";

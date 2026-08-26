@@ -12,12 +12,12 @@ import {
     TransparentUpgradeableProxy
 } from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
-import {CTMUpgradeExecutor} from "contracts/upgrades/registry/CTMUpgradeExecutor.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/EcosystemUpgradeExecutor.sol";
-import {RegistryBootstrapMigration} from "contracts/upgrades/registry/RegistryBootstrapMigration.sol";
-import {EcosystemContractRow} from "contracts/upgrades/registry/ICoreRegistry.sol";
-import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
+import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
+import {EcosystemContractRow} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
+import {GenesisFacet} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";

@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
-import {Diamond} from "../../state-transition/libraries/Diamond.sol";
+import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
+import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 
 /// @notice The complete, typed L2 side of one transition: the force-deployments, the delegate
 ///         call the `L2ComplexUpgrader` performs after them, and the factory dependencies the

@@ -18,8 +18,8 @@ import {
 import {IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../IChainTypeManager.sol";
-import {ICTMRelease} from "../../upgrades/registry/ICTMRelease.sol";
-import {ReleaseFacetReader} from "../../upgrades/registry/ReleaseFacetReader.sol";
+import {ICTMRelease} from "../../upgrades/registry/objects/ICTMRelease.sol";
+import {ReleaseFacetReader} from "../../upgrades/registry/libraries/ReleaseFacetReader.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";

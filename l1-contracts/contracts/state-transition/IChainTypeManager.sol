@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {Diamond} from "./libraries/Diamond.sol";
-import {ICTMTransition} from "../upgrades/registry/ICTMTransition.sol";
+import {ICTMTransition} from "../upgrades/registry/objects/ICTMTransition.sol";
 import {L2CanonicalTransaction, TxStatus} from "../common/Messaging.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 

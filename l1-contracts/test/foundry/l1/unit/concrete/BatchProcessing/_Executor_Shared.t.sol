@@ -7,7 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
-import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {
     Utils,
     DEFAULT_L2_LOGS_TREE_ROOT_HASH,

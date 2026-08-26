@@ -12,9 +12,9 @@ import {IMigrator} from "./chain-interfaces/IMigrator.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {ChainTypeManagerInitializeData, IChainTypeManager} from "./IChainTypeManager.sol";
-import {ICTMRelease} from "../upgrades/registry/ICTMRelease.sol";
-import {ICTMTransition} from "../upgrades/registry/ICTMTransition.sol";
-import {CTMUpgradeComposer} from "../upgrades/registry/CTMUpgradeComposer.sol";
+import {ICTMRelease} from "../upgrades/registry/objects/ICTMRelease.sol";
+import {ICTMTransition} from "../upgrades/registry/objects/ICTMTransition.sol";
+import {CTMUpgradeComposer} from "../upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
@@ -36,7 +36,7 @@ import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHan
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TxStatus} from "../common/Messaging.sol";
-import {CodehashPinLib} from "../upgrades/registry/CodehashPinLib.sol";
+import {CodehashPinLib} from "../upgrades/registry/libraries/CodehashPinLib.sol";
 
 /// @title Chain Type Manager Base contract
 /// @author Matter Labs

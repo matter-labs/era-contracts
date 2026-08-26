@@ -6,8 +6,8 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
-import {ICTMTransition} from "./registry/ICTMTransition.sol";
-import {CTMUpgradeComposer} from "./registry/CTMUpgradeComposer.sol";
+import {ICTMTransition} from "./registry/objects/ICTMTransition.sol";
+import {CTMUpgradeComposer} from "./registry/libraries/CTMUpgradeComposer.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {Diamond} from "../state-transition/libraries/Diamond.sol";

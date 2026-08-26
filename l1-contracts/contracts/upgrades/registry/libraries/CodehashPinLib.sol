@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {RegistryCodehashMismatch, RegistryPinTargetHasNoCode} from "../../common/L1ContractErrors.sol";
+import {RegistryCodehashMismatch, RegistryPinTargetHasNoCode} from "../../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

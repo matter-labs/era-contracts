@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {ICTMTransition} from "../upgrades/registry/ICTMTransition.sol";
-import {CTMUpgradeComposer} from "../upgrades/registry/CTMUpgradeComposer.sol";
+import {ICTMTransition} from "../upgrades/registry/objects/ICTMTransition.sol";
+import {CTMUpgradeComposer} from "../upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
 /// @title RegistryComposerHarness

@@ -7,7 +7,7 @@ import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZK
 // The canonical definition of `CTMContract` lives in the production contracts tree (it keys the
 // per-CTM upgrade registries); it is re-exported here so that all deploy-script importers keep
 // working unchanged.
-import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 struct CTMCoreDeploymentConfig {
     bool isZKsyncOS;

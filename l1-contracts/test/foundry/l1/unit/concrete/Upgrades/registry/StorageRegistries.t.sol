@@ -4,14 +4,14 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {CoreRegistry} from "contracts/upgrades/registry/CoreRegistry.sol";
-import {EcosystemContractRow} from "contracts/upgrades/registry/ICoreRegistry.sol";
-import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
-import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
-import {ICTMTransition, L2UpgradePlan} from "contracts/upgrades/registry/ICTMTransition.sol";
-import {ICTMRelease, GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
-import {CTMUpgradeComposer} from "contracts/upgrades/registry/CTMUpgradeComposer.sol";
-import {ReleaseFacetReader} from "contracts/upgrades/registry/ReleaseFacetReader.sol";
+import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
+import {EcosystemContractRow} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
+import {ICTMTransition, L2UpgradePlan} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {ICTMRelease, GenesisFacet} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
+import {ReleaseFacetReader} from "contracts/upgrades/registry/libraries/ReleaseFacetReader.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";

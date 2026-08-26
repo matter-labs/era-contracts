@@ -26,7 +26,7 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
-import {ICTMRelease, GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
+import {ICTMRelease, GenesisFacet} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";

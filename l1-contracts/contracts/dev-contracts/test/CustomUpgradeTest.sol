@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "../../upgrades/BaseZkSyncUpgrade.sol";
 import {IVerifier} from "../../state-transition/chain-interfaces/IVerifier.sol";
-import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 
 contract CustomUpgradeTest is BaseZkSyncUpgrade {
     // add this to be excluded from coverage report

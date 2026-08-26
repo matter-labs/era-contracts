@@ -6,17 +6,17 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {ICTMTransition, L2UpgradePlan} from "./ICTMTransition.sol";
-import {CodehashPinLib} from "./CodehashPinLib.sol";
-import {TransitionDeltaLib} from "./TransitionDeltaLib.sol";
-import {Diamond} from "../../state-transition/libraries/Diamond.sol";
-import {SemVer} from "../../common/libraries/SemVer.sol";
-import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../../common/Config.sol";
+import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
+import {TransitionDeltaLib} from "../libraries/TransitionDeltaLib.sol";
+import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
+import {SemVer} from "../../../common/libraries/SemVer.sol";
+import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
 import {
     NewProtocolMajorVersionNotZero,
     PreviousProtocolMajorVersionNotZero,
     ProtocolVersionMinorDeltaTooBig,
     ProtocolVersionTooSmall
-} from "../ZkSyncUpgradeErrors.sol";
+} from "../../ZkSyncUpgradeErrors.sol";
 import {
     MalformedL2UpgradePlan,
     PatchMustReuseRelease,
@@ -24,7 +24,7 @@ import {
     SameReleaseTransitionHasPayload,
     TransitionDeadlineBeforeUpgrade,
     ZeroAddress
-} from "../../common/L1ContractErrors.sol";
+} from "../../../common/L1ContractErrors.sol";
 
 /// @notice Storage-backed, write-once transition between two CTM releases.
 /// @dev The facet cuts and base-system hash changes are NOT part of the manifest: they are
@@ -50,17 +50,13 @@ contract CTMTransition is ICTMTransition {
         L2UpgradePlan l2Plan;
     }
 
+    /// @notice `keccak256(abi.encode(manifest))`. No contract reads this — it is a review aid, a
+    ///         single value to compare against the audited manifest. Provenance is the codehash.
     bytes32 public manifestHash;
 
-    uint256 internal transitionOldProtocolVersion;
-    uint256 internal transitionNewProtocolVersion;
-    address internal transitionFromRelease;
-    address internal transitionNewRelease;
-    address internal transitionUpgradeEngine;
-    bytes32 internal upgradeEngineCodehash;
-    uint256 internal transitionOldProtocolVersionDeadline;
-    uint256 internal transitionUpgradeTimestamp;
-    L2UpgradePlan internal plan;
+    /// @dev THE manifest, stored as its own ABI encoding — see {CTMRelease} for why the struct is
+    ///      not transcribed into structured storage.
+    bytes internal encodedManifest;
 
     // Derived at initialization from (fromRelease, newRelease) — never authored, and stored as
     // ready-to-execute cuts the chain applies verbatim (no re-diffing at execution).
@@ -157,30 +153,15 @@ contract CTMTransition is ICTMTransition {
             revert SameReleaseTransitionHasPayload();
         }
 
-        manifestHash = keccak256(abi.encode(_manifest));
-        transitionOldProtocolVersion = _manifest.oldProtocolVersion;
-        transitionNewProtocolVersion = _manifest.newProtocolVersion;
-        transitionFromRelease = _manifest.fromRelease;
-        transitionNewRelease = _manifest.newRelease;
-        transitionUpgradeEngine = _manifest.upgradeEngine;
-        upgradeEngineCodehash = _manifest.upgradeEngineCodehash;
-        transitionOldProtocolVersionDeadline = _manifest.oldProtocolVersionDeadline;
-        transitionUpgradeTimestamp = _manifest.upgradeTimestamp;
-
-        uint256 length = _manifest.l2Plan.deployments.length;
-        for (uint256 i = 0; i < length; ++i) {
-            plan.deployments.push(_manifest.l2Plan.deployments[i]);
-        }
-        plan.delegateTo = _manifest.l2Plan.delegateTo;
-        plan.delegateCalldata = _manifest.l2Plan.delegateCalldata;
-        plan.factoryDepHashes = _manifest.l2Plan.factoryDepHashes;
+        encodedManifest = abi.encode(_manifest);
+        manifestHash = keccak256(encodedManifest);
 
         // Derive the L1 delta from the release pair and freeze it as final diamond cuts.
         Diamond.FacetCut[] memory facetCutsMemory = TransitionDeltaLib.deriveFacetCuts(
             ICTMRelease(_manifest.fromRelease),
             ICTMRelease(_manifest.newRelease)
         );
-        length = facetCutsMemory.length;
+        uint256 length = facetCutsMemory.length;
         for (uint256 i = 0; i < length; ++i) {
             derivedFacetCuts.push(facetCutsMemory[i]);
         }
@@ -188,32 +169,37 @@ contract CTMTransition is ICTMTransition {
             .deriveHashChanges(ICTMRelease(_manifest.fromRelease), ICTMRelease(_manifest.newRelease));
     }
 
+    /// @notice The whole manifest, exactly as it was pinned.
+    function getManifest() public view returns (TransitionManifest memory) {
+        return abi.decode(encodedManifest, (TransitionManifest));
+    }
+
     function oldProtocolVersion() external view returns (uint256) {
-        return transitionOldProtocolVersion;
+        return getManifest().oldProtocolVersion;
     }
 
     function newProtocolVersion() external view returns (uint256) {
-        return transitionNewProtocolVersion;
+        return getManifest().newProtocolVersion;
     }
 
     function fromRelease() external view returns (address) {
-        return transitionFromRelease;
+        return getManifest().fromRelease;
     }
 
     function newRelease() external view returns (address) {
-        return transitionNewRelease;
+        return getManifest().newRelease;
     }
 
     function upgradeEngine() external view returns (address) {
-        return transitionUpgradeEngine;
+        return getManifest().upgradeEngine;
     }
 
     function oldProtocolVersionDeadline() external view returns (uint256) {
-        return transitionOldProtocolVersionDeadline;
+        return getManifest().oldProtocolVersionDeadline;
     }
 
     function upgradeTimestamp() external view returns (uint256) {
-        return transitionUpgradeTimestamp;
+        return getManifest().upgradeTimestamp;
     }
 
     function facetCuts() external view returns (Diamond.FacetCut[] memory) {
@@ -225,20 +211,22 @@ contract CTMTransition is ICTMTransition {
     }
 
     function l2Plan() external view returns (L2UpgradePlan memory) {
-        return plan;
+        return getManifest().l2Plan;
     }
 
     function validate() external view {
-        ICTMRelease(transitionNewRelease).validate();
-        ICTMRelease(transitionFromRelease).validate();
-        _requirePin(transitionUpgradeEngine, upgradeEngineCodehash);
+        TransitionManifest memory m = getManifest();
+        ICTMRelease(m.newRelease).validate();
+        ICTMRelease(m.fromRelease).validate();
+        _requirePin(m.upgradeEngine, m.upgradeEngineCodehash);
     }
 
     function verifyAll() external view returns (bool) {
-        if (!ICTMRelease(transitionNewRelease).verifyAll() || !ICTMRelease(transitionFromRelease).verifyAll()) {
+        TransitionManifest memory m = getManifest();
+        if (!ICTMRelease(m.newRelease).verifyAll() || !ICTMRelease(m.fromRelease).verifyAll()) {
             return false;
         }
-        return CodehashPinLib.pinHolds(transitionUpgradeEngine, upgradeEngineCodehash);
+        return CodehashPinLib.pinHolds(m.upgradeEngine, m.upgradeEngineCodehash);
     }
 
     function _requirePin(address _target, bytes32 _expectedCodehash) private view {

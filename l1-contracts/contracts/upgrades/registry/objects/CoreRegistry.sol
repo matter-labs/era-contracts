@@ -3,12 +3,12 @@
 pragma solidity 0.8.28;
 
 import {ICoreRegistry, EcosystemContractRow} from "./ICoreRegistry.sol";
-import {CodehashPinLib} from "./CodehashPinLib.sol";
+import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {
     RegistryDuplicateProxyRow,
     RegistryUnknownKey,
     ZeroAddress
-} from "../../common/L1ContractErrors.sol";
+} from "../../../common/L1ContractErrors.sol";
 
 /// @title Core (ecosystem-wide) registry — one instance per protocol upgrade.
 /// @author Matter Labs
@@ -36,8 +36,9 @@ contract CoreRegistry is ICoreRegistry {
     ///         single value to compare against the audited manifest. Provenance is the codehash.
     bytes32 public manifestHash;
 
-    /// @dev THE manifest; the getters read out of this rather than a transcribed copy.
-    CoreRegistryManifest internal manifest;
+    /// @dev THE manifest, stored as its own ABI encoding — see {CTMRelease} for why the struct is
+    ///      not transcribed into structured storage.
+    bytes internal encodedManifest;
 
     /*//////////////////////////////////////////////////////////////
                              CONSTRUCTION
@@ -69,13 +70,13 @@ contract CoreRegistry is ICoreRegistry {
                 }
             }
         }
-        manifestHash = keccak256(abi.encode(_manifest));
+        encodedManifest = abi.encode(_manifest);
+        manifestHash = keccak256(encodedManifest);
+    }
 
-        // Field-by-field: the legacy codegen pipeline cannot copy a struct ARRAY from memory to
-        // storage, so `manifest = _manifest` is not available here.
-        for (uint256 i = 0; i < length; ++i) {
-            manifest.contractRows.push(_manifest.contractRows[i]);
-        }
+    /// @notice The whole manifest, exactly as it was pinned.
+    function getManifest() public view returns (CoreRegistryManifest memory) {
+        return abi.decode(encodedManifest, (CoreRegistryManifest));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -84,14 +85,15 @@ contract CoreRegistry is ICoreRegistry {
 
     /// @inheritdoc ICoreRegistry
     function ecosystemRows() external view returns (EcosystemContractRow[] memory) {
-        return manifest.contractRows;
+        return getManifest().contractRows;
     }
 
     /// @inheritdoc ICoreRegistry
     function verifyAll() external view returns (bool) {
-        uint256 length = manifest.contractRows.length;
+        EcosystemContractRow[] memory rows = getManifest().contractRows;
+        uint256 length = rows.length;
         for (uint256 i = 0; i < length; ++i) {
-            if (!CodehashPinLib.pinHolds(manifest.contractRows[i].implNew, manifest.contractRows[i].implNewCodehash)) {
+            if (!CodehashPinLib.pinHolds(rows[i].implNew, rows[i].implNewCodehash)) {
                 return false;
             }
         }
@@ -100,9 +102,10 @@ contract CoreRegistry is ICoreRegistry {
 
     /// @inheritdoc ICoreRegistry
     function validate() external view {
-        uint256 length = manifest.contractRows.length;
+        EcosystemContractRow[] memory rows = getManifest().contractRows;
+        uint256 length = rows.length;
         for (uint256 i = 0; i < length; ++i) {
-            _requirePin(manifest.contractRows[i].implNew, manifest.contractRows[i].implNewCodehash);
+            _requirePin(rows[i].implNew, rows[i].implNewCodehash);
         }
     }
 

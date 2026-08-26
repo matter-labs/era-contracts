@@ -5,14 +5,14 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
-import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {
     GenesisBatchCommitmentZero,
     GenesisBatchHashZero,
     GenesisUpgradeZero
 } from "contracts/common/L1ContractErrors.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
-import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 
 contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
     function setUp() public {

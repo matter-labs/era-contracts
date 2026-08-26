@@ -7,8 +7,8 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ICTMRelease} from "contracts/upgrades/registry/ICTMRelease.sol";
-import {CTMContract} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 library GetDiamondCutData {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));

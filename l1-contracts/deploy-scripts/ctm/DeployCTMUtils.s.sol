@@ -9,8 +9,8 @@ import {console2 as console} from "forge-std/Script.sol";
 import {ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainCreationParams} from "contracts/state-transition/ILegacyChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
-import {GenesisManifestLib} from "contracts/upgrades/registry/GenesisManifestLib.sol";
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {GenesisManifestLib} from "contracts/upgrades/registry/libraries/GenesisManifestLib.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";

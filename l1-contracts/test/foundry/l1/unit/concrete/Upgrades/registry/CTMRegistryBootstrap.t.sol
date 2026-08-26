@@ -4,9 +4,9 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
-import {GenesisFacet} from "contracts/upgrades/registry/ICTMRelease.sol";
-import {GenesisManifestLib} from "contracts/upgrades/registry/GenesisManifestLib.sol";
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {GenesisFacet} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {GenesisManifestLib} from "contracts/upgrades/registry/libraries/GenesisManifestLib.sol";
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 

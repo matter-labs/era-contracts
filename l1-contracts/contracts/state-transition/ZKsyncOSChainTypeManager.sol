@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
-import {ICTMRelease} from "../upgrades/registry/ICTMRelease.sol";
+import {ICTMRelease} from "../upgrades/registry/objects/ICTMRelease.sol";
 import {
     GenesisBatchHashZero,
     GenesisBatchCommitmentIncorrect,

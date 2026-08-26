@@ -37,9 +37,9 @@ import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundr
 import {Utils as DeployUtils} from "deploy-scripts/utils/Utils.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
-import {CTMRelease} from "contracts/upgrades/registry/CTMRelease.sol";
-import {CTMTransition} from "contracts/upgrades/registry/CTMTransition.sol";
-import {CoreRegistry} from "contracts/upgrades/registry/CoreRegistry.sol";
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
+import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;

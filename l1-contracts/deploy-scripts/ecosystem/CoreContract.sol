@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 // The canonical definitions of `L2EcosystemContract` and `ZKsyncOSUpgradeType` live in the production
 // contracts tree (they key the upgrade registries); they are re-exported here so that all
 // deploy-script importers keep working unchanged.
-import {L2EcosystemContract, ZKsyncOSUpgradeType} from "contracts/upgrades/registry/ContractIdentifiers.sol";
+import {L2EcosystemContract, ZKsyncOSUpgradeType} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @notice Programming language of a system contract.
 enum Language {
