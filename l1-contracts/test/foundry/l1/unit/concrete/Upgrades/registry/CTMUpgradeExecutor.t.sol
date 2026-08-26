@@ -18,14 +18,14 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
-    HashMismatch,
+    TransitionNotCommitted,
     RegistryCodehashMismatch,
     TransitionReleaseMismatch,
     Unauthorized,
     UpgradeNotPermissionlessYet
 } from "contracts/common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {GenesisFacet, L2UpgradePlan, ReleaseManifest, TransitionManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {GenesisFacet, L2UpgradePlan, ReleaseGenesisData, ReleaseManifest, TransitionManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Exercises the CTM-BOUND executor against real write-once release and transition
 ///         objects. Release data describes new-chain genesis; transition data describes the one
@@ -112,16 +112,18 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                 diamondInitCodehash: diamondInit.codehash,
                 verifier: address(testnetVerifier),
                 verifierCodehash: address(testnetVerifier).codehash,
-                genesisFacets: genesisFacets,
-                bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                fixedForceDeploymentsData: hex"f1f2",
                 genesisUpgrade: genesisUpgradeAddr,
                 genesisUpgradeCodehash: genesisUpgradeAddr.codehash,
-                genesisBatchHash: bytes32(uint256(1)),
-                genesisBatchCommitment: bytes32(_commitmentNonce),
-                genesisIndexRepeatedStorageChanges: 54
+                genesisFacets: genesisFacets,
+                genesis: ReleaseGenesisData({
+                    bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                    defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                    evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                    fixedForceDeploymentsData: hex"f1f2",
+                    genesisBatchHash: bytes32(uint256(1)),
+                    genesisBatchCommitment: bytes32(_commitmentNonce),
+                    genesisIndexRepeatedStorageChanges: 54
+                })
             });
     }
 
@@ -287,15 +289,16 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
 
     function test_upgradeChain_rejectsDifferentTransition() public {
         _applyCTMUpgrade();
-        // Same edges as the committed transition, but a different timestamp -> a different
-        // composed cut -> the chain's upgradeCutHash check trips.
+        // Same edges as the committed transition, but a different object. The chain executes the
+        // cut its CTM committed, so naming a different transition must be refused rather than
+        // silently running the committed one.
         CTMTransition differentTransition = _deployTransitionFrom(778, transition.fromRelease(), 0);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                HashMismatch.selector,
-                keccak256(abi.encode(_expectedUpgradeCut(transition))),
-                keccak256(abi.encode(_expectedUpgradeCut(differentTransition)))
+                TransitionNotCommitted.selector,
+                address(differentTransition),
+                address(transition)
             )
         );
         vm.prank(governor);

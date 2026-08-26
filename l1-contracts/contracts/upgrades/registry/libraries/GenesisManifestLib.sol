@@ -68,16 +68,11 @@ library GenesisManifestLib {
         manifest.diamondInitCodehash = _diamondInitCodehash;
         manifest.verifier = _cfg.verifier;
         manifest.verifierCodehash = _verifierCodehash;
-        manifest.genesisFacets = _genesisFacets;
-        manifest.bootloaderHash = _cfg.bootloaderHash;
-        manifest.defaultAccountHash = _cfg.defaultAccountHash;
-        manifest.evmEmulatorHash = _cfg.evmEmulatorHash;
-        manifest.fixedForceDeploymentsData = _cfg.fixedForceDeploymentsData;
         manifest.genesisUpgrade = _cfg.genesisUpgrade;
         manifest.genesisUpgradeCodehash = _genesisUpgradeCodehash;
-        manifest.genesisBatchHash = _cfg.genesisBatchHash;
-        manifest.genesisBatchCommitment = _cfg.genesisBatchCommitment;
-        manifest.genesisIndexRepeatedStorageChanges = _cfg.genesisIndexRepeatedStorageChanges;
+        manifest.genesisFacets = _genesisFacets;
+        // The shared block travels verbatim: config and manifest describe it with the same type.
+        manifest.genesis = _cfg.genesis;
     }
 
     /// @notice The canonical genesis facet slot order + freezability. Shared by the live builder

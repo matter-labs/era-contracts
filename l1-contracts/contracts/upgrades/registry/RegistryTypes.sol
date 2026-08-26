@@ -31,22 +31,32 @@ struct GenesisFacet {
     bytes32 codehash;
 }
 
+/// @notice The chain state a release pins that is neither a routing row nor a codehash pin: the
+///         base system contract hashes, the force-deployment descriptor and the genesis batch.
+/// @dev Shared by {ReleaseManifest} and {GenesisConfig} so the deploy-time input and the pinned
+///      manifest cannot drift in these fields — the config carries this verbatim into the
+///      manifest it builds.
+// solhint-disable-next-line gas-struct-packing
+struct ReleaseGenesisData {
+    bytes32 bootloaderHash;
+    bytes32 defaultAccountHash;
+    bytes32 evmEmulatorHash;
+    bytes fixedForceDeploymentsData;
+    bytes32 genesisBatchHash;
+    bytes32 genesisBatchCommitment;
+    uint64 genesisIndexRepeatedStorageChanges;
+}
+
 // solhint-disable-next-line gas-struct-packing
 struct ReleaseManifest {
     address diamondInit;
     bytes32 diamondInitCodehash;
     address verifier;
     bytes32 verifierCodehash;
-    GenesisFacet[] genesisFacets;
-    bytes32 bootloaderHash;
-    bytes32 defaultAccountHash;
-    bytes32 evmEmulatorHash;
-    bytes fixedForceDeploymentsData;
     address genesisUpgrade;
     bytes32 genesisUpgradeCodehash;
-    bytes32 genesisBatchHash;
-    bytes32 genesisBatchCommitment;
-    uint64 genesisIndexRepeatedStorageChanges;
+    GenesisFacet[] genesisFacets;
+    ReleaseGenesisData genesis;
 }
 
 /// @notice The complete, typed L2 side of one transition: the force-deployments, the delegate
@@ -164,12 +174,6 @@ struct BootstrapManifest {
 struct GenesisConfig {
     Facets facets;
     address verifier;
-    bytes32 bootloaderHash;
-    bytes32 defaultAccountHash;
-    bytes32 evmEmulatorHash;
     address genesisUpgrade;
-    bytes32 genesisBatchHash;
-    bytes32 genesisBatchCommitment;
-    uint64 genesisIndexRepeatedStorageChanges;
-    bytes fixedForceDeploymentsData;
+    ReleaseGenesisData genesis;
 }

@@ -52,10 +52,7 @@ import {DefaultL2UpgradeStrategy} from "./DefaultL2UpgradeStrategy.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-
-interface IAdminPreV31 {
-    function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
-}
+import {UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
 
 /// @notice Script used for default CTM upgrade flow. Should be run after Ecosystem upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
@@ -834,14 +831,13 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
         admin = IZKChain(chainDiamondProxyAddress).getAdmin();
 
-        (, uint32 oldProtocolVersionMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(oldProtocolVersion));
-        // Pre-v31 chain diamonds only expose the legacy 2-arg selector; the v31 selector reverts with "F".
-        bytes memory upgradeCallData = oldProtocolVersionMinor < 31
-            ? abi.encodeCall(IAdminPreV31.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData))
-            : abi.encodeCall(
-                IAdmin.upgradeChainFromVersion,
-                (chainDiamondProxyAddress, oldProtocolVersion, upgradeCutData)
-            );
+        // Each protocol generation exposes a different `upgradeChainFromVersion` on the chain
+        // diamond; calling the wrong one hits the DiamondProxy fallback and reverts with "F".
+        bytes memory upgradeCallData = UpgradeChainCall.encode(
+            chainDiamondProxyAddress,
+            oldProtocolVersion,
+            upgradeCutData
+        );
 
         calls = new Call[](1);
         calls[0] = Call({target: chainDiamondProxyAddress, data: upgradeCallData, value: 0});

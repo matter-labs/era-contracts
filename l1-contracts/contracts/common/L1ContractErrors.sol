@@ -414,6 +414,8 @@ error RegistryMissingBaseSystemHash();
 error RegistryPinTargetHasNoCode(address target);
 // 0x9aae4ff8
 error RegistryReleaseCodehashAlreadySet(bytes32 current);
+error NoCommittedUpgradeCutForVersion(uint256 protocolVersion);
+error TransitionNotCommitted(address named, address committed);
 // 0x1f20dafa
 error RegistryUnknownKey();
 // 0x3ea1345a

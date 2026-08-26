@@ -113,16 +113,21 @@ contract CTMRelease is ICTMRelease {
 
     function baseSystemContractHashes() external view returns (bytes32, bytes32, bytes32) {
         ReleaseManifest memory m = getManifest();
-        return (m.bootloaderHash, m.defaultAccountHash, m.evmEmulatorHash);
+        return (m.genesis.bootloaderHash, m.genesis.defaultAccountHash, m.genesis.evmEmulatorHash);
     }
 
     function fixedForceDeploymentsData() external view returns (bytes memory) {
-        return getManifest().fixedForceDeploymentsData;
+        return getManifest().genesis.fixedForceDeploymentsData;
     }
 
     function genesisParams() external view returns (address, bytes32, bytes32, uint64) {
         ReleaseManifest memory m = getManifest();
-        return (m.genesisUpgrade, m.genesisBatchHash, m.genesisBatchCommitment, m.genesisIndexRepeatedStorageChanges);
+        return (
+            m.genesisUpgrade,
+            m.genesis.genesisBatchHash,
+            m.genesis.genesisBatchCommitment,
+            m.genesis.genesisIndexRepeatedStorageChanges
+        );
     }
 
     function validate() external view {

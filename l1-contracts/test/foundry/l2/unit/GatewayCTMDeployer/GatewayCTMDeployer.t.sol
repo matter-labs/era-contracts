@@ -74,7 +74,7 @@ import {
     DeployedContractsComparator,
     GatewayCTMDeployerTestUtils
 } from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
-import {GenesisFacet, ReleaseManifest} from "../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {GenesisFacet, ReleaseGenesisData, ReleaseManifest} from "../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 // We need to use contract the zkfoundry consistently uses
 // zk environment only within a deployed contract
@@ -206,16 +206,18 @@ contract GatewayCTMDeployerTest is Test {
                 diamondInitCodehash: address(diamondInit).codehash,
                 verifier: address(verifier),
                 verifierCodehash: address(verifier).codehash,
-                genesisFacets: facets,
-                bootloaderHash: bytes32(uint256(1)),
-                defaultAccountHash: bytes32(uint256(2)),
-                evmEmulatorHash: bytes32(uint256(3)),
-                fixedForceDeploymentsData: hex"",
                 genesisUpgrade: address(genesisUpgrade),
                 genesisUpgradeCodehash: address(genesisUpgrade).codehash,
-                genesisBatchHash: bytes32(uint256(4)),
-                genesisBatchCommitment: bytes32(uint256(5)),
-                genesisIndexRepeatedStorageChanges: 1
+                genesisFacets: facets,
+                genesis: ReleaseGenesisData({
+                    bootloaderHash: bytes32(uint256(1)),
+                    defaultAccountHash: bytes32(uint256(2)),
+                    evmEmulatorHash: bytes32(uint256(3)),
+                    fixedForceDeploymentsData: hex"",
+                    genesisBatchHash: bytes32(uint256(4)),
+                    genesisBatchCommitment: bytes32(uint256(5)),
+                    genesisIndexRepeatedStorageChanges: 1
+                })
             })
         );
     }

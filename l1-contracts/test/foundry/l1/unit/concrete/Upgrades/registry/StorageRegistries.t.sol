@@ -43,7 +43,7 @@ import {
     ProtocolVersionMinorDeltaTooBig,
     ProtocolVersionTooSmall
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
-import {CoreRegistryManifest, EcosystemContractRow, GenesisFacet, L2UpgradePlan, ReleaseManifest, TransitionManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {CoreRegistryManifest, EcosystemContractRow, GenesisFacet, L2UpgradePlan, ReleaseGenesisData, ReleaseManifest, TransitionManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Unit tests for the write-once upgrade objects in the DERIVED model: releases carry
 ///         explicit routing + inline mandatory pins; transitions derive their facet/hash delta
@@ -143,16 +143,18 @@ contract StorageRegistriesTest is Test {
                 diamondInitCodehash: diamondInit.codehash,
                 verifier: verifier,
                 verifierCodehash: verifier.codehash,
-                genesisFacets: facets,
-                bootloaderHash: _bootloaderHash,
-                defaultAccountHash: DEFAULT_ACCOUNT_HASH,
-                evmEmulatorHash: bytes32(0),
-                fixedForceDeploymentsData: hex"f1f2",
                 genesisUpgrade: genesisUpgrade,
                 genesisUpgradeCodehash: genesisUpgrade.codehash,
-                genesisBatchHash: bytes32(uint256(1)),
-                genesisBatchCommitment: bytes32(uint256(1)),
-                genesisIndexRepeatedStorageChanges: 54
+                genesisFacets: facets,
+                genesis: ReleaseGenesisData({
+                    bootloaderHash: _bootloaderHash,
+                    defaultAccountHash: DEFAULT_ACCOUNT_HASH,
+                    evmEmulatorHash: bytes32(0),
+                    fixedForceDeploymentsData: hex"f1f2",
+                    genesisBatchHash: bytes32(uint256(1)),
+                    genesisBatchCommitment: bytes32(uint256(1)),
+                    genesisIndexRepeatedStorageChanges: 54
+                })
             });
     }
 

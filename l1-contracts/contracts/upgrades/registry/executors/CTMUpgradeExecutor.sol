@@ -12,6 +12,7 @@ import {IDefaultUpgrade} from "../../IDefaultUpgrade.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {
     EmptyBytes32,
+    TransitionNotCommitted,
     TransitionReleaseMismatch,
     UpgradeNotPermissionlessYet,
     ZeroAddress
@@ -124,40 +125,26 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
     /// @param _transition The same transition committed by `applyCTMUpgrade`.
     /// @param _chainId The chain to upgrade.
     function upgradeChain(ICTMTransition _transition, uint256 _chainId) external {
+        uint256 oldProtocolVersion = _transition.oldProtocolVersion();
         if (msg.sender != owner() && msg.sender != CHAIN_TYPE_MANAGER.getChainAdmin(_chainId)) {
-            uint256 deadline = CHAIN_TYPE_MANAGER.protocolVersionDeadline(_transition.oldProtocolVersion());
+            uint256 deadline = CHAIN_TYPE_MANAGER.protocolVersionDeadline(oldProtocolVersion);
             if (block.timestamp <= deadline) {
                 revert UpgradeNotPermissionlessYet(deadline);
             }
         }
-        // Deliberately NOT re-checked here — do not "restore" these:
-        //   - the composed cut embeds `address(_transition)` in its init calldata, and the chain
-        //     compares it against the `upgradeCutHash` this CTM committed. That does not merely
-        //     prove "a genuine transition"; it proves THE transition `applyCTMUpgrade` committed,
-        //     which is strictly stronger than the codehash check.
+        // The chain executes the cut its own CTM committed, so `_transition` must BE that
+        // transition — otherwise the argument would name one edge while a different one ran.
+        address committed = CHAIN_TYPE_MANAGER.upgradeTransition(oldProtocolVersion);
+        if (committed != address(_transition)) {
+            revert TransitionNotCommitted(address(_transition), committed);
+        }
+        // Deliberately NOT re-checked here — do not "restore" this:
         //   - `validate()` re-reads pins that cannot have moved: an `EXTCODEHASH` is fixed for a
         //     non-selfdestructible contract, so anything true at `applyCTMUpgrade` is still true.
         //     It also costs ~19 EXTCODEHASH reads across both releases, PER CHAIN, on a function
         //     that is permissionless once the deadline passes.
-        CHAIN_TYPE_MANAGER.upgradeChainFromVersion(
-            _chainId,
-            _transition.oldProtocolVersion(),
-            _buildUpgradeCut(_transition)
-        );
+        CHAIN_TYPE_MANAGER.upgradeChainFromVersion(_chainId, oldProtocolVersion);
 
         emit ChainUpgradeApplied(_chainId, _transition.newProtocolVersion());
-    }
-
-    /// @dev Composes the upgrade cut: an `upgradeEngine.upgradeFromTransition(transition)` init
-    ///      delegatecall (no outer `facetCuts` — the engine applies the DERIVED facet swaps,
-    ///      reading them from the same transition). Composing HERE keeps the executor the single
-    ///      contract that turns a transition into a cut; the chain sees opaque bytes it checks
-    ///      against the hash its CTM committed.
-    function _buildUpgradeCut(ICTMTransition _transition) private view returns (Diamond.DiamondCutData memory) {
-        return
-            CTMUpgradeComposer.buildUpgradeCutData(
-                _transition.upgradeEngine(),
-                abi.encodeCall(IDefaultUpgrade.upgradeFromTransition, (address(_transition)))
-            );
     }
 }

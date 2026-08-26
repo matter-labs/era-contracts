@@ -32,7 +32,7 @@ import {
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {ProtocolIdMismatch} from "contracts/common/L1ContractErrors.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {GenesisFacet, L2UpgradePlan, ReleaseManifest, TransitionManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {GenesisFacet, L2UpgradePlan, ReleaseGenesisData, ReleaseManifest, TransitionManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice The first full registry-driven upgrade, end to end: a real chain diamond is taken
 ///         v32 -> v33 entirely through the CTM-bound `CTMUpgradeExecutor`, with the facet/hash
@@ -182,18 +182,20 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
                 diamondInitCodehash: diamondInit.codehash,
                 verifier: _verifier,
                 verifierCodehash: _verifier.codehash,
+                genesisUpgrade: genesisUpgradeAddr,
+                genesisUpgradeCodehash: genesisUpgradeAddr.codehash,
                 genesisFacets: _releaseFacets(_adminFacet),
                 // Carried unchanged through every hop: the release pins the complete values, so
                 // the derived hash changes are zero.
-                bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                fixedForceDeploymentsData: hex"f1f2",
-                genesisUpgrade: genesisUpgradeAddr,
-                genesisUpgradeCodehash: genesisUpgradeAddr.codehash,
-                genesisBatchHash: bytes32(uint256(1)),
-                genesisBatchCommitment: _registryGenesisBatchCommitment(),
-                genesisIndexRepeatedStorageChanges: 54
+                genesis: ReleaseGenesisData({
+                    bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                    defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                    evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                    fixedForceDeploymentsData: hex"f1f2",
+                    genesisBatchHash: bytes32(uint256(1)),
+                    genesisBatchCommitment: _registryGenesisBatchCommitment(),
+                    genesisIndexRepeatedStorageChanges: 54
+                })
             });
     }
 

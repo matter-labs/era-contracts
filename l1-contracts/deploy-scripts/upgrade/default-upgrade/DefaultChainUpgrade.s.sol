@@ -22,6 +22,7 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {GetDiamondCutData} from "../../utils/GetDiamondCutData.sol";
+import {UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
 
 contract DefaultChainUpgrade is Script {
     struct ChainConfig {
@@ -61,22 +62,11 @@ contract DefaultChainUpgrade is Script {
     }
 
     function upgradeChain(Diamond.DiamondCutData memory diamondCutData) public {
-        // Chains on protocol version < v31 use the old 2-param upgradeChainFromVersion(uint256, DiamondCutData).
-        // The 3-param version with the leading address was introduced in v31.
-        uint256 oldMinor = (config.oldProtocolVersion >> 32) & 0xFFFF;
-        bytes memory callData;
-        if (oldMinor < 31) {
-            callData = abi.encodeWithSelector(
-                bytes4(0xfc57565f), // upgradeChainFromVersion(uint256,DiamondCutData)
-                config.oldProtocolVersion,
-                diamondCutData
-            );
-        } else {
-            callData = abi.encodeCall(
-                IAdmin.upgradeChainFromVersion,
-                (config.chainDiamondProxyAddress, config.oldProtocolVersion, diamondCutData)
-            );
-        }
+        bytes memory callData = UpgradeChainCall.encode(
+            config.chainDiamondProxyAddress,
+            config.oldProtocolVersion,
+            diamondCutData
+        );
 
         Utils.adminExecute(
             IZKChain(config.chainDiamondProxyAddress).getAdmin(),

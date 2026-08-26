@@ -98,16 +98,19 @@ export function releaseInitArgs(ctm: any): any {
     diamondInitCodehash: release.diamondInit.codehash,
     verifier: release.verifier.address,
     verifierCodehash: release.verifier.codehash,
-    genesisFacets,
-    bootloaderHash: release.baseSystemContracts.bootloader,
-    defaultAccountHash: release.baseSystemContracts.defaultAccount,
-    evmEmulatorHash: release.baseSystemContracts.evmEmulator,
-    fixedForceDeploymentsData: release.fixedForceDeploymentsData,
     genesisUpgrade: release.genesis.genesisUpgrade.address,
     genesisUpgradeCodehash: release.genesis.genesisUpgrade.codehash,
-    genesisBatchHash: release.genesis.batchHash,
-    genesisBatchCommitment: release.genesis.batchCommitment,
-    genesisIndexRepeatedStorageChanges: release.genesis.indexRepeatedStorageChanges,
+    genesisFacets,
+    // `ReleaseGenesisData` — the block a release shares with the deploy-time `GenesisConfig`.
+    genesis: {
+      bootloaderHash: release.baseSystemContracts.bootloader,
+      defaultAccountHash: release.baseSystemContracts.defaultAccount,
+      evmEmulatorHash: release.baseSystemContracts.evmEmulator,
+      fixedForceDeploymentsData: release.fixedForceDeploymentsData,
+      genesisBatchHash: release.genesis.batchHash,
+      genesisBatchCommitment: release.genesis.batchCommitment,
+      genesisIndexRepeatedStorageChanges: release.genesis.indexRepeatedStorageChanges,
+    },
   };
 }
 

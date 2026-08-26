@@ -520,14 +520,14 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     /// @inheritdoc IAdmin
     function upgradeChainFromVersion(
         address, // _chainAddress (unused in this specific implementation)
-        uint256 _oldProtocolVersion,
-        Diamond.DiamondCutData calldata _diamondCut
+        uint256 _oldProtocolVersion
     ) external onlyAdminOrChainTypeManagerOrValidator {
-        bytes32 cutHashInput = keccak256(abi.encode(_diamondCut));
-        bytes32 upgradeCutHash = IChainTypeManager(s.chainTypeManager).upgradeCutHash(_oldProtocolVersion);
-        if (cutHashInput != upgradeCutHash) {
-            revert HashMismatch(upgradeCutHash, cutHashInput);
-        }
+        // The cut comes from this chain's own ChainTypeManager, which composed it from the
+        // transition it committed for this edge — the caller supplies no bytes, so there is
+        // nothing to check it against and nothing to substitute.
+        Diamond.DiamondCutData memory diamondCut = IChainTypeManager(s.chainTypeManager).upgradeCutForVersion(
+            _oldProtocolVersion
+        );
 
         if (s.protocolVersion != _oldProtocolVersion) {
             revert ProtocolIdMismatch(s.protocolVersion, _oldProtocolVersion);
@@ -545,7 +545,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
                 revert UpgradeTimestampNotReached(timestamp, block.timestamp);
             }
         }
-        _executeDiamondCut(_diamondCut);
+        _executeDiamondCut(diamondCut);
         if (s.protocolVersion <= _oldProtocolVersion) {
             revert ProtocolIdNotGreater();
         }
@@ -633,10 +633,10 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     ///      0x4623c91d setValidator(address,bool)
     ///      0x054e80a3 setZKsyncOSPreV31TotalSupply(uint256)
     ///      0x17338945 unfreezeDiamond()
-    ///      0x3b6d7534 upgradeChainFromVersion(address,uint256,((address,uint8,bool,bytes4[])[],address,bytes))
+    ///      0x03129ad9 upgradeChainFromVersion(address,uint256)
     function selectors() public pure returns (bytes4[] memory result) {
         bytes
-            memory packed = hex"0e18b68117338945f9afb97e1b48b94a1cc5d10321f603d7235d9eb523b311922765d07927ae4c162878fe742f257a5c3b6d75344623c91d4dd18bf55b89874860eae0e764bf8d66e76db8656e762e98a9f6d941b4fcb577be6f11cfc5f1f1f5e51935f5";
+            memory packed = hex"0e18b68117338945f9afb97e1b48b94a1cc5d10321f603d7235d9eb523b311922765d07927ae4c162878fe742f257a5c03129ad94623c91d4dd18bf55b89874860eae0e764bf8d66e76db8656e762e98a9f6d941b4fcb577be6f11cfc5f1f1f5e51935f5";
         uint256 count = packed.length / 4;
         result = new bytes4[](count);
         for (uint256 i = 0; i < count; ++i) {

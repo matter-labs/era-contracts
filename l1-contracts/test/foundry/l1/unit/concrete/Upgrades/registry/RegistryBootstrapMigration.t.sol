@@ -30,7 +30,7 @@ import {
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {BootstrapManifest, EcosystemContractRow, GenesisFacet, ReleaseManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {BootstrapManifest, EcosystemContractRow, GenesisFacet, ReleaseGenesisData, ReleaseManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @dev Two distinct implementations so a proxy row is a real `expectedOldImpl -> implNew` edge.
 contract ImplV31 {
@@ -118,16 +118,18 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 diamondInitCodehash: diamondInit.codehash,
                 verifier: address(testnetVerifier),
                 verifierCodehash: address(testnetVerifier).codehash,
-                genesisFacets: genesisFacets,
-                bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                fixedForceDeploymentsData: hex"f1f2",
                 genesisUpgrade: genesisUpgradeAddr,
                 genesisUpgradeCodehash: genesisUpgradeAddr.codehash,
-                genesisBatchHash: bytes32(uint256(1)),
-                genesisBatchCommitment: bytes32(uint256(7)),
-                genesisIndexRepeatedStorageChanges: 54
+                genesisFacets: genesisFacets,
+                genesis: ReleaseGenesisData({
+                    bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                    defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                    evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
+                    fixedForceDeploymentsData: hex"f1f2",
+                    genesisBatchHash: bytes32(uint256(1)),
+                    genesisBatchCommitment: bytes32(uint256(7)),
+                    genesisIndexRepeatedStorageChanges: 54
+                })
             })
         );
     }

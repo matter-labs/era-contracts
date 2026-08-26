@@ -27,6 +27,7 @@ import {
     MigrationsNotPaused,
     EmptyBytes32,
     RegistryReleaseCodehashAlreadySet,
+    NoCommittedUpgradeCutForVersion,
     Unauthorized,
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
@@ -87,6 +88,11 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
     /// @dev The stored cutData for upgrade diamond cut. protocolVersion => cutHash
     mapping(uint256 protocolVersion => bytes32 cutHash) public upgradeCutHash;
+
+    /// @dev The committed cut itself, abi-encoded, keyed by the version chains depart FROM. Read
+    ///      by {upgradeCutForVersion}; `upgradeCutHash` above stays for chains still on protocol
+    ///      versions whose Admin facet is handed the cut.
+    mapping(uint256 protocolVersion => bytes cutData) internal committedUpgradeCut;
 
     /// @dev The address used to manage non critical updates
     address public admin;
@@ -495,7 +501,11 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @param _cutData the new diamond cut data
     /// @param _oldProtocolVersion the old protocol version
     function setUpgradeDiamondCutInner(Diamond.DiamondCutData memory _cutData, uint256 _oldProtocolVersion) internal {
-        bytes32 newCutHash = keccak256(abi.encode(_cutData));
+        bytes memory encoded = abi.encode(_cutData);
+        // Stored, not just hashed: chains read the cut back out of here instead of being handed
+        // bytes to check against the hash.
+        committedUpgradeCut[_oldProtocolVersion] = encoded;
+        bytes32 newCutHash = keccak256(encoded);
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
         upgradeCutDataBlock[_oldProtocolVersion] = block.number;
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
@@ -522,17 +532,27 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         IZKChain(zkChainAddr).revertBatchesSharedBridge(zkChainAddr, _newLastBatch);
     }
 
+    /// @notice The upgrade cut committed for chains departing from `_oldProtocolVersion`.
+    /// @dev THE single source of the cut. Chains no longer receive cut bytes from their caller —
+    ///      they read this — so there is nothing for a chain admin to substitute. It is stored at
+    ///      commit time rather than recomposed here, so the registry-driven and the legacy
+    ///      {setNewVersionUpgrade} paths serve chains through exactly the same read.
+    function upgradeCutForVersion(
+        uint256 _oldProtocolVersion
+    ) public view returns (Diamond.DiamondCutData memory) {
+        bytes memory committed = committedUpgradeCut[_oldProtocolVersion];
+        if (committed.length == 0) {
+            revert NoCommittedUpgradeCutForVersion(_oldProtocolVersion);
+        }
+        return abi.decode(committed, (Diamond.DiamondCutData));
+    }
+
     /// @dev execute predefined upgrade
     /// @param _chainId the chainId of the chain
     /// @param _oldProtocolVersion the old protocol version
-    /// @param _diamondCut the diamond cut data
-    function upgradeChainFromVersion(
-        uint256 _chainId,
-        uint256 _oldProtocolVersion,
-        Diamond.DiamondCutData calldata _diamondCut
-    ) external onlyOwner {
+    function upgradeChainFromVersion(uint256 _chainId, uint256 _oldProtocolVersion) external onlyOwner {
         address chainAddress = getZKChain(_chainId);
-        IZKChain(chainAddress).upgradeChainFromVersion(chainAddress, _oldProtocolVersion, _diamondCut);
+        IZKChain(chainAddress).upgradeChainFromVersion(chainAddress, _oldProtocolVersion);
     }
 
     /// @dev executes upgrade on chain

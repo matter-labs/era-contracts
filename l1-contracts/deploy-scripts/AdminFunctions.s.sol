@@ -43,6 +43,7 @@ import {InteropLibrary} from "./InteropLibrary.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {UpgradeChainCall} from "./utils/UpgradeChainCall.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -52,14 +53,6 @@ bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPL
 ///      2-arg signature; calling the v31 variant against them hits the DiamondProxy
 ///      fallback and reverts with `"F"`.
 uint256 constant V31_UPGRADE_CHAIN_FROM_VERSION_THRESHOLD = uint256(31) << 32;
-
-/// @notice Legacy 2-arg Admin interface used when the chain being upgraded is
-///         still on a pre-v31 protocol version (so its Admin facet only has
-///         the old selector). The abi-encoded call produced via this interface
-///         lands on the old facet; the new 3-arg selector would not.
-interface IAdminLegacy {
-    function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
-}
 
 /// @notice Minimal interface for OZ single-step Ownable contracts (e.g. ProxyAdmin).
 ///         Avoids calling `pendingOwner()` (Ownable2Step-only) on plain Ownable.
@@ -561,7 +554,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             _adminAddr,
             _accessControlRestriction,
             _chainDiamondProxy,
-            abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainDiamondProxy, oldProtocolVersion, upgradeCutData)),
+            UpgradeChainCall.encode(_chainDiamondProxy, oldProtocolVersion, upgradeCutData),
             0
         );
     }
@@ -592,16 +585,13 @@ contract AdminFunctions is Script, IAdminFunctions {
             currentProtocolVersion
         );
 
-        // Select the Admin facet's `upgradeChainFromVersion` signature that
-        // actually lives on the chain we're about to call. Pre-v31 chains
-        // expose the legacy 2-arg variant; v31+ expose the new 3-arg one that
-        // carries `_chainAddress`. Using the wrong one hits the DiamondProxy
-        // fallback and reverts with `"F"`.
-        bytes memory upgradeCall = currentProtocolVersion < V31_UPGRADE_CHAIN_FROM_VERSION_THRESHOLD
-            ? abi.encodeCall(IAdminLegacy.upgradeChainFromVersion, (currentProtocolVersion, diamondCut))
-            : abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainAddress, currentProtocolVersion, diamondCut));
-
-        Utils.adminExecute(_adminAddr, _accessControlRestriction, _chainAddress, upgradeCall, 0);
+        Utils.adminExecute(
+            _adminAddr,
+            _accessControlRestriction,
+            _chainAddress,
+            UpgradeChainCall.encode(_chainAddress, currentProtocolVersion, diamondCut),
+            0
+        );
 
         console.log("AdminFunctions: upgrade completed successfully");
     }
@@ -743,10 +733,7 @@ contract AdminFunctions is Script, IAdminFunctions {
 
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
-            abi.encodeCall(
-                IAdmin.upgradeChainFromVersion,
-                (data.chainDiamondProxyOnGateway, data.oldProtocolVersion, upgradeCutData)
-            ),
+            UpgradeChainCall.encode(data.chainDiamondProxyOnGateway, data.oldProtocolVersion, upgradeCutData),
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
             data.chainDiamondProxyOnGateway,

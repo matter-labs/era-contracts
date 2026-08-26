@@ -126,10 +126,6 @@ contract ProtocolVersion is ChainTypeManagerTest {
         );
 
         vm.expectRevert(ProtocolIdNotGreater.selector);
-        chainContractAddress.upgradeChainFromVersion(
-            chainId,
-            0,
-            getDiamondCutDataWithCustomFacets(address(0), customFacetCuts)
-        );
+        chainContractAddress.upgradeChainFromVersion(chainId, 0);
     }
 }

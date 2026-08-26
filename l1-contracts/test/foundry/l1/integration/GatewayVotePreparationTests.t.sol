@@ -23,7 +23,7 @@ import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {GenesisManifestLib} from "contracts/upgrades/registry/libraries/GenesisManifestLib.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
-import {GenesisConfig} from "../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {GenesisConfig, ReleaseGenesisData} from "../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Test-friendly subclass of GatewayVotePreparation that exposes the
 /// initialization + calculateAddresses path without executing L1->L2 transactions.
@@ -274,17 +274,19 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         CTMRelease release = new CTMRelease(
             GenesisManifestLib.buildGenesisManifest(
                 GenesisConfig({
-                    facets: contracts.stateTransition.facets,
-                    verifier: contracts.stateTransition.verifiers.verifier,
+                facets: contracts.stateTransition.facets,
+                verifier: contracts.stateTransition.verifiers.verifier,
+                genesisUpgrade: contracts.stateTransition.genesisUpgrade,
+                genesis: ReleaseGenesisData({
                     bootloaderHash: config.bootloaderHash,
                     defaultAccountHash: config.defaultAccountHash,
                     evmEmulatorHash: config.evmEmulatorHash,
-                    genesisUpgrade: contracts.stateTransition.genesisUpgrade,
+                    fixedForceDeploymentsData: config.forceDeploymentsData,
                     genesisBatchHash: config.genesisRoot,
                     genesisBatchCommitment: config.genesisBatchCommitment,
-                    genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex),
-                    fixedForceDeploymentsData: config.forceDeploymentsData
+                    genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex)
                 })
+            })
             )
         );
         return address(release);

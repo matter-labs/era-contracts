@@ -63,7 +63,7 @@ import {
 import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 
 import {CTMDeployedAddresses} from "../utils/Types.sol";
-import {GenesisConfig, ReleaseManifest} from "../../contracts/upgrades/registry/RegistryTypes.sol";
+import {GenesisConfig, ReleaseGenesisData, ReleaseManifest} from "../../contracts/upgrades/registry/RegistryTypes.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -145,14 +145,16 @@ abstract contract DeployCTMUtils is DeployUtils {
             GenesisConfig({
                 facets: ctmAddresses.stateTransition.facets,
                 verifier: ctmAddresses.stateTransition.verifiers.verifier,
-                bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
-                defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
-                evmEmulatorHash: config.contracts.chainCreationParams.evmEmulatorHash,
                 genesisUpgrade: ctmAddresses.stateTransition.genesisUpgrade,
-                genesisBatchHash: config.contracts.chainCreationParams.genesisRoot,
-                genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
-                genesisIndexRepeatedStorageChanges: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
-                fixedForceDeploymentsData: generatedData.forceDeploymentsData
+                genesis: ReleaseGenesisData({
+                    bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
+                    defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
+                    evmEmulatorHash: config.contracts.chainCreationParams.evmEmulatorHash,
+                    fixedForceDeploymentsData: generatedData.forceDeploymentsData,
+                    genesisBatchHash: config.contracts.chainCreationParams.genesisRoot,
+                    genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
+                    genesisIndexRepeatedStorageChanges: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex)
+                })
             })
         );
 
