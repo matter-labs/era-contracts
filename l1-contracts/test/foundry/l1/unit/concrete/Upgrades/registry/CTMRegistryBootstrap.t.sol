@@ -5,10 +5,11 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
-import {GenesisFacet} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+
 import {GenesisManifestLib} from "contracts/upgrades/registry/libraries/GenesisManifestLib.sol";
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
+import {GenesisConfig, GenesisFacet, ReleaseManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Unit tests for `CTMRegistry` in its BOOTSTRAP (genesis) mode: a freshly deployed CTM
 ///         (L1 deploy scripts or the Gateway CTM deployer) points at one of these so
@@ -63,10 +64,10 @@ contract CTMRegistryBootstrapTest is Test {
         vm.etch(VERIFIER, hex"600003");
     }
 
-    function _genesisManifest() internal view returns (CTMRelease.ReleaseManifest memory) {
+    function _genesisManifest() internal view returns (ReleaseManifest memory) {
         return
             GenesisManifestLib.buildGenesisManifest(
-                GenesisManifestLib.GenesisConfig({
+                GenesisConfig({
                     facets: facets,
                     verifier: VERIFIER,
                     bootloaderHash: BOOTLOADER_HASH,
@@ -84,7 +85,7 @@ contract CTMRegistryBootstrapTest is Test {
     // ---- Happy path ----
 
     function test_constructorPinsGenesisManifest() public {
-        CTMRelease.ReleaseManifest memory manifest = _genesisManifest();
+        ReleaseManifest memory manifest = _genesisManifest();
         CTMRelease release = new CTMRelease(manifest);
 
         assertEq(release.manifestHash(), keccak256(abi.encode(manifest)), "manifest hash");
@@ -122,7 +123,7 @@ contract CTMRegistryBootstrapTest is Test {
         // Version validation moved to the transition; a release still rejects a zero genesisUpgrade.
         // Build the manifest BEFORE arming expectRevert: the builder itself makes (mocked)
         // external self-description calls that would otherwise consume the expectation.
-        CTMRelease.ReleaseManifest memory manifest = _genesisManifest();
+        ReleaseManifest memory manifest = _genesisManifest();
         manifest.genesisUpgrade = address(0);
 
         vm.expectRevert();
@@ -134,7 +135,7 @@ contract CTMRegistryBootstrapTest is Test {
     function test_zeroHashesAreServedForPinnedVersion() public {
         CTMRelease release = new CTMRelease(
             GenesisManifestLib.buildGenesisManifest(
-                GenesisManifestLib.GenesisConfig({
+                GenesisConfig({
                     facets: facets,
                     verifier: VERIFIER,
                     bootloaderHash: 0,

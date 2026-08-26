@@ -30,7 +30,7 @@ import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "../ctm
 import {Facets, Verifiers} from "contracts/common/StateTransitionTypes.sol";
 import {GenesisManifestLib} from "contracts/upgrades/registry/libraries/GenesisManifestLib.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
-import {GenesisFacet} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
 import {DAContracts} from "contracts/common/StateTransitionTypes.sol";
@@ -46,6 +46,7 @@ import {
     GatewayCTMFinalConfig,
     GatewayCTMFinalResult
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {GenesisConfig, GenesisFacet, ReleaseManifest} from "../../contracts/upgrades/registry/RegistryTypes.sol";
 
 // solhint-disable gas-custom-errors
 
@@ -633,7 +634,7 @@ library GatewayCTMDeployerHelper {
     function _reconstructGenesisManifest(
         DirectDeployedAddresses memory _direct,
         GatewayCTMDeployerConfig memory _baseConfig
-    ) private returns (CTMRelease.ReleaseManifest memory) {
+    ) private returns (ReleaseManifest memory) {
         (
             address[GENESIS_FACET_COUNT_LOCAL] memory addrs,
             bool[GENESIS_FACET_COUNT_LOCAL] memory freezable
@@ -653,7 +654,7 @@ library GatewayCTMDeployerHelper {
 
         return
             GenesisManifestLib.buildGenesisManifestFromRows(
-                GenesisManifestLib.GenesisConfig({
+                GenesisConfig({
                     facets: _direct.facets,
                     verifier: _direct.verifier,
                     bootloaderHash: _baseConfig.bootloaderHash,

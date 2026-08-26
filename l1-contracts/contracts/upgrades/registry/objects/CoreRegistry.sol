@@ -2,13 +2,14 @@
 
 pragma solidity 0.8.28;
 
-import {ICoreRegistry, EcosystemContractRow} from "./ICoreRegistry.sol";
+import {ICoreRegistry} from "./ICoreRegistry.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {
     RegistryDuplicateProxyRow,
     RegistryUnknownKey,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
+import {CoreRegistryManifest, EcosystemContractRow} from "../RegistryTypes.sol";
 
 /// @title Core (ecosystem-wide) registry — one instance per protocol upgrade.
 /// @author Matter Labs
@@ -20,13 +21,6 @@ import {
 /// @dev Rows are source-checked edges (`expectedOldImpl -> implNew`) with MANDATORY inline
 ///      codehash pins on every new implementation — no detached, optional pin list.
 contract CoreRegistry is ICoreRegistry {
-    /// @notice Everything a core registry instance pins, set exactly once by {initialize}.
-    /// @dev Carries NO protocol version (version-schedule identity is owned by {CTMTransition})
-    ///      and NO proxy admin (the `EcosystemUpgradeExecutor` is bound to its immutable
-    ///      `ProxyAdmin`). A core registry pins ONLY the ecosystem contract rows.
-    struct CoreRegistryManifest {
-        EcosystemContractRow[] contractRows;
-    }
 
     /*//////////////////////////////////////////////////////////////
                               STORAGE

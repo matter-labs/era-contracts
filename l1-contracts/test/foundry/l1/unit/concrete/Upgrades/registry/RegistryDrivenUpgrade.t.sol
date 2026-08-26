@@ -9,8 +9,8 @@ import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgra
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
-import {ICTMTransition, L2UpgradePlan} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
-import {GenesisFacet} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
@@ -32,6 +32,7 @@ import {
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {ProtocolIdMismatch} from "contracts/common/L1ContractErrors.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {GenesisFacet, L2UpgradePlan, ReleaseManifest, TransitionManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice The first full registry-driven upgrade, end to end: a real chain diamond is taken
 ///         v32 -> v33 entirely through the CTM-bound `CTMUpgradeExecutor`, with the facet/hash
@@ -174,9 +175,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     function _releaseManifest(
         address _adminFacet,
         address _verifier
-    ) internal returns (CTMRelease.ReleaseManifest memory) {
+    ) internal returns (ReleaseManifest memory) {
         return
-            CTMRelease.ReleaseManifest({
+            ReleaseManifest({
                 diamondInit: diamondInit,
                 diamondInitCodehash: diamondInit.codehash,
                 verifier: _verifier,
@@ -254,7 +255,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         }
 
         transition = new CTMTransition(
-            CTMTransition.TransitionManifest({
+            TransitionManifest({
                 oldProtocolVersion: _oldVersion,
                 newProtocolVersion: _newVersion,
                 fromRelease: _fromRelease,

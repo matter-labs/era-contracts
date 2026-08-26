@@ -8,8 +8,9 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
-import {ICoreRegistry, EcosystemContractRow} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
+import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
 import {EcosystemImplMismatch, RegistryCodehashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {CoreRegistryManifest, EcosystemContractRow} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @dev Not a `CoreRegistry`: exercises the executor's codehash provenance check.
 contract NotACoreRegistry {
@@ -97,7 +98,7 @@ contract EcosystemUpgradeExecutorTest is Test {
     }
 
     function _deployRegistry(EcosystemContractRow[] memory _rows) internal returns (ICoreRegistry) {
-        return ICoreRegistry(address(new CoreRegistry(CoreRegistry.CoreRegistryManifest({contractRows: _rows}))));
+        return ICoreRegistry(address(new CoreRegistry(CoreRegistryManifest({contractRows: _rows}))));
     }
 
     function _applyL1Upgrade() internal {

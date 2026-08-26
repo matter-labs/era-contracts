@@ -2,9 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "../../upgrades/BaseZkSyncUpgrade.sol";
-import {IVerifier} from "../../state-transition/chain-interfaces/IVerifier.sol";
 
 contract CustomUpgradeTest is BaseZkSyncUpgrade {
     // add this to be excluded from coverage report
@@ -27,27 +25,8 @@ contract CustomUpgradeTest is BaseZkSyncUpgrade {
     function _postUpgrade(bytes memory _customCallDataForUpgrade) internal override {}
 
     /// @notice The main function that will be delegate-called by the chain.
-    /// @param _proposedUpgrade The upgrade to be executed.
-    function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
-        (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion, true);
-        _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        if (_proposedUpgrade.verifier != address(0)) {
-            _setVerifier(IVerifier(_proposedUpgrade.verifier));
-        }
-        _setBaseSystemContracts(
-            _proposedUpgrade.bootloaderHash,
-            _proposedUpgrade.defaultAccountHash,
-            _proposedUpgrade.evmEmulatorHash,
-            isPatchOnly
-        );
-
-        bytes32 txHash;
-        txHash = _setL2SystemContractUpgrade(_proposedUpgrade.l2ProtocolUpgradeTx, newMinorVersion, isPatchOnly);
-
-        _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
-
-        emit UpgradeComplete(_proposedUpgrade.newProtocolVersion, txHash, _proposedUpgrade);
-
-        return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
-    }
+    /// @dev Deliberately NOT overridden: {BaseZkSyncUpgrade.upgrade} already runs the whole
+    ///      sequence and calls the hooks above, and the verifier it installs comes from the
+    ///      proposed upgrade (which the transition composes from its target release) — the CTM
+    ///      holds no verifier to look one up in.
 }

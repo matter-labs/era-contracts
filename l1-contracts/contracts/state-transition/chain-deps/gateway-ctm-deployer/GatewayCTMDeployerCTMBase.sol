@@ -124,7 +124,6 @@ abstract contract GatewayCTMDeployerCTMBase {
         );
     }
 
-
     /// @notice Sets the previously deployed CTM inside the ServerNotifier and transfers ownership.
     /// @param _aliasedGovernanceAddress The aliased address of the governance.
     /// @param _result The result struct containing the deployed addresses.

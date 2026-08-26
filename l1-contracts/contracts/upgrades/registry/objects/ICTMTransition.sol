@@ -4,20 +4,7 @@ pragma solidity 0.8.28;
 
 import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
-
-/// @notice The complete, typed L2 side of one transition: the force-deployments, the delegate
-///         call the `L2ComplexUpgrader` performs after them, and the factory dependencies the
-///         L1 -> L2 transaction carries. Shape-validated at transition initialization — a plan
-///         that commits data the composed transaction would not execute refuses to exist.
-/// @dev This is REVIEWED-AND-PINNED data, not proven state: L1 cannot verify L2 execution
-///      effects, so the L1-side convergence guarantee deliberately does not extend here (see
-///      the transition contract docs).
-struct L2UpgradePlan {
-    IComplexUpgrader.UniversalContractUpgradeInfo[] deployments;
-    address delegateTo;
-    bytes delegateCalldata;
-    uint256[] factoryDepHashes;
-}
+import {L2UpgradePlan} from "../RegistryTypes.sol";
 
 /// @notice Immutable description of how one CTM release becomes another.
 /// @dev The facet cuts and base-system hash CHANGES are NOT authored: they are DERIVED from the

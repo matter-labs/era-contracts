@@ -5,10 +5,11 @@ pragma solidity 0.8.28;
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {ICoreRegistry, EcosystemContractRow} from "../objects/ICoreRegistry.sol";
+import {ICoreRegistry} from "../objects/ICoreRegistry.sol";
 import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
 import {EcosystemImplMismatch, EmptyBytes32, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
+import {EcosystemContractRow} from "../RegistryTypes.sol";
 
 /// @title EcosystemUpgradeExecutor
 /// @author Matter Labs

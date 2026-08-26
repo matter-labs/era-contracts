@@ -23,6 +23,7 @@ import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {GenesisManifestLib} from "contracts/upgrades/registry/libraries/GenesisManifestLib.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
+import {GenesisConfig} from "../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Test-friendly subclass of GatewayVotePreparation that exposes the
 /// initialization + calculateAddresses path without executing L1->L2 transactions.
@@ -272,7 +273,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
 
         CTMRelease release = new CTMRelease(
             GenesisManifestLib.buildGenesisManifest(
-                GenesisManifestLib.GenesisConfig({
+                GenesisConfig({
                     facets: contracts.stateTransition.facets,
                     verifier: contracts.stateTransition.verifiers.verifier,
                     bootloaderHash: config.bootloaderHash,

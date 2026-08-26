@@ -2,9 +2,10 @@
 
 pragma solidity 0.8.28;
 
-import {GenesisFacet, ICTMRelease} from "../objects/ICTMRelease.sol";
+import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {RegistryDuplicateSelector, RegistryHashChangeToZero} from "../../../common/L1ContractErrors.sol";
+import {GenesisFacet, L2UpgradePlan} from "../RegistryTypes.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

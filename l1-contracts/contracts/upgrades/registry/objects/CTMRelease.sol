@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {GenesisFacet, ICTMRelease} from "./ICTMRelease.sol";
+import {ICTMRelease} from "./ICTMRelease.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {
     RegistryDuplicateFacetRow,
@@ -11,6 +11,7 @@ import {
     RegistryUnknownKey,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
+import {GenesisFacet, ReleaseManifest} from "../RegistryTypes.sol";
 
 /// @notice Storage-backed, write-once description of one CTM release.
 /// @dev Every pinned address carries its expected `EXTCODEHASH` INLINE and MANDATORILY — the
@@ -19,23 +20,6 @@ import {
 ///      `validate()` / `verifyAll()` re-check the same pins afterwards. There is no optional,
 ///      detached pin list: what the release names, the release pins.
 contract CTMRelease is ICTMRelease {
-    // solhint-disable-next-line gas-struct-packing
-    struct ReleaseManifest {
-        address diamondInit;
-        bytes32 diamondInitCodehash;
-        address verifier;
-        bytes32 verifierCodehash;
-        GenesisFacet[] genesisFacets;
-        bytes32 bootloaderHash;
-        bytes32 defaultAccountHash;
-        bytes32 evmEmulatorHash;
-        bytes fixedForceDeploymentsData;
-        address genesisUpgrade;
-        bytes32 genesisUpgradeCodehash;
-        bytes32 genesisBatchHash;
-        bytes32 genesisBatchCommitment;
-        uint64 genesisIndexRepeatedStorageChanges;
-    }
 
     /// @notice `keccak256(abi.encode(manifest))`. No contract reads this — it is a review aid, a
     ///         single value to compare against the audited manifest. Provenance is the codehash.

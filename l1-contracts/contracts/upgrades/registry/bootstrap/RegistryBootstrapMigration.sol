@@ -6,7 +6,6 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {EcosystemContractRow} from "../objects/ICoreRegistry.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {CTMUpgradeExecutor} from "../executors/CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "../executors/EcosystemUpgradeExecutor.sol";
@@ -23,6 +22,7 @@ import {
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "../../../state-transition/L1StateTransitionErrors.sol";
+import {BootstrapManifest, EcosystemContractRow} from "../RegistryTypes.sol";
 
 /// @title RegistryBootstrapMigration
 /// @author Matter Labs
@@ -42,48 +42,6 @@ import {OutdatedProtocolVersion} from "../../../state-transition/L1StateTransiti
 ///      leaves to the executors before the call returns.
 contract RegistryBootstrapMigration {
     using CodehashPinLib for address;
-
-    /// @param ctm The ChainTypeManager proxy this migration bootstraps.
-    /// @param expectedProtocolVersion The version the CTM must currently be at (the departing one).
-    /// @param ctmProxyAdmin The ProxyAdmin owning every proxy in `proxyRows` (and the CTM proxy).
-    /// @param proxyRows Source-checked implementation swaps: each row applies only if the proxy
-    ///        currently points at `expectedOldImpl`, and each `implNew` carries an inline pin. The
-    ///        CTM's own implementation swap is one of these rows.
-    /// @param releaseCodehash The canonical provenance anchor installed on the CTM: the
-    ///        `EXTCODEHASH` every release this CTM pins must run.
-    /// @param currentRelease The genesis release pinned as `currentRelease`; must run
-    ///        `releaseCodehash`, which the CTM re-checks itself.
-    /// @param newProtocolVersion The version the CTM moves to.
-    /// @param oldProtocolVersionDeadline Until when the departing version stays usable.
-    /// @param upgradeCut The diamond cut committed for chains upgrading across this edge. It cannot
-    ///        be DERIVED the way a transition's is: the departing version predates releases, so
-    ///        there is no `fromRelease` to diff against. It is therefore pinned data, committed by
-    ///        the manifest hash, with its init target pinned separately below. Its `facetCuts` carry
-    ///        no per-facet pins — the one unpinned payload here, and the reason this edge is
-    ///        reviewed as legacy calldata rather than as a derived delta.
-    /// @param upgradeCutInitCodehash Inline pin of `upgradeCut.initAddress`.
-    /// @param ctmExecutor The `CTMUpgradeExecutor` that receives CTM ownership. It must be BOUND to
-    ///        `ctm`, otherwise its fixed entrypoints could never drive the CTM it is handed.
-    /// @param ctmExecutorCodehash Inline pin of `ctmExecutor`.
-    /// @param ecosystemExecutor The `EcosystemUpgradeExecutor` that receives ProxyAdmin ownership.
-    ///        It must be BOUND to `ctmProxyAdmin`, for the same reason.
-    /// @param ecosystemExecutorCodehash Inline pin of `ecosystemExecutor`.
-    struct BootstrapManifest {
-        address ctm;
-        uint256 expectedProtocolVersion;
-        ProxyAdmin ctmProxyAdmin;
-        EcosystemContractRow[] proxyRows;
-        bytes32 releaseCodehash;
-        address currentRelease;
-        uint256 newProtocolVersion;
-        uint256 oldProtocolVersionDeadline;
-        Diamond.DiamondCutData upgradeCut;
-        bytes32 upgradeCutInitCodehash;
-        address ctmExecutor;
-        bytes32 ctmExecutorCodehash;
-        address ecosystemExecutor;
-        bytes32 ecosystemExecutorCodehash;
-    }
 
     /// @notice Commitment to the pinned manifest — the 32 bytes governance approves.
     bytes32 public manifestHash;

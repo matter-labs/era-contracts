@@ -16,8 +16,7 @@ import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
-import {EcosystemContractRow} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
-import {GenesisFacet} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -31,6 +30,7 @@ import {
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {BootstrapManifest, EcosystemContractRow, GenesisFacet, ReleaseManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @dev Two distinct implementations so a proxy row is a real `expectedOldImpl -> implNew` edge.
 contract ImplV31 {
@@ -113,7 +113,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             });
         }
         result = new CTMRelease(
-            CTMRelease.ReleaseManifest({
+            ReleaseManifest({
                 diamondInit: diamondInit,
                 diamondInitCodehash: diamondInit.codehash,
                 verifier: address(testnetVerifier),
@@ -132,7 +132,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         );
     }
 
-    function _manifest() internal view returns (RegistryBootstrapMigration.BootstrapManifest memory) {
+    function _manifest() internal view returns (BootstrapManifest memory) {
         EcosystemContractRow[] memory rows = new EcosystemContractRow[](1);
         rows[0] = EcosystemContractRow({
             proxy: address(ecosystemProxy),
@@ -142,7 +142,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         });
         Diamond.FacetCut[] memory noFacetCuts = new Diamond.FacetCut[](0);
         return
-            RegistryBootstrapMigration.BootstrapManifest({
+            BootstrapManifest({
                 ctm: address(chainContractAddress),
                 expectedProtocolVersion: chainContractAddress.protocolVersion(),
                 ctmProxyAdmin: ecosystemProxyAdmin,
@@ -243,7 +243,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             IChainTypeManager(foreignCtm),
             Utils.transitionCodehash()
         );
-        RegistryBootstrapMigration.BootstrapManifest memory manifest = _manifest();
+        BootstrapManifest memory manifest = _manifest();
         manifest.ctmExecutor = address(foreignExecutor);
         manifest.ctmExecutorCodehash = address(foreignExecutor).codehash;
 
@@ -272,7 +272,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             foreignProxyAdmin,
             Utils.coreRegistryCodehash()
         );
-        RegistryBootstrapMigration.BootstrapManifest memory manifest = _manifest();
+        BootstrapManifest memory manifest = _manifest();
         manifest.ecosystemExecutor = address(foreignExecutor);
         manifest.ecosystemExecutorCodehash = address(foreignExecutor).codehash;
 
@@ -327,7 +327,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             implNew: implV31,
             implNewCodehash: implV31.codehash
         });
-        RegistryBootstrapMigration.BootstrapManifest memory manifest = _manifest();
+        BootstrapManifest memory manifest = _manifest();
         manifest.proxyRows = rows;
 
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateProxyRow.selector, address(ecosystemProxy)));
@@ -342,7 +342,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             implNew: implV32,
             implNewCodehash: implV32.codehash
         });
-        RegistryBootstrapMigration.BootstrapManifest memory manifest = _manifest();
+        BootstrapManifest memory manifest = _manifest();
         manifest.proxyRows = rows;
 
         vm.expectRevert(ZeroAddress.selector);
@@ -433,7 +433,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
     function _manifestWithExpectedVersion(
         uint256 _expectedVersion
-    ) internal view returns (RegistryBootstrapMigration.BootstrapManifest memory manifest) {
+    ) internal view returns (BootstrapManifest memory manifest) {
         manifest = _manifest();
         manifest.expectedProtocolVersion = _expectedVersion;
     }

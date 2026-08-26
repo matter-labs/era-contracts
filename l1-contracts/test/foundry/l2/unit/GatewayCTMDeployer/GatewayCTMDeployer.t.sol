@@ -47,7 +47,7 @@ import {ValidatorTimelock} from "contracts/state-transition/validators/Validator
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
-import {GenesisFacet} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
@@ -74,6 +74,7 @@ import {
     DeployedContractsComparator,
     GatewayCTMDeployerTestUtils
 } from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
+import {GenesisFacet, ReleaseManifest} from "../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 // We need to use contract the zkfoundry consistently uses
 // zk environment only within a deployed contract
@@ -200,7 +201,7 @@ contract GatewayCTMDeployerTest is Test {
         });
 
         new CTMRelease(
-            CTMRelease.ReleaseManifest({
+            ReleaseManifest({
                 diamondInit: address(diamondInit),
                 diamondInitCodehash: address(diamondInit).codehash,
                 verifier: address(verifier),

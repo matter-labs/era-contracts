@@ -2,19 +2,7 @@
 
 pragma solidity 0.8.28;
 
-/// @notice One facet installed on every chain created from a CTM release.
-/// @dev `selectors` is the EXPLICIT, complete routing for this facet — never empty. Releases are
-///      the canonical routing source (transitions derive their cuts from release pairs), so the
-///      routing must be reviewable data in the manifest, not an execution-time code read.
-/// @dev `codehash` is the MANDATORY `EXTCODEHASH` pin of `facet` — verified at initialization
-///      and by `validate()` / `verifyAll()`. Pins sit beside the address they protect; there is
-///      no detached, optional pin list.
-struct GenesisFacet {
-    address facet;
-    bool isFreezable;
-    bytes4[] selectors;
-    bytes32 codehash;
-}
+import {GenesisFacet} from "../RegistryTypes.sol";
 
 /// @notice Immutable description of one CTM release: the version-INDEPENDENT, reusable
 ///         genesis / post-upgrade state a chain at this release runs — facets, DiamondInit,

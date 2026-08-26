@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
-import {ICTMTransition, L2UpgradePlan} from "../objects/ICTMTransition.sol";
+import {ICTMTransition} from "../objects/ICTMTransition.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
 import {IDiamondInit} from "../../../state-transition/chain-interfaces/IDiamondInit.sol";
@@ -17,6 +17,7 @@ import {
 } from "../../../common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {SEMVER_MINOR_OFFSET} from "../../../common/libraries/SemVer.sol";
+import {L2UpgradePlan} from "../RegistryTypes.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

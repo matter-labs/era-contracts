@@ -10,8 +10,8 @@ import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
-import {ICTMTransition, L2UpgradePlan} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
-import {GenesisFacet} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
@@ -25,6 +25,7 @@ import {
     UpgradeNotPermissionlessYet
 } from "contracts/common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {GenesisFacet, L2UpgradePlan, ReleaseManifest, TransitionManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Exercises the CTM-BOUND executor against real write-once release and transition
 ///         objects. Release data describes new-chain genesis; transition data describes the one
@@ -95,7 +96,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
     /// @dev The release describes the complete chain state after the (facet-neutral) hop this
     ///      suite drives: the fixture's full facet routing (explicit selectors, inline pins) and
     ///      the carried base-system hashes — the transition derives an EMPTY delta from it.
-    function _releaseManifest(uint256 _commitmentNonce) internal view returns (CTMRelease.ReleaseManifest memory) {
+    function _releaseManifest(uint256 _commitmentNonce) internal view returns (ReleaseManifest memory) {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
             genesisFacets[i] = GenesisFacet({
@@ -106,7 +107,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
             });
         }
         return
-            CTMRelease.ReleaseManifest({
+            ReleaseManifest({
                 diamondInit: diamondInit,
                 diamondInitCodehash: diamondInit.codehash,
                 verifier: address(testnetVerifier),
@@ -148,7 +149,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         factoryDeps[0] = 1;
 
         result = new CTMTransition(
-            CTMTransition.TransitionManifest({
+            TransitionManifest({
                     oldProtocolVersion: _oldProtocolVersion,
                     newProtocolVersion: newVersion,
                     // The default transition departs from whatever release the fixture CTM was

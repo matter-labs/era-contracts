@@ -3,9 +3,10 @@
 pragma solidity 0.8.28;
 
 import {CTMRelease} from "../objects/CTMRelease.sol";
-import {GenesisFacet} from "../objects/ICTMRelease.sol";
+
 import {Facets} from "../../../common/StateTransitionTypes.sol";
 import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
+import {GenesisConfig, GenesisFacet, ReleaseManifest} from "../RegistryTypes.sol";
 
 /// @title Genesis (bootstrap) manifest builder.
 /// @author Matter Labs
@@ -20,36 +21,9 @@ import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/I
 library GenesisManifestLib {
     uint256 internal constant GENESIS_FACET_COUNT = 6;
 
-    /// @notice Everything the deploy flow feeds into a bootstrap manifest.
-    /// @dev A release is version-INDEPENDENT and VM-flag-free: the version schedule is a transition
-    ///      concern, and VM identity is single-sourced from the pinned DiamondInit immutable.
-    /// @param facets The deployed diamond facet addresses (incl. DiamondInit).
-    /// @param verifier The verifier a chain at this release runs.
-    /// @param bootloaderHash The hash of the bootloader L2 bytecode (zero on ZKsync OS).
-    /// @param defaultAccountHash The hash of the default account L2 bytecode (zero on ZKsync OS).
-    /// @param evmEmulatorHash The hash of the EVM emulator L2 bytecode (zero on ZKsync OS).
-    /// @param genesisUpgrade The L1 genesis upgrade contract run at chain creation.
-    /// @param genesisBatchHash The genesis (batch zero) state root.
-    /// @param genesisBatchCommitment The genesis batch commitment (must be 1 on ZKsync OS).
-    /// @param genesisIndexRepeatedStorageChanges The genesis repeated-storage index.
-    /// @param fixedForceDeploymentsData The ecosystem-wide fixed force-deployment descriptor.
-    // solhint-disable-next-line gas-struct-packing
-    struct GenesisConfig {
-        Facets facets;
-        address verifier;
-        bytes32 bootloaderHash;
-        bytes32 defaultAccountHash;
-        bytes32 evmEmulatorHash;
-        address genesisUpgrade;
-        bytes32 genesisBatchHash;
-        bytes32 genesisBatchCommitment;
-        uint64 genesisIndexRepeatedStorageChanges;
-        bytes fixedForceDeploymentsData;
-    }
-
     function buildGenesisManifest(
         GenesisConfig memory _cfg
-    ) internal view returns (CTMRelease.ReleaseManifest memory manifest) {
+    ) internal view returns (ReleaseManifest memory manifest) {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](GENESIS_FACET_COUNT);
 
         // The canonical facet set of a new chain diamond, with explicit routing and inline pins
@@ -89,7 +63,7 @@ library GenesisManifestLib {
         bytes32 _diamondInitCodehash,
         bytes32 _verifierCodehash,
         bytes32 _genesisUpgradeCodehash
-    ) internal pure returns (CTMRelease.ReleaseManifest memory manifest) {
+    ) internal pure returns (ReleaseManifest memory manifest) {
         manifest.diamondInit = _cfg.facets.diamondInit;
         manifest.diamondInitCodehash = _diamondInitCodehash;
         manifest.verifier = _cfg.verifier;

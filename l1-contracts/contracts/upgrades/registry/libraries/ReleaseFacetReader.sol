@@ -2,8 +2,9 @@
 
 pragma solidity 0.8.28;
 
-import {GenesisFacet, ICTMRelease} from "../objects/ICTMRelease.sol";
+import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
+import {GenesisFacet} from "../RegistryTypes.sol";
 
 /// @notice Turns a release's explicit facet routing into the genesis diamond cut.
 /// @dev No self-description fallback: releases carry complete, reviewable selector lists

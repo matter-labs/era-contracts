@@ -5,11 +5,11 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
-import {EcosystemContractRow} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
+
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
-import {ICTMTransition, L2UpgradePlan} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
-import {ICTMRelease, GenesisFacet} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {ReleaseFacetReader} from "contracts/upgrades/registry/libraries/ReleaseFacetReader.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -43,6 +43,7 @@ import {
     ProtocolVersionMinorDeltaTooBig,
     ProtocolVersionTooSmall
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {CoreRegistryManifest, EcosystemContractRow, GenesisFacet, L2UpgradePlan, ReleaseManifest, TransitionManifest} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Unit tests for the write-once upgrade objects in the DERIVED model: releases carry
 ///         explicit routing + inline mandatory pins; transitions derive their facet/hash delta
@@ -99,7 +100,7 @@ contract StorageRegistriesTest is Test {
         vm.etch(addr, bytes.concat(hex"00", bytes(_name)));
     }
 
-    function _coreManifest() internal view returns (CoreRegistry.CoreRegistryManifest memory manifest) {
+    function _coreManifest() internal view returns (CoreRegistryManifest memory manifest) {
         // A single full source-checked edge — every core row must be a real, unique edge;
         // placeholder (all-zero) rows are rejected at the registry boundary.
         EcosystemContractRow[] memory rows = new EcosystemContractRow[](1);
@@ -109,14 +110,14 @@ contract StorageRegistriesTest is Test {
             implNew: coreImplNew,
             implNewCodehash: coreImplNew.codehash
         });
-        return CoreRegistry.CoreRegistryManifest({contractRows: rows});
+        return CoreRegistryManifest({contractRows: rows});
     }
 
     function _releaseManifest(
         address _adminFacet,
         bytes4[] memory _adminSelectors,
         bytes32 _bootloaderHash
-    ) internal view returns (CTMRelease.ReleaseManifest memory manifest) {
+    ) internal view returns (ReleaseManifest memory manifest) {
         GenesisFacet[] memory facets = new GenesisFacet[](3);
         facets[0] = GenesisFacet({
             facet: _adminFacet,
@@ -137,7 +138,7 @@ contract StorageRegistriesTest is Test {
             codehash: facetFrozen.codehash
         });
         return
-            CTMRelease.ReleaseManifest({
+            ReleaseManifest({
                 diamondInit: diamondInit,
                 diamondInitCodehash: diamondInit.codehash,
                 verifier: verifier,
@@ -155,11 +156,11 @@ contract StorageRegistriesTest is Test {
             });
     }
 
-    function _fromReleaseManifest() internal view returns (CTMRelease.ReleaseManifest memory) {
+    function _fromReleaseManifest() internal view returns (ReleaseManifest memory) {
         return _releaseManifest(facetOldAdmin, _selectors2(bytes4(uint32(1)), bytes4(uint32(2))), BOOTLOADER_FROM);
     }
 
-    function _newReleaseManifest() internal view returns (CTMRelease.ReleaseManifest memory) {
+    function _newReleaseManifest() internal view returns (ReleaseManifest memory) {
         // The hop replaces the admin facet (new address AND new selector set) and bumps the
         // bootloader hash; the shared + frozen facets carry over unchanged.
         return _releaseManifest(facetNewAdmin, _selectors2(bytes4(uint32(2)), bytes4(uint32(3))), BOOTLOADER_NEW);
@@ -190,9 +191,9 @@ contract StorageRegistriesTest is Test {
             });
     }
 
-    function _transitionManifest() internal view returns (CTMTransition.TransitionManifest memory manifest) {
+    function _transitionManifest() internal view returns (TransitionManifest memory manifest) {
         return
-            CTMTransition.TransitionManifest({
+            TransitionManifest({
                 oldProtocolVersion: OLD_VERSION,
                 newProtocolVersion: NEW_VERSION,
                 fromRelease: address(fromRelease),
@@ -294,7 +295,7 @@ contract StorageRegistriesTest is Test {
     /// @dev Regression: a delegate-only L2 plan (no force-deployments) must still compose a
     ///      transaction — previously such committed data was silently discarded.
     function test_composerBuildsDelegateOnlyL2Tx() public {
-        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        TransitionManifest memory manifest = _transitionManifest();
         manifest.l2Plan.deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
         manifest.l2Plan.factoryDepHashes = new uint256[](0);
         CTMTransition delegateOnly = new CTMTransition(manifest);
@@ -316,7 +317,7 @@ contract StorageRegistriesTest is Test {
 
     /// @dev A verifier/schedule-only SemVer patch: same release on both edges, +1 patch
     ///      version, and NO L2 payload — the only shape a same-release hop may take.
-    function _patchManifest() internal view returns (CTMTransition.TransitionManifest memory manifest) {
+    function _patchManifest() internal view returns (TransitionManifest memory manifest) {
         manifest = _transitionManifest();
         manifest.oldProtocolVersion = NEW_VERSION;
         manifest.newProtocolVersion = NEW_VERSION + 1;
@@ -342,7 +343,7 @@ contract StorageRegistriesTest is Test {
     }
 
     function test_revertWhen_sameReleaseTransitionCarriesL2Payload() public {
-        CTMTransition.TransitionManifest memory manifest = _patchManifest();
+        TransitionManifest memory manifest = _patchManifest();
         manifest.l2Plan.delegateTo = address(0x10004);
 
         vm.expectRevert(SameReleaseTransitionHasPayload.selector);
@@ -350,7 +351,7 @@ contract StorageRegistriesTest is Test {
     }
 
     function test_revertWhen_patchTargetsDifferentRelease() public {
-        CTMTransition.TransitionManifest memory manifest = _patchManifest();
+        TransitionManifest memory manifest = _patchManifest();
         manifest.fromRelease = address(fromRelease);
 
         vm.expectRevert(
@@ -362,7 +363,7 @@ contract StorageRegistriesTest is Test {
     // ─────────────────────────── schedule / version guards ───────────────────────────
 
     function test_revertWhen_transitionVersionNotIncreasing() public {
-        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        TransitionManifest memory manifest = _transitionManifest();
         manifest.newProtocolVersion = manifest.oldProtocolVersion;
 
         vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, OLD_VERSION, OLD_VERSION));
@@ -373,7 +374,7 @@ contract StorageRegistriesTest is Test {
     ///      requires every selector of one facet to share freezability, so a split-row release would
     ///      pin fine and then revert at genesis (and in any cut that adds it).
     function test_revertWhen_releaseSplitsOneFacetAcrossRows() public {
-        CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
+        ReleaseManifest memory manifest = _newReleaseManifest();
         // Re-point the frozen row at the shared facet, keeping its distinct selectors: same facet
         // address in two rows, with DIFFERENT freezability.
         manifest.genesisFacets[2].facet = facetShared;
@@ -387,7 +388,7 @@ contract StorageRegistriesTest is Test {
     ///      execution (`BaseZkSyncUpgrade._setNewProtocolVersion`). Otherwise the transition pins,
     ///      `applyCTMUpgrade` bumps the CTM, and every per-chain upgrade then reverts.
     function test_revertWhen_transitionUsesNonzeroMajorVersion() public {
-        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        TransitionManifest memory manifest = _transitionManifest();
         // major = 1 — rejected per-chain, so it must be rejected at pin time too.
         manifest.newProtocolVersion = SemVer.packSemVer(1, 0, 0);
 
@@ -396,7 +397,7 @@ contract StorageRegistriesTest is Test {
     }
 
     function test_revertWhen_transitionMinorDeltaTooBig() public {
-        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        TransitionManifest memory manifest = _transitionManifest();
         (, uint32 oldMinor, ) = SemVer.unpackSemVer(uint96(manifest.oldProtocolVersion));
         uint32 tooFar = oldMinor + uint32(MAX_ALLOWED_MINOR_VERSION_DELTA) + 1;
         manifest.newProtocolVersion = SemVer.packSemVer(0, tooFar, 0);
@@ -415,7 +416,7 @@ contract StorageRegistriesTest is Test {
     ///      rejected at pin time. Otherwise `applyCTMUpgrade` bumps the CTM version and every
     ///      per-chain upgrade then reverts, stranding chains on an unexecutable transition.
     function test_revertWhen_transitionExceedsFactoryDepCap() public {
-        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        TransitionManifest memory manifest = _transitionManifest();
         uint256[] memory tooManyDeps = new uint256[](MAX_NEW_FACTORY_DEPS + 1);
         for (uint256 i = 0; i < tooManyDeps.length; ++i) {
             tooManyDeps[i] = i + 1;
@@ -432,14 +433,14 @@ contract StorageRegistriesTest is Test {
     ///      value, so the derivation rejects it instead of storing a silent no-op.
     function test_revertWhen_transitionBlanksBaseSystemHash() public {
         // A target release identical to the source except that the bootloader hash goes to zero.
-        CTMRelease.ReleaseManifest memory blankingManifest = _releaseManifest(
+        ReleaseManifest memory blankingManifest = _releaseManifest(
             facetNewAdmin,
             _selectors2(bytes4(uint32(2)), bytes4(uint32(3))),
             bytes32(0)
         );
         CTMRelease blankingRelease = new CTMRelease(blankingManifest);
 
-        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        TransitionManifest memory manifest = _transitionManifest();
         manifest.newRelease = address(blankingRelease);
 
         vm.expectRevert(RegistryHashChangeToZero.selector);
@@ -449,7 +450,7 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_deadlineBeforeUpgradeTimestamp() public {
         // A deadline before the upgrade timestamp would disable the old protocol before chains
         // are even allowed to upgrade.
-        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        TransitionManifest memory manifest = _transitionManifest();
         manifest.oldProtocolVersionDeadline = manifest.upgradeTimestamp - 1;
 
         vm.expectRevert(
@@ -465,7 +466,7 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_fromReleaseZero() public {
         // Pre-registry migration is one-time migration code in the legacy scripts, not a
         // permanent zero-source special case.
-        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        TransitionManifest memory manifest = _transitionManifest();
         manifest.fromRelease = address(0);
 
         vm.expectRevert(ZeroAddress.selector);
@@ -475,7 +476,7 @@ contract StorageRegistriesTest is Test {
     // ─────────────────────────── L2 plan shape ───────────────────────────
 
     function test_revertWhen_delegateCalldataWithoutTarget() public {
-        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        TransitionManifest memory manifest = _transitionManifest();
         manifest.l2Plan.delegateTo = address(0);
         // delegateCalldata stays "beef" — data the composed tx would never execute.
 
@@ -484,7 +485,7 @@ contract StorageRegistriesTest is Test {
     }
 
     function test_revertWhen_factoryDepsWithoutL2Side() public {
-        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        TransitionManifest memory manifest = _transitionManifest();
         manifest.l2Plan.deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
         manifest.l2Plan.delegateTo = address(0);
         manifest.l2Plan.delegateCalldata = "";
@@ -498,7 +499,7 @@ contract StorageRegistriesTest is Test {
         // Force-deployments but no delegate target: `L2ComplexUpgrader` always ends with the final
         // delegatecall, so a deployments-only plan would initialize here yet revert on L2 forever.
         // (delegateCalldata is cleared so ONLY the deployments-without-target rule can fire.)
-        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        TransitionManifest memory manifest = _transitionManifest();
         manifest.l2Plan.delegateTo = address(0);
         manifest.l2Plan.delegateCalldata = "";
 
@@ -509,7 +510,7 @@ contract StorageRegistriesTest is Test {
     // ─────────────────────────── routing hygiene ───────────────────────────
 
     function test_revertWhen_releaseRowHasEmptySelectors() public {
-        CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
+        ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets[1].selectors = new bytes4[](0);
 
         vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, facetShared));
@@ -519,7 +520,7 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_releaseHasNoFacets() public {
         // A release IS a complete chain routing: an empty facet set describes an unusable chain
         // and would derive a remove-everything delta. Rejected at the release boundary.
-        CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
+        ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets = new GenesisFacet[](0);
 
         vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, address(0)));
@@ -533,7 +534,7 @@ contract StorageRegistriesTest is Test {
         // them against each other there would prove nothing — and `validate()` is where the pins
         // are held against live code, on every execution path.
         address codeless = makeAddr("codelessFacet");
-        CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
+        ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets[0].facet = codeless;
         manifest.genesisFacets[0].codehash = codeless.codehash;
         CTMRelease codelessRelease = new CTMRelease(manifest);
@@ -546,7 +547,7 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_releaseRoutesSelectorTwice() public {
         // A release validates its OWN routing: a selector routed twice is rejected at release
         // initialization — the release boundary, before any transition ever derives from it.
-        CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
+        ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets[1].selectors[0] = bytes4(uint32(0x20)); // collides with facetFrozen
 
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateSelector.selector, bytes4(uint32(0x20))));
@@ -563,7 +564,7 @@ contract StorageRegistriesTest is Test {
         // VALID release is accepted here and derives a normal delta.
         CTMRelease handDeployed = new CTMRelease(_newReleaseManifest());
 
-        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        TransitionManifest memory manifest = _transitionManifest();
         manifest.newRelease = address(handDeployed);
 
         CTMTransition deferred = new CTMTransition(manifest);
@@ -573,7 +574,7 @@ contract StorageRegistriesTest is Test {
     // ─────────────────────────── pins ───────────────────────────
 
     function test_revertWhen_transitionPinMismatch() public {
-        CTMTransition.TransitionManifest memory manifest = _transitionManifest();
+        TransitionManifest memory manifest = _transitionManifest();
         manifest.upgradeEngineCodehash = keccak256("not the engine's code");
         CTMTransition mispinned = new CTMTransition(manifest);
 
@@ -591,7 +592,7 @@ contract StorageRegistriesTest is Test {
 
     /// @dev The verifier pin moved to the release along with the verifier itself.
     function test_revertWhen_releaseVerifierPinMismatch() public {
-        CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
+        ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.verifierCodehash = keccak256("not the verifier's code");
         CTMRelease mispinned = new CTMRelease(manifest);
 
@@ -635,7 +636,7 @@ contract StorageRegistriesTest is Test {
 
     function test_revertWhen_upgradingRowMissingSource() public {
         // A row that upgrades must be a full edge: known source implementation.
-        CoreRegistry.CoreRegistryManifest memory manifest = _coreManifest();
+        CoreRegistryManifest memory manifest = _coreManifest();
         manifest.contractRows[0].expectedOldImpl = address(0);
 
         vm.expectRevert(ZeroAddress.selector);
@@ -645,7 +646,7 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_coreRegistryRowHasNoImplementation() public {
         // Every core row is a real edge — a placeholder that pins no new implementation
         // (implNew == 0) is refused; the old "skip zero rows" behavior is gone.
-        CoreRegistry.CoreRegistryManifest memory manifest = _coreManifest();
+        CoreRegistryManifest memory manifest = _coreManifest();
         manifest.contractRows[0].implNew = address(0);
         manifest.contractRows[0].implNewCodehash = bytes32(0);
 
@@ -655,7 +656,7 @@ contract StorageRegistriesTest is Test {
 
     function test_revertWhen_coreRegistryHasDuplicateProxyRow() public {
         // A proxy is routed once: two rows naming the same proxy are rejected.
-        CoreRegistry.CoreRegistryManifest memory manifest = _coreManifest();
+        CoreRegistryManifest memory manifest = _coreManifest();
         EcosystemContractRow[] memory rows = new EcosystemContractRow[](2);
         rows[0] = manifest.contractRows[0];
         rows[1] = manifest.contractRows[0]; // same proxy again

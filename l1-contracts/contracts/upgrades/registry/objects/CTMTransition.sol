@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ICTMRelease} from "./ICTMRelease.sol";
-import {ICTMTransition, L2UpgradePlan} from "./ICTMTransition.sol";
+import {ICTMTransition} from "./ICTMTransition.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {TransitionDeltaLib} from "../libraries/TransitionDeltaLib.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
@@ -25,6 +25,7 @@ import {
     TransitionDeadlineBeforeUpgrade,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
+import {L2UpgradePlan, TransitionManifest} from "../RegistryTypes.sol";
 
 /// @notice Storage-backed, write-once transition between two CTM releases.
 /// @dev The facet cuts and base-system hash changes are NOT part of the manifest: they are
@@ -37,18 +38,6 @@ import {
 ///      mechanism as facet routing. The L2 plan is reviewed-and-pinned data (L1 cannot verify L2
 ///      execution effects); the on-chain convergence guarantee covers L1 state only.
 contract CTMTransition is ICTMTransition {
-    // solhint-disable-next-line gas-struct-packing
-    struct TransitionManifest {
-        uint256 oldProtocolVersion;
-        uint256 newProtocolVersion;
-        address fromRelease;
-        address newRelease;
-        address upgradeEngine;
-        bytes32 upgradeEngineCodehash;
-        uint256 oldProtocolVersionDeadline;
-        uint256 upgradeTimestamp;
-        L2UpgradePlan l2Plan;
-    }
 
     /// @notice `keccak256(abi.encode(manifest))`. No contract reads this — it is a review aid, a
     ///         single value to compare against the audited manifest. Provenance is the codehash.

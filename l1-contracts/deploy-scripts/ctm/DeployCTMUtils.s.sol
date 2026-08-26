@@ -63,6 +63,7 @@ import {
 import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 
 import {CTMDeployedAddresses} from "../utils/Types.sol";
+import {GenesisConfig, ReleaseManifest} from "../../contracts/upgrades/registry/RegistryTypes.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -140,8 +141,8 @@ abstract contract DeployCTMUtils is DeployUtils {
         }
 
         require(generatedData.forceDeploymentsData.length != 0, "force deployments data is empty");
-        CTMRelease.ReleaseManifest memory manifest = GenesisManifestLib.buildGenesisManifest(
-            GenesisManifestLib.GenesisConfig({
+        ReleaseManifest memory manifest = GenesisManifestLib.buildGenesisManifest(
+            GenesisConfig({
                 facets: ctmAddresses.stateTransition.facets,
                 verifier: ctmAddresses.stateTransition.verifiers.verifier,
                 bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
