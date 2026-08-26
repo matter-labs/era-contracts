@@ -34,6 +34,7 @@ enum CTMContract {
     // ---- Infrastructure ----
     ValidatorTimelock,
     ChainTypeManager,
+    DefaultUpgrade,
     // ---- Verifiers ----
     VerifierFflonk,
     VerifierPlonk,
@@ -182,6 +183,9 @@ library DeployCTML1OrGateway {
         // Contracts with different names per VM
         if (_c == CTMContract.ChainTypeManager) {
             return _isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        }
+        if (_c == CTMContract.DefaultUpgrade) {
+            return _isZKsyncOS ? "DefaultUpgradeZKsyncOS" : "DefaultUpgrade";
         }
         if (_c == CTMContract.VerifierFflonk) {
             if (_isZKsyncOS) revert("DeployCTML1OrGateway: ZKsync OS does not use FFLONK");
