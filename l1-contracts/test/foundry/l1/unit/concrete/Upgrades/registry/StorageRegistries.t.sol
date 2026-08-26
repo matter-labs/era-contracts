@@ -529,13 +529,18 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_releasePinsCodelessFacet() public {
         // A codehash pin must be over ACTUAL code: an address with no code is not a real
         // implementation (its EXTCODEHASH is zero / the empty-code hash), so pinning it is refused.
+        // Construction accepts it — the manifest supplies both halves of the pair, so checking
+        // them against each other there would prove nothing — and `validate()` is where the pins
+        // are held against live code, on every execution path.
         address codeless = makeAddr("codelessFacet");
         CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets[0].facet = codeless;
         manifest.genesisFacets[0].codehash = codeless.codehash;
+        CTMRelease codelessRelease = new CTMRelease(manifest);
 
         vm.expectRevert(abi.encodeWithSelector(RegistryPinTargetHasNoCode.selector, codeless));
-        new CTMRelease(manifest);
+        codelessRelease.validate();
+        assertFalse(codelessRelease.verifyAll(), "a codeless pin must not verify");
     }
 
     function test_revertWhen_releaseRoutesSelectorTwice() public {
@@ -570,6 +575,7 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_transitionPinMismatch() public {
         CTMTransition.TransitionManifest memory manifest = _transitionManifest();
         manifest.upgradeEngineCodehash = keccak256("not the engine's code");
+        CTMTransition mispinned = new CTMTransition(manifest);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -579,13 +585,15 @@ contract StorageRegistriesTest is Test {
                 upgradeEngine.codehash
             )
         );
-        CTMTransition mispinned = new CTMTransition(manifest);
+        mispinned.validate();
+        assertFalse(mispinned.verifyAll(), "a mispinned engine must not verify");
     }
 
     /// @dev The verifier pin moved to the release along with the verifier itself.
     function test_revertWhen_releaseVerifierPinMismatch() public {
         CTMRelease.ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.verifierCodehash = keccak256("not the verifier's code");
+        CTMRelease mispinned = new CTMRelease(manifest);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -595,7 +603,8 @@ contract StorageRegistriesTest is Test {
                 verifier.codehash
             )
         );
-        new CTMRelease(manifest);
+        mispinned.validate();
+        assertFalse(mispinned.verifyAll(), "a mispinned verifier must not verify");
     }
 
     function test_validateRejectsCodehashDrift() public {

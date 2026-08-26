@@ -76,7 +76,6 @@ import { DeploymentRunner } from "../deployment-runner";
 import { ANVIL_DEFAULT_PRIVATE_KEY, L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR } from "../core/const";
 import {
   getAbi,
-  getBytecode,
   getCreationBytecode,
   getDeterministicBytecode,
   getDeterministicCreationBytecode,
@@ -100,7 +99,6 @@ const CTM_REGISTRY_NAME = "ZKsyncOS";
 
 // The fixed release/transition/core-registry implementations live here; the incremental forge
 // build below keeps their artifacts current before deployment.
-const REGISTRY_CONTRACTS_DIR_REL = "contracts/upgrades/registry";
 // Committed manifest for the local (chain-states) environment — the reviewable per-upgrade
 // artifact the upgrade objects are initialized from. The default CONSUME mode reads it as-is;
 // the EMIT mode (REGEN_REGISTRIES=1) rewrites it so the diff can be reviewed and committed.
@@ -131,6 +129,11 @@ const DETERMINISTIC_SOURCES = [
   "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol",
   "contracts/core/message-root/L1MessageRoot.sol",
   "contracts/dev-contracts/MockContractDeployer.sol",
+  // The objects themselves: the CTM's `releaseCodehash` anchor and the executors' type pins are
+  // codehashes of THIS build, so they have to be deployed from it too.
+  "contracts/upgrades/registry/CTMRelease.sol",
+  "contracts/upgrades/registry/CTMTransition.sol",
+  "contracts/upgrades/registry/CoreRegistry.sol",
 ];
 
 // Fixed L2 address the transition pins for the upgrade's L2 delegate target (and its unsafe
@@ -645,9 +648,11 @@ async function deployUpgradeMachinery(
   const newVerifierPlonk = await deployPinned("ZKsyncOSVerifierPlonk", []);
   // Type provenance is a CODEHASH: each executor is bound at construction to the audited code
   // every transition / core registry it accepts must run. Neither object has immutables, so the
-  // artifact's runtime bytecode IS what they carry once deployed.
-  const transitionCodehash = ethers.utils.keccak256(getBytecode("CTMTransition"));
-  const coreRegistryCodehash = ethers.utils.keccak256(getBytecode("CoreRegistry"));
+  // artifact's runtime bytecode IS what they carry once deployed — from the DETERMINISTIC build,
+  // the same one the objects themselves are deployed from below (and the one the chain states'
+  // release was deployed from, so all three anchors agree).
+  const transitionCodehash = ethers.utils.keccak256(getDeterministicBytecode("CTMTransition"));
+  const coreRegistryCodehash = ethers.utils.keccak256(getDeterministicBytecode("CoreRegistry"));
   return {
     transitionCodehash,
     coreRegistryCodehash,
@@ -923,8 +928,8 @@ function assertCommittedManifestMatchesLiveDeployment(
  * production surface, since each takes its manifest as a constructor argument. The release
  * deploys first: the transition's constructor validates its target release and derives the
  * facet/hash delta from the release pair, so the ordering is functional, not stylistic.
- * Artifacts come from the regular forge build; the incremental build below makes sure they are
- * present and current.
+ * Artifacts come from the deterministic (CBOR-metadata-free) build — the one the chain states'
+ * release was deployed from, so the CTM's `releaseCodehash` anchor holds.
  */
 async function deployUpgradeObjectsFromManifest(
   deployer: ethers.Wallet,
@@ -932,8 +937,6 @@ async function deployUpgradeObjectsFromManifest(
   deployed: DeployedMachinery,
   releaseCodehashAnchor: string
 ): Promise<{ release: string; transition: string; coreRegistry: string }> {
-  execSync(`forge build ${REGISTRY_CONTRACTS_DIR_REL}`, { cwd: l1ContractsDir, stdio: "inherit" });
-
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
   const ctm = (manifest.ctms || []).find((c: { name?: string }) => c.name === CTM_REGISTRY_NAME);
   if (!ctm) {
@@ -948,7 +951,7 @@ async function deployUpgradeObjectsFromManifest(
     manifestArg: unknown,
     expectedCodehash: string
   ): Promise<string> => {
-    const factory = new ethers.ContractFactory(getAbi(name), getCreationBytecode(name), deployer);
+    const factory = new ethers.ContractFactory(getAbi(name), getDeterministicCreationBytecode(name), deployer);
     const contract = await factory.deploy(manifestArg);
     await contract.deployed();
     const actual = ethers.utils.keccak256(await contract.provider.getCode(contract.address));

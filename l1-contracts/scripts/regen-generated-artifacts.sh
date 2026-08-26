@@ -5,10 +5,11 @@
 # (or in the wrong order) leaves the stale intermediate state CI then rejects:
 #
 #   build           -> artifacts every later step reads
+#   zkstack-out     -> copied ABIs/bytecode; the anvil harness PREFERS these over out/, so a
+#                      stale copy here makes the chain-state step run against the old interface
 #   chain states    -> genesis deploys, so they move whenever contract bytecode moves
 #   registry manifest -> pins addresses/codehashes taken from those chain states
 #   selectors       -> derived from the built ABIs
-#   zkstack-out     -> copied ABIs/bytecode consumed by zkstack
 #
 # AllContractsHashes is deliberately NOT regenerated here: zksolc output diverges off Linux, so
 # CI is the only oracle for it (dispatch the `update-hashes-on-demand` workflow instead).
@@ -22,18 +23,18 @@ PORT_OFFSET="${ANVIL_INTEROP_PORT_OFFSET:-300}"
 echo "==> [1/5] building l1-contracts artifacts"
 forge build
 
-echo "==> [2/5] regenerating anvil-interop chain states (port offset ${PORT_OFFSET})"
+echo "==> [2/5] regenerating zkstack-out"
+yarn copy-to-zkstack-out
+
+echo "==> [3/5] regenerating anvil-interop chain states (port offset ${PORT_OFFSET})"
 (cd test/anvil-interop && ANVIL_INTEROP_PORT_OFFSET="${PORT_OFFSET}" npx ts-node setup-and-dump-state.ts)
 
-echo "==> [3/5] regenerating the v32 registry manifest from the fresh chain states"
+echo "==> [4/5] regenerating the v32 registry manifest from the fresh chain states"
 (cd test/anvil-interop && ANVIL_INTEROP_PORT_OFFSET="${PORT_OFFSET}" REGEN_REGISTRIES=1 \
     npx ts-node run-registry-driven-upgrade-test.ts)
 
-echo "==> [4/5] regenerating selectors"
+echo "==> [5/5] regenerating selectors"
 yarn selectors --fix
-
-echo "==> [5/5] regenerating zkstack-out"
-yarn copy-to-zkstack-out
 
 echo
 echo "Done. Now run the formatting gates and commit:"

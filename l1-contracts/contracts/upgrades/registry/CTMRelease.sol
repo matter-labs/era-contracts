@@ -57,9 +57,11 @@ contract CTMRelease is ICTMRelease {
             revert ZeroAddress();
         }
 
-        _requirePin(_manifest.diamondInit, _manifest.diamondInitCodehash);
-        _requirePin(_manifest.genesisUpgrade, _manifest.genesisUpgradeCodehash);
-        _requirePin(_manifest.verifier, _manifest.verifierCodehash);
+        // The pins are deliberately NOT checked here: the manifest author supplies both halves of
+        // every (address, codehash) pair, so a construction-time check proves only that the pair is
+        // self-consistent. `validate()` re-checks all of them against live code on every execution
+        // path, which is where the property is actually needed — and keeping construction free of
+        // live-code reads makes an object's address a pure function of its manifest.
         uint256 length = _manifest.genesisFacets.length;
         // A release IS a complete chain routing — an empty one would describe an unusable chain
         // and, worse, derive a remove-everything delta in any transition that departs from a
@@ -70,12 +72,11 @@ contract CTMRelease is ICTMRelease {
         }
         for (uint256 i = 0; i < length; ++i) {
             // Releases are the canonical routing source: every facet row carries its explicit,
-            // complete selector list (transitions derive their cuts from these) and its pin.
+            // complete selector list (transitions derive their cuts from these).
             uint256 selectorsLength = _manifest.genesisFacets[i].selectors.length;
             if (selectorsLength == 0) {
                 revert RegistryEmptySelectors(_manifest.genesisFacets[i].facet);
             }
-            _requirePin(_manifest.genesisFacets[i].facet, _manifest.genesisFacets[i].codehash);
             // Exactly ONE row per facet address. A row carries that facet's complete selector
             // list, so a second row is never needed — and `Diamond._addOneFunction` requires every
             // selector of one facet address to share freezability, so two rows differing in

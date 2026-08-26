@@ -93,8 +93,10 @@ contract CTMTransition is ICTMTransition {
             revert TransitionDeadlineBeforeUpgrade(_manifest.oldProtocolVersionDeadline, _manifest.upgradeTimestamp);
         }
 
-        _requirePin(_manifest.upgradeEngine, _manifest.upgradeEngineCodehash);
-        // Live validation of both edges. RELEASE PROVENANCE is deliberately NOT checked here: the
+        // The upgrade engine's pin is checked by `validate()` against live code, not here — see
+        // {CoreRegistry}. Both release EDGES are validated, though: the delta below is derived
+        // from their manifests, so a malformed edge would silently produce a malformed cut.
+        // RELEASE PROVENANCE is still deliberately NOT checked here: the
         // attestation that both edges are genuine write-once CTMRelease instances comes from the
         // CTM itself — its canonical `releaseCodehash` is enforced in `_storeCurrentRelease`, which
         // every pinned release (bootstrap and every transition target) passes through, and the

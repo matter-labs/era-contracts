@@ -57,11 +57,12 @@ contract CoreRegistry is ICoreRegistry {
             EcosystemContractRow memory row = _manifest.contractRows[i];
             // Every row is a REAL, unique edge: known source, pinned target, one row per proxy.
             // Placeholder rows (zero implNew) are refused — a contract not participating in the
-            // upgrade simply has no row.
+            // upgrade simply has no row. The codehash pins are checked by `validate()` against
+            // live code, not here: the manifest supplies both halves of each pair, so a
+            // construction-time check would only prove the pair self-consistent.
             if (row.proxy == address(0) || row.expectedOldImpl == address(0) || row.implNew == address(0)) {
                 revert ZeroAddress();
             }
-            _requirePin(row.implNew, row.implNewCodehash);
             for (uint256 j = 0; j < i; ++j) {
                 if (_manifest.contractRows[j].proxy == row.proxy) {
                     revert RegistryDuplicateProxyRow(row.proxy);
