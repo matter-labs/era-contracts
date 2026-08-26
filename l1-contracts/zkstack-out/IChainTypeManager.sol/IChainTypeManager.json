@@ -92,9 +92,24 @@
         "internalType": "uint256"
       },
       {
+        "name": "_baseTokenAssetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
         "name": "_admin",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "_initData",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_factoryDeps",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
       }
     ],
     "outputs": [
@@ -108,16 +123,31 @@
   },
   {
     "type": "function",
-    "name": "currentRelease",
-    "inputs": [],
-    "outputs": [
+    "name": "createNewVerifierOnlyUpgrade",
+    "inputs": [
       {
-        "name": "",
+        "name": "_oldProtocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_oldProtocolVersionDeadline",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_newProtocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_verifier",
         "type": "address",
         "internalType": "address"
       }
     ],
-    "stateMutability": "view"
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -131,6 +161,19 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "defaultUpgrade",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -403,6 +446,19 @@
   },
   {
     "type": "function",
+    "name": "initialCutHash",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "initialize",
     "inputs": [
       {
@@ -421,19 +477,90 @@
             "internalType": "address"
           },
           {
-            "name": "releaseFactory",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "currentRelease",
-            "type": "address",
-            "internalType": "address"
+            "name": "chainCreationParams",
+            "type": "tuple",
+            "internalType": "struct ChainCreationParams",
+            "components": [
+              {
+                "name": "genesisUpgrade",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "genesisBatchHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "genesisIndexRepeatedStorageChanges",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "genesisBatchCommitment",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "diamondCut",
+                "type": "tuple",
+                "internalType": "struct Diamond.DiamondCutData",
+                "components": [
+                  {
+                    "name": "facetCuts",
+                    "type": "tuple[]",
+                    "internalType": "struct Diamond.FacetCut[]",
+                    "components": [
+                      {
+                        "name": "facet",
+                        "type": "address",
+                        "internalType": "address"
+                      },
+                      {
+                        "name": "action",
+                        "type": "uint8",
+                        "internalType": "enum Diamond.Action"
+                      },
+                      {
+                        "name": "isFreezable",
+                        "type": "bool",
+                        "internalType": "bool"
+                      },
+                      {
+                        "name": "selectors",
+                        "type": "bytes4[]",
+                        "internalType": "bytes4[]"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "initAddress",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "initCalldata",
+                    "type": "bytes",
+                    "internalType": "bytes"
+                  }
+                ]
+              },
+              {
+                "name": "forceDeploymentsData",
+                "type": "bytes",
+                "internalType": "bytes"
+              }
+            ]
           },
           {
             "name": "protocolVersion",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "verifier",
+            "type": "address",
+            "internalType": "address"
           },
           {
             "name": "serverNotifier",
@@ -525,8 +652,14 @@
   },
   {
     "type": "function",
-    "name": "releaseFactory",
-    "inputs": [],
+    "name": "protocolVersionVerifier",
+    "inputs": [
+      {
+        "name": "_protocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [
       {
         "name": "",
@@ -551,10 +684,94 @@
   },
   {
     "type": "function",
-    "name": "setCurrentRelease",
+    "name": "setChainCreationParams",
     "inputs": [
       {
-        "name": "_release",
+        "name": "_chainCreationParams",
+        "type": "tuple",
+        "internalType": "struct ChainCreationParams",
+        "components": [
+          {
+            "name": "genesisUpgrade",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "genesisBatchHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "genesisIndexRepeatedStorageChanges",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "genesisBatchCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "diamondCut",
+            "type": "tuple",
+            "internalType": "struct Diamond.DiamondCutData",
+            "components": [
+              {
+                "name": "facetCuts",
+                "type": "tuple[]",
+                "internalType": "struct Diamond.FacetCut[]",
+                "components": [
+                  {
+                    "name": "facet",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "action",
+                    "type": "uint8",
+                    "internalType": "enum Diamond.Action"
+                  },
+                  {
+                    "name": "isFreezable",
+                    "type": "bool",
+                    "internalType": "bool"
+                  },
+                  {
+                    "name": "selectors",
+                    "type": "bytes4[]",
+                    "internalType": "bytes4[]"
+                  }
+                ]
+              },
+              {
+                "name": "initAddress",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "initCalldata",
+                "type": "bytes",
+                "internalType": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "forceDeploymentsData",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setDefaultUpgrade",
+    "inputs": [
+      {
+        "name": "_defaultUpgrade",
         "type": "address",
         "internalType": "address"
       }
@@ -637,19 +854,11 @@
         "name": "_newProtocolVersion",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setNewVersionUpgradeFromTransition",
-    "inputs": [
+      },
       {
-        "name": "_transition",
+        "name": "_verifier",
         "type": "address",
-        "internalType": "contract ICTMTransition"
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -706,10 +915,15 @@
   },
   {
     "type": "function",
-    "name": "setReleaseFactory",
+    "name": "setProtocolVersionVerifier",
     "inputs": [
       {
-        "name": "_releaseFactory",
+        "name": "_protocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_verifier",
         "type": "address",
         "internalType": "address"
       }
@@ -942,25 +1156,6 @@
   },
   {
     "type": "function",
-    "name": "upgradeTransition",
-    "inputs": [
-      {
-        "name": "_oldProtocolVersion",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "validatorTimelock",
     "inputs": [],
     "outputs": [
@@ -1113,16 +1308,110 @@
   },
   {
     "type": "event",
-    "name": "NewCurrentRelease",
+    "name": "NewChainCreationParams",
     "inputs": [
       {
-        "name": "protocolVersion",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        "name": "genesisUpgrade",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
       },
       {
-        "name": "release",
+        "name": "genesisBatchHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "genesisIndexRepeatedStorageChanges",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      },
+      {
+        "name": "genesisBatchCommitment",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "newInitialCut",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct Diamond.DiamondCutData",
+        "components": [
+          {
+            "name": "facetCuts",
+            "type": "tuple[]",
+            "internalType": "struct Diamond.FacetCut[]",
+            "components": [
+              {
+                "name": "facet",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "action",
+                "type": "uint8",
+                "internalType": "enum Diamond.Action"
+              },
+              {
+                "name": "isFreezable",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "selectors",
+                "type": "bytes4[]",
+                "internalType": "bytes4[]"
+              }
+            ]
+          },
+          {
+            "name": "initAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "initCalldata",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      },
+      {
+        "name": "newInitialCutHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "forceDeploymentsData",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      },
+      {
+        "name": "forceDeploymentHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewDefaultUpgrade",
+    "inputs": [
+      {
+        "name": "oldDefaultUpgrade",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "newDefaultUpgrade",
         "type": "address",
         "indexed": true,
         "internalType": "address"
@@ -1170,10 +1459,16 @@
   },
   {
     "type": "event",
-    "name": "NewReleaseFactory",
+    "name": "NewProtocolVersionVerifier",
     "inputs": [
       {
-        "name": "releaseFactory",
+        "name": "protocolVersion",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "verifier",
         "type": "address",
         "indexed": true,
         "internalType": "address"
@@ -1273,25 +1568,6 @@
         "type": "bytes32",
         "indexed": true,
         "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "NewUpgradeTransition",
-    "inputs": [
-      {
-        "name": "oldProtocolVersion",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "transition",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
       }
     ],
     "anonymous": false

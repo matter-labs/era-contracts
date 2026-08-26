@@ -164,7 +164,7 @@ contract GatewayCTMDeployerTest is Test {
 
         // Direct deployment contracts (no deployer)
         new AdminFacet(1, RollupDAManager(address(0)));
-        new MailboxFacet(1, 1, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false);
+        new MailboxFacet(1, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false);
         new ExecutorFacet();
         new GettersFacet();
         new MigratorFacet(1, false);
@@ -182,7 +182,6 @@ contract GatewayCTMDeployerTest is Test {
         GatewayCTMDeployerConfig memory config = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: address(0x123),
             salt: keccak256("test-salt"),
-            eraChainId: 1001,
             l1ChainId: 1,
             testnetVerifier: true,
             isZKsyncOS: false,

@@ -31,9 +31,6 @@ pub struct HubInitArgs {
     /// Era chain ID
     #[clap(long, default_value_t = 270, help_heading = "Advanced input")]
     pub era_chain_id: u64,
-    /// Enable legacy bridge testing
-    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
-    pub with_legacy_bridge: bool,
     /// CREATE2 factory salt
     #[clap(long, help_heading = "Advanced input")]
     pub create2_factory_salt: Option<B256>,
@@ -49,7 +46,6 @@ pub async fn run(args: HubInitArgs) -> anyhow::Result<()> {
     let input = HubInitInput {
         owner: owner.address,
         era_chain_id: args.era_chain_id,
-        with_legacy_bridge: args.with_legacy_bridge,
         create2_factory_salt: args.create2_factory_salt,
     };
     let output = hub_init(&mut runner, &sender, &owner, &input).await?;
@@ -67,7 +63,6 @@ pub async fn run(args: HubInitArgs) -> anyhow::Result<()> {
 pub struct HubInitInput {
     pub owner: Address,
     pub era_chain_id: u64,
-    pub with_legacy_bridge: bool,
     pub create2_factory_salt: Option<B256>,
 }
 
@@ -82,7 +77,6 @@ pub async fn hub_init(
     let deploy_input = DeployInput {
         owner: input.owner,
         era_chain_id: input.era_chain_id,
-        with_legacy_bridge: input.with_legacy_bridge,
         create2_factory_salt: input.create2_factory_salt,
     };
     let t = std::time::Instant::now();

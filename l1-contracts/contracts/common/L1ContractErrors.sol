@@ -318,6 +318,8 @@ error NonSequentialBatch();
 error NonSequentialVersion();
 // 0x0e0ff4d9
 error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
+// 0x31967fc6
+error NonZeroCarriedHash();
 // 0xfa5cd00f
 error NotAllowed(address addr);
 // 0x64846fe4
@@ -344,8 +346,6 @@ error NotL1(uint256 l1ChainId, uint256 blockChainId);
 error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
 // 0xdf17e316
 error NotWhitelisted(address);
-// 0xf3ed9dfa
-error OnlyEraSupported();
 // 0x9d7bb13f
 error OnlyNormalMode();
 // 0xd702c443

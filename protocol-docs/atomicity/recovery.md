@@ -27,7 +27,8 @@ sender and value to drive recovery; the hash is recomputed and matched against t
 ## `_recoverBundle`: reversing the burns
 
 `_recoverBundle` walks the bundle's calls and reverses each recoverable one, re-crediting the original
-depositor. There are two disjoint mechanisms, chosen per call by its local sender `InteropCall.from`:
+depositor. There are two disjoint mechanisms, selected per call by testing its local sender
+`InteropCall.from` against the asset-router address:
 
 - **Router-produced calls (`from == L2_ASSET_ROUTER_ADDR`).** These are the burns created by
   `initiateIndirectCall`. The manager asks the sender to reverse itself via
@@ -37,16 +38,20 @@ depositor. There are two disjoint mechanisms, chosen per call by its local sende
   through the failed-transfer path of the asset handler registered for the asset — is documented in
   {protocol-docs/bridging.md#atomic-recovery-hook}.
   Indirect calls force `interopCallValue == 0`, so router-produced calls never also carry native value.
-- **Native base-token value on direct calls (`from != L2_ASSET_ROUTER_ADDR` and `value != 0`).** A
-  direct call moves no asset-router funds, but it may carry base-token `value`. That value is reversed
-  through `IAssetRouterShared.bridgehubRecoverBaseToken(destChainId, destBaseTokenAssetId, from, value)`,
+- **Native base-token value on direct calls (`from != L2_ASSET_ROUTER_ADDR` and `value != 0`).**
+  Only a direct call can carry base-token `value` (indirect calls force it to zero and are always
+  router-sent), and a direct call moves no asset-router funds. That value is reversed through
+  `IAssetRouterShared.bridgehubRecoverBaseToken(destChainId, destBaseTokenAssetId, from, value)`,
   which reuses the same NTV failed-transfer recovery to re-credit the call's `from`.
 
 The manager is agnostic to call/encoding formats — it forwards `(destChainId, data)` and lets the
-sender own its reversal; the L2 asset router is the only `IAtomicRecoverable` sender today, and the
-`from == L2_ASSET_ROUTER_ADDR` test is what selects the hook. Implementations **must** gate both hooks
-to the canonical `AtomicFlowManager` (`onlyAtomicFlowManager`) and **must** return `false` rather than
-revert for calls they do not recognize.
+sender own its reversal — but the dispatch is pinned to the L2 asset router, the only
+`IAtomicRecoverable` sender the manager ever invokes. The pin is exhaustive: send-time validation
+restricts every indirect call to the asset router (`IndirectCallOnlyToAssetRouter`, see
+{protocol-docs/interop.md#restrictions}), so the hook reaches every burn-producing call.
+Implementations **must** gate both hooks to the canonical `AtomicFlowManager`
+(`onlyAtomicFlowManager`) and **must** return `false` rather than revert for calls they do not
+recognize.
 
 ### The walk is all-or-nothing, not per-call isolated
 

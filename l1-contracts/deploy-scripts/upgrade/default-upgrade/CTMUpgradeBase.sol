@@ -176,7 +176,6 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
 
         upgradeCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: _stateTransition.defaultUpgrade,
             initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
         });
     }

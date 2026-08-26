@@ -23,6 +23,7 @@ import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIAL
 import {AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
 import {ProtocolVersionTooSmall} from "../upgrades/ZkSyncUpgradeErrors.sol";
 import {
+    AddressHasNoCode,
     ChainAlreadyLive,
     MigrationsNotPaused,
     NotFactoryDeployed,
@@ -133,6 +134,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     ///         being handed its bytes. Written beside `upgradeCutHash`, which stays the authority on
     ///         what a chain may execute.
     mapping(uint256 oldProtocolVersion => address transition) public upgradeTransition;
+
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.

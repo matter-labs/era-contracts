@@ -111,7 +111,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: aliasedGovernor,
             salt: toml.readBytes32("$.contracts.create2_factory_salt"),
-            eraChainId: eraChainId,
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
             isZKsyncOS: config.isZKsyncOS,
@@ -404,7 +403,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         vm.serializeAddress(
             "gateway_state_transition",
             "default_upgrade_addr",
-            output.gatewayStateTransition.defaultUpgrade
         );
         vm.serializeAddress(
             "gateway_state_transition",

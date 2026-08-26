@@ -94,12 +94,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _;
     }
 
-    /// @notice Checks that the message sender is the native token vault.
-    modifier onlyNativeTokenVault() {
-        require(msg.sender == address(nativeTokenVault), Unauthorized(msg.sender));
-        _;
-    }
-
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
         if (msg.sender != address(BRIDGE_HUB)) {

@@ -68,7 +68,6 @@ contract CTMUpgrade_v32 is Script, DefaultCTMUpgrade {
     ///         proxies are discovered from the live CTM, and unchanged contracts re-deploy to
     ///         their existing CREATE2 address.
     function deployNewCTMContracts() public virtual override {
-        ctmAddresses.stateTransition.defaultUpgrade = deployUsedUpgradeContract();
         ctmAddresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", false);
 
         deployVerifiers();

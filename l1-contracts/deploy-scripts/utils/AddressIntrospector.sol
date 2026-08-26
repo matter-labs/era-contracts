@@ -256,7 +256,6 @@ library AddressIntrospector {
             verifiers: Verifiers({verifier: verifier, verifierFflonk: verifierFflonk, verifierPlonk: verifierPlonk}),
             facets: facets,
             genesisUpgrade: ctm.l1GenesisUpgrade(),
-            defaultUpgrade: address(0),
             chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr),
             // Pre-registry CTMs expose neither getter, so those are the only ones reported as
             // zero; from v32 on the live pointers are read, otherwise callers that merely
