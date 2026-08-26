@@ -1911,13 +1911,13 @@
   },
   {
     "contractName": "l1-contracts/RegistryBootstrapMigration",
-    "zkBytecodeHash": "0x010003b188a6e87ac016fe6bdb2ad2af6feee4dea8e3ef7575ea2c8483463258",
+    "zkBytecodeHash": "0x01000479389cf7d8c56ddea0634eaa57c75578ed06946397f8f603889450034b",
     "zkBytecodePath": "/l1-contracts/zkout/RegistryBootstrapMigration.sol/RegistryBootstrapMigration.json",
-    "evmBytecodeHash": "0x35a35a3f49505a48ddb3f9bb05464dd8cbd626b280a04d5c3362342a2d0f7d5b",
+    "evmBytecodeHash": "0x0654f22cc4a82fecf974facc8e7e4aaf4e5fc97a86d26cc58aa915307564c7b7",
     "evmBytecodePath": "/l1-contracts/out/RegistryBootstrapMigration.sol/RegistryBootstrapMigration.json",
-    "evmDeployedBytecodeHash": "0xaf2e347bd7a6716f042a6457f55255663612719e56d7061e8729442f80c447d9",
-    "evmDeployedBytecodeBlakeHash": "0x94e18f3ff453403bda386a65dd18f8413118c628a5bfa0c52e7e84cbdd7eb724",
-    "evmDeployedBytecodeLength": 7997
+    "evmDeployedBytecodeHash": "0x3b5971231baa0ac24c2124e72d783eb0ee00c0ec80258498a3738066ea11a66b",
+    "evmDeployedBytecodeBlakeHash": "0x0166a9618aa97e5f29f5d918cccbaa640a9b2c4dfb562fd6dea5bc66c0f828e2",
+    "evmDeployedBytecodeLength": 7022
   },
   {
     "contractName": "l1-contracts/RelayedSLDAValidator",
