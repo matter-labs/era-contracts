@@ -16,7 +16,7 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0x463D2f86070fB96e74aA733D11249ac013453d22",
+      "ctmProxy": "0xB8A43826E8137B774b1E3661b17c1711F8b4431d",
       "release": {
         "diamondInit": {
           "address": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",

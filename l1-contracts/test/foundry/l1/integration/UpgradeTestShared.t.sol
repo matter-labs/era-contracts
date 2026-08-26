@@ -210,15 +210,28 @@ contract UpgradeIntegrationTestBase is Test {
         assertEq(uint256(npv.topics[1]), ctmUpgrade.getOldProtocolVersion(), "CTM old version mismatch");
         assertEq(uint256(npv.topics[2]), ctmUpgrade.getNewProtocolVersion(), "CTM new version mismatch");
 
-        // NewUpgradeCutHash: both fields are indexed -> protocolVersion in topics[1], cutHash in topics[2].
-        // Cut data is stored under the OLD (FROM) version key in setUpgradeDiamondCutInner,
-        // so the event's topics[1] is the old version, not the new one.
-        Vm.Log memory nuch = ecosystemLogs.requireOneFrom(
-            "NewUpgradeCutHash(uint256,bytes32)",
-            ctmUpgrade.getCTMAddress()
+        // The commit shape differs per edge: a transition-committed edge writes only the
+        // transition pointer (the deprecated `upgradeCutHash` stays zero); a legacy cut-taking
+        // edge writes the hash and emits `NewUpgradeCutHash` keyed by the OLD (FROM) version.
+        address committedTransition = IChainTypeManager(ctmUpgrade.getCTMAddress()).upgradeTransition(
+            ctmUpgrade.getOldProtocolVersion()
         );
-        assertEq(uint256(nuch.topics[1]), ctmUpgrade.getOldProtocolVersion(), "Cut hash protocol version mismatch");
-        _expectedUpgradeCutHash = nuch.topics[2];
+        if (committedTransition != address(0)) {
+            Vm.Log memory nut = ecosystemLogs.requireOneFrom(
+                "NewUpgradeTransition(uint256,address)",
+                ctmUpgrade.getCTMAddress()
+            );
+            assertEq(uint256(nut.topics[1]), ctmUpgrade.getOldProtocolVersion(), "Transition version mismatch");
+            assertEq(address(uint160(uint256(nut.topics[2]))), committedTransition, "Committed transition mismatch");
+            _expectedUpgradeCutHash = bytes32(0);
+        } else {
+            Vm.Log memory nuch = ecosystemLogs.requireOneFrom(
+                "NewUpgradeCutHash(uint256,bytes32)",
+                ctmUpgrade.getCTMAddress()
+            );
+            assertEq(uint256(nuch.topics[1]), ctmUpgrade.getOldProtocolVersion(), "Cut hash protocol version mismatch");
+            _expectedUpgradeCutHash = nuch.topics[2];
+        }
         assertEq(
             IChainTypeManager(ctmUpgrade.getCTMAddress()).upgradeCutHash(ctmUpgrade.getOldProtocolVersion()),
             _expectedUpgradeCutHash,

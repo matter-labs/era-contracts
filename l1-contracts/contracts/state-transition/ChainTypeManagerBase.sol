@@ -79,14 +79,19 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev The current packed protocolVersion. To access human-readable version, use `getSemverProtocolVersion` function.
     uint256 public protocolVersion;
 
-    /// @dev The timestamp when protocolVersion can be last used
-    mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
+    /// @dev Deadlines for versions with no committed transition: versions departed via the legacy
+    ///      cut-taking path (the bootstrap edge and everything before it). Registry-driven edges
+    ///      never write here — their deadline lives on the transition, and the
+    ///      {protocolVersionDeadline} view resolves it from there.
+    mapping(uint256 _protocolVersion => uint256) internal __LEGACY_protocolVersionDeadline;
 
     /// @dev The validatorTimelock contract address.
     /// @dev Note, that address contains validator timelock for pre-v29 protocol versions. It is deprecated and will be removed in the future.
     address internal __DEPRECATED_validatorTimelock;
 
-    /// @dev The stored cutData for upgrade diamond cut. protocolVersion => cutHash
+    /// @dev Deprecated. Written only by the legacy cut-taking commit path: pre-v32 Admin facets
+    ///      crossing that edge verify the handed cut bytes against it. Registry-driven edges commit
+    ///      only the transition ({upgradeTransition}); chains read {upgradeCutForVersion}.
     mapping(uint256 protocolVersion => bytes32 cutHash) public upgradeCutHash;
 
     /// @dev The address used to manage non critical updates
@@ -233,8 +238,9 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         }
         _transferOwnership(_initializeData.owner);
 
+        // No deadline write: the current version resolves to `type(uint256).max` in
+        // {protocolVersionDeadline} until a transition departing from it is committed.
         protocolVersion = _initializeData.protocolVersion;
-        _setProtocolVersionDeadline(_initializeData.protocolVersion, type(uint256).max);
         validatorTimelockPostV29 = _initializeData.validatorTimelock;
         serverNotifierAddress = _initializeData.serverNotifier;
 
@@ -398,14 +404,16 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     ///      entrypoint below, which accepts arbitrary calldata from the same owner.
     function setNewVersionUpgradeFromTransition(ICTMTransition _transition) external onlyOwner {
         uint256 oldProtocolVersion = _transition.oldProtocolVersion();
-        _setNewVersionUpgrade({
-            _cutData: _transitionUpgradeCut(_transition),
-            _oldProtocolVersion: oldProtocolVersion,
-            _oldProtocolVersionDeadline: _transition.oldProtocolVersionDeadline(),
-            _newProtocolVersion: _transition.newProtocolVersion()
-        });
+        uint256 newProtocolVersion = _transition.newProtocolVersion();
+        _commitVersionEdge(oldProtocolVersion, newProtocolVersion);
+        // The transition is the ONLY commitment: the cut derives from it on read
+        // (`upgradeCutForVersion`), its deadline resolves from it (`protocolVersionDeadline`),
+        // so neither the deprecated `upgradeCutHash` nor the legacy deadline storage is written.
         upgradeTransition[oldProtocolVersion] = address(_transition);
+        upgradeCutDataBlock[oldProtocolVersion] = block.number;
         emit NewUpgradeTransition(oldProtocolVersion, address(_transition));
+        // Off-chain consumers keep receiving the composed cut through the same event as before.
+        emit NewUpgradeCutData(newProtocolVersion, _transitionUpgradeCut(_transition));
     }
 
     /// @dev set New Version with upgrade from old version
@@ -422,26 +430,20 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external onlyOwner {
-        _setNewVersionUpgrade({
-            _cutData: _cutData,
-            _oldProtocolVersion: _oldProtocolVersion,
-            _oldProtocolVersionDeadline: _oldProtocolVersionDeadline,
-            _newProtocolVersion: _newProtocolVersion
-        });
+        _commitVersionEdge(_oldProtocolVersion, _newProtocolVersion);
+        // The departing version has no transition to resolve a deadline from, so this path is the
+        // one writer of the legacy deadline storage.
+        __LEGACY_protocolVersionDeadline[_oldProtocolVersion] = _oldProtocolVersionDeadline;
+        emit UpdateProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
+        setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
+        // Emit event with backward compatible hack.
+        emit NewUpgradeCutData(_newProtocolVersion, _cutData);
     }
 
-    /// @dev Common logic for setting new version upgrade
-    /// @param _cutData the new diamond cut data
-    /// @param _oldProtocolVersion the old protocol version
-    /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
-    /// @param _newProtocolVersion the new protocol version
+    /// @dev The version-edge commit shared by both entrypoints: checks the edge and moves
+    ///      `protocolVersion` forward.
     /// @dev Note: non-sequential protocol versions are allowed (e.g., minor/patch jumps).
-    function _setNewVersionUpgrade(
-        Diamond.DiamondCutData memory _cutData,
-        uint256 _oldProtocolVersion,
-        uint256 _oldProtocolVersionDeadline,
-        uint256 _newProtocolVersion
-    ) internal {
+    function _commitVersionEdge(uint256 _oldProtocolVersion, uint256 _newProtocolVersion) internal {
         // Migrations must be paused before setting new version upgrades
         if (!IChainAssetHandlerBase(IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()).migrationPaused()) {
             revert MigrationsNotPaused();
@@ -457,26 +459,30 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         if (_newProtocolVersion <= _oldProtocolVersion) {
             revert ProtocolVersionTooSmall(_oldProtocolVersion, _newProtocolVersion);
         }
-        _setProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
-        _setProtocolVersionDeadline(_newProtocolVersion, type(uint256).max);
         protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
-        setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
-        // Emit event with backward compatible hack.
-        emit NewUpgradeCutData(_newProtocolVersion, _cutData);
+    }
+
+    /// @notice The timestamp until which `_protocolVersion` can be used.
+    /// @dev Single-sourced from the committed transition departing that version. There is no
+    ///      setter: a version's schedule is part of the write-once transition governance approved.
+    ///      The current version has no departing transition and is usable indefinitely; versions
+    ///      departed via the legacy cut-taking path read the legacy storage that path wrote.
+    function protocolVersionDeadline(uint256 _protocolVersion) public view returns (uint256) {
+        address transition = upgradeTransition[_protocolVersion];
+        if (transition != address(0)) {
+            return ICTMTransition(transition).oldProtocolVersionDeadline();
+        }
+        if (_protocolVersion == protocolVersion) {
+            return type(uint256).max;
+        }
+        return __LEGACY_protocolVersionDeadline[_protocolVersion];
     }
 
     /// @dev check that the protocolVersion is active
     /// @param _protocolVersion the protocol version to check
     function protocolVersionIsActive(uint256 _protocolVersion) external view override returns (bool) {
-        return block.timestamp <= protocolVersionDeadline[_protocolVersion];
-    }
-
-    /// @notice Set the protocol version deadline
-    /// @param _protocolVersion the protocol version
-    /// @param _timestamp the timestamp is the deadline
-    function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
-        _setProtocolVersionDeadline(_protocolVersion, _timestamp);
+        return block.timestamp <= protocolVersionDeadline(_protocolVersion);
     }
 
     /// @dev set upgrade for some protocolVersion
@@ -715,14 +721,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     ) external onlyChainAssetHandler {
         // Function is empty due to the fact that when calling `forwardedBridgeBurn` there are no
         // state updates that occur.
-    }
-
-    /// @notice Set the protocol version deadline
-    /// @param _protocolVersion the protocol version
-    /// @param _timestamp the timestamp is the deadline
-    function _setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) internal {
-        protocolVersionDeadline[_protocolVersion] = _timestamp;
-        emit UpdateProtocolVersionDeadline(_protocolVersion, _timestamp);
     }
 
     /*//////////////////////////////////////////////////////////////

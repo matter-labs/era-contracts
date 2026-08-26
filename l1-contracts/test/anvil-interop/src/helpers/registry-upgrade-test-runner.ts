@@ -373,9 +373,15 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       objects.release,
       "CTM currentRelease moved to the transition's target release"
     );
-    assertTrue(
-      (await ctm.upgradeCutHash(live.oldVersion)) !== ethers.constants.HashZero,
-      "CTM upgradeCutHash committed for the old version"
+    assertEq(
+      await ctm.upgradeTransition(live.oldVersion),
+      objects.transition,
+      "CTM transition committed for the old version"
+    );
+    assertEq(
+      await ctm.upgradeCutHash(live.oldVersion),
+      ethers.constants.HashZero,
+      "deprecated upgradeCutHash stays untouched on the transition path"
     );
     const pinnedRelease = new ethers.Contract(await ctm.currentRelease(), getAbi("ICTMRelease"), l1Provider);
     assertEq(await pinnedRelease.verifier(), deployed.newVerifier, "the pinned release carries the fresh verifier");

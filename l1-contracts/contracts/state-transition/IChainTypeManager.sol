@@ -97,6 +97,8 @@ interface IChainTypeManager {
 
     function l1GenesisUpgrade() external view returns (address);
 
+    /// @dev Deprecated. Populated only by the legacy cut-taking commit path, for pre-v32 Admin
+    ///      facets that verify handed cut bytes. Registry-driven edges commit only the transition.
     function upgradeCutHash(uint256 _protocolVersion) external view returns (bytes32);
 
     function protocolVersion() external view returns (uint256);

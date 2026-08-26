@@ -72,7 +72,7 @@ flowchart TB
       CPL["CodehashPinLib"]
     end
 
-    CTM["ChainTypeManager<br/>currentRelease · releaseCodehash<br/>upgradeTransition · upgradeCutHash"]
+    CTM["ChainTypeManager<br/>currentRelease · releaseCodehash<br/>upgradeTransition"]
     DI["DiamondInit — genesis"]
     BZU["BaseZkSyncUpgrade — upgrade"]
 
@@ -174,9 +174,13 @@ The CTM stores one release pointer and derives genesis data from it:
   `l1GenesisUpgrade()` are views over `ICTMRelease(currentRelease).genesisParams()`.
 - `releaseCodehash` — the provenance anchor every pinned release is checked against.
 - `upgradeTransition[oldProtocolVersion]` — the transition committed for chains departing from that
-  version. This is the ONLY commitment for registry-driven edges: `upgradeCutForVersion` derives the
-  cut from it on read, so a chain is never handed cut bytes. `upgradeCutHash` remains only for
-  chains still on pre-v32 Admin facets, whose handed-cut path verifies against it.
+  version, and the ONLY commitment for registry-driven edges: `upgradeCutForVersion` derives the cut
+  from it on read (a chain is never handed cut bytes), and `protocolVersionDeadline` resolves the
+  departing version's deadline from it (the current version is open-ended; there is no deadline
+  setter — the schedule is part of the write-once transition governance approved).
+- `upgradeCutHash` — DEPRECATED. Written only by the legacy cut-taking commit path; pre-v32 Admin
+  facets crossing that edge verify the handed cut bytes against it. Transition commits leave it
+  zero. The same legacy path is the only writer of the legacy deadline storage.
 
 Nothing else about a chain's installed state is keyed by protocol version on the CTM. The verifier in
 particular is not: a chain several versions behind resolves it from the release its own transition

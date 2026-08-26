@@ -199,7 +199,14 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         assertEq(chainContractAddress.protocolVersionDeadline(newVersion), type(uint256).max);
         // The verifier is pinned by the release the CTM now points at, not by a version-keyed map.
         assertEq(CTMRelease(chainContractAddress.currentRelease()).verifier(), address(testnetVerifier));
-        assertEq(chainContractAddress.upgradeCutHash(0), keccak256(abi.encode(_expectedUpgradeCut(transition))));
+        // The transition is the only commitment: the deprecated hash stays untouched and the cut
+        // derives on read.
+        assertEq(chainContractAddress.upgradeTransition(0), address(transition));
+        assertEq(chainContractAddress.upgradeCutHash(0), bytes32(0));
+        assertEq(
+            keccak256(abi.encode(chainContractAddress.upgradeCutForVersion(0))),
+            keccak256(abi.encode(_expectedUpgradeCut(transition)))
+        );
         assertEq(chainContractAddress.currentRelease(), address(release));
         assertEq(chainContractAddress.l1GenesisUpgrade(), makeAddr("genesisUpgrade"));
     }

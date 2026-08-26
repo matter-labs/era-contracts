@@ -66,22 +66,18 @@ contract ProtocolVersion is ChainTypeManagerTest {
         assertEq(chainContractAddress.protocolVersionIsActive(1), true);
     }
 
-    // setProtocolVersionDeadline
-    function test_SuccessfulSetProtocolVersionDeadline() public {
-        address chainAddress = createNewChain(getDiamondCutData(diamondInit));
+    // protocolVersionDeadline resolution: the current version is open-ended; a version that was
+    // never current, has no committed transition and no legacy write resolves to 0 (inactive).
+    // There is deliberately no setter — a departed version's deadline is part of its committed
+    // edge (the transition, or the legacy commit's argument).
+    function test_ProtocolVersionDeadlineResolution() public {
+        createNewChain(getDiamondCutData(diamondInit));
 
-        uint256 deadlineBefore = chainContractAddress.protocolVersionDeadline(0);
-        assertEq(deadlineBefore, type(uint256).max);
+        assertEq(chainContractAddress.protocolVersionDeadline(0), type(uint256).max, "current version is open-ended");
 
-        uint256 newDeadline = 1000;
-
-        _mockGetZKChainFromBridgehub(chainAddress);
-
-        vm.prank(governor);
-        chainContractAddress.setProtocolVersionDeadline(0, newDeadline);
-
-        uint256 deadline = chainContractAddress.protocolVersionDeadline(0);
-        assertEq(deadline, newDeadline);
+        uint256 unknownVersion = SemVer.packSemVer(0, 99, 0);
+        assertEq(chainContractAddress.protocolVersionDeadline(unknownVersion), 0, "unknown version has no deadline");
+        assertEq(chainContractAddress.protocolVersionIsActive(unknownVersion), false, "unknown version inactive");
     }
 
     // executeUpgrade
