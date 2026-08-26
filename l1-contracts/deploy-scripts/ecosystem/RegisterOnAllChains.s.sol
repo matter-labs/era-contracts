@@ -18,9 +18,13 @@ contract RegisterOnAllChainsScript is Script, IRegisterOnAllChains {
         for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
             if (
                 chainRegistrationSender.chainRegisteredOnChain(chainsToRegisterOn[i], _chainId) ||
-                !_sameSettlementLayerNotL1(bridgehub, chainsToRegisterOn[i], _chainId) ||
+                !_sameSettlementLayer(bridgehub, chainsToRegisterOn[i], _chainId) ||
                 chainsToRegisterOn[i] == _chainId
             ) {
+                continue;
+            }
+            if (!_hasBatchesInMessageRoot(bridgehub, chainsToRegisterOn[i])) {
+                _logMissingBatches(chainsToRegisterOn[i], _chainId);
                 continue;
             }
             vm.startBroadcast();
@@ -30,7 +34,7 @@ contract RegisterOnAllChainsScript is Script, IRegisterOnAllChains {
         for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
             if (
                 chainRegistrationSender.chainRegisteredOnChain(_chainId, chainsToRegisterOn[i]) ||
-                !_sameSettlementLayerNotL1(bridgehub, _chainId, chainsToRegisterOn[i]) ||
+                !_sameSettlementLayer(bridgehub, _chainId, chainsToRegisterOn[i]) ||
                 chainsToRegisterOn[i] == _chainId
             ) {
                 continue;
@@ -42,6 +46,10 @@ contract RegisterOnAllChainsScript is Script, IRegisterOnAllChains {
                     ", skipping registration for chain:",
                     _chainId
                 );
+                continue;
+            }
+            if (!_hasBatchesInMessageRoot(bridgehub, _chainId)) {
+                _logMissingBatches(_chainId, chainsToRegisterOn[i]);
                 continue;
             }
             vm.startBroadcast();
@@ -56,13 +64,36 @@ contract RegisterOnAllChainsScript is Script, IRegisterOnAllChains {
         return mailbox.depositsPaused();
     }
 
-    function _sameSettlementLayerNotL1(
+    /// @notice Both chains must settle on the same layer, which is what `ChainRegistrationSender` enforces.
+    /// @dev Two chains settling directly on L1 are a legitimate pair: the release this script belongs to
+    ///      disables chain migrations altogether (`CHAIN_MIGRATIONS_ENABLED` in `Config.sol`), so L1 is the
+    ///      only settlement layer any chain has.
+    function _sameSettlementLayer(
         IBridgehubBase bridgehub,
         uint256 chainToBeRegistered,
         uint256 chainToRegisterOn
     ) internal view returns (bool) {
-        return
-            bridgehub.settlementLayer(chainToBeRegistered) == bridgehub.settlementLayer(chainToRegisterOn) &&
-            bridgehub.settlementLayer(chainToBeRegistered) != block.chainid;
+        return bridgehub.settlementLayer(chainToBeRegistered) == bridgehub.settlementLayer(chainToRegisterOn);
+    }
+
+    /// @notice Whether the chain already has a batch in this layer's message root.
+    /// @dev `ChainRegistrationSender` requires it (`ChainHasNoBatchesInMessageRoot`) so that an interop
+    ///      timeout can always be proven against the registered chain. A freshly created ZKsync OS chain
+    ///      satisfies it from its genesis root seeding (`MessageRootBase.seedGenesisRoot`), so this only
+    ///      skips chains that genuinely have nothing to prove against yet, instead of reverting the run.
+    function _hasBatchesInMessageRoot(
+        IBridgehubBase bridgehub,
+        uint256 chainToBeRegistered
+    ) internal view returns (bool) {
+        return bridgehub.messageRoot().chainTreeLeafCount(chainToBeRegistered) != 0;
+    }
+
+    function _logMissingBatches(uint256 chainToBeRegistered, uint256 chainToRegisterOn) internal pure {
+        console.log(
+            "Info: Chain has no batches in the message root:",
+            chainToBeRegistered,
+            ", skipping its registration on chain:",
+            chainToRegisterOn
+        );
     }
 }
