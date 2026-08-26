@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{
     IDeployL2ContractsAbi, IDeployPaymasterAbi, IEnableEvmEmulatorAbi, IFinalizeChainInitAbi,
-    IRegisterOnAllChainsAbi, IRegisterZKChainAbi, ISetupLegacyBridgeAbi,
+    IRegisterOnAllChainsAbi, IRegisterZKChainAbi,
 };
 use crate::common::addresses::{ETH_ADDRESS, ZERO_ADDRESS};
 use crate::common::forge::scripts::{
@@ -105,9 +105,6 @@ pub struct ChainInitArgs {
     /// Skip L2 deployments via priority transactions
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub skip_priority_txs: bool,
-    /// Enable support for legacy bridge testing
-    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
-    pub with_legacy_bridge: bool,
     /// Register the chain for interop with every other chain of the ecosystem (and vice versa) once it
     /// is initialized. Permissionless and once-per-ordered-pair; pairs that are not registrable yet are
     /// skipped, see `RegisterOnAllChains.s.sol`.
@@ -174,7 +171,6 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         chain_params,
         vm_type,
         l2_da_commitment_scheme: args.l2_da_commitment_scheme,
-        with_legacy_bridge: args.with_legacy_bridge,
         register_for_interop: args.register_for_interop,
         create2_factory_salt: None,
         pause_deposits: args.pause_deposits,
@@ -205,7 +201,8 @@ pub async fn chain_init(
     runner: &mut ForgeRunner,
     deployer: &Wallet,
     owner: &Wallet,
-    bridgehub_admin: &Wallet,
+    // Retained for call-site compatibility; the legacy-bridge setup that used it has been removed.
+    _bridgehub_admin: &Wallet,
     input: &ChainInitInput,
 ) -> anyhow::Result<FullChainInitOutput> {
     // Register chain on CTM
@@ -225,7 +222,7 @@ pub async fn chain_init(
     let diamond_proxy = register_output.diamond_proxy_addr;
     let chain_admin = register_output.chain_admin_addr;
     let mut full_output = FullChainInitOutput::from_register(&register_output);
-    let should_unpause_deposits = !input.pause_deposits && !input.with_legacy_bridge;
+    let should_unpause_deposits = !input.pause_deposits;
     // The DA validator pair is always required for the chain to commit
     // batches; it is an admin call, not a priority transaction, so it must
     // not be skipped for ZKsync OS chains (skip_priority_txs=true).
@@ -309,7 +306,6 @@ pub async fn chain_init(
             governance,
             input.chain_params.owner,
             input.chain_params.da_mode,
-            input.with_legacy_bridge,
         )?;
         full_output.l2_default_upgrader = Some(l2_output.l2_default_upgrader);
         full_output.consensus_registry_proxy = Some(l2_output.consensus_registry_proxy);
@@ -327,17 +323,6 @@ pub async fn chain_init(
         register_on_all_chains_step(
             runner,
             deployer,
-            input.bridgehub,
-            input.chain_params.chain_id.as_u64(),
-        )?;
-    }
-
-    // Setup legacy bridge (if requested)
-    if input.with_legacy_bridge {
-        logger::step("Setting up legacy bridge...");
-        setup_legacy_bridge_step(
-            runner,
-            bridgehub_admin,
             input.bridgehub,
             input.chain_params.chain_id.as_u64(),
         )?;
@@ -363,7 +348,8 @@ pub fn register_chain(
         &input.chain_params,
         Address::ZERO,
         Some(salt),
-        input.with_legacy_bridge,
+        // The legacy-bridge setup this gated was removed with legacy bridging.
+        false,
         input.evm_emulator,
     )?;
 
@@ -439,27 +425,15 @@ fn deploy_l2_contracts_step(
     governance: Address,
     consensus_registry_owner: Address,
     da_mode: DAValidatorType,
-    with_legacy_bridge: bool,
 ) -> anyhow::Result<FullL2DeployOutput> {
-    let calldata = if with_legacy_bridge {
-        IDeployL2ContractsAbi::runWithLegacyBridgeCall {
-            _bridgehub: bridgehub,
-            _chainId: U256::from(chain_id),
-            _governance: governance,
-            _consensusRegistryOwner: consensus_registry_owner,
-            _daValidatorType: U256::from(da_mode.to_u8()),
-        }
-        .abi_encode()
-    } else {
-        IDeployL2ContractsAbi::runCall {
-            _bridgehub: bridgehub,
-            _chainId: U256::from(chain_id),
-            _governance: governance,
-            _consensusRegistryOwner: consensus_registry_owner,
-            _daValidatorType: U256::from(da_mode.to_u8()),
-        }
-        .abi_encode()
-    };
+    let calldata = IDeployL2ContractsAbi::runCall {
+        _bridgehub: bridgehub,
+        _chainId: U256::from(chain_id),
+        _governance: governance,
+        _consensusRegistryOwner: consensus_registry_owner,
+        _daValidatorType: U256::from(da_mode.to_u8()),
+    }
+    .abi_encode();
     let forge = runner
         .script_with_calldata(&DEPLOY_L2_CONTRACTS_INVOCATION, calldata)
         .with_wallet(auth);
@@ -520,23 +494,6 @@ fn register_on_all_chains_step(
     Ok(())
 }
 
-fn setup_legacy_bridge_step(
-    runner: &mut ForgeRunner,
-    auth: &Wallet,
-    bridgehub: Address,
-    chain_id: u64,
-) -> anyhow::Result<()> {
-    let forge = runner
-        .script_call(ISetupLegacyBridgeAbi::runCall {
-            _bridgehub: bridgehub,
-            _chainId: U256::from(chain_id),
-        })
-        .with_wallet(auth);
-
-    runner.run(forge)?;
-    Ok(())
-}
-
 // ── Internal structs ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]
@@ -547,7 +504,6 @@ pub struct ChainInitInput {
     pub chain_params: NewChainParams,
     pub vm_type: VMOption,
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
-    pub with_legacy_bridge: bool,
     /// Run the interop registration step (see `register_on_all_chains_step`). Off by default: on a
     /// production ecosystem which chains may talk to each other is a deliberate decision, not a
     /// side effect of creating one.

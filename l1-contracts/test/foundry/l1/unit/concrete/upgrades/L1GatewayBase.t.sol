@@ -5,7 +5,6 @@ import "forge-std/Test.sol";
 import {L1FixedForceDeploymentsHelper} from "contracts/upgrades/L1FixedForceDeploymentsHelper.sol"; // Adjust the import path accordingly
 import {ZKChainStorage} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {IL1SharedBridgeLegacy} from "contracts/bridge/interfaces/IL1SharedBridgeLegacy.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -66,7 +65,6 @@ contract L1FixedForceDeploymentsHelperTest is Test {
 
     // Addresses
     address sharedBridgeAddress;
-    address legacySharedBridgeAddress;
 
     // Chain ID for testing
     uint256 chainId = 123;
@@ -77,7 +75,6 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         bridgehubMock = makeAddr("bridgehubMock");
         sharedBridgeMock = makeAddr("sharedBridgeMock");
         nativeTokenVaultMock = makeAddr("nativeTokenVaultMock");
-        legacySharedBridgeAddress = makeAddr("legacySharedBridgeAddress");
 
         testGateway = new TestL1FixedForceDeploymentsHelper();
 
@@ -88,11 +85,6 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         testGateway.setBaseTokenAssetId(baseTokenAssetId);
 
         vm.mockCall(bridgehubMock, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(sharedBridgeMock));
-        vm.mockCall(
-            sharedBridgeMock,
-            abi.encodeCall(IL1SharedBridgeLegacy.l2BridgeAddress, (chainId)),
-            abi.encode(address(legacySharedBridgeAddress))
-        );
         vm.mockCall(
             sharedBridgeMock,
             abi.encodeCall(IL1AssetRouter.nativeTokenVault, ()),
@@ -126,7 +118,8 @@ contract L1FixedForceDeploymentsHelperTest is Test {
 
         // Check the values
         assertEq(chainData.baseTokenBridgingData.assetId, baseTokenAssetId);
-        assertEq(chainData.l2LegacySharedBridge, legacySharedBridgeAddress);
+        // The legacy shared bridge has been removed; this ABI placeholder is always address(0).
+        assertEq(chainData.l2LegacySharedBridge, address(0));
         assertEq(chainData.predeployedL2WethAddress, address(0));
         assertEq(chainData.baseTokenL1Address, ETH_TOKEN_ADDRESS);
         assertEq(chainData.baseTokenMetadata.name, "Ether");
@@ -153,7 +146,8 @@ contract L1FixedForceDeploymentsHelperTest is Test {
 
         // Check the values
         assertEq(chainData.baseTokenBridgingData.assetId, baseTokenAssetId);
-        assertEq(chainData.l2LegacySharedBridge, legacySharedBridgeAddress);
+        // The legacy shared bridge has been removed; this ABI placeholder is always address(0).
+        assertEq(chainData.l2LegacySharedBridge, address(0));
         assertEq(chainData.predeployedL2WethAddress, address(0));
         assertEq(chainData.baseTokenL1Address, address(token));
         assertEq(chainData.baseTokenMetadata.name, "Test Token");
@@ -180,7 +174,8 @@ contract L1FixedForceDeploymentsHelperTest is Test {
 
         // Check the values
         assertEq(chainData.baseTokenBridgingData.assetId, baseTokenAssetId);
-        assertEq(chainData.l2LegacySharedBridge, legacySharedBridgeAddress);
+        // The legacy shared bridge has been removed; this ABI placeholder is always address(0).
+        assertEq(chainData.l2LegacySharedBridge, address(0));
         assertEq(chainData.predeployedL2WethAddress, address(0));
         assertEq(chainData.baseTokenL1Address, address(token));
         assertEq(chainData.baseTokenMetadata.name, "Base Token");

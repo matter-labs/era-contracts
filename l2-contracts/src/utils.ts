@@ -246,25 +246,32 @@ export async function getL1TxInfo(
   priorityTxMaxGasLimit: BigNumber,
   provider: ethers.providers.JsonRpcProvider
 ): Promise<TxInfo> {
-  const zksync = deployer.stateTransitionContract(ethers.Wallet.createRandom().connect(provider));
-  const l1Calldata = zksync.interface.encodeFunctionData("requestL2Transaction", [
-    to,
-    0,
-    l2Calldata,
-    priorityTxMaxGasLimit,
-    REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
-    [], // It is assumed that the target has already been deployed
-    refundRecipient,
-  ]);
+  const bridgehub = deployer.bridgehubContract(ethers.Wallet.createRandom().connect(provider));
+  const chainId = deployer.chainId;
 
-  const neededValue = await zksync.l2TransactionBaseCost(
+  const neededValue = await bridgehub.l2TransactionBaseCost(
+    chainId,
     gasPrice,
     priorityTxMaxGasLimit,
     REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT
   );
 
+  const l1Calldata = bridgehub.interface.encodeFunctionData("requestL2TransactionDirect", [
+    {
+      chainId,
+      l2Contract: to,
+      mintValue: neededValue,
+      l2Value: 0,
+      l2Calldata,
+      l2GasLimit: priorityTxMaxGasLimit,
+      l2GasPerPubdataByteLimit: REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
+      factoryDeps: [], // It is assumed that the target has already been deployed
+      refundRecipient,
+    },
+  ]);
+
   return {
-    target: zksync.address,
+    target: bridgehub.address,
     data: l1Calldata,
     value: neededValue.toString(),
   };

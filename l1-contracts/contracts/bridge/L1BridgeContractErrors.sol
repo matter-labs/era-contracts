@@ -6,8 +6,6 @@ pragma solidity ^0.8.21;
 error AssetNotNativeToL1(bytes32 assetId, uint256 originChainId);
 // 0x066f53b1
 error EmptyToken();
-// 0x82b0de47
-error EthAlreadyMigratedToL1NTV();
 // 0xabd51c42
 error InteropWithdrawalNonZeroValue(uint256 value);
 // 0x1c55230b
@@ -18,7 +16,5 @@ error OnlyFailureStatusAllowed();
 error TokenAlreadyInBridgedTokensList();
 // 0xb4aeddbc
 error WrongCounterpart();
-// 0x636c90db
-error WrongL2Sender(address providedL2Sender);
 // 0x61cdb17e
 error WrongMsgLength(uint256 expected, uint256 length);

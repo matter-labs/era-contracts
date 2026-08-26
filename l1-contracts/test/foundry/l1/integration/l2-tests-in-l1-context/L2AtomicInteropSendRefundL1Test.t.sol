@@ -48,8 +48,6 @@ contract L2AtomicInteropSendRefundL1Test is Test, SharedL2ContractL1Deployer, L2
         return super.getInitializeCalldata(contractName, isZKBytecode);
     }
 
-    /// @dev Disambiguate the diamond: defer to the refund abstract's no-op so the shared deployer's void
-    /// mock of the AtomicFlowManager gates is NOT installed (these tests deploy the real manager).
     function _mockAtomicFlowManager()
         internal
         override(SharedL2ContractDeployer, L2AtomicInteropSendRefundTestAbstract)

@@ -20,7 +20,6 @@ import {
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
-import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubSetter.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
@@ -29,7 +28,7 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
-import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
+import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
 import {
     L2_COMPLEX_UPGRADER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
@@ -70,8 +69,6 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {IMessageVerification} from "contracts/common/MessageVerification.sol";
-
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
 
@@ -83,8 +80,10 @@ contract ExperimentalBridgeTest is Test {
     address public testTokenAddress;
     DummyChainTypeManagerWBH mockCTM;
     DummyZKChain mockChainContract;
-    DummySharedBridge mockSharedBridge;
-    DummySharedBridge mockSecondSharedBridge;
+    // These are real `L1AssetRouter` instances used as stand-in asset routers in the
+    // bridgehub tests; the legacy `DummySharedBridge` dev stub has been removed.
+    L1AssetRouter mockSharedBridge;
+    L1AssetRouter mockSecondSharedBridge;
     L1AssetRouter sharedBridge;
     address sharedBridgeAddress;
     address secondBridgeAddress;
@@ -160,23 +159,24 @@ contract ExperimentalBridgeTest is Test {
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        mockChainContract = new DummyZKChain(address(bridgehub), eraChainId, block.chainid, address(0), eip7702Checker);
+        mockChainContract = new DummyZKChain(address(bridgehub), block.chainid, address(0), eip7702Checker);
 
         mockL2Contract = makeAddr("mockL2Contract");
         // mocks to use in bridges instead of using a dummy one
         address mockL1WethAddress = makeAddr("Weth");
         address eraDiamondProxy = makeAddr("eraDiamondProxy");
 
-        l1Nullifier = new L1Nullifier(bridgehub, messageRoot, eraChainId, eraDiamondProxy);
+        l1Nullifier = new L1Nullifier(bridgehub, messageRoot);
         l1NullifierAddress = address(l1Nullifier);
 
-        mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
-        mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
+        mockSharedBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
+        mockSecondSharedBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
 
         // kl todo: clean this up. NTV id deployed below in deployNTV. its was a mess before this upgrade.
         ntv = _deployNTVWithoutEthToken(address(mockSharedBridge));
         ntv.registerEthToken();
 
+        vm.prank(bridgeOwner);
         mockSecondSharedBridge.setNativeTokenVault(ntv);
 
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
@@ -194,31 +194,8 @@ contract ExperimentalBridgeTest is Test {
             )
         );
 
-        sharedBridge = new L1AssetRouter(
-            mockL1WethAddress,
-            address(bridgehub),
-            l1NullifierAddress,
-            eraChainId,
-            eraDiamondProxy
-        );
-        address defaultOwner = sharedBridge.owner();
-        vm.prank(defaultOwner);
-        sharedBridge.transferOwnership(bridgeOwner);
-        vm.prank(bridgeOwner);
-        sharedBridge.acceptOwnership();
-
-        secondBridge = new L1AssetRouter(
-            mockL1WethAddress,
-            address(bridgehub),
-            l1NullifierAddress,
-            eraChainId,
-            eraDiamondProxy
-        );
-        defaultOwner = secondBridge.owner();
-        vm.prank(defaultOwner);
-        secondBridge.transferOwnership(bridgeOwner);
-        vm.prank(bridgeOwner);
-        secondBridge.acceptOwnership();
+        sharedBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
+        secondBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
 
         sharedBridgeAddress = address(sharedBridge);
         secondBridgeAddress = address(secondBridge);
@@ -227,7 +204,7 @@ contract ExperimentalBridgeTest is Test {
         testToken8 = new TestnetERC20Token("WBTC", "Wrapped Bitcoin", 8);
 
         // test if the ownership of the bridgehub is set correctly or not
-        defaultOwner = bridgehub.owner();
+        address defaultOwner = bridgehub.owner();
 
         // Now, the `reentrancyGuardInitializer` should prevent anyone from calling `initialize` since we have called the constructor of the contract
         vm.expectRevert(SlotOccupied.selector);
@@ -254,6 +231,27 @@ contract ExperimentalBridgeTest is Test {
         assertEq(bridgehub.owner(), bridgeOwner);
 
         simpleExecutor = new SimpleExecutor();
+    }
+
+    /// @dev Deploys a real `L1AssetRouter` and transfers ownership to `bridgeOwner`,
+    /// mirroring the production ownership handover. Used everywhere the tests previously
+    /// relied on the (now removed) `DummySharedBridge` dev stub.
+    function _deployAssetRouter(
+        address _l1WethAddress,
+        address _eraDiamondProxy
+    ) internal returns (L1AssetRouter assetRouter) {
+        assetRouter = new L1AssetRouter(
+            _l1WethAddress,
+            address(bridgehub),
+            l1NullifierAddress,
+            eraChainId,
+            _eraDiamondProxy
+        );
+        address defaultOwner = assetRouter.owner();
+        vm.prank(defaultOwner);
+        assetRouter.transferOwnership(bridgeOwner);
+        vm.prank(bridgeOwner);
+        assetRouter.acceptOwnership();
     }
 
     function _deployNTVWithoutEthToken(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
@@ -921,137 +919,6 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(bridgehub.getZKChain(chainId) == newChainAddress);
     }
 
-    function test_proveL2MessageInclusion_new(
-        uint256 mockChainId,
-        uint256 mockBatchNumber,
-        uint256 mockIndex,
-        bytes32[] memory mockProof,
-        uint16 randomTxNumInBatch,
-        address randomSender,
-        bytes memory randomData
-    ) public {
-        _initializeBridgehub();
-        mockChainId = _setUpZKChainForChainId(mockChainId);
-
-        // Now the following statements should be true as well:
-        assertTrue(bridgehub.chainTypeManager(mockChainId) == address(mockCTM));
-        assertTrue(bridgehub.getZKChain(mockChainId) == address(mockChainContract));
-
-        // Creating a random L2Message::l2Message so that we pass the correct parameters to `proveL2MessageInclusion`
-        L2Message memory l2Message = _createMockL2Message(randomTxNumInBatch, randomSender, randomData);
-
-        // Since we have used random data for the `InteropCenter.proveL2MessageInclusion` function which basically forwards the call
-        // to the same function in the mailbox, we will mock the call to the mailbox to return true and see if it works.
-        vm.mockCall(
-            address(messageRoot),
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
-
-        assertTrue(
-            bridgehub.proveL2MessageInclusion({
-                _chainId: mockChainId,
-                _batchNumber: mockBatchNumber,
-                _index: mockIndex,
-                _message: l2Message,
-                _proof: mockProof
-            })
-        );
-        vm.clearMockedCalls();
-    }
-
-    function test_proveL2LogInclusion_new(
-        uint256 mockChainId,
-        uint256 mockBatchNumber,
-        uint256 mockIndex,
-        bytes32[] memory mockProof,
-        uint8 randomL2ShardId,
-        bool randomIsService,
-        uint16 randomTxNumInBatch,
-        address randomSender,
-        bytes32 randomKey,
-        bytes32 randomValue
-    ) public {
-        _initializeBridgehub();
-        mockChainId = _setUpZKChainForChainId(mockChainId);
-
-        // Now the following statements should be true as well:
-        assertTrue(bridgehub.chainTypeManager(mockChainId) == address(mockCTM));
-        assertTrue(bridgehub.getZKChain(mockChainId) == address(mockChainContract));
-
-        // Creating a random L2Log::l2Log so that we pass the correct parameters to `proveL2LogInclusion`
-        L2Log memory l2Log = _createMockL2Log({
-            randomL2ShardId: randomL2ShardId,
-            randomIsService: randomIsService,
-            randomTxNumInBatch: randomTxNumInBatch,
-            randomSender: randomSender,
-            randomKey: randomKey,
-            randomValue: randomValue
-        });
-
-        // Since we have used random data for the `interopCenter.proveL2LogInclusion` function which basically forwards the call
-        // to the same function in the mailbox, we will mock the call to the mailbox to return true and see if it works.
-        vm.mockCall(
-            address(messageRoot),
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(IMessageVerification.proveL2LogInclusionShared.selector),
-            abi.encode(true)
-        );
-
-        assertTrue(
-            bridgehub.proveL2LogInclusion({
-                _chainId: mockChainId,
-                _batchNumber: mockBatchNumber,
-                _index: mockIndex,
-                _log: l2Log,
-                _proof: mockProof
-            })
-        );
-        vm.clearMockedCalls();
-    }
-
-    function test_proveL1ToL2TransactionStatus_new(
-        uint256 randomChainId,
-        bytes32 randomL2TxHash,
-        uint256 randomL2BatchNumber,
-        uint256 randomL2MessageIndex,
-        uint16 randomL2TxNumberInBatch,
-        bytes32[] memory randomMerkleProof,
-        bool randomResultantBool,
-        bool txStatusBool
-    ) public {
-        _initializeBridgehub();
-        randomChainId = _setUpZKChainForChainId(randomChainId);
-
-        TxStatus txStatus;
-
-        if (txStatusBool) {
-            txStatus = TxStatus.Failure;
-        } else {
-            txStatus = TxStatus.Success;
-        }
-
-        vm.mockCall(
-            address(messageRoot),
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(IMessageVerification.proveL1ToL2TransactionStatusShared.selector),
-            abi.encode(randomResultantBool)
-        );
-
-        assertTrue(
-            bridgehub.proveL1ToL2TransactionStatus({
-                _chainId: randomChainId,
-                _l2TxHash: randomL2TxHash,
-                _l2BatchNumber: randomL2BatchNumber,
-                _l2MessageIndex: randomL2MessageIndex,
-                _l2TxNumberInBatch: randomL2TxNumberInBatch,
-                _merkleProof: randomMerkleProof,
-                _status: txStatus
-            }) == randomResultantBool
-        );
-    }
-
     function test_l2TransactionBaseCost(
         uint256 mockChainId,
         uint256 mockGasPrice,
@@ -1180,6 +1047,8 @@ contract ExperimentalBridgeTest is Test {
 
         address randomCaller = makeAddr("RANDOM_CALLER");
         mockChainId = bound(mockChainId, 1, type(uint48).max);
+        // Base-token burns require a non-zero amount, so the mint value must be positive for a successful request.
+        mockMintValue = bound(mockMintValue, 1, type(uint128).max);
 
         (L2TransactionRequestDirect memory l2TxnReqDirect, bytes32 hash) = _prepareETHL2TransactionDirectRequest({
             mockChainId: mockChainId,
@@ -1200,79 +1069,6 @@ contract ExperimentalBridgeTest is Test {
         bytes32 resultantHash = bridgehub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
 
         assertTrue(resultantHash == hash);
-    }
-
-    function test_requestL2TransactionDirect_NonETHCase(
-        uint256 mockChainId,
-        uint256 mockMintValue,
-        address mockL2Contract,
-        uint256 mockL2Value,
-        bytes memory mockL2Calldata,
-        uint256 mockL2GasLimit,
-        uint256 mockL2GasPerPubdataByteLimit,
-        bytes[] memory mockFactoryDeps,
-        uint256 gasPrice,
-        uint256 randomValue
-    ) public useRandomToken(randomValue) {
-        _useFullSharedBridge();
-        _initializeBridgehub();
-
-        address randomCaller = makeAddr("RANDOM_CALLER");
-        mockChainId = bound(mockChainId, 1, type(uint48).max);
-
-        vm.assume(mockFactoryDeps.length <= MAX_NEW_FACTORY_DEPS);
-        vm.assume(mockMintValue > 0);
-
-        L2TransactionRequestDirect memory l2TxnReqDirect = _createMockL2TransactionRequestDirect({
-            mockChainId: mockChainId,
-            mockMintValue: mockMintValue,
-            mockL2Contract: mockL2Contract,
-            mockL2Value: mockL2Value,
-            mockL2Calldata: mockL2Calldata,
-            mockL2GasLimit: mockL2GasLimit,
-            mockL2GasPerPubdataByteLimit: mockL2GasPerPubdataByteLimit,
-            mockFactoryDeps: mockFactoryDeps,
-            mockRefundRecipient: address(0)
-        });
-
-        l2TxnReqDirect.chainId = _setUpZKChainForChainId(l2TxnReqDirect.chainId);
-
-        _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, false, address(testToken));
-
-        assertTrue(bridgehub.getZKChain(l2TxnReqDirect.chainId) == address(mockChainContract));
-        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
-
-        vm.mockCall(
-            address(mockChainContract),
-            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
-            abi.encode(canonicalHash)
-        );
-
-        mockChainContract.setFeeParams();
-        mockChainContract.setBaseTokenGasMultiplierPrice(uint128(1), uint128(1));
-        mockChainContract.setBridgeHubAddress(address(bridgehub));
-        assertTrue(mockChainContract.getBridgeHubAddress() == address(bridgehub));
-
-        gasPrice = bound(gasPrice, 1_000, 50_000_000);
-        vm.txGasPrice(gasPrice * 1 gwei);
-
-        vm.deal(randomCaller, 1 ether);
-        vm.prank(randomCaller);
-        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, 0, randomCaller.balance));
-        bytes32 resultantHash = bridgehub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
-
-        // Now, let's call the same function with zero msg.value
-        testToken.mint(randomCaller, l2TxnReqDirect.mintValue);
-        assertEq(testToken.balanceOf(randomCaller), l2TxnReqDirect.mintValue);
-
-        vm.prank(randomCaller);
-        testToken.transfer(address(this), l2TxnReqDirect.mintValue);
-        assertEq(testToken.balanceOf(address(this)), l2TxnReqDirect.mintValue);
-        testToken.approve(sharedBridgeAddress, l2TxnReqDirect.mintValue);
-
-        resultantHash = bridgehub.requestL2TransactionDirect(l2TxnReqDirect);
-
-        assertEq(canonicalHash, resultantHash);
     }
 
     // This is an example how to test behaviour of 7702. Keeping it, so the logic can be reused in the future
@@ -1368,6 +1164,8 @@ contract ExperimentalBridgeTest is Test {
         vm.assume(magicValue != TWO_BRIDGES_MAGIC_VALUE);
 
         chainId = bound(chainId, 1, type(uint48).max);
+        // Base-token burns require a non-zero amount; bound the mint value so the flow reaches the magic-value check.
+        mintValue = bound(mintValue, 1, type(uint128).max);
 
         L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
             chainId: chainId,
@@ -1494,149 +1292,6 @@ contract ExperimentalBridgeTest is Test {
         bridgehub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
     }
 
-    function test_requestL2TransactionTwoBridges_ERC20ToNonBase(
-        uint256 chainId,
-        uint256 mintValue,
-        uint256 l2Value,
-        uint256 l2GasLimit,
-        uint256 l2GasPerPubdataByteLimit,
-        address l2Receiver,
-        uint256 randomValue
-    ) public useRandomToken(randomValue) {
-        _useFullSharedBridge();
-        _initializeBridgehub();
-        vm.assume(mintValue > 0);
-
-        // create another token, to avoid base token
-        TestnetERC20Token erc20Token = new TestnetERC20Token("ZKESTT", "ZkSync ERC Test Token", 18);
-        address erc20TokenAddress = address(erc20Token);
-        l2Value = bound(l2Value, 1, type(uint256).max);
-        bytes memory secondBridgeCalldata = abi.encode(erc20TokenAddress, l2Value, l2Receiver);
-
-        chainId = _setUpZKChainForChainId(chainId);
-
-        L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
-            chainId: chainId,
-            mintValue: mintValue,
-            l2Value: 0, // not used
-            l2GasLimit: l2GasLimit,
-            l2GasPerPubdataByteLimit: l2GasPerPubdataByteLimit,
-            refundRecipient: address(0),
-            secondBridgeValue: 0, // not used cause we are using ERC20
-            secondBridgeCalldata: secondBridgeCalldata
-        });
-
-        address randomCaller = makeAddr("RANDOM_CALLER");
-        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
-
-        _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, false, address(testToken));
-        assertTrue(bridgehub.baseToken(l2TxnReq2BridgeOut.chainId) == address(testToken));
-        assertTrue(bridgehub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
-        mockChainContract.setBridgeHubAddress(address(bridgehub));
-
-        vm.mockCall(
-            address(mockChainContract),
-            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
-            abi.encode(canonicalHash)
-        );
-
-        testToken.mint(randomCaller, l2TxnReq2BridgeOut.mintValue);
-        erc20Token.mint(randomCaller, l2Value);
-
-        assertEq(testToken.balanceOf(randomCaller), l2TxnReq2BridgeOut.mintValue);
-        assertEq(erc20Token.balanceOf(randomCaller), l2Value);
-
-        vm.startPrank(randomCaller);
-        testToken.approve(sharedBridgeAddress, l2TxnReq2BridgeOut.mintValue);
-        erc20Token.approve(secondBridgeAddress, l2Value);
-        vm.stopPrank();
-        vm.prank(randomCaller);
-        bytes32 resultHash = bridgehub.requestL2TransactionTwoBridges(l2TxnReq2BridgeOut);
-        assertEq(resultHash, canonicalHash);
-
-        assertEq(erc20Token.balanceOf(randomCaller), 0);
-        assertEq(testToken.balanceOf(randomCaller), 0);
-        assertEq(erc20Token.balanceOf(address(ntv)), l2Value);
-        assertEq(testToken.balanceOf(address(ntv)), l2TxnReq2BridgeOut.mintValue);
-
-        l2TxnReq2BridgeOut.secondBridgeValue = 1;
-        testToken.mint(randomCaller, l2TxnReq2BridgeOut.mintValue);
-        vm.startPrank(randomCaller);
-        testToken.approve(sharedBridgeAddress, l2TxnReq2BridgeOut.mintValue);
-        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, l2TxnReq2BridgeOut.secondBridgeValue, 0));
-        bridgehub.requestL2TransactionTwoBridges(l2TxnReq2BridgeOut);
-        vm.stopPrank();
-    }
-
-    function test_requestL2TransactionTwoBridges_ETHToNonBase(
-        uint256 chainId,
-        uint256 mintValue,
-        uint256 msgValue,
-        uint256 l2GasLimit,
-        uint256 l2GasPerPubdataByteLimit,
-        address refundRecipient,
-        uint256 secondBridgeValue,
-        address l2Receiver,
-        uint256 randomValue
-    ) public useRandomToken(randomValue) {
-        _useFullSharedBridge();
-        _initializeBridgehub();
-        vm.assume(mintValue > 0);
-
-        secondBridgeValue = bound(secondBridgeValue, 1, type(uint256).max);
-        bytes memory secondBridgeCalldata = abi.encode(ETH_TOKEN_ADDRESS, 0, l2Receiver);
-
-        chainId = _setUpZKChainForChainId(chainId);
-
-        L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
-            chainId: chainId,
-            mintValue: mintValue,
-            l2Value: 0,
-            l2GasLimit: l2GasLimit,
-            l2GasPerPubdataByteLimit: l2GasPerPubdataByteLimit,
-            refundRecipient: refundRecipient,
-            secondBridgeValue: secondBridgeValue,
-            secondBridgeCalldata: secondBridgeCalldata
-        });
-
-        _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, false, address(testToken));
-        assertTrue(bridgehub.baseToken(l2TxnReq2BridgeOut.chainId) == address(testToken));
-        assertTrue(bridgehub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
-
-        address randomCaller = makeAddr("RANDOM_CALLER");
-
-        mockChainContract.setBridgeHubAddress(address(bridgehub));
-
-        {
-            bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
-
-            vm.mockCall(
-                address(mockChainContract),
-                abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
-                abi.encode(canonicalHash)
-            );
-        }
-
-        // kl todo this was copied up.
-        testToken.mint(randomCaller, l2TxnReq2BridgeOut.mintValue);
-        assertEq(testToken.balanceOf(randomCaller), l2TxnReq2BridgeOut.mintValue);
-        vm.prank(randomCaller);
-        testToken.approve(sharedBridgeAddress, l2TxnReq2BridgeOut.mintValue);
-
-        if (msgValue != secondBridgeValue) {
-            vm.deal(randomCaller, msgValue);
-            vm.expectRevert(
-                abi.encodeWithSelector(MsgValueMismatch.selector, l2TxnReq2BridgeOut.secondBridgeValue, msgValue)
-            );
-            vm.prank(randomCaller);
-            bridgehub.requestL2TransactionTwoBridges{value: msgValue}(l2TxnReq2BridgeOut);
-        }
-
-        vm.deal(randomCaller, l2TxnReq2BridgeOut.secondBridgeValue);
-        vm.prank(randomCaller);
-        bridgehub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
-    }
-
     /////////////////////////////////////////////////////////
     // INTERNAL UTILITY FUNCTIONS
     /////////////////////////////////////////////////////////
@@ -1669,40 +1324,6 @@ contract ExperimentalBridgeTest is Test {
         l2Req.secondBridgeCalldata = secondBridgeCalldata;
 
         return l2Req;
-    }
-
-    function _createMockL2Message(
-        uint16 randomTxNumInBatch,
-        address randomSender,
-        bytes memory randomData
-    ) internal pure returns (L2Message memory) {
-        L2Message memory l2Message;
-
-        l2Message.txNumberInBatch = randomTxNumInBatch;
-        l2Message.sender = randomSender;
-        l2Message.data = randomData;
-
-        return l2Message;
-    }
-
-    function _createMockL2Log(
-        uint8 randomL2ShardId,
-        bool randomIsService,
-        uint16 randomTxNumInBatch,
-        address randomSender,
-        bytes32 randomKey,
-        bytes32 randomValue
-    ) internal pure returns (L2Log memory) {
-        L2Log memory l2Log;
-
-        l2Log.l2ShardId = randomL2ShardId;
-        l2Log.isService = randomIsService;
-        l2Log.txNumberInBatch = randomTxNumInBatch;
-        l2Log.sender = randomSender;
-        l2Log.key = randomKey;
-        l2Log.value = randomValue;
-
-        return l2Log;
     }
 
     function _createNewChainInitData(
@@ -1832,149 +1453,5 @@ contract ExperimentalBridgeTest is Test {
         }
 
         return shortArray;
-    }
-
-    /////////////////////////////////////////////////////////
-    // OLDER (HIGH-LEVEL MOCKED) TESTS
-    ////////////////////////////////////////////////////////
-
-    function test_proveL2MessageInclusion_old(
-        uint256 mockChainId,
-        uint256 mockBatchNumber,
-        uint256 mockIndex,
-        bytes32[] memory mockProof,
-        uint16 randomTxNumInBatch,
-        address randomSender,
-        bytes memory randomData
-    ) public {
-        vm.startPrank(bridgeOwner);
-        bridgehub.addChainTypeManager(address(mockCTM));
-        vm.stopPrank();
-
-        L2Message memory l2Message = _createMockL2Message(randomTxNumInBatch, randomSender, randomData);
-
-        vm.mockCall(
-            address(bridgehub),
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                bridgehub.proveL2MessageInclusion.selector,
-                mockChainId,
-                mockBatchNumber,
-                mockIndex,
-                l2Message,
-                mockProof
-            ),
-            abi.encode(true)
-        );
-
-        assertTrue(
-            bridgehub.proveL2MessageInclusion({
-                _chainId: mockChainId,
-                _batchNumber: mockBatchNumber,
-                _index: mockIndex,
-                _message: l2Message,
-                _proof: mockProof
-            })
-        );
-    }
-
-    function test_proveL2LogInclusion_old(
-        uint256 mockChainId,
-        uint256 mockBatchNumber,
-        uint256 mockIndex,
-        bytes32[] memory mockProof,
-        uint8 randomL2ShardId,
-        bool randomIsService,
-        uint16 randomTxNumInBatch,
-        address randomSender,
-        bytes32 randomKey,
-        bytes32 randomValue
-    ) public {
-        vm.startPrank(bridgeOwner);
-        bridgehub.addChainTypeManager(address(mockCTM));
-        vm.stopPrank();
-
-        L2Log memory l2Log = _createMockL2Log({
-            randomL2ShardId: randomL2ShardId,
-            randomIsService: randomIsService,
-            randomTxNumInBatch: randomTxNumInBatch,
-            randomSender: randomSender,
-            randomKey: randomKey,
-            randomValue: randomValue
-        });
-
-        vm.mockCall(
-            address(bridgehub),
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                bridgehub.proveL2LogInclusion.selector,
-                mockChainId,
-                mockBatchNumber,
-                mockIndex,
-                l2Log,
-                mockProof
-            ),
-            abi.encode(true)
-        );
-
-        assertTrue(
-            bridgehub.proveL2LogInclusion({
-                _chainId: mockChainId,
-                _batchNumber: mockBatchNumber,
-                _index: mockIndex,
-                _log: l2Log,
-                _proof: mockProof
-            })
-        );
-    }
-
-    function test_proveL1ToL2TransactionStatus_old(
-        uint256 randomChainId,
-        bytes32 randomL2TxHash,
-        uint256 randomL2BatchNumber,
-        uint256 randomL2MessageIndex,
-        uint16 randomL2TxNumberInBatch,
-        bytes32[] memory randomMerkleProof,
-        bool randomResultantBool
-    ) public {
-        vm.startPrank(bridgeOwner);
-        bridgehub.addChainTypeManager(address(mockCTM));
-        vm.stopPrank();
-
-        TxStatus txStatus;
-
-        if (randomChainId % 2 == 0) {
-            txStatus = TxStatus.Failure;
-        } else {
-            txStatus = TxStatus.Success;
-        }
-
-        vm.mockCall(
-            address(bridgehub),
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                bridgehub.proveL1ToL2TransactionStatus.selector,
-                randomChainId,
-                randomL2TxHash,
-                randomL2BatchNumber,
-                randomL2MessageIndex,
-                randomL2TxNumberInBatch,
-                randomMerkleProof,
-                txStatus
-            ),
-            abi.encode(randomResultantBool)
-        );
-
-        assertTrue(
-            bridgehub.proveL1ToL2TransactionStatus({
-                _chainId: randomChainId,
-                _l2TxHash: randomL2TxHash,
-                _l2BatchNumber: randomL2BatchNumber,
-                _l2MessageIndex: randomL2MessageIndex,
-                _l2TxNumberInBatch: randomL2TxNumberInBatch,
-                _merkleProof: randomMerkleProof,
-                _status: txStatus
-            }) == randomResultantBool
-        );
     }
 }

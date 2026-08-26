@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L2Log, L2Message, TokenBridgingData, TxStatus} from "../../common/Messaging.sol";
+import {TokenBridgingData, TxStatus} from "../../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
@@ -128,33 +128,6 @@ interface IBridgehubBase {
     function ctmAssetIdToAddress(bytes32 _assetInfo) external view returns (address);
 
     function chainAssetHandler() external view returns (address);
-
-    /// Mailbox forwarder
-    function proveL2MessageInclusion(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        uint256 _index,
-        L2Message calldata _message,
-        bytes32[] calldata _proof
-    ) external view returns (bool);
-
-    function proveL2LogInclusion(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        uint256 _index,
-        L2Log memory _log,
-        bytes32[] calldata _proof
-    ) external view returns (bool);
-
-    function proveL1ToL2TransactionStatus(
-        uint256 _chainId,
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof,
-        TxStatus _status
-    ) external view returns (bool);
 
     function l2TransactionBaseCost(
         uint256 _chainId,

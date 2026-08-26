@@ -617,8 +617,6 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             return BytecodeUtils.readBytecodeL1(false, "BytecodesSupplier.sol", "BytecodesSupplier");
         } else if (compareStrings(contractName, "TransitionaryOwner")) {
             return BytecodeUtils.readBytecodeL1(false, "TransitionaryOwner.sol", "TransitionaryOwner");
-        } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
-            return ContractsBytecodesLib.getCreationCodeEra("L2SharedBridgeLegacy");
         } else if (compareStrings(contractName, "ValidatorTimelock")) {
             return ContractsBytecodesLib.getCreationCodeEra("ValidatorTimelock");
         }

@@ -33,7 +33,6 @@ import {L2_INTEROP_ACCOUNT_ADDR} from "../l2-tests-abstract/Utils.sol";
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {L2ChainAssetHandlerDev} from "contracts/dev-contracts/L2ChainAssetHandlerDev.sol";
@@ -172,7 +171,6 @@ library L2UtilsBase {
                 _args.l1ChainId,
                 _args.eraChainId,
                 IL1AssetRouter(_args.l1AssetRouter),
-                IL2SharedBridgeLegacy(_args.legacySharedBridge),
                 baseTokenAssetId,
                 _args.aliasedOwner
             );
@@ -197,7 +195,6 @@ library L2UtilsBase {
                 _args.l1ChainId,
                 _args.aliasedOwner,
                 _args.l2TokenProxyBytecodeHash,
-                _args.legacySharedBridge,
                 _args.l2TokenBeacon,
                 wethToken,
                 TokenBridgingData({

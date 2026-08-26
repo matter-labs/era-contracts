@@ -122,12 +122,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         vm.prank(governor);
         chainAssetHandler.setAddresses();
 
-        vm.mockCall(
-            address(sharedBridge),
-            abi.encodeCall(L1AssetRouter.l2BridgeAddress, (chainId)),
-            abi.encode(makeAddr("l2BridgeAddress"))
-        );
-
         newChainAdmin = makeAddr("chainadmin");
 
         chainTypeManager = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
@@ -169,13 +163,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         facetCuts.push(
             Diamond.FacetCut({
                 facet: address(
-                    new MailboxFacet(
-                        eraChainId,
-                        block.chainid,
-                        address(0),
-                        IEIP7702Checker(makeAddr("eip7702Checker")),
-                        false
-                    )
+                    new MailboxFacet(block.chainid, address(0), IEIP7702Checker(makeAddr("eip7702Checker")), false)
                 ),
                 action: Diamond.Action.Add,
                 isFreezable: false,
@@ -270,12 +258,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         );
 
         vm.mockCall(
-            address(l1Nullifier),
-            abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
-            abi.encode(l1Nullifier)
-        );
-
-        vm.mockCall(
             address(bridgehub),
             abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
             abi.encode(baseToken)
@@ -301,12 +283,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         vm.mockCall(
             address(sharedBridge),
             abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
-            abi.encode(l1Nullifier)
-        );
-
-        vm.mockCall(
-            address(l1Nullifier),
-            abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
             abi.encode(l1Nullifier)
         );
 

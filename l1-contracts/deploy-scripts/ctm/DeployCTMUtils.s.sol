@@ -23,7 +23,6 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
@@ -378,7 +377,6 @@ abstract contract DeployCTMUtils is DeployUtils {
             CTMCoreDeploymentConfig({
                 isZKsyncOS: _config.isZKsyncOS,
                 testnetVerifier: _config.testnetVerifier,
-                eraChainId: _config.eraChainId,
                 l1ChainId: _config.l1ChainId,
                 bridgehubProxy: coreAddresses.bridgehub.proxies.bridgehub,
                 interopCenterProxy: L2_INTEROP_CENTER_ADDR,

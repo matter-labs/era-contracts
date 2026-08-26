@@ -6,7 +6,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol";
 import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.sol";
-import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
 import {
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
@@ -19,7 +18,6 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_BASE_TOKEN_HOLDER} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
-import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {
     BaseTokenHolderAlreadyInitialized,
     BaseTokenHolderMintFailed,
@@ -45,21 +43,8 @@ contract L2BaseTokenZKOSHarness is L2BaseTokenZKOS {
 contract L2BaseTokenZKOSTest is Test {
     L2BaseTokenZKOS internal l2BaseToken;
 
-    address internal l1Receiver;
-    uint256 internal constant WITHDRAW_AMOUNT = 1 ether;
-
-    event Withdrawal(address indexed _l2Sender, address indexed _l1Receiver, uint256 _amount);
-    event WithdrawalWithMessage(
-        address indexed _l2Sender,
-        address indexed _l1Receiver,
-        uint256 _amount,
-        bytes _additionalData
-    );
-    event L1MessageSent(address indexed _sender, bytes32 indexed _hash, bytes _message);
-
     function setUp() public {
         l2BaseToken = new L2BaseTokenZKOS();
-        l1Receiver = makeAddr("l1Receiver");
 
         // Deploy dummy dependencies at system addresses (replaces broad vm.mockCall)
         vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(new DummyL2L1Messenger()).code);
@@ -72,278 +57,6 @@ contract L2BaseTokenZKOSTest is Test {
         vm.etch(
             L2_ASSET_TRACKER_ADDR,
             address(new DummyL2AssetTracker(address(0), DummyL2AssetTracker.RecordMode.None)).code
-        );
-    }
-
-    /// @dev Helper to initialize l2BaseToken via initL2() — sets L1_CHAIN_ID and transfers to BaseTokenHolder.
-    function _initL2() internal {
-        vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
-        vm.deal(address(l2BaseToken), INITIAL_BASE_TOKEN_HOLDER_BALANCE);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2BaseToken.initL2(1);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            withdraw() TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_withdraw_success() public {
-        _initL2();
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-
-        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
-
-        // Expect the L1Messenger call
-        bytes memory expectedMessage = abi.encodePacked(
-            IMailboxLegacy.finalizeEthWithdrawal.selector,
-            l1Receiver,
-            WITHDRAW_AMOUNT
-        );
-        vm.expectCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSignature("sendToL1(bytes)", expectedMessage)
-        );
-
-        // Expect the Withdrawal event
-        vm.expectEmit(true, true, false, true);
-        emit Withdrawal(sender, l1Receiver, WITHDRAW_AMOUNT);
-
-        vm.prank(sender);
-        l2BaseToken.withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
-
-        // Verify BaseTokenHolder received the ETH
-        assertEq(
-            L2_BASE_TOKEN_HOLDER_ADDR.balance,
-            holderBalanceBefore + WITHDRAW_AMOUNT,
-            "BaseTokenHolder should receive ETH"
-        );
-    }
-
-    /// @dev Covers the holder->vault forwarding only: the vault is a recording mock, so the real
-    /// tracker's settlement gating and `interopInfo` update are exercised in L2AssetTracker.t.sol.
-    function test_withdraw_forwardsBaseTokenBookkeepingToTracker() public {
-        // Use the actual holder to verify the forwarded withdrawal.
-        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
-
-        // Deploy L2BaseTokenZKOS at the expected system contract address so it passes onlyBridgingCaller check
-        L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
-        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
-        // Initialize L1_CHAIN_ID on the system-address instance via initL2()
-        vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
-        vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(1);
-
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-
-        vm.prank(sender);
-        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
-
-        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
-        assertEq(tracker.toChainCalls(), 1, "withdrawal should be reported to the tracker");
-        assertEq(tracker.recordedToChainId(), 1, "withdrawal destination should be the L1 chain id");
-        assertEq(tracker.recordedToAmount(), WITHDRAW_AMOUNT, "withdrawal amount should be forwarded verbatim");
-    }
-
-    function test_withdraw_callsL1Messenger() public {
-        _initL2();
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-
-        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
-
-        // Expected message format
-        bytes memory expectedMessage = abi.encodePacked(
-            IMailboxLegacy.finalizeEthWithdrawal.selector,
-            l1Receiver,
-            WITHDRAW_AMOUNT
-        );
-
-        // Expect the L1Messenger call
-        vm.expectCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSignature("sendToL1(bytes)", expectedMessage)
-        );
-
-        vm.prank(sender);
-        l2BaseToken.withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
-
-        // Verify BaseTokenHolder received the ETH
-        assertEq(
-            L2_BASE_TOKEN_HOLDER_ADDR.balance,
-            holderBalanceBefore + WITHDRAW_AMOUNT,
-            "BaseTokenHolder should receive ETH"
-        );
-    }
-
-    function test_withdraw_revertsIfBaseTokenHolderRejectsTransfer() public {
-        _initL2();
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-
-        // Deploy a contract that rejects burnAndStartBridging at BaseTokenHolder address
-        RejectingBurnAndStartBridgingContract rejecting = new RejectingBurnAndStartBridgingContract();
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(rejecting).code);
-
-        vm.prank(sender);
-        vm.expectRevert("Rejected");
-        l2BaseToken.withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
-    }
-
-    function testFuzz_withdraw_variousAmounts(uint256 amount) public {
-        _initL2();
-        vm.assume(amount > 0 && amount < type(uint128).max);
-
-        address sender = makeAddr("sender");
-        vm.deal(sender, amount);
-
-        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
-
-        vm.prank(sender);
-        l2BaseToken.withdraw{value: amount}(l1Receiver);
-
-        assertEq(
-            L2_BASE_TOKEN_HOLDER_ADDR.balance,
-            holderBalanceBefore + amount,
-            "BaseTokenHolder should receive correct amount"
-        );
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        withdrawWithMessage() TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_withdrawWithMessage_success() public {
-        _initL2();
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-        bytes memory additionalData = "test message";
-
-        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
-
-        // Expect the WithdrawalWithMessage event
-        vm.expectEmit(true, true, false, true);
-        emit WithdrawalWithMessage(sender, l1Receiver, WITHDRAW_AMOUNT, additionalData);
-
-        vm.prank(sender);
-        l2BaseToken.withdrawWithMessage{value: WITHDRAW_AMOUNT}(l1Receiver, additionalData);
-
-        // Verify BaseTokenHolder received the ETH
-        assertEq(
-            L2_BASE_TOKEN_HOLDER_ADDR.balance,
-            holderBalanceBefore + WITHDRAW_AMOUNT,
-            "BaseTokenHolder should receive ETH"
-        );
-    }
-
-    /// @dev Forwarding-only coverage, like the withdrawal test above.
-    function test_withdrawWithMessage_forwardsBaseTokenBookkeepingToTracker() public {
-        // Use the actual holder to verify the forwarded withdrawal.
-        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
-
-        // Deploy L2BaseTokenZKOS at the expected system contract address so it passes onlyBridgingCaller check
-        L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
-        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
-        // Initialize L1_CHAIN_ID on the system-address instance via initL2()
-        vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
-        vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(1);
-
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-        bytes memory additionalData = "test message";
-
-        vm.prank(sender);
-        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).withdrawWithMessage{value: WITHDRAW_AMOUNT}(
-            l1Receiver,
-            additionalData
-        );
-
-        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
-        assertEq(tracker.toChainCalls(), 1, "withdrawal should be reported to the tracker");
-        assertEq(tracker.recordedToChainId(), 1, "withdrawal destination should be the L1 chain id");
-        assertEq(tracker.recordedToAmount(), WITHDRAW_AMOUNT, "withdrawal amount should be forwarded verbatim");
-    }
-
-    function test_withdrawWithMessage_callsL1MessengerWithExtendedMessage() public {
-        _initL2();
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-        bytes memory additionalData = "test message";
-
-        // Expected extended message format
-        bytes memory expectedMessage = abi.encodePacked(
-            IMailboxLegacy.finalizeEthWithdrawal.selector,
-            l1Receiver,
-            WITHDRAW_AMOUNT,
-            sender,
-            additionalData
-        );
-
-        // Expect the L1Messenger call
-        vm.expectCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSignature("sendToL1(bytes)", expectedMessage)
-        );
-
-        vm.prank(sender);
-        l2BaseToken.withdrawWithMessage{value: WITHDRAW_AMOUNT}(l1Receiver, additionalData);
-    }
-
-    function test_withdrawWithMessage_emptyAdditionalData() public {
-        _initL2();
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-        bytes memory additionalData = "";
-
-        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
-
-        vm.prank(sender);
-        l2BaseToken.withdrawWithMessage{value: WITHDRAW_AMOUNT}(l1Receiver, additionalData);
-
-        assertEq(
-            L2_BASE_TOKEN_HOLDER_ADDR.balance,
-            holderBalanceBefore + WITHDRAW_AMOUNT,
-            "BaseTokenHolder should receive ETH"
-        );
-    }
-
-    function test_withdrawWithMessage_revertsIfBaseTokenHolderRejectsTransfer() public {
-        _initL2();
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-        bytes memory additionalData = "test message";
-
-        // Deploy a contract that rejects burnAndStartBridging at BaseTokenHolder address
-        RejectingBurnAndStartBridgingContract rejecting = new RejectingBurnAndStartBridgingContract();
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(rejecting).code);
-
-        vm.prank(sender);
-        vm.expectRevert("Rejected");
-        l2BaseToken.withdrawWithMessage{value: WITHDRAW_AMOUNT}(l1Receiver, additionalData);
-    }
-
-    function testFuzz_withdrawWithMessage_variousAmountsAndData(uint256 amount, bytes calldata additionalData) public {
-        _initL2();
-        vm.assume(amount > 0 && amount < type(uint128).max);
-
-        address sender = makeAddr("sender");
-        vm.deal(sender, amount);
-
-        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
-
-        vm.prank(sender);
-        l2BaseToken.withdrawWithMessage{value: amount}(l1Receiver, additionalData);
-
-        assertEq(
-            L2_BASE_TOKEN_HOLDER_ADDR.balance,
-            holderBalanceBefore + amount,
-            "BaseTokenHolder should receive correct amount"
         );
     }
 
@@ -475,23 +188,6 @@ contract L2BaseTokenZKOSTest is Test {
         assertEq(tracker.recordedToAmount(), burnAmount);
     }
 
-    /// @notice Verifies that L2BaseToken can call burnAndStartBridging for withdrawals
-    /// @dev This test ensures L2BaseToken is a valid bridging caller
-    function test_baseTokenHolder_reportsL2BaseTokenWithdrawalToTracker() public {
-        // Deploy real BaseTokenHolder for integration tests
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
-        uint256 burnAmount = 1 ether;
-
-        // L2BaseToken calls burnAndStartBridging (simulating a withdrawal)
-        vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, burnAmount);
-        vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
-        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(1);
-
-        DummyL2AssetTracker tracker = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
-        assertEq(tracker.toChainCalls(), 1);
-        assertEq(tracker.recordedToAmount(), burnAmount);
-    }
-
     /// @notice Verifies that BaseTokenHolder reports nothing on initialization receive().
     /// @dev L2BaseToken sends via receive() during initialization, which is not a bridging operation
     function test_baseTokenHolder_doesNotReportReceiveFromL2BaseToken() public {
@@ -584,20 +280,23 @@ contract L2BaseTokenZKOSTest is Test {
         L2BaseTokenZKOSHarness token = L2BaseTokenZKOSHarness(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         token.harnessSetZkosPreV31TotalSupply(200);
 
-        // Post-upgrade steady state: the holder holds exactly the initial balance.
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new DummyL2BaseTokenHolder()).code);
+        // Post-upgrade steady state: the holder holds exactly the initial balance. The real holder
+        // is used so the bridging call below goes through its actual access control.
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
         vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        // A holder of pre-v31 supply withdraws 150 wei to L1: the value flows into the holder.
-        address preV31Holder = makeAddr("preV31Holder");
-        vm.deal(preV31Holder, 150);
-        vm.prank(preV31Holder);
-        token.withdraw{value: 150}(l1Receiver);
+        // A holder of pre-v31 supply bridges 150 wei out to L1: the value flows into the holder.
+        // Upstream (#2364) drove this through `L2BaseToken.withdraw()`, which this release removed
+        // with the rest of the legacy withdrawal path; base-token exits now go through the
+        // InteropCenter, which is the caller the holder still accepts.
+        vm.deal(L2_INTEROP_CENTER_ADDR, 150);
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: 150}(1);
 
         assertEq(
             L2_BASE_TOKEN_HOLDER_ADDR.balance,
             INITIAL_BASE_TOKEN_HOLDER_BALANCE + 150,
-            "the withdrawal must flow into the holder"
+            "the bridged-out value must flow into the holder"
         );
         // totalSupply = preV31Supply + INITIAL - holder.balance = 200 - 150 = 50
         assertEq(token.totalSupply(), 50, "net-burn state should decrease totalSupply without reverting");
@@ -644,63 +343,10 @@ contract L2BaseTokenZKOSTest is Test {
         IL2BaseTokenBase token = IL2BaseTokenBase(address(l2BaseToken));
         assert(address(token) == address(l2BaseToken));
     }
-
-    /*//////////////////////////////////////////////////////////////
-                        MESSAGE FORMAT TESTS
-    //////////////////////////////////////////////////////////////*/
-
-    function test_withdrawMessage_format() public {
-        // Verify the message format matches what L1 expects
-        address sender = makeAddr("sender");
-        vm.deal(sender, WITHDRAW_AMOUNT);
-
-        bytes memory expectedMessage = abi.encodePacked(
-            IMailboxLegacy.finalizeEthWithdrawal.selector,
-            l1Receiver,
-            WITHDRAW_AMOUNT
-        );
-
-        // The selector should be 4 bytes + address (20 bytes) + uint256 (32 bytes) = 56 bytes
-        assertEq(expectedMessage.length, 56, "Basic withdrawal message should be 56 bytes");
-
-        // First 4 bytes should be the selector
-        bytes4 selector;
-        assembly {
-            selector := mload(add(expectedMessage, 32))
-        }
-        assertEq(selector, IMailboxLegacy.finalizeEthWithdrawal.selector, "Selector should match");
-    }
-
-    function test_withdrawWithMessage_extendedFormat() public {
-        address sender = makeAddr("sender");
-        bytes memory additionalData = "hello";
-
-        bytes memory expectedMessage = abi.encodePacked(
-            IMailboxLegacy.finalizeEthWithdrawal.selector,
-            l1Receiver,
-            WITHDRAW_AMOUNT,
-            sender,
-            additionalData
-        );
-
-        // selector (4) + l1Receiver (20) + amount (32) + sender (20) + data (5) = 81 bytes
-        assertEq(expectedMessage.length, 81, "Extended withdrawal message should be 81 bytes");
-    }
 }
 
 /// @notice Helper contract that rejects ETH transfers via receive()
 contract RejectingContract {
-    receive() external payable {
-        revert("Rejected");
-    }
-}
-
-/// @notice Helper contract that rejects burnAndStartBridging calls
-contract RejectingBurnAndStartBridgingContract {
-    function burnAndStartBridging(uint256) external payable {
-        revert("Rejected");
-    }
-
     receive() external payable {
         revert("Rejected");
     }
