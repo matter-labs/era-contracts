@@ -170,6 +170,7 @@ contract RegistryBootstrapMigration {
         if (executed) {
             revert BootstrapAlreadyExecuted();
         }
+        executed = true;
         BootstrapManifest memory m = getManifest();
         // The CTM is `Ownable2Step`: governance's `transferOwnership` only nominated this contract,
         // so claim it here. Doing it inside `migrate` keeps the whole edge — claim, mutate, hand on
@@ -178,7 +179,6 @@ contract RegistryBootstrapMigration {
             Ownable2Step(m.ctm).acceptOwnership();
         }
         validate();
-        executed = true;
 
         uint256 rowsLength = m.proxyRows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {

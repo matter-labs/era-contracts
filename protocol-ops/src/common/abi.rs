@@ -36,6 +36,15 @@ pub mod i_chain_type_manager {
 }
 pub use i_chain_type_manager::IChainTypeManagerAbi;
 
+pub mod i_ctm_release {
+    alloy::sol!(
+        #[sol(rpc)]
+        ICTMReleaseAbi,
+        "../l1-contracts/zkstack-out/ICTMRelease.sol/ICTMRelease.json"
+    );
+}
+pub use i_ctm_release::ICTMReleaseAbi;
+
 pub mod zk_chain {
     alloy::sol!(
         #[sol(rpc)]

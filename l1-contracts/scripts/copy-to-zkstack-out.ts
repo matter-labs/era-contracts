@@ -15,6 +15,7 @@ const REQUIRED_CONTRACTS = [
   "IValidatorTimelock.sol",
   "IChainAssetHandler.sol",
   "IChainTypeManager.sol",
+  "ICTMRelease.sol",
   "IAdmin.sol",
   "IDiamondCut.sol",
   "IChainAdminOwnable.sol",

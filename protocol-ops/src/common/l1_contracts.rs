@@ -381,17 +381,20 @@ pub async fn resolve_is_testnet_verifier(
     let p = provider(l1_rpc_url)?;
     let ctm = IChainTypeManagerAbi::new(ctm_proxy, p.clone());
 
-    let version = ctm
-        .protocolVersion()
+    // The verifier is part of the installed chain state and is pinned by the release the CTM
+    // points at, not keyed by protocol version on the CTM.
+    let release = ctm
+        .currentRelease()
         .call()
         .await
-        .context("ctm.protocolVersion() call failed")?;
-    let verifier = ctm
-        .protocolVersionVerifier(version)
+        .context("ctm.currentRelease() call failed")?;
+    ensure_nonzero(release, "ctm.currentRelease()")?;
+    let verifier = crate::common::abi::ICTMReleaseAbi::new(release, p.clone())
+        .verifier()
         .call()
         .await
-        .context("ctm.protocolVersionVerifier() call failed")?;
-    ensure_nonzero(verifier, "ctm.protocolVersionVerifier()")?;
+        .context("release.verifier() call failed")?;
+    ensure_nonzero(verifier, "release.verifier()")?;
 
     let verifier_contract = ITestnetVerifier::new(verifier, p);
     match verifier_contract.IS_TESTNET_VERIFIER().call().await {
