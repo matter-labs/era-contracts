@@ -239,7 +239,6 @@ pub async fn chain_init(
             .with_wallet(owner),
     )?;
 
-
     // Register the chain for interop with the rest of the ecosystem (if requested). Kept last: the
     // script requires the chain to be registered on the Bridgehub with a batch leaf in the message
     // root, which `register_chain` above establishes (a fresh ZKsync OS chain gets its genesis leaf
