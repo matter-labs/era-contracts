@@ -33,7 +33,7 @@ interface INativeTokenVault {
     /// @dev This function is used to ensure that the token is registered with the NTV.
     function ensureTokenIsRegistered(address _nativeToken) external returns (bytes32);
 
-    /// @notice Used to get the the ERC20 data for a token
+    /// @notice Used to get the ERC20 data for a token
     function getERC20Getters(address _token, uint256 _originChainId) external view returns (bytes memory);
 
     /// @notice Used to get the token address of an assetId
