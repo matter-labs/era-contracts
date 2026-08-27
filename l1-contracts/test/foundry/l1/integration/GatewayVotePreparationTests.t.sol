@@ -53,9 +53,7 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
     /// that this test can actually deploy, but the CTM the harness registers is an Era one.
     /// The two genesis files carry different protocol versions, so read the params from the Era
     /// genesis to match the CTM that `setAddressesBasedOnBridgehub` checks against.
-    function getChainCreationParamsConfig(
-        string memory
-    ) internal override returns (ChainCreationParamsConfig memory) {
+    function getChainCreationParamsConfig(string memory) internal override returns (ChainCreationParamsConfig memory) {
         return ChainCreationParamsLib.getChainCreationParams(Utils.genesisConfigPath(false), false);
     }
 }
