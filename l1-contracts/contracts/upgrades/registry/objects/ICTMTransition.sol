@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
-import {L2UpgradePlan} from "../RegistryTypes.sol";
+import {L2UpgradePlan, TransitionManifest} from "../RegistryTypes.sol";
 
 /// @notice Immutable description of how one CTM release becomes another.
 /// @dev The facet cuts and base-system hash CHANGES are NOT authored: they are DERIVED from the
@@ -14,6 +14,11 @@ interface ICTMTransition {
     /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value,
     ///         and the key under which the deploying factory attests this instance.
     function manifestHash() external view returns (bytes32);
+
+    /// @notice The whole manifest, exactly as it was pinned. Readers needing several fields
+    ///         should take this once instead of calling the per-field getters (each getter
+    ///         decodes the full manifest).
+    function getManifest() external view returns (TransitionManifest memory);
 
     function oldProtocolVersion() external view returns (uint256);
 

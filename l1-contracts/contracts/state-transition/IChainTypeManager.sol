@@ -103,6 +103,11 @@ interface IChainTypeManager {
 
     function protocolVersion() external view returns (uint256);
 
+    /// @notice The timestamp until which `_protocolVersion` can be used.
+    /// @dev Single-sourced from the committed transition departing that version. There is no
+    ///      setter: a version's schedule is part of the write-once transition governance approved.
+    ///      The current version has no departing transition and is usable indefinitely; versions
+    ///      departed via the legacy cut-taking path read the legacy storage that path wrote.
     function protocolVersionDeadline(uint256 _protocolVersion) external view returns (uint256);
 
     function protocolVersionIsActive(uint256 _protocolVersion) external view returns (bool);

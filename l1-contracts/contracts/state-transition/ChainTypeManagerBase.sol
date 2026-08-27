@@ -83,16 +83,17 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     ///      cut-taking path (the bootstrap edge and everything before it). Registry-driven edges
     ///      never write here — their deadline lives on the transition, and the
     ///      {protocolVersionDeadline} view resolves it from there.
-    mapping(uint256 _protocolVersion => uint256) internal __LEGACY_protocolVersionDeadline;
+    mapping(uint256 _protocolVersion => uint256) internal __DEPRECATED_protocolVersionDeadline;
 
     /// @dev The validatorTimelock contract address.
     /// @dev Note, that address contains validator timelock for pre-v29 protocol versions. It is deprecated and will be removed in the future.
     address internal __DEPRECATED_validatorTimelock;
 
     /// @dev Deprecated. Written only by the legacy cut-taking commit path: pre-v32 Admin facets
-    ///      crossing that edge verify the handed cut bytes against it. Registry-driven edges commit
-    ///      only the transition ({upgradeTransition}); chains read {upgradeCutForVersion}.
-    mapping(uint256 protocolVersion => bytes32 cutHash) public upgradeCutHash;
+    ///      crossing that edge verify the handed cut bytes against it (served through the
+    ///      {upgradeCutHash} view). Registry-driven edges commit only the transition
+    ///      ({upgradeTransition}); chains read {upgradeCutForVersion}.
+    mapping(uint256 protocolVersion => bytes32 cutHash) internal __DEPRECATED_upgradeCutHash;
 
     /// @dev The address used to manage non critical updates
     address public admin;
@@ -113,7 +114,8 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev Both validatorTimelock and validatorTimelockPostV29 getters are available for backward compatibility of nodes that rely on the validatorTimelock address being available.
     address public validatorTimelockPostV29;
 
-    /// @dev The block number when upgradeCutHash was saved for some protocolVersion.
+    /// @dev The block number when the upgrade commitment (transition or legacy cut) was saved for
+    ///      some protocolVersion.
     /// @dev It's used for easier tracking the upgrade cutData off-chain.
     mapping(uint256 protocolVersion => uint256) public upgradeCutDataBlock;
 
@@ -433,7 +435,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         _commitVersionEdge(_oldProtocolVersion, _newProtocolVersion);
         // The departing version has no transition to resolve a deadline from, so this path is the
         // one writer of the legacy deadline storage.
-        __LEGACY_protocolVersionDeadline[_oldProtocolVersion] = _oldProtocolVersionDeadline;
+        __DEPRECATED_protocolVersionDeadline[_oldProtocolVersion] = _oldProtocolVersionDeadline;
         emit UpdateProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
         setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
         // Emit event with backward compatible hack.
@@ -463,11 +465,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
     }
 
-    /// @notice The timestamp until which `_protocolVersion` can be used.
-    /// @dev Single-sourced from the committed transition departing that version. There is no
-    ///      setter: a version's schedule is part of the write-once transition governance approved.
-    ///      The current version has no departing transition and is usable indefinitely; versions
-    ///      departed via the legacy cut-taking path read the legacy storage that path wrote.
+    /// @inheritdoc IChainTypeManager
     function protocolVersionDeadline(uint256 _protocolVersion) public view returns (uint256) {
         address transition = upgradeTransition[_protocolVersion];
         if (transition != address(0)) {
@@ -476,7 +474,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         if (_protocolVersion == protocolVersion) {
             return type(uint256).max;
         }
-        return __LEGACY_protocolVersionDeadline[_protocolVersion];
+        return __DEPRECATED_protocolVersionDeadline[_protocolVersion];
     }
 
     /// @dev check that the protocolVersion is active
@@ -500,10 +498,15 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @param _oldProtocolVersion the old protocol version
     function setUpgradeDiamondCutInner(Diamond.DiamondCutData memory _cutData, uint256 _oldProtocolVersion) internal {
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
-        upgradeCutHash[_oldProtocolVersion] = newCutHash;
+        __DEPRECATED_upgradeCutHash[_oldProtocolVersion] = newCutHash;
         upgradeCutDataBlock[_oldProtocolVersion] = block.number;
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
         emit NewUpgradeCutData(_oldProtocolVersion, _cutData);
+    }
+
+    /// @inheritdoc IChainTypeManager
+    function upgradeCutHash(uint256 _protocolVersion) public view returns (bytes32) {
+        return __DEPRECATED_upgradeCutHash[_protocolVersion];
     }
 
     /// @dev freezes the specified chain

@@ -16,7 +16,7 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0xB8A43826E8137B774b1E3661b17c1711F8b4431d",
+      "ctmProxy": "0x993C6ea7D42091C3435C5B9F80926Ae4c22419f6",
       "release": {
         "diamondInit": {
           "address": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",
@@ -165,8 +165,8 @@
         "fixedForceDeploymentsData": "0xf1f2",
         "genesis": {
           "genesisUpgrade": {
-            "address": "0x8e9b6c71867d836bdF981f40a6812986D7228C31",
-            "codehash": "0xb19269ca9eafbca345e8d5e27d916179a95cb67a607c5e167bfda70e7b475893"
+            "address": "0x2Ce3E397CaCB9DEdFC6b977D2bE5010FafDFB87c",
+            "codehash": "0xc654ce8b6d4314683f893451eee58c9bbc1ff32b1d5a03bfee3863102357b0a4"
           },
           "batchHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
           "batchCommitment": "0x0000000000000000000000000000000000000000000000000000000000000001",
@@ -178,7 +178,7 @@
         "fromRelease": "0x0355B7B8cb128fA5692729Ab3AAa199C1753f726",
         "upgradeEngine": {
           "address": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057",
-          "codehash": "0x8ed7901e8c64dc93e97ecbaa9b6353cadb9f4818633d300a0f448217f51b3d75"
+          "codehash": "0x5679e06e0800114abd2f664a3cae9ca0d1cce204f28846d1242273deee81b8b0"
         },
         "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "upgradeTimestamp": 0,

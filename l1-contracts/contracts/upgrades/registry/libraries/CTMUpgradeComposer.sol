@@ -17,7 +17,7 @@ import {
 } from "../../../common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {SEMVER_MINOR_OFFSET} from "../../../common/libraries/SemVer.sol";
-import {L2UpgradePlan} from "../RegistryTypes.sol";
+import {L2UpgradePlan, TransitionManifest} from "../RegistryTypes.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -62,8 +62,13 @@ library CTMUpgradeComposer {
     ///      supports an empty deployment list followed by a delegatecall, and transition
     ///      initialization already rejects plans whose data could never execute.
     function buildL2UpgradeTx(ICTMTransition _transition) internal view returns (L2CanonicalTransaction memory) {
-        uint256 newVersion = _transition.newProtocolVersion();
-        L2UpgradePlan memory plan = _transition.l2Plan();
+        return _buildL2UpgradeTx(_transition.getManifest());
+    }
+
+    /// @dev Manifest-taking form so callers already holding the decoded manifest avoid re-decoding.
+    function _buildL2UpgradeTx(TransitionManifest memory _m) private view returns (L2CanonicalTransaction memory) {
+        uint256 newVersion = _m.newProtocolVersion;
+        L2UpgradePlan memory plan = _m.l2Plan;
         if (plan.deployments.length == 0 && plan.delegateTo == address(0)) {
             // The upgrade has no L2 side (patch upgrades, or L1-only minor upgrades): an all-zero
             // transaction (txType == 0) makes `BaseZkSyncUpgrade` skip the L2 protocol upgrade
@@ -72,7 +77,7 @@ library CTMUpgradeComposer {
         }
 
         // VM identity is single-sourced from the target release's pinned DiamondInit.
-        bool isZKsyncOS = IDiamondInit(ICTMRelease(_transition.newRelease()).diamondInit()).IS_ZKSYNC_OS();
+        bool isZKsyncOS = IDiamondInit(ICTMRelease(_m.newRelease).diamondInit()).IS_ZKSYNC_OS();
 
         L2CanonicalTransaction memory transaction = ProposedUpgradeLib.emptyL2CanonicalTransaction();
         transaction.txType = isZKsyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
@@ -93,19 +98,21 @@ library CTMUpgradeComposer {
     function buildProposedUpgrade(
         ICTMTransition _transition
     ) internal view returns (ProposedUpgrade memory proposedUpgrade) {
-        uint256 newVersion = _transition.newProtocolVersion();
-        proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(newVersion);
-        proposedUpgrade.l2ProtocolUpgradeTx = buildL2UpgradeTx(_transition);
+        // One decode for every manifest field; only the DERIVED delta (hash changes) lives outside
+        // the manifest and needs its own read.
+        TransitionManifest memory m = _transition.getManifest();
+        proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(m.newProtocolVersion);
+        proposedUpgrade.l2ProtocolUpgradeTx = _buildL2UpgradeTx(m);
         // Straight from the TARGET release, not from `CTM.currentRelease()`: a chain several
         // versions behind executes the transition that names its own next release, and the CTM may
         // already have moved past it.
-        proposedUpgrade.verifier = ICTMRelease(_transition.newRelease()).verifier();
+        proposedUpgrade.verifier = ICTMRelease(m.newRelease).verifier();
         (
             proposedUpgrade.bootloaderHash,
             proposedUpgrade.defaultAccountHash,
             proposedUpgrade.evmEmulatorHash
         ) = _transition.baseSystemContractHashChanges();
-        proposedUpgrade.upgradeTimestamp = _transition.upgradeTimestamp();
+        proposedUpgrade.upgradeTimestamp = m.upgradeTimestamp;
     }
 
     /// @notice The nonce of the L2 protocol upgrade transaction for a packed SemVer version.
