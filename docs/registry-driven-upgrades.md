@@ -375,3 +375,5 @@ manifest data stays in storage rather than immutables — see [Provenance and pi
 
 - [Governance self-migration](./governance-self-migration.md) — how the authority root above
   upgrades itself.
+
+<!-- test: verifying how pushes render on the reopened PR; safe to drop -->
