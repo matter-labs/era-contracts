@@ -364,6 +364,8 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /// @param _refundRecipient the refund recipient
     /// @param _request the request
     /// @return canonicalTxHash the canonical transaction hash
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function _sendRequest(
         uint256 _chainId,
         address _refundRecipient,

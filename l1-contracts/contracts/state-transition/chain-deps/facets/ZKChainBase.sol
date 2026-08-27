@@ -103,6 +103,8 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
+    /// @custom:deprecated Expected to be deprecated in the next release: L1->L2 requests move to a more
+    /// interop-native entry point, so the Bridgehub will no longer be the caller.
     modifier onlyBridgehub() {
         if (msg.sender != s.bridgehub) {
             revert Unauthorized(msg.sender);

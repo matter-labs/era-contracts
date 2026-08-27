@@ -507,6 +507,8 @@ library Utils {
         });
     }
 
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function prepareL1L2TransactionTwoBridges(
         uint256 l1GasPrice,
         uint256 l2GasLimit,
@@ -679,6 +681,8 @@ library Utils {
         );
     }
 
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function prepareGovernanceL1L2TwoBridgesTransaction(
         uint256 l1GasPrice,
         uint256 l2GasLimit,
@@ -803,6 +807,8 @@ library Utils {
         return calls;
     }
 
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function prepareAdminL1L2TwoBridgesTransaction(
         uint256 l1GasPrice,
         uint256 l2GasLimit,
@@ -899,6 +905,8 @@ library Utils {
         console.logBytes32(txHash);
     }
 
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function runAdminL1L2TwoBridgesTransaction(
         uint256 l1GasPrice,
         address admin,
@@ -1001,6 +1009,8 @@ library Utils {
         console.logBytes32(txHash);
     }
 
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function runGovernanceL1L2TwoBridgesTransaction(
         uint256 l1GasPrice,
         address governor,

@@ -7,6 +7,8 @@ import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 
+/// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+/// interop-native approach to L1->L2 messaging.
 struct L2TransactionRequestDirect {
     uint256 chainId;
     uint256 mintValue;
@@ -19,6 +21,8 @@ struct L2TransactionRequestDirect {
     address refundRecipient;
 }
 
+/// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+/// interop-native approach to L1->L2 messaging.
 struct L2TransactionRequestTwoBridgesOuter {
     uint256 chainId;
     uint256 mintValue;
@@ -31,6 +35,8 @@ struct L2TransactionRequestTwoBridgesOuter {
     bytes secondBridgeCalldata;
 }
 
+/// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+/// interop-native approach to L1->L2 messaging.
 struct L2TransactionRequestTwoBridgesInner {
     bytes32 magicValue;
     address l2Contract;

@@ -11,11 +11,15 @@ interface IL1Bridgehub is IBridgehubBase {
     /// @notice Get L1 chain ID
     function L1_CHAIN_ID() external view returns (uint256);
     /// @notice Request L2 transaction directly
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request
     ) external payable returns (bytes32 canonicalTxHash);
 
     /// @notice Request L2 transaction through two bridges
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function requestL2TransactionTwoBridges(
         L2TransactionRequestTwoBridgesOuter calldata _request
     ) external payable returns (bytes32 canonicalTxHash);

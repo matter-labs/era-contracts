@@ -103,6 +103,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
+    /// @custom:deprecated Expected to be deprecated in the next release: L1->L2 requests move to a more
+    /// interop-native entry point, so the Bridgehub will no longer be the caller.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         require(
             msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == address(ERA_DIAMOND_PROXY)),
@@ -124,6 +126,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Checks that the message sender is the bridgehub.
+    /// @custom:deprecated Expected to be deprecated in the next release: L1->L2 requests move to a more
+    /// interop-native entry point, so the Bridgehub will no longer be the caller.
     modifier onlyBridgehub() {
         if (msg.sender != address(BRIDGE_HUB)) {
             revert Unauthorized(msg.sender);
@@ -259,6 +263,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @inheritdoc IL1CrossChainSender
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function bridgehubDeposit(
         uint256 _chainId,
         address _originalCaller,
@@ -306,6 +312,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @inheritdoc IL1CrossChainSender
+    /// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+    /// interop-native approach to L1->L2 messaging.
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,

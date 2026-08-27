@@ -183,9 +183,13 @@ uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 address constant ETH_TOKEN_ADDRESS = address(1);
 
 /// @dev the value returned in bridgehubDeposit in the TwoBridges function.
+/// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+/// interop-native approach to L1->L2 messaging.
 bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
 
 /// @dev https://eips.ethereum.org/EIPS/eip-1352
+/// @custom:deprecated Expected to be deprecated in the next release in favor of a more
+/// interop-native approach to L1->L2 messaging.
 address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint16).max));
 
 /// @dev the maximum number of supported chains, this is an arbitrary limit.
