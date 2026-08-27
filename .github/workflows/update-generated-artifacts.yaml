@@ -1,7 +1,7 @@
 # One-click regen for everything pre-merge-checks.yaml validates: contract
 # hashes, selectors, and zkstack-out first, then the anvil-interop chain-state
 # snapshots (sequential so the two pushes to the PR branch don't race).
-# Dispatch this once when a PR is ready, then add the `pre-merge` label.
+# Dispatch this once when a draft PR is done, then mark it ready for review.
 name: Update All Generated Artifacts
 
 on:

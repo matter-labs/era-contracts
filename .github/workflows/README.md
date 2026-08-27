@@ -55,15 +55,18 @@ PR CI is split into two tiers:
   `l1-contracts/zkstack-out`, and the anvil-interop chain-state snapshots
   (determinism gate + preloaded-state interop run). These fail whenever
   bytecode changes and are fixed by a regen + commit, so they would force a
-  regeneration on every push if they ran per-commit.
+  regeneration on every push if they ran on drafts.
 
-Merge flow for a PR:
+The tiers are tied to the PR's **draft status**: on a draft PR only per-commit
+CI runs (every `pre-merge-checks` job skips); on a ready-for-review PR all CI
+runs. Merge flow:
 
-1. Iterate; per-commit CI must be green.
-2. When ready to merge, dispatch **Update All Generated Artifacts** with the PR
+1. Open the PR as a **draft** and iterate; per-commit CI must be green.
+2. When ready, dispatch **Update All Generated Artifacts** with the PR
    number — a single regen that commits hashes + selectors + zkstack-out, then
    the chain-state snapshots, to the PR branch.
-3. Add the **`pre-merge`** label to the PR. `pre-merge-checks` runs on the
-   labeled commit and on every later push while the label stays on; merge once
-   it is green. (The workflow also runs unconditionally in a merge queue and
-   via manual dispatch.)
+3. Mark the PR **ready for review**. `pre-merge-checks` runs on the
+   ready_for_review transition and on every later push while the PR stays
+   non-draft; merge once it is green. If review forces bytecode changes, regen
+   again (or convert back to draft until done). The workflow also runs
+   unconditionally in a merge queue and via manual dispatch.

@@ -172,4 +172,4 @@ jobs:
   # NOTE: the chain-state determinism gate (state-generation-check) and the fast
   # preloaded-state interop run live in pre-merge-checks.yaml: both depend on the
   # committed chain-state snapshots being regenerated after contract changes, so
-  # they only run once a PR is labeled `pre-merge`.
+  # they skip on draft PRs and run once the PR is marked ready for review.

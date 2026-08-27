@@ -81,8 +81,9 @@ jobs:
 
   # NOTE: the committed-generated-artifact checks (check-hashes, check-selectors,
   # check-zkstack-out) live in pre-merge-checks.yaml. They fail whenever contract
-  # bytecode changes and are fixed by a regen + commit, so they only run once a PR
-  # is labeled `pre-merge` (see that workflow's header for the flow).
+  # bytecode changes and are fixed by a regen + commit, so they skip while a PR is
+  # a draft and run once it is marked ready for review (see that workflow's
+  # header for the flow).
 
   test-foundry:
     needs: [build]
