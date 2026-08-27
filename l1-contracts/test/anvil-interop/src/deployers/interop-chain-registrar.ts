@@ -1,7 +1,8 @@
-import { ethers, providers } from "ethers";
+import type { providers } from "ethers";
+import { ethers } from "ethers";
 import { getAbi } from "../core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, L2_BRIDGEHUB_ADDR } from "../core/const";
-import { relayPriorityRequestsToChain } from "../core/utils";
+import { relayPriorityRequestsToChain, createProvider } from "../core/utils";
 
 export class InteropChainRegistrar {
   private l1Provider: providers.JsonRpcProvider;
@@ -10,8 +11,8 @@ export class InteropChainRegistrar {
   private currentChainDiamondProxy: string;
 
   constructor(l2RpcUrl: string, l1RpcUrl: string, chainRegistrationSender: string, currentChainDiamondProxy: string) {
-    this.l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
-    this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
+    this.l1Provider = createProvider(l1RpcUrl);
+    this.l2Provider = createProvider(l2RpcUrl);
     this.chainRegistrationSenderAddr = chainRegistrationSender;
     this.currentChainDiamondProxy = currentChainDiamondProxy;
   }

@@ -35,6 +35,7 @@
  */
 
 import * as fs from "fs";
+import { createProvider } from "./src/core/utils";
 import * as path from "path";
 import { ethers } from "ethers";
 import { AnvilManager } from "./src/daemons/anvil-manager";
@@ -171,7 +172,7 @@ async function main(): Promise<void> {
     // block.chainid` routes the lookup down the bridged-token branch. Matching
     // the real chain ID makes the production short-circuit fire correctly.
     console.log(`\n=== Step 1: Starting forked L1 anvil (${elapsed()}) ===\n`);
-    const upstreamProvider = new ethers.providers.JsonRpcProvider(cfg.l1ForkUrl);
+    const upstreamProvider = createProvider(cfg.l1ForkUrl);
     const upstreamChainId = (await upstreamProvider.getNetwork()).chainId;
     runtimeConfig.l1ChainId = upstreamChainId;
     console.log(`  Upstream L1 chain ID: ${upstreamChainId}`);
@@ -184,7 +185,7 @@ async function main(): Promise<void> {
     });
     const l1Chain = anvilManager.getL1Chain();
     if (!l1Chain) throw new Error("L1 chain failed to start");
-    const l1Provider = new ethers.providers.JsonRpcProvider(l1Chain.rpcUrl);
+    const l1Provider = createProvider(l1Chain.rpcUrl);
 
     // ── Step 2: Discover chains from forked Bridgehub ────────────
     console.log(`\n=== Step 2: Discovering chains from Bridgehub (${elapsed()}) ===\n`);

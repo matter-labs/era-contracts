@@ -1,9 +1,9 @@
 import { spawn, execSync } from "child_process";
-import { providers } from "ethers";
+import type { providers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
 import type { AnvilChain } from "../core/types";
-import { waitForChainReady, formatChainInfo } from "../core/utils";
+import { waitForChainReady, formatChainInfo, createProvider } from "../core/utils";
 
 export class AnvilManager {
   private chains: Map<number, AnvilChain> = new Map();
@@ -97,6 +97,9 @@ export class AnvilManager {
     const foundryBinPath = homeDir ? path.join(homeDir, ".foundry/bin") : "";
     const enrichedPath = foundryBinPath ? `${foundryBinPath}:${process.env.PATH || ""}` : process.env.PATH;
 
+    // Interval mining is required so the interop relayers and TBM keep progressing. It is not what
+    // paces the suite, though: 0.2s blocks moved it by ~5%, because the specs wait on receipts
+    // rather than on blocks — see createProvider in core/utils.ts for what actually cost the time.
     const effectiveBlockTime = blockTime ?? 1;
     const args = [
       "--port",
@@ -277,7 +280,7 @@ export class AnvilManager {
     if (!chain) {
       throw new Error(`Chain ${chainId} not found`);
     }
-    return new providers.JsonRpcProvider(chain.rpcUrl);
+    return createProvider(chain.rpcUrl);
   }
 
   getL1Chain(): AnvilChain | undefined {

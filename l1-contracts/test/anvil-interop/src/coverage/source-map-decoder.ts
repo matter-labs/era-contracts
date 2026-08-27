@@ -38,7 +38,18 @@ export type SourceIdMap = Record<string, string>;
 /**
  * Loads the source_id_to_path mapping from the Forge build-info directory.
  */
-export function loadSourceIdMap(outDir: string): SourceIdMap {
+export interface BuildInfo {
+  file: string;
+  sourceIdMap: SourceIdMap;
+}
+
+/**
+ * Every build-info in the output directory, newest first.
+ *
+ * Usually more than one, and their source IDs are *not* comparable: of 224 IDs present in two of
+ * them here, 223 point at different files. An artifact must be decoded with its own compilation's map.
+ */
+export function loadBuildInfos(outDir: string): BuildInfo[] {
   const buildInfoDir = path.join(outDir, "build-info");
   if (!fs.existsSync(buildInfoDir)) {
     throw new Error(`Build info directory not found: ${buildInfoDir}`);
@@ -49,9 +60,58 @@ export function loadSourceIdMap(outDir: string): SourceIdMap {
     throw new Error(`No build-info JSON files found in ${buildInfoDir}`);
   }
 
-  // Use the first (and typically only) build-info file
-  const buildInfo = JSON.parse(fs.readFileSync(path.join(buildInfoDir, files[0]), "utf-8"));
-  return buildInfo.source_id_to_path || {};
+  return files.map((file) => {
+    const full = path.join(buildInfoDir, file);
+    const parsed = JSON.parse(fs.readFileSync(full, "utf-8"));
+    return { file, sourceIdMap: parsed.source_id_to_path || {} };
+  });
+}
+
+/**
+ * Forge's own artifact-to-build linkage, read from `cache-forge/solidity-files-cache.json`.
+ *
+ * Keys are artifact paths relative to the output directory, e.g. "Foo.sol/Foo.json".
+ *
+ * Read rather than inferred. Guessing from the artifact's own source id is unsound — `{0:A, 1:B}`
+ * and `{0:A, 1:C}` both "match" an A artifact while disagreeing on id 1 — and it fails silently,
+ * counting nothing as unresolved. Verified over all 525 artifact mappings here.
+ */
+export function loadArtifactBuildIds(projectRoot: string): Map<string, string> {
+  const cachePath = path.join(projectRoot, "cache-forge", "solidity-files-cache.json");
+  const buildIds = new Map<string, string>();
+  if (!fs.existsSync(cachePath)) return buildIds;
+
+  let cache: { files?: Record<string, { artifacts?: Record<string, unknown> }> };
+  try {
+    cache = JSON.parse(fs.readFileSync(cachePath, "utf-8"));
+  } catch {
+    return buildIds;
+  }
+
+  // files[source].artifacts[contract][solcVersion][profile] = { path, build_id }
+  for (const file of Object.values(cache.files || {})) {
+    for (const versions of Object.values(file.artifacts || {})) {
+      for (const profiles of Object.values((versions as Record<string, unknown>) || {})) {
+        for (const entry of Object.values((profiles as Record<string, unknown>) || {})) {
+          const artifact = entry as { path?: string; build_id?: string };
+          if (artifact?.path && artifact?.build_id) buildIds.set(artifact.path, artifact.build_id);
+        }
+      }
+    }
+  }
+  return buildIds;
+}
+
+/** The build-info with this id, or null when it is not on disk. */
+export function buildInfoById(buildInfos: BuildInfo[], buildId: string): BuildInfo | null {
+  return buildInfos.find((info) => info.file === `${buildId}.json`) ?? null;
+}
+
+/** Every source path any compilation knows about, for reading file contents. */
+export function allSourcePaths(buildInfos: BuildInfo[]): Set<string> {
+  const paths = new Set<string>();
+  for (const info of buildInfos) for (const p of Object.values(info.sourceIdMap)) paths.add(p);
+  return paths;
 }
 
 /**
@@ -359,28 +419,35 @@ export function resolveFunctionHits(
  * Counts the total number of executable lines in a source file by checking
  * which lines appear in any contract's source map.
  */
+/** A contract's source map paired with the source-id map of the compilation it came from. */
+export interface DecodedContract {
+  contractMap: ContractSourceMap;
+  sourceIdMap: SourceIdMap;
+}
+
 export function getExecutableLines(
   filePath: string,
-  sourceIdMap: SourceIdMap,
-  allContractMaps: ContractSourceMap[],
+  contracts: DecodedContract[],
   sourceContents: Map<string, string>
 ): Set<number> {
   const content = sourceContents.get(filePath);
   if (!content) return new Set();
 
-  // Find the source file index for this path
-  let fileIndex = -1;
-  for (const [id, p] of Object.entries(sourceIdMap)) {
-    if (p === filePath) {
-      fileIndex = parseInt(id, 10);
-      break;
-    }
-  }
-  if (fileIndex < 0) return new Set();
-
   const executableLines = new Set<number>();
 
-  for (const contractMap of allContractMaps) {
+  for (const { contractMap, sourceIdMap } of contracts) {
+    // The file's index differs per compilation, so it has to be looked up in this contract's own
+    // map. Using one index across contracts from different compilations attributes lines to the
+    // wrong files.
+    let fileIndex = -1;
+    for (const [id, p] of Object.entries(sourceIdMap)) {
+      if (p === filePath) {
+        fileIndex = parseInt(id, 10);
+        break;
+      }
+    }
+    if (fileIndex < 0) continue;
+
     for (const entry of contractMap.entries) {
       if (entry.fileIndex === fileIndex && entry.start >= 0 && entry.length > 0) {
         const line = byteOffsetToLine(content, entry.start);

@@ -1,9 +1,10 @@
 import { expect } from "chai";
-import { Contract, ethers, providers } from "ethers";
+import type { providers } from "ethers";
+import { Contract, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { getAbi } from "../../src/core/contracts";
 import { L2_BRIDGEHUB_ADDR } from "../../src/core/const";
-import { getChainIdByRole, getL2Chain } from "../../src/core/utils";
+import { getChainIdByRole, getL2Chain, createProvider } from "../../src/core/utils";
 
 describe("04 - Gateway Deployment Verification (read-only)", function () {
   this.timeout(0);
@@ -29,7 +30,7 @@ describe("04 - Gateway Deployment Verification (read-only)", function () {
 
     before(() => {
       const gwChain = getL2Chain(state.chains!, gwChainId);
-      gwProvider = new providers.JsonRpcProvider(gwChain.rpcUrl);
+      gwProvider = createProvider(gwChain.rpcUrl);
     });
 
     it("has GW-settled chains registered on GW L2Bridgehub", async () => {
@@ -62,7 +63,7 @@ describe("04 - Gateway Deployment Verification (read-only)", function () {
     let l1Provider: providers.JsonRpcProvider;
 
     before(() => {
-      l1Provider = new providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
+      l1Provider = createProvider(state.chains!.l1!.rpcUrl);
     });
 
     it("GW chain has diamond proxy on L1", async () => {
