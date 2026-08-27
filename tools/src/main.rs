@@ -1,59 +1,63 @@
-use circuit_definitions::circuit_definitions::aux_layer::{ZkSyncSnarkWrapperCircuit, ZkSyncSnarkWrapperCircuitNoLookupCustomGate};
+use circuit_definitions::circuit_definitions::aux_layer::{
+    ZkSyncSnarkWrapperCircuit, ZkSyncSnarkWrapperCircuitNoLookupCustomGate,
+};
 use circuit_definitions::snark_wrapper::franklin_crypto::bellman::pairing::bn256::Bn256;
 use circuit_definitions::snark_wrapper::franklin_crypto::bellman::plonk::better_better_cs::setup::VerificationKey;
-use zksync_crypto::flonk::FflonkVerificationKey;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Write};
-use zksync_crypto::{calculate_fflonk_verification_key_hash, calculate_verification_key_hash};
 
 pub mod fflonk;
 pub mod plonk;
 pub mod types;
 pub mod utils;
+pub mod verification_key;
 
+use clap::Parser;
 use fflonk::insert_residue_elements_and_commitments as fflonk_insert_residue_elements_and_commitments;
 use plonk::insert_residue_elements_and_commitments as plonk_insert_residue_elements_and_commitments;
 use serde_json::{from_reader, Value};
-use structopt::StructOpt;
+use verification_key::{
+    calculate_fflonk_verification_key_hash, calculate_verification_key_hash, FflonkVerificationKey,
+};
 
-#[derive(Debug, StructOpt)]
-#[structopt(
+#[derive(Debug, Parser)]
+#[command(
     name = "zksync_verifier_contract_generator",
     about = "Tool for generating verifier contract using scheduler json key"
 )]
 struct Opt {
     /// Input path to scheduler verification key file.
-    #[structopt(
+    #[arg(
         long = "plonk_input_path",
         default_value = "data/plonk_scheduler_key.json"
     )]
     plonk_input_path: String,
 
     /// Input path to scheduler verification key file for .
-    #[structopt(
+    #[arg(
         long = "fflonk_input_path",
         default_value = "data/fflonk_scheduler_key.json"
     )]
     fflonk_input_path: String,
 
     /// Output path to verifier contract file.
-    #[structopt(long = "fflonk_output_path", default_value = "data/VerifierFflonk.sol")]
+    #[arg(long = "fflonk_output_path", default_value = "data/VerifierFflonk.sol")]
     fflonk_output_path: String,
 
     /// Output path to verifier contract file.
-    #[structopt(long = "plonk_output_path", default_value = "data/VerifierPlonk.sol")]
+    #[arg(long = "plonk_output_path", default_value = "data/VerifierPlonk.sol")]
     plonk_output_path: String,
 
     /// The Verifier is to be compiled for an L2 network, where modexp precompile is not available.
-    #[structopt(short = "l2", long = "l2_mode")]
+    #[arg(short = 'l', long = "l2_mode")]
     l2_mode: bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
 
     let plonk_reader = BufReader::new(File::open(&opt.plonk_input_path)?);
     let fflonk_reader = BufReader::new(File::open(&opt.fflonk_input_path)?);
@@ -91,14 +95,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     let plonk_verification_key: VerificationKey<Bn256, ZkSyncSnarkWrapperCircuit> =
         serde_json::from_str(&plonk_verification_key).unwrap();
 
-    let fflonk_verification_key: FflonkVerificationKey<Bn256, ZkSyncSnarkWrapperCircuitNoLookupCustomGate> =
-        serde_json::from_str(&fflonk_verification_key).unwrap();
+    let fflonk_verification_key: FflonkVerificationKey<
+        Bn256,
+        ZkSyncSnarkWrapperCircuitNoLookupCustomGate,
+    > = serde_json::from_str(&fflonk_verification_key).unwrap();
 
     let plonk_vk_hash =
         hex::encode(calculate_verification_key_hash(plonk_verification_key).to_fixed_bytes());
-    
-    let fflonk_vk_hash =
-        hex::encode(calculate_fflonk_verification_key_hash(fflonk_verification_key).to_fixed_bytes());
+
+    let fflonk_vk_hash = hex::encode(
+        calculate_fflonk_verification_key_hash(fflonk_verification_key).to_fixed_bytes(),
+    );
 
     let plonk_verifier_contract_template = plonk_insert_residue_elements_and_commitments(
         &plonk_verifier_contract_template,

@@ -28,6 +28,27 @@
     "prettier": "^3.0.3",
     "solhint": "^5.1.0"
   },
+  "resolutions": {
+    "**/@matterlabs/hardhat-zksync-verify/minimatch": "5.1.9",
+    "**/@typescript-eslint/typescript-estree/minimatch": "9.0.7",
+    "**/adm-zip": "0.6.0",
+    "**/cookie": "0.7.0",
+    "**/cross-spawn": "7.0.5",
+    "**/diff": "5.2.2",
+    "**/elliptic": "6.6.1",
+    "**/hardhat": "2.22.5",
+    "**/js-yaml": "4.3.2",
+    "**/linkify-it": "5.0.2",
+    "**/markdown-it": "14.2.0",
+    "**/micromatch": "4.0.8",
+    "**/mocha/minimatch": "5.1.9",
+    "**/serialize-javascript": "7.0.5",
+    "**/tar-fs": "2.1.4",
+    "**/tmp": "0.2.7",
+    "**/undici": "6.28.0",
+    "**/uuid": "11.1.1",
+    "**/ws": "7.5.11"
+  },
   "scripts": {
     "calculate-hashes:check": "ts-node scripts/calculate-hashes.ts --check-only",
     "calculate-hashes:fix": "ts-node scripts/calculate-hashes.ts",
