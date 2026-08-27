@@ -1,6 +1,6 @@
 import type { BigNumber } from "ethers";
-import { Contract, providers, Wallet, ethers } from "ethers";
-import { buildWithdrawalMerkleProof, getSettlementLayerChainId } from "../core/utils";
+import { Contract, Wallet, ethers } from "ethers";
+import { buildWithdrawalMerkleProof, getSettlementLayerChainId, createProvider } from "../core/utils";
 import { getAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
@@ -74,8 +74,8 @@ export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): P
   const { l2RpcUrl, l1RpcUrl, chainId, l1Addresses, amount } = params;
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
-  const l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
-  const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
+  const l2Provider = createProvider(l2RpcUrl);
+  const l1Provider = createProvider(l1RpcUrl);
   const l2Wallet = new Wallet(privateKey, l2Provider);
   const l1Recipient = params.l1Recipient || l2Wallet.address;
 
@@ -129,8 +129,8 @@ export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalPar
   const { l2RpcUrl, l1RpcUrl, l2TokenAddress, tokenOriginChainId, chainId, amount } = params;
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
-  const l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
-  const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
+  const l2Provider = createProvider(l2RpcUrl);
+  const l1Provider = createProvider(l1RpcUrl);
   const l2Wallet = new Wallet(privateKey, l2Provider);
   const l1Recipient = params.l1Recipient || l2Wallet.address;
 
@@ -193,7 +193,7 @@ export async function finalizeWithdrawalOnL1(
   l1Addresses: CoreDeployedAddresses,
   pending: PendingWithdrawal
 ): Promise<{ success: boolean; txHash?: string; errorMessage?: string; revertData?: string }> {
-  const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
+  const l1Provider = createProvider(l1RpcUrl);
 
   const settlementLayerChainId = await getSettlementLayerChainId(l1Provider, l1Addresses.bridgehub, pending.chainId);
 

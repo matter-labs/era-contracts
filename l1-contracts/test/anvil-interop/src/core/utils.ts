@@ -14,6 +14,51 @@ import {
 } from "./const";
 import { runtimeConfig } from "./runtime-config";
 import { getAbi } from "./contracts";
+
+/**
+ * ethers v5 polls for transaction receipts every `pollingInterval` ms, defaulting to 4000 — so
+ * every `tx.wait()` costs up to four seconds no matter how fast blocks are produced, and the
+ * interop relay loops in temp-sdk.ts sleep `provider.pollingInterval` per iteration on top of
+ * that. That is what paces this suite against Anvil: dropping the block time from 1s to 0.2s moved
+ * the wall clock by ~5%, while polling at 100ms took `09-interop-unbundle` from 158s to 48s.
+ *
+ * Aggressive polling is only safe against a local node. Live mode (`ANVIL_INTEROP_LIVE=1`) points
+ * the same helpers at real `LIVE_*_RPC` endpoints via `setupLiveState()` and `getGatewayProvider()`,
+ * where a proof or finalization wait can run for minutes: at 100ms that is ten requests per second
+ * per waiter, and those loops do not handle rate limiting, so one 429 would abort the run. Remote
+ * URLs therefore keep ethers' 4000ms default — unchanged from before this helper existed.
+ *
+ * Build every provider through this helper so the choice is made in one place.
+ */
+export const LOCAL_POLLING_INTERVAL_MS = 100;
+export const REMOTE_POLLING_INTERVAL_MS = 4000;
+
+// URL.hostname yields the bracketed form for IPv6, so "[::1]" is the only spelling reachable here.
+const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "0.0.0.0", "[::1]"]);
+
+/** True for an RPC served from this machine, where fast polling costs nothing but CPU. */
+export function isLocalRpcUrl(rpcUrl: string): boolean {
+  try {
+    const { hostname } = new URL(rpcUrl);
+    return LOCAL_HOSTNAMES.has(hostname) || hostname.endsWith(".localhost");
+  } catch {
+    // Not a valid URL: treat it as remote, the conservative choice.
+    return false;
+  }
+}
+
+/** Polling interval this helper uses for `rpcUrl`. */
+export function pollingIntervalFor(rpcUrl: string): number {
+  return isLocalRpcUrl(rpcUrl) ? LOCAL_POLLING_INTERVAL_MS : REMOTE_POLLING_INTERVAL_MS;
+}
+
+export function createProvider(rpcUrl: string): providers.JsonRpcProvider {
+  // eslint-disable-next-line no-restricted-syntax -- the one place that may construct a provider
+  const provider = new providers.JsonRpcProvider(rpcUrl);
+  provider.pollingInterval = pollingIntervalFor(rpcUrl);
+  return provider;
+}
+
 import type {
   AnvilChainConfig,
   ChainAddresses,
@@ -35,7 +80,7 @@ export function timeIt(label: string, prefix = "⏱️  [TIMING]"): () => void {
 }
 
 export async function waitForChainReady(rpcUrl: string, maxAttempts = 30): Promise<boolean> {
-  const provider = new providers.JsonRpcProvider(rpcUrl);
+  const provider = createProvider(rpcUrl);
 
   for (let i = 0; i < maxAttempts; i++) {
     try {
@@ -376,8 +421,8 @@ async function resolvePriorityRelayPath(path: PriorityRelayResolvedPath): Promis
   gwDiamondProxy?: string;
   nestedL1DiamondProxy?: string;
 }> {
-  const l1Provider = new providers.JsonRpcProvider(path.l1RpcUrl);
-  const l2Provider = new providers.JsonRpcProvider(path.chainRpcUrl);
+  const l1Provider = createProvider(path.l1RpcUrl);
+  const l2Provider = createProvider(path.chainRpcUrl);
   const bridgehub = new ethers.Contract(path.bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
   const settlementLayerChainId = await getSettlementLayerChainId(l1Provider, path.bridgehubAddr, path.chainId);
   const relayChainId = settlementLayerChainId === 0 ? path.chainId : settlementLayerChainId;
@@ -410,7 +455,7 @@ async function resolvePriorityRelayPath(path: PriorityRelayResolvedPath): Promis
     throw new Error(`No L1 diamond proxy registered for nested chain ${path.chainId}`);
   }
 
-  const gwProvider = new providers.JsonRpcProvider(path.gwRpcUrl);
+  const gwProvider = createProvider(path.gwRpcUrl);
   const gwBridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), gwProvider);
   const gwDiamondProxy: string = await gwBridgehub.getZKChain(path.chainId);
 
@@ -646,7 +691,7 @@ export async function scanAndRelayPriorityRequests(
  * @returns The interopBundle argument from the first InteropBundleSent event found.
  */
 export async function extractInteropBundle(rpcUrl: string, txHash: string): Promise<InteropBundle> {
-  const provider = new providers.JsonRpcProvider(rpcUrl);
+  const provider = createProvider(rpcUrl);
   const receipt = await provider.getTransactionReceipt(txHash);
   const iface = new ethers.utils.Interface(getAbi("InteropCenter"));
 

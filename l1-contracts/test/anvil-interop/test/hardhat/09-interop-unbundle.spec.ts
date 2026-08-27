@@ -1,7 +1,8 @@
 import { expect } from "chai";
-import { BigNumber, ethers, providers } from "ethers";
+import type { providers } from "ethers";
+import { BigNumber, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getChainIdsByRole, getL2Chain } from "../../src/core/utils";
+import { getChainIdsByRole, getL2Chain, createProvider } from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
 import {
   getInteropRecipientAddress,
@@ -119,8 +120,8 @@ describe("09 - Interop Unbundle (failing calls)", function () {
 
     const sourceChain = getL2Chain(state.chains, sourceChainId);
     const destChain = getL2Chain(state.chains, destChainId);
-    sourceProvider = new providers.JsonRpcProvider(sourceChain.rpcUrl);
-    destProvider = new providers.JsonRpcProvider(destChain.rpcUrl);
+    sourceProvider = createProvider(sourceChain.rpcUrl);
+    destProvider = createProvider(destChain.rpcUrl);
 
     if (!isLiveInteropMode()) {
       await setInteropProtocolFee(sourceProvider, ANVIL_INTEROP_PROTOCOL_FEE);

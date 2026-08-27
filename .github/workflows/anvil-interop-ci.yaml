@@ -78,6 +78,11 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn tsc --noEmit
 
+      # Each suite covers something an ordinary run cannot fail on; see their headers.
+      - name: Unit-test the interop harness
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn test:unit
+
       - name: Run interop tests (preloaded state)
         working-directory: l1-contracts/test/anvil-interop
         env:
@@ -127,14 +132,23 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      # Reuses the artifacts l1-contracts-ci built for this commit rather than compiling them again.
+      # Via the action, not a bare cache restore: the prefix key can land a previous commit's `out`,
+      # and without the pruning a deleted contract's stale ABI would reach the upgrade harness.
+      - name: Warm solc build cache
+        uses: ./.github/actions/warm-solc-cache
+
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
 
       - name: Build system-contracts artifacts
         run: yarn sc build:foundry
 
-      - name: Build l1-contracts artifacts
-        run: yarn l1 build:foundry
+      # No zksolc pass: the test variant of the upgrade script says it skips zkout bytecodes
+      # ("already on L2 via anvil_setCode"). zkstack-out comes from out/, so solc alone suffices.
+      - name: Build l1-contracts artifacts (solc only — zkout is unused here)
+        working-directory: l1-contracts
+        run: forge build && yarn copy-to-zkstack-out
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
