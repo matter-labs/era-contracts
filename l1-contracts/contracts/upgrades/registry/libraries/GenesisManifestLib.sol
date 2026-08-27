@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {Facets} from "../../../common/StateTransitionTypes.sol";
-import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {GenesisConfig, GenesisFacet, ReleaseManifest} from "../RegistryTypes.sol";
 
 /// @title Genesis (bootstrap) manifest builder.
