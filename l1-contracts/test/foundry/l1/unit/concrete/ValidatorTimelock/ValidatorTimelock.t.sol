@@ -13,7 +13,13 @@ import {CommitBatchInfo, ICommitter} from "contracts/state-transition/chain-inte
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 
-import {NotAZKChain, RoleAccessDenied, TimeNotReached} from "contracts/common/L1ContractErrors.sol";
+import {
+    ExecutionDelayNotIncreased,
+    ExecutionDelayTooLarge,
+    NotAZKChain,
+    RoleAccessDenied,
+    TimeNotReached
+} from "contracts/common/L1ContractErrors.sol";
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
@@ -648,5 +654,274 @@ contract ValidatorTimelockTest is Test {
         assertEq(validator.getCommittedBatchTimestamp(zkSync, batchNumberStart), timestamp);
         assertEq(validator.getCommittedBatchTimestamp(zkSync, batchNumberStart + 1), timestamp);
         assertEq(validator.getCommittedBatchTimestamp(zkSync, batchNumberStart + 2), timestamp);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        PER-CHAIN EXECUTION DELAY
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Re-points the mocked `getAdmin` of the ZK chain so that the chain admin is a different
+    /// address than the owner of the `ValidatorTimelock`. This is required to tell the two apart:
+    /// in `setUp` both roles are held by `owner`.
+    function _setChainAdmin(address _newAdmin) internal {
+        vm.mockCall(zkSync, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(_newAdmin));
+    }
+
+    function test_getExecutionDelay_defaultsToEcosystemDelay() public view {
+        assertEq(validator.chainExecutionDelay(zkSync), 0);
+        assertEq(validator.getExecutionDelay(zkSync), executionDelay);
+    }
+
+    function test_increaseChainExecutionDelay() public {
+        // The chain admin is deliberately not the owner of the timelock here.
+        _setChainAdmin(bob);
+        uint32 newDelay = executionDelay + 5;
+
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit IValidatorTimelock.NewChainExecutionDelay(zkSync, newDelay);
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, newDelay);
+
+        assertEq(validator.chainExecutionDelay(zkSync), newDelay);
+        assertEq(validator.getExecutionDelay(zkSync), newDelay);
+        // The ecosystem-wide value is untouched.
+        assertEq(validator.executionDelay(), executionDelay);
+    }
+
+    function test_increaseChainExecutionDelay_multipleTimes() public {
+        _setChainAdmin(bob);
+
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, 100);
+        assertEq(validator.getExecutionDelay(zkSync), 100);
+
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, 200);
+        assertEq(validator.getExecutionDelay(zkSync), 200);
+    }
+
+    /// @dev The cap is an inclusive bound, so a chain may raise its delay exactly up to it.
+    function test_increaseChainExecutionDelay_upToMax() public {
+        uint32 maxDelay = validator.MAX_EXECUTION_DELAY();
+        assertEq(maxDelay, 7 days);
+
+        _setChainAdmin(bob);
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, maxDelay);
+
+        assertEq(validator.getExecutionDelay(zkSync), maxDelay);
+    }
+
+    /// @dev The ecosystem-wide delay is a lower bound: raising it above a chain's own value takes
+    /// precedence, while lowering it again leaves the chain's own choice in effect.
+    function test_getExecutionDelay_ecosystemDelayIsAFloor() public {
+        _setChainAdmin(bob);
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, 100);
+
+        vm.prank(owner);
+        validator.setExecutionDelay(200);
+        assertEq(validator.chainExecutionDelay(zkSync), 100);
+        assertEq(validator.getExecutionDelay(zkSync), 200);
+
+        vm.prank(owner);
+        validator.setExecutionDelay(50);
+        assertEq(validator.getExecutionDelay(zkSync), 100);
+    }
+
+    function test_setChainExecutionDelay_ownerCanDecrease() public {
+        _setChainAdmin(bob);
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, 1000);
+        assertEq(validator.getExecutionDelay(zkSync), 1000);
+
+        // The owner of the timelock is not the chain admin at this point, yet it is the only
+        // party able to bring the chain-specific delay back down.
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit IValidatorTimelock.NewChainExecutionDelay(zkSync, 0);
+        vm.prank(owner);
+        validator.setChainExecutionDelay(zkSync, 0);
+
+        assertEq(validator.chainExecutionDelay(zkSync), 0);
+        assertEq(validator.getExecutionDelay(zkSync), executionDelay);
+    }
+
+    /// @dev Commits a single batch `_batchNumber` at the current block timestamp through the timelock.
+    function _commitSingleBatch(uint64 _batchNumber) internal {
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(chainId));
+
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
+        batchesToCommit[0] = Utils.createCommitBatchInfo();
+        batchesToCommit[0].batchNumber = _batchNumber;
+
+        (uint256 batchFrom, uint256 batchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            Utils.createStoredBatchInfo(),
+            batchesToCommit
+        );
+        vm.prank(alice);
+        validator.commitBatchesSharedBridge(zkSync, batchFrom, batchTo, commitData);
+    }
+
+    /// @dev Encodes the `executeBatchesSharedBridge` arguments for a single batch `_batchNumber`.
+    function _encodeExecuteSingleBatch(
+        uint64 _batchNumber
+    ) internal returns (uint256 batchFrom, uint256 batchTo, bytes memory executeData) {
+        IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
+        storedBatches[0] = Utils.createStoredBatchInfo();
+        storedBatches[0].batchNumber = _batchNumber;
+
+        vm.mockCall(
+            zkSync,
+            abi.encodeWithSelector(IExecutor.executeBatchesSharedBridge.selector),
+            abi.encode(storedBatches)
+        );
+
+        return Utils.encodeExecuteBatchesData(storedBatches, Utils.emptyData());
+    }
+
+    /// @dev The chain-specific delay is what `executeBatchesSharedBridge` actually enforces.
+    function test_executeBatches_respectsChainExecutionDelay() public {
+        uint32 chainDelay = 1 days;
+        _setChainAdmin(bob);
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, chainDelay);
+
+        uint64 batchNumber = 10;
+        uint64 commitTimestamp = 123456;
+
+        vm.warp(commitTimestamp);
+        _commitSingleBatch(batchNumber);
+
+        (uint256 batchFrom, uint256 batchTo, bytes memory executeData) = _encodeExecuteSingleBatch(batchNumber);
+
+        // The ecosystem-wide delay has long passed, but the chain-specific one has not.
+        vm.warp(commitTimestamp + executionDelay + 1);
+        vm.expectRevert(abi.encodeWithSelector(TimeNotReached.selector, commitTimestamp + chainDelay, block.timestamp));
+        vm.prank(alice);
+        validator.executeBatchesSharedBridge(zkSync, batchFrom, batchTo, executeData);
+
+        vm.warp(commitTimestamp + chainDelay);
+        vm.prank(alice);
+        validator.executeBatchesSharedBridge(zkSync, batchFrom, batchTo, executeData);
+    }
+
+    function test_RevertWhen_increaseChainExecutionDelayNotChainAdmin() public {
+        _setChainAdmin(bob);
+
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, DEFAULT_ADMIN_ROLE, alice));
+        vm.prank(alice);
+        validator.increaseChainExecutionDelay(zkSync, 1000);
+
+        assertEq(validator.chainExecutionDelay(zkSync), 0);
+    }
+
+    /// @dev Being the owner of the timelock does not by itself grant the right to raise a chain's delay.
+    function test_RevertWhen_increaseChainExecutionDelayOwnerNotChainAdmin() public {
+        _setChainAdmin(bob);
+
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, DEFAULT_ADMIN_ROLE, owner));
+        vm.prank(owner);
+        validator.increaseChainExecutionDelay(zkSync, 1000);
+    }
+
+    function test_RevertWhen_increaseChainExecutionDelayAboveMax() public {
+        uint32 maxDelay = validator.MAX_EXECUTION_DELAY();
+        _setChainAdmin(bob);
+
+        vm.expectRevert(abi.encodeWithSelector(ExecutionDelayTooLarge.selector, maxDelay + 1, maxDelay));
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, maxDelay + 1);
+    }
+
+    /// @dev A chain that has not set its own delay yet must still clear the ecosystem-wide one,
+    /// otherwise the call would be a no-op.
+    function test_RevertWhen_increaseChainExecutionDelayEqualToEcosystemDelay() public {
+        _setChainAdmin(bob);
+
+        vm.expectRevert(abi.encodeWithSelector(ExecutionDelayNotIncreased.selector, executionDelay, executionDelay));
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, executionDelay);
+    }
+
+    function test_RevertWhen_increaseChainExecutionDelayBelowEcosystemDelay() public {
+        _setChainAdmin(bob);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ExecutionDelayNotIncreased.selector, executionDelay, executionDelay - 1)
+        );
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, executionDelay - 1);
+    }
+
+    /// @dev The core property of this feature: a chain admin cannot walk back a delay it raised.
+    function test_RevertWhen_increaseChainExecutionDelayDecreasesOwnValue() public {
+        _setChainAdmin(bob);
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, 1000);
+
+        vm.expectRevert(abi.encodeWithSelector(ExecutionDelayNotIncreased.selector, 1000, 999));
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, 999);
+
+        assertEq(validator.getExecutionDelay(zkSync), 1000);
+    }
+
+    function test_RevertWhen_setChainExecutionDelayNotOwner() public {
+        // Even the chain admin cannot use the owner-only setter to lower the delay.
+        _setChainAdmin(bob);
+        vm.prank(bob);
+        validator.increaseChainExecutionDelay(zkSync, 1000);
+
+        vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(bob);
+        validator.setChainExecutionDelay(zkSync, 0);
+
+        assertEq(validator.getExecutionDelay(zkSync), 1000);
+    }
+
+    function test_RevertWhen_setChainExecutionDelayAboveMax() public {
+        uint32 maxDelay = validator.MAX_EXECUTION_DELAY();
+
+        vm.expectRevert(abi.encodeWithSelector(ExecutionDelayTooLarge.selector, maxDelay + 1, maxDelay));
+        vm.prank(owner);
+        validator.setChainExecutionDelay(zkSync, maxDelay + 1);
+    }
+
+    function test_RevertWhen_setExecutionDelayAboveMax() public {
+        uint32 maxDelay = validator.MAX_EXECUTION_DELAY();
+
+        vm.expectRevert(abi.encodeWithSelector(ExecutionDelayTooLarge.selector, maxDelay + 1, maxDelay));
+        vm.prank(owner);
+        validator.setExecutionDelay(maxDelay + 1);
+    }
+
+    function test_RevertWhen_initialExecutionDelayAboveMax() public {
+        uint32 maxDelay = validator.MAX_EXECUTION_DELAY();
+
+        // The proxy admin and the implementation are deployed upfront so that `expectRevert`
+        // applies to the proxy deployment, i.e. to the initializer call itself.
+        ProxyAdmin admin = new ProxyAdmin();
+        ValidatorTimelock timelockImplementation = new ValidatorTimelock(address(dummyBridgehub));
+
+        vm.expectRevert(abi.encodeWithSelector(ExecutionDelayTooLarge.selector, maxDelay + 1, maxDelay));
+        new TransparentUpgradeableProxy(
+            address(timelockImplementation),
+            address(admin),
+            abi.encodeCall(ValidatorTimelock.initialize, (owner, maxDelay + 1))
+        );
+    }
+
+    function testFuzz_getExecutionDelayIsTheMaximumOfBothValues(uint32 _ecosystemDelay, uint32 _chainDelay) public {
+        uint32 maxDelay = validator.MAX_EXECUTION_DELAY();
+        _ecosystemDelay = uint32(bound(_ecosystemDelay, 0, maxDelay));
+        _chainDelay = uint32(bound(_chainDelay, 0, maxDelay));
+
+        vm.startPrank(owner);
+        validator.setExecutionDelay(_ecosystemDelay);
+        validator.setChainExecutionDelay(zkSync, _chainDelay);
+        vm.stopPrank();
+
+        uint32 expected = _chainDelay > _ecosystemDelay ? _chainDelay : _ecosystemDelay;
+        assertEq(validator.getExecutionDelay(zkSync), expected);
     }
 }

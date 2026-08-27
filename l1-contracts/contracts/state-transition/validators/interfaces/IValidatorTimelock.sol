@@ -28,8 +28,15 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
         bool rotateUpgraderRole;
     }
 
-    /// @notice The delay between committing and executing batches is changed.
+    /// @notice The ecosystem-wide delay between committing and executing batches is changed.
+    /// @dev This value acts as the lower bound for every chain: the effective delay of a chain is
+    /// the maximum of this value and the chain's own `chainExecutionDelay`.
     event NewExecutionDelay(uint256 _newExecutionDelay);
+
+    /// @notice The chain-specific delay between committing and executing batches is changed.
+    /// @param _chainAddress The address of the ZK chain (i.e. its DiamondProxy) the delay belongs to.
+    /// @param _newExecutionDelay The new chain-specific execution delay.
+    event NewChainExecutionDelay(address indexed _chainAddress, uint256 _newExecutionDelay);
 
     /// @notice Role hash for addresses allowed to precommit batches on a chain.
     function PRECOMMITTER_ROLE() external view returns (bytes32);
@@ -64,8 +71,19 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
 
     /// @notice The address of the bridgehub
     function BRIDGE_HUB() external view returns (IL1Bridgehub);
-    /// @dev The delay between committing and executing batches.
+    /// @notice The maximal execution delay that either the ecosystem owner or a chain admin can set.
+    function MAX_EXECUTION_DELAY() external view returns (uint32);
+    /// @dev The ecosystem-wide delay between committing and executing batches.
+    /// @dev It is a lower bound only: a chain may raise its own delay above it, see `chainExecutionDelay`.
     function executionDelay() external view returns (uint32);
+    /// @dev The chain-specific delay between committing and executing batches, `0` if the chain never set one.
+    /// @dev Prefer `getExecutionDelay` to obtain the delay that is actually enforced for a chain.
+    /// @param _chainAddress The address of the ZK chain (i.e. its DiamondProxy).
+    function chainExecutionDelay(address _chainAddress) external view returns (uint32);
+    /// @notice The execution delay that is actually enforced for `_chainAddress`.
+    /// @param _chainAddress The address of the ZK chain (i.e. its DiamondProxy).
+    /// @return The maximum of the ecosystem-wide `executionDelay` and the chain's `chainExecutionDelay`.
+    function getExecutionDelay(address _chainAddress) external view returns (uint32);
     /// @dev Part of the IBase interface. Not used in this contract.
     function getName() external pure returns (string memory);
 
@@ -74,8 +92,24 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     /// @param _initialOwner The initial owner of the Validator timelock.
     /// @param _initialExecutionDelay The initial execution delay, i.e. minimal time between a batch is committed and executed.
     function initialize(address _initialOwner, uint32 _initialExecutionDelay) external;
-    /// @dev Set the delay between committing and executing batches.
+    /// @dev Set the ecosystem-wide delay between committing and executing batches.
+    /// @dev Can only be called by the owner of this contract and must not exceed `MAX_EXECUTION_DELAY`.
     function setExecutionDelay(uint32 _executionDelay) external;
+    /// @notice Raises the execution delay of a single chain.
+    /// @param _chainAddress The address of the ZK chain (i.e. its DiamondProxy).
+    /// @param _newExecutionDelay The new chain-specific execution delay.
+    /// @dev Can only be called by the admin of the chain. The new delay must be strictly greater than the
+    /// currently enforced delay (see `getExecutionDelay`) and must not exceed `MAX_EXECUTION_DELAY`.
+    /// @dev A chain admin can only ever increase the delay. Lowering it back requires the ecosystem owner
+    /// to call `setChainExecutionDelay`, so that a chain cannot cheaply undo the extra protection it
+    /// advertised to its users.
+    function increaseChainExecutionDelay(address _chainAddress, uint32 _newExecutionDelay) external;
+    /// @notice Sets the execution delay of a single chain to an arbitrary value, including a lower one.
+    /// @param _chainAddress The address of the ZK chain (i.e. its DiamondProxy).
+    /// @param _newExecutionDelay The new chain-specific execution delay.
+    /// @dev Can only be called by the owner of this contract and must not exceed `MAX_EXECUTION_DELAY`.
+    /// @dev This is the only way to decrease a delay that a chain admin has previously increased.
+    function setChainExecutionDelay(address _chainAddress, uint32 _newExecutionDelay) external;
     /// @dev Returns the timestamp when `_l2BatchNumber` was committed.
     function getCommittedBatchTimestamp(address _chainAddress, uint256 _l2BatchNumber) external view returns (uint256);
 

@@ -6,7 +6,13 @@ import {AccessControlEnumerablePerChainAddressUpgradeable} from "../AccessContro
 import {LibMap} from "../libraries/LibMap.sol";
 import {Diamond} from "../libraries/Diamond.sol";
 import {IZKChain} from "../chain-interfaces/IZKChain.sol";
-import {NotAZKChain, TimeNotReached} from "../../common/L1ContractErrors.sol";
+import {
+    ExecutionDelayNotIncreased,
+    ExecutionDelayTooLarge,
+    NotAZKChain,
+    TimeNotReached
+} from "../../common/L1ContractErrors.sol";
+import {MAX_VALIDATOR_TIMELOCK_EXECUTION_DELAY} from "../../common/Config.sol";
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IValidatorTimelock} from "./interfaces/IValidatorTimelock.sol";
 import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
@@ -22,6 +28,12 @@ import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
 /// @dev The contract overloads all of the 5 methods, that are used in state transition. When the batch is committed,
 /// the timestamp is stored for it. Later, when the owner calls the batch execution, the contract checks that batch
 /// was committed not earlier than X time ago.
+/// @dev The delay is configured on two levels. `executionDelay` is set by the owner of this contract and applies to
+/// the whole ecosystem, while `chainExecutionDelay` lets an individual chain opt into a longer delay than the
+/// ecosystem-wide one. The delay that is actually enforced is the maximum of the two, see `getExecutionDelay`.
+/// A chain admin may only ever raise its chain's delay: bringing it back down requires the owner of this contract,
+/// so that a chain cannot cheaply revoke the additional protection it has advertised to its users. Neither of the
+/// two values may exceed `MAX_EXECUTION_DELAY`.
 /// @dev Expected to be deployed as a TransparentUpgradeableProxy.
 contract ValidatorTimelock is
     IValidatorTimelock,
@@ -71,6 +83,9 @@ contract ValidatorTimelock is
     bytes32 public constant override OPTIONAL_UPGRADER_ADMIN_ROLE = keccak256("OPTIONAL_UPGRADER_ADMIN_ROLE");
 
     /// @inheritdoc IValidatorTimelock
+    uint32 public constant override MAX_EXECUTION_DELAY = MAX_VALIDATOR_TIMELOCK_EXECUTION_DELAY;
+
+    /// @inheritdoc IValidatorTimelock
     IL1Bridgehub public immutable override BRIDGE_HUB;
 
     /// @dev The mapping of ZK chain address => batch number => timestamp when it was committed.
@@ -79,8 +94,11 @@ contract ValidatorTimelock is
     /// @inheritdoc IValidatorTimelock
     uint32 public override executionDelay;
 
+    /// @inheritdoc IValidatorTimelock
+    mapping(address chainAddress => uint32 delay) public override chainExecutionDelay;
+
     /// @dev Reserved storage space to allow for layout changes in future upgrades.
-    uint256[48] private __gap;
+    uint256[47] private __gap;
 
     constructor(address _bridgehubAddr) {
         BRIDGE_HUB = IL1Bridgehub(_bridgehubAddr);
@@ -95,13 +113,55 @@ contract ValidatorTimelock is
 
     function _validatorTimelockInit(address _initialOwner, uint32 _initialExecutionDelay) internal onlyInitializing {
         _transferOwnership(_initialOwner);
+        _checkExecutionDelayWithinBounds(_initialExecutionDelay);
         executionDelay = _initialExecutionDelay;
     }
 
     /// @inheritdoc IValidatorTimelock
     function setExecutionDelay(uint32 _executionDelay) external onlyOwner {
+        _checkExecutionDelayWithinBounds(_executionDelay);
         executionDelay = _executionDelay;
         emit NewExecutionDelay(_executionDelay);
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function increaseChainExecutionDelay(
+        address _chainAddress,
+        uint32 _newExecutionDelay
+    ) external onlyRole(_chainAddress, DEFAULT_ADMIN_ROLE) {
+        _checkExecutionDelayWithinBounds(_newExecutionDelay);
+
+        // Note, that the comparison is done against the currently enforced delay rather than against the
+        // stored chain-specific one. This way the chain admin can never lower the delay that the chain's
+        // users observe, not even down to the ecosystem-wide default.
+        uint32 currentDelay = getExecutionDelay(_chainAddress);
+        if (_newExecutionDelay <= currentDelay) {
+            revert ExecutionDelayNotIncreased(currentDelay, _newExecutionDelay);
+        }
+
+        chainExecutionDelay[_chainAddress] = _newExecutionDelay;
+        emit NewChainExecutionDelay(_chainAddress, _newExecutionDelay);
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function setChainExecutionDelay(address _chainAddress, uint32 _newExecutionDelay) external onlyOwner {
+        _checkExecutionDelayWithinBounds(_newExecutionDelay);
+        chainExecutionDelay[_chainAddress] = _newExecutionDelay;
+        emit NewChainExecutionDelay(_chainAddress, _newExecutionDelay);
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function getExecutionDelay(address _chainAddress) public view override returns (uint32) {
+        uint32 ecosystemDelay = executionDelay;
+        uint32 chainDelay = chainExecutionDelay[_chainAddress];
+        return chainDelay > ecosystemDelay ? chainDelay : ecosystemDelay;
+    }
+
+    /// @dev Reverts if `_executionDelay` exceeds the maximal allowed execution delay.
+    function _checkExecutionDelayWithinBounds(uint32 _executionDelay) internal pure {
+        if (_executionDelay > MAX_EXECUTION_DELAY) {
+            revert ExecutionDelayTooLarge(_executionDelay, MAX_EXECUTION_DELAY);
+        }
     }
 
     /// @inheritdoc IValidatorTimelock
@@ -270,7 +330,7 @@ contract ValidatorTimelock is
         uint256 _processBatchTo,
         bytes calldata // _batchData (unused in this specific implementation)
     ) public virtual onlyRole(_chainAddress, EXECUTOR_ROLE) {
-        uint256 delay = executionDelay; // uint32
+        uint256 delay = getExecutionDelay(_chainAddress); // uint32
         unchecked {
             for (uint256 i = _processBatchFrom; i <= _processBatchTo; ++i) {
                 uint256 commitBatchTimestamp = committedBatchTimestamp[_chainAddress].get(i);
