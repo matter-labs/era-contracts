@@ -15,8 +15,8 @@ import {EcosystemContractRow} from "../RegistryTypes.sol";
 ///      `validate()` / `verifyAll()`. Version-schedule identity is owned by {ICTMTransition},
 ///      not pinned here.
 interface ICoreRegistry {
-    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value,
-    ///         and the key under which the deploying factory attests this instance.
+    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value:
+    ///         the single value governance reviews against the audited manifest.
     function manifestHash() external view returns (bytes32);
 
     /// @notice Every ecosystem contract participating in this upgrade, as complete typed rows —

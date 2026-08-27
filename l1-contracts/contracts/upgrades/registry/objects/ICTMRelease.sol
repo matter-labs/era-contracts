@@ -13,8 +13,8 @@ import {GenesisFacet} from "../RegistryTypes.sol";
 ///      `DiamondInit`'s `IS_ZKSYNC_OS` immutable, which the CTM validates against its own
 ///      flavour when the release is pinned (`_setCurrentRelease`).
 interface ICTMRelease {
-    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value,
-    ///         and the key under which the deploying factory attests this instance.
+    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value:
+    ///         the single value governance reviews against the audited manifest.
     function manifestHash() external view returns (bytes32);
 
     function diamondInit() external view returns (address);

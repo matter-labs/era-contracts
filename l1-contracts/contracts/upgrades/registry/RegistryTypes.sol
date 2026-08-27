@@ -157,19 +157,13 @@ struct BootstrapManifest {
     bytes32 ecosystemExecutorCodehash;
 }
 
-/// @notice Everything the deploy flow feeds into a bootstrap manifest.
+/// @notice Everything the deploy flow feeds into a release manifest at build time.
 /// @dev A release is version-INDEPENDENT and VM-flag-free: the version schedule is a transition
 ///      concern, and VM identity is single-sourced from the pinned DiamondInit immutable.
 /// @param facets The deployed diamond facet addresses (incl. DiamondInit).
 /// @param verifier The verifier a chain at this release runs.
-/// @param bootloaderHash The hash of the bootloader L2 bytecode (zero on ZKsync OS).
-/// @param defaultAccountHash The hash of the default account L2 bytecode (zero on ZKsync OS).
-/// @param evmEmulatorHash The hash of the EVM emulator L2 bytecode (zero on ZKsync OS).
 /// @param genesisUpgrade The L1 genesis upgrade contract run at chain creation.
-/// @param genesisBatchHash The genesis (batch zero) state root.
-/// @param genesisBatchCommitment The genesis batch commitment (must be 1 on ZKsync OS).
-/// @param genesisIndexRepeatedStorageChanges The genesis repeated-storage index.
-/// @param fixedForceDeploymentsData The ecosystem-wide fixed force-deployment descriptor.
+/// @param genesis The genesis payload shared verbatim with {ReleaseManifest} ({ReleaseGenesisData}).
 // solhint-disable-next-line gas-struct-packing
 struct GenesisConfig {
     Facets facets;

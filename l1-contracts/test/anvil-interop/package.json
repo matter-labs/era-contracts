@@ -11,7 +11,7 @@
     "setup-and-dump": "ts-node setup-and-dump-state.ts",
     "test:v31-to-v32": "ts-node run-v31-to-v32-upgrade-test.ts",
     "test:registry-upgrade": "ts-node run-registry-driven-upgrade-test.ts",
-    "regen:v32-registries": "REGEN_REGISTRIES=1 ts-node run-registry-driven-upgrade-test.ts",
+    "regen:registry-manifest": "REGEN_REGISTRIES=1 ts-node run-registry-driven-upgrade-test.ts",
     "coverage": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts",
     "coverage:html": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts --html",
     "coverage:collect": "ts-node collect-coverage.ts",

@@ -29,7 +29,7 @@ yarn copy-to-zkstack-out
 echo "==> [3/5] regenerating anvil-interop chain states (port offset ${PORT_OFFSET})"
 (cd test/anvil-interop && ANVIL_INTEROP_PORT_OFFSET="${PORT_OFFSET}" npx ts-node setup-and-dump-state.ts)
 
-echo "==> [4/5] regenerating the v32 registry manifest from the fresh chain states"
+echo "==> [4/5] regenerating the registry manifest from the fresh chain states"
 (cd test/anvil-interop && ANVIL_INTEROP_PORT_OFFSET="${PORT_OFFSET}" REGEN_REGISTRIES=1 \
     npx ts-node run-registry-driven-upgrade-test.ts)
 

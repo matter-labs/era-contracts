@@ -11,8 +11,8 @@ import {L2UpgradePlan, TransitionManifest} from "../RegistryTypes.sol";
 ///      is two releases and this transition's schedule/engine/L2 plan; the delta is a
 ///      pure function of the release pair, so transition and release state cannot diverge.
 interface ICTMTransition {
-    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value,
-    ///         and the key under which the deploying factory attests this instance.
+    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every pinned value:
+    ///         the single value governance reviews against the audited manifest.
     function manifestHash() external view returns (bytes32);
 
     /// @notice The whole manifest, exactly as it was pinned. Readers needing several fields

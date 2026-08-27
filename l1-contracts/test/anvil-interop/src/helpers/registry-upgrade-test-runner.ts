@@ -18,7 +18,7 @@
  *      codehashes are reproducible run-to-run and machine-to-machine.
  *   3. Deploy the fixed `CTMRelease` + `CTMTransition` + `CoreRegistry` implementations and
  *      initialize them (write-once) from the COMMITTED manifest
- *      scripts/registry-manifests/v32-local.json — the reviewable per-upgrade artifact:
+ *      scripts/registry-manifests/v34-local.json — the reviewable per-upgrade artifact:
  *      - the RELEASE describes what a chain at the target version IS (complete facet set,
  *        DiamondInit, base-system hashes, genesis params) — version-independent;
  *      - the TRANSITION describes how the CURRENT release becomes that release (facet swaps,
@@ -27,13 +27,17 @@
  *      Then assert `verifyAll()` against the live deployment. This is the default CONSUME mode:
  *      the manifest is never regenerated here, so any drift between the committed data and the
  *      live/freshly-deployed addresses or codehashes fails loudly. With `REGEN_REGISTRIES=1`
- *      (EMIT mode, `yarn regen:v32-registries`) the runner instead rebuilds the manifest from
+ *      (EMIT mode, `yarn regen:registry-manifest`) the runner instead rebuilds the manifest from
  *      the LIVE deployment and writes it to the committed path, then continues exactly like
  *      consume mode — the regenerated manifest is meant to be committed.
- *   4. Hand the CTM to the CTM-BOUND `CTMUpgradeExecutor` through the production surface
- *      (`transferOwnership` + the fixed `acceptCTMOwnership` entrypoint) and the ecosystem
- *      `ProxyAdmin` to its bound `EcosystemUpgradeExecutor` through 1-step `transferOwnership`.
- *   5. Execute the upgrade purely through the executors' fixed entrypoints
+ *   4. BOOTSTRAP STAGE ("v33 -> v34", see bootstrap-upgrade-stage.ts): cross the one-time entry
+ *      edge into the registry model through `RegistryBootstrapMigration` — legacy cut-taking
+ *      commit (the ONLY writer of the deprecated `upgradeCutHash`), the CTM implementation swap
+ *      as a source-checked proxy row, and the authority handover to both bound executors,
+ *      completed by the fixed `acceptCTMOwnership` entrypoint. Each chain crosses the edge
+ *      through the legacy 3-arg `upgradeChainFromVersion`, HANDED the committed cut, exactly
+ *      like production pre-v34 chains.
+ *   5. Execute the registry-driven hop ("v34 -> v35") purely through the executors' fixed entrypoints
  *      (`applyCTMUpgrade(transition)`, `applyL1Upgrade(coreRegistry)`, per-chain
  *      `upgradeChain(transition, chainId)`) — no generic delegatecall modules and no
  *      stage-0/1/2 governance calldata anywhere. The schedule (upgrade timestamp, old-version
@@ -81,7 +85,17 @@ import {
   getDeterministicCreationBytecode,
 } from "../core/contracts";
 import { impersonateAndRun } from "../core/utils";
-import { coreInitArgs, releaseInitArgs, transitionInitArgs } from "./registry-manifest";
+import { coreInitArgs, packSemVer, releaseInitArgs, transitionInitArgs } from "./registry-manifest";
+import {
+  assertBootstrapEndState,
+  bootstrapInitArgs,
+  bootstrapManifestChecks,
+  buildBootstrapCut,
+  buildBootstrapSection,
+  crossBootstrapEdgeOnChains,
+  handAuthorityToMigration,
+  installLegacyFacet,
+} from "./bootstrap-upgrade-stage";
 import type { ChainRole } from "../core/types";
 import { clearGenesisUpgradeTxHash, selectUpgradeChains, traceFailedTx } from "./v31-upgrade-test-runner";
 
@@ -94,7 +108,7 @@ const l1ContractsDir = path.resolve(anvilInteropDir, "../..");
 const SEMVER_MINOR_SHIFT = 32;
 
 // Manifest tag (kept in the JSON for human orientation) and the CTM entry consumed here.
-const REGISTRY_TAG = "V32";
+const REGISTRY_TAG = "V34";
 const CTM_REGISTRY_NAME = "ZKsyncOS";
 
 // The fixed release/transition/core-registry implementations live here; the incremental forge
@@ -102,14 +116,14 @@ const CTM_REGISTRY_NAME = "ZKsyncOS";
 // Committed manifest for the local (chain-states) environment — the reviewable per-upgrade
 // artifact the upgrade objects are initialized from. The default CONSUME mode reads it as-is;
 // the EMIT mode (REGEN_REGISTRIES=1) rewrites it so the diff can be reviewed and committed.
-const REGISTRY_MANIFEST_REL = "scripts/registry-manifests/v32-local.json";
+const REGISTRY_MANIFEST_REL = "scripts/registry-manifests/v34-local.json";
 
 // Set REGEN_REGISTRIES=1 to run in EMIT mode (see module docs).
 const REGEN_ENV_VAR = "REGEN_REGISTRIES";
 
 const STALE_REGISTRIES_HINT =
-  `committed v32 registry manifest is stale — rerun with ${REGEN_ENV_VAR}=1 ` +
-  "(yarn regen:v32-registries in l1-contracts/test/anvil-interop) and commit the result " +
+  `committed registry manifest is stale — rerun with ${REGEN_ENV_VAR}=1 ` +
+  "(yarn regen:registry-manifest in l1-contracts/test/anvil-interop) and commit the result " +
   `(${REGISTRY_MANIFEST_REL}).`;
 
 // Sources compiled with the `registry-deterministic` forge profile (CBOR-metadata-free ⇒
@@ -134,6 +148,11 @@ const DETERMINISTIC_SOURCES = [
   "contracts/upgrades/registry/objects/CTMRelease.sol",
   "contracts/upgrades/registry/objects/CTMTransition.sol",
   "contracts/upgrades/registry/objects/CoreRegistry.sol",
+  // Bootstrap stage: the manifest pins the fresh CTM implementation's codehash (proxy row) and
+  // the bootstrap engine's (`upgradeCutInitCodehash`); the legacy facet rides along for uniform
+  // reproducibility of the committed addresses.
+  "contracts/state-transition/ZKsyncOSChainTypeManager.sol",
+  "contracts/dev-contracts/test/LegacyTestAdminFacet.sol",
 ];
 
 // Fixed L2 address the transition pins for the upgrade's L2 delegate target (and its unsafe
@@ -185,7 +204,18 @@ async function sendAndCheck(
   label: string
 ): Promise<ethers.providers.TransactionReceipt> {
   const tx = await txPromise;
-  const receipt = await tx.wait();
+  let receipt: ethers.providers.TransactionReceipt;
+  try {
+    receipt = await tx.wait();
+  } catch (error) {
+    // ethers v5 throws CALL_EXCEPTION on status-0 receipts before we can inspect them.
+    const failed = (error as { receipt?: ethers.providers.TransactionReceipt }).receipt;
+    if (failed) {
+      const trace = await traceFailedTx(provider, failed.transactionHash);
+      throw new Error(`${label} reverted:\n${trace}`);
+    }
+    throw error;
+  }
   if (receipt.status !== 1) {
     const trace = await traceFailedTx(provider, receipt.transactionHash);
     throw new Error(`${label} reverted:\n${trace}`);
@@ -240,13 +270,14 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       chainAssetHandler: live.chainAssetHandler,
       ctm: ctmAddresses.chainTypeManager,
       ecosystemProxyAdmin: live.ecosystemProxyAdmin,
+      ctmProxyAdmin: live.ctmProxyAdmin,
     });
 
     // ── 4. Regenerate (EMIT mode) or validate (CONSUME mode) the committed manifest, then
     //       deploy + initialize the release/transition/core registry from it ──
     const manifestPath = path.join(l1ContractsDir, REGISTRY_MANIFEST_REL);
     if (regenRegistries) {
-      console.log(`\n── ${REGEN_ENV_VAR}=1: regenerating the committed v32 registry manifest ──`);
+      console.log(`\n── ${REGEN_ENV_VAR}=1: regenerating the committed registry manifest ──`);
       const manifest = await buildRegistryManifest(
         l1Provider,
         live,
@@ -258,7 +289,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
       console.log(`  manifest written to ${REGISTRY_MANIFEST_REL}`);
     } else {
-      console.log(`\n── Consuming the committed v32 registry manifest (${REGISTRY_MANIFEST_REL}) ──`);
+      console.log(`\n── Consuming the committed registry manifest (${REGISTRY_MANIFEST_REL}) ──`);
       assertCommittedManifestMatchesLiveDeployment(
         manifestPath,
         live,
@@ -305,23 +336,112 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       throw regenRegistries ? error : staleRegistriesError(error);
     }
 
-    // ── 5. Authority handover ──
-    console.log("\n── Handing CTM + ProxyAdmin authority to the executors ──");
-    await handOverAuthority(l1Provider, deployer, {
-      ctmExecutor: deployed.ctmExecutor,
-      ecoExecutor: deployed.ecoExecutor,
-      ctmAddr: ctmAddresses.chainTypeManager,
-      proxyAdminAddr: live.ecosystemProxyAdmin,
-    });
+    // ── 5. Bootstrap stage: the one-time entry edge ("v33 -> v34") ──
+    // Authority reaches the executors THROUGH the migration — the production handover — so the
+    // registry-driven hop below runs against a bootstrap-produced ownership state.
+    console.log("\n── Bootstrap stage: crossing the entry edge via RegistryBootstrapMigration ──");
+    const ctmExecutor = new ethers.Contract(deployed.ctmExecutor, getAbi("CTMUpgradeExecutor"), deployer);
+    const ecoExecutor = new ethers.Contract(deployed.ecoExecutor, getAbi("EcosystemUpgradeExecutor"), deployer);
+    const manifestJson = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+    const bootstrapPieces = {
+      legacyAdminFacet: deployed.legacyAdminFacet,
+      bootstrapEngine: deployed.bootstrapEngine,
+      ctmImplNew: deployed.ctmImplNew,
+    };
 
-    // ── 6. Pause migrations (the production prerequisite of setNewVersionUpgrade) ──
+    await installLegacyFacet(
+      l1Provider,
+      ctmAddresses.chainTypeManager,
+      bootstrapPieces.legacyAdminFacet,
+      upgradeChains,
+      sendAndCheck
+    );
+
+    // One migration-pause window across both edges (`setNewVersionUpgrade` inside `migrate()`
+    // and `applyCTMUpgrade` both require it).
     console.log("\n── Pausing chain migrations ──");
     await setMigrationPaused(l1Provider, live.chainAssetHandler, true);
 
-    // ── 7. Execute the registry-driven upgrade through the domain executors ──
+    const migrationFactory = new ethers.ContractFactory(
+      getAbi("RegistryBootstrapMigration"),
+      getCreationBytecode("RegistryBootstrapMigration"),
+      deployer
+    );
+    const migration = await migrationFactory.deploy(
+      await bootstrapInitArgs(l1Provider, manifestJson, packSemVer, {
+        ctmProxy: ctmAddresses.chainTypeManager,
+        proxyAdmin: live.ctmProxyAdmin,
+        releaseCodehash: ctmAddresses.releaseCodehash,
+        currentRelease: live.fromRelease,
+        ctmExecutor: deployed.ctmExecutor,
+        ecosystemExecutor: deployed.ctmProxyAdminExecutor,
+      })
+    );
+    await migration.deployed();
+    console.log(`  RegistryBootstrapMigration: ${migration.address}`);
+
+    await handAuthorityToMigration(
+      l1Provider,
+      migration.address,
+      ctmAddresses.chainTypeManager,
+      live.ctmProxyAdmin,
+      sendAndCheck
+    );
+    await sendAndCheck(
+      l1Provider,
+      migration.connect(deployer).migrate({ gasLimit: DEFAULT_GAS_LIMIT }),
+      "migration.migrate()"
+    );
+    console.log("  ✓ migrate() executed (impl swap + legacy commit + release pin + handover)");
+    await sendAndCheck(
+      l1Provider,
+      ctmExecutor.acceptCTMOwnership({ gasLimit: DEFAULT_GAS_LIMIT }),
+      "ctmExecutor.acceptCTMOwnership()"
+    );
+
+    // The chains' genesis upgrade tx is still pending on the sequencer-less anvil chains;
+    // clear it exactly like the v31 runner does (see module docs). Once, before the first bump.
+    await clearGenesisUpgradeTxHash(l1Provider, upgradeChains);
+
+    const bootstrapCut = buildBootstrapCut(manifestJson, packSemVer);
+    await crossBootstrapEdgeOnChains(l1Provider, upgradeChains, live.oldVersion, bootstrapCut, sendAndCheck);
+
+    console.log("\n── Verifying bootstrap end state ──");
+    await assertBootstrapEndState(
+      l1Provider,
+      { assertEq, assertTrue },
+      {
+        ctmAddr: ctmAddresses.chainTypeManager,
+        migration: migration.address,
+        oldVersion: live.oldVersion,
+        midVersion: live.midVersion,
+        bootstrapCut,
+        ctmImplNew: deployed.ctmImplNew,
+        ctmExecutor: deployed.ctmExecutor,
+        ecoExecutor: deployed.ctmProxyAdminExecutor,
+        proxyAdminAddr: live.ctmProxyAdmin,
+        chains: upgradeChains,
+        deadline: ethers.constants.MaxUint256,
+      }
+    );
+
+    // ── 6. Execute the registry-driven upgrade through the domain executors ("v34 -> v35") ──
     console.log("\n── Executing registry-driven upgrade via the domain executors ──");
-    const ctmExecutor = new ethers.Contract(deployed.ctmExecutor, getAbi("CTMUpgradeExecutor"), deployer);
-    const ecoExecutor = new ethers.Contract(deployed.ecoExecutor, getAbi("EcosystemUpgradeExecutor"), deployer);
+
+    // The ECOSYSTEM ProxyAdmin (MessageRoot et al.) is separate from the CTM's own ProxyAdmin
+    // the bootstrap handed over; governance hands it to its bound executor directly (1-step).
+    const ecosystemProxyAdmin = new ethers.Contract(live.ecosystemProxyAdmin, getAbi("ProxyAdmin"), l1Provider);
+    const ecosystemProxyAdminOwner: string = await ecosystemProxyAdmin.owner();
+    if (ecosystemProxyAdminOwner.toLowerCase() !== deployed.ecoExecutor.toLowerCase()) {
+      await impersonateAndRun(l1Provider, ecosystemProxyAdminOwner, async (signer) => {
+        await sendAndCheck(
+          l1Provider,
+          ecosystemProxyAdmin.connect(signer).transferOwnership(deployed.ecoExecutor, { gasLimit: DEFAULT_GAS_LIMIT }),
+          "ecosystem ProxyAdmin transferOwnership(ecoExecutor)"
+        );
+      });
+      console.log("  ✓ ecosystem ProxyAdmin owned by ecoExecutor");
+    }
 
     await sendAndCheck(
       l1Provider,
@@ -336,10 +456,6 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       "ecoExecutor.applyL1Upgrade(coreRegistry)"
     );
     console.log("  ✓ applyL1Upgrade executed");
-
-    // The chains' genesis upgrade tx is still pending on the sequencer-less anvil chains;
-    // clear it exactly like the v31 runner does (see module docs).
-    await clearGenesisUpgradeTxHash(l1Provider, upgradeChains);
 
     for (const chain of upgradeChains) {
       await sendAndCheck(
@@ -374,14 +490,19 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       "CTM currentRelease moved to the transition's target release"
     );
     assertEq(
-      await ctm.upgradeTransition(live.oldVersion),
+      await ctm.upgradeTransition(live.midVersion),
       objects.transition,
-      "CTM transition committed for the old version"
+      "CTM transition committed for the registry-driven edge's departing version"
     );
     assertEq(
-      await ctm.upgradeCutHash(live.oldVersion),
+      await ctm.upgradeCutHash(live.midVersion),
       ethers.constants.HashZero,
       "deprecated upgradeCutHash stays untouched on the transition path"
+    );
+    assertEq(
+      (await ctm.protocolVersionDeadline(live.midVersion)).toString(),
+      ethers.constants.MaxUint256.toString(),
+      "departing version's deadline resolves through the committed transition"
     );
     const pinnedRelease = new ethers.Contract(await ctm.currentRelease(), getAbi("ICTMRelease"), l1Provider);
     assertEq(await pinnedRelease.verifier(), deployed.newVerifier, "the pinned release carries the fresh verifier");
@@ -450,9 +571,16 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
 
 type LiveUpgradeInputs = {
   oldVersion: ethers.BigNumber;
+  /** The bootstrap edge's target ("v34") — also the registry-driven hop's departure. */
+  midVersion: ethers.BigNumber;
   newVersion: ethers.BigNumber;
   oldVersionString: string;
+  midVersionString: string;
   newVersionString: string;
+  /** The CTM proxy's live (pre-bootstrap) implementation — the source side of its swap row. */
+  ctmImplOld: string;
+  /** The CTM proxy's own ProxyAdmin — the authority the bootstrap manifest names. */
+  ctmProxyAdmin: string;
   /** The CTM's live `currentRelease` — the release edge the transition must depart from. */
   fromRelease: string;
   oldAdminFacet: string;
@@ -491,11 +619,14 @@ async function readLiveUpgradeInputs(
   const oldVersion: ethers.BigNumber = await ctm.protocolVersion();
   const minorShift = ethers.BigNumber.from(2).pow(SEMVER_MINOR_SHIFT);
   if (!oldVersion.mod(minorShift).isZero() || !oldVersion.div(minorShift).lt(minorShift)) {
-    // The synthetic bump below assumes a plain 0.<minor>.0 version.
+    // The synthetic bumps below assume a plain 0.<minor>.0 version.
     throw new Error(`Unexpected packed protocol version ${oldVersion.toString()}`);
   }
   const oldMinor = oldVersion.div(minorShift).toNumber();
-  const newVersion = ethers.BigNumber.from(oldMinor + 1).mul(minorShift);
+  // Two synthetic edges: the bootstrap crosses V -> V+1 (the "v33 -> v34" model), the
+  // registry-driven hop then crosses V+1 -> V+2 (the "v34 -> v35" model).
+  const midVersion = ethers.BigNumber.from(oldMinor + 1).mul(minorShift);
+  const newVersion = ethers.BigNumber.from(oldMinor + 2).mul(minorShift);
 
   // The release edge: the chain states are a registry-era deployment, so the CTM must already
   // carry a genesis release. (A zero fromRelease is migration-only semantics — v31 -> v32.)
@@ -573,12 +704,27 @@ async function readLiveUpgradeInputs(
   const implSlotRaw = await l1Provider.getStorageAt(messageRootProxy, EIP1967_IMPL_SLOT);
   const messageRootImplOld = ethers.utils.getAddress("0x" + implSlotRaw.slice(26));
 
+  const ctmImplSlotRaw = await l1Provider.getStorageAt(ctm.address, EIP1967_IMPL_SLOT);
+  const ctmImplOld = ethers.utils.getAddress("0x" + ctmImplSlotRaw.slice(26));
+
+  // The CTM proxy sits under its OWN ProxyAdmin in this deployment (separate from the
+  // ecosystem one read above) — the admin the bootstrap manifest's `ctmProxyAdmin` names.
+  const ctmAdminSlotRaw = await l1Provider.getStorageAt(
+    ctm.address,
+    "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103"
+  );
+  const ctmProxyAdmin = ethers.utils.getAddress("0x" + ctmAdminSlotRaw.slice(26));
+
   const toVersionString = (v: ethers.BigNumber) => `0.${v.div(minorShift).toString()}.0`;
   return {
     oldVersion,
+    midVersion,
     newVersion,
     oldVersionString: toVersionString(oldVersion),
+    midVersionString: toVersionString(midVersion),
     newVersionString: toVersionString(newVersion),
+    ctmImplOld,
+    ctmProxyAdmin,
     fromRelease,
     oldAdminFacet,
     adminSelectors,
@@ -604,7 +750,11 @@ type DeployedMachinery = {
   coreRegistryCodehash: string;
   ctmExecutor: string;
   ecoExecutor: string;
+  ctmProxyAdminExecutor: string;
   composerHarness: string;
+  legacyAdminFacet: string;
+  bootstrapEngine: string;
+  ctmImplNew: string;
   newAdminFacet: string;
   newGettersFacet: string;
   newExecutorFacet: string;
@@ -627,6 +777,7 @@ async function deployUpgradeMachinery(
     chainAssetHandler: string;
     ctm: string;
     ecosystemProxyAdmin: string;
+    ctmProxyAdmin: string;
   }
 ): Promise<DeployedMachinery> {
   const deployFrom = async (
@@ -646,6 +797,9 @@ async function deployUpgradeMachinery(
   // deterministic (CBOR-metadata-free) build — see buildDeterministicArtifacts().
   const deployPinned = (name: Parameters<typeof getAbi>[0], args: unknown[]) =>
     deployFrom(name, getDeterministicCreationBytecode(name), args);
+
+  // Live CTM immutables for the bootstrap's fresh implementation.
+  const liveCtm = new ethers.Contract(params.ctm, getAbi("ZKsyncOSChainTypeManager"), deployer.provider);
 
   // NOTE: the deploy ORDER below is part of the committed manifest's contract: the deployer
   // key + starting nonce are fixed by the chain states, so each contract's address is a pure
@@ -676,6 +830,14 @@ async function deployUpgradeMachinery(
       params.ecosystemProxyAdmin,
       coreRegistryCodehash,
     ]),
+    // Each ProxyAdmin gets its bound executor: the CTM proxy sits under its own admin in this
+    // deployment, and the bootstrap hands that admin to THIS executor.
+    ctmProxyAdminExecutor: await deploy("EcosystemUpgradeExecutor", [
+      deployer.address,
+      deployer.address,
+      params.ctmProxyAdmin,
+      coreRegistryCodehash,
+    ]),
     composerHarness: await deploy("RegistryComposerHarness", []),
     // The synthetic v-bump's "changed facet": a fresh AdminFacet built from the same source,
     // constructed with the live RollupDAManager so DA-validation behavior is unchanged.
@@ -701,6 +863,18 @@ async function deployUpgradeMachinery(
       params.bridgehub,
       params.eraGatewayChainId,
       params.chainAssetHandler,
+    ]),
+    // ── Bootstrap stage (appended: deploy order is nonce-load-bearing, see NOTE above) ──
+    // The legacy cut-taking entrypoint the harness installs pre-bootstrap.
+    legacyAdminFacet: await deployPinned("LegacyTestAdminFacet", []),
+    // The bootstrap cut's init contract — its codehash is the manifest's `upgradeCutInitCodehash`.
+    bootstrapEngine: await deployPinned("DefaultUpgrade", []),
+    // The bootstrap's proxy row: the CTM's own implementation swap, built with live immutables.
+    ctmImplNew: await deployPinned("ZKsyncOSChainTypeManager", [
+      params.bridgehub,
+      await liveCtm.INTEROP_CENTER(),
+      await liveCtm.L1_BYTECODES_SUPPLIER(),
+      await liveCtm.PERMISSIONLESS_VALIDATOR(),
     ]),
   };
 }
@@ -766,7 +940,22 @@ async function buildRegistryManifest(
   return {
     tag: REGISTRY_TAG,
     oldVersion: live.oldVersionString,
+    // The bootstrap edge's target ("v34"): the registry-driven hop below departs FROM it.
+    bootstrapVersion: live.midVersionString,
     newVersion: live.newVersionString,
+    // The one-time entry edge into the registry model — consumed by
+    // RegistryBootstrapMigration, not by the release/transition objects.
+    bootstrap: await buildBootstrapSection(
+      l1Provider,
+      {
+        legacyAdminFacet: deployed.legacyAdminFacet,
+        bootstrapEngine: deployed.bootstrapEngine,
+        ctmImplNew: deployed.ctmImplNew,
+      },
+      ctmProxy,
+      live.ctmImplOld,
+      ethers.constants.MaxUint256.toHexString()
+    ),
     core: {
       // Source-checked edges: the proxy must currently point at `expectedOldImpl` for the row
       // to apply — replaying a stale registry can never downgrade a proxy. No proxy admin: the
@@ -888,7 +1077,18 @@ function assertCommittedManifestMatchesLiveDeployment(
   const checks: Array<[string, unknown, unknown]> = [
     ["tag", manifest.tag, REGISTRY_TAG],
     ["oldVersion", manifest.oldVersion, live.oldVersionString],
+    ["bootstrapVersion", manifest.bootstrapVersion, live.midVersionString],
     ["newVersion", manifest.newVersion, live.newVersionString],
+    ...bootstrapManifestChecks(
+      manifest,
+      {
+        legacyAdminFacet: deployed.legacyAdminFacet,
+        bootstrapEngine: deployed.bootstrapEngine,
+        ctmImplNew: deployed.ctmImplNew,
+      },
+      ctmProxy,
+      live.ctmImplOld
+    ),
     ["core.contracts.L1MessageRoot.proxy", manifest.core?.contracts?.L1MessageRoot?.proxy, live.messageRootProxy],
     [
       "core.contracts.L1MessageRoot.expectedOldImpl",
@@ -977,49 +1177,6 @@ async function deployUpgradeObjectsFromManifest(
     ),
     coreRegistry: await deployObject("CoreRegistry", coreInitArgs(manifest), deployed.coreRegistryCodehash),
   };
-}
-
-// ── Authority handover ───────────────────────────────────────────────
-
-async function handOverAuthority(
-  l1Provider: ethers.providers.JsonRpcProvider,
-  deployer: ethers.Wallet,
-  params: { ctmExecutor: string; ecoExecutor: string; ctmAddr: string; proxyAdminAddr: string }
-): Promise<void> {
-  // CTM (Ownable2Step): transferOwnership from the current owner, then accept through the
-  // executor's FIXED acceptCTMOwnership entrypoint — no break-glass involved in the standard
-  // handover (forward is a separately governed emergency capability).
-  const ctmOwnable = new ethers.Contract(params.ctmAddr, getAbi("Ownable2Step"), l1Provider);
-  const ctmOwner: string = await ctmOwnable.owner();
-  await impersonateAndRun(l1Provider, ctmOwner, async (signer) => {
-    await sendAndCheck(
-      l1Provider,
-      ctmOwnable.connect(signer).transferOwnership(params.ctmExecutor, { gasLimit: DEFAULT_GAS_LIMIT }),
-      "CTM transferOwnership(ctmExecutor)"
-    );
-  });
-  const ctmExecutor = new ethers.Contract(params.ctmExecutor, getAbi("CTMUpgradeExecutor"), deployer);
-  await sendAndCheck(
-    l1Provider,
-    ctmExecutor.acceptCTMOwnership({ gasLimit: DEFAULT_GAS_LIMIT }),
-    "ctmExecutor.acceptCTMOwnership()"
-  );
-  console.log("  ✓ CTM ownership accepted through the fixed handover entrypoint");
-
-  // Ecosystem ProxyAdmin (1-step Ownable): the current owner (governance in the pre-generated
-  // states) hands it to the ecosystem executor directly.
-  const proxyAdmin = new ethers.Contract(params.proxyAdminAddr, getAbi("ProxyAdmin"), l1Provider);
-  const proxyAdminOwner: string = await proxyAdmin.owner();
-  if (proxyAdminOwner.toLowerCase() !== params.ecoExecutor.toLowerCase()) {
-    await impersonateAndRun(l1Provider, proxyAdminOwner, async (signer) => {
-      await sendAndCheck(
-        l1Provider,
-        proxyAdmin.connect(signer).transferOwnership(params.ecoExecutor, { gasLimit: DEFAULT_GAS_LIMIT }),
-        "ProxyAdmin transferOwnership(ecoExecutor)"
-      );
-    });
-  }
-  console.log("  ✓ ecosystem ProxyAdmin owned by ecoExecutor");
 }
 
 async function setMigrationPaused(

@@ -41,10 +41,16 @@ const ARTIFACTS = {
   // Write-once release/transition/core-registry objects (contracts/upgrades/registry). Each
   // takes its manifest as a CONSTRUCTOR argument, so a plain deployment is the whole creation
   // step. The committed manifest they are built from regenerates via
-  // `yarn regen:v32-registries` (emit mode of the registry upgrade runner).
+  // `yarn regen:registry-manifest` (emit mode of the registry upgrade runner).
   CTMRelease: "CTMRelease.sol/CTMRelease.json",
   CTMTransition: "CTMTransition.sol/CTMTransition.json",
   CoreRegistry: "CoreRegistry.sol/CoreRegistry.json",
+  // Bootstrap stage (see bootstrap-upgrade-stage.ts): the one-time entry edge into the
+  // registry-driven model, plus the legacy cut-taking entrypoint the harness installs and the
+  // CTM implementation the bootstrap's proxy row swaps in.
+  RegistryBootstrapMigration: "RegistryBootstrapMigration.sol/RegistryBootstrapMigration.json",
+  LegacyTestAdminFacet: "LegacyTestAdminFacet.sol/LegacyTestAdminFacet.json",
+  ZKsyncOSChainTypeManager: "ZKsyncOSChainTypeManager.sol/ZKsyncOSChainTypeManager.json",
   BridgedStandardERC20: "BridgedStandardERC20.sol/BridgedStandardERC20.json",
   ChainAdminOwnable: "ChainAdminOwnable.sol/ChainAdminOwnable.json",
   ChainRegistrationSender: "ChainRegistrationSender.sol/ChainRegistrationSender.json",

@@ -134,7 +134,9 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string):
   }));
 
   return {
-    oldProtocolVersion: packSemVer(manifest.oldVersion),
+    // The registry-driven hop departs from the BOOTSTRAP edge's target version (the bootstrap
+    // crossed manifest.oldVersion -> manifest.bootstrapVersion first).
+    oldProtocolVersion: packSemVer(manifest.bootstrapVersion),
     newProtocolVersion: packSemVer(manifest.newVersion),
     fromRelease: transition.fromRelease,
     newRelease,
