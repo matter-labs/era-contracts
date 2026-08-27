@@ -276,12 +276,15 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
                 "zisk_range_verifier_addr holds no code: deploy the range verifier first"
             );
         }
-        (, string memory airbenderVerifierName) = DeployCTML1OrGateway.resolve(
+        (, string memory airbenderVerifierName) = DeployCTML1OrGateway.resolveMainVerifier(
             config.isZKsyncOS,
-            CTMContract.DualVerifier
+            config.testnetVerifier
         );
         multiProofAddresses.airbenderVerifier = deploySimpleContract(airbenderVerifierName, false);
         multiProofAddresses.ziskVerifier = deploySimpleContract("ZiskVerifier", false);
+        if (config.testnetVerifier) {
+            multiProofAddresses.ziskTestnetVerifier = deploySimpleContract("ZiskTestnetVerifier", false);
+        }
         multiProofAddresses.multiProofVerifier = deploySimpleContract("MultiProofVerifier", false);
 
         if (config.testnetVerifier) {
@@ -402,8 +405,25 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.proxies.chainTypeManager
         );
         vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
+        if (multiProofAddresses.airbenderVerifier != address(0)) {
+            vm.serializeAddress("state_transition", "airbender_verifier_addr", multiProofAddresses.airbenderVerifier);
+        }
         if (multiProofAddresses.ziskVerifier != address(0)) {
             vm.serializeAddress("state_transition", "zisk_verifier_addr", multiProofAddresses.ziskVerifier);
+        }
+        if (multiProofAddresses.ziskTestnetVerifier != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "zisk_testnet_verifier_addr",
+                multiProofAddresses.ziskTestnetVerifier
+            );
+        }
+        if (multiProofAddresses.multiProofVerifier != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "multi_proof_verifier_addr",
+                multiProofAddresses.multiProofVerifier
+            );
         }
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);

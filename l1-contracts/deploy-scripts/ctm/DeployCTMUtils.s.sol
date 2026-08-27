@@ -94,6 +94,7 @@ struct MultiProofConfig {
 struct MultiProofAddresses {
     address airbenderVerifier;
     address ziskVerifier;
+    address ziskTestnetVerifier;
     address multiProofVerifier;
 }
 
@@ -357,6 +358,11 @@ abstract contract DeployCTMUtils is DeployUtils {
             // The standalone snarkJS Plonk verifier this wraps; deployed
             // beforehand (see verifiers/README.md) and passed by address.
             return abi.encode(config.multiProof.ziskPlonkVerifierAddr);
+        } else if (compareStrings(contractName, "ZiskTestnetVerifier")) {
+            address ziskRangeVerifier = config.multiProof.ziskRangeVerifierAddr != address(0)
+                ? config.multiProof.ziskRangeVerifierAddr
+                : multiProofAddresses.ziskVerifier;
+            return abi.encode(ziskRangeVerifier);
         } else if (compareStrings(contractName, "MultiProofVerifier")) {
             // The Airbender side is the ZKsync OS dual verifier, so the
             // sub-verifier registry has one home.
@@ -365,6 +371,9 @@ abstract contract DeployCTMUtils is DeployUtils {
             address ziskRangeVerifier = config.multiProof.ziskRangeVerifierAddr != address(0)
                 ? config.multiProof.ziskRangeVerifierAddr
                 : multiProofAddresses.ziskVerifier;
+            if (config.testnetVerifier) {
+                ziskRangeVerifier = multiProofAddresses.ziskTestnetVerifier;
+            }
             return abi.encode(multiProofAddresses.airbenderVerifier, ziskRangeVerifier);
         } else if (compareStrings(contractName, "MultiProofTestnetVerifier")) {
             return abi.encode(multiProofAddresses.multiProofVerifier);

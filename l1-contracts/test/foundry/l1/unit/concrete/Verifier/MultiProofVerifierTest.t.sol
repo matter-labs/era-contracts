@@ -5,7 +5,9 @@ import "forge-std/Test.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol";
+import {ZiskTestnetVerifier} from "contracts/state-transition/verifiers/ZiskTestnetVerifier.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {NonZeroCarriedHash} from "contracts/common/L1ContractErrors.sol";
 import {DeployCTML1OrGateway} from "deploy-scripts/ctm/DeployCTML1OrGateway.sol";
 
@@ -139,6 +141,29 @@ contract MultiProofVerifierTest is Test {
         uint256 ziskStart = 3 + _airbenderLen;
         for (uint256 i = 0; i < 24; i++) {
             proof[ziskStart + i] = 1000 + i;
+        }
+    }
+
+    function _fakeComponent(uint256 _publicInput) internal pure returns (uint256[] memory proof) {
+        proof = new uint256[](24);
+        proof[0] = 3;
+        proof[1] = 0;
+        proof[2] = 13;
+        proof[3] = _publicInput;
+    }
+
+    function _fakeAllType5Proof(uint256 _publicInput) internal pure returns (uint256[] memory proof) {
+        proof = new uint256[](3 + 4 + 24);
+        proof[0] = 5;
+        proof[1] = 0;
+        proof[2] = 4;
+        proof[3] = 3;
+        proof[4] = 0;
+        proof[5] = 13;
+        proof[6] = _publicInput;
+        uint256[] memory ziskProof = _fakeComponent(_publicInput);
+        for (uint256 i = 0; i < ziskProof.length; ++i) {
+            proof[7 + i] = ziskProof[i];
         }
     }
 
@@ -361,5 +386,118 @@ contract MultiProofVerifierTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, 2));
         testnetVerifier.verify(_singlePublicInputs(), proof);
+    }
+
+    /// @dev FakeAll still exercises the type-5 decoder and both component
+    ///      bindings; each testnet sub-verifier accepts only its own canonical
+    ///      mock component.
+    function test_testnet_type5FakeAll_passes() public {
+        ZKsyncOSTestnetVerifier airbender = new ZKsyncOSTestnetVerifier(IVerifier(address(failVerifier)));
+        ZiskTestnetVerifier zisk = new ZiskTestnetVerifier(IVerifier(address(failVerifier)));
+        MultiProofVerifier multiProof = new MultiProofVerifier(IVerifier(address(airbender)), IVerifier(address(zisk)));
+
+        uint256[] memory publicInputs = _rangePublicInputs();
+        uint256 folded = new ZKsyncOSVerifier(IVerifier(address(passVerifier))).computeZKsyncOSHash(0, publicInputs);
+
+        assertTrue(multiProof.verify(publicInputs, _fakeAllType5Proof(folded)));
+    }
+
+    /// @dev FakeZisk combines the ordinary Airbender proof route with the
+    ///      canonical ZiSK mock component in one type-5 envelope.
+    function test_testnet_type5FakeZisk_passes() public {
+        ZKsyncOSTestnetVerifier airbender = new ZKsyncOSTestnetVerifier(IVerifier(address(passVerifier)));
+        ZiskTestnetVerifier zisk = new ZiskTestnetVerifier(IVerifier(address(failVerifier)));
+        MultiProofVerifier multiProof = new MultiProofVerifier(IVerifier(address(airbender)), IVerifier(address(zisk)));
+
+        uint256[] memory publicInputs = _rangePublicInputs();
+        uint256 folded = new ZKsyncOSVerifier(IVerifier(address(passVerifier))).computeZKsyncOSHash(0, publicInputs);
+        uint256[] memory proof = _type5Proof(0, 4);
+        proof[3] = 2;
+        proof[4] = 0;
+        proof[5] = 100;
+        proof[6] = 101;
+        uint256[] memory fakeZisk = _fakeComponent(folded);
+        for (uint256 i = 0; i < fakeZisk.length; ++i) {
+            proof[7 + i] = fakeZisk[i];
+        }
+
+        assertTrue(multiProof.verify(publicInputs, proof));
+    }
+}
+
+contract ZiskTestnetVerifierTest is Test {
+    MockPassVerifier internal passVerifier;
+    MockFailVerifier internal failVerifier;
+
+    function setUp() public {
+        passVerifier = new MockPassVerifier();
+        failVerifier = new MockFailVerifier();
+    }
+
+    function _publicInputs() internal pure returns (uint256[] memory inputs) {
+        inputs = new uint256[](3);
+        inputs[0] = 42;
+        inputs[1] = 43;
+        inputs[2] = 44;
+    }
+
+    function _fakeProof(uint256 _foldedPublicInput) internal pure returns (uint256[] memory proof) {
+        proof = new uint256[](24);
+        proof[0] = 3;
+        proof[1] = 0;
+        proof[2] = 13;
+        proof[3] = _foldedPublicInput;
+    }
+
+    function test_fakeProof_acceptsCanonicalPaddedComponent() public {
+        ZiskTestnetVerifier verifier = new ZiskTestnetVerifier(IVerifier(address(failVerifier)));
+        uint256[] memory inputs = _publicInputs();
+        uint256 folded = new ZKsyncOSVerifier(IVerifier(address(passVerifier))).computeZKsyncOSHash(0, inputs);
+
+        assertTrue(verifier.verify(inputs, _fakeProof(folded)));
+    }
+
+    function test_fakeProof_rejectsMismatchedPublicInput() public {
+        ZiskTestnetVerifier verifier = new ZiskTestnetVerifier(IVerifier(address(failVerifier)));
+
+        vm.expectRevert(ZiskTestnetVerifier.InvalidMockProof.selector);
+        verifier.verify(_publicInputs(), _fakeProof(1));
+    }
+
+    function test_fakeProof_rejectsNonzeroPadding() public {
+        ZiskTestnetVerifier verifier = new ZiskTestnetVerifier(IVerifier(address(failVerifier)));
+        uint256[] memory inputs = _publicInputs();
+        uint256 folded = new ZKsyncOSVerifier(IVerifier(address(passVerifier))).computeZKsyncOSHash(0, inputs);
+        uint256[] memory proof = _fakeProof(folded);
+        proof[23] = 1;
+
+        vm.expectRevert(ZiskTestnetVerifier.InvalidMockProof.selector);
+        verifier.verify(inputs, proof);
+    }
+
+    function test_realProof_delegatesToInnerVerifier() public {
+        ZiskTestnetVerifier verifier = new ZiskTestnetVerifier(IVerifier(address(passVerifier)));
+        uint256[] memory proof = new uint256[](24);
+        proof[0] = 1;
+
+        assertTrue(verifier.verify(_publicInputs(), proof));
+    }
+
+    /// @dev ZiSK proof words are field elements, not a typed envelope. A real
+    ///      proof whose first word equals the mock type must still delegate
+    ///      unless the complete mock marker is present.
+    function test_realProof_startingWithMockType_delegatesToInnerVerifier() public {
+        ZiskTestnetVerifier verifier = new ZiskTestnetVerifier(IVerifier(address(passVerifier)));
+        uint256[] memory proof = new uint256[](24);
+        proof[0] = 3;
+        proof[1] = 1;
+
+        assertTrue(verifier.verify(_publicInputs(), proof));
+    }
+
+    function test_verificationKeyHash_delegatesToInnerVerifier() public {
+        ZiskTestnetVerifier verifier = new ZiskTestnetVerifier(IVerifier(address(passVerifier)));
+
+        assertEq(verifier.verificationKeyHash(), passVerifier.verificationKeyHash());
     }
 }
