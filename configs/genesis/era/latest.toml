@@ -1,4 +1,4 @@
-protocol_semantic_version = 133143986177
+protocol_semantic_version = 137438953474
 genesis_root = "0x165530549ee8b02b6ab6c703c00dd4965065413c64ee7dd109a9988816148407"
 genesis_rollup_leaf_index = 102
 genesis_batch_commitment = "0x1aece7b49008c333ba094046be34d5858284ef6101cee1c30f1cecbfce75768f"
@@ -7,5 +7,5 @@ default_aa_hash = "0x010005f9d84c1863bf21a9393f2fd1631af92aab68f12c35dba580c8d7a
 evm_emulator_hash = "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63"
 
 [prover]
-recursion_scheduler_level_vk_hash = "0xcde2e1dc7800da93384e5b2e0bb1f195ed3eb4aed0ad01a877588a890f8bd970"
-fflonk_snark_wrapper_vk_hash = "0x95d735ed04680e0f7777f1d2016f3b6e2f507726b32e2d8b47a37fd8355fd47a"
+recursion_scheduler_level_vk_hash = "0xbaaa46d644f7034d609eea327e818bd9a93a3c0fdd60e887d233da8a35c4f8ae"
+fflonk_snark_wrapper_vk_hash = "0xd89b62ac599b15d9dc47860c8ebca5964c99e7b177e9b8ea38a0c13714dc32bb"
