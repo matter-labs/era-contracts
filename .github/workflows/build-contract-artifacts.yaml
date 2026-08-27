@@ -1,0 +1,88 @@
+# Shared foundry build of all contract projects + artifacts cache save.
+# Called as the `build` job by l1-contracts-ci.yaml and pre-merge-checks.yaml.
+name: Build contract artifacts
+
+on:
+  workflow_call:
+    inputs:
+      cache-key:
+        description: "Key to save the artifacts cache under"
+        required: true
+        type: string
+      upload-artifacts:
+        description: "Also upload the artifacts for manual download"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install foundry-zksync
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build da contracts
+        working-directory: da-contracts
+        run: |
+          yarn build:foundry
+
+      - name: Build l1 contracts
+        working-directory: l1-contracts
+        run: |
+          yarn build:foundry
+
+      - name: Build l2 contracts
+        working-directory: l2-contracts
+        run: |
+          yarn build:foundry
+
+      - name: Build system contracts
+        working-directory: system-contracts
+        run: |
+          yarn install
+          yarn build:foundry
+
+      - name: Create cache
+        uses: actions/cache/save@v4
+        with:
+          key: ${{ inputs.cache-key }}
+          path: |
+            da-contracts/cache-forge
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
+
+      - name: Upload artifacts for download
+        if: inputs.upload-artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            da-contracts/cache-forge
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
