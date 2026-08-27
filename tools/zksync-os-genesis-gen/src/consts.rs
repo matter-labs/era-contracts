@@ -112,6 +112,70 @@ pub const L2_SYSTEM_CONTEXT_ADDR: Address = Address(FixedBytes::<20>(hex_literal
 
 pub const SYSTEM_PROXY_ADMIN_OWNER_SLOT: B256 = B256::ZERO;
 
+/// TEMPORARY (EVM-XXXX): storage slot of `L2AssetTracker.BASE_TOKEN_ASSET_ID`, seeded at genesis.
+///
+/// The zksync-os bootloader runs a synthetic, immediately-rolled-back
+/// `L2AssetTracker.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, 1)` at the start of *every* block
+/// to admit the mandatory L1-finalization preimages before any transaction can exhaust its
+/// preimage-cache budget (`prewarm_l1_postprocessing`, added in zksync-os v0.5.0). It treats a revert
+/// as a fatal block error.
+///
+/// A fresh chain's genesis deploys the tracker with code but no initialized storage: `initL2` runs
+/// inside the genesis upgrade transaction, which lives in block 1 and therefore *after* that block's
+/// prewarm. The prewarm consequently hits `MissingBaseTokenAssetId()` and block 1 can never execute,
+/// so `initL2` never runs and the chain is dead on arrival.
+///
+/// Seeding a non-zero placeholder gets the prewarm past that check. The value is deliberately not a
+/// real asset id — no chain-specific data can live in this chain-agnostic genesis — and it is
+/// overwritten with the correct one by `L2GenesisForceDeploymentsHelper._initPreV32Contracts`, which
+/// calls `initL2` before any non-prewarm code can observe it.
+///
+/// Remove this once the bootloader tolerates a revert in the prewarm (the sibling
+/// `prewarm_l2_chain_asset_handler` already documents that an EVM-level revert there is harmless),
+/// or once `handleFinalizeBaseTokenBridgingOnL2` returns instead of reverting on a zero asset id.
+///
+/// Slot 205 verified via `forge inspect contracts/bridge/asset-tracker/L2AssetTracker.sol:L2AssetTracker
+/// storage-layout`. Note the tracker inherits `PausableUpgradeable`, so the tracker's own state starts
+/// at slot 201, not the 151 that the zksync-os test rig's vendored fixture assumes.
+pub const L2_ASSET_TRACKER_BASE_TOKEN_ASSET_ID_SLOT: B256 = FixedBytes::<32>(hex_literal::hex!(
+    "00000000000000000000000000000000000000000000000000000000000000cd"
+));
+
+/// TEMPORARY (EVM-XXXX): placeholder asset id written to
+/// [`L2_ASSET_TRACKER_BASE_TOKEN_ASSET_ID_SLOT`] at genesis. Any non-zero value works; see that
+/// constant for why this is needed and when to remove it.
+pub const GENESIS_PLACEHOLDER_BASE_TOKEN_ASSET_ID: B256 = FixedBytes::<32>(hex_literal::hex!(
+    "0000000000000000000000000000000000000000000000000000000000000001"
+));
+
+/// TEMPORARY (EVM-XXXX): slot of `L2AssetTracker.isAssetRegistered[GENESIS_PLACEHOLDER_BASE_TOKEN_ASSET_ID]`,
+/// i.e. `keccak256(abi.encode(bytes32(1), uint256(203)))`.
+///
+/// Seeding the asset id alone is *not* enough. Once it is non-zero the prewarm stops early-returning
+/// and runs the full `_handleFinalizeBridgingOnL2Inner` path, whose first step is
+/// `_registerLegacyTokenIfNeeded` → `_registerLegacyToken` →
+/// `require(L2NativeTokenVault.originChainId(assetId) != 0, AssetIdNotRegistered(assetId))`. The
+/// genesis NTV is deployed but uninitialized, so that mapping reads zero and the prewarm reverts one
+/// level deeper than before.
+///
+/// Marking the placeholder asset as already registered makes `_registerLegacyTokenIfNeeded` return
+/// immediately, so the NTV is never consulted. The rest of the path is revert-free on genesis state:
+/// `_isNativeToThisChain` is false for the base token, and `SystemContext.currentSettlementLayerChainId()`
+/// is a plain getter over zeroed storage. (zksync-os's own test rig seeds this same pair — see
+/// `install_default_predeployed_contracts` in tests/rig/src/predeployed_contracts.rs.)
+///
+/// `initL2` does not clear this flag, but it is harmless: it is keyed by the placeholder asset id,
+/// which is not the chain's real base-token asset id, so no real asset's registration state is
+/// affected. Remove it together with [`L2_ASSET_TRACKER_BASE_TOKEN_ASSET_ID_SLOT`].
+pub const L2_ASSET_TRACKER_PLACEHOLDER_ASSET_REGISTERED_SLOT: B256 = FixedBytes::<32>(
+    hex_literal::hex!("b3c459fcfa972435363277a54960f9947fdf75faf912b521fbcc6cd1c34ddc33"),
+);
+
+/// TEMPORARY (EVM-XXXX): `true`, written to [`L2_ASSET_TRACKER_PLACEHOLDER_ASSET_REGISTERED_SLOT`].
+pub const GENESIS_PLACEHOLDER_ASSET_REGISTERED: B256 = FixedBytes::<32>(hex_literal::hex!(
+    "0000000000000000000000000000000000000000000000000000000000000001"
+));
+
 pub const EIP1967_IMPLEMENTATION_SLOT: B256 = FixedBytes::<32>(hex_literal::hex!(
     "360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
 ));

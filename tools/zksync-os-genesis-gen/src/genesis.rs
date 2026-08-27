@@ -1,7 +1,9 @@
 use crate::consts::{
     ContractDeployment, ContractSource, EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT,
-    INITIAL_CONTRACTS, L2_COMPLEX_UPGRADER_ADDR, SYSTEM_CONTRACT_PROXY_ADMIN,
-    SYSTEM_PROXY_ADMIN_OWNER_SLOT,
+    GENESIS_PLACEHOLDER_ASSET_REGISTERED, GENESIS_PLACEHOLDER_BASE_TOKEN_ASSET_ID,
+    INITIAL_CONTRACTS, L2_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_BASE_TOKEN_ASSET_ID_SLOT,
+    L2_ASSET_TRACKER_PLACEHOLDER_ASSET_REGISTERED_SLOT, L2_COMPLEX_UPGRADER_ADDR,
+    SYSTEM_CONTRACT_PROXY_ADMIN, SYSTEM_PROXY_ADMIN_OWNER_SLOT,
 };
 use crate::types::{InitialGenesisInput, LeafInfo, MAX_B256_VALUE, MERKLE_TREE_DEPTH};
 use crate::utils::{
@@ -312,6 +314,9 @@ pub fn build_genesis_root_hash(genesis_input: &InitialGenesisInput) -> anyhow::R
 /// For each proxy:
 /// - `EIP1967_IMPLEMENTATION_SLOT` → impl address
 /// - `EIP1967_ADMIN_SLOT`          → `SYSTEM_CONTRACT_PROXY_ADMIN`
+///
+/// Also seeds two placeholder slots on the L2AssetTracker; see
+/// [`L2_ASSET_TRACKER_BASE_TOKEN_ASSET_ID_SLOT`] for why this is temporary.
 fn construct_additional_storage(
     proxy_impls: &[(Address, Address)],
 ) -> BTreeMap<Address, BTreeMap<B256, B256>> {
@@ -335,6 +340,27 @@ fn construct_additional_storage(
             address_to_b256(&SYSTEM_CONTRACT_PROXY_ADMIN),
         );
         map.insert(*proxy_addr, proxy_storage);
+    }
+
+    // TEMPORARY (EVM-XXXX): keep the every-block bootloader prewarm from reverting on a fresh chain,
+    // whose tracker has code but no initialized storage until the genesis upgrade tx runs in block 1.
+    // Inserted after the proxy loop so it joins the tracker's existing EIP-1967 entries rather than
+    // replacing them. See L2_ASSET_TRACKER_BASE_TOKEN_ASSET_ID_SLOT for the full rationale.
+    let tracker_storage = map.entry(L2_ASSET_TRACKER_ADDR).or_default();
+    for (slot, value) in [
+        (
+            L2_ASSET_TRACKER_BASE_TOKEN_ASSET_ID_SLOT,
+            GENESIS_PLACEHOLDER_BASE_TOKEN_ASSET_ID,
+        ),
+        (
+            L2_ASSET_TRACKER_PLACEHOLDER_ASSET_REGISTERED_SLOT,
+            GENESIS_PLACEHOLDER_ASSET_REGISTERED,
+        ),
+    ] {
+        assert!(
+            tracker_storage.insert(slot, value).is_none(),
+            "L2AssetTracker slot {slot:?} already seeded at genesis"
+        );
     }
 
     map
