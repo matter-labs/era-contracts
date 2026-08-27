@@ -37,6 +37,15 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      # Fixture tests for the pruning that decides which restored artifacts are trusted. Every bug
+      # found in it needed a deleted or modified source to show up, so an ordinary run never
+      # exercises it — hence pinning it here, next to the job that relies on it.
+      - name: Unit-test the cache pruning
+        run: node .github/actions/warm-solc-cache/prune-stale-artifacts.test.js
+
+      - name: Warm solc build cache
+        uses: ./.github/actions/warm-solc-cache
+
       - name: Build da contracts
         working-directory: da-contracts
         run: |
@@ -58,6 +67,11 @@ jobs:
           yarn install
           yarn build:foundry
 
+      # Reads the cross-commit solc cache, never writes it. A PR's later runs can restore what its
+      # earlier runs saved, so a PR could plant a forged artifact plus a manifest vouching for it and
+      # have check-hashes attest to bytecode that never came from its sources. Constraining the writer
+      # is the only fix: verify-merged-commit.yaml builds clean and saves only after those checks pass.
+      # A PR pays only its own incremental recompile, since it still warms from the base's cache.
       - name: Create cache
         uses: actions/cache/save@v4
         with:

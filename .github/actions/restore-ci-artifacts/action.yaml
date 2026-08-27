@@ -1,0 +1,38 @@
+name: "Restore this commit's build artifacts"
+description: >
+  Restores the artifacts `build` produced for this exact commit, for the jobs that consume them
+  rather than compile their own.
+
+  It exists to hold the path list once. Cache entries are versioned by their paths, so a copy that
+  drifts by one line stops matching the saved entry — and with fail-on-cache-miss that is a hard
+  failure reading as infrastructure flake. This repo has already had that bug: a comment sitting
+  inside a `path:` block was parsed as a path, which is how `l1-contracts/zkout` went missing from
+  one job's list.
+
+  The paired save in `build` and the `build-artifacts` upload still carry their own copies, because
+  actions/cache's restore/save split has no mechanism for sharing inputs between them. Keep all
+  three in step.
+
+inputs:
+  key:
+    description: "Cache key to restore. Defaults to this commit's l1-contracts-ci build cache; pre-merge-checks passes its own build's key."
+    required: false
+    default: artifacts-l1-ci-${{ github.sha }}
+
+runs:
+  using: composite
+  steps:
+    - name: Restore artifacts cache
+      uses: actions/cache/restore@v4
+      with:
+        fail-on-cache-miss: true
+        key: ${{ inputs.key }}
+        path: |
+          da-contracts/cache-forge
+          da-contracts/out
+          l1-contracts/cache-forge
+          l1-contracts/out
+          l1-contracts/zkout
+          l2-contracts/cache-forge
+          l2-contracts/zkout
+          system-contracts/zkout

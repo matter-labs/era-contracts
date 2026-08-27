@@ -1,6 +1,4 @@
-# Regenerates and commits AllContractsHashes.json, l1-contracts/selectors, and
-# l1-contracts/zkstack-out (chain states: see regenerate-chain-states.yaml).
-name: Update Generated Files in PR
+name: Update Hashes in PR
 
 on:
   workflow_dispatch:
@@ -77,16 +75,22 @@ jobs:
 
           yarn
 
-          # Removed first so deleted-source files don't linger; the l1 build regenerates it.
-          rm -rf l1-contracts/zkstack-out
-
           yarn --cwd da-contracts build:foundry
           yarn --cwd l1-contracts build:foundry
           yarn --cwd l2-contracts build:foundry
           yarn --cwd system-contracts build:foundry
 
           yarn calculate-hashes:fix
-          yarn --cwd l1-contracts selectors --fix
+
+          # `l1-contracts build:foundry` above already refreshed zkstack-out; selectors are
+          # derived from the same build. Regenerating all three here means one dispatch clears
+          # check-hashes, check-zkstack-out and check-selectors together, instead of leaving two
+          # of them for someone to reproduce by hand.
+          yarn l1 selectors --fix
+
+          # zkstack-out JSON needs prettier's trailing newlines, or check-zkstack-out sees a diff.
+          # Scoped to the generated files so this cannot sweep unrelated formatting into the commit.
+          npx prettier --write "l1-contracts/zkstack-out/**/*.json" "AllContractsHashes.json"
 
       - name: Commit and push changes
         run: |
@@ -94,9 +98,12 @@ jobs:
           git config user.name "zksync[bot]"
           git config user.email "zksync[bot]@users.noreply.github.com"
 
-          git add AllContractsHashes.json l1-contracts/selectors l1-contracts/zkstack-out
+          git add AllContractsHashes.json l1-contracts/zkstack-out l1-contracts/selectors
           # Check if there are any changes to commit
-          git diff --cached --quiet && { echo "No generated-file changes to commit"; exit 0; }
-          # Push changes otherwise
-          git commit -m "chore: Updated generated files from CI (hashes, selectors, zkstack-out)"
+          git diff --cached --quiet && { echo "No generated-artifact changes to commit"; exit 0; }
+
+          # Report what moved, so the dispatch log says which checks this should clear.
+          git --no-pager diff --cached --stat
+
+          git commit -m "chore: Updated generated artifacts from CI (hashes, zkstack-out, selectors)"
           git push origin HEAD
