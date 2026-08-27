@@ -43,16 +43,17 @@ args to `protocol_ops` unless the first post-flag word is `forge`/`cast`).
 ## CI tiers: per-commit vs pre-merge
 
 - **Per-commit** (`l1-contracts-ci`, `anvil-interop-ci`, `lint`, `slither`, ...):
-  builds, tests, and static checks that depend only on the PR's source. The
-  anvil-interop suite runs a fresh from-source deployment
-  (`ANVIL_INTEROP_FRESH_DEPLOY=1`), so it never depends on committed snapshots.
+  builds, tests, and static checks. The anvil-interop suite runs from the
+  committed chain-state snapshots; if a change alters genesis state it may run
+  against stale bytecode (or fail) until the snapshots are regenerated — the
+  pre-merge determinism gate catches that before merge.
 - **Pre-merge** (`pre-merge-checks`): checks of committed _generated_ artifacts —
   `AllContractsHashes.json`, `l1-contracts/selectors`, `l1-contracts/zkstack-out`,
-  and the anvil-interop chain-state snapshots (determinism gate +
-  preloaded-state run). Any bytecode change invalidates these; the fix is a
-  regen + commit, so they skip on **draft** PRs and run once the PR is ready
-  for review (and on every later push while it stays non-draft; also
-  unconditionally on merge queue / manual dispatch).
+  and the anvil-interop chain-state snapshots (`state-generation-check`). Any
+  bytecode change invalidates these; the fix is a regen + commit, so they skip
+  on **draft** PRs and run once the PR is ready for review (and on every later
+  push while it stays non-draft; also unconditionally on merge queue / manual
+  dispatch).
 
 Merge flow: iterate on a draft PR until per-commit CI is green → dispatch
 **Update All Generated Artifacts** with the PR number (a single regen that

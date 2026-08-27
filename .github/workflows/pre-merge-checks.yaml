@@ -111,57 +111,6 @@ jobs:
             exit 1
           fi
 
-  # Fast interop run against the committed chain-state snapshots (the config
-  # developers run locally); requires current snapshots, see state-generation-check.
-  integration-test-preloaded:
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: v1.5.1
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn
-
-      - name: Build anvil-interop dev artifacts
-        run: yarn l1 build:anvil-interop-dev-artifacts
-
-      - name: Install anvil-interop dependencies
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn install
-
-      - name: Run interop tests (preloaded state)
-        working-directory: l1-contracts/test/anvil-interop
-        env:
-          # Each worker spawns 6 Anvil chains + a hardhat process; running all 10 spec groups at
-          # once oversubscribes the 4-core runner and causes load-dependent RPC flakes (worker
-          # failures mid-spec). Cap concurrency; locally the suite stays fully parallel.
-          ANVIL_INTEROP_MAX_PARALLEL_WORKERS: "4"
-        run: |
-          echo "Running interop tests with preloaded chain states..."
-          yarn ts-node run-hardhat-interop-test.ts
-
-      - name: Cleanup
-        if: always()
-        working-directory: l1-contracts/test/anvil-interop
-        run: |
-          bash cleanup.sh
-
   # Mandatory determinism gate for the current protocol version's chain state:
   # rebuilds the state from scratch and verifies it matches the committed
   # snapshots. If a contract change alters genesis state, this fails —

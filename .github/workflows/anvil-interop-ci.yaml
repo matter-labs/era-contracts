@@ -41,15 +41,14 @@ on:
       - "yarn.lock"
 
 jobs:
-  # Runs the interop suite against a fresh from-source deployment, so per-commit
-  # CI never depends on the committed chain-state snapshots being regenerated.
+  # Fast job: uses pre-generated chain states from the repo.
+  # We still compile DummyInteropRecipient so deploy bytecode is available in out/.
+  # If a contract change alters genesis state, regenerate the states via the
+  # 'Regenerate Anvil Interop Chain States' workflow; the pre-merge
+  # state-generation-check gates that the committed states are current.
   integration-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
-    env:
-      # Shared by the builds below and the harness-spawned deploy scripts (one
-      # compilation cache); same profile as chain-state generation.
-      FOUNDRY_PROFILE: anvil-interop
+    timeout-minutes: 20
 
     steps:
       - name: Checkout the repository
@@ -71,13 +70,6 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Build da-contracts artifacts
-        run: yarn da build:foundry
-
-      - name: Build l1-contracts artifacts
-        working-directory: l1-contracts
-        run: forge build
-
       - name: Build anvil-interop dev artifacts
         run: yarn l1 build:anvil-interop-dev-artifacts
 
@@ -89,13 +81,15 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn tsc --noEmit
 
-      - name: Run interop tests (fresh deployment)
+      - name: Run interop tests (preloaded state)
         working-directory: l1-contracts/test/anvil-interop
         env:
-          # Fresh deploy runs the specs serially, hence the longer job timeout.
-          ANVIL_INTEROP_FRESH_DEPLOY: "1"
+          # Each worker spawns 6 Anvil chains + a hardhat process; running all 10 spec groups at
+          # once oversubscribes the 4-core runner and causes load-dependent RPC flakes (worker
+          # failures mid-spec). Cap concurrency; locally the suite stays fully parallel.
+          ANVIL_INTEROP_MAX_PARALLEL_WORKERS: "4"
         run: |
-          echo "Running interop tests with a fresh deployment..."
+          echo "Running interop tests with preloaded chain states..."
           yarn ts-node run-hardhat-interop-test.ts
 
       - name: Cleanup
@@ -161,5 +155,5 @@ jobs:
         run: |
           bash cleanup.sh
 
-  # The state determinism gate (state-generation-check) and the preloaded-state
-  # interop run live in pre-merge-checks.yaml (skipped on draft PRs).
+  # The state determinism gate (state-generation-check) lives in
+  # pre-merge-checks.yaml (skipped on draft PRs).
