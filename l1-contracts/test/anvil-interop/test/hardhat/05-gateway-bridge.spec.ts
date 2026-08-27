@@ -5,7 +5,7 @@ import { depositETHToL2 } from "../../src/helpers/l1-deposit-helper";
 import { withdrawETHFromL2 } from "../../src/helpers/l2-withdrawal-helper";
 import { getL1BridgedOut, getL1BaseTokenAssetId } from "../../src/helpers/bridged-out-helper";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_RECIPIENT_ADDR } from "../../src/core/const";
-import { getL1RpcUrl, getL2RpcUrl, getChainIdByRole, getChainIdsByRole } from "../../src/core/utils";
+import { getL1RpcUrl, getL2RpcUrl, getChainIdByRole, getChainIdsByRole, createProvider } from "../../src/core/utils";
 
 describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
   this.timeout(0);
@@ -26,7 +26,7 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
 
   describe("ETH deposits L1 -> GW-settled chain through gateway", () => {
     it("deposits ETH from L1 to GW-settled chain", async () => {
-      const l1Provider = new ethers.providers.JsonRpcProvider(getL1RpcUrl(state));
+      const l1Provider = createProvider(getL1RpcUrl(state));
       const amount = ethers.utils.parseEther("0.5");
       const senderAddr = ANVIL_DEFAULT_ACCOUNT_ADDR;
 
@@ -71,7 +71,7 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
 
   describe("ETH withdrawals GW-settled chain -> L1 through gateway", () => {
     it("withdraws ETH from GW-settled chain to L1", async () => {
-      const l1Provider = new ethers.providers.JsonRpcProvider(getL1RpcUrl(state));
+      const l1Provider = createProvider(getL1RpcUrl(state));
       const amount = ethers.utils.parseEther("0.2");
       const recipientAddr = ANVIL_RECIPIENT_ADDR;
 
