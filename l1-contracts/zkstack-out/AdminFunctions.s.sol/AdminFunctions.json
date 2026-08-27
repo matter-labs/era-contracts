@@ -402,6 +402,24 @@
   },
   {
     "type": "function",
+    "name": "executeChainAdminMulticall",
+    "inputs": [
+      {
+        "name": "_callsToExecute",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_chainAdmin",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "executeOwnableCallsWithWraps",
     "inputs": [
       {

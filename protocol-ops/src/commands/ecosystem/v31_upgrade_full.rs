@@ -171,22 +171,29 @@ impl<'a> V31UpgradeFull<'a> {
         deployer: &Wallet,
         ctm_entries: &[CtmPrepareEntry],
     ) -> anyhow::Result<()> {
-        let wraps = encode_owner_wraps(&self.ownable_proxies);
         for entry in ctm_entries {
-            let encoded_calls_hex = read_server_notifier_upgrade_calls(&entry.toml)?;
-            let encoded_calls = hex::decode(encoded_calls_hex.trim_start_matches("0x"))
-                .with_context(|| {
-                    format!("invalid CTM admin calls hex in {}", entry.toml.display())
-                })?;
+            let admin_calls = read_ctm_admin_calls(&entry.toml)?;
+
+            // ServerNotifier ProxyAdmin upgrade (+ deferred acceptOwnership when the
+            // ServerNotifier's ownership was transferred to this ChainAdmin) executed
+            // as a single ChainAdmin.multicall — see `executeChainAdminMulticall`.
+            let sn_calls =
+                hex::decode(admin_calls.server_notifier_upgrade.trim_start_matches("0x"))
+                    .with_context(|| {
+                        format!(
+                            "invalid server_notifier_upgrade hex in {}",
+                            entry.toml.display()
+                        )
+                    })?;
             logger::step(format!(
                 "Running v31 CTM admin calls for {:#x}",
                 entry.proxy
             ));
             runner.run(
                 runner
-                    .script_call(AdminFunctionsAbi::executeOwnableCallsWithWrapsCall {
-                        _callsToExecute: Bytes::from(encoded_calls),
-                        _wraps: wraps.clone(),
+                    .script_call(AdminFunctionsAbi::executeChainAdminMulticallCall {
+                        _callsToExecute: Bytes::from(sn_calls),
+                        _chainAdmin: admin_calls.chain_admin,
                     })
                     .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
                     .with_wallet(deployer),
@@ -382,12 +389,15 @@ struct CtmAdminCallsToml {
 
 #[derive(Debug, Deserialize)]
 struct CtmAdminCalls {
+    /// ChainAdmin that owns the ServerNotifier's ProxyAdmin and executes the
+    /// `server_notifier_upgrade` multicall.
+    chain_admin: Address,
     server_notifier_upgrade: String,
 }
 
-fn read_server_notifier_upgrade_calls(path: &Path) -> anyhow::Result<String> {
+fn read_ctm_admin_calls(path: &Path) -> anyhow::Result<CtmAdminCalls> {
     let raw = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
     let parsed: CtmAdminCallsToml =
         toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
-    Ok(parsed.ctm_admin_calls.server_notifier_upgrade)
+    Ok(parsed.ctm_admin_calls)
 }

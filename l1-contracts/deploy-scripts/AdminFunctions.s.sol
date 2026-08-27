@@ -43,8 +43,16 @@ import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
+
+/// @dev CREATE2 salt for the ecosystem `TransitionaryOwner`. Fixed (not
+///      per-regen): the TransitionaryOwner is a fresh, single-purpose contract
+///      whose address should be stable for a given governance address, and its
+///      init code already varies with the governance ctor arg so there is no
+///      cross-env collision.
+bytes32 constant TRANSITIONARY_OWNER_SALT = keccak256("v31:transitionary-owner");
 
 /// @dev Protocol version threshold (packed `major << 32`) at which the Admin
 ///      facet's `upgradeChainFromVersion` gained the leading `address _chainAddress`
@@ -80,6 +88,12 @@ interface ILegacyGovernance {
     }
     function scheduleTransparent(LegacyOperation calldata op, uint256 delay) external;
     function executeInstant(LegacyOperation calldata op) external payable;
+    /// `execute` is `onlyOwnerOrSecurityCouncil` and only requires the op to be
+    /// ready (scheduled + delay elapsed). With `delay = 0` it is ready in the
+    /// same block, so the EOA owner can `scheduleTransparent(op, 0)` then
+    /// `execute(op)` without needing the security council (whose address is 0x0
+    /// on the mainnet Atlas Governance).
+    function execute(LegacyOperation calldata op) external payable;
     function securityCouncil() external view returns (address);
 }
 
@@ -301,6 +315,21 @@ contract AdminFunctions is Script, IAdminFunctions {
         address _governance,
         OwnerWrap[] memory _wraps
     ) public {
+        // Deploy (or reuse) the ecosystem TransitionaryOwner. Every target's
+        // ownership is routed through it: the current owner transfers the target
+        // to the TransitionaryOwner, which then accepts it and forwards ownership
+        // to `_governance`. The TransitionaryOwner is trustless — it can only
+        // forward to its immutable GOVERNANCE_ADDRESS — so the deployer never
+        // persists as an owner. Governance finishes the handover via the deferred
+        // stage-0 acceptOwnership() calls collected below. End state per target:
+        // owner == TransitionaryOwner, pendingOwner == _governance.
+        address transitionaryOwner = Utils.deployViaCreate2(
+            abi.encodePacked(type(TransitionaryOwner).creationCode, abi.encode(_governance)),
+            TRANSITIONARY_OWNER_SALT,
+            Utils.DETERMINISTIC_CREATE2_ADDRESS
+        );
+        _saveTransitionaryOwner(transitionaryOwner);
+
         Call[] memory acceptCalls = new Call[](_targets.length);
         uint256 acceptCount = 0;
 
@@ -312,9 +341,44 @@ contract AdminFunctions is Script, IAdminFunctions {
 
             Ownable2Step ownable = Ownable2Step(target);
             address owner = ownable.owner();
-            if (owner != _governance && ownable.pendingOwner() != _governance) {
-                _issueAsOwner(owner, target, abi.encodeCall(Ownable2Step.transferOwnership, (_governance)), _wraps);
+            // Already fully governance-owned (e.g. a re-run after governance accepted).
+            if (owner == _governance) {
+                continue;
             }
+            if (owner == transitionaryOwner || owner.code.length == 0) {
+                // Deployer-temp-owned (the current owner is an EOA — the deployer),
+                // or already routed through the TransitionaryOwner on a re-run.
+                // Route ownership through the TransitionaryOwner so the deployer
+                // never persists as an owner: transfer to it (if not already
+                // pending), then have it accept + forward to governance.
+                if (owner != transitionaryOwner) {
+                    if (ownable.pendingOwner() != transitionaryOwner) {
+                        _issueAsOwner(
+                            owner,
+                            target,
+                            abi.encodeCall(Ownable2Step.transferOwnership, (transitionaryOwner)),
+                            _wraps
+                        );
+                    }
+                    // Callable by anyone; accepts ownership and forwards it to governance.
+                    vm.broadcast(Utils.getBroadcasterAddress());
+                    TransitionaryOwner(transitionaryOwner).claimOwnershipAndGiveToGovernance(target);
+                }
+            } else {
+                // The current owner is a contract (e.g. the legacy Governance):
+                // this is not a deployer-temp-owned contract, so keep the existing
+                // direct transfer to governance through its wrapper (the legacy-Gov
+                // ceremony). No TransitionaryOwner hop.
+                if (ownable.pendingOwner() != _governance) {
+                    _issueAsOwner(
+                        owner,
+                        target,
+                        abi.encodeCall(Ownable2Step.transferOwnership, (_governance)),
+                        _wraps
+                    );
+                }
+            }
+            // Defer the stage-0 governance acceptOwnership once pending == governance.
             if (ownable.pendingOwner() == _governance) {
                 acceptCalls[acceptCount++] = Call({
                     target: target,
@@ -325,6 +389,16 @@ contract AdminFunctions is Script, IAdminFunctions {
         }
 
         _savePreGovernanceAuxAcceptOwnershipCalls(acceptCalls, acceptCount);
+    }
+
+    /// Persist the deployed TransitionaryOwner address so `upgrade-prepare-all`
+    /// can fold it into the merged `ecosystem.toml` (consumed by PUVT + the
+    /// transaction simulator). Always written so the Rust side can read it
+    /// unconditionally.
+    function _saveTransitionaryOwner(address _transitionaryOwner) private {
+        string memory toml = vm.serializeAddress("transitionary_owner", "addr", _transitionaryOwner);
+        string memory path = string.concat(vm.projectRoot(), "/script-out/transitionary-owner.toml");
+        vm.writeToml(toml, path);
     }
 
     /// Helper: read the EIP-1967 admin slot of `_proxy`, and if its single-step
@@ -406,6 +480,28 @@ contract AdminFunctions is Script, IAdminFunctions {
             address currentOwner = IOwnableSingleStep(calls[i].target).owner();
             _issueAsOperationalOwner(currentOwner, calls[i].target, calls[i].data, _wraps);
         }
+    }
+
+    /// Execute a set of calls as a SINGLE `ChainAdmin.multicall`, broadcast by the
+    /// ChainAdmin's EOA owner. Unlike `executeOwnableCallsWithWraps` (which routes
+    /// each call by its target's `owner()`), every call here runs with
+    /// `msg.sender == _chainAdmin`. This is required for calls whose executor must
+    /// be the ChainAdmin as the *pending* owner (e.g. `acceptOwnership()` on a
+    /// ServerNotifier / verifier whose ownership was transferred to the ChainAdmin
+    /// but not yet accepted) — a plain owner-routed call would run as the stale
+    /// current owner and revert. It also mirrors exactly how the transaction
+    /// simulator encodes a `ctm_admin_calls` entry (one `ChainAdmin.multicall`),
+    /// keeping the prepare broadcast and the sim bundle byte-identical.
+    function executeChainAdminMulticall(bytes memory _callsToExecute, address _chainAdmin) public {
+        Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
+        if (calls.length == 0) {
+            return;
+        }
+        address chainAdminOwner = IOwnableSingleStep(_chainAdmin).owner();
+        _anvilFund(chainAdminOwner);
+        vm.startBroadcast(chainAdminOwner);
+        IChainAdminMulticall(_chainAdmin).multicall(calls, true);
+        vm.stopBroadcast();
     }
 
     function _issueAsOperationalOwner(
@@ -494,15 +590,19 @@ contract AdminFunctions is Script, IAdminFunctions {
             predecessor: bytes32(0),
             salt: keccak256(abi.encodePacked(Utils.currentLegacyGovSalt(), _legacyGovSaltCounter++))
         });
+        // Normal `scheduleTransparent(op, 0)` + `execute(op)` path, both from the
+        // EOA owner. `delay = 0` makes the op ready in the same block, and
+        // `execute` is `onlyOwnerOrSecurityCouncil`, so we don't route through
+        // `executeInstant` (which is `onlySecurityCouncil`, and the mainnet Atlas
+        // Governance's `securityCouncil()` is 0x0 — that produced a `from = 0x0`
+        // execute tx that only works under simulator impersonation).
         address eoaOwner = IOwnableSingleStep(_gov).owner();
-        address sc = ILegacyGovernance(_gov).securityCouncil();
         _anvilFund(eoaOwner);
         vm.startBroadcast(eoaOwner);
         ILegacyGovernance(_gov).scheduleTransparent(op, 0);
         vm.stopBroadcast();
-        _anvilFund(sc);
-        vm.startBroadcast(sc);
-        ILegacyGovernance(_gov).executeInstant(op);
+        vm.startBroadcast(eoaOwner);
+        ILegacyGovernance(_gov).execute(op);
         vm.stopBroadcast();
     }
 

@@ -27,12 +27,47 @@ use alloy::{
 };
 
 const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
+/// AllContractsHashes entry name for the ecosystem TransitionaryOwner.
+const TRANSITIONARY_OWNER_CONTRACT_FILE: &str = "l1-contracts/TransitionaryOwner";
+
+alloy::sol! {
+    #[sol(rpc)]
+    interface ITransitionaryOwner {
+        function GOVERNANCE_ADDRESS() external view returns (address);
+    }
+}
+
+/// The accepted post-aux ownership end-state for an Ownable2Step contract handed
+/// to governance during v31. Either governance already owns it (final, after the
+/// stage-0 acceptOwnership), or an intermediate holder owns it with governance
+/// pending: the ecosystem TransitionaryOwner for deployer-deployed contracts, or
+/// the per-CTM ecosystem admin (the pre-existing owner, e.g. the legacy
+/// Governance) for contracts that reach governance via their existing ceremony.
+/// Notably this rejects `owner == <deployer EOA>` — the property the
+/// TransitionaryOwner rollout is meant to guarantee.
+fn owner_reached_governance(
+    owner: Address,
+    pending: Address,
+    governance: Address,
+    transitionary_owner: Option<Address>,
+    ecosystem_admin: Address,
+) -> bool {
+    owner == governance
+        || (pending == governance
+            && (Some(owner) == transitionary_owner || owner == ecosystem_admin))
+}
 
 // `DiamondInit` writes the default fee params from `Config.sol` into
 // `ZKChainStorage.s.feeParams`; this slot matches the v31 storage layout.
 const FEE_PARAMS_STORAGE_SLOT: u64 = 38;
 const MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 10_800;
 const TESTNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 0;
+// ZKsync OS (Atlas) chains commit through the `MultisigCommitter` rather than
+// the classic ValidatorTimelock flow, and their ValidatorTimelock proxy carries
+// a zero execution delay on every environment (mainnet included) — unlike Era,
+// which uses the env-standard delay. The v31 upgrade reuses the existing VT
+// proxy, preserving this delay.
+const ZKSYNC_OS_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 0;
 
 /// Core proxies whose EIP-1967 admin slot must match the ecosystem
 /// `transparent_proxy_admin`.
@@ -166,6 +201,7 @@ pub(crate) async fn verify_v31_artifact_state(
     verify_v31_validator_timelocks(artifact, verifiers, result).await?;
     verify_v31_rollup_da_managers(artifact, verifiers, result).await?;
     verify_v31_zksync_os_verifier_ownership(artifact, verifiers, result).await?;
+    verify_v31_transitionary_owner(artifact, verifiers, result).await?;
     verify_v31_era_fee_params(verifiers, result).await;
     verify_v31_timer_admin_state(artifact, verifiers, result).await?;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
@@ -609,7 +645,12 @@ async fn verify_v31_validator_timelocks(
         )?;
         let expected_owner =
             required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
-        let expected_delay = if ctm.contracts_config.is_testnet {
+        // ZKsync OS CTMs keep a zero VT execution delay on every env; only the
+        // Era CTM uses the env-standard delay (0 on testnet/stage, 10800 on
+        // mainnet).
+        let expected_delay = if ctm.flavor == CtmFlavor::ZksyncOs {
+            ZKSYNC_OS_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS
+        } else if ctm.contracts_config.is_testnet {
             TESTNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS
         } else {
             MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS
@@ -638,13 +679,23 @@ async fn verify_v31_validator_timelocks(
             vt_ownable.pendingOwner().call().await,
         ) {
             (Ok(owner), _) if owner == expected_owner => result.report_ok(&format!(
-                "{label}.ValidatorTimelock.owner() matches expected ({expected_owner})"
+                "{label}.ValidatorTimelock.owner() matches governance ({expected_owner})"
             )),
-            (Ok(_), Ok(pending)) if pending == expected_owner => result.report_ok(&format!(
-                "{label}.ValidatorTimelock ownership transfer to {expected_owner} is pending (acceptOwnership deferred to stage 0)"
-            )),
+            (Ok(owner), Ok(pending))
+                if owner_reached_governance(
+                    owner,
+                    pending,
+                    expected_owner,
+                    artifact.transitionary_owner,
+                    required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?,
+                ) =>
+            {
+                result.report_ok(&format!(
+                    "{label}.ValidatorTimelock owned by TransitionaryOwner/ecosystem-admin ({owner}) with governance ({expected_owner}) pending (acceptOwnership deferred to stage 0)"
+                ))
+            }
             (Ok(owner), _) => result.report_error(&format!(
-                "{label}.ValidatorTimelock.owner() mismatch: expected {expected_owner} (or pendingOwner), got {owner}"
+                "{label}.ValidatorTimelock.owner() mismatch: expected governance {expected_owner} (or TransitionaryOwner with governance pending), got {owner}"
             )),
             (Err(err), _) => result.report_error(&format!(
                 "Failed to call {label}.ValidatorTimelock.owner(): {err}"
@@ -681,22 +732,33 @@ async fn verify_v31_rollup_da_managers(
             &scope,
             &["deployed_addresses", "l1_rollup_da_manager"],
         )?;
-        let expected_owner =
-            required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
+        let governance = required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
+        let ecosystem_admin =
+            required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?;
 
         let ownable = Ownable2Step::new(rollup_da_manager, provider.clone());
         match (
             ownable.owner().call().await,
             ownable.pendingOwner().call().await,
         ) {
-            (Ok(owner), _) if owner == expected_owner => result.report_ok(&format!(
-                "{label}.RollupDAManager.owner() matches expected ({expected_owner})"
+            (Ok(owner), _) if owner == governance => result.report_ok(&format!(
+                "{label}.RollupDAManager.owner() matches governance ({governance})"
             )),
-            (Ok(_), Ok(pending)) if pending == expected_owner => result.report_ok(&format!(
-                "{label}.RollupDAManager ownership transfer to {expected_owner} is pending"
-            )),
+            (Ok(owner), Ok(pending))
+                if owner_reached_governance(
+                    owner,
+                    pending,
+                    governance,
+                    artifact.transitionary_owner,
+                    ecosystem_admin,
+                ) =>
+            {
+                result.report_ok(&format!(
+                    "{label}.RollupDAManager owned by TransitionaryOwner/ecosystem-admin ({owner}) with governance ({governance}) pending"
+                ))
+            }
             (Ok(owner), _) => result.report_error(&format!(
-                "{label}.RollupDAManager.owner() mismatch: expected {expected_owner} (or pendingOwner), got {owner}"
+                "{label}.RollupDAManager.owner() mismatch: expected governance {governance} (or TransitionaryOwner with governance pending), got {owner}"
             )),
             (Err(err), _) => result.report_error(&format!(
                 "Failed to call {label}.RollupDAManager.owner(): {err}"
@@ -765,6 +827,12 @@ async fn verify_v31_zksync_os_verifier_ownership(
     result: &mut VerificationResult,
 ) -> Result<()> {
     let provider = verifiers.network_verifier.get_l1_provider();
+    // The ZKsync OS dual verifier's ownership is routed to governance (PUH) via
+    // the ecosystem TransitionaryOwner: the deployer transfers the freshly
+    // deployed verifier to it, it accepts + forwards to governance, and governance
+    // accepts in stage 0. Accepted end-states: owner == governance (final), or
+    // owner == TransitionaryOwner with pendingOwner == governance.
+    let transitionary_owner = artifact.transitionary_owner;
     for ctm in &artifact.ctms {
         if ctm.flavor != CtmFlavor::ZksyncOs {
             continue;
@@ -774,27 +842,91 @@ async fn verify_v31_zksync_os_verifier_ownership(
         let scope = format!("ctms.{label}");
         let verifier =
             required_address(&ctm.value, &scope, &["state_transition", "verifier_addr"])?;
-        let expected_owner =
-            required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
+        let governance = required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
+        let ecosystem_admin =
+            required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?;
 
         let ownable = Ownable2Step::new(verifier, provider.clone());
         match (
             ownable.owner().call().await,
             ownable.pendingOwner().call().await,
         ) {
-            (Ok(owner), _) if owner == expected_owner => result.report_ok(&format!(
-                "{label}.verifier.owner() matches expected ({expected_owner})"
+            (Ok(owner), _) if owner == governance => result.report_ok(&format!(
+                "{label}.verifier.owner() matches governance ({governance})"
             )),
-            (Ok(_), Ok(pending)) if pending == expected_owner => result.report_ok(&format!(
-                "{label}.verifier ownership transfer to {expected_owner} is pending"
-            )),
+            (Ok(owner), Ok(pending))
+                if owner_reached_governance(
+                    owner,
+                    pending,
+                    governance,
+                    transitionary_owner,
+                    ecosystem_admin,
+                ) =>
+            {
+                result.report_ok(&format!(
+                    "{label}.verifier owned by TransitionaryOwner/ecosystem-admin ({owner}) with governance ({governance}) pending"
+                ))
+            }
             (Ok(owner), _) => result.report_error(&format!(
-                "{label}.verifier.owner() mismatch: expected {expected_owner} (or pendingOwner), got {owner}"
+                "{label}.verifier.owner() mismatch: expected governance {governance} (or TransitionaryOwner with governance pending), got {owner}"
             )),
             (Err(err), _) => result.report_error(&format!(
                 "Failed to call {label}.verifier.owner(): {err}"
             )),
         }
+    }
+
+    Ok(())
+}
+
+/// Verify the ecosystem TransitionaryOwner (when the aux ownership step routed
+/// contracts through it): its deployed bytecode must match
+/// `l1-contracts/TransitionaryOwner`, and its immutable `GOVERNANCE_ADDRESS`
+/// must equal governance (PUH) — the property that makes it safe to hold
+/// ownership, since it can only ever forward to governance.
+async fn verify_v31_transitionary_owner(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    let Some(transitionary_owner) = artifact.transitionary_owner else {
+        return Ok(());
+    };
+    let governance = verifiers.bridgehub_owner;
+    let provider = verifiers.network_verifier.get_l1_provider();
+
+    // The TransitionaryOwner has an immutable GOVERNANCE_ADDRESS baked into its
+    // runtime bytecode, so a runtime-hash match against AllContractsHashes would
+    // fail. Instead rely on the CREATE2 deploy-tracking, which matched the
+    // deployment's *init* bytecode (+ constructor args) to the known contract at
+    // parse time (requires the TransitionaryOwner deploy tx in the transactions log).
+    match verifiers
+        .network_verifier
+        .create2_known_bytecodes
+        .get(&transitionary_owner)
+    {
+        Some(file) if file.as_str() == TRANSITIONARY_OWNER_CONTRACT_FILE => result.report_ok(&format!(
+            "TransitionaryOwner ({transitionary_owner}) is a recognized {TRANSITIONARY_OWNER_CONTRACT_FILE} CREATE2 deployment"
+        )),
+        Some(other) => result.report_error(&format!(
+            "TransitionaryOwner ({transitionary_owner}) deployment is {other}, expected {TRANSITIONARY_OWNER_CONTRACT_FILE}"
+        )),
+        None => result.report_error(&format!(
+            "TransitionaryOwner ({transitionary_owner}) is not a recognized CREATE2 deployment (missing from the transactions log?)"
+        )),
+    }
+
+    let to = ITransitionaryOwner::new(transitionary_owner, provider.clone());
+    match to.GOVERNANCE_ADDRESS().call().await {
+        Ok(actual) if actual == governance => result.report_ok(&format!(
+            "TransitionaryOwner.GOVERNANCE_ADDRESS() matches governance ({governance})"
+        )),
+        Ok(actual) => result.report_error(&format!(
+            "TransitionaryOwner.GOVERNANCE_ADDRESS() mismatch: expected {governance}, got {actual}"
+        )),
+        Err(err) => result.report_error(&format!(
+            "Failed to call TransitionaryOwner.GOVERNANCE_ADDRESS(): {err}"
+        )),
     }
 
     Ok(())

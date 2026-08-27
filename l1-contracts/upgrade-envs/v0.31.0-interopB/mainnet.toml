@@ -16,8 +16,12 @@ max_expected_l1_gas_price = 30000000000
 governance_min_delay = 0
 
 max_number_of_chains = 100
-create2_factory_salt = "0x55de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb5"
+create2_factory_salt = "0x68cedf1bb910716f323465ba80c970e7454a5caf83202c030036908c2c088840"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+# Per-regen salt for the legacy `Governance.sol` ceremony (Atlas CTM owner
+# wrap). Rotate on every regen so the op id doesn't collide with a previously
+# broadcast op of the same content. Mirrors testnet's `legacy_gov_salt`.
+legacy_gov_salt = "0xc3f54afd1010be452462a4140bfdb90d85eadd9cd72b6e3e283a99348eedd216"
 validator_timelock_execution_delay = 10800
 genesis_root = "0xedaadbbfe3202aabc4de8dfbf1728ea15a2f2d04fb994b9008f01dfaf5a9efa9"
 genesis_rollup_leaf_index = 102
@@ -33,7 +37,7 @@ diamond_init_max_l2_gas_per_batch = 80000000
 diamond_init_priority_tx_max_pubdata = 99000
 diamond_init_minimal_l2_gas_price = 250000000
 bootloader_hash = "0x0100099b799188da75411d9c2815a792e60e031bc5f89c2938b6deced048ad83"
-default_aa_hash = "0x0100099b799188da75411d9c2815a792e60e031bc5f89c2938b6deced048ad83"
+default_aa_hash = "0x010005f9d84c1863bf21a9393f2fd1631af92aab68f12c35dba580c8d7a06146"
 evm_emulator_hash = "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63"
 bridgehub_proxy_address = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"
 rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
@@ -47,7 +51,7 @@ protocol_upgrade_handler_implementation_address = "0x36625Bd3dDB469377C6e9893712
 [tokens]
 token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
 
-[gateway]
+[legacy_gateway]
 chain_id = 9075
 
 [gateway.gateway_state_transition]
@@ -64,9 +68,9 @@ rollup_sl_da_validator = "0x595b8C88B9e5f3a4c596C3e81BE6e11D53Bb9200"
 # regen — reusing a salt collides with already-deployed CREATE2 addresses.
 [create2_factory_salts]
 # Era CTM
-"0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C" = "0xd93600da02313bab9de70ef4ca32f1397e32764b5c1d4fcec317717fff515cc9"
+"0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C" = "0x622c0f6b0e6f8c4210e8470a0ecc959a8cdbb7af850a8936e2f29b58ae922039"
 # ZKsync OS (Atlas) CTM
-"0x1adf137f59949c9081157d5dE1e002D1c992071F" = "0x2bb3435f739fae8c8edc3d8b91f33261b972ef3301ab8edcc3cd48237ca6bbd9"
+"0x1adf137f59949c9081157d5dE1e002D1c992071F" = "0xc4f3db05d921fab5c2de986e1dcd95c8397e06710a868423175b227dba102988"
 
 [V29]
 encoded_old_validator_timelocks = "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000050000000000000000000000003db52ce065f728011ac6732222270b3f2360d919000000000000000000000000a0425d71cb1d6fb80e65a5361a04096e0672de03000000000000000000000000a8cb082a5a689e0d594d7da1e2d72a3d63adc1bd0000000000000000000000005d8ba173dc6c3c90c8f7c04c9288bef5fdbad06e0000000000000000000000008c0bfc04ada21fd496c55b8c50331f904306f564"

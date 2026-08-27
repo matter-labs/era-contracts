@@ -185,10 +185,23 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     /// @dev `DefaultCTMUpgrade.saveOutput` writes the discovered chain's DA validator
     ///      (`discoveredEraZkChain.l1DAValidator`) by default. For the Era CTM we deploy
     ///      a new validator, so overwrite that field with the freshly deployed address.
+    ///      For the ZKsync OS CTM we reuse the existing (v30) RollupDAManager + validator,
+    ///      so the fresh-DA verification must be skipped. The default `saveOutput` records
+    ///      the discovered *Era* chain's L1 DA validator here, which is non-zero whenever a
+    ///      real Era chain is registered (e.g. mainnet chain 324) and would wrongly trigger
+    ///      that verification. Write zero to signal "reuse" — matching the environments where
+    ///      the Era chain is unregistered (testnet's legacy era 270) and the discovered
+    ///      validator is already zero.
     function saveOutputVersionSpecific() internal virtual override {
         if (!config.isZKsyncOS && ctmAddresses.daAddresses.daContracts.rollupSLDAValidator != address(0)) {
             vm.writeToml(
                 vm.toString(ctmAddresses.daAddresses.daContracts.rollupSLDAValidator),
+                upgradeConfig.outputPath,
+                ".deployed_addresses.rollup_l1_da_validator_addr"
+            );
+        } else if (config.isZKsyncOS) {
+            vm.writeToml(
+                vm.toString(address(0)),
                 upgradeConfig.outputPath,
                 ".deployed_addresses.rollup_l1_da_validator_addr"
             );
