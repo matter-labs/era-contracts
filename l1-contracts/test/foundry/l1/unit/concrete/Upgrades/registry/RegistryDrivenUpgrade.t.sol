@@ -202,10 +202,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             });
     }
 
-    /// @dev The complete facet routing of one release: the fixture's full facet set, with the
-    ///      AdminFacet row pointing at `_adminFacet` when nonzero. The replaced row carries an
-    ///      EMPTY selector list (self-describing facet) — the same source the transition's add
-    ///      side resolves — so transition and release agree by construction.
+    /// @dev The complete facet set of one release: the fixture's facets, with the AdminFacet
+    ///      row pointing at `_adminFacet` when nonzero. Routing is not stored — every consumer
+    ///      reads it from the pinned facet's own self-description.
     function _releaseFacets(address _adminFacet) internal view returns (GenesisFacet[] memory genesisFacets) {
         genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
@@ -214,9 +213,6 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             genesisFacets[i] = GenesisFacet({
                 facet: facet,
                 isFreezable: facetCuts[i].isFreezable,
-                // Explicit, complete routing: the replaced facet's list is read from its own
-                // self-description AT BUILD TIME (the generator's job in production) and stored.
-                selectors: replaced ? ISelfDescribingFacet(_adminFacet).selectors() : facetCuts[i].selectors,
                 codehash: facet.codehash
             });
         }

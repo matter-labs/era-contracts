@@ -5,6 +5,8 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
+import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
+import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
@@ -82,10 +84,12 @@ contract StorageRegistriesTest is Test {
     bytes32 internal constant DEFAULT_ACCOUNT_HASH = bytes32(uint256(0xda0));
 
     function setUp() public {
-        facetOldAdmin = _pinned("facetOldAdmin");
-        facetNewAdmin = _pinned("facetNewAdmin");
-        facetShared = _pinned("facetShared");
-        facetFrozen = _pinned("facetFrozen");
+        // Facets must actually self-describe their routing (the registry objects read it from
+        // `ISelfDescribingFacet.selectors()`), so they are real mock deployments, not etches.
+        facetOldAdmin = address(new MockSelfDescribingFacet(_selectors2(bytes4(uint32(1)), bytes4(uint32(2)))));
+        facetNewAdmin = address(new MockSelfDescribingFacet(_selectors2(bytes4(uint32(2)), bytes4(uint32(3)))));
+        facetShared = address(new MockSelfDescribingFacet(_selectors2(bytes4(uint32(0x10)), bytes4(uint32(0x11)))));
+        facetFrozen = address(new MockSelfDescribingFacet(_selectors1(bytes4(uint32(0x20)))));
         genesisUpgrade = _pinned("genesisUpgrade");
         verifier = _pinned("verifier");
         upgradeEngine = _pinned("upgradeEngine");
@@ -123,28 +127,12 @@ contract StorageRegistriesTest is Test {
 
     function _releaseManifest(
         address _adminFacet,
-        bytes4[] memory _adminSelectors,
         bytes32 _bootloaderHash
     ) internal view returns (ReleaseManifest memory manifest) {
         GenesisFacet[] memory facets = new GenesisFacet[](3);
-        facets[0] = GenesisFacet({
-            facet: _adminFacet,
-            isFreezable: false,
-            selectors: _adminSelectors,
-            codehash: _adminFacet.codehash
-        });
-        facets[1] = GenesisFacet({
-            facet: facetShared,
-            isFreezable: false,
-            selectors: _selectors2(bytes4(uint32(0x10)), bytes4(uint32(0x11))),
-            codehash: facetShared.codehash
-        });
-        facets[2] = GenesisFacet({
-            facet: facetFrozen,
-            isFreezable: true,
-            selectors: _selectors1(bytes4(uint32(0x20))),
-            codehash: facetFrozen.codehash
-        });
+        facets[0] = GenesisFacet({facet: _adminFacet, isFreezable: false, codehash: _adminFacet.codehash});
+        facets[1] = GenesisFacet({facet: facetShared, isFreezable: false, codehash: facetShared.codehash});
+        facets[2] = GenesisFacet({facet: facetFrozen, isFreezable: true, codehash: facetFrozen.codehash});
         return
             ReleaseManifest({
                 diamondInit: diamondInit,
@@ -167,13 +155,13 @@ contract StorageRegistriesTest is Test {
     }
 
     function _fromReleaseManifest() internal view returns (ReleaseManifest memory) {
-        return _releaseManifest(facetOldAdmin, _selectors2(bytes4(uint32(1)), bytes4(uint32(2))), BOOTLOADER_FROM);
+        return _releaseManifest(facetOldAdmin, BOOTLOADER_FROM);
     }
 
     function _newReleaseManifest() internal view returns (ReleaseManifest memory) {
         // The hop replaces the admin facet (new address AND new selector set) and bumps the
         // bootloader hash; the shared + frozen facets carry over unchanged.
-        return _releaseManifest(facetNewAdmin, _selectors2(bytes4(uint32(2)), bytes4(uint32(3))), BOOTLOADER_NEW);
+        return _releaseManifest(facetNewAdmin, BOOTLOADER_NEW);
     }
 
     function _l2Plan() internal pure returns (L2UpgradePlan memory plan) {
@@ -443,11 +431,7 @@ contract StorageRegistriesTest is Test {
     ///      value, so the derivation rejects it instead of storing a silent no-op.
     function test_revertWhen_transitionBlanksBaseSystemHash() public {
         // A target release identical to the source except that the bootloader hash goes to zero.
-        ReleaseManifest memory blankingManifest = _releaseManifest(
-            facetNewAdmin,
-            _selectors2(bytes4(uint32(2)), bytes4(uint32(3))),
-            bytes32(0)
-        );
+        ReleaseManifest memory blankingManifest = _releaseManifest(facetNewAdmin, bytes32(0));
         CTMRelease blankingRelease = new CTMRelease(blankingManifest);
 
         TransitionManifest memory manifest = _transitionManifest();
@@ -520,10 +504,14 @@ contract StorageRegistriesTest is Test {
     // ─────────────────────────── routing hygiene ───────────────────────────
 
     function test_revertWhen_releaseRowHasEmptySelectors() public {
+        // Routing comes from the facet's own self-description, so "empty routing" means a facet
+        // that describes no selectors.
+        address emptyFacet = address(new MockSelfDescribingFacet(new bytes4[](0)));
         ReleaseManifest memory manifest = _newReleaseManifest();
-        manifest.genesisFacets[1].selectors = new bytes4[](0);
+        manifest.genesisFacets[1].facet = emptyFacet;
+        manifest.genesisFacets[1].codehash = emptyFacet.codehash;
 
-        vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, facetShared));
+        vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, emptyFacet));
         new CTMRelease(manifest);
     }
 
@@ -539,15 +527,16 @@ contract StorageRegistriesTest is Test {
 
     function test_revertWhen_releasePinsCodelessFacet() public {
         // A codehash pin must be over ACTUAL code: an address with no code is not a real
-        // implementation (its EXTCODEHASH is zero / the empty-code hash), so pinning it is refused.
-        // Construction accepts it — the manifest supplies both halves of the pair, so checking
-        // them against each other there would prove nothing — and `validate()` is where the pins
-        // are held against live code, on every execution path.
-        address codeless = makeAddr("codelessFacet");
+        // implementation (its EXTCODEHASH is zero / the empty-code hash), so pinning it is refused
+        // by `validate()`, which holds the pins against live code on every execution path. The
+        // facet self-describes normally at construction; its code is stripped afterwards to model
+        // a pinned target that no longer carries code at validation time.
+        address codeless = address(new MockSelfDescribingFacet(_selectors1(bytes4(uint32(0x99)))));
         ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets[0].facet = codeless;
         manifest.genesisFacets[0].codehash = codeless.codehash;
         CTMRelease codelessRelease = new CTMRelease(manifest);
+        vm.etch(codeless, "");
 
         vm.expectRevert(abi.encodeWithSelector(RegistryPinTargetHasNoCode.selector, codeless));
         codelessRelease.validate();
@@ -557,8 +546,11 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_releaseRoutesSelectorTwice() public {
         // A release validates its OWN routing: a selector routed twice is rejected at release
         // initialization — the release boundary, before any transition ever derives from it.
+        // The colliding facet self-describes a selector facetFrozen also carries (0x20).
+        address collidingFacet = address(new MockSelfDescribingFacet(_selectors1(bytes4(uint32(0x20)))));
         ReleaseManifest memory manifest = _newReleaseManifest();
-        manifest.genesisFacets[1].selectors[0] = bytes4(uint32(0x20)); // collides with facetFrozen
+        manifest.genesisFacets[1].facet = collidingFacet;
+        manifest.genesisFacets[1].codehash = collidingFacet.codehash;
 
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateSelector.selector, bytes4(uint32(0x20))));
         new CTMRelease(manifest);

@@ -18,16 +18,17 @@ import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.
 ///      artifact of the whole model — see {protocol-docs} and {docs/registry-driven-upgrades.md}.
 
 /// @notice One facet installed on every chain created from a CTM release.
-/// @dev `selectors` is the EXPLICIT, complete routing for this facet — never empty. Releases are
-///      the canonical routing source (transitions derive their cuts from release pairs), so the
-///      routing must be reviewable data in the manifest, not an execution-time code read.
-/// @dev `codehash` is the MANDATORY `EXTCODEHASH` pin of `facet` — verified at initialization
-///      and by `validate()` / `verifyAll()`. Pins sit beside the address they protect; there is
+/// @dev The facet's selector routing is NOT stored: every facet is self-describing
+///      (`ISelfDescribingFacet.selectors()`), and the `codehash` pin freezes that
+///      self-description together with the code — a stored copy would only be a second,
+///      unverified source that could disagree with it. Consumers (genesis installation,
+///      transition delta derivation) read the routing from the pinned facet.
+/// @dev `codehash` is the MANDATORY `EXTCODEHASH` pin of `facet` — verified by
+///      `validate()` / `verifyAll()`. Pins sit beside the address they protect; there is
 ///      no detached, optional pin list.
 struct GenesisFacet {
     address facet;
     bool isFreezable;
-    bytes4[] selectors;
     bytes32 codehash;
 }
 

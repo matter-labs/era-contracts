@@ -927,13 +927,11 @@ async function buildRegistryManifest(
   ];
   const genesisFacets = [];
   for (const { name, address } of installedFacets) {
-    const selfDescribing = new ethers.Contract(address, getAbi("ISelfDescribingFacet"), l1Provider);
     genesisFacets.push({
       name,
       address,
       codehash: await codehash(address),
       isFreezable: freezability[name],
-      selectors: await selfDescribing.selectors(),
     });
   }
 

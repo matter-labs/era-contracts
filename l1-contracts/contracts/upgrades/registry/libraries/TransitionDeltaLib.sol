@@ -6,6 +6,7 @@ import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {RegistryDuplicateSelector, RegistryHashChangeToZero} from "../../../common/L1ContractErrors.sol";
 import {GenesisFacet} from "../RegistryTypes.sol";
+import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -27,6 +28,14 @@ library TransitionDeltaLib {
         bool isFreezable;
     }
 
+    /// @dev One facet row with its routing read from the facet's own self-description
+    ///      (see {GenesisFacet} — routing is not stored in the manifest).
+    struct FacetRouting {
+        address facet;
+        bool isFreezable;
+        bytes4[] selectors;
+    }
+
     /// @notice Derives the diamond cuts whose execution transforms `_fromRelease`'s routing into
     ///         `_newRelease`'s routing exactly.
     /// @dev Emitted as one `Remove` cut per departing facet (facet address zero, per
@@ -39,8 +48,8 @@ library TransitionDeltaLib {
         ICTMRelease _fromRelease,
         ICTMRelease _newRelease
     ) internal view returns (Diamond.FacetCut[] memory facetCuts) {
-        GenesisFacet[] memory fromFacets = _fromRelease.genesisFacets();
-        GenesisFacet[] memory newFacets = _newRelease.genesisFacets();
+        FacetRouting[] memory fromFacets = _loadRouting(_fromRelease);
+        FacetRouting[] memory newFacets = _loadRouting(_newRelease);
         Route[] memory fromRouting = _expand(fromFacets);
         Route[] memory newRouting = _expand(newFacets);
 
@@ -124,7 +133,7 @@ library TransitionDeltaLib {
     /// @dev The selectors of `_facet` that do NOT appear in `_otherRouting` with the same facet
     ///      address and freezability — i.e. the ones this side of the delta must act on.
     function _filterRoutes(
-        GenesisFacet memory _facet,
+        FacetRouting memory _facet,
         Route[] memory _otherRouting
     ) private pure returns (bytes4[] memory result) {
         bytes4[] memory selectors = _facet.selectors;
@@ -162,10 +171,24 @@ library TransitionDeltaLib {
         return false;
     }
 
+    /// @dev A release's facet rows with each facet's live self-described routing.
+    function _loadRouting(ICTMRelease _release) private view returns (FacetRouting[] memory rows) {
+        GenesisFacet[] memory facets = _release.genesisFacets();
+        uint256 length = facets.length;
+        rows = new FacetRouting[](length);
+        for (uint256 i = 0; i < length; ++i) {
+            rows[i] = FacetRouting({
+                facet: facets[i].facet,
+                isFreezable: facets[i].isFreezable,
+                selectors: ISelfDescribingFacet(facets[i].facet).selectors()
+            });
+        }
+    }
+
     /// @dev Flattens facet rows into one route per selector, rejecting duplicate selectors —
     ///      a diamond routes each selector exactly once, so a duplicated selector in a release's
     ///      routing is a malformed manifest.
-    function _expand(GenesisFacet[] memory _facets) private pure returns (Route[] memory routes) {
+    function _expand(FacetRouting[] memory _facets) private pure returns (Route[] memory routes) {
         uint256 facetsLength = _facets.length;
         uint256 total = 0;
         for (uint256 i = 0; i < facetsLength; ++i) {

@@ -10,6 +10,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
+import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
@@ -281,6 +282,18 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         return chainContractAddress.createNewChain({_chainId: chainId, _admin: newChainAdmin});
     }
 
+    /// @notice Routing is read from each facet's own self-description; the fixture's test facets
+    ///         (e.g. UtilsFacet) do not implement it, so describe them with the cut's routing.
+    function _mockFacetSelfDescriptions(Diamond.FacetCut[] memory _facetCuts) internal {
+        for (uint256 i = 0; i < _facetCuts.length; ++i) {
+            vm.mockCall(
+                _facetCuts[i].facet,
+                abi.encodeWithSelector(ISelfDescribingFacet.selectors.selector),
+                abi.encode(_facetCuts[i].selectors)
+            );
+        }
+    }
+
     /// @notice Mocks the release's typed genesis facet rows from the requested cut.
     function _mockGenesisRegistryFacets(Diamond.FacetCut[] memory _facetCuts) internal {
         GenesisFacet[] memory facets = new GenesisFacet[](_facetCuts.length);
@@ -288,10 +301,10 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             facets[i] = GenesisFacet({
                 facet: _facetCuts[i].facet,
                 isFreezable: _facetCuts[i].isFreezable,
-                selectors: _facetCuts[i].selectors,
                 codehash: _facetCuts[i].facet.codehash
             });
         }
+        _mockFacetSelfDescriptions(_facetCuts);
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
             abi.encodeWithSelector(ICTMRelease.genesisFacets.selector),

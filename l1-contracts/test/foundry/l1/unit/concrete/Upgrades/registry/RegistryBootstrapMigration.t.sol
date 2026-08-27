@@ -102,6 +102,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         );
 
         newVersion = SemVer.packSemVer(0, 1, 0);
+        // The release constructor reads each facet's self-description (see the shared fixture).
+        _mockFacetSelfDescriptions(facetCuts);
         genesisRelease = _deployGenesisRelease();
         migration = new RegistryBootstrapMigration(_manifest());
     }
@@ -114,7 +116,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             genesisFacets[i] = GenesisFacet({
                 facet: facetCuts[i].facet,
                 isFreezable: facetCuts[i].isFreezable,
-                selectors: facetCuts[i].selectors,
                 codehash: facetCuts[i].facet.codehash
             });
         }

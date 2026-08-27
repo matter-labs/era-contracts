@@ -7,9 +7,10 @@
  * manifest JSON (scripts/registry-manifests/*.json — the reviewable per-upgrade artifact) into
  * the `initialize()` argument objects ethers encodes against the contract ABIs:
  *
- *   - `CTMRelease.ReleaseManifest` — what a chain at the target release IS: EXPLICIT complete
- *     selector routing and INLINE MANDATORY codehash pins beside every address. Version- and
- *     VM-flag-independent (VM identity lives in the pinned DiamondInit immutable).
+ *   - `CTMRelease.ReleaseManifest` — what a chain at the target release IS: facet rows with
+ *     INLINE MANDATORY codehash pins beside every address (routing is read from each pinned
+ *     facet's own self-description). Version- and VM-flag-independent (VM identity lives in
+ *     the pinned DiamondInit immutable).
  *   - `CTMTransition.TransitionManifest` — how the current release becomes the target release.
  *     Carries NO facet swaps and NO hash changes: the delta is DERIVED on-chain from the
  *     `(fromRelease, newRelease)` pair at initialization. What is authored: version edge,
@@ -85,11 +86,11 @@ export function coreInitArgs(manifest: any): any {
 export function releaseInitArgs(ctm: any): any {
   const release = ctm.release;
 
-  // Explicit complete routing + inline mandatory pin per facet row.
+  // Inline mandatory pin per facet row; routing is read from each pinned facet's own
+  // self-description, never stored.
   const genesisFacets = release.genesisFacets.map((f: any) => ({
     facet: f.address,
     isFreezable: f.isFreezable,
-    selectors: f.selectors,
     codehash: f.codehash,
   }));
 

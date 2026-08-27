@@ -108,9 +108,11 @@ contract CTMRegistryBootstrapTest is Test {
         assertTrue(list[2].isFreezable, "mailbox freezable");
         assertTrue(list[5].isFreezable, "committer freezable");
 
-        // Explicit routing captured from each facet's self-description at build time.
-        assertEq(list[0].selectors.length, 1, "explicit selectors");
-        assertEq(list[0].selectors[0], bytes4(uint32(0x100)), "admin selector");
+        // Routing is not stored in the manifest: it is read from the pinned facet's own
+        // self-description on demand.
+        bytes4[] memory adminSelectors = ISelfDescribingFacet(list[0].facet).selectors();
+        assertEq(adminSelectors.length, 1, "self-described selectors");
+        assertEq(adminSelectors[0], bytes4(uint32(0x100)), "admin selector");
 
         (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash) = release
             .baseSystemContractHashes();

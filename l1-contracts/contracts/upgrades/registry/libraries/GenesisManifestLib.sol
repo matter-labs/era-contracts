@@ -22,19 +22,15 @@ library GenesisManifestLib {
     function buildGenesisManifest(GenesisConfig memory _cfg) internal view returns (ReleaseManifest memory manifest) {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](GENESIS_FACET_COUNT);
 
-        // The canonical facet set of a new chain diamond, with explicit routing and inline pins
-        // captured from the just-deployed facets (live calls: this variant runs where the facets
-        // exist — in the deployers).
+        // The canonical facet set of a new chain diamond, with inline pins captured from the
+        // just-deployed facets (live calls: this variant runs where the facets exist — in the
+        // deployers). Routing is not captured: consumers read it from the pinned facets' own
+        // self-description.
         (address[GENESIS_FACET_COUNT] memory addrs, bool[GENESIS_FACET_COUNT] memory freezable) = genesisFacetSlots(
             _cfg.facets
         );
         for (uint256 i = 0; i < GENESIS_FACET_COUNT; ++i) {
-            genesisFacets[i] = GenesisFacet({
-                facet: addrs[i],
-                isFreezable: freezable[i],
-                selectors: ISelfDescribingFacet(addrs[i]).selectors(),
-                codehash: addrs[i].codehash
-            });
+            genesisFacets[i] = GenesisFacet({facet: addrs[i], isFreezable: freezable[i], codehash: addrs[i].codehash});
         }
 
         return

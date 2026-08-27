@@ -108,7 +108,6 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
             genesisFacets[i] = GenesisFacet({
                 facet: facetCuts[i].facet,
                 isFreezable: facetCuts[i].isFreezable,
-                selectors: facetCuts[i].selectors,
                 codehash: facetCuts[i].facet.codehash
             });
         }

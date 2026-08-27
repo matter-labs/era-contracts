@@ -652,7 +652,6 @@ library GatewayCTMDeployerHelper {
             rows[i] = GenesisFacet({
                 facet: addrs[i],
                 isFreezable: freezable[i],
-                selectors: _direct.genesisFacetSelectors[i],
                 codehash: _direct.genesisFacetCodehashes[i]
             });
         }

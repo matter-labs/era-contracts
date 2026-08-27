@@ -5,10 +5,11 @@ pragma solidity 0.8.28;
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {GenesisFacet} from "../RegistryTypes.sol";
+import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
-/// @notice Turns a release's explicit facet routing into the genesis diamond cut.
-/// @dev No self-description fallback: releases carry complete, reviewable selector lists
-///      (enforced at release initialization), so genesis installs exactly the pinned routing.
+/// @notice Turns a release's facet routing into the genesis diamond cut.
+/// @dev Routing comes from each pinned facet's own self-description (see {GenesisFacet}), so
+///      genesis installs exactly the routing the pinned code carries.
 library ReleaseFacetReader {
     function newChainInstallations(ICTMRelease _release) internal view returns (Diamond.FacetCut[] memory facetCuts) {
         GenesisFacet[] memory facets = _release.genesisFacets();
@@ -19,7 +20,7 @@ library ReleaseFacetReader {
                 facet: facets[i].facet,
                 action: Diamond.Action.Add,
                 isFreezable: facets[i].isFreezable,
-                selectors: facets[i].selectors
+                selectors: ISelfDescribingFacet(facets[i].facet).selectors()
             });
         }
     }

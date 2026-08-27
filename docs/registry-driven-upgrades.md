@@ -29,12 +29,12 @@ the transition's own fields; the delta between them is computed, not written.
 All are storage-backed, built once from a manifest they take in the constructor, and commit
 `manifestHash = keccak256(abi.encode(manifest))`.
 
-| Contract                     | Holds                                                                                                                                                                                                 |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, explicit selectors, pin), three base-system hashes, `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin |
-| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine` + pin, deadline, `upgradeTimestamp`, `L2UpgradePlan`; **derived and stored:** final `Diamond.FacetCut[]` and base-system hash changes      |
-| `CoreRegistry`               | `EcosystemContractRow[]` — `(proxy, expectedOldImpl, implNew, implNewCodehash)`                                                                                                                       |
-| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                        |
+| Contract                     | Holds                                                                                                                                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, pin — routing is read from each pinned facet's own self-description), three base-system hashes, `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin |
+| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine` + pin, deadline, `upgradeTimestamp`, `L2UpgradePlan`; **derived and stored:** final `Diamond.FacetCut[]` and base-system hash changes                                                  |
+| `CoreRegistry`               | `EcosystemContractRow[]` — `(proxy, expectedOldImpl, implNew, implNewCodehash)`                                                                                                                                                                   |
+| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                    |
 
 Supporting libraries:
 

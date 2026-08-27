@@ -11,6 +11,7 @@ import {
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 import {GenesisFacet, ReleaseManifest} from "../RegistryTypes.sol";
+import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
 /// @notice Storage-backed, write-once description of one CTM release.
 /// @dev Every pinned address carries its expected `EXTCODEHASH` INLINE and MANDATORILY — the
@@ -45,8 +46,7 @@ contract CTMRelease is ICTMRelease {
         // The pins are deliberately NOT checked here: the manifest author supplies both halves of
         // every (address, codehash) pair, so a construction-time check proves only that the pair is
         // self-consistent. `validate()` re-checks all of them against live code on every execution
-        // path, which is where the property is actually needed — and keeping construction free of
-        // live-code reads makes an object's address a pure function of its manifest.
+        // path, which is where the property is actually needed.
         uint256 length = _manifest.genesisFacets.length;
         // A release IS a complete chain routing — an empty one would describe an unusable chain
         // and, worse, derive a remove-everything delta in any transition that departs from a
@@ -55,15 +55,17 @@ contract CTMRelease is ICTMRelease {
         if (length == 0) {
             revert RegistryEmptySelectors(address(0));
         }
+        // Routing is read from the facets' own self-description (see {GenesisFacet}); the reads
+        // here freeze the shape checks against the exact code the rows pin.
+        bytes4[][] memory routing = new bytes4[][](length);
         for (uint256 i = 0; i < length; ++i) {
-            // Releases are the canonical routing source: every facet row carries its explicit,
-            // complete selector list (transitions derive their cuts from these).
-            uint256 selectorsLength = _manifest.genesisFacets[i].selectors.length;
+            routing[i] = ISelfDescribingFacet(_manifest.genesisFacets[i].facet).selectors();
+            uint256 selectorsLength = routing[i].length;
             if (selectorsLength == 0) {
                 revert RegistryEmptySelectors(_manifest.genesisFacets[i].facet);
             }
-            // Exactly ONE row per facet address. A row carries that facet's complete selector
-            // list, so a second row is never needed — and `Diamond._addOneFunction` requires every
+            // Exactly ONE row per facet address. A facet describes its complete selector list,
+            // so a second row is never needed — and `Diamond._addOneFunction` requires every
             // selector of one facet address to share freezability, so two rows differing in
             // `isFreezable` would install at genesis only to revert
             // (`SelectorsMustAllHaveSameFreezability`). Reject the shape instead of pinning a
@@ -76,11 +78,11 @@ contract CTMRelease is ICTMRelease {
             // A diamond routes each selector exactly once — reject duplicates across the whole
             // routing (within AND across rows), not just when a transition later derives.
             for (uint256 j = 0; j < selectorsLength; ++j) {
-                bytes4 selector = _manifest.genesisFacets[i].selectors[j];
+                bytes4 selector = routing[i][j];
                 for (uint256 k = 0; k <= i; ++k) {
-                    uint256 upperBound = k == i ? j : _manifest.genesisFacets[k].selectors.length;
+                    uint256 upperBound = k == i ? j : routing[k].length;
                     for (uint256 m = 0; m < upperBound; ++m) {
-                        if (_manifest.genesisFacets[k].selectors[m] == selector) {
+                        if (routing[k][m] == selector) {
                             revert RegistryDuplicateSelector(selector);
                         }
                     }

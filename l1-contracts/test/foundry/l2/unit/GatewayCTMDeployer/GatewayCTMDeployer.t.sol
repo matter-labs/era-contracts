@@ -197,12 +197,7 @@ contract GatewayCTMDeployerTest is Test {
         );
 
         GenesisFacet[] memory facets = new GenesisFacet[](1);
-        facets[0] = GenesisFacet({
-            facet: address(getters),
-            isFreezable: false,
-            selectors: ISelfDescribingFacet(address(getters)).selectors(),
-            codehash: address(getters).codehash
-        });
+        facets[0] = GenesisFacet({facet: address(getters), isFreezable: false, codehash: address(getters).codehash});
 
         new CTMRelease(
             ReleaseManifest({
