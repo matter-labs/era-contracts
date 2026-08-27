@@ -79,13 +79,20 @@ impl PubdataContent {
     }
 }
 
+/// The mechanism a chain's batches commit their pubdata with — the on-chain `L2DACommitmentScheme`.
+///
+/// Callers normally never name a variant: [`Self::from_da_and_vm_types`] derives it from what the
+/// chain does with its pubdata plus the VM it runs. The CLI spellings below exist for the few places
+/// that still need to override the derived value (a gateway-settling chain).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, ValueEnum)]
 #[repr(u8)]
 pub enum L2DACommitmentScheme {
     None = 0,
+    #[value(name = "empty-no-da", alias = "empty-no-d-a")]
     EmptyNoDA = 1,
     PubdataKeccak256 = 2,
     BlobsAndPubdataKeccak256 = 3,
+    #[value(name = "blobs-zksync-os", alias = "blobs-z-k-sync-os")]
     BlobsZKSyncOS = 4,
 }
 

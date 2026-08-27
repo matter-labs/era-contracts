@@ -359,6 +359,21 @@ pub async fn resolve_rollup_da_manager(
 }
 
 /// Resolve `ctm.isZKsyncOS()` → bool.
+/// Resolve the VM a CTM's chains run, so callers do not have to be told which one they are on.
+pub async fn resolve_vm_type(
+    l1_rpc_url: &str,
+    ctm_proxy: Address,
+) -> anyhow::Result<crate::types::VMOption> {
+    let is_zksync_os = resolve_is_zksync_os(l1_rpc_url, ctm_proxy)
+        .await
+        .context("Failed to resolve isZKsyncOS from CTM")?;
+    Ok(if is_zksync_os {
+        crate::types::VMOption::ZKSyncOsVM
+    } else {
+        crate::types::VMOption::EraVM
+    })
+}
+
 pub async fn resolve_is_zksync_os(l1_rpc_url: &str, ctm_proxy: Address) -> anyhow::Result<bool> {
     let ctm = IChainTypeManagerAbi::new(ctm_proxy, provider(l1_rpc_url)?);
     ctm.isZKsyncOS()

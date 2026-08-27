@@ -140,17 +140,7 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
     logger::info(format!("CTM proxy (from L1): {:#x}", ctm_proxy));
 
     // Resolve VM type from CTM.
-    let vm_type = {
-        let is_zksync_os =
-            crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
-                .await
-                .context("Failed to resolve isZKsyncOS from CTM")?;
-        if is_zksync_os {
-            VMOption::ZKSyncOsVM
-        } else {
-            VMOption::EraVM
-        }
-    };
+    let vm_type = crate::common::l1_contracts::resolve_vm_type(&runner.rpc_url, ctm_proxy).await?;
     logger::info(format!("VM type (from L1): {:?}", vm_type));
 
     let chain_params = NewChainParams {
