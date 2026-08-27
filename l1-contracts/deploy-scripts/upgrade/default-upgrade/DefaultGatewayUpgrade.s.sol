@@ -183,7 +183,9 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
-    /// @notice Full default upgrade preparation flow
+    /// @notice Full default upgrade preparation flow.
+    /// @dev DISABLED IN v32 — see `deployGWContract`. Kept (rather than deleted) because the gateway
+    ///      machinery returns in a later release; the whole flow reverts on the first deployment attempt.
     function prepareEcosystemUpgrade() public virtual {
         console.log("Ecosystem contracts are deployed!");
         deployNewEcosystemContractsGW();
@@ -192,7 +194,20 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         console.log("Upgrade data generated!");
     }
 
+    /// @notice Deploys one contract onto the gateway through an L1->L2 CREATE2 transaction. The single
+    ///         funnel for everything this script puts on a gateway.
+    /// @dev DISABLED IN v32: nothing is deployed onto a gateway in this release. Chain migrations are off
+    ///      ecosystem-wide (`CHAIN_MIGRATIONS_ENABLED == false` in `Config.sol`), so no chain settles on a
+    ///      gateway and the gateway-side contracts of this release are untested. Reverting here — rather
+    ///      than at the individual call sites — keeps any future gateway step from silently slipping a
+    ///      deployment into an upgrade bundle.
     function deployGWContract(string memory contractName) internal returns (address contractAddress) {
+        revert(
+            string.concat(
+                "DefaultGatewayUpgrade: v32 deploys nothing onto a gateway; refusing to deploy ",
+                contractName
+            )
+        );
         bytes memory creationCalldata = getCreationCalldata(contractName, true);
         contractAddress = Utils.deployThroughL1Deterministic(
             getCreationCode(contractName, true),

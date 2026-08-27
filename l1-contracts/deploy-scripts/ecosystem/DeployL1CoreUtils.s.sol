@@ -118,15 +118,6 @@ contract DeployL1CoreUtils is DeployUtils {
                 );
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub, coreAddresses.bridges.proxies.l1AssetRouter);
-        } else if (compareStrings(contractName, "ChainAssetHandler")) {
-            return
-                abi.encode(
-                    config.l1ChainId,
-                    config.ownerAddress,
-                    coreAddresses.bridgehub.proxies.bridgehub,
-                    coreAddresses.bridges.proxies.l1AssetRouter,
-                    coreAddresses.bridgehub.proxies.messageRoot
-                );
         } else if (compareStrings(contractName, "L1Nullifier")) {
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub, coreAddresses.bridgehub.proxies.messageRoot);
         } else if (compareStrings(contractName, "L1InteropHandler")) {

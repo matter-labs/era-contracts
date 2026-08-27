@@ -24,7 +24,7 @@ use crate::common::{
     traits::{FileConfigTrait, ReadConfig, SaveConfig},
     wallets::Wallet,
 };
-use crate::types::{DAValidatorType, L2ChainId, L2DACommitmentScheme, VMOption};
+use crate::types::{DAValidatorType, L2ChainId, L2DACommitmentScheme, PubdataContent, VMOption};
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -90,6 +90,10 @@ pub struct ChainInitArgs {
     /// Override L2 DA commitment scheme (default: Rollup + ZKsync OS VM uses BlobsZKSyncOS, etc.)
     #[clap(long, value_enum, help_heading = "Advanced input")]
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
+    /// Override the pubdata content (ZKsync OS only; default: FullPubdata for a rollup or custom-DA
+    /// chain, LogsOnly for a validium). Must match the chain's server/prover chain config.
+    #[clap(long, value_enum, help_heading = "Advanced input")]
+    pub pubdata_content: Option<PubdataContent>,
     /// Keep deposits paused after init
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub pause_deposits: bool,
@@ -171,6 +175,7 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         chain_params,
         vm_type,
         l2_da_commitment_scheme: args.l2_da_commitment_scheme,
+        pubdata_content: args.pubdata_content,
         register_for_interop: args.register_for_interop,
         create2_factory_salt: None,
         pause_deposits: args.pause_deposits,
@@ -241,6 +246,22 @@ pub async fn chain_init(
         L2DACommitmentScheme::from_da_and_vm_types(input.chain_params.da_mode, input.vm_type)
     });
 
+    // The pubdata content is part of every batch's public input (via the ZKsync OS chain config hash),
+    // so it is set here, at creation, before the chain commits its first batch. `None` means the chain
+    // has no such setting (Era) and the call must not be made at all.
+    let pubdata_content = input.pubdata_content.or_else(|| {
+        PubdataContent::from_da_and_vm_types(input.chain_params.da_mode, input.vm_type)
+    });
+    anyhow::ensure!(
+        !(input.make_permanent_rollup && pubdata_content == Some(PubdataContent::LogsOnly)),
+        "a permanent rollup must publish the full pubdata, so it cannot be created with \
+         pubdata content LogsOnly (chain {})",
+        input.chain_params.chain_id.as_u64()
+    );
+    // A fresh chain starts at `FullPubdata`, so only a differing value needs a transaction.
+    let should_set_pubdata_content =
+        pubdata_content.is_some_and(|content| content != PubdataContent::FullPubdata);
+
     logger::step("Finalizing chain admin operations...");
     runner.run(
         runner
@@ -254,8 +275,10 @@ pub async fn chain_init(
                     l1DaValidator: input.l1_da_validator,
                     tokenMultiplierSetter: token_multiplier_setter,
                     l2DaCommitmentScheme: commitment_scheme as u8,
+                    pubdataContent: pubdata_content.unwrap_or_default().to_u8(),
                     shouldUnpauseDeposits: should_unpause_deposits,
                     shouldSetDaValidatorPair: should_set_da_validator_pair,
+                    shouldSetPubdataContent: should_set_pubdata_content,
                     shouldMakePermanentRollup: input.make_permanent_rollup,
                 },
             })
@@ -504,6 +527,9 @@ pub struct ChainInitInput {
     pub chain_params: NewChainParams,
     pub vm_type: VMOption,
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
+    /// Overrides the pubdata content derived from the DA mode; see
+    /// [`PubdataContent::from_da_and_vm_types`]. `None` keeps the derived value.
+    pub pubdata_content: Option<PubdataContent>,
     /// Run the interop registration step (see `register_on_all_chains_step`). Off by default: on a
     /// production ecosystem which chains may talk to each other is a deliberate decision, not a
     /// side effect of creating one.

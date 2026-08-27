@@ -59,6 +59,9 @@ impl RegisterChainL1Config {
                 governance_security_council_address: Default::default(),
                 governance_min_delay: 0,
                 bridgehub_create_new_chain_salt: 0,
+                // Pubdata *pricing*: whether users are charged for pubdata. A fee-policy choice,
+                // independent of the DA mechanism — a logs-only validium publishes (little) pubdata
+                // through blobs and may still price as a validium.
                 validium_mode: chain_params.da_mode != DAValidatorType::Rollup,
                 // TODO fix script to assign roles correctly
                 validator_sender_operator_eth: chain_params.prove_operator,
