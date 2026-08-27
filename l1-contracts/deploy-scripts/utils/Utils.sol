@@ -21,10 +21,7 @@ import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {
-    L2_CREATE2_FACTORY_ADDR,
-    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {EIP712Utils} from "./EIP712Utils.sol";
@@ -66,8 +63,6 @@ address constant L2_ASSET_ROUTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x03)
 address constant L2_NATIVE_TOKEN_VAULT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x04);
 address constant L2_MESSAGE_ROOT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x05);
 address constant L2_WRAPPED_BASE_TOKEN_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
-
-address constant L2_CREATE2_FACTORY_ADDRESS = address(USER_CONTRACTS_OFFSET);
 
 uint256 constant SECURITY_COUNCIL_SIZE = 12;
 
@@ -326,30 +321,6 @@ library Utils {
         return contractAddress;
     }
 
-    function getL2AddressViaCreate2Factory(
-        bytes32 create2Salt,
-        bytes32 bytecodeHash,
-        bytes memory constructorArgs
-    ) internal pure returns (address) {
-        return
-            L2ContractHelper.computeCreate2Address(
-                L2_CREATE2_FACTORY_ADDR,
-                create2Salt,
-                bytecodeHash,
-                keccak256(constructorArgs)
-            );
-    }
-
-    function getDeploymentCalldata(
-        bytes32 create2Salt,
-        bytes memory bytecode,
-        bytes memory constructorArgs
-    ) internal pure returns (bytes32 bytecodeHash, bytes memory data) {
-        bytecodeHash = L2ContractHelper.hashL2Bytecode(bytecode);
-
-        data = abi.encodeWithSignature("create2(bytes32,bytes32,bytes)", create2Salt, bytecodeHash, constructorArgs);
-    }
-
     /// @notice Prepares calldata for the deterministic CREATE2 factory (Arachnid's proxy).
     /// @dev The format is: salt (32 bytes) + initCode.
     /// @param salt The salt value.
@@ -372,9 +343,8 @@ library Utils {
     }
 
     /// @notice Deploys an L2 contract from L1 through the deterministic CREATE2 factory.
-    /// @dev The EVM-native counterpart to {deployThroughL1Deterministic}: the init code travels in the
-    /// calldata (`salt ++ initCode`) rather than as a factory dep, and the address uses standard EVM
-    /// CREATE2 derivation. Contracts deployed this way run their constructors normally — only the
+    /// @dev The init code travels in the calldata (`salt ++ initCode`) rather than as a factory dep,
+    /// and the address uses standard EVM CREATE2 derivation. Contracts deployed this way run their constructors normally — only the
     /// predeployed L2 built-ins are constructor-less and initialized via `initL2`.
     function deployThroughL1ViaDeterministicCreate2(
         bytes memory bytecode,
@@ -394,52 +364,6 @@ library Utils {
             l2Value: 0,
             factoryDeps: new bytes[](0),
             dstAddress: DETERMINISTIC_CREATE2_ADDRESS,
-            chainId: chainId,
-            bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy,
-            refundRecipient: msg.sender
-        });
-        return contractAddress;
-    }
-
-    function appendArray(bytes[] memory array, bytes memory element) internal pure returns (bytes[] memory) {
-        uint256 arrayLength = array.length;
-        bytes[] memory newArray = new bytes[](arrayLength + 1);
-        for (uint256 i = 0; i < arrayLength; ++i) {
-            newArray[i] = array[i];
-        }
-        newArray[arrayLength] = element;
-        return newArray;
-    }
-
-    /**
-     * @dev Deploy l2 contracts through l1, while using built-in L2 Create2Factory contract.
-     * TODO(gateway-os): EraVM-format bytecode only — the bytecode ships as a factory dep and is
-     * hashed with the EraVM scheme, so an EVM creation code deployed this way would not run. Use
-     * {deployThroughL1ViaDeterministicCreate2} for ZKsync OS targets.
-     */
-    function deployThroughL1Deterministic(
-        bytes memory bytecode,
-        bytes memory constructorargs,
-        bytes32 create2salt,
-        uint256 l2GasLimit,
-        bytes[] memory factoryDeps,
-        uint256 chainId,
-        address bridgehubAddress,
-        address l1SharedBridgeProxy
-    ) internal returns (address) {
-        (bytes32 bytecodeHash, bytes memory deployData) = getDeploymentCalldata(create2salt, bytecode, constructorargs);
-
-        address contractAddress = getL2AddressViaCreate2Factory(create2salt, bytecodeHash, constructorargs);
-
-        bytes[] memory _factoryDeps = appendArray(factoryDeps, bytecode);
-
-        runL1L2Transaction({
-            l2Calldata: deployData,
-            l2GasLimit: l2GasLimit,
-            l2Value: 0,
-            factoryDeps: _factoryDeps,
-            dstAddress: L2_CREATE2_FACTORY_ADDR,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
             l1SharedBridgeProxy: l1SharedBridgeProxy,

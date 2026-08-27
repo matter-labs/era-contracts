@@ -194,16 +194,15 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
 
     function deployGWContract(string memory contractName) internal returns (address contractAddress) {
         bytes memory creationCalldata = getCreationCalldata(contractName);
-        contractAddress = Utils.deployThroughL1Deterministic(
-            getCreationCode(contractName),
-            creationCalldata,
-            0,
-            newConfig.priorityTxsL2GasLimit,
-            new bytes[](0),
-            gatewayConfig.chainId,
-            coreAddresses.bridgehub.proxies.bridgehub,
-            coreAddresses.bridges.proxies.l1AssetRouter
-        );
+        contractAddress = Utils.deployThroughL1ViaDeterministicCreate2({
+            bytecode: getCreationCode(contractName),
+            constructorArgs: creationCalldata,
+            create2Salt: bytes32(0),
+            l2GasLimit: newConfig.priorityTxsL2GasLimit,
+            chainId: gatewayConfig.chainId,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter
+        });
         notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName);
     }
 
@@ -366,16 +365,20 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function deployUsedUpgradeContractGW() internal virtual returns (address) {
-        return deployGWContract("DefaultUpgrade");
+        (, string memory defaultUpgradeName) = DeployCTML1OrGateway.resolve(CTMContract.DefaultUpgrade);
+        return deployGWContract(defaultUpgradeName);
     }
 
     /// @notice Deploy everything that should be deployed for GW
     function deployNewEcosystemContractsGW() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
 
-        gatewayConfig.gatewayStateTransition.verifiers.verifierFflonk = deployGWContract("VerifierFflonk");
-        gatewayConfig.gatewayStateTransition.verifiers.verifierPlonk = deployGWContract("VerifierPlonk");
-        gatewayConfig.gatewayStateTransition.verifiers.verifier = deployGWContract("Verifier");
+        // Mirrors `DeployCTM.deployVerifiers`: ZKsync OS has no FFLONK verifier, and the surviving
+        // two are resolved rather than named, since their contracts carry a ZKsyncOS prefix.
+        (, string memory plonkName) = DeployCTML1OrGateway.resolve(CTMContract.VerifierPlonk);
+        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
+        gatewayConfig.gatewayStateTransition.verifiers.verifierPlonk = deployGWContract(plonkName);
+        gatewayConfig.gatewayStateTransition.verifiers.verifier = deployGWContract(verifierName);
 
         gatewayConfig.gatewayStateTransition.facets.executorFacet = deployGWContract("ExecutorFacet");
         gatewayConfig.gatewayStateTransition.facets.adminFacet = deployGWContract("AdminFacet");
@@ -606,22 +609,6 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
 
     function getAddresses() public view virtual override returns (CTMDeployedAddresses memory) {
         return ctmDeployedAddresses;
-    }
-
-    function getCreationCode(string memory contractName) internal view virtual override returns (bytes memory) {
-        if (
-            compareStrings(contractName, "DefaultUpgrade") ||
-            compareStrings(contractName, "BytecodesSupplier") ||
-            compareStrings(contractName, "TransitionaryOwner") ||
-            compareStrings(contractName, "L2LegacySharedBridge") ||
-            compareStrings(contractName, "ValidatorTimelock")
-        ) {
-            // TODO(gateway-os): these were deployed onto the legacy EraVM Gateway from zkout bytecodes,
-            // which were removed together with EraVM support. The ZKsync-OS-based Gateway upgrade flow
-            // must source EVM bytecodes instead.
-            revert("TODO(gateway-os): EraVM Gateway bytecodes are no longer available");
-        }
-        return super.getCreationCode(contractName);
     }
 
     function saveOutputVersionSpecific() internal virtual {}

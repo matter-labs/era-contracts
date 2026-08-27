@@ -155,6 +155,7 @@ library DeployCTML1OrGateway {
     // solhint-disable-next-line code-complexity
     function _resolveCTMContractName(CTMContract _c) private view returns (string memory) {
         if (_c == CTMContract.ChainTypeManager) return "ZKsyncOSChainTypeManager";
+        if (_c == CTMContract.DefaultUpgrade) return "DefaultUpgradeZKsyncOS";
         if (_c == CTMContract.VerifierPlonk) return "ZKsyncOSVerifierPlonk";
         if (_c == CTMContract.DualVerifier) return "ZKsyncOSVerifier";
         if (_c == CTMContract.TestnetVerifier) return "ZKsyncOSTestnetVerifier";
