@@ -23,8 +23,8 @@ blake2 = "0.10.6"
 # TODO: `dev-20260724-atomic-interop` is a dev pre-release of the atomic-interop zksync-os line
 # (needed because older releases don't build on the nightly-2026-02-10 toolchain); update to the
 # proper release tag once it is cut.
-zk_os_api = { package = "zksync_os_api", git = "https://github.com/matter-labs/zksync-os", tag = "v0.5.0" }
-zk_os_basic_system = { package = "basic_system", git = "https://github.com/matter-labs/zksync-os", tag = "v0.5.0" }
+zk_os_api = { package = "zksync_os_api", git = "https://github.com/matter-labs/zksync-os", tag = "v0.5.2-private" }
+zk_os_basic_system = { package = "basic_system", git = "https://github.com/matter-labs/zksync-os", tag = "v0.5.2-private" }
 
 anyhow = "1"
 hex = "0.4"
