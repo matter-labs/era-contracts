@@ -27,3 +27,10 @@ runs:
         ./${INSTALL_DIR}/forge --version
         ./${INSTALL_DIR}/cast --version
         echo "Installed zksync-foundry version: ${VERSION}"
+
+    # foundry-zksync resolves stable zksolc releases from the matter-labs/zksolc-bin
+    # mirror, which stopped publishing after v1.5.15, so it cannot install the pinned
+    # 1.5.17 on its own. See scripts/install-zksolc.sh.
+    - name: Install pinned zksolc versions
+      shell: bash
+      run: ./scripts/install-zksolc.sh
