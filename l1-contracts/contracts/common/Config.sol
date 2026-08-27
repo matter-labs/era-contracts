@@ -84,6 +84,9 @@ uint256 constant ZKSYNC_OS_MOCK_PROOF_LENGTH = 2;
 /// @dev Marker expected as the first word in a proof-skipping ZKsync OS testnet proof.
 uint256 constant ZKSYNC_OS_MOCK_PROOF_MAGIC = 13;
 
+/// @dev Number of words in the ZiSK BN254 PLONK proof and its padded testnet mock component.
+uint256 constant ZISK_SNARK_PROOF_LENGTH = 24;
+
 /// @dev Padding value for empty/unused leaves in an {IndexedMerkleTree}. Deliberately NOT a valid
 /// `hashLeaf(IMTLeaf)` output, so an unused padded index can't be presented as a `{0,0,0}` low leaf to forge
 /// a non-inclusion proof. The off-chain imt-engine must use the same value.

@@ -7,7 +7,9 @@ import {DeployCTMScript} from "deploy-scripts/ctm/DeployCTM.s.sol";
 import {DeployCTML1OrGateway} from "deploy-scripts/ctm/DeployCTML1OrGateway.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol";
+import {ZiskTestnetVerifier} from "contracts/state-transition/verifiers/ZiskTestnetVerifier.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 
 /// @dev Drives the verifier stage of `DeployCTM` on its own. The stage needs
 ///      only the verifier fields of the config, so this reaches them directly
@@ -36,6 +38,10 @@ contract MultiProofVerifierDeployer is DeployCTMScript {
 
     function ziskVerifier() public view returns (address) {
         return multiProofAddresses.ziskVerifier;
+    }
+
+    function ziskTestnetVerifier() public view returns (address) {
+        return multiProofAddresses.ziskTestnetVerifier;
     }
 
     function multiProofVerifier() public view returns (address) {
@@ -89,12 +95,21 @@ contract MultiProofVerifierDeploymentTest is Test {
         assertEq(
             address(MultiProofVerifier(multiProof).AIRBENDER_VERIFIER()),
             deployer.airbenderVerifier(),
-            "Airbender inner verifier is the ZKsync OS verifier"
+            "Airbender inner verifier"
+        );
+        assertTrue(
+            ZKsyncOSTestnetVerifier(deployer.airbenderVerifier()).IS_TESTNET_VERIFIER(),
+            "Airbender inner accepts canonical fake components"
         );
         assertEq(
             address(MultiProofVerifier(multiProof).ZISK_RANGE_VERIFIER()),
+            deployer.ziskTestnetVerifier(),
+            "ZiSK testnet range verifier"
+        );
+        assertEq(
+            address(ZiskTestnetVerifier(deployer.ziskTestnetVerifier()).INNER_VERIFIER()),
             deployer.ziskVerifier(),
-            "ZiSK range verifier"
+            "ZiSK testnet verifier wraps the real range verifier"
         );
     }
 
@@ -103,6 +118,11 @@ contract MultiProofVerifierDeploymentTest is Test {
         deployer.deployMultiProofLane(owner, ziskPlonk, false);
 
         assertEq(deployer.chainVerifier(), deployer.multiProofVerifier(), "chain verifier is MultiProofVerifier");
+        assertEq(
+            address(MultiProofVerifier(deployer.multiProofVerifier()).ZISK_RANGE_VERIFIER()),
+            deployer.ziskVerifier(),
+            "production lane uses the real ZiSK verifier"
+        );
     }
 
     /// @dev The ZKsync OS verifier holds the PLONK sub-verifier, which the
