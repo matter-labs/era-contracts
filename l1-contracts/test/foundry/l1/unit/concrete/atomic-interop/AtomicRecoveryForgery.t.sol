@@ -117,12 +117,7 @@ contract AtomicRecoveryForgeryTest is Test {
             _amount: amount,
             _erc20Metadata: bytes("")
         });
-        bytes memory callData = abi.encodeWithSelector(
-            AssetRouterBase.finalizeDeposit.selector,
-            block.chainid,
-            assetId,
-            mintData
-        );
+        bytes memory callData = abi.encodeCall(AssetRouterBase.finalizeDeposit, (block.chainid, assetId, mintData));
 
         InteropCall[] memory calls = new InteropCall[](1);
         calls[0] = InteropCall({

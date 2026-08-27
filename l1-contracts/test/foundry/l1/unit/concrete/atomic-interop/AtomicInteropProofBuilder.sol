@@ -175,13 +175,13 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
         address chainSender = address(uint160(uint256(keccak256(abi.encode("chainSender", _sourceChainId)))));
         vm.mockCall(
             msgRootBridgehub,
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, _sourceChainId),
+            abi.encodeCall(IBridgehubBase.getZKChain, (_sourceChainId)),
             abi.encode(chainSender)
         );
         vm.mockCall(chainSender, abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(true));
         vm.mockCall(
             chainSender,
-            abi.encodeWithSelector(IGetters.l2LogsRootHash.selector, uint256(0)),
+            abi.encodeCall(IGetters.l2LogsRootHash, (uint256(0))),
             abi.encode(ChainBatchRootTree.genesisChainBatchRoot())
         );
         vm.prank(msgRootBridgehub);
@@ -446,13 +446,15 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
     function _expectRootAuthentication(ImtProof memory _proof, uint256 _imtRootLeafIndex) internal {
         vm.expectCall(
             address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(
-                L2_MESSAGE_VERIFICATION.proveL2LeafInclusionShared.selector,
-                _proof.sourceChainId,
-                _proof.batchNumber,
-                _imtRootLeafIndex,
-                _proof.chainImtRoot,
-                _proof.settlementProof
+            abi.encodeCall(
+                L2_MESSAGE_VERIFICATION.proveL2LeafInclusionShared,
+                (
+                    _proof.sourceChainId,
+                    _proof.batchNumber,
+                    _imtRootLeafIndex,
+                    _proof.chainImtRoot,
+                    _proof.settlementProof
+                )
             )
         );
     }
