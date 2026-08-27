@@ -108,11 +108,9 @@ controlling the doubly-aliased address on L2.
 
 ### Finalization (destination side)
 
-`finalizeDeposit(sourceChainId, assetId, transferData)` is the new-format finalization entry point. It
-is not the only one: `L1AssetRouter.finalizeWithdrawal` is still live and forwards to
-`L1Nullifier.finalizeWithdrawal`, which serves the legacy withdrawal-message format (see
-[Legacy compatibility](#legacy-compatibility)). It looks up the asset
-handler and calls `bridgeMint`; if no handler is registered yet, it registers the NTV as the handler and
+`finalizeDeposit(sourceChainId, assetId, transferData)` is the finalization entry point: there is no
+legacy withdrawal-message path on this branch, every finalization arrives as an interop bundle call. It
+looks up the asset handler and calls `bridgeMint`; if no handler is registered yet, it registers the NTV as the handler and
 mints through it (`msg.value` is forwarded so ETH cannot get stuck in the router; whether non-zero value is
 supported is decided at the handler layer). `_sourceChainId` is the source chain of the _message_, not
 necessarily the origin chain of the token; since chains can be malicious and supply arbitrary transfer
@@ -134,13 +132,9 @@ Authorization:
   - Reverts of the inner call are bubbled up verbatim so callers can react to specific errors (e.g. the
     TBM flow retries withdrawals on `InsufficientChainBalance`).
 - On L2, `finalizeDeposit` is additionally callable by the aliased L1 asset router (L1 -> L2 deposits) and
-  rejects the chain's own base-token asset ID. On L1 it is `onlySelfOrNullifier`: the router itself, or
-  `L1Nullifier` finalizing a legacy-format withdrawal.
-- Replay protection depends on the path. A new-format bundle executes at most once via the interop
-  handler's `bundleStatus` mapping. The legacy `finalizeWithdrawal` path is guarded by
-  `L1Nullifier.isWithdrawalFinalized[chainId][batch][messageIndex]` — actively written and checked
-  (`WithdrawalAlreadyFinalized`), not deprecated — and it additionally consults the legacy bridge's own
-  `isWithdrawalFinalized` for pre-migration withdrawals.
+  rejects the chain's own base-token asset ID. On L1 it is `onlySelf`, i.e. reachable only through
+  `receiveMessage`'s self-call.
+- Replay protection is the interop handler's `bundleStatus` mapping: a bundle executes at most once.
 
 ## Native Token Vault
 
@@ -353,9 +347,8 @@ mintData)` on the asset handler registered for the asset (`assetHandlerAddress[a
 
 ## Legacy compatibility
 
-- The legacy **withdrawal** path is still supported: `L1AssetRouter.finalizeWithdrawal` ->
-  `L1Nullifier.finalizeWithdrawal` parses the old message format and nullifies via
-  `isWithdrawalFinalized`. Numerous
+- The legacy **withdrawal** path is removed on this branch: withdrawals are interop bundles only (see
+  [Finalization (destination side)](#finalization-destination-side)). Numerous
   `__DEPRECATED_*` storage slots remain across `L1AssetRouter`, `L2AssetRouter`, `L1Nullifier`,
   `L2NativeTokenVault`, `L1NativeTokenVault` and `L2AssetTracker` solely to preserve the upgradeable
   storage layouts of already-deployed proxies; they must not be reused. Three are still read:

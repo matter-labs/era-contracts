@@ -24,8 +24,6 @@ interface IBridgedStandardToken {
     /// @param _amount The amount to burn.
     function bridgeBurn(address _account, uint256 _amount) external;
 
-    function l1Address() external view returns (address);
-
     /// @notice The token on the origin chain that this bridged token represents.
     function originToken() external view returns (address);
 

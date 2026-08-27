@@ -28,7 +28,7 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
-import {CTMDeployedAddresses, StateTransitionDeployedAddresses, ERA_CHAIN_ID_UNUSED} from "../utils/Types.sol";
+import {CTMDeployedAddresses, StateTransitionDeployedAddresses} from "../utils/Types.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
 import {
@@ -111,7 +111,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: aliasedGovernor,
             salt: toml.readBytes32("$.contracts.create2_factory_salt"),
-            eraChainId: ERA_CHAIN_ID_UNUSED,
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
             // Only ZKsync-OS-based gateway CTMs are supported on this release.

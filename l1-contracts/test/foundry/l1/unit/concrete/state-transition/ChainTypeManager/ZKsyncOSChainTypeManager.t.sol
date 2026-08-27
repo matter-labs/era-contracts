@@ -121,12 +121,6 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         vm.prank(governor);
         chainAssetHandler.setAddresses();
 
-        vm.mockCall(
-            address(sharedBridge),
-            abi.encodeCall(L1AssetRouter.l2BridgeAddress, (chainId)),
-            abi.encode(makeAddr("l2BridgeAddress"))
-        );
-
         vm.startPrank(address(bridgehub));
         chainTypeManager = new ZKsyncOSChainTypeManager(
             address(bridgehub),
@@ -172,13 +166,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         facetCuts.push(
             Diamond.FacetCut({
                 facet: address(
-                    new MailboxFacet(
-                        zkChainId,
-                        block.chainid,
-                        address(0),
-                        IEIP7702Checker(makeAddr("eip7702Checker")),
-                        false
-                    )
+                    new MailboxFacet(block.chainid, address(0), IEIP7702Checker(makeAddr("eip7702Checker")), false)
                 ),
                 action: Diamond.Action.Add,
                 isFreezable: false,

@@ -12,7 +12,6 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
@@ -23,7 +22,6 @@ import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
@@ -128,10 +126,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         ) = deployTuppWithContract("L1InteropHandler");
         setL1NativeTokenVaultParams();
 
-        (
-            coreAddresses.bridges.implementations.erc20Bridge,
-            coreAddresses.bridges.proxies.erc20Bridge
-        ) = deployTuppWithContract("L1ERC20Bridge");
         updateSharedBridge();
         (
             coreAddresses.bridgehub.implementations.ctmDeploymentTracker,
@@ -166,11 +160,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
     }
 
     function updateSharedBridge() internal {
-        IL1AssetRouter sharedBridge = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
-        vm.broadcast(getDeployerAddress());
-        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(coreAddresses.bridges.proxies.erc20Bridge));
-        console.log("SharedBridge updated with ERC20Bridge address");
-
         vm.broadcast(getDeployerAddress());
         IL1NativeTokenVault(coreAddresses.bridges.proxies.l1NativeTokenVault).registerEthToken();
     }
@@ -266,12 +255,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridgehub.implementations.messageRoot
         );
 
-        vm.serializeAddress(
-            "bridges",
-            "erc20_bridge_implementation_addr",
-            coreAddresses.bridges.implementations.erc20Bridge
-        );
-        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", coreAddresses.bridges.proxies.erc20Bridge);
         vm.serializeAddress(
             "bridges",
             "l1_nullifier_implementation_addr",

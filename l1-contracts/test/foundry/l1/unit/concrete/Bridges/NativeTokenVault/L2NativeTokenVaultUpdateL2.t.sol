@@ -29,7 +29,6 @@ contract L2NativeTokenVaultUpdateL2Test is Test {
             _l1ChainId: L1_CHAIN_ID,
             _aliasedOwner: aliasedOwner,
             _l2TokenProxyBytecodeHash: bytes32(uint256(1)),
-            _legacySharedBridge: address(0),
             _wethToken: makeAddr("weth"),
             _baseTokenBridgingData: TokenBridgingData({
                 assetId: _assetId,

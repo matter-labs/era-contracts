@@ -118,7 +118,6 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         GatewayCTMDeployerConfig memory config = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: address(0x123),
             salt: keccak256("test-salt"),
-            eraChainId: 1001,
             l1ChainId: 1,
             testnetVerifier: true,
             isZKsyncOS: true, // ZKsyncOS mode enabled

@@ -27,7 +27,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
-import {OriginChainIdNotFound, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {OriginChainIdNotFound} from "contracts/common/L1ContractErrors.sol";
 import {AssetNotNativeToL1, OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {InsufficientChainBalance} from "contracts/common/L1ContractErrors.sol";
 import {ILegacyL1AssetTracker} from "contracts/bridge/asset-tracker/ILegacyL1AssetTracker.sol";
@@ -44,10 +44,6 @@ contract L1NativeTokenVaultTestHelper is L1NativeTokenVault {
 
     function getOriginChainIdPublic(bytes32 _assetId) external view returns (uint256) {
         return _getOriginChainId(_assetId);
-    }
-
-    function registerTokenIfBridgedLegacyPublic(address _token) external returns (bytes32) {
-        return _registerTokenIfBridgedLegacy(_token);
     }
 
     // Expose internal state setters for testing
@@ -117,14 +113,12 @@ contract L1NativeTokenVaultTest is Test {
         // Deploy L1Nullifier
         L1NullifierDev l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehubAddress),
-            _messageRoot: IMessageRootBase(messageRootAddress),
-            _eraChainId: eraChainId,
-            _eraDiamondProxy: eraDiamondProxy
+            _messageRoot: IMessageRootBase(messageRootAddress)
         });
         TransparentUpgradeableProxy l1NullifierProxy = new TransparentUpgradeableProxy(
             address(l1NullifierImpl),
             proxyAdmin,
-            abi.encodeWithSelector(L1Nullifier.initialize.selector, owner, 1, 1, 1, 0)
+            abi.encodeWithSelector(L1Nullifier.initialize.selector, owner)
         );
         l1Nullifier = L1Nullifier(payable(l1NullifierProxy));
 
@@ -242,23 +236,6 @@ contract L1NativeTokenVaultTest is Test {
 
         uint256 result = nativeTokenVault.getOriginChainIdPublic(token3AssetId);
         assertEq(result, 0);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                    _registerTokenIfBridgedLegacy Tests
-    //////////////////////////////////////////////////////////////*/
-
-    function test_registerTokenIfBridgedLegacy_ReturnsZero() public {
-        // On L1, there are no legacy tokens, so this should always return bytes32(0)
-        bytes32 result = nativeTokenVault.registerTokenIfBridgedLegacyPublic(address(testToken));
-        assertEq(result, bytes32(0));
-    }
-
-    function test_registerTokenIfBridgedLegacy_ReturnsZeroForAnyToken() public {
-        // Test with a random address
-        address randomToken = makeAddr("randomToken");
-        bytes32 result = nativeTokenVault.registerTokenIfBridgedLegacyPublic(randomToken);
-        assertEq(result, bytes32(0));
     }
 
     /*//////////////////////////////////////////////////////////////

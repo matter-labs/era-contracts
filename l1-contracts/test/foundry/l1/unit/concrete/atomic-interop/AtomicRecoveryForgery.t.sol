@@ -3,20 +3,16 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
+import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
+
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {LegState} from "contracts/atomic-interop/IAtomicInterop.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.sol";
 import {AssetHandlerDoesNotExist, RecoverToL1NotSupported, Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {
-    BundleAttributes,
-    INTEROP_BUNDLE_VERSION,
-    INTEROP_CALL_VERSION,
-    InteropBundle,
-    InteropCall
-} from "contracts/common/Messaging.sol";
+import {INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -144,12 +140,7 @@ contract AtomicRecoveryForgeryTest is Test {
             destinationBaseTokenAssetId: bytes32(uint256(1)),
             interopBundleSalt: keccak256(abi.encodePacked("salt", _from, _to)),
             calls: calls,
-            bundleAttributes: BundleAttributes({
-                executionAddress: bytes(""),
-                unbundlerAddress: bytes(""),
-                useFixedFee: false,
-                salt: bytes32(0)
-            })
+            bundleAttributes: AtomicFlowFixtures.noBundleAttributes()
         });
     }
 
@@ -164,9 +155,7 @@ contract AtomicRecoveryForgeryTest is Test {
         manager.forceRevertable(flowId, bundleHash);
     }
 
-    // ---------------------------------------------------------------------------------------------
     // Recovery side (AtomicFlowManager._recoverBundle skips `from != L2_ASSET_ROUTER_ADDR`)
-    // ---------------------------------------------------------------------------------------------
 
     /// A forged, never-burned `finalizeDeposit` (its `from` is the attacker, not the router's burn path) is
     /// skipped on recovery: the NTV is never asked to release funds. The claim itself still goes through —
@@ -298,9 +287,42 @@ contract AtomicRecoveryForgeryTest is Test {
             L1_CHAIN_ID,
             ERA_CHAIN_ID,
             IL1AssetRouter(makeAddr("l1 asset router")),
-            IL2SharedBridgeLegacy(address(0)),
             keccak256("base token asset id"),
             makeAddr("aliased owner")
         );
+    }
+
+    // L2AssetRouter.recoverAtomicCall entry-point surface (the recovery collaborator, called directly)
+
+    /// @notice `recoverAtomicCall` is gated to the atomic flow manager: any other caller is rejected
+    /// with `Unauthorized`, so nobody can drive a recovery (a re-mint) outside the timeout flow.
+    function test_recoverAtomicCall_RevertWhen_callerNotManager() external {
+        bytes memory callData = abi.encodeWithSelector(AssetRouterBase.finalizeDeposit.selector);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+        IAtomicRecoverable(L2_ASSET_ROUTER_ADDR).recoverAtomicCall(destinationChainId, callData);
+    }
+
+    /// @notice A manager-issued call whose data is too short to carry a selector recovers nothing:
+    /// `recoverAtomicCall` returns `false` and never touches the NTV. This is the "not a recoverable
+    /// call" branch — it must be a no-op, not a revert, so a mixed bundle's other calls can still
+    /// recover (see {AtomicFlowManager._recoverBundle}).
+    function test_recoverAtomicCall_managerShortData_returnsFalseAndDoesNotRecover() external {
+        vm.prank(address(manager));
+        bool recovered = IAtomicRecoverable(L2_ASSET_ROUTER_ADDR).recoverAtomicCall(destinationChainId, hex"00");
+        assertFalse(recovered, "sub-selector data must not recover");
+        assertEq(ntv.recoveries(), 0, "the NTV must be untouched");
+    }
+
+    /// @notice ...and a manager-issued call whose selector is not `finalizeDeposit` is likewise a
+    /// no-op `false` — only asset-router deposit calls are reversible.
+    function test_recoverAtomicCall_managerWrongSelector_returnsFalseAndDoesNotRecover() external {
+        bytes memory wrongSelectorData = abi.encodeWithSelector(bytes4(keccak256("notFinalizeDeposit()")), uint256(1));
+        vm.prank(address(manager));
+        bool recovered = IAtomicRecoverable(L2_ASSET_ROUTER_ADDR).recoverAtomicCall(
+            destinationChainId,
+            wrongSelectorData
+        );
+        assertFalse(recovered, "a non-finalizeDeposit selector must not recover");
+        assertEq(ntv.recoveries(), 0, "the NTV must be untouched");
     }
 }

@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
-import {ERA_CHAIN_ID_UNUSED} from "../utils/Types.sol";
 
 struct CTMCoreDeploymentConfig {
     bool testnetVerifier;
@@ -71,10 +70,7 @@ library DeployCTML1OrGateway {
             return abi.encode(_config.l1ChainId, _config.rollupDAManager);
         } else if (_contractName == CTMContract.MailboxFacet) {
             return
-                // TODO: drop the `_eraChainId` parameter from `MailboxFacet` in the next release; it
-                // cannot change here without re-auditing the frozen contract.
                 abi.encode(
-                    ERA_CHAIN_ID_UNUSED,
                     _config.l1ChainId,
                     _config.chainAssetHandler,
                     _config.eip7702Checker,

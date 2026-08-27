@@ -1,27 +1,69 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+
+import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.sol";
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {RecoverToL1NotSupported} from "contracts/common/L1ContractErrors.sol";
-import {
-    BundleAttributes,
-    INTEROP_BUNDLE_VERSION,
-    INTEROP_CALL_VERSION,
-    InteropBundle,
-    InteropCall
-} from "contracts/common/Messaging.sol";
+import {INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
 
-/// @dev Exposes the internal {AtomicFlowManager._recoverBundle} so its value-refund dispatch can be unit
-/// tested in isolation (the surrounding Committed->Revertable->Reverted state machine is exercised by the
-/// atomic-interop anvil spec end-to-end).
+/// @dev Exposes {AtomicFlowManager._recoverBundle} so its per-call dispatch can be tested in
+/// isolation. The Committed -> Revertable -> Reverted machine is driven through the production path in
+/// {AtomicFlowManagerRefundTest}; no test forces leg state directly.
 contract AtomicFlowManagerRecoverHarness is AtomicFlowManager {
     function exposedRecoverBundle(InteropBundle memory _bundle) external {
         _recoverBundle(_bundle);
+    }
+}
+
+/// @dev Stateful stand-in for the asset router at its canonical address: unlike `vm.mockCall`, its
+/// counters are real storage, so they roll back with a reverting `claimRefund` — which is exactly what
+/// the "later recovery reverts" test needs to prove. `recoverAtomicCall` can be scripted per call-data
+/// to return true, return false, or revert; `bridgehubRecoverBaseToken` just tallies base-token
+/// refunds. Recognised by the manager as the recoverer because it lives at `L2_ASSET_ROUTER_ADDR`.
+contract MockRecoveryRouter {
+    uint256 public recoverAttempts;
+    uint256 public recoverSuccesses;
+    uint256 public baseTokenRecoveries;
+
+    mapping(bytes32 dataHash => bool) public returnsFalse;
+    mapping(bytes32 dataHash => bool) public reverts;
+
+    function scriptReturnsFalse(bytes calldata _data) external {
+        returnsFalse[keccak256(_data)] = true;
+    }
+
+    function scriptReverts(bytes calldata _data) external {
+        reverts[keccak256(_data)] = true;
+    }
+
+    function scriptSucceeds(bytes calldata _data) external {
+        bytes32 dataHash = keccak256(_data);
+        delete returnsFalse[dataHash];
+        delete reverts[dataHash];
+    }
+
+    function recoverAtomicCall(uint256 _destChainId, bytes calldata _data) external returns (bool) {
+        _destChainId; // unused; recovery routing is not exercised by this stateful stand-in
+        ++recoverAttempts;
+        if (reverts[keccak256(_data)]) {
+            revert("recovery boom");
+        }
+        if (returnsFalse[keccak256(_data)]) {
+            return false;
+        }
+        ++recoverSuccesses;
+        return true;
+    }
+
+    function bridgehubRecoverBaseToken(uint256 _destChainId, bytes32 _assetId, address _from, uint256 _value) external {
+        (_destChainId, _assetId, _from, _value); // unused; only the tally matters here
+        ++baseTokenRecoveries;
     }
 }
 
@@ -71,45 +113,13 @@ contract AtomicFlowManagerRecoverTest is Test {
             destinationBaseTokenAssetId: _destBaseTokenAssetId,
             interopBundleSalt: bytes32(0),
             calls: calls,
-            bundleAttributes: BundleAttributes({
-                executionAddress: "",
-                unbundlerAddress: "",
-                useFixedFee: false,
-                salt: bytes32(0)
-            })
+            bundleAttributes: AtomicFlowFixtures.noBundleAttributes()
         });
     }
 
-    /// @dev Dispatch-only: the asset router is mocked, so this asserts that `_recoverBundle` FORWARDS a
-    /// direct value leg's refund to `L2AssetRouter.bridgehubRecoverBaseToken` with the correct
-    /// (destChainId, source-base-token assetId, from, value). It does NOT exercise the downstream
-    /// disbursement — same-base routing to `BaseTokenHolder.recoverBaseToken` vs different-base NTV re-mint
-    /// happens inside {L2NativeTokenVault._disburseFailedTransfer}, which is covered on the real stack by
-    /// {L2AtomicInteropSendRefundTestAbstract}'s `test_atomicSend_directValueLeg_sameBase_*` /
-    /// `..._differentBase_*` tests (and {AtomicRecoveryForgery} for the router->NTV hop).
-    function test_recoverBundle_directValueLeg_forwardsSameBaseAssetIdToRouter() public {
-        vm.mockCall(
-            L2_ASSET_ROUTER_ADDR,
-            abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
-            ""
-        );
-
-        uint256 value = 5 ether;
-        vm.expectCall(
-            L2_ASSET_ROUTER_ADDR,
-            abi.encodeCall(
-                IAssetRouterShared.bridgehubRecoverBaseToken,
-                (DEST_CHAIN_ID, SOURCE_BASE_TOKEN_ASSET_ID, DEPOSITOR, value)
-            )
-        );
-        manager.exposedRecoverBundle(_bundle(SOURCE_BASE_TOKEN_ASSET_ID, value));
-    }
-
-    /// @dev Dispatch-only counterpart of {test_recoverBundle_directValueLeg_forwardsSameBaseAssetIdToRouter}
-    /// for a different destination base token: asserts the manager forwards the destination base-token
-    /// assetId (not this chain's) to `bridgehubRecoverBaseToken`. Downstream disbursement is not exercised
-    /// here (see that test's note).
-    function test_recoverBundle_directValueLeg_forwardsDifferentBaseAssetIdToRouter() public {
+    /// @dev Dispatch-only (router mocked): a direct value leg's refund is forwarded to
+    /// `bridgehubRecoverBaseToken` with the DESTINATION base-token asset id, the depositor, and the value.
+    function test_recoverBundle_directValueLeg_forwardsDestinationBaseAssetIdToRouter() public {
         vm.mockCall(
             L2_ASSET_ROUTER_ADDR,
             abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
@@ -128,10 +138,8 @@ contract AtomicFlowManagerRecoverTest is Test {
     }
 
     function test_recoverBundle_revertsWhenDestinationIsL1() public {
-        // L2->L1 atomic bundles are rejected at send, so recovery must never process an L1-destined bundle:
-        // that keeps it away from the append-only L1 counters in BaseTokenHolder (whose settlement-layer
-        // updates are only correct at send time). Set L1_CHAIN_ID == the builder's DEST_CHAIN_ID so the bundle
-        // is L1-destined, and assert the guard reverts before any refund dispatch.
+        // An L1-destined bundle must never be recovered (see {AtomicFlowManager._recoverBundle}); set
+        // L1_CHAIN_ID == DEST_CHAIN_ID so the bundle reads as L1-destined.
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         manager.initL2(DEST_CHAIN_ID);
 
@@ -139,22 +147,9 @@ contract AtomicFlowManagerRecoverTest is Test {
         manager.exposedRecoverBundle(_bundle(SOURCE_BASE_TOKEN_ASSET_ID, 5 ether));
     }
 
-    function test_recoverBundle_pureValueCallIsRefunded() public {
-        // A value leg whose direct sender has no per-sender recovery must still succeed: the value
-        // refund is dispatched through the router on its own.
-        vm.mockCall(
-            L2_ASSET_ROUTER_ADDR,
-            abi.encodeWithSelector(IAssetRouterShared.bridgehubRecoverBaseToken.selector),
-            ""
-        );
-
-        // Does not revert.
-        manager.exposedRecoverBundle(_bundle(SOURCE_BASE_TOKEN_ASSET_ID, 1 ether));
-    }
-
     function test_recoverBundle_routerBackedValueDoesNotRefundSeparately() public {
-        // Router-produced calls recover through recoverAtomicCall. Their value is part of that burn and
-        // must not be refunded a second time through bridgehubRecoverBaseToken.
+        // Indirect (router-produced) calls force `value == 0` at send, so a `from == router` call takes
+        // only the recoverAtomicCall branch — never bridgehubRecoverBaseToken (no double refund).
         bytes memory callData = abi.encodeWithSignature("finalizeDeposit(uint256,bytes32,bytes)");
         vm.mockCall(
             L2_ASSET_ROUTER_ADDR,
@@ -167,6 +162,12 @@ contract AtomicFlowManagerRecoverTest is Test {
             "double recovery"
         );
 
+        // Pin that the router-backed branch is taken: otherwise this passes even if `_recoverBundle`
+        // skips both branches.
+        vm.expectCall(
+            L2_ASSET_ROUTER_ADDR,
+            abi.encodeWithSelector(IAtomicRecoverable.recoverAtomicCall.selector, DEST_CHAIN_ID, callData)
+        );
         manager.exposedRecoverBundle(_bundleFrom(L2_ASSET_ROUTER_ADDR, SOURCE_BASE_TOKEN_ASSET_ID, 1 ether, callData));
     }
 
@@ -186,5 +187,73 @@ contract AtomicFlowManagerRecoverTest is Test {
             "unexpected recovery"
         );
         manager.exposedRecoverBundle(_bundle(SOURCE_BASE_TOKEN_ASSET_ID, 0));
+    }
+
+    // ============ multi-call bundles: every call is processed, none strands the rest ============
+
+    /// @dev Deploys the stateful mock router at the canonical asset-router address and returns it.
+    function _deployMockRouter() internal returns (MockRecoveryRouter router) {
+        deployCodeTo("AtomicFlowManagerRecover.t.sol:MockRecoveryRouter", L2_ASSET_ROUTER_ADDR);
+        router = MockRecoveryRouter(L2_ASSET_ROUTER_ADDR);
+    }
+
+    /// @dev A multi-call bundle assembled from raw calls (bypasses the single-call `_bundleFrom`).
+    function _multiCallBundle(InteropCall[] memory _calls) internal view returns (InteropBundle memory b) {
+        b = InteropBundle({
+            version: INTEROP_BUNDLE_VERSION,
+            sourceChainId: block.chainid,
+            destinationChainId: DEST_CHAIN_ID,
+            destinationBaseTokenAssetId: SOURCE_BASE_TOKEN_ASSET_ID,
+            interopBundleSalt: bytes32(0),
+            calls: _calls,
+            bundleAttributes: AtomicFlowFixtures.noBundleAttributes()
+        });
+    }
+
+    function _call(address _from, uint256 _value, bytes memory _data) internal pure returns (InteropCall memory) {
+        return
+            InteropCall({
+                version: INTEROP_CALL_VERSION,
+                shadowAccount: false,
+                to: CALL_TARGET,
+                from: _from,
+                value: _value,
+                data: _data
+            });
+    }
+
+    /// @notice A bundle mixing [router-backed recovery, non-fund direct call, direct value leg] recovers
+    /// EVERY fund-bearing call exactly once and skips the non-fund one — proving the loop processes all
+    /// calls, not just the first recoverable one.
+    function test_recoverBundle_multiCall_recoversEveryFundBearingCallOnce() public {
+        MockRecoveryRouter router = _deployMockRouter();
+
+        InteropCall[] memory calls = new InteropCall[](3);
+        calls[0] = _call(L2_ASSET_ROUTER_ADDR, 0, hex"a1a1"); // router-backed -> recoverAtomicCall
+        calls[1] = _call(DEPOSITOR, 0, hex""); // direct, no value -> nothing to reverse (skipped)
+        calls[2] = _call(DEPOSITOR, 4 ether, hex""); // direct value leg -> base-token recovery
+
+        manager.exposedRecoverBundle(_multiCallBundle(calls));
+
+        assertEq(router.recoverAttempts(), 1, "exactly one router-backed call is asked to recover");
+        assertEq(router.recoverSuccesses(), 1, "the router-backed call recovers once");
+        assertEq(router.baseTokenRecoveries(), 1, "the direct value leg is refunded once");
+    }
+
+    /// @notice A router-backed call that returns `false` (nothing to recover) does not abort the loop: a
+    /// LATER recoverable call is still attempted and recovers. Guards against a regression that treated
+    /// a `false` as terminal.
+    function test_recoverBundle_multiCall_falseThenLaterSuccess() public {
+        MockRecoveryRouter router = _deployMockRouter();
+        router.scriptReturnsFalse(hex"deed");
+
+        InteropCall[] memory calls = new InteropCall[](2);
+        calls[0] = _call(L2_ASSET_ROUTER_ADDR, 0, hex"deed"); // recoverAtomicCall -> false
+        calls[1] = _call(L2_ASSET_ROUTER_ADDR, 0, hex"adad"); // recoverAtomicCall -> true
+
+        manager.exposedRecoverBundle(_multiCallBundle(calls));
+
+        assertEq(router.recoverAttempts(), 2, "both router-backed calls are attempted");
+        assertEq(router.recoverSuccesses(), 1, "only the second call actually recovers");
     }
 }

@@ -11,7 +11,7 @@ import {
 } from "contracts/common/StateTransitionTypes.sol";
 
 /// @dev Value passed for the `eraChainId` parameter that several audited constructors and structs
-/// still carry (`MailboxFacet`, `L1Nullifier`, `L1AssetRouter`, `L1ERC20Bridge`,
+/// still carry (`MailboxFacet`, `L1Nullifier`, `L1AssetRouter`,
 /// `FixedForceDeploymentsData`, `GatewayCTMDeployerConfig`). Nothing this release deploys has an
 /// Era chain, and `Bridgehub` rejects chain id 0 (`ZeroChainId`), so every Era-legacy branch keyed
 /// off it is unreachable — whereas a made-up non-zero id would unlock those branches for whichever
@@ -55,14 +55,7 @@ struct ZkChainAddresses {
     address l2LegacySharedBridge;
 }
 
-struct L2ERC20BridgeAddresses {
-    address l2TokenBeacon;
-    address l2Bridge;
-    bytes32 l2TokenProxyBytecodeHash;
-}
-
 struct BridgeContracts {
-    address erc20Bridge;
     address l1AssetRouter;
     address l1Nullifier;
     address l1NativeTokenVault;

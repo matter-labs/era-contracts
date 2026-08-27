@@ -423,7 +423,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
         require(config.ownerAddress != address(0), "owner not set");
 
-        data = _buildForceDeploymentsData(config.ownerAddress, address(0));
+        data = _buildForceDeploymentsData(config.ownerAddress);
         bytes memory encodedData = abi.encode(data);
         generatedData.forceDeploymentsData = encodedData;
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;

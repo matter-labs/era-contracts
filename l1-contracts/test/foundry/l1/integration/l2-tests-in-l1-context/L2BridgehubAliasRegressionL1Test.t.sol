@@ -35,8 +35,6 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
 
     /// @notice Test that the aliased sender can successfully call registerChainForInterop
     /// @dev This is the correct behavior after the fix
-    /// @dev Note: We don't verify the storage write because mock calls in the test setup interfere.
-    ///      The key test is that the call doesn't revert with Unauthorized.
     function test_regression_aliasedSenderCanRegisterChain() public {
         uint256 testChainId = 12345;
         bytes32 testBaseTokenAssetId = bytes32(uint256(0xABCDEF));
@@ -44,13 +42,14 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
         // Verify that aliasedChainRegistrationSender is set and is what we expect
         assertNotEq(aliasedChainRegistrationSender, address(0), "chainRegistrationSender should be set");
 
-        // The aliased address should be able to call registerChainForInterop
-        // This call should NOT revert - if it does, the test fails
         vm.prank(aliasedChainRegistrationSender);
         L2Bridgehub(L2_BRIDGEHUB_ADDR).registerChainForInterop(testChainId, testBaseTokenAssetId);
 
-        // If we get here without revert, the authorization check passed
-        // That's the core of this regression test - verifying the modifier allows the correct caller
+        assertEq(
+            L2Bridgehub(L2_BRIDGEHUB_ADDR).baseTokenAssetId(testChainId),
+            testBaseTokenAssetId,
+            "aliased sender registration must persist"
+        );
     }
 
     /// @notice Test that the non-aliased (original L1) address cannot call registerChainForInterop
@@ -71,11 +70,14 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
         uint256 testChainId = 12347;
         bytes32 testBaseTokenAssetId = bytes32(uint256(0x789ABC));
 
-        // SERVICE_TRANSACTION_SENDER should be able to call without reverting
         vm.prank(SERVICE_TRANSACTION_SENDER);
         L2Bridgehub(L2_BRIDGEHUB_ADDR).registerChainForInterop(testChainId, testBaseTokenAssetId);
 
-        // If we get here without revert, the SERVICE_TRANSACTION_SENDER bypass works correctly
+        assertEq(
+            L2Bridgehub(L2_BRIDGEHUB_ADDR).baseTokenAssetId(testChainId),
+            testBaseTokenAssetId,
+            "service sender registration must persist"
+        );
     }
 
     /// @notice Test that random addresses cannot call registerChainForInterop
@@ -113,12 +115,17 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
     ) public {
         // Avoid chainId 0 which might have special meaning
         vm.assume(testChainId > 0);
+        // Keep the storage assertion observable rather than accepting the mapping's default value.
+        vm.assume(testBaseTokenAssetId != bytes32(0));
 
-        // The aliased sender should be able to register any chain without Unauthorized revert
         vm.prank(aliasedChainRegistrationSender);
         L2Bridgehub(L2_BRIDGEHUB_ADDR).registerChainForInterop(testChainId, testBaseTokenAssetId);
 
-        // If we get here without revert, the authorization check passed for any chain ID
+        assertEq(
+            L2Bridgehub(L2_BRIDGEHUB_ADDR).baseTokenAssetId(testChainId),
+            testBaseTokenAssetId,
+            "fuzzed registration must persist"
+        );
     }
 
     /// @notice Fuzz test that random addresses are always rejected

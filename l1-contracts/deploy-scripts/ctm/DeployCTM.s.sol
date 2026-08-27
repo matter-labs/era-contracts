@@ -37,7 +37,6 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
@@ -299,6 +298,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         IOwnable(ctmAddresses.stateTransition.proxies.serverNotifier).transferOwnership(ctmAddresses.chainAdmin);
         IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
+
         vm.stopBroadcast();
         console.log("Owners updated");
     }
@@ -309,9 +309,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "bridgehub_proxy_addr",
             coreAddresses.bridgehub.proxies.bridgehub
         );
-        // Note: AssetRouterAddresses doesn't have legacyBridge, so we get it directly
-        L1AssetRouter assetRouter = L1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
-        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", address(assetRouter.legacyBridge()));
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
         string memory bridges = vm.serializeAddress(
             "bridges",
@@ -425,14 +422,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function prepareForceDeploymentsData() internal returns (bytes memory) {
         require(ctmAddresses.admin.governance != address(0), "Governance address is not set");
 
-        // The dev legacy-bridge test flow was retired with EraVM support; the frozen
-        // FixedForceDeploymentsData ABI keeps the field, always zero now.
-        address dangerousTestOnlyForcedBeacon = address(0);
-
-        FixedForceDeploymentsData memory data = _buildForceDeploymentsData(
-            ctmAddresses.admin.governance,
-            dangerousTestOnlyForcedBeacon
-        );
+        FixedForceDeploymentsData memory data = _buildForceDeploymentsData(ctmAddresses.admin.governance);
 
         return abi.encode(data);
     }
@@ -533,8 +523,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function _buildForceDeploymentsData(
-        address _governance,
-        address _dangerousTestOnlyForcedBeacon
+        address _governance
     ) internal virtual returns (FixedForceDeploymentsData memory data) {
         _precomputeBlakeHashes();
 
@@ -563,7 +552,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
                 coreAddresses.bridgehub.proxies.chainRegistrationSender
             ),
-            dangerousTestOnlyForcedBeacon: _dangerousTestOnlyForcedBeacon,
+            // Retained as address(0) for force-deployments ABI compatibility; the legacy forced beacon is gone.
+            dangerousTestOnlyForcedBeacon: address(0),
             zkTokenAssetId: config.zkTokenAssetId
         });
     }
@@ -578,7 +568,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         AdminFacet adminFacet = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(
-            1,
             block.chainid,
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             IEIP7702Checker(address(1)),

@@ -5,6 +5,7 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {StdStorage, Test, console, stdStorage} from "forge-std/Test.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
@@ -21,7 +22,6 @@ import {
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/common/Config.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
@@ -73,20 +73,10 @@ contract L2AssetTrackerL1Test is Test, SharedL2ContractL1Deployer {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
         uint256 amount = 11;
 
+        // An unregistered foreign asset must be rejected by handleFinalizeBridgingOnL2.
         vm.expectRevert(abi.encodeWithSelector(AssetIdNotRegistered.selector, assetId));
         vm.prank(address(L2_NATIVE_TOKEN_VAULT_ADDR));
         L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(L1_CHAIN_ID, assetId, amount, L1_CHAIN_ID, address(token));
-
-        stdstore.target(sharedBridgeLegacy).sig("l1TokenAddress(address)").with_key(address(token)).checked_write(
-            l1Token
-        );
-        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(address(token));
-
-        vm.prank(address(L2_NATIVE_TOKEN_VAULT_ADDR));
-        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(L1_CHAIN_ID, assetId, amount, L1_CHAIN_ID, address(token));
-
-        uint256 chainBalance = L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, assetId);
-        assertEq(chainBalance, 0, "Foreign token chain balance should remain zero");
     }
 
     function test_handleFinalizeBaseTokenBridgingOnL2() public {
@@ -299,15 +289,7 @@ contract L2AssetTrackerL1Test is Test, SharedL2ContractL1Deployer {
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         // solhint-disable-next-line func-named-parameters
-        ntv.updateL2(
-            liveL1ChainId,
-            liveOwner,
-            liveProxyBytecodeHash,
-            address(0),
-            liveWethToken,
-            bridgingData,
-            metadata
-        );
+        ntv.updateL2(liveL1ChainId, liveOwner, liveProxyBytecodeHash, liveWethToken, bridgingData, metadata);
 
         vm.expectRevert(BaseTokenNativeToThisChain.selector);
         L2_ASSET_TRACKER.assertBaseTokenRecoveryIsAccountingNeutral(505);
