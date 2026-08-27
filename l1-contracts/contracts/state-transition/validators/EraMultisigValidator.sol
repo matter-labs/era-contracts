@@ -25,8 +25,10 @@ import {IEraMultisigValidator} from "./interfaces/IEraMultisigValidator.sol";
 /// calls are forwarded directly, while execute calls require that enough multisig members have
 /// pre-approved the exact execution parameters via `approveHash`.
 /// @dev Expected to be deployed as a TransparentUpgradeableProxy.
-/// @dev In order for the validator to work correctly, the execution delay should be the same as in the actual validator timelock (as the server would fetch it). Note
-/// that this contract itself does NOT enforce the timelock in any way, it just forwards the calls to the underlying `ValidatorTimelock` after checking for multisig approvals.
+/// @dev This contract itself does NOT enforce the timelock in any way, it just forwards the calls to the underlying
+/// `ValidatorTimelock` after checking for multisig approvals. Since the server reads the execution delay off whichever
+/// validator it talks to, all the execution delay getters are overridden to read through to the downstream
+/// `ValidatorTimelock`, which is the contract that actually enforces the delay.
 contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP712Upgradeable {
     /// @dev EIP-712 typehash for the ExecuteBatches struct.
     bytes32 internal constant EXECUTE_BATCHES_TYPEHASH =
@@ -171,6 +173,29 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
     /// to the downstream `ValidatorTimelock` rather than directly to the ZK chain.
     function _getPropagationAddress(address) internal view override returns (address) {
         return validatorTimelock;
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    /// @dev Read through to the downstream `ValidatorTimelock`: it is the contract that enforces the
+    /// delay, so its value is the only one that matters. The delay stored in this contract is unused.
+    function executionDelay() public view override(ValidatorTimelock, IValidatorTimelock) returns (uint32) {
+        return IValidatorTimelock(validatorTimelock).executionDelay();
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    /// @dev Read through to the downstream `ValidatorTimelock`, see `executionDelay`.
+    function chainExecutionDelay(
+        address _chainAddress
+    ) public view override(ValidatorTimelock, IValidatorTimelock) returns (uint32) {
+        return IValidatorTimelock(validatorTimelock).chainExecutionDelay(_chainAddress);
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    /// @dev Read through to the downstream `ValidatorTimelock`, see `executionDelay`.
+    function getExecutionDelay(
+        address _chainAddress
+    ) public view override(ValidatorTimelock, IValidatorTimelock) returns (uint32) {
+        return IValidatorTimelock(validatorTimelock).getExecutionDelay(_chainAddress);
     }
 
     /// @inheritdoc IEraMultisigValidator

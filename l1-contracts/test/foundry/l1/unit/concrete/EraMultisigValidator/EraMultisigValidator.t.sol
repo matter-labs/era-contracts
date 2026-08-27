@@ -690,4 +690,64 @@ contract EraMultisigValidatorTest is Test {
         bytes32 hash = eraMultisig.calculateHash(chainAddress, from, to, data);
         assertTrue(hash != bytes32(0));
     }
+
+    /*//////////////////////////////////////////////////////////////
+                    EXECUTION DELAY READ-THROUGH
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev `EraMultisigValidator` does not enforce the timelock itself, so all of its execution delay
+    /// getters must report the values of the downstream `ValidatorTimelock` that does enforce it.
+    /// The downstream timelock here is a real contract (not a mock), so these tests exercise the
+    /// actual read-through path.
+
+    function test_executionDelay_readsThroughToValidatorTimelock() public {
+        vm.prank(owner);
+        validatorTimelock.setExecutionDelay(1 hours);
+
+        assertEq(validatorTimelock.executionDelay(), 1 hours);
+        assertEq(eraMultisig.executionDelay(), 1 hours);
+    }
+
+    function test_chainExecutionDelay_readsThroughToValidatorTimelock() public {
+        vm.prank(owner);
+        validatorTimelock.setChainExecutionDelay(chainAddress, 2 days);
+
+        assertEq(validatorTimelock.chainExecutionDelay(chainAddress), 2 days);
+        assertEq(eraMultisig.chainExecutionDelay(chainAddress), 2 days);
+        // A chain that never set its own delay reads through as zero as well.
+        assertEq(eraMultisig.chainExecutionDelay(makeAddr("otherChain")), 0);
+    }
+
+    /// @dev The read-through must preserve the `max(ecosystem, chain)` semantics of the downstream
+    /// timelock rather than recomputing them from this contract's own storage.
+    function test_getExecutionDelay_readsThroughToValidatorTimelock() public {
+        vm.startPrank(owner);
+        validatorTimelock.setExecutionDelay(1 hours);
+        validatorTimelock.setChainExecutionDelay(chainAddress, 3 hours);
+        vm.stopPrank();
+
+        assertEq(eraMultisig.getExecutionDelay(chainAddress), 3 hours);
+
+        // Raising the ecosystem-wide floor above the chain's own value must be reflected too.
+        vm.prank(owner);
+        validatorTimelock.setExecutionDelay(5 hours);
+        assertEq(eraMultisig.getExecutionDelay(chainAddress), 5 hours);
+    }
+
+    /// @dev The delay stored in `EraMultisigValidator`'s own storage is unused: the getters must
+    /// ignore it entirely so the two contracts can never drift apart.
+    function test_executionDelay_ignoresOwnStoredValue() public {
+        vm.startPrank(owner);
+        // Write a different value into this contract's own (now unused) storage...
+        eraMultisig.setExecutionDelay(6 days);
+        eraMultisig.setChainExecutionDelay(chainAddress, 6 days);
+        // ...while the downstream timelock holds the value that is actually enforced.
+        validatorTimelock.setExecutionDelay(30 minutes);
+        validatorTimelock.setChainExecutionDelay(chainAddress, 4 hours);
+        vm.stopPrank();
+
+        assertEq(eraMultisig.executionDelay(), 30 minutes);
+        assertEq(eraMultisig.chainExecutionDelay(chainAddress), 4 hours);
+        assertEq(eraMultisig.getExecutionDelay(chainAddress), 4 hours);
+    }
 }

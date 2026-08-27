@@ -91,11 +91,13 @@ contract ValidatorTimelock is
     /// @dev The mapping of ZK chain address => batch number => timestamp when it was committed.
     mapping(address chainAddress => LibMap.Uint32Map batchNumberToTimestampMapping) internal committedBatchTimestamp;
 
-    /// @inheritdoc IValidatorTimelock
-    uint32 public override executionDelay;
+    /// @dev The backing storage of `executionDelay`. It is not public so that inheriting contracts
+    /// are able to override the getter, see `EraMultisigValidator`.
+    uint32 internal _executionDelay;
 
-    /// @inheritdoc IValidatorTimelock
-    mapping(address chainAddress => uint32 delay) public override chainExecutionDelay;
+    /// @dev The backing storage of `chainExecutionDelay`. It is not public so that inheriting contracts
+    /// are able to override the getter, see `EraMultisigValidator`.
+    mapping(address chainAddress => uint32 delay) internal _chainExecutionDelay;
 
     /// @dev Reserved storage space to allow for layout changes in future upgrades.
     uint256[47] private __gap;
@@ -114,14 +116,24 @@ contract ValidatorTimelock is
     function _validatorTimelockInit(address _initialOwner, uint32 _initialExecutionDelay) internal onlyInitializing {
         _transferOwnership(_initialOwner);
         _checkExecutionDelayWithinBounds(_initialExecutionDelay);
-        executionDelay = _initialExecutionDelay;
+        _executionDelay = _initialExecutionDelay;
     }
 
     /// @inheritdoc IValidatorTimelock
-    function setExecutionDelay(uint32 _executionDelay) external onlyOwner {
-        _checkExecutionDelayWithinBounds(_executionDelay);
-        executionDelay = _executionDelay;
-        emit NewExecutionDelay(_executionDelay);
+    function executionDelay() public view virtual override returns (uint32) {
+        return _executionDelay;
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function chainExecutionDelay(address _chainAddress) public view virtual override returns (uint32) {
+        return _chainExecutionDelay[_chainAddress];
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function setExecutionDelay(uint32 _newExecutionDelay) external onlyOwner {
+        _checkExecutionDelayWithinBounds(_newExecutionDelay);
+        _executionDelay = _newExecutionDelay;
+        emit NewExecutionDelay(_newExecutionDelay);
     }
 
     /// @inheritdoc IValidatorTimelock
@@ -139,21 +151,21 @@ contract ValidatorTimelock is
             revert ExecutionDelayNotIncreased(currentDelay, _newExecutionDelay);
         }
 
-        chainExecutionDelay[_chainAddress] = _newExecutionDelay;
+        _chainExecutionDelay[_chainAddress] = _newExecutionDelay;
         emit NewChainExecutionDelay(_chainAddress, _newExecutionDelay);
     }
 
     /// @inheritdoc IValidatorTimelock
     function setChainExecutionDelay(address _chainAddress, uint32 _newExecutionDelay) external onlyOwner {
         _checkExecutionDelayWithinBounds(_newExecutionDelay);
-        chainExecutionDelay[_chainAddress] = _newExecutionDelay;
+        _chainExecutionDelay[_chainAddress] = _newExecutionDelay;
         emit NewChainExecutionDelay(_chainAddress, _newExecutionDelay);
     }
 
     /// @inheritdoc IValidatorTimelock
-    function getExecutionDelay(address _chainAddress) public view override returns (uint32) {
-        uint32 ecosystemDelay = executionDelay;
-        uint32 chainDelay = chainExecutionDelay[_chainAddress];
+    function getExecutionDelay(address _chainAddress) public view virtual override returns (uint32) {
+        uint32 ecosystemDelay = executionDelay();
+        uint32 chainDelay = chainExecutionDelay(_chainAddress);
         return chainDelay > ecosystemDelay ? chainDelay : ecosystemDelay;
     }
 
