@@ -41,11 +41,20 @@ on:
       - "yarn.lock"
 
 jobs:
-  # Fast job: uses pre-generated chain states from the repo.
-  # We still compile DummyInteropRecipient so deploy bytecode is available in out/.
+  # Per-commit job: runs the interop suite against a fresh from-source deployment,
+  # so every commit is tested against the PR's actual contracts without requiring
+  # the committed chain-state snapshots to be regenerated first. The fast
+  # preloaded-state run and the state determinism gate live in
+  # pre-merge-checks.yaml and only have to pass once, right before merging.
   integration-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
+    env:
+      # One foundry profile for every forge invocation in this job (the builds
+      # below and the deployment scripts spawned by the test harness) so they
+      # share a compilation cache. Same profile as chain-state generation; it
+      # only strips CBOR metadata.
+      FOUNDRY_PROFILE: anvil-interop
 
     steps:
       - name: Checkout the repository
@@ -67,6 +76,13 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
+
+      - name: Build l1-contracts artifacts
+        working-directory: l1-contracts
+        run: forge build
+
       - name: Build anvil-interop dev artifacts
         run: yarn l1 build:anvil-interop-dev-artifacts
 
@@ -78,15 +94,16 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn tsc --noEmit
 
-      - name: Run interop tests (preloaded state)
+      - name: Run interop tests (fresh deployment)
         working-directory: l1-contracts/test/anvil-interop
         env:
-          # Each worker spawns 6 Anvil chains + a hardhat process; running all 10 spec groups at
-          # once oversubscribes the 4-core runner and causes load-dependent RPC flakes (worker
-          # failures mid-spec). Cap concurrency; locally the suite stays fully parallel.
-          ANVIL_INTEROP_MAX_PARALLEL_WORKERS: "4"
+          # Deploy the ecosystem from source instead of loading the committed
+          # chain-state snapshots — stale snapshots must not fail (or silently
+          # pass) per-commit CI. Fresh deploy runs the specs serially against a
+          # single set of chains, hence the longer job timeout.
+          ANVIL_INTEROP_FRESH_DEPLOY: "1"
         run: |
-          echo "Running interop tests with preloaded chain states..."
+          echo "Running interop tests with a fresh deployment..."
           yarn ts-node run-hardhat-interop-test.ts
 
       - name: Cleanup
@@ -152,79 +169,7 @@ jobs:
         run: |
           bash cleanup.sh
 
-  # Mandatory determinism gate for the current protocol version's chain state:
-  # rebuilds the state from scratch and verifies it matches the committed
-  # snapshots. If a contract change alters genesis state, this fails —
-  # regenerate via the 'Regenerate Anvil Interop Chain States' workflow and push.
-  #
-  # The compare tolerates block-number-derived drift: the harness runs Anvil with
-  # interval mining (`--block-time 1`, required so the interop relayers/TBM keep
-  # progressing), so the block count is wall-clock-dependent. compare-chain-states
-  # ignores block.number and storage slots that just hold a block number (values
-  # ≤ block height), plus the block-indexed MessageRoot storage. Everything else
-  # (balances, roots, addresses, code, protocol version) must match exactly, so
-  # this still catches real drift. To block merges, add "state-generation-check"
-  # to the branch protection required checks.
-  state-generation-check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - name: Install Foundry (no foundry-zksync — deterministic bytecode)
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: v1.5.1
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn
-
-      - name: Build da-contracts artifacts (no CBOR metadata for determinism)
-        run: FOUNDRY_PROFILE=anvil-interop yarn da build:foundry
-
-      - name: Build l1-contracts artifacts (no CBOR metadata for determinism)
-        working-directory: l1-contracts
-        run: FOUNDRY_PROFILE=anvil-interop forge build
-
-      - name: Install anvil-interop dependencies
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn install
-
-      - name: Save committed chain states
-        working-directory: l1-contracts/test/anvil-interop
-        run: cp -r chain-states chain-states-committed
-
-      - name: Generate chain state
-        working-directory: l1-contracts/test/anvil-interop
-        run: |
-          echo "Generating chain state from scratch..."
-          yarn ts-node setup-and-dump-state.ts
-
-      - name: Verify committed state matches generated state
-        working-directory: l1-contracts/test/anvil-interop
-        run: |
-          echo "Comparing generated state against committed chain-states..."
-          if yarn ts-node compare-chain-states.ts chain-states-committed chain-states; then
-            echo "Committed chain states are up to date"
-          else
-            echo ""
-            echo "Committed chain-states differ from freshly generated state (beyond block-number drift)."
-            echo "Run the 'Regenerate Anvil Interop Chain States' workflow from the Actions tab to update them."
-            exit 1
-          fi
-
-      - name: Cleanup
-        if: always()
-        working-directory: l1-contracts/test/anvil-interop
-        run: |
-          bash cleanup.sh
+  # NOTE: the chain-state determinism gate (state-generation-check) and the fast
+  # preloaded-state interop run live in pre-merge-checks.yaml: both depend on the
+  # committed chain-state snapshots being regenerated after contract changes, so
+  # they only run once a PR is labeled `pre-merge`.

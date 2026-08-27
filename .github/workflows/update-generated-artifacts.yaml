@@ -1,3 +1,7 @@
+# One-click regen for everything pre-merge-checks.yaml validates: contract
+# hashes, selectors, and zkstack-out first, then the anvil-interop chain-state
+# snapshots (sequential so the two pushes to the PR branch don't race).
+# Dispatch this once when a PR is ready, then add the `pre-merge` label.
 name: Update All Generated Artifacts
 
 on:
@@ -13,7 +17,7 @@ permissions:
 
 jobs:
   update-hashes:
-    name: Update contract hashes
+    name: Update hashes, selectors, zkstack-out
     uses: ./.github/workflows/update-hashes-on-demand.yaml
     with:
       pr_number: ${{ github.event.inputs.pr_number }}
