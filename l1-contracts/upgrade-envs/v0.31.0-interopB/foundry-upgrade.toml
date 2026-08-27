@@ -3,13 +3,13 @@
 # The harness deploys at whatever the genesis config declares and then upgrades to
 # `new_protocol_version`, and `DefaultCTMUpgrade.initUpgrade` requires
 # `ctmProtocolVersion != getNewProtocolVersion()` — so this has to stay one minor ahead of genesis.
-# Genesis is at v32.0.0, so the fixture exercises a v32 -> v33 upgrade.
+# Genesis is at v33.0.0, so the fixture exercises a v33 -> v34 upgrade.
 #
 # The real v31 -> v32 transition is still covered: the anvil harness pins its own `stateVersion` and
 # `run-v31-to-v32-upgrade-test.ts` drives it from the committed `chain-states/v0.31.0` snapshots,
 # independent of this genesis version.
 
-old_protocol_version = 0x2000000000  # v32.0.0 (current genesis)
+old_protocol_version = 0x2100000000  # v33.0.0 (current genesis)
 
 # The fixture's chains are now labelled at the same version as the core contracts it deploys, so
 # autodetection would classify the ecosystem correctly on its own; the key is kept explicit so the
@@ -18,5 +18,5 @@ pre_v32_introspection = false
 v28_protocol_version = 0x1c00000000  # v28.0.0 (for reference)
 
 [contracts]
-new_protocol_version = 0x2100000000  # v33.0.0 (target for upgrade)
-latest_protocol_version = 0x2100000000  # v33.0.0
+new_protocol_version = 0x2200000000  # v34.0.0 (target for upgrade)
+latest_protocol_version = 0x2200000000  # v34.0.0
