@@ -42,31 +42,20 @@ args to `protocol_ops` unless the first post-flag word is `forge`/`cast`).
 
 ## CI tiers: per-commit vs pre-merge
 
-PR CI is split into two tiers:
+- **Per-commit** (`l1-contracts-ci`, `anvil-interop-ci`, `lint`, `slither`, ...):
+  builds, tests, and static checks that depend only on the PR's source. The
+  anvil-interop suite runs a fresh from-source deployment
+  (`ANVIL_INTEROP_FRESH_DEPLOY=1`), so it never depends on committed snapshots.
+- **Pre-merge** (`pre-merge-checks`): checks of committed _generated_ artifacts —
+  `AllContractsHashes.json`, `l1-contracts/selectors`, `l1-contracts/zkstack-out`,
+  and the anvil-interop chain-state snapshots (determinism gate +
+  preloaded-state run). Any bytecode change invalidates these; the fix is a
+  regen + commit, so they skip on **draft** PRs and run once the PR is ready
+  for review (and on every later push while it stays non-draft; also
+  unconditionally on merge queue / manual dispatch).
 
-- **Per-commit** (`l1-contracts-ci`, `l1-contracts-foundry-ci`, `l2-contracts-ci`,
-  `system-contracts-ci`, `anvil-interop-ci`, `lint`, `slither`, ...): builds,
-  tests, and static checks that depend only on the source in the PR. The
-  anvil-interop suite runs against a **fresh from-source deployment**
-  (`ANVIL_INTEROP_FRESH_DEPLOY=1`), so it never depends on the committed
-  chain-state snapshots.
-- **Pre-merge** (`pre-merge-checks`): checks that validate committed
-  _generated_ artifacts — `AllContractsHashes.json`, `l1-contracts/selectors`,
-  `l1-contracts/zkstack-out`, and the anvil-interop chain-state snapshots
-  (determinism gate + preloaded-state interop run). These fail whenever
-  bytecode changes and are fixed by a regen + commit, so they would force a
-  regeneration on every push if they ran on drafts.
-
-The tiers are tied to the PR's **draft status**: on a draft PR only per-commit
-CI runs (every `pre-merge-checks` job skips); on a ready-for-review PR all CI
-runs. Merge flow:
-
-1. Open the PR as a **draft** and iterate; per-commit CI must be green.
-2. When ready, dispatch **Update All Generated Artifacts** with the PR
-   number — a single regen that commits hashes + selectors + zkstack-out, then
-   the chain-state snapshots, to the PR branch.
-3. Mark the PR **ready for review**. `pre-merge-checks` runs on the
-   ready_for_review transition and on every later push while the PR stays
-   non-draft; merge once it is green. If review forces bytecode changes, regen
-   again (or convert back to draft until done). The workflow also runs
-   unconditionally in a merge queue and via manual dispatch.
+Merge flow: iterate on a draft PR until per-commit CI is green → dispatch
+**Update All Generated Artifacts** with the PR number (a single regen that
+commits hashes + selectors + zkstack-out, then chain states) → mark the PR
+ready for review → merge once `pre-merge-checks` is green. If review forces
+bytecode changes, regen again (or convert back to draft until done).

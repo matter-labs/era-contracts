@@ -1,28 +1,9 @@
-# Pre-merge checks: validation of committed generated artifacts.
-#
-# Every check in this workflow compares a committed, generated file against a
-# fresh regeneration — AllContractsHashes.json, l1-contracts/selectors,
-# l1-contracts/zkstack-out, and the anvil-interop chain-state snapshots. These
-# fail whenever contract bytecode changes, and the only fix is a regen + commit,
-# so running them on every push would force a regeneration per commit. They are
-# therefore tied to the PR's draft status:
-#
-#   - Draft PR: only per-commit CI runs; every job here skips.
-#   - Ready-for-review PR: these checks run too — on the ready_for_review
-#     transition and on every later push while the PR stays non-draft.
-#
-# Flow: iterate on a draft PR; when ready, dispatch the "Update All Generated
-# Artifacts" workflow for the PR (a single regen that commits hashes,
-# selectors, zkstack-out, and chain states to the branch), then mark the PR
-# ready for review. If review forces bytecode changes, regen again (or convert
-# back to draft until done).
-#
-# Per-commit CI (l1-contracts-ci, anvil-interop-ci, ...) intentionally excludes
-# these checks; the per-commit interop suite deploys from source, so it never
-# depends on the committed snapshots.
-#
-# The workflow also runs unconditionally in a merge queue (merge_group) should
-# one ever be enabled, and can be dispatched manually against any branch.
+# Checks that validate committed generated artifacts (AllContractsHashes.json,
+# l1-contracts/selectors, l1-contracts/zkstack-out, anvil-interop chain-state
+# snapshots). Any bytecode change invalidates them and the fix is a regen +
+# commit, so they skip on draft PRs and run once the PR is ready for review
+# (plus unconditionally on merge_group / workflow_dispatch). Flow: see
+# "CI tiers" in .github/workflows/README.md.
 name: Pre-merge checks
 
 on:
@@ -201,10 +182,8 @@ jobs:
             exit 1
           fi
 
-  # Fast interop run against the committed chain-state snapshots — the exact
-  # configuration developers run locally. Requires the snapshots to be current
-  # (see state-generation-check below); the per-commit fresh-deploy run in
-  # anvil-interop-ci.yaml covers correctness of the PR's contracts themselves.
+  # Fast interop run against the committed chain-state snapshots (the config
+  # developers run locally); requires current snapshots, see state-generation-check.
   integration-test-preloaded:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest

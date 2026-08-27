@@ -79,11 +79,8 @@ jobs:
             l2-contracts/zkout
             system-contracts/zkout
 
-  # NOTE: the committed-generated-artifact checks (check-hashes, check-selectors,
-  # check-zkstack-out) live in pre-merge-checks.yaml. They fail whenever contract
-  # bytecode changes and are fixed by a regen + commit, so they skip while a PR is
-  # a draft and run once it is marked ready for review (see that workflow's
-  # header for the flow).
+  # check-hashes, check-selectors, and check-zkstack-out live in
+  # pre-merge-checks.yaml (skipped on draft PRs).
 
   test-foundry:
     needs: [build]

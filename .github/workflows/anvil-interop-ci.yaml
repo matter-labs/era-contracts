@@ -41,19 +41,14 @@ on:
       - "yarn.lock"
 
 jobs:
-  # Per-commit job: runs the interop suite against a fresh from-source deployment,
-  # so every commit is tested against the PR's actual contracts without requiring
-  # the committed chain-state snapshots to be regenerated first. The fast
-  # preloaded-state run and the state determinism gate live in
-  # pre-merge-checks.yaml and only have to pass once, right before merging.
+  # Runs the interop suite against a fresh from-source deployment, so per-commit
+  # CI never depends on the committed chain-state snapshots being regenerated.
   integration-test:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
-      # One foundry profile for every forge invocation in this job (the builds
-      # below and the deployment scripts spawned by the test harness) so they
-      # share a compilation cache. Same profile as chain-state generation; it
-      # only strips CBOR metadata.
+      # Shared by the builds below and the harness-spawned deploy scripts (one
+      # compilation cache); same profile as chain-state generation.
       FOUNDRY_PROFILE: anvil-interop
 
     steps:
@@ -97,10 +92,7 @@ jobs:
       - name: Run interop tests (fresh deployment)
         working-directory: l1-contracts/test/anvil-interop
         env:
-          # Deploy the ecosystem from source instead of loading the committed
-          # chain-state snapshots — stale snapshots must not fail (or silently
-          # pass) per-commit CI. Fresh deploy runs the specs serially against a
-          # single set of chains, hence the longer job timeout.
+          # Fresh deploy runs the specs serially, hence the longer job timeout.
           ANVIL_INTEROP_FRESH_DEPLOY: "1"
         run: |
           echo "Running interop tests with a fresh deployment..."
@@ -169,7 +161,5 @@ jobs:
         run: |
           bash cleanup.sh
 
-  # NOTE: the chain-state determinism gate (state-generation-check) and the fast
-  # preloaded-state interop run live in pre-merge-checks.yaml: both depend on the
-  # committed chain-state snapshots being regenerated after contract changes, so
-  # they skip on draft PRs and run once the PR is marked ready for review.
+  # The state determinism gate (state-generation-check) and the preloaded-state
+  # interop run live in pre-merge-checks.yaml (skipped on draft PRs).
