@@ -13,10 +13,58 @@ description: >
   actions/cache's restore/save split has no mechanism for sharing inputs between them. Keep all
   three in step.
 
+  The restore retries on a miss: l1-contracts-ci and pre-merge-checks build the same key
+  concurrently, and the losing save is silently dropped while the winner's upload may still be
+  finalizing — so a consumer released by the losing `build` can arrive before the entry is
+  committed. The retries outwait that upload; a genuine miss (evicted entry, never built) still
+  fails, just ~2 minutes later.
+
 runs:
   using: composite
   steps:
     - name: Restore artifacts cache
+      id: try1
+      uses: actions/cache/restore@v4
+      with:
+        key: artifacts-l1-ci-${{ github.sha }}
+        path: |
+          da-contracts/cache-forge
+          da-contracts/out
+          l1-contracts/cache-forge
+          l1-contracts/out
+          l1-contracts/zkout
+          l2-contracts/cache-forge
+          l2-contracts/zkout
+          system-contracts/zkout
+
+    - name: Wait for the concurrent producer's upload
+      if: steps.try1.outputs.cache-hit != 'true'
+      shell: bash
+      run: sleep 45
+
+    - name: Restore artifacts cache (retry)
+      id: try2
+      if: steps.try1.outputs.cache-hit != 'true'
+      uses: actions/cache/restore@v4
+      with:
+        key: artifacts-l1-ci-${{ github.sha }}
+        path: |
+          da-contracts/cache-forge
+          da-contracts/out
+          l1-contracts/cache-forge
+          l1-contracts/out
+          l1-contracts/zkout
+          l2-contracts/cache-forge
+          l2-contracts/zkout
+          system-contracts/zkout
+
+    - name: Wait again before the final attempt
+      if: steps.try1.outputs.cache-hit != 'true' && steps.try2.outputs.cache-hit != 'true'
+      shell: bash
+      run: sleep 90
+
+    - name: Restore artifacts cache (final attempt)
+      if: steps.try1.outputs.cache-hit != 'true' && steps.try2.outputs.cache-hit != 'true'
       uses: actions/cache/restore@v4
       with:
         fail-on-cache-miss: true

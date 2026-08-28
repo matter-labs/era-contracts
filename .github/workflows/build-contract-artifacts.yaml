@@ -22,8 +22,9 @@ jobs:
           submodules: recursive
 
       # Both callers build the same commit into the same key, so whichever runs second reuses the
-      # first's artifacts instead of compiling again (a second save of the same key is a harmless
-      # warning). Concurrent callers both miss here and both build.
+      # first's artifacts instead of compiling again. Concurrent callers both miss here and both
+      # build; the losing save is silently dropped, which is safe because consumers retry their
+      # restore until the winning upload finalizes (see restore-ci-artifacts).
       - name: Reuse this commit's artifacts if already built
         id: reuse
         uses: actions/cache/restore@v4

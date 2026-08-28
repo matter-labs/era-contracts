@@ -17,8 +17,10 @@ permissions:
 
 jobs:
   # Shares the artifacts cache with l1-contracts-ci: on a plain push both build
-  # concurrently, but when this workflow runs alone (ready_for_review, dispatch)
-  # it reuses the artifacts l1-contracts-ci already built for this commit.
+  # concurrently, but on the ready_for_review transition — where this workflow
+  # runs alone — it reuses the artifacts l1-contracts-ci already built for this
+  # commit. (merge_group/workflow_dispatch runs build their own: caches are
+  # ref-scoped, so a PR's entries are invisible there.)
   build:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     uses: ./.github/workflows/build-contract-artifacts.yaml
