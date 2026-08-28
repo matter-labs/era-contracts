@@ -16,11 +16,12 @@ permissions:
   contents: read
 
 jobs:
+  # Shares the artifacts cache with l1-contracts-ci: on a plain push both build
+  # concurrently, but when this workflow runs alone (ready_for_review, dispatch)
+  # it reuses the artifacts l1-contracts-ci already built for this commit.
   build:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     uses: ./.github/workflows/build-contract-artifacts.yaml
-    with:
-      cache-key: artifacts-l1-pre-merge-${{ github.sha }}
 
   check-hashes:
     needs: [build]
@@ -40,8 +41,6 @@ jobs:
 
       - name: Restore this commit's artifacts
         uses: ./.github/actions/restore-ci-artifacts
-        with:
-          key: artifacts-l1-pre-merge-${{ github.sha }}
 
       - name: Check hashes
         run: yarn calculate-hashes:check
@@ -66,8 +65,6 @@ jobs:
 
       - name: Restore this commit's artifacts
         uses: ./.github/actions/restore-ci-artifacts
-        with:
-          key: artifacts-l1-pre-merge-${{ github.sha }}
 
       - name: Install foundry-zksync
         uses: ./.github/actions/install-zksync-foundry
@@ -101,8 +98,6 @@ jobs:
 
       - name: Restore this commit's artifacts
         uses: ./.github/actions/restore-ci-artifacts
-        with:
-          key: artifacts-l1-pre-merge-${{ github.sha }}
 
       - name: Build and check zkstack-out
         working-directory: l1-contracts

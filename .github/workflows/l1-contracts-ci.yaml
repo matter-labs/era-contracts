@@ -12,7 +12,6 @@ jobs:
   build:
     uses: ./.github/workflows/build-contract-artifacts.yaml
     with:
-      cache-key: artifacts-l1-ci-${{ github.sha }}
       upload-artifacts: true
 
   # check-hashes, check-selectors, and check-zkstack-out live in
