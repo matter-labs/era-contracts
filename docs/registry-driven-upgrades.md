@@ -9,12 +9,12 @@ addresses, not calldata; the contracts hold the data, validate it, and the execu
 
 Two objects, deliberately separate:
 
-|          | **Release**                                                                                       | **Transition**                                  |
-| -------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| Answers  | what a chain **is**                                                                               | how release A **becomes** release B             |
-| Contains | facet routing, `DiamondInit`, verifier, base-system hashes, genesis params, force-deployment data | version edge, upgrade engine, schedule, L2 plan |
-| Version  | none — version-independent, reusable                                                              | owns the `old -> new` version edge              |
-| VM flag  | none — read from the pinned `DiamondInit.IS_ZKSYNC_OS`                                            | —                                               |
+|          | **Release**                                                                                                                                 | **Transition**                                                         |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Answers  | what a chain **is**                                                                                                                         | how release A **becomes** release B                                    |
+| Contains | pinned facet set (routing self-described by the facets), `DiamondInit`, verifier, base-system hashes, genesis params, force-deployment data | version edge, upgrade engine, CTM-domain proxy rows, schedule, L2 plan |
+| Version  | none — version-independent, reusable                                                                                                        | owns the `old -> new` version edge                                     |
+| VM flag  | none — read from the pinned `DiamondInit.IS_ZKSYNC_OS`                                                                                      | —                                                                      |
 
 A release is reusable chain state: everything a chain _runs_ belongs to it, including the verifier
 (the chain stores it as `s.verifier`). What a release does **not** carry is anything about _when_ —
@@ -53,7 +53,7 @@ Who holds what, who reads what. Solid = writes or drives; dashed = reads.
 ```mermaid
 flowchart TB
     subgraph obj["Write-once objects — manifest fixed in the constructor"]
-      REL["CTMRelease<br/>routing + pins, verifier,<br/>system hashes, genesis params"]
+      REL["CTMRelease<br/>pinned facet rows, verifier,<br/>system hashes, genesis params"]
       TRA["CTMTransition<br/>version edge, engine, schedule,<br/>L2 plan + DERIVED cuts"]
       CR["CoreRegistry<br/>source-checked proxy rows"]
       BOOT["RegistryBootstrapMigration<br/>pre-registry entry edge"]
@@ -203,7 +203,7 @@ init calldata, so the committed cut and the source of the derived facet cuts are
 2. The CTM builds a genesis cut with **empty** `facetCuts`,
    `initAddress = currentRelease.diamondInit()`, empty `initCalldata`, and deploys the `DiamondProxy`.
 3. `DiamondInit.initialize(chainId, admin)` is delegatecalled from the proxy constructor, so
-   `msg.sender` is the CTM. It reads `currentRelease`, installs that release's explicit routing via
+   `msg.sender` is the CTM. It reads `currentRelease`, installs that release's self-described routing via
    `ReleaseFacetReader`, and takes the verifier and base-system hashes from the release.
 4. The CTM runs `IAdmin.genesisUpgrade` with the release's `fixedForceDeploymentsData` and genesis
    upgrade address.
