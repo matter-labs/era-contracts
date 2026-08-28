@@ -7,11 +7,10 @@ use zksync_multivm::interface::{
     VmInterface,
 };
 use zksync_multivm::vm_latest::{HistoryDisabled, ToTracerPointer, TracerDispatcher, Vm};
-use zksync_types::fee_model::BatchFeeInput;
-use zksync_types::settlement::SettlementLayer;
-use zksync_vm_interface::storage::{
+use zksync_state::interface::{
     InMemoryStorage, StoragePtr, StorageView, IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID,
 };
+use zksync_types::fee_model::BatchFeeInput;
 
 use std::{env, sync::Arc};
 use tracing_subscriber::fmt;
@@ -85,7 +84,6 @@ fn execute_internal_bootloader_test() {
         number: L1BatchNumber::from(1),
         timestamp: 14,
         fee_input: BatchFeeInput::sensible_l1_pegged_default(),
-        interop_fee: U256::zero(),
         fee_account: Address::default(),
 
         enforced_base_fee: None,
@@ -96,7 +94,6 @@ fn execute_internal_bootloader_test() {
             max_virtual_blocks_to_create: 1,
             interop_roots: vec![],
         },
-        settlement_layer: SettlementLayer::for_tests(),
     };
 
     // First - get the number of tests.

@@ -11,7 +11,7 @@ use zksync_multivm::vm_latest::{
 };
 use zksync_multivm::zk_evm_latest::tracing::{BeforeExecutionData, VmLocalStateData};
 
-use zksync_vm_interface::storage::{StoragePtr, WriteStorage};
+use zksync_state::interface::{StoragePtr, WriteStorage};
 
 use crate::hook::TestVmHook;
 
