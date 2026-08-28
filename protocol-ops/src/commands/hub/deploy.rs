@@ -8,6 +8,7 @@ use crate::common::{
     traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
 };
+use crate::types::L1Network;
 use alloy::primitives::{Address, B256};
 use serde::Serialize;
 
@@ -19,7 +20,8 @@ pub struct DeployInput {
     pub create2_factory_salt: Option<B256>,
     /// L1 WETH token. Baked as an immutable into the `L1AssetRouter` and
     /// `L1NativeTokenVault` implementations, so it cannot be changed after
-    /// deployment without an implementation upgrade. Defaults to mainnet WETH.
+    /// deployment without an implementation upgrade. When omitted it is
+    /// resolved from the L1 the deploy is running against.
     pub token_weth_address: Option<Address>,
 }
 
@@ -35,9 +37,10 @@ pub fn deploy(
         initial_config.create2_factory_salt = salt;
     }
 
-    if let Some(weth) = input.token_weth_address {
-        initial_config.token_weth_address = weth;
-    }
+    initial_config.token_weth_address = match input.token_weth_address {
+        Some(weth) => weth,
+        None => L1Network::from_l1_rpc(&runner.rpc_url)?.weth_address()?,
+    };
 
     let deploy_config = DeployL1Config::new(
         input.owner,

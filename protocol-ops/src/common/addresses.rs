@@ -4,11 +4,10 @@ pub const ZERO_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
 /// ETH pseudo-token address used by chain registration configs.
 pub const ETH_ADDRESS: &str = "0x0000000000000000000000000000000000000001";
 
-/// Mainnet WETH address used by the default L1 deployment config.
+/// Canonical mainnet WETH. Resolved via `L1Network::weth_address`.
 pub const MAINNET_WETH_ADDRESS: &str = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 
-/// Sepolia WETH address. Pass via `--token-weth-address` when deploying an
-/// ecosystem on Sepolia; the default config carries the mainnet address.
+/// Canonical Sepolia WETH. Resolved via `L1Network::weth_address`.
 pub const SEPOLIA_WETH_ADDRESS: &str = "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9";
 
 /// Locally deployed ZK token address used by interop fixtures.
