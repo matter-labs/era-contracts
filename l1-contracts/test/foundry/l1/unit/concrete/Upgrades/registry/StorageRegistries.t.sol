@@ -30,7 +30,6 @@ import {
     MalformedL2UpgradePlan,
     PatchMustReuseRelease,
     RegistryCodehashMismatch,
-    RegistryDuplicateFacetRow,
     RegistryDuplicateProxyRow,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
@@ -375,17 +374,21 @@ contract StorageRegistriesTest is Test {
         new CTMTransition(manifest);
     }
 
-    /// @dev Regression: two rows for the SAME facet address are rejected. `Diamond._addOneFunction`
-    ///      requires every selector of one facet to share freezability, so a split-row release would
-    ///      pin fine and then revert at genesis (and in any cut that adds it).
-    function test_revertWhen_releaseSplitsOneFacetAcrossRows() public {
+    /// @dev The release does NOT own the routing concept: a split-row (same facet twice) release
+    ///      constructs — routing well-formedness is enforced where routing executes. Here: the
+    ///      transition deriving toward it rejects the duplicated selectors (`TransitionDeltaLib`),
+    ///      BEFORE anything is committed. (Genesis would equally revert in `Diamond.diamondCut`.)
+    function test_revertWhen_transitionDerivesTowardSplitRowRelease() public {
         ReleaseManifest memory manifest = _newReleaseManifest();
-        // Re-point the frozen row at the shared facet, keeping its distinct selectors: same facet
-        // address in two rows, with DIFFERENT freezability.
+        // Same facet address in two rows: its selectors appear twice in the release's routing.
         manifest.genesisFacets[2].facet = PinnedContract({addr: facetShared, codehash: facetShared.codehash});
+        CTMRelease splitRowRelease = new CTMRelease(manifest);
 
-        vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateFacetRow.selector, facetShared));
-        new CTMRelease(manifest);
+        TransitionManifest memory transitionManifest = _transitionManifest();
+        transitionManifest.newRelease = address(splitRowRelease);
+
+        vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateSelector.selector, bytes4(uint32(0x10))));
+        new CTMTransition(transitionManifest);
     }
 
     /// @dev Regression: the transition must enforce the SAME version shape chains enforce at
@@ -509,15 +512,16 @@ contract StorageRegistriesTest is Test {
 
     // ─────────────────────────── routing hygiene ───────────────────────────
 
-    function test_revertWhen_releaseRowHasEmptySelectors() public {
-        // Routing comes from the facet's own self-description, so "empty routing" means a facet
-        // that describes no selectors.
+    function test_releaseDoesNotValidateRouting() public {
+        // Deliberate non-check: a facet describing no selectors constructs fine — the release is
+        // pinned data, and `Diamond.diamondCut` rejects empty routing (`NoFunctionsForDiamondCut`)
+        // when a chain is actually created from it.
         address emptyFacet = address(new MockSelfDescribingFacet(new bytes4[](0)));
         ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets[1].facet = PinnedContract({addr: emptyFacet, codehash: emptyFacet.codehash});
 
-        vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, emptyFacet));
-        new CTMRelease(manifest);
+        CTMRelease release = new CTMRelease(manifest);
+        assertEq(release.manifestHash(), keccak256(abi.encode(manifest)), "unvalidated routing still pins");
     }
 
     function test_revertWhen_releaseHasNoFacets() public {
@@ -547,16 +551,21 @@ contract StorageRegistriesTest is Test {
         assertFalse(codelessRelease.verifyAll(), "a codeless pin must not verify");
     }
 
-    function test_revertWhen_releaseRoutesSelectorTwice() public {
-        // A release validates its OWN routing: a selector routed twice is rejected at release
-        // initialization — the release boundary, before any transition ever derives from it.
+    function test_revertWhen_transitionDerivesTowardSelectorCollision() public {
+        // A selector routed twice constructs as a release (pinned data, no routing ownership) but
+        // is rejected when a transition derives toward it — pre-commit, so a malformed routing
+        // can never strand chains behind a bumped CTM version.
         // The colliding facet self-describes a selector facetFrozen also carries (0x20).
         address collidingFacet = address(new MockSelfDescribingFacet(_selectors1(bytes4(uint32(0x20)))));
         ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets[1].facet = PinnedContract({addr: collidingFacet, codehash: collidingFacet.codehash});
+        CTMRelease collidingRelease = new CTMRelease(manifest);
+
+        TransitionManifest memory transitionManifest = _transitionManifest();
+        transitionManifest.newRelease = address(collidingRelease);
 
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateSelector.selector, bytes4(uint32(0x20))));
-        new CTMRelease(manifest);
+        new CTMTransition(transitionManifest);
     }
 
     // ─────────────────────────── factory provenance ───────────────────────────

@@ -17,10 +17,10 @@ pragma solidity ^0.8.21;
 /// @dev The returned list MUST NOT include `selectors()` itself (or other helper views that are
 ///      not registered in the diamond, such as `getName()`): every self-describing facet exposes
 ///      it, so registering it would make two such facets collide.
-/// @dev The list MUST be strictly ascending (selectors compared as big-endian integers).
-///      `CTMRelease` enforces it at initialization: sortedness makes duplicate detection — within
-///      a facet and across a release's whole routing — a linear merge instead of nested scans.
+/// @dev By convention the list is strictly ascending (selectors compared as big-endian
+///      integers) — generated sorted, kept sorted, which keeps the packed constants
+///      deterministic and diffs reviewable.
 interface ISelfDescribingFacet {
-    /// @notice The function selectors this facet serves in the diamond, strictly ascending.
+    /// @notice The function selectors this facet serves in the diamond, ascending by convention.
     function selectors() external pure returns (bytes4[] memory);
 }

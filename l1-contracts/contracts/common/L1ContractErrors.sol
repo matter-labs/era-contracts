@@ -398,8 +398,6 @@ error RecoverToL1NotSupported();
 error Reentrancy();
 // 0xfc83be31
 error RegistryCodehashMismatch(address target, bytes32 expected, bytes32 actual);
-// 0xcb530847
-error RegistryDuplicateFacetRow(address facet);
 // 0x3e28bae4
 error RegistryDuplicateProxyRow(address proxy);
 // 0x22345d26

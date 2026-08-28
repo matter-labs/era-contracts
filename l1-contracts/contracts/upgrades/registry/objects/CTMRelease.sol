@@ -4,15 +4,8 @@ pragma solidity 0.8.28;
 
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
-import {
-    RegistryDuplicateFacetRow,
-    RegistryDuplicateSelector,
-    RegistryEmptySelectors,
-    RegistryUnsortedSelectors,
-    ZeroAddress
-} from "../../../common/L1ContractErrors.sol";
+import {RegistryEmptySelectors, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {GenesisFacet, PinnedContract, ReleaseManifest} from "../RegistryTypes.sol";
-import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
 /// @notice Storage-backed, write-once description of one CTM release.
 /// @dev Every pinned address carries its expected `EXTCODEHASH` INLINE and MANDATORILY — the
@@ -44,83 +37,18 @@ contract CTMRelease is ICTMRelease {
         // every (address, codehash) pair, so a construction-time check proves only that the pair is
         // self-consistent. `validate()` re-checks all of them against live code on every execution
         // path, which is where the property is actually needed.
-        uint256 length = _manifest.genesisFacets.length;
-        // A release IS a complete chain routing — an empty one would describe an unusable chain
-        // and, worse, derive a remove-everything delta in any transition that departs from a
-        // populated release toward it. Whole-routing validity is enforced at THIS boundary, not
-        // only when a transition later derives from the release.
-        if (length == 0) {
+        // The one facet-set check kept: an empty set would describe an unusable chain and derive
+        // a remove-everything delta in any transition departing toward it.
+        if (_manifest.genesisFacets.length == 0) {
             revert RegistryEmptySelectors(address(0));
         }
-        // Routing is read from the facets' own self-description (see {GenesisFacet}); the reads
-        // here freeze the shape checks against the exact code the rows pin. Each facet's list
-        // MUST be strictly ascending ({ISelfDescribingFacet}), which makes both duplicate checks
-        // linear: within a facet by adjacency, across the whole routing by a k-way merge.
-        bytes4[][] memory routing = new bytes4[][](length);
-        for (uint256 i = 0; i < length; ++i) {
-            routing[i] = ISelfDescribingFacet(_manifest.genesisFacets[i].facet.addr).selectors();
-            uint256 selectorsLength = routing[i].length;
-            if (selectorsLength == 0) {
-                revert RegistryEmptySelectors(_manifest.genesisFacets[i].facet.addr);
-            }
-            // Strictly ascending also rules out duplicates WITHIN the facet.
-            for (uint256 j = 1; j < selectorsLength; ++j) {
-                if (routing[i][j] <= routing[i][j - 1]) {
-                    revert RegistryUnsortedSelectors(_manifest.genesisFacets[i].facet.addr, routing[i][j]);
-                }
-            }
-            // Exactly ONE row per facet address. A facet describes its complete selector list,
-            // so a second row is never needed — and `Diamond._addOneFunction` requires every
-            // selector of one facet address to share freezability, so two rows differing in
-            // `isFreezable` would install at genesis only to revert
-            // (`SelectorsMustAllHaveSameFreezability`). Reject the shape instead of pinning a
-            // release that cannot be applied.
-            for (uint256 prev = 0; prev < i; ++prev) {
-                if (_manifest.genesisFacets[prev].facet.addr == _manifest.genesisFacets[i].facet.addr) {
-                    revert RegistryDuplicateFacetRow(_manifest.genesisFacets[i].facet.addr);
-                }
-            }
-        }
-        // A diamond routes each selector exactly once — reject duplicates ACROSS rows with a
-        // k-way merge over the (per-facet sorted) lists: repeatedly take the global minimum and
-        // require it to strictly exceed the previous one.
-        _requireGloballyUniqueSelectors(routing);
-
+        // NO routing validation here — the release does not own the routing concept at all. It
+        // pins facet rows; the selectors live in the facets' own self-description, and routing
+        // well-formedness is enforced where routing actually executes: `Diamond.diamondCut`
+        // rejects duplicate or empty routing when a chain is created, and `TransitionDeltaLib`
+        // re-walks both releases' routing when a transition derives its delta — both before
+        // anything is committed.
         encodedManifest = abi.encode(_manifest);
-    }
-
-    /// @dev K-way merge duplicate detection over per-facet ascending selector lists. `_cursors`
-    ///      tracks per-facet progress; each step picks the smallest remaining selector, which must
-    ///      strictly exceed the previously taken one. O(total · facets) with facets ~ 7.
-    function _requireGloballyUniqueSelectors(bytes4[][] memory _routing) private pure {
-        uint256 facetsLength = _routing.length;
-        uint256[] memory cursors = new uint256[](facetsLength);
-        bool first = true;
-        bytes4 previous;
-        while (true) {
-            bool found = false;
-            uint256 minFacet = 0;
-            bytes4 minSelector;
-            for (uint256 i = 0; i < facetsLength; ++i) {
-                if (cursors[i] < _routing[i].length) {
-                    bytes4 candidate = _routing[i][cursors[i]];
-                    if (!found || candidate < minSelector) {
-                        found = true;
-                        minFacet = i;
-                        minSelector = candidate;
-                    }
-                }
-            }
-            if (!found) {
-                break;
-            }
-            if (!first && minSelector == previous) {
-                revert RegistryDuplicateSelector(minSelector);
-            }
-            first = false;
-            previous = minSelector;
-            ++cursors[minFacet];
-        }
     }
 
     /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment governance compares
