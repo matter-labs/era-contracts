@@ -68,9 +68,7 @@ struct StateTransitionDeployedAddresses {
     address genesisUpgrade;
     address defaultUpgrade;
     address chainTypeManagerProxyAdmin;
-    /// @notice The bootstrap `CTMRelease` that defines chain genesis.
+    /// @notice The bootstrap `CTMRelease` that defines chain genesis. Its `EXTCODEHASH` is the
+    ///         anchor the CTM pins as `releaseCodehash` — derived where needed, never copied.
     address currentRelease;
-    /// @notice `EXTCODEHASH` of `currentRelease`. The CTM pins it as `releaseCodehash`: every
-    ///         release it ever accepts must run exactly that code.
-    bytes32 releaseCodehash;
 }

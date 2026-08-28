@@ -261,8 +261,7 @@ library AddressIntrospector {
             // Pre-registry CTMs expose neither getter, so those are the only ones reported as
             // zero; from v32 on the live pointers are read, otherwise callers that merely
             // introspect (rather than deploy) would silently see an unanchored CTM.
-            currentRelease: _isPreV32 ? address(0) : ctm.currentRelease(),
-            releaseCodehash: _isPreV32 ? bytes32(0) : ctm.releaseCodehash()
+            currentRelease: _isPreV32 ? address(0) : ctm.currentRelease()
         });
         info.l1Specific = L1SpecificStateTransitionAddresses({
             legacyValidatorTimelock: ctm.validatorTimelock(),

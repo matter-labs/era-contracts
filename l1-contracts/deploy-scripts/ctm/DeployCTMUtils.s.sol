@@ -162,7 +162,6 @@ abstract contract DeployCTMUtils is DeployUtils {
 
         vm.broadcast(getBroadcasterAddress());
         address release = address(new CTMRelease(manifest));
-        ctmAddresses.stateTransition.releaseCodehash = release.codehash;
 
         // Deploy + initialize ran in one transaction inside the factory, so the release is already
         // initialized here with no front-runnable window; this is now a pure sanity assertion.
@@ -262,7 +261,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             ChainTypeManagerInitializeData({
                 owner: getBroadcasterAddress(),
                 validatorTimelock: stateTransition.proxies.validatorTimelock,
-                releaseCodehash: stateTransition.releaseCodehash,
+                releaseCodehash: stateTransition.currentRelease.codehash,
                 currentRelease: stateTransition.currentRelease,
                 protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
                 serverNotifier: stateTransition.proxies.serverNotifier
