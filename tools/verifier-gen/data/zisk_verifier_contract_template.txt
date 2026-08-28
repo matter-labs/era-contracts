@@ -12,7 +12,7 @@ import {PUBLIC_INPUT_SHIFT} from "../../common/Config.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Verifies the aggregated ZiSK SNARK for a batch range on behalf of
 ///         MultiProofVerifier (registered as its range verifier).
-/// @dev The 320-byte ZiSK public values are RECONSTRUCTED on-chain from this
+/// @dev The 576-byte ZiSK public values are RECONSTRUCTED on-chain from this
 ///      contract's pinned VKs and the batch public inputs — nothing about the
 ///      state transition is read from the submitted proof, which carries only
 ///      the SNARK itself. MultiProofVerifier strips the proof header
@@ -59,16 +59,20 @@ contract ZiskVerifier is IZiskVerifier {
     /// of the ZiSK release. One cargo-zisk setup produces both the inner proofs
     /// and the aggregated proof, so a single pin serves both. The
     /// reconstruction uses it in the binding digest and in public-values bytes
-    /// [288..320].
+    /// [544..576].
 {{root_cv_constants}}
     /// @notice BN254 scalar field modulus.
     uint256 private constant _RFIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
+
+    /// @notice Byte length of the ZiSK public-values preimage:
+    /// aggregatorProgramVK(32) || guest publics(512) || rootCVadcopFinal(32).
+    uint256 private constant _PUBLIC_VALUES_BYTES = 576;
 
     /// @notice Hash over the three pins above, in the order inner programVK,
     /// aggregator programVK, vadcop-final root. The server derives the ZiSK
     /// verification key hash of the protocol version the same way, so a
     /// rotation of any pin is visible on both sides.
-    bytes32 private constant _VK_HASH = 0x{{vk_hash}};
+{{vk_hash_note}}    bytes32 private constant _VK_HASH = 0x{{vk_hash}};
 
     /// @inheritdoc IZiskVerifier
     function innerProgramVK() public pure override returns (bytes32) {
@@ -118,14 +122,19 @@ contract ZiskVerifier is IZiskVerifier {
             ziskProof[i] = _proof[i];
         }
 
-        // Reconstruct the 320-byte ZiSK public-values preimage the aggregated
+        // Reconstruct the 576-byte ZiSK public-values preimage the aggregated
         // proof commits to — entirely from this contract's pinned VKs and the
         // batch public inputs, never from the submitted proof. Wire layout
         // (matching the aggregator guest's output region):
         //   [0..32]    aggregatorProgramVK (this contract's pin)
-        //   [32..64]   digest              keccak256(innerProgramVK || rootCVadcopFinal || chainedPI)
-        //   [64..288]  zero (224 bytes)
-        //   [288..320] rootCVadcopFinal    (this contract's pin)
+        //   [32..544]  guest publics       64 little-endian u64 slots
+        //   [544..576] rootCVadcopFinal    (this contract's pin)
+        // A guest public holds a 32-bit value, so each slot is four significant
+        // bytes then four zero pad bytes. The aggregator guest writes the
+        // binding digest keccak256(innerProgramVK || rootCVadcopFinal ||
+        // chainedPI) into the first eight slots and leaves the rest zero:
+        //   [32..96]   digest, four bytes per slot, eight slots
+        //   [96..544]  zero (448 bytes)
         // where chainedPI is the SELF-CONTAINED (seed-0) ZKsync OS hash chain
         // over the batch public inputs.
         //
@@ -146,12 +155,16 @@ contract ZiskVerifier is IZiskVerifier {
             abi.encodePacked(innerProgramVK(), rootC, bytes32(_selfContainedChain(_publicInputs)))
         );
 
-        bytes memory publicValues = new bytes(320);
+        bytes32 digestSlots0 = _digestPublicSlots(uint128(uint256(digest) >> 128));
+        bytes32 digestSlots1 = _digestPublicSlots(uint128(uint256(digest)));
+
+        bytes memory publicValues = new bytes(_PUBLIC_VALUES_BYTES);
         assembly {
             mstore(add(publicValues, 32), aggregatorVk) // [0..32]   aggregatorProgramVK
-            mstore(add(publicValues, 64), digest) // [32..64]  binding digest
-            // [64..288] left zero by `new bytes(320)`
-            mstore(add(publicValues, 320), rootC) // [288..320] rootCVadcopFinal
+            mstore(add(publicValues, 64), digestSlots0) // [32..64]  digest slots 0-3
+            mstore(add(publicValues, 96), digestSlots1) // [64..96]  digest slots 4-7
+            // [96..544] left zero by the allocation above
+            mstore(add(publicValues, 576), rootC) // [544..576] rootCVadcopFinal
         }
 
         // The circuit's single public signal: sha256(publicValues) % RFIELD.
@@ -178,5 +191,18 @@ contract ZiskVerifier is IZiskVerifier {
         // which reaches the same value through the same rule.
         result = _publicInputs.length == 1 ? _publicInputs[0] : uint256(keccak256(abi.encodePacked(_publicInputs)));
         result = result >> PUBLIC_INPUT_SHIFT;
+    }
+
+    /// @dev The four guest-public slots that carry `_digestHalf`, sixteen
+    ///      digest bytes read as four 4-byte groups. A slot holds one group in
+    ///      its four significant bytes and four zero pad bytes, so the four
+    ///      slots are one 32-byte word of the public values. Call it on the
+    ///      high half for word [32..64] and on the low half for word [64..96].
+    function _digestPublicSlots(uint128 _digestHalf) private pure returns (bytes32 slots) {
+        uint256 packed;
+        for (uint256 i = 0; i < 4; ++i) {
+            packed |= uint256(uint32(_digestHalf >> (96 - i * 32))) << (224 - i * 64);
+        }
+        slots = bytes32(packed);
     }
 }
