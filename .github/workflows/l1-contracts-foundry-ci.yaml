@@ -83,6 +83,8 @@ jobs:
 
       - name: Use Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.4.3
 
       - name: Copy configs from template
         working-directory: ./l1-contracts
