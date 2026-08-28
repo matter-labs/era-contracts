@@ -19,6 +19,7 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {MockCTMForDiamondInit} from "contracts/dev-contracts/test/MockCTMForDiamondInit.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {GenesisManifestLib} from "contracts/upgrades/registry/libraries/GenesisManifestLib.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -200,33 +201,16 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         // create2 deployment is covered by the Gateway CTM deployer tests; this one builds an
         // equivalent release below and only exercises the diamond cut.
 
-        // Mock the CTM calls that DiamondInit.initialize() makes. The CTM is `msg.sender`
-        // during the proxy construction, so the deploy below pranks as this mock.
-        address mockCTM = address(0xC7A1);
-        vm.mockCall(
-            mockCTM,
-            abi.encodeWithSelector(IChainTypeManager.PERMISSIONLESS_VALIDATOR.selector),
-            abi.encode(address(0))
-        );
-        vm.mockCall(
-            mockCTM,
-            abi.encodeWithSelector(IChainTypeManager.BRIDGE_HUB.selector),
-            abi.encode(L2_BRIDGEHUB_ADDR)
-        );
-        vm.mockCall(
-            mockCTM,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
-            abi.encode(config.protocolVersion)
-        );
-        vm.mockCall(
-            mockCTM,
-            abi.encodeWithSelector(IChainTypeManager.validatorTimelockPostV29.selector),
-            abi.encode(address(0x1337))
-        );
-        vm.mockCall(
-            mockCTM,
-            abi.encodeWithSelector(IChainTypeManager.storedBatchZero.selector),
-            abi.encode(bytes32(uint256(1)))
+        // A real mock contract for the CTM calls DiamondInit.initialize() makes. The CTM is
+        // `msg.sender` during the proxy construction, so the deploy below pranks as this mock.
+        address mockCTM = address(
+            new MockCTMForDiamondInit(
+                address(0),
+                L2_BRIDGEHUB_ADDR,
+                config.protocolVersion,
+                address(0x1337),
+                bytes32(uint256(1))
+            )
         );
         // The L2 bridgehub built-in has no code in this test; etch a stub so it can be mocked.
         vm.etch(L2_BRIDGEHUB_ADDR, hex"00");

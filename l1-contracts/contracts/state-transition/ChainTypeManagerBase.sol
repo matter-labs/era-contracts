@@ -114,10 +114,12 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev Both validatorTimelock and validatorTimelockPostV29 getters are available for backward compatibility of nodes that rely on the validatorTimelock address being available.
     address public validatorTimelockPostV29;
 
-    /// @dev The block number when the upgrade commitment (transition or legacy cut) was saved for
-    ///      some protocolVersion.
-    /// @dev It's used for easier tracking the upgrade cutData off-chain.
-    mapping(uint256 protocolVersion => uint256) public upgradeCutDataBlock;
+    /// @dev Deprecated. Off-chain tooling used it to locate the `NewUpgradeCutData` log for a
+    ///      version; the legacy cut-taking commit still writes it (its tooling reads it for the
+    ///      bootstrap edge), registry-driven commits do not — the cut is read from
+    ///      {upgradeCutForVersion}, no log archaeology needed. Served read-only
+    ///      ({upgradeCutDataBlock}) otherwise.
+    mapping(uint256 protocolVersion => uint256) internal __DEPRECATED_upgradeCutDataBlock;
 
     /// @dev Deprecated, no longer written. Off-chain tooling used it to locate the block where
     ///      chain-creation params changed; under the registry model the genesis data is read
@@ -412,7 +414,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         // (`upgradeCutForVersion`), its deadline resolves from it (`protocolVersionDeadline`),
         // so neither the deprecated `upgradeCutHash` nor the legacy deadline storage is written.
         upgradeTransition[oldProtocolVersion] = address(_transition);
-        upgradeCutDataBlock[oldProtocolVersion] = block.number;
         emit NewUpgradeTransition(oldProtocolVersion, address(_transition));
         // Off-chain consumers keep receiving the composed cut through the same event as before.
         emit NewUpgradeCutData(newProtocolVersion, _transitionUpgradeCut(_transition));
@@ -477,6 +478,13 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         return __DEPRECATED_protocolVersionDeadline[_protocolVersion];
     }
 
+    /// @notice Deprecated. The block of a LEGACY cut commit, where its tooling finds the
+    ///         `NewUpgradeCutData` log; zero for registry-driven edges (read the cut from
+    ///         {upgradeCutForVersion} instead).
+    function upgradeCutDataBlock(uint256 _protocolVersion) public view returns (uint256) {
+        return __DEPRECATED_upgradeCutDataBlock[_protocolVersion];
+    }
+
     /// @notice Deprecated. The block where pre-v34 code recorded a chain-creation-params change;
     ///         nothing writes it any more — genesis data is read from `currentRelease`.
     function newChainCreationParamsBlock(uint256 _protocolVersion) public view returns (uint256) {
@@ -505,7 +513,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     function setUpgradeDiamondCutInner(Diamond.DiamondCutData memory _cutData, uint256 _oldProtocolVersion) internal {
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         __DEPRECATED_upgradeCutHash[_oldProtocolVersion] = newCutHash;
-        upgradeCutDataBlock[_oldProtocolVersion] = block.number;
+        __DEPRECATED_upgradeCutDataBlock[_oldProtocolVersion] = block.number;
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
         emit NewUpgradeCutData(_oldProtocolVersion, _cutData);
     }

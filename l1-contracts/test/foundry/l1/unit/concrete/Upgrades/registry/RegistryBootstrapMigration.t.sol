@@ -153,8 +153,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 expectedProtocolVersion: chainContractAddress.protocolVersion(),
                 ctmProxyAdmin: ecosystemProxyAdmin,
                 proxyRows: rows,
-                releaseCodehash: Utils.releaseCodehash(),
-                currentRelease: address(genesisRelease),
+                currentRelease: PinnedContract({addr: address(genesisRelease), codehash: Utils.releaseCodehash()}),
                 newProtocolVersion: newVersion,
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeCut: Diamond.DiamondCutData({

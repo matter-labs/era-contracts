@@ -56,7 +56,7 @@ contract RegistryBootstrapMigration {
         if (
             _manifest.ctm == address(0) ||
             address(_manifest.ctmProxyAdmin) == address(0) ||
-            _manifest.currentRelease == address(0) ||
+            _manifest.currentRelease.addr == address(0) ||
             _manifest.ctmExecutor.addr == address(0)
         ) {
             revert ZeroAddress();
@@ -143,8 +143,8 @@ contract RegistryBootstrapMigration {
 
         // The release must run the very code this migration installs as the anchor, so the anchor
         // and the release it vouches for cannot be mismatched at the moment of installation.
-        ICTMRelease(m.currentRelease).validate();
-        m.currentRelease.requirePin(m.releaseCodehash);
+        ICTMRelease(m.currentRelease.addr).validate();
+        CodehashPinLib.requirePin(m.currentRelease);
     }
 
     /// @notice Performs the whole edge, then hands authority to the bound executors.
@@ -186,8 +186,8 @@ contract RegistryBootstrapMigration {
             _newProtocolVersion: m.newProtocolVersion
         });
         // The anchor first: `setCurrentRelease` checks the release against it.
-        ctm.setReleaseCodehash(m.releaseCodehash);
-        ctm.setCurrentRelease(m.currentRelease);
+        ctm.setReleaseCodehash(m.currentRelease.codehash);
+        ctm.setCurrentRelease(m.currentRelease.addr);
 
         // Authority leaves in the same transaction it arrived. The ProxyAdmin is plain `Ownable`,
         // so its transfer lands immediately. The CTM is `Ownable2Step`, so this NOMINATES the
@@ -198,6 +198,6 @@ contract RegistryBootstrapMigration {
         Ownable2Step(m.ctm).transferOwnership(m.ctmExecutor.addr);
         m.ctmProxyAdmin.transferOwnership(m.ctmExecutor.addr);
 
-        emit EcosystemBootstrapped(m.ctm, m.currentRelease, m.newProtocolVersion);
+        emit EcosystemBootstrapped(m.ctm, m.currentRelease.addr, m.newProtocolVersion);
     }
 }

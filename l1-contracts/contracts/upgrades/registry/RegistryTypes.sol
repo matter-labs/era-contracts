@@ -131,10 +131,9 @@ struct CoreRegistryManifest {
 /// @param proxyRows Source-checked implementation swaps: each row applies only if the proxy
 ///        currently points at `expectedOldImpl`, and each `implNew` carries an inline pin. The
 ///        CTM's own implementation swap is one of these rows.
-/// @param releaseCodehash The canonical provenance anchor installed on the CTM: the
-///        `EXTCODEHASH` every release this CTM pins must run.
-/// @param currentRelease The genesis release pinned as `currentRelease`; must run
-///        `releaseCodehash`, which the CTM re-checks itself.
+/// @param currentRelease The pinned genesis release installed as `currentRelease`. Its
+///        `codehash` doubles as the CTM's canonical provenance anchor (`releaseCodehash`):
+///        every release this CTM ever pins must run exactly that code.
 /// @param newProtocolVersion The version the CTM moves to.
 /// @param oldProtocolVersionDeadline Until when the departing version stays usable.
 /// @param upgradeCut The diamond cut committed for chains upgrading across this edge. It cannot
@@ -153,8 +152,7 @@ struct BootstrapManifest {
     uint256 expectedProtocolVersion;
     ProxyAdmin ctmProxyAdmin;
     ProxyUpgradeRow[] proxyRows;
-    bytes32 releaseCodehash;
-    address currentRelease;
+    PinnedContract currentRelease;
     uint256 newProtocolVersion;
     uint256 oldProtocolVersionDeadline;
     Diamond.DiamondCutData upgradeCut;
