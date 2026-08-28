@@ -17,7 +17,6 @@ pub enum DAValidatorType {
     /// message preimages. On ZKsync OS that region still goes into blobs, so the chain runs the same
     /// DA validator a rollup does and differs from it only in `PubdataContent`; the Era VM has no
     /// pubdata-content axis, so there this is the classic no-DA validium (`EmptyNoDA`).
-    #[value(alias = "no-da")]
     LogsOnlyValidium,
     /// Hands the full pubdata to an external DA layer.
     Avail,
