@@ -18,10 +18,10 @@ case "$(uname -s)" in
   *) echo "unsupported OS $(uname -s)" >&2 && exit 1 ;;
 esac
 
-versions=$(find . -name foundry.toml \
-    -not -path './node_modules/*' -not -path '*/node_modules/*' -not -path '*/lib/*' \
-    -exec grep -hoP '^\s*zksolc\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' {} + \
-  | sort -u)
+# Every package lives one level below the repository root, so a glob is enough and
+# this stays portable to the slim images used for the docker builds.
+versions=$(sed -n 's/^[[:space:]]*zksolc[[:space:]]*=[[:space:]]*"\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)".*/\1/p' \
+    ./*/foundry.toml | sort -u)
 
 if [ -z "$versions" ]; then
   echo "no zksolc version pinned in any foundry.toml" >&2
