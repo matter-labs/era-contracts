@@ -32,7 +32,7 @@ import {NonZeroCarriedHash} from "../../common/L1ContractErrors.sol";
 ///
 ///      The ZiSK public values are NOT carried in the proof. Every range,
 ///      single batch or many, is ONE aggregated proof checked by
-///      `ziskRangeVerifier`, which RECONSTRUCTS the 320-byte ZiSK public
+///      `ziskRangeVerifier`, which RECONSTRUCTS the 576-byte ZiSK public
 ///      values on-chain from its own pinned VKs and the batch public inputs
 ///      (the self-contained seed-0 chain). Reconstructing rather than reading
 ///      them makes the cross-proof binding inherent: a ZiSK proof that

@@ -19,10 +19,14 @@
 //! - Hardcodes `aggregatorProgramVK` (ROM Merkle root of the aggregator guest
 //!   ELF — it enters public-values bytes [0..32] only)
 //! - Hardcodes `rootCVadcopFinal` (vadcop final root — changes on SNARK circuit
-//!   regen; one value serves the digest and public-values bytes [288..320])
-//! - Reconstructs the 320-byte public values from those pins and the batch
+//!   regen; one value serves the digest and public-values bytes [544..576])
+//! - Reconstructs the 576-byte public values from those pins and the batch
 //!   public inputs, then computes `sha256(publicValues) % RFIELD`
 //! - Calls the inner snarkJS PlonkVerifier for the actual SNARK check
+//!
+//! A programVK the ZiSK release has not published yet is carried as a
+//! placeholder. The generator recognizes each placeholder and marks the
+//! generated pin, and the VK hash derived from it, `STALE`.
 
 use serde::Deserialize;
 use sha3::{Digest, Keccak256};
@@ -36,26 +40,37 @@ struct ZiskVk {
     root_cv_adcop_final: [u64; 4],
 }
 
-/// The stand-in aggregator programVK: `keccak256("zisk-aggregator-programvk-standin")`,
-/// read as four big-endian u64 limbs.
-///
-/// The aggregator ELF setup (`cargo-zisk rom-setup`) is a deferred step, so no
-/// real aggregator programVK exists yet. The stand-in is deliberately different
-/// from the inner programVK, so a swapped pin fails the tests instead of
-/// passing unnoticed.
-const AGGREGATOR_PROGRAM_VK_STANDIN: [u64; 4] = [
-    17729362989869135779,
-    4982293879150230269,
-    707304827962946936,
-    5830690200720541849,
+/// Placeholder inner programVK: `keccak256("zisk-inner-programvk-stale")`, read
+/// as four big-endian u64 limbs.
+const INNER_PROGRAM_VK_PLACEHOLDER: [u64; 4] = [
+    13700430501868844200,
+    15096809239806032041,
+    12859342089998199634,
+    9860071608042129445,
 ];
 
-/// The NatSpec the generator adds while the aggregator pin is the stand-in.
-const AGGREGATOR_PROGRAM_VK_STANDIN_NOTE: &str = concat!(
-    "    /// @dev This pin is a STAND-IN: keccak256(\"zisk-aggregator-programvk-standin\").\n",
-    "    /// The aggregator ELF setup is deferred. Run `cargo-zisk rom-setup` on the\n",
-    "    /// aggregator guest ELF to get the real programVK. Put the four limbs into\n",
-    "    /// the ZiSK VK JSON and regenerate this contract.\n",
+/// Placeholder aggregator programVK:
+/// `keccak256("zisk-aggregator-programvk-stale")`, read as four big-endian u64
+/// limbs. It differs from the inner placeholder, so a swapped pin still fails.
+const AGGREGATOR_PROGRAM_VK_PLACEHOLDER: [u64; 4] = [
+    12432157590653728692,
+    12050317199529546573,
+    4997395890756632183,
+    12023935818373595804,
+];
+
+/// The NatSpec the generator adds above a placeholder programVK pin.
+const PLACEHOLDER_PIN_NOTE: &str = concat!(
+    "    /// @dev STALE: a placeholder, not a guest ELF root. The real limbs come\n",
+    "    /// from the `rotate-program-vks` dispatch in the ZiSK repository. Put them\n",
+    "    /// into the ZiSK VK JSON and regenerate this contract.\n",
+);
+
+/// The NatSpec the generator adds above the VK hash while any pin is a
+/// placeholder.
+const PLACEHOLDER_VK_HASH_NOTE: &str = concat!(
+    "    /// @dev STALE: derived from a placeholder programVK pin, so it names no\n",
+    "    /// deployed guest. It rotates with the pin.\n",
 );
 
 /// Format four u64 limbs as private Solidity constants named `_{prefix}_{index}`.
@@ -89,25 +104,40 @@ pub fn generate_zisk_verifier(
 
     let template = fs::read_to_string("data/zisk_verifier_contract_template.txt")?;
 
-    let inner_program_vk_constants = limb_constants("INNER_PROGRAM_VK", &vk.inner_program_vk);
+    // While a pin is a placeholder, the generated contract says so.
+    let inner_is_placeholder = vk.inner_program_vk == INNER_PROGRAM_VK_PLACEHOLDER;
+    let inner_program_vk_constants = format!(
+        "{}{}",
+        if inner_is_placeholder {
+            PLACEHOLDER_PIN_NOTE
+        } else {
+            ""
+        },
+        limb_constants("INNER_PROGRAM_VK", &vk.inner_program_vk),
+    );
 
-    // While the pin is the stand-in, the generated contract says so.
-    let aggregator_is_standin = vk.aggregator_program_vk == AGGREGATOR_PROGRAM_VK_STANDIN;
+    let aggregator_is_placeholder = vk.aggregator_program_vk == AGGREGATOR_PROGRAM_VK_PLACEHOLDER;
     let aggregator_program_vk_constants = format!(
         "{}{}",
-        if aggregator_is_standin {
-            AGGREGATOR_PROGRAM_VK_STANDIN_NOTE
+        if aggregator_is_placeholder {
+            PLACEHOLDER_PIN_NOTE
         } else {
             ""
         },
         limb_constants("AGGREGATOR_PROGRAM_VK", &vk.aggregator_program_vk),
     );
 
+    let vk_hash_note = if inner_is_placeholder || aggregator_is_placeholder {
+        PLACEHOLDER_VK_HASH_NOTE
+    } else {
+        ""
+    };
+
     let root_cv_constants = limb_constants("ROOT_CV_ADCOP_FINAL", &vk.root_cv_adcop_final);
 
     // Compute VK hash = keccak256(innerProgramVK || aggregatorProgramVK ||
     // rootCVadcopFinal), u64 limbs serialized big-endian — the same byte order
-    // the 320-byte public values use on the wire. Every pin enters the hash, so
+    // the 576-byte public values use on the wire. Every pin enters the hash, so
     // a rotation of any one of them rotates the hash.
     let mut vk_hash_preimage = Vec::with_capacity(96);
     extend_with_limbs(&mut vk_hash_preimage, &vk.inner_program_vk);
@@ -123,14 +153,18 @@ pub fn generate_zisk_verifier(
             &aggregator_program_vk_constants,
         )
         .replace("{{root_cv_constants}}", &root_cv_constants)
+        .replace("{{vk_hash_note}}", vk_hash_note)
         .replace("{{vk_hash}}", &vk_hash);
 
     fs::write(output_path, &contract)?;
     println!("Generated ZiskVerifier at: {}", output_path);
     println!("  innerProgramVK: {:?}", vk.inner_program_vk);
+    if inner_is_placeholder {
+        println!("  WARNING: the inner programVK is the documented placeholder");
+    }
     println!("  aggregatorProgramVK: {:?}", vk.aggregator_program_vk);
-    if aggregator_is_standin {
-        println!("  WARNING: the aggregator programVK is the documented stand-in");
+    if aggregator_is_placeholder {
+        println!("  WARNING: the aggregator programVK is the documented placeholder");
     }
     println!("  rootCVadcopFinal: {:?}", vk.root_cv_adcop_final);
     println!("  VK hash: 0x{}", vk_hash);

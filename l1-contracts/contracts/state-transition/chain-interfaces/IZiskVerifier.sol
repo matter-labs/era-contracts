@@ -9,7 +9,7 @@ import {IVerifier} from "./IVerifier.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice IVerifier plus the three values every generated ZiSK verifier pins,
 ///         in their 32-byte wire forms: the four u64 limbs big-endian, in
-///         order — exactly the bytes the reconstructed 320-byte public values
+///         order — exactly the bytes the reconstructed 576-byte public values
 ///         carry.
 /// @dev The ZiSK verifier reconstructs the aggregated proof's public values
 ///      (and the binding digest) from these pins on-chain, so nothing is read
@@ -24,8 +24,8 @@ interface IZiskVerifier is IVerifier {
     /// @notice The pinned programVK (ROM Merkle root) of the inner
     ///         state-transition guest ELF. It enters the binding digest as
     ///         `keccak256(innerProgramVK || rootCVadcopFinal || chainedPI)`.
-    ///         The aggregated proof carries that digest in public-values bytes
-    ///         [32..64].
+    ///         The aggregated proof carries that digest across the first eight
+    ///         guest-public slots, public-values bytes [32..96].
     function innerProgramVK() external view returns (bytes32);
 
     /// @notice The pinned programVK (ROM Merkle root) of the aggregator guest
@@ -35,6 +35,6 @@ interface IZiskVerifier is IVerifier {
 
     /// @notice The pinned vadcop-final root commitment (recursive-setup VK) of
     ///         the ZiSK release. One value serves both roles: it enters the
-    ///         binding digest, and it occupies public-values bytes [288..320].
+    ///         binding digest, and it occupies public-values bytes [544..576].
     function rootCVadcopFinal() external view returns (bytes32);
 }

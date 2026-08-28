@@ -2,28 +2,39 @@
 
 `MultiProofVerifier` accepts a combined proof (type 5) and requires BOTH an
 Airbender SNARK and a ZiSK SNARK for every state transition. `ZiskVerifier`
-is its range verifier: it pins three values, RECONSTRUCTS the 320-byte ZiSK
+is its range verifier: it pins three values, RECONSTRUCTS the 576-byte ZiSK
 public values on-chain from those pins and the batch public inputs (the
 self-contained seed-0 chain), and delegates the Plonk check to a standalone
 snarkJS-generated verifier referenced through `IZiskSnarkPlonkVerifier`. The
 public values are not carried in the proof, so there is nothing redundant to
 cross-check and the cross-proof binding is inherent.
 
+The public values are `aggregatorProgramVK(32) || guest publics(512) ||
+rootCVadcopFinal(32)`. The guest-publics section is 64 little-endian u64
+slots, one per guest public. A guest public holds a 32-bit value, so each
+slot carries four significant bytes and four zero pad bytes. The aggregator
+guest writes the binding digest into the first eight slots, bytes
+`[32..96]`, and leaves the remaining slots zero.
+
 The three pins are:
 
 - `innerProgramVK` — the programVK of the inner state-transition guest ELF.
   It enters the binding digest
   `keccak256(innerProgramVK || rootCVadcopFinal || chainedPI)`, because the
-  aggregator guest builds that digest from the inner proofs it ingests.
+  aggregator guest builds that digest from the inner proofs it ingests. The
+  `rotate-program-vks` dispatch in the ZiSK repository publishes it.
 - `aggregatorProgramVK` — the programVK of the aggregator guest ELF. The
   aggregated proof attests to that program, so this pin is public-values
-  bytes `[0..32]`. Run `cargo-zisk rom-setup` on the aggregator ELF to get
-  it, put the four limbs into `tools/verifier-gen/data/ZiSK_vk.json`, and regenerate the
-  contract.
+  bytes `[0..32]`. The same `rotate-program-vks` dispatch publishes it.
 - `rootCVadcopFinal` — the vadcop-final recursive-setup constant of the ZiSK
   release. One cargo-zisk setup produces the inner proofs and the aggregated
   proof, so a single pin serves both the digest and public-values bytes
-  `[288..320]`.
+  `[544..576]`.
+
+Put the four limbs of each pin into `tools/verifier-gen/data/ZiSK_vk.json`
+and regenerate the contract. A programVK the ZiSK release has not published
+yet stays at the placeholder the generator recognizes, which marks the pin
+and the VK hash `STALE` in the generated source.
 
 `verificationKeyHash()` is `keccak256` over the three pins in that order, so
 a rotation of any pin rotates the hash.
