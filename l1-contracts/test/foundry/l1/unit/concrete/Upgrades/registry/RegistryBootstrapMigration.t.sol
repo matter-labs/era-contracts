@@ -24,7 +24,7 @@ import {
     BootstrapAlreadyExecuted,
     BootstrapAuthorityNotHeld,
     BootstrapExecutorNotBound,
-    EcosystemImplMismatch,
+    ProxyUpgradeRowMismatch,
     RegistryCodehashMismatch,
     RegistryDuplicateProxyRow,
     ZeroAddress
@@ -32,7 +32,7 @@ import {
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {
     BootstrapManifest,
-    EcosystemContractRow,
+    ProxyUpgradeRow,
     GenesisFacet,
     ReleaseGenesisData,
     ReleaseManifest,
@@ -93,6 +93,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             governor,
             makeAddr("emergencyUpgradeBoard"),
             IChainTypeManager(address(chainContractAddress)),
+            ecosystemProxyAdmin,
             Utils.transitionCodehash()
         );
         ecoExecutor = new EcosystemUpgradeExecutor(
@@ -139,8 +140,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     }
 
     function _manifest() internal view returns (BootstrapManifest memory) {
-        EcosystemContractRow[] memory rows = new EcosystemContractRow[](1);
-        rows[0] = EcosystemContractRow({
+        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](1);
+        rows[0] = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
             implNew: PinnedContract({addr: implV32, codehash: implV32.codehash})
@@ -162,8 +163,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                     initCalldata: hex""
                 }),
                 upgradeCutInitCodehash: upgradeCutInit.codehash,
-                ctmExecutor: PinnedContract({addr: address(ctmExecutor), codehash: address(ctmExecutor).codehash}),
-                ecosystemExecutor: PinnedContract({addr: address(ecoExecutor), codehash: address(ecoExecutor).codehash})
+                ctmExecutor: PinnedContract({addr: address(ctmExecutor), codehash: address(ctmExecutor).codehash})
             });
     }
 
@@ -202,9 +202,14 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         // The verifier is pinned by the release the bootstrap installs, not by a version-keyed map.
         assertEq(CTMRelease(chainContractAddress.currentRelease()).verifier(), address(testnetVerifier));
 
-        // Authority ended up with the executors — never left resting in the migration.
+        // The WHOLE CTM domain ended up with the one CTM-bound executor — never left resting in
+        // the migration.
         assertEq(chainContractAddress.owner(), address(ctmExecutor), "CTM must be owned by its executor");
-        assertEq(ecosystemProxyAdmin.owner(), address(ecoExecutor), "ProxyAdmin must be owned by its executor");
+        assertEq(
+            ecosystemProxyAdmin.owner(),
+            address(ctmExecutor),
+            "CTM-domain ProxyAdmin must be owned by the CTM executor"
+        );
         assertTrue(migration.executed(), "migration must be marked executed");
     }
 
@@ -244,6 +249,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             governor,
             makeAddr("emergencyUpgradeBoard2"),
             IChainTypeManager(foreignCtm),
+            ecosystemProxyAdmin,
             Utils.transitionCodehash()
         );
         BootstrapManifest memory manifest = _manifest();
@@ -269,16 +275,17 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         assertFalse(mismatched.executed(), "a refused edge must stay unspent");
     }
 
-    function test_revertWhen_ecosystemExecutorIsBoundToAnotherProxyAdmin() public {
+    function test_revertWhen_ctmExecutorIsBoundToAnotherProxyAdmin() public {
         ProxyAdmin foreignProxyAdmin = new ProxyAdmin();
-        EcosystemUpgradeExecutor foreignExecutor = new EcosystemUpgradeExecutor(
+        CTMUpgradeExecutor foreignExecutor = new CTMUpgradeExecutor(
             governor,
             makeAddr("emergencyUpgradeBoard2"),
+            IChainTypeManager(address(chainContractAddress)),
             foreignProxyAdmin,
-            Utils.coreRegistryCodehash()
+            Utils.transitionCodehash()
         );
         BootstrapManifest memory manifest = _manifest();
-        manifest.ecosystemExecutor = PinnedContract({
+        manifest.ctmExecutor = PinnedContract({
             addr: address(foreignExecutor),
             codehash: address(foreignExecutor).codehash
         });
@@ -321,13 +328,13 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     ///      pre-migration implementation) and the last would silently win — so the reviewed edge
     ///      and the executed edge would differ. Same rule {CoreRegistry} enforces.
     function test_revertWhen_manifestCarriesDuplicateProxyRows() public {
-        EcosystemContractRow[] memory rows = new EcosystemContractRow[](2);
-        rows[0] = EcosystemContractRow({
+        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](2);
+        rows[0] = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
             implNew: PinnedContract({addr: implV32, codehash: implV32.codehash})
         });
-        rows[1] = EcosystemContractRow({
+        rows[1] = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
             implNew: PinnedContract({addr: implV31, codehash: implV31.codehash})
@@ -340,8 +347,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     }
 
     function test_revertWhen_manifestCarriesAZeroRowField() public {
-        EcosystemContractRow[] memory rows = new EcosystemContractRow[](1);
-        rows[0] = EcosystemContractRow({
+        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](1);
+        rows[0] = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: address(0),
             implNew: PinnedContract({addr: implV32, codehash: implV32.codehash})
@@ -379,7 +386,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         _handOverAuthority();
 
         vm.expectRevert(
-            abi.encodeWithSelector(EcosystemImplMismatch.selector, address(ecosystemProxy), implV31, implV32)
+            abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(ecosystemProxy), implV31, implV32)
         );
         migration.migrate();
     }

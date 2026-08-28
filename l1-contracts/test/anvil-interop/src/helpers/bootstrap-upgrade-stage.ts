@@ -23,9 +23,10 @@
  *      handing the committed cut — verified against `upgradeCutHash` exactly like production
  *      pre-v34 chains do.
  *
- * After this stage the CTM is owned by `CTMUpgradeExecutor`, the ProxyAdmin by
- * `EcosystemUpgradeExecutor`, and every later upgrade is registry-driven — which is exactly what
- * the runner's next stage exercises.
+ * After this stage the WHOLE CTM domain — the CTM and its own ProxyAdmin — is owned by
+ * `CTMUpgradeExecutor`, and every later upgrade is registry-driven — which is exactly what the
+ * runner's next stage exercises. (Ecosystem singletons stay under the separate ecosystem
+ * ProxyAdmin / `EcosystemUpgradeExecutor`.)
  */
 
 import { ethers } from "ethers";
@@ -172,7 +173,6 @@ export async function bootstrapInitArgs(
     releaseCodehash: string;
     currentRelease: string;
     ctmExecutor: string;
-    ecosystemExecutor: string;
   }
 ): Promise<any> {
   const codehash = async (addr: string) => ethers.utils.keccak256(await l1Provider.getCode(addr));
@@ -196,10 +196,9 @@ export async function bootstrapInitArgs(
     oldProtocolVersionDeadline: ethers.BigNumber.from(manifest.bootstrap.oldProtocolVersionDeadline),
     upgradeCut: buildBootstrapCut(manifest, packSemVer),
     upgradeCutInitCodehash: manifest.bootstrap.upgradeEngine.codehash,
-    // The executors are deployed by this run (regular build), so their codehashes are read live
+    // The executor is deployed by this run (regular build), so its codehash is read live
     // rather than committed — the manifest pins only cross-machine-stable values.
     ctmExecutor: { addr: params.ctmExecutor, codehash: await codehash(params.ctmExecutor) },
-    ecosystemExecutor: { addr: params.ecosystemExecutor, codehash: await codehash(params.ecosystemExecutor) },
   };
 }
 
@@ -371,7 +370,7 @@ export async function assertBootstrapEndState(
   a.assertEq(
     await proxyAdmin.owner(),
     params.ecoExecutor,
-    "ecosystem ProxyAdmin owned by EcosystemUpgradeExecutor after the bootstrap"
+    "CTM-domain ProxyAdmin owned by CTMUpgradeExecutor after the bootstrap"
   );
 
   for (const chain of params.chains) {

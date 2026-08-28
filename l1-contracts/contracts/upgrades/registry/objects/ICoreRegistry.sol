@@ -2,14 +2,14 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {EcosystemContractRow} from "../RegistryTypes.sol";
+import {ProxyUpgradeRow} from "../RegistryTypes.sol";
 
 /// @title Core (ecosystem-wide) upgrade registry.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The lookup surface of a storage-backed, write-once registry that pins every
 ///         ecosystem-wide L1 contract row for one protocol upgrade, as a `fromState -> toState`
-///         edge (see {EcosystemContractRow}).
+///         edge (see {ProxyUpgradeRow}).
 /// @dev The registry is initialized once from an audited manifest; `manifestHash` commits to the
 ///      pinned values and each `implNew` carries an inline `EXTCODEHASH` pin verified by
 ///      `validate()` / `verifyAll()`. Version-schedule identity is owned by {ICTMTransition},
@@ -21,7 +21,7 @@ interface ICoreRegistry {
 
     /// @notice Every ecosystem contract participating in this upgrade, as complete typed rows —
     ///         one call, no per-key rescans. Consumers iterate these directly.
-    function ecosystemRows() external view returns (EcosystemContractRow[] memory);
+    function ecosystemRows() external view returns (ProxyUpgradeRow[] memory);
 
     /// @notice Walks every pinned implementation and compares its `EXTCODEHASH` against the hash
     ///         pinned at generation time. Anyone can call this to check that deployed bytecode

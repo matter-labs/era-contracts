@@ -24,7 +24,8 @@ import {
     TransitionDeadlineBeforeUpgrade,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
-import {L2UpgradePlan, PinnedContract, TransitionManifest} from "../RegistryTypes.sol";
+import {L2UpgradePlan, PinnedContract, ProxyUpgradeRow, TransitionManifest} from "../RegistryTypes.sol";
+import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 
 /// @notice Storage-backed, write-once transition between two CTM releases.
 /// @dev The facet cuts and base-system hash changes are NOT part of the manifest: they are
@@ -61,6 +62,9 @@ contract CTMTransition is ICTMTransition {
         ) {
             revert ZeroAddress();
         }
+        // CTM-domain implementation swaps ride on the transition (see {TransitionManifest});
+        // empty is the common case — most upgrades change chain state, not the CTM itself.
+        ProxyUpgradeRowLib.validateRows(_manifest.ctmProxyRows);
         // A transition only ever moves the version forward — the same rule chains enforce at
         // execution and the CTM enforces in `setNewVersionUpgrade`.
         if (_manifest.newProtocolVersion <= _manifest.oldProtocolVersion) {
@@ -203,11 +207,16 @@ contract CTMTransition is ICTMTransition {
         return getManifest().l2Plan;
     }
 
+    function ctmProxyRows() external view returns (ProxyUpgradeRow[] memory) {
+        return getManifest().ctmProxyRows;
+    }
+
     function validate() external view {
         TransitionManifest memory m = getManifest();
         ICTMRelease(m.newRelease).validate();
         ICTMRelease(m.fromRelease).validate();
         _requirePin(m.upgradeEngine);
+        ProxyUpgradeRowLib.requireRowPins(m.ctmProxyRows);
     }
 
     function verifyAll() external view returns (bool) {
@@ -215,7 +224,7 @@ contract CTMTransition is ICTMTransition {
         if (!ICTMRelease(m.newRelease).verifyAll() || !ICTMRelease(m.fromRelease).verifyAll()) {
             return false;
         }
-        return CodehashPinLib.pinHolds(m.upgradeEngine);
+        return CodehashPinLib.pinHolds(m.upgradeEngine) && ProxyUpgradeRowLib.rowPinsHold(m.ctmProxyRows);
     }
 
     function _requirePin(PinnedContract memory _pinned) private view {

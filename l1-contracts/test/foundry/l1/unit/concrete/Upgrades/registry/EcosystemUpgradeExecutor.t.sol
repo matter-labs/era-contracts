@@ -9,10 +9,10 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
 import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
-import {EcosystemImplMismatch, RegistryCodehashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {ProxyUpgradeRowMismatch, RegistryCodehashMismatch} from "contracts/common/L1ContractErrors.sol";
 import {
     CoreRegistryManifest,
-    EcosystemContractRow,
+    ProxyUpgradeRow,
     PinnedContract
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
@@ -69,7 +69,7 @@ contract EcosystemUpgradeExecutorTest is Test {
         // Bridgehub is a full source-checked edge (old -> new); MessageRoot pins its live
         // implementation (the executor's live comparison must skip it). Every row must be a real,
         // unique edge — a placeholder (all-zero) row is rejected at the registry boundary.
-        EcosystemContractRow[] memory rows = new EcosystemContractRow[](2);
+        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](2);
         rows[0] = _row(address(bridgehubProxy), address(implOld), address(implNew));
         rows[1] = _row(address(messageRootProxy), address(implOld), address(implOld));
         coreRegistry = _deployRegistry(rows);
@@ -91,16 +91,16 @@ contract EcosystemUpgradeExecutorTest is Test {
         address _proxy,
         address _expectedOldImpl,
         address _implNew
-    ) internal view returns (EcosystemContractRow memory) {
+    ) internal view returns (ProxyUpgradeRow memory) {
         return
-            EcosystemContractRow({
+            ProxyUpgradeRow({
                 proxy: _proxy,
                 expectedOldImpl: _expectedOldImpl,
                 implNew: PinnedContract({addr: _implNew, codehash: _implNew.codehash})
             });
     }
 
-    function _deployRegistry(EcosystemContractRow[] memory _rows) internal returns (ICoreRegistry) {
+    function _deployRegistry(ProxyUpgradeRow[] memory _rows) internal returns (ICoreRegistry) {
         return ICoreRegistry(address(new CoreRegistry(CoreRegistryManifest({contractRows: _rows}))));
     }
 
@@ -164,7 +164,7 @@ contract EcosystemUpgradeExecutorTest is Test {
 
     function test_manifestHashCommitsToTheRows() public {
         // Provenance pins the CODE; the manifest hash is what distinguishes two instances of it.
-        EcosystemContractRow[] memory rows = new EcosystemContractRow[](1);
+        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](1);
         rows[0] = _row(address(bridgehubProxy), address(implOld), address(implNew));
         ICoreRegistry first = _deployRegistry(rows);
         assertEq(
@@ -184,7 +184,7 @@ contract EcosystemUpgradeExecutorTest is Test {
         // replayed: the proxy is at neither that registry's source nor its target, so the replay
         // must revert instead of silently downgrading.
         DummyImplA implNewer = new DummyImplA();
-        EcosystemContractRow[] memory rows = new EcosystemContractRow[](1);
+        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](1);
         rows[0] = _row(address(bridgehubProxy), address(implNew), address(implNewer));
         ICoreRegistry laterRegistry = _deployRegistry(rows);
         vm.prank(ecosystemGovernor);
@@ -192,7 +192,7 @@ contract EcosystemUpgradeExecutorTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                EcosystemImplMismatch.selector,
+                ProxyUpgradeRowMismatch.selector,
                 address(bridgehubProxy),
                 address(implOld),
                 address(implNewer)

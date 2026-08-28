@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
 import {ZKsyncOSChainTypeManagerSharedTest} from "../../state-transition/ChainTypeManager/_ZKsyncOSChainTypeManager_Shared.t.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
@@ -38,7 +39,8 @@ import {
     ReleaseGenesisData,
     ReleaseManifest,
     TransitionManifest,
-    PinnedContract
+    PinnedContract,
+    ProxyUpgradeRow
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice The first full registry-driven upgrade, end to end: a real chain diamond is taken
@@ -122,6 +124,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             governor,
             makeAddr("emergencyUpgradeBoard"),
             IChainTypeManager(address(chainContractAddress)),
+            new ProxyAdmin(),
             Utils.transitionCodehash()
         );
 
@@ -259,6 +262,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
                 fromRelease: _fromRelease,
                 newRelease: release,
                 upgradeEngine: PinnedContract({addr: defaultUpgrade, codehash: defaultUpgrade.codehash}),
+                ctmProxyRows: new ProxyUpgradeRow[](0),
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: 0,
                 l2Plan: l2Plan

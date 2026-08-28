@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
-import {L2UpgradePlan, TransitionManifest} from "../RegistryTypes.sol";
+import {L2UpgradePlan, ProxyUpgradeRow, TransitionManifest} from "../RegistryTypes.sol";
 
 /// @notice Immutable description of how one CTM release becomes another.
 /// @dev The facet cuts and base-system hash CHANGES are NOT authored: they are DERIVED from the
@@ -46,6 +46,9 @@ interface ICTMTransition {
 
     /// @notice The DERIVED base-system hash changes (zero = carried over unchanged).
     function baseSystemContractHashChanges() external view returns (bytes32, bytes32, bytes32);
+
+    /// @notice CTM-domain implementation swaps applied by the bound executor before the commit.
+    function ctmProxyRows() external view returns (ProxyUpgradeRow[] memory);
 
     function l2Plan() external view returns (L2UpgradePlan memory);
 

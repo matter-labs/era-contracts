@@ -127,8 +127,6 @@ error DepositExists();
 error DiamondAlreadyFrozen();
 // 0xa7151b9a
 error DiamondNotFrozen();
-// 0x60d92061
-error EcosystemImplMismatch(address proxy, address expectedOldImpl, address actualImpl);
 // 0x7138356f
 error EmptyAddress();
 // 0x2d4d012f
@@ -386,6 +384,8 @@ error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 error ProtocolIdMismatch(uint256 expectedProtocolVersion, uint256 providedProtocolId);
 // 0x64f94ec2
 error ProtocolIdNotGreater();
+// 0x929dc94b
+error ProxyUpgradeRowMismatch(address proxy, address expectedOldImpl, address actualImpl);
 // 0xd95d4d82
 error PubdataContentLockedForPermanentRollup();
 // 0x959f26fb

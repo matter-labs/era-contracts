@@ -3,9 +3,9 @@
 pragma solidity 0.8.28;
 
 import {ICoreRegistry} from "./ICoreRegistry.sol";
-import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
-import {RegistryDuplicateProxyRow, RegistryUnknownKey, ZeroAddress} from "../../../common/L1ContractErrors.sol";
-import {CoreRegistryManifest, EcosystemContractRow, PinnedContract} from "../RegistryTypes.sol";
+import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
+import {RegistryUnknownKey} from "../../../common/L1ContractErrors.sol";
+import {CoreRegistryManifest, ProxyUpgradeRow} from "../RegistryTypes.sol";
 
 /// @title Core (ecosystem-wide) registry — one instance per protocol upgrade.
 /// @author Matter Labs
@@ -39,22 +39,7 @@ contract CoreRegistry is ICoreRegistry {
         if (length == 0) {
             revert RegistryUnknownKey();
         }
-        for (uint256 i = 0; i < length; ++i) {
-            EcosystemContractRow memory row = _manifest.contractRows[i];
-            // Every row is a REAL, unique edge: known source, pinned target, one row per proxy.
-            // Placeholder rows (zero implNew) are refused — a contract not participating in the
-            // upgrade simply has no row. The codehash pins are checked by `validate()` against
-            // live code, not here: the manifest supplies both halves of each pair, so a
-            // construction-time check would only prove the pair self-consistent.
-            if (row.proxy == address(0) || row.expectedOldImpl == address(0) || row.implNew.addr == address(0)) {
-                revert ZeroAddress();
-            }
-            for (uint256 j = 0; j < i; ++j) {
-                if (_manifest.contractRows[j].proxy == row.proxy) {
-                    revert RegistryDuplicateProxyRow(row.proxy);
-                }
-            }
-        }
+        ProxyUpgradeRowLib.validateRows(_manifest.contractRows);
         encodedManifest = abi.encode(_manifest);
     }
 
@@ -75,32 +60,17 @@ contract CoreRegistry is ICoreRegistry {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc ICoreRegistry
-    function ecosystemRows() external view returns (EcosystemContractRow[] memory) {
+    function ecosystemRows() external view returns (ProxyUpgradeRow[] memory) {
         return getManifest().contractRows;
     }
 
     /// @inheritdoc ICoreRegistry
     function verifyAll() external view returns (bool) {
-        EcosystemContractRow[] memory rows = getManifest().contractRows;
-        uint256 length = rows.length;
-        for (uint256 i = 0; i < length; ++i) {
-            if (!CodehashPinLib.pinHolds(rows[i].implNew)) {
-                return false;
-            }
-        }
-        return true;
+        return ProxyUpgradeRowLib.rowPinsHold(getManifest().contractRows);
     }
 
     /// @inheritdoc ICoreRegistry
     function validate() external view {
-        EcosystemContractRow[] memory rows = getManifest().contractRows;
-        uint256 length = rows.length;
-        for (uint256 i = 0; i < length; ++i) {
-            _requirePin(rows[i].implNew);
-        }
-    }
-
-    function _requirePin(PinnedContract memory _pinned) private view {
-        CodehashPinLib.requirePin(_pinned);
+        ProxyUpgradeRowLib.requireRowPins(getManifest().contractRows);
     }
 }

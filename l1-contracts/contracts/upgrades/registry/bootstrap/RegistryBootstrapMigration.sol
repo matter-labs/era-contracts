@@ -6,21 +6,20 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
+import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {CTMUpgradeExecutor} from "../executors/CTMUpgradeExecutor.sol";
-import {EcosystemUpgradeExecutor} from "../executors/EcosystemUpgradeExecutor.sol";
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {
     BootstrapAlreadyExecuted,
     BootstrapAuthorityNotHeld,
     BootstrapExecutorNotBound,
-    EcosystemImplMismatch,
-    RegistryDuplicateProxyRow,
+    ProxyUpgradeRowMismatch,
     RegistryUnknownKey,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "../../../state-transition/L1StateTransitionErrors.sol";
-import {BootstrapManifest, EcosystemContractRow} from "../RegistryTypes.sol";
+import {BootstrapManifest, ProxyUpgradeRow} from "../RegistryTypes.sol";
 
 /// @title RegistryBootstrapMigration
 /// @author Matter Labs
@@ -58,8 +57,7 @@ contract RegistryBootstrapMigration {
             _manifest.ctm == address(0) ||
             address(_manifest.ctmProxyAdmin) == address(0) ||
             _manifest.currentRelease == address(0) ||
-            _manifest.ctmExecutor.addr == address(0) ||
-            _manifest.ecosystemExecutor.addr == address(0)
+            _manifest.ctmExecutor.addr == address(0)
         ) {
             revert ZeroAddress();
         }
@@ -69,21 +67,8 @@ contract RegistryBootstrapMigration {
         if (rowsLength == 0) {
             revert RegistryUnknownKey();
         }
-        // Same row discipline as {CoreRegistry}: every row is a real, unique edge. Without the
-        // per-proxy dedup two rows naming one proxy would BOTH pass the source check (they compare
-        // against the same pre-migration implementation) and the last one would silently win — so
-        // the edge governance reviewed would not be the edge that executes.
-        for (uint256 i = 0; i < rowsLength; ++i) {
-            EcosystemContractRow memory row = _manifest.proxyRows[i];
-            if (row.proxy == address(0) || row.expectedOldImpl == address(0) || row.implNew.addr == address(0)) {
-                revert ZeroAddress();
-            }
-            for (uint256 j = 0; j < i; ++j) {
-                if (_manifest.proxyRows[j].proxy == row.proxy) {
-                    revert RegistryDuplicateProxyRow(row.proxy);
-                }
-            }
-        }
+        // Same row discipline as {CoreRegistry} and {CTMTransition} (shared lib).
+        ProxyUpgradeRowLib.validateRows(_manifest.proxyRows);
 
         encodedManifest = abi.encode(_manifest);
     }
@@ -124,14 +109,16 @@ contract RegistryBootstrapMigration {
         // drive — and since the edge is one-shot, recovering from that would mean falling back to
         // break-glass, the one authority this design exists to avoid depending on.
         CodehashPinLib.requirePin(m.ctmExecutor);
-        CodehashPinLib.requirePin(m.ecosystemExecutor);
         address boundCtm = address(CTMUpgradeExecutor(payable(m.ctmExecutor.addr)).CHAIN_TYPE_MANAGER());
         if (boundCtm != m.ctm) {
             revert BootstrapExecutorNotBound(m.ctmExecutor.addr, m.ctm, boundCtm);
         }
-        address boundProxyAdmin = address(EcosystemUpgradeExecutor(payable(m.ecosystemExecutor.addr)).PROXY_ADMIN());
+        // The WHOLE CTM domain lands under the one CTM-bound executor: the CTM proxy and its
+        // per-CTM proxies share `ctmProxyAdmin`, and later transitions apply their
+        // `ctmProxyRows` through it. Nothing CTM-scoped goes under ecosystem authority.
+        address boundProxyAdmin = address(CTMUpgradeExecutor(payable(m.ctmExecutor.addr)).CTM_PROXY_ADMIN());
         if (boundProxyAdmin != address(m.ctmProxyAdmin)) {
-            revert BootstrapExecutorNotBound(m.ecosystemExecutor.addr, address(m.ctmProxyAdmin), boundProxyAdmin);
+            revert BootstrapExecutorNotBound(m.ctmExecutor.addr, address(m.ctmProxyAdmin), boundProxyAdmin);
         }
 
         // The departing version fixes which ecosystem this edge is valid for.
@@ -144,10 +131,10 @@ contract RegistryBootstrapMigration {
         // against an ecosystem someone already moved, cannot silently re-point a proxy.
         uint256 rowsLength = m.proxyRows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {
-            EcosystemContractRow memory row = m.proxyRows[i];
+            ProxyUpgradeRow memory row = m.proxyRows[i];
             address liveImpl = m.ctmProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(row.proxy));
             if (liveImpl != row.expectedOldImpl) {
-                revert EcosystemImplMismatch(row.proxy, row.expectedOldImpl, liveImpl);
+                revert ProxyUpgradeRowMismatch(row.proxy, row.expectedOldImpl, liveImpl);
             }
             CodehashPinLib.requirePin(row.implNew);
         }
@@ -209,7 +196,7 @@ contract RegistryBootstrapMigration {
         // gate is deliberately not loosened here: an unguarded accept would widen the executor's
         // only ownership-acquiring entrypoint to save one reviewable call.
         Ownable2Step(m.ctm).transferOwnership(m.ctmExecutor.addr);
-        m.ctmProxyAdmin.transferOwnership(m.ecosystemExecutor.addr);
+        m.ctmProxyAdmin.transferOwnership(m.ctmExecutor.addr);
 
         emit EcosystemBootstrapped(m.ctm, m.currentRelease, m.newProtocolVersion);
     }

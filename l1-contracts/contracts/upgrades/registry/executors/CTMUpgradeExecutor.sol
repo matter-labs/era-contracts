@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {ICTMTransition} from "../objects/ICTMTransition.sol";
 import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
@@ -16,6 +17,7 @@ import {
 } from "../../../common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "../../../state-transition/L1StateTransitionErrors.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
+import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 
 /// @title CTMUpgradeExecutor
 /// @author Matter Labs
@@ -35,6 +37,14 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
     ///         the binding is this immutable, so a transition cannot be aimed at a foreign CTM.
     IChainTypeManager public immutable CHAIN_TYPE_MANAGER;
 
+    /// @notice The CTM DOMAIN's `ProxyAdmin` — the admin of the CTM proxy itself and of the
+    ///         per-CTM proxies (validator timelock, server notifier). Owned by this executor, so
+    ///         a transition's `ctmProxyRows` (including the CTM's own implementation swap) apply
+    ///         through the same authority that commits the transition. Deliberately NOT the
+    ///         ecosystem `ProxyAdmin`: a CTM is one of possibly many and upgrades on its own
+    ///         cadence, so nothing CTM-scoped sits under ecosystem authority.
+    ProxyAdmin public immutable CTM_PROXY_ADMIN;
+
     /// @notice `EXTCODEHASH` of the audited `CTMTransition`. Every transition this executor accepts
     ///         must run exactly that code — which, since the manifest is written in the constructor
     ///         and no setter exists, makes "canonical write-once object" an on-chain invariant: an
@@ -53,15 +63,17 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
         address _initialOwner,
         address _emergencyUpgradeBoard,
         IChainTypeManager _ctm,
+        ProxyAdmin _ctmProxyAdmin,
         bytes32 _transitionCodehash
     ) UpgradeExecutorBase(_initialOwner, _emergencyUpgradeBoard) {
-        if (address(_ctm) == address(0)) {
+        if (address(_ctm) == address(0) || address(_ctmProxyAdmin) == address(0)) {
             revert ZeroAddress();
         }
         if (_transitionCodehash == bytes32(0)) {
             revert EmptyBytes32();
         }
         CHAIN_TYPE_MANAGER = _ctm;
+        CTM_PROXY_ADMIN = _ctmProxyAdmin;
         TRANSITION_CODEHASH = _transitionCodehash;
     }
 
@@ -99,6 +111,11 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
         if (currentProtocolVersion != oldProtocolVersion) {
             revert OutdatedProtocolVersion(currentProtocolVersion, oldProtocolVersion);
         }
+
+        // CTM-domain implementation swaps FIRST — the commit below may need setters that only
+        // exist on the implementation this very transition installs (the bootstrap's
+        // "ordering is load-bearing" rule, made permanent).
+        ProxyUpgradeRowLib.applyRows(CTM_PROXY_ADMIN, _transition.ctmProxyRows());
 
         // One argument, not four plus a cut: the CTM reads the version edge, the schedule and the
         // cut from the same pinned object, so they cannot be passed inconsistently.

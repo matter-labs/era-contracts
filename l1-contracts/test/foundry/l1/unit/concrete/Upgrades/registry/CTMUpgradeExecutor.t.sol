@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
 import {Utils} from "../../Utils/Utils.sol";
 
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
@@ -31,7 +32,8 @@ import {
     ReleaseGenesisData,
     ReleaseManifest,
     TransitionManifest,
-    PinnedContract
+    PinnedContract,
+    ProxyUpgradeRow
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Exercises the CTM-BOUND executor against real write-once release and transition
@@ -41,6 +43,7 @@ import {
 ///         exercised end-to-end by RegistryDrivenUpgrade.t.sol).
 contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
     CTMUpgradeExecutor internal ctmExecutor;
+    ProxyAdmin internal ctmProxyAdmin;
     CTMRelease internal fromRelease;
     CTMRelease internal release;
     CTMTransition internal transition;
@@ -58,10 +61,12 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         _mockMigrationPausedFromBridgehub();
 
         emergencyUpgradeBoard = makeAddr("emergencyUpgradeBoard");
+        ctmProxyAdmin = new ProxyAdmin();
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
             emergencyUpgradeBoard,
             IChainTypeManager(address(chainContractAddress)),
+            ctmProxyAdmin,
             Utils.transitionCodehash()
         );
 
@@ -161,6 +166,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                 fromRelease: _fromRelease,
                 newRelease: address(release),
                 upgradeEngine: PinnedContract({addr: upgradeEngineAddr, codehash: upgradeEngineAddr.codehash}),
+                ctmProxyRows: new ProxyUpgradeRow[](0),
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: _upgradeTimestamp,
                 l2Plan: L2UpgradePlan({

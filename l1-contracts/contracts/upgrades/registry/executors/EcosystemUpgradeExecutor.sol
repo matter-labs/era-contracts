@@ -3,13 +3,12 @@
 pragma solidity 0.8.28;
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {ICoreRegistry} from "../objects/ICoreRegistry.sol";
 import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
-import {EcosystemImplMismatch, EmptyBytes32, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {EmptyBytes32, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
-import {EcosystemContractRow} from "../RegistryTypes.sol";
+import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 
 /// @title EcosystemUpgradeExecutor
 /// @author Matter Labs
@@ -21,10 +20,10 @@ import {EcosystemContractRow} from "../RegistryTypes.sol";
 /// @dev Fixed logic, no generic delegatecall. The break-glass `forward` (base) is gated by a
 ///      SEPARATE governor. The registry address is a *pinned implementation address* — the exact
 ///      generated contract governance approved — never a proxy.
-/// @dev There is deliberately no separate executor for the CTM *implementation*: the CTM proxy
-///      sits under the same ecosystem `ProxyAdmin`, so swapping its implementation is just
-///      another {EcosystemContractRow} here. `CTMUpgradeExecutor` owns only what the CTM does
-///      (version schedule, releases, chain upgrades), not what the CTM is.
+/// @dev The ecosystem is the SHARED singletons — bridges, Bridgehub, MessageRoot. Nothing
+///      CTM-scoped is expressible here: the CTM's own implementation (and its per-CTM proxies)
+///      upgrade through the transition's `ctmProxyRows`, under `CTMUpgradeExecutor`'s authority —
+///      there may be several CTMs, each on its own cadence.
 contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
     using CodehashPinLib for address;
 
@@ -35,10 +34,6 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
     /// @notice `EXTCODEHASH` of the audited `CoreRegistry` — see
     ///         `CTMUpgradeExecutor.TRANSITION_CODEHASH` for the provenance model.
     bytes32 public immutable CORE_REGISTRY_CODEHASH;
-
-    /// @notice Emitted for every ecosystem proxy pointed at its new implementation. The proxy
-    ///         ADDRESS is the row identity (human labels live in the off-chain manifest).
-    event EcosystemContractUpgraded(address indexed proxy, address newImpl);
 
     constructor(
         address _initialOwner,
@@ -70,21 +65,6 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
         _coreRegistry.validate();
 
         // One call returns complete typed rows; no per-key rescans of the registry.
-        EcosystemContractRow[] memory rows = _coreRegistry.ecosystemRows();
-        uint256 rowsLength = rows.length;
-        for (uint256 i = 0; i < rowsLength; ++i) {
-            // Every row is a real edge by registry construction (no placeholder rows exist).
-            address newImpl = rows[i].implNew.addr;
-            ITransparentUpgradeableProxy proxy = ITransparentUpgradeableProxy(rows[i].proxy);
-            address liveImpl = PROXY_ADMIN.getProxyImplementation(proxy);
-            if (liveImpl == newImpl) {
-                continue;
-            }
-            if (liveImpl != rows[i].expectedOldImpl) {
-                revert EcosystemImplMismatch(rows[i].proxy, rows[i].expectedOldImpl, liveImpl);
-            }
-            PROXY_ADMIN.upgrade(proxy, newImpl);
-            emit EcosystemContractUpgraded(address(proxy), newImpl);
-        }
+        ProxyUpgradeRowLib.applyRows(PROXY_ADMIN, _coreRegistry.ecosystemRows());
     }
 }

@@ -29,12 +29,12 @@ the transition's own fields; the delta between them is computed, not written.
 All are storage-backed, built once from a manifest they take in the constructor, and commit
 `manifestHash = keccak256(abi.encode(manifest))`.
 
-| Contract                     | Holds                                                                                                                                                                                                                                             |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, pin — routing is read from each pinned facet's own self-description), three base-system hashes, `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin |
-| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine` + pin, deadline, `upgradeTimestamp`, `L2UpgradePlan`; **derived and stored:** final `Diamond.FacetCut[]` and base-system hash changes                                                  |
-| `CoreRegistry`               | `EcosystemContractRow[]` — `(proxy, expectedOldImpl, implNew, implNewCodehash)`                                                                                                                                                                   |
-| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                    |
+| Contract                     | Holds                                                                                                                                                                                                                                                          |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, pin — routing is read from each pinned facet's own self-description), three base-system hashes, `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin              |
+| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine` + pin, `ctmProxyRows` (CTM-domain impl swaps, incl. the CTM itself), deadline, `upgradeTimestamp`, `L2UpgradePlan`; **derived and stored:** final `Diamond.FacetCut[]` and base-system hash changes |
+| `CoreRegistry`               | `ProxyUpgradeRow[]` — `(proxy, expectedOldImpl, implNew + pin)` for the SHARED singletons (bridges, Bridgehub, MessageRoot)                                                                                                                                    |
+| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                 |
 
 Supporting libraries:
 
@@ -84,7 +84,7 @@ flowchart TB
     CE -. "codehash-check + validate" .-> TRA
     EE -. "codehash-check + validate" .-> CR
     BOOT -- "one-time: hands over CTM ownership" --> CE
-    BOOT -- "one-time: hands over ProxyAdmin ownership" --> EE
+    BOOT -- "one-time: hands over the CTM-domain ProxyAdmin" --> CE
 
     CTM -. currentRelease .-> REL
     CTM -. "codehash-check on setCurrentRelease" .-> REL
@@ -118,16 +118,17 @@ flowchart LR
     BG -.->|"forward(Call[])"| CTMEXE
     BG -.->|"forward(Call[])"| ECOEXE
     CTMEXE -->|owns| CTM
+    CTMEXE -->|owns| CTMPA["CTM-domain ProxyAdmin"]
     ECOEXE -->|owns| PA
 ```
 
 Each executor is **bound at construction** to the contracts it governs and to the codehash of the
 object type it accepts — both immutable.
 
-| Executor                   | Bound to                                             | Entrypoints                                             |
-| -------------------------- | ---------------------------------------------------- | ------------------------------------------------------- |
-| `CTMUpgradeExecutor`       | one `ChainTypeManager`, the `CTMTransition` codehash | `applyCTMUpgrade`, `upgradeChain`, `acceptCTMOwnership` |
-| `EcosystemUpgradeExecutor` | one `ProxyAdmin`, the `CoreRegistry` codehash        | `applyL1Upgrade`                                        |
+| Executor                   | Bound to                                                                    | Entrypoints                                             |
+| -------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `CTMUpgradeExecutor`       | one `ChainTypeManager` + its own `ProxyAdmin`, the `CTMTransition` codehash | `applyCTMUpgrade`, `upgradeChain`, `acceptCTMOwnership` |
+| `EcosystemUpgradeExecutor` | one `ProxyAdmin`, the `CoreRegistry` codehash                               | `applyL1Upgrade`                                        |
 
 CTM authority and ecosystem authority are separate: each CTM is governed by its own executor and
 upgrades on its own cadence.

@@ -47,7 +47,7 @@ import {
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {
     CoreRegistryManifest,
-    EcosystemContractRow,
+    ProxyUpgradeRow,
     GenesisFacet,
     L2UpgradePlan,
     ReleaseGenesisData,
@@ -116,8 +116,8 @@ contract StorageRegistriesTest is Test {
     function _coreManifest() internal view returns (CoreRegistryManifest memory manifest) {
         // A single full source-checked edge — every core row must be a real, unique edge;
         // placeholder (all-zero) rows are rejected at the registry boundary.
-        EcosystemContractRow[] memory rows = new EcosystemContractRow[](1);
-        rows[0] = EcosystemContractRow({
+        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](1);
+        rows[0] = ProxyUpgradeRow({
             proxy: address(0xB001),
             expectedOldImpl: address(0xB101),
             implNew: PinnedContract({addr: coreImplNew, codehash: coreImplNew.codehash})
@@ -203,6 +203,7 @@ contract StorageRegistriesTest is Test {
                 fromRelease: address(fromRelease),
                 newRelease: address(newRelease),
                 upgradeEngine: PinnedContract({addr: upgradeEngine, codehash: upgradeEngine.codehash}),
+                ctmProxyRows: new ProxyUpgradeRow[](0),
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeTimestamp: 1234567,
                 l2Plan: _l2Plan()
@@ -660,7 +661,7 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_coreRegistryHasDuplicateProxyRow() public {
         // A proxy is routed once: two rows naming the same proxy are rejected.
         CoreRegistryManifest memory manifest = _coreManifest();
-        EcosystemContractRow[] memory rows = new EcosystemContractRow[](2);
+        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](2);
         rows[0] = manifest.contractRows[0];
         rows[1] = manifest.contractRows[0]; // same proxy again
         manifest.contractRows = rows;

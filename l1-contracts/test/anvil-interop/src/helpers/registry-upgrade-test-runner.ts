@@ -374,7 +374,6 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
         releaseCodehash: ctmAddresses.releaseCodehash,
         currentRelease: live.fromRelease,
         ctmExecutor: deployed.ctmExecutor,
-        ecosystemExecutor: deployed.ctmProxyAdminExecutor,
       })
     );
     await migration.deployed();
@@ -418,7 +417,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
         bootstrapCut,
         ctmImplNew: deployed.ctmImplNew,
         ctmExecutor: deployed.ctmExecutor,
-        ecoExecutor: deployed.ctmProxyAdminExecutor,
+        ecoExecutor: deployed.ctmExecutor,
         proxyAdminAddr: live.ctmProxyAdmin,
         chains: upgradeChains,
         deadline: ethers.constants.MaxUint256,
@@ -750,7 +749,6 @@ type DeployedMachinery = {
   coreRegistryCodehash: string;
   ctmExecutor: string;
   ecoExecutor: string;
-  ctmProxyAdminExecutor: string;
   composerHarness: string;
   legacyAdminFacet: string;
   bootstrapEngine: string;
@@ -818,24 +816,19 @@ async function deployUpgradeMachinery(
     coreRegistryCodehash,
     // The deployer plays the role of protocol governance AND (for this harness) the break-glass
     // governor; each executor is BOUND to its immutable authority targets at construction.
+    // Bound to the whole CTM domain: the CTM itself AND its own ProxyAdmin (a transition's
+    // `ctmProxyRows` — the CTM impl swap included — apply through it).
     ctmExecutor: await deploy("CTMUpgradeExecutor", [
       deployer.address,
       deployer.address,
       params.ctm,
+      params.ctmProxyAdmin,
       transitionCodehash,
     ]),
     ecoExecutor: await deploy("EcosystemUpgradeExecutor", [
       deployer.address,
       deployer.address,
       params.ecosystemProxyAdmin,
-      coreRegistryCodehash,
-    ]),
-    // Each ProxyAdmin gets its bound executor: the CTM proxy sits under its own admin in this
-    // deployment, and the bootstrap hands that admin to THIS executor.
-    ctmProxyAdminExecutor: await deploy("EcosystemUpgradeExecutor", [
-      deployer.address,
-      deployer.address,
-      params.ctmProxyAdmin,
       coreRegistryCodehash,
     ]),
     composerHarness: await deploy("RegistryComposerHarness", []),

@@ -79,6 +79,13 @@ struct L2UpgradePlan {
 /// @param upgradeEngine The diamond cut's init delegatecall target implementing
 ///        `upgradeFromTransition` — the registry-model name for what deploy tooling calls the
 ///        per-version "default upgrade" contract (`DefaultUpgrade` and its versioned subclasses).
+/// @param ctmProxyRows Source-checked implementation swaps in the CTM DOMAIN — the CTM proxy
+///        itself and the per-CTM proxies under its own ProxyAdmin (validator timelock, server
+///        notifier). Applied by the CTM-bound executor BEFORE the version commit, so a
+///        transition whose commit needs the new CTM implementation carries that swap itself.
+///        Ecosystem singletons (bridges, Bridgehub, MessageRoot) are NOT expressible here — a
+///        CTM is one of possibly many and upgrades on its own cadence; shared contracts belong
+///        to the core registry. Empty when the CTM domain's implementations do not change.
 // solhint-disable-next-line gas-struct-packing
 struct TransitionManifest {
     uint256 oldProtocolVersion;
@@ -86,6 +93,7 @@ struct TransitionManifest {
     address fromRelease;
     address newRelease;
     PinnedContract upgradeEngine;
+    ProxyUpgradeRow[] ctmProxyRows;
     uint256 oldProtocolVersionDeadline;
     uint256 upgradeTimestamp;
     L2UpgradePlan l2Plan;
@@ -103,7 +111,7 @@ struct TransitionManifest {
 ///        apply. This is the replay guard: after a later registry moves the proxy on, replaying
 ///        this registry cannot silently downgrade it — the source no longer matches.
 /// @param implNew The pinned implementation the proxy points at afterwards.
-struct EcosystemContractRow {
+struct ProxyUpgradeRow {
     address proxy;
     address expectedOldImpl;
     PinnedContract implNew;
@@ -114,7 +122,7 @@ struct EcosystemContractRow {
 ///      and NO proxy admin (the `EcosystemUpgradeExecutor` is bound to its immutable
 ///      `ProxyAdmin`). A core registry pins ONLY the ecosystem contract rows.
 struct CoreRegistryManifest {
-    EcosystemContractRow[] contractRows;
+    ProxyUpgradeRow[] contractRows;
 }
 
 /// @param ctm The ChainTypeManager proxy this migration bootstraps.
@@ -136,15 +144,15 @@ struct CoreRegistryManifest {
 ///        no per-facet pins — the one unpinned payload here, and the reason this edge is
 ///        reviewed as legacy calldata rather than as a derived delta.
 /// @param upgradeCutInitCodehash Inline pin of `upgradeCut.initAddress`.
-/// @param ctmExecutor The pinned `CTMUpgradeExecutor` that receives CTM ownership. It must be
-///        BOUND to `ctm`, otherwise its fixed entrypoints could never drive the CTM it is handed.
-/// @param ecosystemExecutor The pinned `EcosystemUpgradeExecutor` that receives ProxyAdmin
-///        ownership. It must be BOUND to `ctmProxyAdmin`, for the same reason.
+/// @param ctmExecutor The pinned `CTMUpgradeExecutor` that receives BOTH CTM ownership and the
+///        CTM-domain `ProxyAdmin` — the whole CTM domain lands under one executor. It must be
+///        BOUND to `ctm` AND to `ctmProxyAdmin`, otherwise its fixed entrypoints could never
+///        drive what it is handed.
 struct BootstrapManifest {
     address ctm;
     uint256 expectedProtocolVersion;
     ProxyAdmin ctmProxyAdmin;
-    EcosystemContractRow[] proxyRows;
+    ProxyUpgradeRow[] proxyRows;
     bytes32 releaseCodehash;
     address currentRelease;
     uint256 newProtocolVersion;
@@ -152,7 +160,6 @@ struct BootstrapManifest {
     Diamond.DiamondCutData upgradeCut;
     bytes32 upgradeCutInitCodehash;
     PinnedContract ctmExecutor;
-    PinnedContract ecosystemExecutor;
 }
 
 /// @notice Everything the deploy flow feeds into a release manifest at build time.
