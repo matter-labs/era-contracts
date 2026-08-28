@@ -30,7 +30,8 @@ import {
     L2UpgradePlan,
     ReleaseGenesisData,
     ReleaseManifest,
-    TransitionManifest
+    TransitionManifest,
+    PinnedContract
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Exercises the CTM-BOUND executor against real write-once release and transition
@@ -106,19 +107,15 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
             genesisFacets[i] = GenesisFacet({
-                facet: facetCuts[i].facet,
-                isFreezable: facetCuts[i].isFreezable,
-                codehash: facetCuts[i].facet.codehash
+                facet: PinnedContract({addr: facetCuts[i].facet, codehash: facetCuts[i].facet.codehash}),
+                isFreezable: facetCuts[i].isFreezable
             });
         }
         return
             ReleaseManifest({
-                diamondInit: diamondInit,
-                diamondInitCodehash: diamondInit.codehash,
-                verifier: address(testnetVerifier),
-                verifierCodehash: address(testnetVerifier).codehash,
-                genesisUpgrade: genesisUpgradeAddr,
-                genesisUpgradeCodehash: genesisUpgradeAddr.codehash,
+                diamondInit: PinnedContract({addr: diamondInit, codehash: diamondInit.codehash}),
+                verifier: PinnedContract({addr: address(testnetVerifier), codehash: address(testnetVerifier).codehash}),
+                genesisUpgrade: PinnedContract({addr: genesisUpgradeAddr, codehash: genesisUpgradeAddr.codehash}),
                 genesisFacets: genesisFacets,
                 genesis: ReleaseGenesisData({
                     bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
@@ -163,8 +160,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                 // genesis'd with (its current release), as the executor's release-edge pin requires.
                 fromRelease: _fromRelease,
                 newRelease: address(release),
-                upgradeEngine: upgradeEngineAddr,
-                upgradeEngineCodehash: upgradeEngineAddr.codehash,
+                upgradeEngine: PinnedContract({addr: upgradeEngineAddr, codehash: upgradeEngineAddr.codehash}),
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: _upgradeTimestamp,
                 l2Plan: L2UpgradePlan({

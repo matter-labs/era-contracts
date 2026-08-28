@@ -46,7 +46,7 @@ import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCall
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
-import {GenesisFacet} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {GenesisFacet, PinnedContract} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 contract ChainTypeManagerTest is UtilsCallMockerTest {
     using stdStorage for StdStorage;
@@ -299,9 +299,8 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         GenesisFacet[] memory facets = new GenesisFacet[](_facetCuts.length);
         for (uint256 i = 0; i < _facetCuts.length; ++i) {
             facets[i] = GenesisFacet({
-                facet: _facetCuts[i].facet,
-                isFreezable: _facetCuts[i].isFreezable,
-                codehash: _facetCuts[i].facet.codehash
+                facet: PinnedContract({addr: _facetCuts[i].facet, codehash: _facetCuts[i].facet.codehash}),
+                isFreezable: _facetCuts[i].isFreezable
             });
         }
         _mockFacetSelfDescriptions(_facetCuts);

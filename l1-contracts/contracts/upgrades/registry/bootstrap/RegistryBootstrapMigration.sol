@@ -58,8 +58,8 @@ contract RegistryBootstrapMigration {
             _manifest.ctm == address(0) ||
             address(_manifest.ctmProxyAdmin) == address(0) ||
             _manifest.currentRelease == address(0) ||
-            _manifest.ctmExecutor == address(0) ||
-            _manifest.ecosystemExecutor == address(0)
+            _manifest.ctmExecutor.addr == address(0) ||
+            _manifest.ecosystemExecutor.addr == address(0)
         ) {
             revert ZeroAddress();
         }
@@ -75,7 +75,7 @@ contract RegistryBootstrapMigration {
         // the edge governance reviewed would not be the edge that executes.
         for (uint256 i = 0; i < rowsLength; ++i) {
             EcosystemContractRow memory row = _manifest.proxyRows[i];
-            if (row.proxy == address(0) || row.expectedOldImpl == address(0) || row.implNew == address(0)) {
+            if (row.proxy == address(0) || row.expectedOldImpl == address(0) || row.implNew.addr == address(0)) {
                 revert ZeroAddress();
             }
             for (uint256 j = 0; j < i; ++j) {
@@ -123,15 +123,15 @@ contract RegistryBootstrapMigration {
         // receive. An executor bound elsewhere would take ownership its fixed entrypoints cannot
         // drive — and since the edge is one-shot, recovering from that would mean falling back to
         // break-glass, the one authority this design exists to avoid depending on.
-        m.ctmExecutor.requirePin(m.ctmExecutorCodehash);
-        m.ecosystemExecutor.requirePin(m.ecosystemExecutorCodehash);
-        address boundCtm = address(CTMUpgradeExecutor(payable(m.ctmExecutor)).CHAIN_TYPE_MANAGER());
+        CodehashPinLib.requirePin(m.ctmExecutor);
+        CodehashPinLib.requirePin(m.ecosystemExecutor);
+        address boundCtm = address(CTMUpgradeExecutor(payable(m.ctmExecutor.addr)).CHAIN_TYPE_MANAGER());
         if (boundCtm != m.ctm) {
-            revert BootstrapExecutorNotBound(m.ctmExecutor, m.ctm, boundCtm);
+            revert BootstrapExecutorNotBound(m.ctmExecutor.addr, m.ctm, boundCtm);
         }
-        address boundProxyAdmin = address(EcosystemUpgradeExecutor(payable(m.ecosystemExecutor)).PROXY_ADMIN());
+        address boundProxyAdmin = address(EcosystemUpgradeExecutor(payable(m.ecosystemExecutor.addr)).PROXY_ADMIN());
         if (boundProxyAdmin != address(m.ctmProxyAdmin)) {
-            revert BootstrapExecutorNotBound(m.ecosystemExecutor, address(m.ctmProxyAdmin), boundProxyAdmin);
+            revert BootstrapExecutorNotBound(m.ecosystemExecutor.addr, address(m.ctmProxyAdmin), boundProxyAdmin);
         }
 
         // The departing version fixes which ecosystem this edge is valid for.
@@ -149,7 +149,7 @@ contract RegistryBootstrapMigration {
             if (liveImpl != row.expectedOldImpl) {
                 revert EcosystemImplMismatch(row.proxy, row.expectedOldImpl, liveImpl);
             }
-            row.implNew.requirePin(row.implNewCodehash);
+            CodehashPinLib.requirePin(row.implNew);
         }
 
         m.upgradeCut.initAddress.requirePin(m.upgradeCutInitCodehash);
@@ -184,7 +184,7 @@ contract RegistryBootstrapMigration {
 
         uint256 rowsLength = m.proxyRows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {
-            m.ctmProxyAdmin.upgrade(ITransparentUpgradeableProxy(m.proxyRows[i].proxy), m.proxyRows[i].implNew);
+            m.ctmProxyAdmin.upgrade(ITransparentUpgradeableProxy(m.proxyRows[i].proxy), m.proxyRows[i].implNew.addr);
         }
 
         IChainTypeManager ctm = IChainTypeManager(m.ctm);
@@ -208,8 +208,8 @@ contract RegistryBootstrapMigration {
         // is owner-gated on the executor and therefore the governance bundle's final call. That
         // gate is deliberately not loosened here: an unguarded accept would widen the executor's
         // only ownership-acquiring entrypoint to save one reviewable call.
-        Ownable2Step(m.ctm).transferOwnership(m.ctmExecutor);
-        m.ctmProxyAdmin.transferOwnership(m.ecosystemExecutor);
+        Ownable2Step(m.ctm).transferOwnership(m.ctmExecutor.addr);
+        m.ctmProxyAdmin.transferOwnership(m.ecosystemExecutor.addr);
 
         emit EcosystemBootstrapped(m.ctm, m.currentRelease, m.newProtocolVersion);
     }

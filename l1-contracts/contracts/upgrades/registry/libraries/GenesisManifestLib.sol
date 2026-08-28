@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Facets} from "../../../common/StateTransitionTypes.sol";
-import {GenesisConfig, GenesisFacet, ReleaseManifest} from "../RegistryTypes.sol";
+import {GenesisConfig, GenesisFacet, PinnedContract, ReleaseManifest} from "../RegistryTypes.sol";
 
 /// @title Genesis (bootstrap) manifest builder.
 /// @author Matter Labs
@@ -29,7 +29,10 @@ library GenesisManifestLib {
             _cfg.facets
         );
         for (uint256 i = 0; i < GENESIS_FACET_COUNT; ++i) {
-            genesisFacets[i] = GenesisFacet({facet: addrs[i], isFreezable: freezable[i], codehash: addrs[i].codehash});
+            genesisFacets[i] = GenesisFacet({
+                facet: PinnedContract({addr: addrs[i], codehash: addrs[i].codehash}),
+                isFreezable: freezable[i]
+            });
         }
 
         return
@@ -55,12 +58,9 @@ library GenesisManifestLib {
         bytes32 _verifierCodehash,
         bytes32 _genesisUpgradeCodehash
     ) internal pure returns (ReleaseManifest memory manifest) {
-        manifest.diamondInit = _cfg.facets.diamondInit;
-        manifest.diamondInitCodehash = _diamondInitCodehash;
-        manifest.verifier = _cfg.verifier;
-        manifest.verifierCodehash = _verifierCodehash;
-        manifest.genesisUpgrade = _cfg.genesisUpgrade;
-        manifest.genesisUpgradeCodehash = _genesisUpgradeCodehash;
+        manifest.diamondInit = PinnedContract({addr: _cfg.facets.diamondInit, codehash: _diamondInitCodehash});
+        manifest.verifier = PinnedContract({addr: _cfg.verifier, codehash: _verifierCodehash});
+        manifest.genesisUpgrade = PinnedContract({addr: _cfg.genesisUpgrade, codehash: _genesisUpgradeCodehash});
         manifest.genesisFacets = _genesisFacets;
         // The shared block travels verbatim: config and manifest describe it with the same type.
         manifest.genesis = _cfg.genesis;

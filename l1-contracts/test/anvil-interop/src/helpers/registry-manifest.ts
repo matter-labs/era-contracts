@@ -75,8 +75,10 @@ export function coreInitArgs(manifest: any): any {
   const contractRows = entries.map(([, e]) => ({
     proxy: e.proxy,
     expectedOldImpl: e.expectedOldImpl ?? ethers.constants.AddressZero,
-    implNew: e.implNew ?? ethers.constants.AddressZero,
-    implNewCodehash: e.implNewCodehash ?? ethers.constants.HashZero,
+    implNew: {
+      addr: e.implNew ?? ethers.constants.AddressZero,
+      codehash: e.implNewCodehash ?? ethers.constants.HashZero,
+    },
   }));
 
   return { contractRows };
@@ -89,18 +91,14 @@ export function releaseInitArgs(ctm: any): any {
   // Inline mandatory pin per facet row; routing is read from each pinned facet's own
   // self-description, never stored.
   const genesisFacets = release.genesisFacets.map((f: any) => ({
-    facet: f.address,
+    facet: { addr: f.address, codehash: f.codehash },
     isFreezable: f.isFreezable,
-    codehash: f.codehash,
   }));
 
   return {
-    diamondInit: release.diamondInit.address,
-    diamondInitCodehash: release.diamondInit.codehash,
-    verifier: release.verifier.address,
-    verifierCodehash: release.verifier.codehash,
-    genesisUpgrade: release.genesis.genesisUpgrade.address,
-    genesisUpgradeCodehash: release.genesis.genesisUpgrade.codehash,
+    diamondInit: { addr: release.diamondInit.address, codehash: release.diamondInit.codehash },
+    verifier: { addr: release.verifier.address, codehash: release.verifier.codehash },
+    genesisUpgrade: { addr: release.genesis.genesisUpgrade.address, codehash: release.genesis.genesisUpgrade.codehash },
     genesisFacets,
     // `ReleaseGenesisData` — the block a release shares with the deploy-time `GenesisConfig`.
     genesis: {
@@ -141,8 +139,7 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string):
     newProtocolVersion: packSemVer(manifest.newVersion),
     fromRelease: transition.fromRelease,
     newRelease,
-    upgradeEngine: transition.upgradeEngine.address,
-    upgradeEngineCodehash: transition.upgradeEngine.codehash,
+    upgradeEngine: { addr: transition.upgradeEngine.address, codehash: transition.upgradeEngine.codehash },
     oldProtocolVersionDeadline: ethers.BigNumber.from(transition.oldProtocolVersionDeadline),
     upgradeTimestamp: transition.upgradeTimestamp,
     l2Plan: {

@@ -52,7 +52,8 @@ import {
     L2UpgradePlan,
     ReleaseGenesisData,
     ReleaseManifest,
-    TransitionManifest
+    TransitionManifest,
+    PinnedContract
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Unit tests for the write-once upgrade objects in the DERIVED model: releases carry
@@ -119,8 +120,7 @@ contract StorageRegistriesTest is Test {
         rows[0] = EcosystemContractRow({
             proxy: address(0xB001),
             expectedOldImpl: address(0xB101),
-            implNew: coreImplNew,
-            implNewCodehash: coreImplNew.codehash
+            implNew: PinnedContract({addr: coreImplNew, codehash: coreImplNew.codehash})
         });
         return CoreRegistryManifest({contractRows: rows});
     }
@@ -130,17 +130,23 @@ contract StorageRegistriesTest is Test {
         bytes32 _bootloaderHash
     ) internal view returns (ReleaseManifest memory manifest) {
         GenesisFacet[] memory facets = new GenesisFacet[](3);
-        facets[0] = GenesisFacet({facet: _adminFacet, isFreezable: false, codehash: _adminFacet.codehash});
-        facets[1] = GenesisFacet({facet: facetShared, isFreezable: false, codehash: facetShared.codehash});
-        facets[2] = GenesisFacet({facet: facetFrozen, isFreezable: true, codehash: facetFrozen.codehash});
+        facets[0] = GenesisFacet({
+            facet: PinnedContract({addr: _adminFacet, codehash: _adminFacet.codehash}),
+            isFreezable: false
+        });
+        facets[1] = GenesisFacet({
+            facet: PinnedContract({addr: facetShared, codehash: facetShared.codehash}),
+            isFreezable: false
+        });
+        facets[2] = GenesisFacet({
+            facet: PinnedContract({addr: facetFrozen, codehash: facetFrozen.codehash}),
+            isFreezable: true
+        });
         return
             ReleaseManifest({
-                diamondInit: diamondInit,
-                diamondInitCodehash: diamondInit.codehash,
-                verifier: verifier,
-                verifierCodehash: verifier.codehash,
-                genesisUpgrade: genesisUpgrade,
-                genesisUpgradeCodehash: genesisUpgrade.codehash,
+                diamondInit: PinnedContract({addr: diamondInit, codehash: diamondInit.codehash}),
+                verifier: PinnedContract({addr: verifier, codehash: verifier.codehash}),
+                genesisUpgrade: PinnedContract({addr: genesisUpgrade, codehash: genesisUpgrade.codehash}),
                 genesisFacets: facets,
                 genesis: ReleaseGenesisData({
                     bootloaderHash: _bootloaderHash,
@@ -196,8 +202,7 @@ contract StorageRegistriesTest is Test {
                 newProtocolVersion: NEW_VERSION,
                 fromRelease: address(fromRelease),
                 newRelease: address(newRelease),
-                upgradeEngine: upgradeEngine,
-                upgradeEngineCodehash: upgradeEngine.codehash,
+                upgradeEngine: PinnedContract({addr: upgradeEngine, codehash: upgradeEngine.codehash}),
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeTimestamp: 1234567,
                 l2Plan: _l2Plan()
@@ -375,8 +380,7 @@ contract StorageRegistriesTest is Test {
         ReleaseManifest memory manifest = _newReleaseManifest();
         // Re-point the frozen row at the shared facet, keeping its distinct selectors: same facet
         // address in two rows, with DIFFERENT freezability.
-        manifest.genesisFacets[2].facet = facetShared;
-        manifest.genesisFacets[2].codehash = facetShared.codehash;
+        manifest.genesisFacets[2].facet = PinnedContract({addr: facetShared, codehash: facetShared.codehash});
 
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateFacetRow.selector, facetShared));
         new CTMRelease(manifest);
@@ -508,8 +512,7 @@ contract StorageRegistriesTest is Test {
         // that describes no selectors.
         address emptyFacet = address(new MockSelfDescribingFacet(new bytes4[](0)));
         ReleaseManifest memory manifest = _newReleaseManifest();
-        manifest.genesisFacets[1].facet = emptyFacet;
-        manifest.genesisFacets[1].codehash = emptyFacet.codehash;
+        manifest.genesisFacets[1].facet = PinnedContract({addr: emptyFacet, codehash: emptyFacet.codehash});
 
         vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, emptyFacet));
         new CTMRelease(manifest);
@@ -533,8 +536,7 @@ contract StorageRegistriesTest is Test {
         // a pinned target that no longer carries code at validation time.
         address codeless = address(new MockSelfDescribingFacet(_selectors1(bytes4(uint32(0x99)))));
         ReleaseManifest memory manifest = _newReleaseManifest();
-        manifest.genesisFacets[0].facet = codeless;
-        manifest.genesisFacets[0].codehash = codeless.codehash;
+        manifest.genesisFacets[0].facet = PinnedContract({addr: codeless, codehash: codeless.codehash});
         CTMRelease codelessRelease = new CTMRelease(manifest);
         vm.etch(codeless, "");
 
@@ -549,8 +551,7 @@ contract StorageRegistriesTest is Test {
         // The colliding facet self-describes a selector facetFrozen also carries (0x20).
         address collidingFacet = address(new MockSelfDescribingFacet(_selectors1(bytes4(uint32(0x20)))));
         ReleaseManifest memory manifest = _newReleaseManifest();
-        manifest.genesisFacets[1].facet = collidingFacet;
-        manifest.genesisFacets[1].codehash = collidingFacet.codehash;
+        manifest.genesisFacets[1].facet = PinnedContract({addr: collidingFacet, codehash: collidingFacet.codehash});
 
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateSelector.selector, bytes4(uint32(0x20))));
         new CTMRelease(manifest);
@@ -577,7 +578,7 @@ contract StorageRegistriesTest is Test {
 
     function test_revertWhen_transitionPinMismatch() public {
         TransitionManifest memory manifest = _transitionManifest();
-        manifest.upgradeEngineCodehash = keccak256("not the engine's code");
+        manifest.upgradeEngine.codehash = keccak256("not the engine's code");
         CTMTransition mispinned = new CTMTransition(manifest);
 
         vm.expectRevert(
@@ -595,7 +596,7 @@ contract StorageRegistriesTest is Test {
     /// @dev The verifier pin moved to the release along with the verifier itself.
     function test_revertWhen_releaseVerifierPinMismatch() public {
         ReleaseManifest memory manifest = _newReleaseManifest();
-        manifest.verifierCodehash = keccak256("not the verifier's code");
+        manifest.verifier.codehash = keccak256("not the verifier's code");
         CTMRelease mispinned = new CTMRelease(manifest);
 
         vm.expectRevert(
@@ -649,8 +650,8 @@ contract StorageRegistriesTest is Test {
         // Every core row is a real edge — a placeholder that pins no new implementation
         // (implNew == 0) is refused; the old "skip zero rows" behavior is gone.
         CoreRegistryManifest memory manifest = _coreManifest();
-        manifest.contractRows[0].implNew = address(0);
-        manifest.contractRows[0].implNewCodehash = bytes32(0);
+        manifest.contractRows[0].implNew.addr = address(0);
+        manifest.contractRows[0].implNew.codehash = bytes32(0);
 
         vm.expectRevert(ZeroAddress.selector);
         new CoreRegistry(manifest);

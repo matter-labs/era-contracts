@@ -12,7 +12,8 @@ import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.s
 import {EcosystemImplMismatch, RegistryCodehashMismatch} from "contracts/common/L1ContractErrors.sol";
 import {
     CoreRegistryManifest,
-    EcosystemContractRow
+    EcosystemContractRow,
+    PinnedContract
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @dev Not a `CoreRegistry`: exercises the executor's codehash provenance check.
@@ -95,8 +96,7 @@ contract EcosystemUpgradeExecutorTest is Test {
             EcosystemContractRow({
                 proxy: _proxy,
                 expectedOldImpl: _expectedOldImpl,
-                implNew: _implNew,
-                implNewCodehash: _implNew.codehash
+                implNew: PinnedContract({addr: _implNew, codehash: _implNew.codehash})
             });
     }
 

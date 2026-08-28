@@ -10,7 +10,7 @@ import {
     RegistryEmptySelectors,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
-import {GenesisFacet, ReleaseManifest} from "../RegistryTypes.sol";
+import {GenesisFacet, PinnedContract, ReleaseManifest} from "../RegistryTypes.sol";
 import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
 /// @notice Storage-backed, write-once description of one CTM release.
@@ -32,9 +32,9 @@ contract CTMRelease is ICTMRelease {
     ///         runtime guard and `manifestHash` can never describe a stale object.
     constructor(ReleaseManifest memory _manifest) {
         if (
-            _manifest.diamondInit == address(0) ||
-            _manifest.genesisUpgrade == address(0) ||
-            _manifest.verifier == address(0)
+            _manifest.diamondInit.addr == address(0) ||
+            _manifest.genesisUpgrade.addr == address(0) ||
+            _manifest.verifier.addr == address(0)
         ) {
             revert ZeroAddress();
         }
@@ -55,10 +55,10 @@ contract CTMRelease is ICTMRelease {
         // here freeze the shape checks against the exact code the rows pin.
         bytes4[][] memory routing = new bytes4[][](length);
         for (uint256 i = 0; i < length; ++i) {
-            routing[i] = ISelfDescribingFacet(_manifest.genesisFacets[i].facet).selectors();
+            routing[i] = ISelfDescribingFacet(_manifest.genesisFacets[i].facet.addr).selectors();
             uint256 selectorsLength = routing[i].length;
             if (selectorsLength == 0) {
-                revert RegistryEmptySelectors(_manifest.genesisFacets[i].facet);
+                revert RegistryEmptySelectors(_manifest.genesisFacets[i].facet.addr);
             }
             // Exactly ONE row per facet address. A facet describes its complete selector list,
             // so a second row is never needed — and `Diamond._addOneFunction` requires every
@@ -67,8 +67,8 @@ contract CTMRelease is ICTMRelease {
             // (`SelectorsMustAllHaveSameFreezability`). Reject the shape instead of pinning a
             // release that cannot be applied.
             for (uint256 prev = 0; prev < i; ++prev) {
-                if (_manifest.genesisFacets[prev].facet == _manifest.genesisFacets[i].facet) {
-                    revert RegistryDuplicateFacetRow(_manifest.genesisFacets[i].facet);
+                if (_manifest.genesisFacets[prev].facet.addr == _manifest.genesisFacets[i].facet.addr) {
+                    revert RegistryDuplicateFacetRow(_manifest.genesisFacets[i].facet.addr);
                 }
             }
             // A diamond routes each selector exactly once — reject duplicates across the whole
@@ -102,11 +102,11 @@ contract CTMRelease is ICTMRelease {
     }
 
     function diamondInit() external view returns (address) {
-        return getManifest().diamondInit;
+        return getManifest().diamondInit.addr;
     }
 
     function verifier() external view returns (address) {
-        return getManifest().verifier;
+        return getManifest().verifier.addr;
     }
 
     function genesisFacets() external view returns (GenesisFacet[] memory) {
@@ -125,7 +125,7 @@ contract CTMRelease is ICTMRelease {
     function genesisParams() external view returns (address, bytes32, bytes32, uint64) {
         ReleaseManifest memory m = getManifest();
         return (
-            m.genesisUpgrade,
+            m.genesisUpgrade.addr,
             m.genesis.genesisBatchHash,
             m.genesis.genesisBatchCommitment,
             m.genesis.genesisIndexRepeatedStorageChanges
@@ -134,34 +134,34 @@ contract CTMRelease is ICTMRelease {
 
     function validate() external view {
         ReleaseManifest memory m = getManifest();
-        _requirePin(m.diamondInit, m.diamondInitCodehash);
-        _requirePin(m.genesisUpgrade, m.genesisUpgradeCodehash);
-        _requirePin(m.verifier, m.verifierCodehash);
+        _requirePin(m.diamondInit);
+        _requirePin(m.genesisUpgrade);
+        _requirePin(m.verifier);
         uint256 length = m.genesisFacets.length;
         for (uint256 i = 0; i < length; ++i) {
-            _requirePin(m.genesisFacets[i].facet, m.genesisFacets[i].codehash);
+            _requirePin(m.genesisFacets[i].facet);
         }
     }
 
     function verifyAll() external view returns (bool) {
         ReleaseManifest memory m = getManifest();
-        if (
-            !CodehashPinLib.pinHolds(m.diamondInit, m.diamondInitCodehash) ||
-            !CodehashPinLib.pinHolds(m.genesisUpgrade, m.genesisUpgradeCodehash) ||
-            !CodehashPinLib.pinHolds(m.verifier, m.verifierCodehash)
-        ) {
+        if (!_pinHolds(m.diamondInit) || !_pinHolds(m.genesisUpgrade) || !_pinHolds(m.verifier)) {
             return false;
         }
         uint256 length = m.genesisFacets.length;
         for (uint256 i = 0; i < length; ++i) {
-            if (!CodehashPinLib.pinHolds(m.genesisFacets[i].facet, m.genesisFacets[i].codehash)) {
+            if (!_pinHolds(m.genesisFacets[i].facet)) {
                 return false;
             }
         }
         return true;
     }
 
-    function _requirePin(address _target, bytes32 _expectedCodehash) private view {
-        CodehashPinLib.requirePin(_target, _expectedCodehash);
+    function _requirePin(PinnedContract memory _pinned) private view {
+        CodehashPinLib.requirePin(_pinned);
+    }
+
+    function _pinHolds(PinnedContract memory _pinned) private view returns (bool) {
+        return CodehashPinLib.pinHolds(_pinned);
     }
 }

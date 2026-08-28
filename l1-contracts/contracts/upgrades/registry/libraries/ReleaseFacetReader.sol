@@ -17,10 +17,10 @@ library ReleaseFacetReader {
         facetCuts = new Diamond.FacetCut[](length);
         for (uint256 i = 0; i < length; ++i) {
             facetCuts[i] = Diamond.FacetCut({
-                facet: facets[i].facet,
+                facet: facets[i].facet.addr,
                 action: Diamond.Action.Add,
                 isFreezable: facets[i].isFreezable,
-                selectors: ISelfDescribingFacet(facets[i].facet).selectors()
+                selectors: ISelfDescribingFacet(facets[i].facet.addr).selectors()
             });
         }
     }

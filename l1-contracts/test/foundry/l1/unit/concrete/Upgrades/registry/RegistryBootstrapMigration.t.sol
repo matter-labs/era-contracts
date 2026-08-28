@@ -35,7 +35,8 @@ import {
     EcosystemContractRow,
     GenesisFacet,
     ReleaseGenesisData,
-    ReleaseManifest
+    ReleaseManifest,
+    PinnedContract
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @dev Two distinct implementations so a proxy row is a real `expectedOldImpl -> implNew` edge.
@@ -114,19 +115,15 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
             genesisFacets[i] = GenesisFacet({
-                facet: facetCuts[i].facet,
-                isFreezable: facetCuts[i].isFreezable,
-                codehash: facetCuts[i].facet.codehash
+                facet: PinnedContract({addr: facetCuts[i].facet, codehash: facetCuts[i].facet.codehash}),
+                isFreezable: facetCuts[i].isFreezable
             });
         }
         result = new CTMRelease(
             ReleaseManifest({
-                diamondInit: diamondInit,
-                diamondInitCodehash: diamondInit.codehash,
-                verifier: address(testnetVerifier),
-                verifierCodehash: address(testnetVerifier).codehash,
-                genesisUpgrade: genesisUpgradeAddr,
-                genesisUpgradeCodehash: genesisUpgradeAddr.codehash,
+                diamondInit: PinnedContract({addr: diamondInit, codehash: diamondInit.codehash}),
+                verifier: PinnedContract({addr: address(testnetVerifier), codehash: address(testnetVerifier).codehash}),
+                genesisUpgrade: PinnedContract({addr: genesisUpgradeAddr, codehash: genesisUpgradeAddr.codehash}),
                 genesisFacets: genesisFacets,
                 genesis: ReleaseGenesisData({
                     bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
@@ -146,8 +143,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         rows[0] = EcosystemContractRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
-            implNew: implV32,
-            implNewCodehash: implV32.codehash
+            implNew: PinnedContract({addr: implV32, codehash: implV32.codehash})
         });
         Diamond.FacetCut[] memory noFacetCuts = new Diamond.FacetCut[](0);
         return
@@ -166,10 +162,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                     initCalldata: hex""
                 }),
                 upgradeCutInitCodehash: upgradeCutInit.codehash,
-                ctmExecutor: address(ctmExecutor),
-                ctmExecutorCodehash: address(ctmExecutor).codehash,
-                ecosystemExecutor: address(ecoExecutor),
-                ecosystemExecutorCodehash: address(ecoExecutor).codehash
+                ctmExecutor: PinnedContract({addr: address(ctmExecutor), codehash: address(ctmExecutor).codehash}),
+                ecosystemExecutor: PinnedContract({addr: address(ecoExecutor), codehash: address(ecoExecutor).codehash})
             });
     }
 
@@ -253,8 +247,10 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             Utils.transitionCodehash()
         );
         BootstrapManifest memory manifest = _manifest();
-        manifest.ctmExecutor = address(foreignExecutor);
-        manifest.ctmExecutorCodehash = address(foreignExecutor).codehash;
+        manifest.ctmExecutor = PinnedContract({
+            addr: address(foreignExecutor),
+            codehash: address(foreignExecutor).codehash
+        });
 
         RegistryBootstrapMigration mismatched = new RegistryBootstrapMigration(manifest);
         vm.prank(governor);
@@ -282,8 +278,10 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             Utils.coreRegistryCodehash()
         );
         BootstrapManifest memory manifest = _manifest();
-        manifest.ecosystemExecutor = address(foreignExecutor);
-        manifest.ecosystemExecutorCodehash = address(foreignExecutor).codehash;
+        manifest.ecosystemExecutor = PinnedContract({
+            addr: address(foreignExecutor),
+            codehash: address(foreignExecutor).codehash
+        });
 
         RegistryBootstrapMigration mismatched = new RegistryBootstrapMigration(manifest);
         vm.prank(governor);
@@ -327,14 +325,12 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         rows[0] = EcosystemContractRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
-            implNew: implV32,
-            implNewCodehash: implV32.codehash
+            implNew: PinnedContract({addr: implV32, codehash: implV32.codehash})
         });
         rows[1] = EcosystemContractRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
-            implNew: implV31,
-            implNewCodehash: implV31.codehash
+            implNew: PinnedContract({addr: implV31, codehash: implV31.codehash})
         });
         BootstrapManifest memory manifest = _manifest();
         manifest.proxyRows = rows;
@@ -348,8 +344,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         rows[0] = EcosystemContractRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: address(0),
-            implNew: implV32,
-            implNewCodehash: implV32.codehash
+            implNew: PinnedContract({addr: implV32, codehash: implV32.codehash})
         });
         BootstrapManifest memory manifest = _manifest();
         manifest.proxyRows = rows;

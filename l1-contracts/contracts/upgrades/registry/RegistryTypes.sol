@@ -17,19 +17,24 @@ import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.
 /// @dev They live here rather than next to their contracts because they are the reviewable
 ///      artifact of the whole model — see {protocol-docs} and {docs/registry-driven-upgrades.md}.
 
+/// @notice An address together with the MANDATORY `EXTCODEHASH` pin of the code it must run —
+///         the unit every manifest names contracts in. Pins sit beside the address they protect
+///         (there is no detached, optional pin list) and are held against live code by
+///         `validate()` / `verifyAll()`.
+struct PinnedContract {
+    address addr;
+    bytes32 codehash;
+}
+
 /// @notice One facet installed on every chain created from a CTM release.
 /// @dev The facet's selector routing is NOT stored: every facet is self-describing
 ///      (`ISelfDescribingFacet.selectors()`), and the `codehash` pin freezes that
 ///      self-description together with the code — a stored copy would only be a second,
 ///      unverified source that could disagree with it. Consumers (genesis installation,
 ///      transition delta derivation) read the routing from the pinned facet.
-/// @dev `codehash` is the MANDATORY `EXTCODEHASH` pin of `facet` — verified by
-///      `validate()` / `verifyAll()`. Pins sit beside the address they protect; there is
-///      no detached, optional pin list.
 struct GenesisFacet {
-    address facet;
+    PinnedContract facet;
     bool isFreezable;
-    bytes32 codehash;
 }
 
 /// @notice The chain state a release pins that is neither a routing row nor a codehash pin: the
@@ -50,12 +55,9 @@ struct ReleaseGenesisData {
 
 // solhint-disable-next-line gas-struct-packing
 struct ReleaseManifest {
-    address diamondInit;
-    bytes32 diamondInitCodehash;
-    address verifier;
-    bytes32 verifierCodehash;
-    address genesisUpgrade;
-    bytes32 genesisUpgradeCodehash;
+    PinnedContract diamondInit;
+    PinnedContract verifier;
+    PinnedContract genesisUpgrade;
     GenesisFacet[] genesisFacets;
     ReleaseGenesisData genesis;
 }
@@ -83,8 +85,7 @@ struct TransitionManifest {
     uint256 newProtocolVersion;
     address fromRelease;
     address newRelease;
-    address upgradeEngine;
-    bytes32 upgradeEngineCodehash;
+    PinnedContract upgradeEngine;
     uint256 oldProtocolVersionDeadline;
     uint256 upgradeTimestamp;
     L2UpgradePlan l2Plan;
@@ -101,14 +102,11 @@ struct TransitionManifest {
 /// @param expectedOldImpl The implementation the proxy must currently point at for this row to
 ///        apply. This is the replay guard: after a later registry moves the proxy on, replaying
 ///        this registry cannot silently downgrade it — the source no longer matches.
-/// @param implNew The implementation the proxy points at afterwards.
-/// @param implNewCodehash The MANDATORY `EXTCODEHASH` pin of `implNew`, inline beside the address
-///        it protects.
+/// @param implNew The pinned implementation the proxy points at afterwards.
 struct EcosystemContractRow {
     address proxy;
     address expectedOldImpl;
-    address implNew;
-    bytes32 implNewCodehash;
+    PinnedContract implNew;
 }
 
 /// @notice Everything a core registry instance pins, set exactly once by {initialize}.
@@ -138,12 +136,10 @@ struct CoreRegistryManifest {
 ///        no per-facet pins — the one unpinned payload here, and the reason this edge is
 ///        reviewed as legacy calldata rather than as a derived delta.
 /// @param upgradeCutInitCodehash Inline pin of `upgradeCut.initAddress`.
-/// @param ctmExecutor The `CTMUpgradeExecutor` that receives CTM ownership. It must be BOUND to
-///        `ctm`, otherwise its fixed entrypoints could never drive the CTM it is handed.
-/// @param ctmExecutorCodehash Inline pin of `ctmExecutor`.
-/// @param ecosystemExecutor The `EcosystemUpgradeExecutor` that receives ProxyAdmin ownership.
-///        It must be BOUND to `ctmProxyAdmin`, for the same reason.
-/// @param ecosystemExecutorCodehash Inline pin of `ecosystemExecutor`.
+/// @param ctmExecutor The pinned `CTMUpgradeExecutor` that receives CTM ownership. It must be
+///        BOUND to `ctm`, otherwise its fixed entrypoints could never drive the CTM it is handed.
+/// @param ecosystemExecutor The pinned `EcosystemUpgradeExecutor` that receives ProxyAdmin
+///        ownership. It must be BOUND to `ctmProxyAdmin`, for the same reason.
 struct BootstrapManifest {
     address ctm;
     uint256 expectedProtocolVersion;
@@ -155,10 +151,8 @@ struct BootstrapManifest {
     uint256 oldProtocolVersionDeadline;
     Diamond.DiamondCutData upgradeCut;
     bytes32 upgradeCutInitCodehash;
-    address ctmExecutor;
-    bytes32 ctmExecutorCodehash;
-    address ecosystemExecutor;
-    bytes32 ecosystemExecutorCodehash;
+    PinnedContract ctmExecutor;
+    PinnedContract ecosystemExecutor;
 }
 
 /// @notice Everything the deploy flow feeds into a release manifest at build time.

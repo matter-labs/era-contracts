@@ -37,7 +37,8 @@ import {
     L2UpgradePlan,
     ReleaseGenesisData,
     ReleaseManifest,
-    TransitionManifest
+    TransitionManifest,
+    PinnedContract
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice The first full registry-driven upgrade, end to end: a real chain diamond is taken
@@ -181,12 +182,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     function _releaseManifest(address _adminFacet, address _verifier) internal returns (ReleaseManifest memory) {
         return
             ReleaseManifest({
-                diamondInit: diamondInit,
-                diamondInitCodehash: diamondInit.codehash,
-                verifier: _verifier,
-                verifierCodehash: _verifier.codehash,
-                genesisUpgrade: genesisUpgradeAddr,
-                genesisUpgradeCodehash: genesisUpgradeAddr.codehash,
+                diamondInit: PinnedContract({addr: diamondInit, codehash: diamondInit.codehash}),
+                verifier: PinnedContract({addr: _verifier, codehash: _verifier.codehash}),
+                genesisUpgrade: PinnedContract({addr: genesisUpgradeAddr, codehash: genesisUpgradeAddr.codehash}),
                 genesisFacets: _releaseFacets(_adminFacet),
                 // Carried unchanged through every hop: the release pins the complete values, so
                 // the derived hash changes are zero.
@@ -211,9 +209,8 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             bool replaced = _adminFacet != address(0) && facetCuts[i].facet == facetCuts[1].facet;
             address facet = replaced ? _adminFacet : facetCuts[i].facet;
             genesisFacets[i] = GenesisFacet({
-                facet: facet,
-                isFreezable: facetCuts[i].isFreezable,
-                codehash: facet.codehash
+                facet: PinnedContract({addr: facet, codehash: facet.codehash}),
+                isFreezable: facetCuts[i].isFreezable
             });
         }
     }
@@ -261,8 +258,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
                 newProtocolVersion: _newVersion,
                 fromRelease: _fromRelease,
                 newRelease: release,
-                upgradeEngine: defaultUpgrade,
-                upgradeEngineCodehash: defaultUpgrade.codehash,
+                upgradeEngine: PinnedContract({addr: defaultUpgrade, codehash: defaultUpgrade.codehash}),
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: 0,
                 l2Plan: l2Plan

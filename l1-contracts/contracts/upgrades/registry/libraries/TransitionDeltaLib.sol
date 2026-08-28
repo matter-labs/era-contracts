@@ -178,9 +178,9 @@ library TransitionDeltaLib {
         rows = new FacetRouting[](length);
         for (uint256 i = 0; i < length; ++i) {
             rows[i] = FacetRouting({
-                facet: facets[i].facet,
+                facet: facets[i].facet.addr,
                 isFreezable: facets[i].isFreezable,
-                selectors: ISelfDescribingFacet(facets[i].facet).selectors()
+                selectors: ISelfDescribingFacet(facets[i].facet.addr).selectors()
             });
         }
     }

@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ICoreRegistry} from "./ICoreRegistry.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {RegistryDuplicateProxyRow, RegistryUnknownKey, ZeroAddress} from "../../../common/L1ContractErrors.sol";
-import {CoreRegistryManifest, EcosystemContractRow} from "../RegistryTypes.sol";
+import {CoreRegistryManifest, EcosystemContractRow, PinnedContract} from "../RegistryTypes.sol";
 
 /// @title Core (ecosystem-wide) registry — one instance per protocol upgrade.
 /// @author Matter Labs
@@ -46,7 +46,7 @@ contract CoreRegistry is ICoreRegistry {
             // upgrade simply has no row. The codehash pins are checked by `validate()` against
             // live code, not here: the manifest supplies both halves of each pair, so a
             // construction-time check would only prove the pair self-consistent.
-            if (row.proxy == address(0) || row.expectedOldImpl == address(0) || row.implNew == address(0)) {
+            if (row.proxy == address(0) || row.expectedOldImpl == address(0) || row.implNew.addr == address(0)) {
                 revert ZeroAddress();
             }
             for (uint256 j = 0; j < i; ++j) {
@@ -84,7 +84,7 @@ contract CoreRegistry is ICoreRegistry {
         EcosystemContractRow[] memory rows = getManifest().contractRows;
         uint256 length = rows.length;
         for (uint256 i = 0; i < length; ++i) {
-            if (!CodehashPinLib.pinHolds(rows[i].implNew, rows[i].implNewCodehash)) {
+            if (!CodehashPinLib.pinHolds(rows[i].implNew)) {
                 return false;
             }
         }
@@ -96,11 +96,11 @@ contract CoreRegistry is ICoreRegistry {
         EcosystemContractRow[] memory rows = getManifest().contractRows;
         uint256 length = rows.length;
         for (uint256 i = 0; i < length; ++i) {
-            _requirePin(rows[i].implNew, rows[i].implNewCodehash);
+            _requirePin(rows[i].implNew);
         }
     }
 
-    function _requirePin(address _target, bytes32 _expectedCodehash) private view {
-        CodehashPinLib.requirePin(_target, _expectedCodehash);
+    function _requirePin(PinnedContract memory _pinned) private view {
+        CodehashPinLib.requirePin(_pinned);
     }
 }

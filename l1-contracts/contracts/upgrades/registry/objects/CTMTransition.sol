@@ -24,7 +24,7 @@ import {
     TransitionDeadlineBeforeUpgrade,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
-import {L2UpgradePlan, TransitionManifest} from "../RegistryTypes.sol";
+import {L2UpgradePlan, PinnedContract, TransitionManifest} from "../RegistryTypes.sol";
 
 /// @notice Storage-backed, write-once transition between two CTM releases.
 /// @dev The facet cuts and base-system hash changes are NOT part of the manifest: they are
@@ -57,7 +57,7 @@ contract CTMTransition is ICTMTransition {
         if (
             _manifest.fromRelease == address(0) ||
             _manifest.newRelease == address(0) ||
-            _manifest.upgradeEngine == address(0)
+            _manifest.upgradeEngine.addr == address(0)
         ) {
             revert ZeroAddress();
         }
@@ -180,7 +180,7 @@ contract CTMTransition is ICTMTransition {
     }
 
     function upgradeEngine() external view returns (address) {
-        return getManifest().upgradeEngine;
+        return getManifest().upgradeEngine.addr;
     }
 
     function oldProtocolVersionDeadline() external view returns (uint256) {
@@ -207,7 +207,7 @@ contract CTMTransition is ICTMTransition {
         TransitionManifest memory m = getManifest();
         ICTMRelease(m.newRelease).validate();
         ICTMRelease(m.fromRelease).validate();
-        _requirePin(m.upgradeEngine, m.upgradeEngineCodehash);
+        _requirePin(m.upgradeEngine);
     }
 
     function verifyAll() external view returns (bool) {
@@ -215,10 +215,10 @@ contract CTMTransition is ICTMTransition {
         if (!ICTMRelease(m.newRelease).verifyAll() || !ICTMRelease(m.fromRelease).verifyAll()) {
             return false;
         }
-        return CodehashPinLib.pinHolds(m.upgradeEngine, m.upgradeEngineCodehash);
+        return CodehashPinLib.pinHolds(m.upgradeEngine);
     }
 
-    function _requirePin(address _target, bytes32 _expectedCodehash) private view {
-        CodehashPinLib.requirePin(_target, _expectedCodehash);
+    function _requirePin(PinnedContract memory _pinned) private view {
+        CodehashPinLib.requirePin(_pinned);
     }
 }

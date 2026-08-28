@@ -27,7 +27,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
-import {L2UpgradePlan, TransitionManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {L2UpgradePlan, PinnedContract, TransitionManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {UpgradeHelperLib} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeHelperLib.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
@@ -55,8 +55,7 @@ contract CTMUpgrade_v32_Test is CTMUpgrade_v32 {
                 newProtocolVersion: getNewProtocolVersion(),
                 fromRelease: IChainTypeManager(ctmProxy).currentRelease(),
                 newRelease: ctmAddresses.stateTransition.currentRelease,
-                upgradeEngine: engine,
-                upgradeEngineCodehash: engine.codehash,
+                upgradeEngine: PinnedContract({addr: engine, codehash: engine.codehash}),
                 oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
                 upgradeTimestamp: 0,
                 l2Plan: L2UpgradePlan({

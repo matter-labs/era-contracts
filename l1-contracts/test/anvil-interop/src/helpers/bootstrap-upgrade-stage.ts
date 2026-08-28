@@ -184,8 +184,10 @@ export async function bootstrapInitArgs(
       {
         proxy: manifest.bootstrap.ctmImpl.proxy,
         expectedOldImpl: manifest.bootstrap.ctmImpl.expectedOldImpl,
-        implNew: manifest.bootstrap.ctmImpl.implNew,
-        implNewCodehash: manifest.bootstrap.ctmImpl.implNewCodehash,
+        implNew: {
+          addr: manifest.bootstrap.ctmImpl.implNew,
+          codehash: manifest.bootstrap.ctmImpl.implNewCodehash,
+        },
       },
     ],
     releaseCodehash: params.releaseCodehash,
@@ -194,12 +196,10 @@ export async function bootstrapInitArgs(
     oldProtocolVersionDeadline: ethers.BigNumber.from(manifest.bootstrap.oldProtocolVersionDeadline),
     upgradeCut: buildBootstrapCut(manifest, packSemVer),
     upgradeCutInitCodehash: manifest.bootstrap.upgradeEngine.codehash,
-    ctmExecutor: params.ctmExecutor,
     // The executors are deployed by this run (regular build), so their codehashes are read live
     // rather than committed — the manifest pins only cross-machine-stable values.
-    ctmExecutorCodehash: await codehash(params.ctmExecutor),
-    ecosystemExecutor: params.ecosystemExecutor,
-    ecosystemExecutorCodehash: await codehash(params.ecosystemExecutor),
+    ctmExecutor: { addr: params.ctmExecutor, codehash: await codehash(params.ctmExecutor) },
+    ecosystemExecutor: { addr: params.ecosystemExecutor, codehash: await codehash(params.ecosystemExecutor) },
   };
 }
 

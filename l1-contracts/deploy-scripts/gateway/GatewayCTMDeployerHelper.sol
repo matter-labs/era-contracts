@@ -50,7 +50,8 @@ import {
     GenesisConfig,
     GenesisFacet,
     ReleaseGenesisData,
-    ReleaseManifest
+    ReleaseManifest,
+    PinnedContract
 } from "../../contracts/upgrades/registry/RegistryTypes.sol";
 
 // solhint-disable gas-custom-errors
@@ -650,9 +651,8 @@ library GatewayCTMDeployerHelper {
         GenesisFacet[] memory rows = new GenesisFacet[](GENESIS_FACET_COUNT_LOCAL);
         for (uint256 i = 0; i < GENESIS_FACET_COUNT_LOCAL; ++i) {
             rows[i] = GenesisFacet({
-                facet: addrs[i],
-                isFreezable: freezable[i],
-                codehash: _direct.genesisFacetCodehashes[i]
+                facet: PinnedContract({addr: addrs[i], codehash: _direct.genesisFacetCodehashes[i]}),
+                isFreezable: freezable[i]
             });
         }
 

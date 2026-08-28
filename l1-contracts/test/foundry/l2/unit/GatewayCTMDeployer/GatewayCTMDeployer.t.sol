@@ -77,7 +77,8 @@ import {
 import {
     GenesisFacet,
     ReleaseGenesisData,
-    ReleaseManifest
+    ReleaseManifest,
+    PinnedContract
 } from "../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 // We need to use contract the zkfoundry consistently uses
@@ -197,16 +198,19 @@ contract GatewayCTMDeployerTest is Test {
         );
 
         GenesisFacet[] memory facets = new GenesisFacet[](1);
-        facets[0] = GenesisFacet({facet: address(getters), isFreezable: false, codehash: address(getters).codehash});
+        facets[0] = GenesisFacet({
+            facet: PinnedContract({addr: address(getters), codehash: address(getters).codehash}),
+            isFreezable: false
+        });
 
         new CTMRelease(
             ReleaseManifest({
-                diamondInit: address(diamondInit),
-                diamondInitCodehash: address(diamondInit).codehash,
-                verifier: address(verifier),
-                verifierCodehash: address(verifier).codehash,
-                genesisUpgrade: address(genesisUpgrade),
-                genesisUpgradeCodehash: address(genesisUpgrade).codehash,
+                diamondInit: PinnedContract({addr: address(diamondInit), codehash: address(diamondInit).codehash}),
+                verifier: PinnedContract({addr: address(verifier), codehash: address(verifier).codehash}),
+                genesisUpgrade: PinnedContract({
+                    addr: address(genesisUpgrade),
+                    codehash: address(genesisUpgrade).codehash
+                }),
                 genesisFacets: facets,
                 genesis: ReleaseGenesisData({
                     bootloaderHash: bytes32(uint256(1)),

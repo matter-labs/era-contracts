@@ -336,7 +336,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "current_release_addr", ctmAddresses.stateTransition.currentRelease);
-        vm.serializeBytes32("state_transition", "release_codehash", ctmAddresses.stateTransition.currentRelease.codehash);
+        vm.serializeBytes32(
+            "state_transition",
+            "release_codehash",
+            ctmAddresses.stateTransition.currentRelease.codehash
+        );
         vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
         vm.serializeAddress(

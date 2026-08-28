@@ -99,9 +99,9 @@ contract CTMRegistryBootstrapTest is Test {
 
         GenesisFacet[] memory list = release.genesisFacets();
         assertEq(list.length, 6, "list length");
-        assertEq(list[0].facet, facets.adminFacet, "admin addr");
-        assertEq(list[1].facet, facets.gettersFacet, "getters addr");
-        assertEq(list[5].facet, facets.committerFacet, "committer addr");
+        assertEq(list[0].facet.addr, facets.adminFacet, "admin addr");
+        assertEq(list[1].facet.addr, facets.gettersFacet, "getters addr");
+        assertEq(list[5].facet.addr, facets.committerFacet, "committer addr");
 
         // Canonical freezability: Mailbox/Executor/Committer freezable, the rest not.
         assertFalse(list[0].isFreezable, "admin freezable");
@@ -110,7 +110,7 @@ contract CTMRegistryBootstrapTest is Test {
 
         // Routing is not stored in the manifest: it is read from the pinned facet's own
         // self-description on demand.
-        bytes4[] memory adminSelectors = ISelfDescribingFacet(list[0].facet).selectors();
+        bytes4[] memory adminSelectors = ISelfDescribingFacet(list[0].facet.addr).selectors();
         assertEq(adminSelectors.length, 1, "self-described selectors");
         assertEq(adminSelectors[0], bytes4(uint32(0x100)), "admin selector");
 
@@ -133,7 +133,7 @@ contract CTMRegistryBootstrapTest is Test {
         // Build the manifest BEFORE arming expectRevert: the builder itself makes (mocked)
         // external self-description calls that would otherwise consume the expectation.
         ReleaseManifest memory manifest = _genesisManifest();
-        manifest.genesisUpgrade = address(0);
+        manifest.genesisUpgrade.addr = address(0);
 
         vm.expectRevert();
         new CTMRelease(manifest);
