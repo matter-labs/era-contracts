@@ -601,7 +601,7 @@
   },
   {
     "contractName": "l2-contracts/AddressAliasHelper",
-    "zkBytecodeHash": "0x01000007fb50ba603c351244db9d3bdb66fa9af16a4aa732e5c34fcaffc2ee3c",
+    "zkBytecodeHash": "0x0100000b491aa3cf51635a010c1b7f5eca42d6ab230d651ed2dec99616971378",
     "zkBytecodePath": "/l2-contracts/zkout/AddressAliasHelper.sol/AddressAliasHelper.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
@@ -611,7 +611,7 @@
   },
   {
     "contractName": "l2-contracts/AddressUpgradeable",
-    "zkBytecodeHash": "0x010000075cee346c59383017fcbb22e5e6be22e09e2276db4a5e563fded83880",
+    "zkBytecodeHash": "0x0100000b517993ad8fc387f8daaf39c77fea85c3426af56176099e843a217672",
     "zkBytecodePath": "/l2-contracts/zkout/AddressUpgradeable.sol/AddressUpgradeable.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
@@ -621,7 +621,7 @@
   },
   {
     "contractName": "l2-contracts/ConsensusRegistry",
-    "zkBytecodeHash": "0x0100046faad435920287d7e13ce84ec962e75d0e18292c02e074d562c95bcd8f",
+    "zkBytecodeHash": "0x0100040d1bfc2a262cf99cf8bd3c5eb8e3a503028f9f2f3825f60618a73034eb",
     "zkBytecodePath": "/l2-contracts/zkout/ConsensusRegistry.sol/ConsensusRegistry.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
@@ -631,7 +631,7 @@
   },
   {
     "contractName": "l2-contracts/ForceDeployUpgrader",
-    "zkBytecodeHash": "0x0100005be42b941d563e143fe83be92c412656f943d3ee6128d502e6643bf069",
+    "zkBytecodeHash": "0x0100005dd96dd6f1e7684dbcf67e5ff3d7b3dd935f470956af0d0194eb6f7d7f",
     "zkBytecodePath": "/l2-contracts/zkout/ForceDeployUpgrader.sol/ForceDeployUpgrader.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
@@ -641,7 +641,7 @@
   },
   {
     "contractName": "l2-contracts/L2ContractHelper",
-    "zkBytecodeHash": "0x010000076087c680d688436b892abeacbea2ee5d4af648a05d2e6b0c16df53c6",
+    "zkBytecodeHash": "0x0100000bc29ac386faad0bbeffcdae52a182c09bbb51e28cdd2bacf39f0bbfc6",
     "zkBytecodePath": "/l2-contracts/zkout/L2ContractHelper.sol/L2ContractHelper.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
@@ -651,7 +651,7 @@
   },
   {
     "contractName": "l2-contracts/Multicall3",
-    "zkBytecodeHash": "0x010001f58b7a0cbb699bb9f0720e57b291f4d8183114cbcec6155e530626f835",
+    "zkBytecodeHash": "0x010001f3c37d2d9640e69a4ecb89c7b95b11434cbd40308f9ecef5a3068e0a9b",
     "zkBytecodePath": "/l2-contracts/zkout/Multicall3.sol/Multicall3.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
@@ -661,7 +661,7 @@
   },
   {
     "contractName": "l2-contracts/SystemContractsCaller",
-    "zkBytecodeHash": "0x01000007be4fa087cdffa602435d4b12f849519d5c91dd77a24b9e25356ed6fa",
+    "zkBytecodeHash": "0x0100000b1392ff9be43f57ef592d3048b2c09c088cccebdcbb540ec1a5d16ebe",
     "zkBytecodePath": "/l2-contracts/zkout/SystemContractsCaller.sol/SystemContractsCaller.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
@@ -671,7 +671,7 @@
   },
   {
     "contractName": "l2-contracts/Utils",
-    "zkBytecodeHash": "0x01000007ba17aea3f651a7a94ce2833018934c4e8a39b54c7093e3fa83c09886",
+    "zkBytecodeHash": "0x0100000b61ec9359b1e8433512f59d2755f0871142bf3d1782e5fd95f9d18b76",
     "zkBytecodePath": "/l2-contracts/zkout/SystemContractsCaller.sol/Utils.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
@@ -681,7 +681,7 @@
   },
   {
     "contractName": "l2-contracts/TestnetPaymaster",
-    "zkBytecodeHash": "0x010000b796cd992a6779900d5c8b237f90e47616c07949c7d201961229d4aebb",
+    "zkBytecodeHash": "0x010000bbb8bddec98985a6314a201311ce055cf1c5a5597336b9079662ea877e",
     "zkBytecodePath": "/l2-contracts/zkout/TestnetPaymaster.sol/TestnetPaymaster.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
@@ -691,7 +691,7 @@
   },
   {
     "contractName": "l2-contracts/TimestampAsserter",
-    "zkBytecodeHash": "0x0100001b61f262e48b0d75e55cb9ca0fc5bfb8836d5898478bedbc78cd8a9ca4",
+    "zkBytecodeHash": "0x0100001de679666f722ad9999e51c9ccbf679bac48f0040bf2b9685f91571cf8",
     "zkBytecodePath": "/l2-contracts/zkout/TimestampAsserter.sol/TimestampAsserter.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
