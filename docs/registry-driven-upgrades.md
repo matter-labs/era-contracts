@@ -21,8 +21,11 @@ A release is reusable chain state: everything a chain _runs_ belongs to it, incl
 the version edge and the schedule are the transition's, and one release can serve several versions.
 
 **A transition's facet cuts and hash changes are not authored.** They are derived from its
-`(fromRelease, newRelease)` pair in the constructor and stored. Governance reviews two releases plus
-the transition's own fields; the delta between them is computed, not written.
+`(fromRelease, newRelease)` pair in the constructor and stored: a full reinstall — remove the
+departing release's routing, install the target's (a same-release pair derives empty, so patches
+stay schedule-only). No selector-level diffing: each release redeploys its facets anyway.
+Governance reviews two releases plus the transition's own fields; the cuts are computed, not
+written.
 
 ## Objects
 

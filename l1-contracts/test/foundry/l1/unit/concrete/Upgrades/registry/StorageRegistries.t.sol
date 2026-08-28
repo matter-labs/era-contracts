@@ -254,19 +254,23 @@ contract StorageRegistriesTest is Test {
         assertEq(transition.newRelease(), address(newRelease));
         assertEq(transition.upgradeEngine(), upgradeEngine);
 
-        // Derived, not authored — and stored as final cuts: one Remove cut (the departing admin
-        // facet's full routing, facet address zero per Diamond semantics) followed by one Add
-        // cut (its replacement); carried-over facets contribute nothing, and there is no
-        // Replace bucket by construction.
+        // Derived, not authored — and stored as final cuts: a FULL REINSTALL, removals first.
+        // One Remove cut per departing facet (facet address zero per Diamond semantics), one Add
+        // cut per arriving facet; no selector-level diffing and no Replace bucket.
         Diamond.FacetCut[] memory derivedCuts = transition.facetCuts();
-        assertEq(derivedCuts.length, 2);
+        assertEq(derivedCuts.length, 6);
         assertEq(derivedCuts[0].facet, address(0));
         assertTrue(derivedCuts[0].action == Diamond.Action.Remove);
-        assertEq(derivedCuts[0].selectors.length, 2);
-        assertEq(derivedCuts[1].facet, facetNewAdmin);
-        assertTrue(derivedCuts[1].action == Diamond.Action.Add);
-        assertEq(derivedCuts[1].selectors.length, 2);
-        assertFalse(derivedCuts[1].isFreezable);
+        assertEq(derivedCuts[0].selectors.length, 2, "old admin routing removed");
+        assertTrue(derivedCuts[1].action == Diamond.Action.Remove);
+        assertTrue(derivedCuts[2].action == Diamond.Action.Remove);
+        assertEq(derivedCuts[3].facet, facetNewAdmin);
+        assertTrue(derivedCuts[3].action == Diamond.Action.Add);
+        assertEq(derivedCuts[3].selectors.length, 2);
+        assertFalse(derivedCuts[3].isFreezable);
+        assertEq(derivedCuts[4].facet, facetShared);
+        assertEq(derivedCuts[5].facet, facetFrozen);
+        assertTrue(derivedCuts[5].isFreezable);
 
         // Hash changes derived the same way: only the bootloader differs between the releases.
         (bytes32 bootloaderChange, bytes32 defaultAccountChange, bytes32 evmEmulatorChange) = transition

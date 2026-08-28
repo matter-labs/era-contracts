@@ -21,13 +21,6 @@ import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/I
 ///      (`L2UpgradePlan`) is reviewed-and-pinned data, not derived — L1 cannot verify L2
 ///      execution effects, and the guarantee is deliberately not overstated.
 library TransitionDeltaLib {
-    /// @dev One `selector -> (facet, freezable)` route, flattened from a release's facet rows.
-    struct Route {
-        bytes4 selector;
-        address facet;
-        bool isFreezable;
-    }
-
     /// @dev One facet row with its routing read from the facet's own self-description
     ///      (see {GenesisFacet} — routing is not stored in the manifest).
     struct FacetRouting {
@@ -37,63 +30,61 @@ library TransitionDeltaLib {
     }
 
     /// @notice Derives the diamond cuts whose execution transforms `_fromRelease`'s routing into
-    ///         `_newRelease`'s routing exactly.
-    /// @dev Emitted as one `Remove` cut per departing facet (facet address zero, per
-    ///      `Diamond._removeFunctions`) followed by one `Add` cut per arriving facet — all
-    ///      removals first, so selectors moving between facets are freed before being re-added.
-    ///      There is no `Replace` bucket: a re-routed selector is a removal from its old facet
-    ///      plus an addition to its new one. A selector survives (contributes nothing) iff the
-    ///      target routes it to the SAME facet with the SAME freezability.
+    ///         `_newRelease`'s routing.
+    /// @dev A FULL REINSTALL, removals first: one `Remove` cut per departing facet (its complete
+    ///      self-described routing, facet address zero per `Diamond._removeFunctions`) followed by
+    ///      one `Add` cut per arriving facet. There is deliberately no selector-level diffing:
+    ///      each release redeploys its facets, so a "minimal" delta re-routes almost everything
+    ///      anyway — the diff engine bought little and cost a routing model. A same-release pair
+    ///      (SemVer patch) derives an empty cut by identity, keeping patches schedule-only.
     function deriveFacetCuts(
         ICTMRelease _fromRelease,
         ICTMRelease _newRelease
     ) internal view returns (Diamond.FacetCut[] memory facetCuts) {
+        if (address(_fromRelease) == address(_newRelease)) {
+            return facetCuts;
+        }
         FacetRouting[] memory fromFacets = _loadRouting(_fromRelease);
         FacetRouting[] memory newFacets = _loadRouting(_newRelease);
-        Route[] memory fromRouting = _expand(fromFacets);
-        Route[] memory newRouting = _expand(newFacets);
+        // Pre-commit guards: a duplicated selector (or, downstream, an empty cut) would only
+        // surface when chains execute — AFTER `applyCTMUpgrade` bumped the CTM version, stranding
+        // every chain on an unexecutable transition. Facets with empty routing simply contribute
+        // no cut (`Diamond` rejects empty selector lists).
+        _requireNoDuplicateSelectors(fromFacets);
+        _requireNoDuplicateSelectors(newFacets);
 
-        uint256 fromFacetsLength = fromFacets.length;
-        uint256 newFacetsLength = newFacets.length;
-        // Per from-facet: the selectors NOT carried over unchanged (removed or re-routed).
-        bytes4[][] memory removedPerFacet = new bytes4[][](fromFacetsLength);
-        uint256 removalCuts = 0;
-        for (uint256 i = 0; i < fromFacetsLength; ++i) {
-            removedPerFacet[i] = _filterRoutes(fromFacets[i], newRouting);
-            if (removedPerFacet[i].length != 0) {
-                ++removalCuts;
+        uint256 cutCount = 0;
+        for (uint256 i = 0; i < fromFacets.length; ++i) {
+            if (fromFacets[i].selectors.length != 0) {
+                ++cutCount;
             }
         }
-        // Per new-facet: the selectors NOT already routed identically in `fromRelease`.
-        bytes4[][] memory addedPerFacet = new bytes4[][](newFacetsLength);
-        uint256 additionCuts = 0;
-        for (uint256 i = 0; i < newFacetsLength; ++i) {
-            addedPerFacet[i] = _filterRoutes(newFacets[i], fromRouting);
-            if (addedPerFacet[i].length != 0) {
-                ++additionCuts;
+        for (uint256 i = 0; i < newFacets.length; ++i) {
+            if (newFacets[i].selectors.length != 0) {
+                ++cutCount;
             }
         }
 
-        facetCuts = new Diamond.FacetCut[](removalCuts + additionCuts);
+        facetCuts = new Diamond.FacetCut[](cutCount);
         uint256 cursor = 0;
-        for (uint256 i = 0; i < fromFacetsLength; ++i) {
-            if (removedPerFacet[i].length != 0) {
+        for (uint256 i = 0; i < fromFacets.length; ++i) {
+            if (fromFacets[i].selectors.length != 0) {
                 facetCuts[cursor] = Diamond.FacetCut({
                     facet: address(0),
                     action: Diamond.Action.Remove,
                     isFreezable: false,
-                    selectors: removedPerFacet[i]
+                    selectors: fromFacets[i].selectors
                 });
                 ++cursor;
             }
         }
-        for (uint256 i = 0; i < newFacetsLength; ++i) {
-            if (addedPerFacet[i].length != 0) {
+        for (uint256 i = 0; i < newFacets.length; ++i) {
+            if (newFacets[i].selectors.length != 0) {
                 facetCuts[cursor] = Diamond.FacetCut({
                     facet: newFacets[i].facet,
                     action: Diamond.Action.Add,
                     isFreezable: newFacets[i].isFreezable,
-                    selectors: addedPerFacet[i]
+                    selectors: newFacets[i].selectors
                 });
                 ++cursor;
             }
@@ -130,47 +121,6 @@ library TransitionDeltaLib {
         return _newHash;
     }
 
-    /// @dev The selectors of `_facet` that do NOT appear in `_otherRouting` with the same facet
-    ///      address and freezability — i.e. the ones this side of the delta must act on.
-    function _filterRoutes(
-        FacetRouting memory _facet,
-        Route[] memory _otherRouting
-    ) private pure returns (bytes4[] memory result) {
-        bytes4[] memory selectors = _facet.selectors;
-        uint256 selectorsLength = selectors.length;
-        uint256 count = 0;
-        bool[] memory acts = new bool[](selectorsLength);
-        for (uint256 i = 0; i < selectorsLength; ++i) {
-            if (!_routedIdentically(_otherRouting, selectors[i], _facet.facet, _facet.isFreezable)) {
-                acts[i] = true;
-                ++count;
-            }
-        }
-        result = new bytes4[](count);
-        uint256 cursor = 0;
-        for (uint256 i = 0; i < selectorsLength; ++i) {
-            if (acts[i]) {
-                result[cursor] = selectors[i];
-                ++cursor;
-            }
-        }
-    }
-
-    function _routedIdentically(
-        Route[] memory _routing,
-        bytes4 _selector,
-        address _facet,
-        bool _isFreezable
-    ) private pure returns (bool) {
-        uint256 routingLength = _routing.length;
-        for (uint256 i = 0; i < routingLength; ++i) {
-            if (_routing[i].selector == _selector) {
-                return _routing[i].facet == _facet && _routing[i].isFreezable == _isFreezable;
-            }
-        }
-        return false;
-    }
-
     /// @dev A release's facet rows with each facet's live self-described routing.
     function _loadRouting(ICTMRelease _release) private view returns (FacetRouting[] memory rows) {
         GenesisFacet[] memory facets = _release.genesisFacets();
@@ -185,31 +135,25 @@ library TransitionDeltaLib {
         }
     }
 
-    /// @dev Flattens facet rows into one route per selector, rejecting duplicate selectors —
-    ///      a diamond routes each selector exactly once, so a duplicated selector in a release's
-    ///      routing is a malformed manifest.
-    function _expand(FacetRouting[] memory _facets) private pure returns (Route[] memory routes) {
-        uint256 facetsLength = _facets.length;
+    /// @dev A diamond routes each selector exactly once — reject a release whose facets
+    ///      collectively duplicate one. Plain pairwise scan: runs once, at transition
+    ///      construction, over ~a hundred selectors.
+    function _requireNoDuplicateSelectors(FacetRouting[] memory _facets) private pure {
         uint256 total = 0;
-        for (uint256 i = 0; i < facetsLength; ++i) {
+        for (uint256 i = 0; i < _facets.length; ++i) {
             total += _facets[i].selectors.length;
         }
-        routes = new Route[](total);
+        bytes4[] memory flat = new bytes4[](total);
         uint256 cursor = 0;
-        for (uint256 i = 0; i < facetsLength; ++i) {
+        for (uint256 i = 0; i < _facets.length; ++i) {
             bytes4[] memory selectors = _facets[i].selectors;
-            uint256 selectorsLength = selectors.length;
-            for (uint256 j = 0; j < selectorsLength; ++j) {
+            for (uint256 j = 0; j < selectors.length; ++j) {
                 for (uint256 k = 0; k < cursor; ++k) {
-                    if (routes[k].selector == selectors[j]) {
+                    if (flat[k] == selectors[j]) {
                         revert RegistryDuplicateSelector(selectors[j]);
                     }
                 }
-                routes[cursor] = Route({
-                    selector: selectors[j],
-                    facet: _facets[i].facet,
-                    isFreezable: _facets[i].isFreezable
-                });
+                flat[cursor] = selectors[j];
                 ++cursor;
             }
         }
