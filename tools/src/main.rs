@@ -8,20 +8,18 @@ use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Write};
+use zksync_crypto::flonk::FflonkVerificationKey;
+use zksync_crypto::{calculate_fflonk_verification_key_hash, calculate_verification_key_hash};
 
 pub mod fflonk;
 pub mod plonk;
 pub mod types;
 pub mod utils;
-pub mod verification_key;
 
 use clap::Parser;
 use fflonk::insert_residue_elements_and_commitments as fflonk_insert_residue_elements_and_commitments;
 use plonk::insert_residue_elements_and_commitments as plonk_insert_residue_elements_and_commitments;
 use serde_json::{from_reader, Value};
-use verification_key::{
-    calculate_fflonk_verification_key_hash, calculate_verification_key_hash, FflonkVerificationKey,
-};
 
 #[derive(Debug, Parser)]
 #[command(
