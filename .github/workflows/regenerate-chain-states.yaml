@@ -58,30 +58,8 @@ jobs:
           # keep it non-fatal — the working tree is already at the correct commit.
           git submodule update --init --recursive || true
 
-      - name: Install Foundry (no foundry-zksync — deterministic bytecode)
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: v1.5.1
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn
-
-      - name: Build da-contracts artifacts (no CBOR metadata for determinism)
-        run: FOUNDRY_PROFILE=anvil-interop yarn da build:foundry
-
-      - name: Build l1-contracts artifacts (no CBOR metadata for determinism)
-        working-directory: l1-contracts
-        run: FOUNDRY_PROFILE=anvil-interop forge build
-
-      - name: Install anvil-interop dependencies
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn install
+      - name: Build anvil-interop artifacts
+        uses: ./.github/actions/build-anvil-interop-artifacts
 
       - name: Generate chain state
         working-directory: l1-contracts/test/anvil-interop

@@ -1,0 +1,44 @@
+name: "Build anvil-interop artifacts"
+description: >
+  Toolchain + deterministic build for the anvil-interop chain-state pipeline, shared by
+  regenerate-chain-states.yaml (the writer) and pre-merge-checks.yaml's state-generation-check
+  (the verifier) so the two can never drift apart. Expects the repository (with submodules) to
+  already be checked out.
+
+  The committed snapshots must be byte-for-byte reproducible, which pins three choices: plain
+  upstream Foundry (no foundry-zksync), the anvil-interop profile (cbor_metadata=false,
+  bytecode_hash=none — path- and environment-independent bytecode), and no warm-solc-cache —
+  workflows that generate or verify committed snapshots build from scratch, per the trust model
+  in warm-solc-cache/action.yaml.
+
+runs:
+  using: composite
+  steps:
+    - name: Install Foundry (no foundry-zksync — deterministic bytecode)
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: v1.5.1
+
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: yarn
+
+    - name: Install dependencies
+      shell: bash
+      run: yarn
+
+    - name: Build da-contracts artifacts (no CBOR metadata for determinism)
+      shell: bash
+      run: FOUNDRY_PROFILE=anvil-interop yarn da build:foundry
+
+    - name: Build l1-contracts artifacts (no CBOR metadata for determinism)
+      shell: bash
+      working-directory: l1-contracts
+      run: FOUNDRY_PROFILE=anvil-interop forge build
+
+    - name: Install anvil-interop dependencies
+      shell: bash
+      working-directory: l1-contracts/test/anvil-interop
+      run: yarn install
