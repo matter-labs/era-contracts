@@ -8,6 +8,7 @@ import {
     RegistryDuplicateFacetRow,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
+    RegistryUnsortedSelectors,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 import {GenesisFacet, PinnedContract, ReleaseManifest} from "../RegistryTypes.sol";
@@ -52,13 +53,21 @@ contract CTMRelease is ICTMRelease {
             revert RegistryEmptySelectors(address(0));
         }
         // Routing is read from the facets' own self-description (see {GenesisFacet}); the reads
-        // here freeze the shape checks against the exact code the rows pin.
+        // here freeze the shape checks against the exact code the rows pin. Each facet's list
+        // MUST be strictly ascending ({ISelfDescribingFacet}), which makes both duplicate checks
+        // linear: within a facet by adjacency, across the whole routing by a k-way merge.
         bytes4[][] memory routing = new bytes4[][](length);
         for (uint256 i = 0; i < length; ++i) {
             routing[i] = ISelfDescribingFacet(_manifest.genesisFacets[i].facet.addr).selectors();
             uint256 selectorsLength = routing[i].length;
             if (selectorsLength == 0) {
                 revert RegistryEmptySelectors(_manifest.genesisFacets[i].facet.addr);
+            }
+            // Strictly ascending also rules out duplicates WITHIN the facet.
+            for (uint256 j = 1; j < selectorsLength; ++j) {
+                if (routing[i][j] <= routing[i][j - 1]) {
+                    revert RegistryUnsortedSelectors(_manifest.genesisFacets[i].facet.addr, routing[i][j]);
+                }
             }
             // Exactly ONE row per facet address. A facet describes its complete selector list,
             // so a second row is never needed — and `Diamond._addOneFunction` requires every
@@ -71,22 +80,47 @@ contract CTMRelease is ICTMRelease {
                     revert RegistryDuplicateFacetRow(_manifest.genesisFacets[i].facet.addr);
                 }
             }
-            // A diamond routes each selector exactly once — reject duplicates across the whole
-            // routing (within AND across rows), not just when a transition later derives.
-            for (uint256 j = 0; j < selectorsLength; ++j) {
-                bytes4 selector = routing[i][j];
-                for (uint256 k = 0; k <= i; ++k) {
-                    uint256 upperBound = k == i ? j : routing[k].length;
-                    for (uint256 m = 0; m < upperBound; ++m) {
-                        if (routing[k][m] == selector) {
-                            revert RegistryDuplicateSelector(selector);
-                        }
+        }
+        // A diamond routes each selector exactly once — reject duplicates ACROSS rows with a
+        // k-way merge over the (per-facet sorted) lists: repeatedly take the global minimum and
+        // require it to strictly exceed the previous one.
+        _requireGloballyUniqueSelectors(routing);
+
+        encodedManifest = abi.encode(_manifest);
+    }
+
+    /// @dev K-way merge duplicate detection over per-facet ascending selector lists. `_cursors`
+    ///      tracks per-facet progress; each step picks the smallest remaining selector, which must
+    ///      strictly exceed the previously taken one. O(total · facets) with facets ~ 7.
+    function _requireGloballyUniqueSelectors(bytes4[][] memory _routing) private pure {
+        uint256 facetsLength = _routing.length;
+        uint256[] memory cursors = new uint256[](facetsLength);
+        bool first = true;
+        bytes4 previous;
+        while (true) {
+            bool found = false;
+            uint256 minFacet = 0;
+            bytes4 minSelector;
+            for (uint256 i = 0; i < facetsLength; ++i) {
+                if (cursors[i] < _routing[i].length) {
+                    bytes4 candidate = _routing[i][cursors[i]];
+                    if (!found || candidate < minSelector) {
+                        found = true;
+                        minFacet = i;
+                        minSelector = candidate;
                     }
                 }
             }
+            if (!found) {
+                break;
+            }
+            if (!first && minSelector == previous) {
+                revert RegistryDuplicateSelector(minSelector);
+            }
+            first = false;
+            previous = minSelector;
+            ++cursors[minFacet];
         }
-
-        encodedManifest = abi.encode(_manifest);
     }
 
     /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment governance compares

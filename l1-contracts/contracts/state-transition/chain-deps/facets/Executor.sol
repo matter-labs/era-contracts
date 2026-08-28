@@ -322,7 +322,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor, ISelfDescribingFacet {
     ///      0x9271e450 proveBatchesSharedBridge(address,uint256,uint256,bytes)
     ///      0x7ca4eff7 revertBatchesSharedBridge(address,uint256)
     function selectors() public pure returns (bytes4[] memory result) {
-        bytes memory packed = hex"a085344d9271e4507ca4eff7";
+        bytes memory packed = hex"7ca4eff79271e450a085344d";
         uint256 count = packed.length / 4;
         result = new bytes4[](count);
         for (uint256 i = 0; i < count; ++i) {

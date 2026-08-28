@@ -635,7 +635,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     ///      0x03129ad9 upgradeChainFromVersion(address,uint256)
     function selectors() public pure returns (bytes4[] memory result) {
         bytes
-            memory packed = hex"0e18b68117338945f9afb97e1b48b94a1cc5d10321f603d7235d9eb523b311922765d07927ae4c162878fe742f257a5c03129ad94623c91d4dd18bf55b89874860eae0e764bf8d66e76db8656e762e98a9f6d941b4fcb577be6f11cfc5f1f1f5e51935f5";
+            memory packed = hex"03129ad90e18b681173389451b48b94a1cc5d10321f603d7235d9eb523b311922765d07927ae4c162878fe742f257a5c4623c91d4dd18bf55b89874860eae0e764bf8d666e762e98a9f6d941b4fcb577be6f11cfc5f1f1f5e51935f5e76db865f9afb97e";
         uint256 count = packed.length / 4;
         result = new bytes4[](count);
         for (uint256 i = 0; i < count; ++i) {

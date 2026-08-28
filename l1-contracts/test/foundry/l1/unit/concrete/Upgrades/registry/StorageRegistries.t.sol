@@ -120,7 +120,8 @@ contract StorageRegistriesTest is Test {
         rows[0] = ProxyUpgradeRow({
             proxy: address(0xB001),
             expectedOldImpl: address(0xB101),
-            implNew: PinnedContract({addr: coreImplNew, codehash: coreImplNew.codehash})
+            implNew: PinnedContract({addr: coreImplNew, codehash: coreImplNew.codehash}),
+            initCalldata: ""
         });
         return CoreRegistryManifest({contractRows: rows});
     }

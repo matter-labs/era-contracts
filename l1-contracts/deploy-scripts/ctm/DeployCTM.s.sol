@@ -604,9 +604,17 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function deployServerNotifier() internal returns (address implementation, address proxy) {
-        // We will not store the address of the ProxyAdmin as it is trivial to query if needed.
-        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", ctmAddresses.chainAdmin, false);
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin, false);
+        // DELIBERATELY not under the CTM-domain ProxyAdmin (which governance / the CTM executor
+        // owns): the notifier is operational tooling, and its upgrades are a CTM-ADMIN concern —
+        // the upgrade pipeline swaps its implementation through this admin as an admin call, not
+        // a governance stage. It is therefore also outside the registry-driven flow on purpose.
+        // The ProxyAdmin address itself is not stored: trivial to query from the proxy.
+        address serverNotifierProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", ctmAddresses.chainAdmin, false);
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin(
+            "ServerNotifier",
+            serverNotifierProxyAdmin,
+            false
+        );
     }
 
     function saveDiamondSelectors() public {

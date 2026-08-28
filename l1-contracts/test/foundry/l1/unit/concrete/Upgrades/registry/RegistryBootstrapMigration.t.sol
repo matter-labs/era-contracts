@@ -144,7 +144,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         rows[0] = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
-            implNew: PinnedContract({addr: implV32, codehash: implV32.codehash})
+            implNew: PinnedContract({addr: implV32, codehash: implV32.codehash}),
+            initCalldata: ""
         });
         Diamond.FacetCut[] memory noFacetCuts = new Diamond.FacetCut[](0);
         return
@@ -331,12 +332,14 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         rows[0] = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
-            implNew: PinnedContract({addr: implV32, codehash: implV32.codehash})
+            implNew: PinnedContract({addr: implV32, codehash: implV32.codehash}),
+            initCalldata: ""
         });
         rows[1] = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
-            implNew: PinnedContract({addr: implV31, codehash: implV31.codehash})
+            implNew: PinnedContract({addr: implV31, codehash: implV31.codehash}),
+            initCalldata: ""
         });
         BootstrapManifest memory manifest = _manifest();
         manifest.proxyRows = rows;
@@ -350,7 +353,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         rows[0] = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: address(0),
-            implNew: PinnedContract({addr: implV32, codehash: implV32.codehash})
+            implNew: PinnedContract({addr: implV32, codehash: implV32.codehash}),
+            initCalldata: ""
         });
         BootstrapManifest memory manifest = _manifest();
         manifest.proxyRows = rows;

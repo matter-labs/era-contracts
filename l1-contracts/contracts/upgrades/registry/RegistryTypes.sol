@@ -99,22 +99,21 @@ struct TransitionManifest {
     L2UpgradePlan l2Plan;
 }
 
-/// @notice One ecosystem contract's upgrade row: a SOURCE-CHECKED edge, not just a target.
-/// @dev Scope: implementation swaps only — every row executes as a plain `ProxyAdmin.upgrade`.
-///      A proxy needing an initializer call as part of its upgrade is deliberately NOT expressible
-///      here; expressing it would mean pinning arbitrary calldata, which is a different (and much
-///      wider) review surface than "this proxy moves from this implementation to that one". Such
-///      an upgrade belongs in a version-specific script until a pinned-initializer row shape is
-///      designed and audited on its own terms.
-/// @param proxy The ecosystem proxy this row upgrades.
+/// @notice One proxy's upgrade row: a SOURCE-CHECKED edge, not just a target.
+/// @param proxy The proxy this row upgrades.
 /// @param expectedOldImpl The implementation the proxy must currently point at for this row to
-///        apply. This is the replay guard: after a later registry moves the proxy on, replaying
-///        this registry cannot silently downgrade it — the source no longer matches.
+///        apply. This is the replay guard: after a later upgrade moves the proxy on, replaying
+///        this row cannot silently downgrade it — the source no longer matches.
 /// @param implNew The pinned implementation the proxy points at afterwards.
+/// @param initCalldata Optional PINNED reinitializer: empty executes a plain `ProxyAdmin.upgrade`;
+///        nonempty executes `upgradeAndCall` with exactly these bytes (e.g. a `reinitializeV2()`
+///        storage migration). The calldata is arbitrary by type but not by review: it is fixed in
+///        the manifest and committed by the manifest hash like every other pinned value.
 struct ProxyUpgradeRow {
     address proxy;
     address expectedOldImpl;
     PinnedContract implNew;
+    bytes initCalldata;
 }
 
 /// @notice Everything a core registry instance pins, set exactly once by {initialize}.

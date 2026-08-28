@@ -79,6 +79,7 @@ export function coreInitArgs(manifest: any): any {
       addr: e.implNew ?? ethers.constants.AddressZero,
       codehash: e.implNewCodehash ?? ethers.constants.HashZero,
     },
+    initCalldata: e.initCalldata ?? "0x",
   }));
 
   return { contractRows };

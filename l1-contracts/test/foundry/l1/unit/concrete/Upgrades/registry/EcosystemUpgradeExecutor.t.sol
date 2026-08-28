@@ -96,7 +96,8 @@ contract EcosystemUpgradeExecutorTest is Test {
             ProxyUpgradeRow({
                 proxy: _proxy,
                 expectedOldImpl: _expectedOldImpl,
-                implNew: PinnedContract({addr: _implNew, codehash: _implNew.codehash})
+                implNew: PinnedContract({addr: _implNew, codehash: _implNew.codehash}),
+                initCalldata: ""
             });
     }
 

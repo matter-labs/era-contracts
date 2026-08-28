@@ -283,14 +283,28 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     /// @notice Routing is read from each facet's own self-description; the fixture's test facets
-    ///         (e.g. UtilsFacet) do not implement it, so describe them with the cut's routing.
+    ///         (e.g. UtilsFacet) do not implement it, so describe them with the cut's routing —
+    ///         sorted, since self-described lists are strictly ascending by contract.
     function _mockFacetSelfDescriptions(Diamond.FacetCut[] memory _facetCuts) internal {
         for (uint256 i = 0; i < _facetCuts.length; ++i) {
             vm.mockCall(
                 _facetCuts[i].facet,
                 abi.encodeWithSelector(ISelfDescribingFacet.selectors.selector),
-                abi.encode(_facetCuts[i].selectors)
+                abi.encode(_sortSelectors(_facetCuts[i].selectors))
             );
+        }
+    }
+
+    /// @dev Insertion sort (fixture-sized lists) into a fresh ascending array.
+    function _sortSelectors(bytes4[] memory _selectors) internal pure returns (bytes4[] memory sorted) {
+        sorted = new bytes4[](_selectors.length);
+        for (uint256 i = 0; i < _selectors.length; ++i) {
+            uint256 j = i;
+            while (j > 0 && sorted[j - 1] > _selectors[i]) {
+                sorted[j] = sorted[j - 1];
+                --j;
+            }
+            sorted[j] = _selectors[i];
         }
     }
 

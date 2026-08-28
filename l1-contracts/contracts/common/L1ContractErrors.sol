@@ -416,6 +416,8 @@ error RegistryPinTargetHasNoCode(address target);
 error RegistryReleaseCodehashAlreadySet(bytes32 current);
 // 0x1f20dafa
 error RegistryUnknownKey();
+// 0x364b629b
+error RegistryUnsortedSelectors(address facet, bytes4 selector);
 // 0x3ea1345a
 error RegistryWrongVM(bool expected, bool actual);
 // 0x667d17de

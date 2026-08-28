@@ -387,7 +387,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
     ///      0x74f4d30d storedBlockHash(uint256)
     function selectors() public pure returns (bytes4[] memory result) {
         bytes
-            memory packed = hex"06d49e5b0ec6b0b7fe26699e18e3a9411de72e3422c5cf2329b98c6733ce93fe3408e4703591c1a03960738239d7d4aa4451801246657fe952ef6b2c5a590335631f4bac6a27e8b5fd791f3c6e9960c370e7ef4f74f4d30d79823c9a7a0ed6277b30c8da8708474e946ebad1960dcf2498acd7a69cd939e49d1b5a81a1954fc5adfca15eaf6a2dcdb22dd78eb8c2f66fbd7c5412c3bbd2d7c81838b7cdffacc6d0468156d86970d8db1f0bf9dc2f223add655bb0e5355c75e81e0ba1ea6c029cef3f0baef4ff5e2ef5c1182cfacd743b";
+            memory packed = hex"06d49e5b0ec6b0b718e3a9411de72e3422c5cf2329b98c6733ce93fe3408e4703591c1a03960738239d7d4aa4451801246657fe952ef6b2c5a590335631f4bac6a27e8b56e9960c370e7ef4f74f4d30d79823c9a7a0ed6277b30c8da8708474e946ebad1960dcf2498acd7a69cd939e49d1b5a81a1954fc5adfca15eaf6a2dcdb22dd78eb8c2f66fbd7c5412c3bbd2d7c81838b7cdffacc6d0468156d86970d8db1f0bf9dc2f223add655bb0e5355c75e81e0ba1ea6c029cef3f0baef4ff5e2ef5c1182cfacd743bfd791f3cfe26699e";
         uint256 count = packed.length / 4;
         result = new bytes4[](count);
         for (uint256 i = 0; i < count; ++i) {

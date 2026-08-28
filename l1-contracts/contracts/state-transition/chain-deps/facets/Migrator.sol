@@ -383,7 +383,7 @@ contract MigratorFacet is ZKChainBase, IMigrator, ISelfDescribingFacet {
     ///      0x41cf49bb prepareChainCommitment()
     ///      0x63d8882a unpauseDeposits()
     function selectors() public pure returns (bytes4[] memory result) {
-        bytes memory packed = hex"64b554ad75ceffdf3f42d5dd42249f9f3b064e4041cf49bb63d8882a";
+        bytes memory packed = hex"3b064e403f42d5dd41cf49bb42249f9f63d8882a64b554ad75ceffdf";
         uint256 count = packed.length / 4;
         result = new bytes4[](count);
         for (uint256 i = 0; i < count; ++i) {

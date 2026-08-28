@@ -75,7 +75,11 @@ library ProxyUpgradeRowLib {
             if (liveImpl != _rows[i].expectedOldImpl) {
                 revert ProxyUpgradeRowMismatch(_rows[i].proxy, _rows[i].expectedOldImpl, liveImpl);
             }
-            _admin.upgrade(proxy, newImpl);
+            if (_rows[i].initCalldata.length == 0) {
+                _admin.upgrade(proxy, newImpl);
+            } else {
+                _admin.upgradeAndCall(proxy, newImpl, _rows[i].initCalldata);
+            }
             emit ProxyImplementationUpgraded(address(proxy), newImpl);
         }
     }

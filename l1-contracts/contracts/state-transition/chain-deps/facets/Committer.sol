@@ -860,7 +860,7 @@ contract CommitterFacet is ZKChainBase, ICommitter, ISelfDescribingFacet {
     ///      0x0db9eb87 commitBatchesSharedBridge(address,uint256,uint256,bytes)
     ///      0x0b6db820 precommitSharedBridge(address,uint256,bytes)
     function selectors() public pure returns (bytes4[] memory result) {
-        bytes memory packed = hex"0db9eb870b6db820";
+        bytes memory packed = hex"0b6db8200db9eb87";
         uint256 count = packed.length / 4;
         result = new bytes4[](count);
         for (uint256 i = 0; i < count; ++i) {
