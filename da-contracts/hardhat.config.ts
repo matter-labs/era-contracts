@@ -1,6 +1,6 @@
 import "@nomiclabs/hardhat-ethers";
 import "@nomiclabs/hardhat-etherscan";
-import "@nomiclabs/hardhat-waffle";
+import "@nomicfoundation/hardhat-chai-matchers";
 import "hardhat-contract-sizer";
 import "hardhat-gas-reporter";
 import "hardhat-typechain";

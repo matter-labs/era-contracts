@@ -3,7 +3,8 @@ use colored::Colorize;
 use once_cell::sync::OnceCell;
 use std::process;
 use zksync_multivm::interface::{
-    L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode, InspectExecutionMode, VmFactory, VmInterface,
+    InspectExecutionMode, L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode, VmFactory,
+    VmInterface,
 };
 use zksync_multivm::vm_latest::{HistoryDisabled, ToTracerPointer, TracerDispatcher, Vm};
 use zksync_state::interface::{
@@ -16,14 +17,15 @@ use tracing_subscriber::fmt;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use zksync_contracts::{
-    BaseSystemContracts, ContractLanguage, SystemContractCode,
-    SystemContractsRepo,
+    BaseSystemContracts, ContractLanguage, SystemContractCode, SystemContractsRepo,
 };
 use zksync_multivm::interface::{ExecutionResult, Halt};
-use zksync_types::system_contracts::get_system_smart_contracts_from_dir;
-use zksync_types::{block::L2BlockHasher, Address, L1BatchNumber, L2BlockNumber, U256, u256_to_h256, };
-use zksync_types::{L2ChainId, Transaction};
 use zksync_types::bytecode::BytecodeHash;
+use zksync_types::system_contracts::get_system_smart_contracts_from_dir;
+use zksync_types::{
+    block::L2BlockHasher, u256_to_h256, Address, L1BatchNumber, L2BlockNumber, U256,
+};
+use zksync_types::{L2ChainId, Transaction};
 
 mod hook;
 mod test_count_tracer;
@@ -41,15 +43,20 @@ fn execute_internal_bootloader_test() {
         root: env::current_dir().unwrap().join("../../"),
     };
 
-    let bytecode = repo.read_sys_contract_bytecode(artifacts_location, "bootloader_test", Some("Bootloader"), ContractLanguage::Yul);
+    let bytecode = repo.read_sys_contract_bytecode(
+        artifacts_location,
+        "bootloader_test",
+        Some("Bootloader"),
+        ContractLanguage::Yul,
+    );
     let hash = BytecodeHash::for_bytecode(&bytecode).value();
     let bootloader = SystemContractCode {
         code: bytecode,
         hash,
     };
 
-
-    let bytecode = repo.read_sys_contract_bytecode("", "DefaultAccount", None, ContractLanguage::Sol);
+    let bytecode =
+        repo.read_sys_contract_bytecode("", "DefaultAccount", None, ContractLanguage::Sol);
     let hash = BytecodeHash::for_bytecode(&bytecode).value();
     let default_aa = SystemContractCode {
         code: bytecode,
@@ -94,9 +101,7 @@ fn execute_internal_bootloader_test() {
         let storage: StoragePtr<StorageView<InMemoryStorage>> =
             StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
                 L2ChainId::from(IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID),
-                get_system_smart_contracts_from_dir(
-                    env::current_dir().unwrap().join("../../"),
-                ),
+                get_system_smart_contracts_from_dir(env::current_dir().unwrap().join("../../")),
             ))
             .to_rc_ptr();
 
@@ -124,9 +129,7 @@ fn execute_internal_bootloader_test() {
         let storage: StoragePtr<StorageView<InMemoryStorage>> =
             StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
                 L2ChainId::from(IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID),
-                get_system_smart_contracts_from_dir(
-                    env::current_dir().unwrap().join("../../"),
-                ),
+                get_system_smart_contracts_from_dir(env::current_dir().unwrap().join("../../")),
             ))
             .to_rc_ptr();
 
