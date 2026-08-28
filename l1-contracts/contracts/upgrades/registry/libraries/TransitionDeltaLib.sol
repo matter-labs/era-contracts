@@ -53,13 +53,15 @@ library TransitionDeltaLib {
         _requireNoDuplicateSelectors(fromFacets);
         _requireNoDuplicateSelectors(newFacets);
 
+        uint256 fromFacetsLength = fromFacets.length;
+        uint256 newFacetsLength = newFacets.length;
         uint256 cutCount = 0;
-        for (uint256 i = 0; i < fromFacets.length; ++i) {
+        for (uint256 i = 0; i < fromFacetsLength; ++i) {
             if (fromFacets[i].selectors.length != 0) {
                 ++cutCount;
             }
         }
-        for (uint256 i = 0; i < newFacets.length; ++i) {
+        for (uint256 i = 0; i < newFacetsLength; ++i) {
             if (newFacets[i].selectors.length != 0) {
                 ++cutCount;
             }
@@ -67,7 +69,7 @@ library TransitionDeltaLib {
 
         facetCuts = new Diamond.FacetCut[](cutCount);
         uint256 cursor = 0;
-        for (uint256 i = 0; i < fromFacets.length; ++i) {
+        for (uint256 i = 0; i < fromFacetsLength; ++i) {
             if (fromFacets[i].selectors.length != 0) {
                 facetCuts[cursor] = Diamond.FacetCut({
                     facet: address(0),
@@ -78,7 +80,7 @@ library TransitionDeltaLib {
                 ++cursor;
             }
         }
-        for (uint256 i = 0; i < newFacets.length; ++i) {
+        for (uint256 i = 0; i < newFacetsLength; ++i) {
             if (newFacets[i].selectors.length != 0) {
                 facetCuts[cursor] = Diamond.FacetCut({
                     facet: newFacets[i].facet,
@@ -139,15 +141,17 @@ library TransitionDeltaLib {
     ///      collectively duplicate one. Plain pairwise scan: runs once, at transition
     ///      construction, over ~a hundred selectors.
     function _requireNoDuplicateSelectors(FacetRouting[] memory _facets) private pure {
+        uint256 facetsLength = _facets.length;
         uint256 total = 0;
-        for (uint256 i = 0; i < _facets.length; ++i) {
+        for (uint256 i = 0; i < facetsLength; ++i) {
             total += _facets[i].selectors.length;
         }
         bytes4[] memory flat = new bytes4[](total);
         uint256 cursor = 0;
-        for (uint256 i = 0; i < _facets.length; ++i) {
+        for (uint256 i = 0; i < facetsLength; ++i) {
             bytes4[] memory selectors = _facets[i].selectors;
-            for (uint256 j = 0; j < selectors.length; ++j) {
+            uint256 selectorsLength = selectors.length;
+            for (uint256 j = 0; j < selectorsLength; ++j) {
                 for (uint256 k = 0; k < cursor; ++k) {
                     if (flat[k] == selectors[j]) {
                         revert RegistryDuplicateSelector(selectors[j]);
