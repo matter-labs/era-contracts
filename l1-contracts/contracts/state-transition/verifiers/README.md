@@ -66,11 +66,13 @@ holds the same key.
    `l1-contracts/contracts/dev-contracts/generated/ZiskSnarkPlonkVerifier.sol`
    (a gitignored path that `forge build` compiles when present).
 
-3. Validate the result. For the cargo-zisk v0.18.0 key the adapted source's
-   SHA-256 is
-   `e21103887543396795edef162cbcba38c1c4cc0522686f6e109885f93e065735`. The
-   behavioral check is `forge test --match-contract ZiskVerifierRealProofTest`,
-   which drives real proofs through a real pairing.
+3. Validate the result. For the cargo-zisk v1.2.0-alpha key the adapted
+   source's SHA-256 is
+   `6171dbc45b9b84627a560ffd9121148efc31f7e5f3b3840fe29b4d0c0ae54ef1`, and
+   the rendered `data/PlonkVerifier.sol` is byte-identical to that release's
+   own `zisk-contracts/PlonkVerifier.sol`. The behavioral check is
+   `forge test --match-contract ZiskVerifierRealProofTest`, which drives real
+   proofs through a real pairing.
 
 ## Deploying and wiring
 
