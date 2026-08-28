@@ -7,6 +7,10 @@ pub const ETH_ADDRESS: &str = "0x0000000000000000000000000000000000000001";
 /// Mainnet WETH address used by the default L1 deployment config.
 pub const MAINNET_WETH_ADDRESS: &str = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 
+/// Sepolia WETH address. Pass via `--token-weth-address` when deploying an
+/// ecosystem on Sepolia; the default config carries the mainnet address.
+pub const SEPOLIA_WETH_ADDRESS: &str = "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9";
+
 /// Locally deployed ZK token address used by interop fixtures.
 pub const LOCAL_ZK_TOKEN_ADDRESS: &str = "0x8207187d1682B3ebaF2e1bdE471aC9d5B886fD93";
 

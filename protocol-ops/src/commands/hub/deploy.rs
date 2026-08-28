@@ -17,6 +17,10 @@ pub struct DeployInput {
     pub owner: Address,
     pub era_chain_id: u64,
     pub create2_factory_salt: Option<B256>,
+    /// L1 WETH token. Baked as an immutable into the `L1AssetRouter` and
+    /// `L1NativeTokenVault` implementations, so it cannot be changed after
+    /// deployment without an implementation upgrade. Defaults to mainnet WETH.
+    pub token_weth_address: Option<Address>,
 }
 
 /// Deploy hub contracts and return the output.
@@ -29,6 +33,10 @@ pub fn deploy(
 
     if let Some(salt) = input.create2_factory_salt {
         initial_config.create2_factory_salt = salt;
+    }
+
+    if let Some(weth) = input.token_weth_address {
+        initial_config.token_weth_address = weth;
     }
 
     let deploy_config = DeployL1Config::new(
