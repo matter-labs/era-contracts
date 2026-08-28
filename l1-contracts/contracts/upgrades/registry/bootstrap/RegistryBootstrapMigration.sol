@@ -41,9 +41,6 @@ import {BootstrapManifest, EcosystemContractRow} from "../RegistryTypes.sol";
 contract RegistryBootstrapMigration {
     using CodehashPinLib for address;
 
-    /// @notice Commitment to the pinned manifest — the 32 bytes governance approves.
-    bytes32 public manifestHash;
-
     /// @notice Set once `migrate` has run. The edge is one-shot: replaying it would re-check a
     ///         starting state that no longer exists anyway, but failing loudly is clearer.
     bool public executed;
@@ -89,7 +86,12 @@ contract RegistryBootstrapMigration {
         }
 
         encodedManifest = abi.encode(_manifest);
-        manifestHash = keccak256(encodedManifest);
+    }
+
+    /// @notice Commitment to the pinned manifest — the 32 bytes governance approves. Computed
+    ///         from the stored encoding; no contract reads it.
+    function manifestHash() external view returns (bytes32) {
+        return keccak256(encodedManifest);
     }
 
     /// @notice The whole manifest, exactly as it was pinned.

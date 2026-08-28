@@ -74,6 +74,9 @@ struct L2UpgradePlan {
     uint256[] factoryDepHashes;
 }
 
+/// @param upgradeEngine The diamond cut's init delegatecall target implementing
+///        `upgradeFromTransition` — the registry-model name for what deploy tooling calls the
+///        per-version "default upgrade" contract (`DefaultUpgrade` and its versioned subclasses).
 // solhint-disable-next-line gas-struct-packing
 struct TransitionManifest {
     uint256 oldProtocolVersion;

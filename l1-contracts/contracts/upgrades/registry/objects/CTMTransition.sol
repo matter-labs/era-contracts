@@ -37,10 +37,6 @@ import {L2UpgradePlan, TransitionManifest} from "../RegistryTypes.sol";
 ///      mechanism as facet routing. The L2 plan is reviewed-and-pinned data (L1 cannot verify L2
 ///      execution effects); the on-chain convergence guarantee covers L1 state only.
 contract CTMTransition is ICTMTransition {
-    /// @notice `keccak256(abi.encode(manifest))`. No contract reads this — it is a review aid, a
-    ///         single value to compare against the audited manifest. Provenance is the codehash.
-    bytes32 public manifestHash;
-
     /// @dev THE manifest, stored as its own ABI encoding — see {CTMRelease} for why the struct is
     ///      not transcribed into structured storage.
     bytes internal encodedManifest;
@@ -141,7 +137,6 @@ contract CTMTransition is ICTMTransition {
         }
 
         encodedManifest = abi.encode(_manifest);
-        manifestHash = keccak256(encodedManifest);
 
         // Derive the L1 delta from the release pair and freeze it as final diamond cuts.
         Diamond.FacetCut[] memory facetCutsMemory = TransitionDeltaLib.deriveFacetCuts(
@@ -154,6 +149,13 @@ contract CTMTransition is ICTMTransition {
         }
         (derivedBootloaderChange, derivedDefaultAccountChange, derivedEvmEmulatorChange) = TransitionDeltaLib
             .deriveHashChanges(ICTMRelease(_manifest.fromRelease), ICTMRelease(_manifest.newRelease));
+    }
+
+    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment governance compares
+    ///         against the audited manifest. Computed from the stored encoding, not stored
+    ///         separately: no contract reads it, and a second copy could only ever agree.
+    function manifestHash() external view returns (bytes32) {
+        return keccak256(encodedManifest);
     }
 
     /// @notice The whole manifest, exactly as it was pinned.

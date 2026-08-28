@@ -119,10 +119,11 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev It's used for easier tracking the upgrade cutData off-chain.
     mapping(uint256 protocolVersion => uint256) public upgradeCutDataBlock;
 
-    /// @dev The block number when newChainCreationParams was saved for some protocolVersion.
-    /// @dev It's used for easier tracking the upgrade cutData off-chain.
-    /// @dev Populated starting from v31 and only when chain creation params change.
-    mapping(uint256 protocolVersion => uint256) public newChainCreationParamsBlock;
+    /// @dev Deprecated, no longer written. Off-chain tooling used it to locate the block where
+    ///      chain-creation params changed; under the registry model the genesis data is read
+    ///      directly from `currentRelease` and pin moves are announced by `NewCurrentRelease`.
+    ///      Served read-only ({newChainCreationParamsBlock}) for versions written pre-v34.
+    mapping(uint256 protocolVersion => uint256) internal __DEPRECATED_newChainCreationParamsBlock;
 
     /// @dev Retained only to preserve the upgradeable storage layout. The verifier is part of the
     /// installed chain state and is pinned by the release (`ICTMRelease.verifier`), so both the
@@ -305,7 +306,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         // fail-fast check in `_setCurrentRelease`.
         _requireGenuineRelease(_release);
         currentRelease = _release;
-        newChainCreationParamsBlock[protocolVersion] = block.number;
         emit NewCurrentRelease(protocolVersion, _release);
     }
 
@@ -475,6 +475,12 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
             return type(uint256).max;
         }
         return __DEPRECATED_protocolVersionDeadline[_protocolVersion];
+    }
+
+    /// @notice Deprecated. The block where pre-v34 code recorded a chain-creation-params change;
+    ///         nothing writes it any more — genesis data is read from `currentRelease`.
+    function newChainCreationParamsBlock(uint256 _protocolVersion) public view returns (uint256) {
+        return __DEPRECATED_newChainCreationParamsBlock[_protocolVersion];
     }
 
     /// @dev check that the protocolVersion is active

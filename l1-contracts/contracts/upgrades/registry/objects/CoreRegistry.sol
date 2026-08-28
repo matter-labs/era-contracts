@@ -21,10 +21,6 @@ contract CoreRegistry is ICoreRegistry {
                               STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice `keccak256(abi.encode(manifest))`. No contract reads this — it is a review aid, a
-    ///         single value to compare against the audited manifest. Provenance is the codehash.
-    bytes32 public manifestHash;
-
     /// @dev THE manifest, stored as its own ABI encoding — see {CTMRelease} for why the struct is
     ///      not transcribed into structured storage.
     bytes internal encodedManifest;
@@ -60,7 +56,13 @@ contract CoreRegistry is ICoreRegistry {
             }
         }
         encodedManifest = abi.encode(_manifest);
-        manifestHash = keccak256(encodedManifest);
+    }
+
+    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment governance compares
+    ///         against the audited manifest. Computed from the stored encoding, not stored
+    ///         separately: no contract reads it, and a second copy could only ever agree.
+    function manifestHash() external view returns (bytes32) {
+        return keccak256(encodedManifest);
     }
 
     /// @notice The whole manifest, exactly as it was pinned.
