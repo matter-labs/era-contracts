@@ -28,7 +28,7 @@ import {Utils} from "../../utils/Utils.sol";
 
 import {ChainCreationParamsLib} from "../../ctm/ChainCreationParamsLib.sol";
 import {CoreUpgradeParams} from "./UpgradeParams.sol";
-import {ICoreUpgrade} from "contracts/script-interfaces/IDefaultUpgrade.sol";
+import {ICoreUpgrade} from "contracts/script-interfaces/ICoreUpgrade.sol";
 
 /// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.

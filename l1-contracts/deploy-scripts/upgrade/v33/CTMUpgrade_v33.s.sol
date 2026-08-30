@@ -14,6 +14,7 @@ import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
 import {Call} from "contracts/governance/Common.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
+import {CTMUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 
 /// @notice CTM-side half of the v33 upgrade flow, invoked once per CTM proxy.
@@ -23,22 +24,30 @@ import {CoreContract} from "../../ecosystem/CoreContract.sol";
 ///      timer and picks the EraVM `DefaultUpgrade` as the per-chain upgrade contract, so everything
 ///      that makes this release a release is supplied here.
 ///
-/// @dev v33 is ZKsync OS-only: {deployUsedUpgradeContract} rejects Era CTMs, and consequently the
-///      Era force-deployment and L2-upgrade-calldata branches the v31 script carried are omitted
-///      rather than left as dead code.
+/// @dev v33 is ZKsync OS-only. {noGovernancePrepare} rejects an EraVM CTM up front rather than
+///      letting the run get as far as deploying contracts, and the Era force-deployment and
+///      L2-upgrade-calldata branches the v31 script carried are omitted rather than left as dead
+///      code.
 ///
 /// @dev The per-chain upgrade contract is still named `V32UpgradeZKsyncOS`, and the L2 side
 ///      `L2V32Upgrade`: this release was developed as v32 and renumbered to v33 when genesis moved
 ///      to `0.33.0`. The contracts are the v33 payload; only their names lag, and renaming them
 ///      would churn the bytecode vendored by zksync-os-server.
 contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
+    /// @inheritdoc DefaultCTMUpgrade
+    /// @dev Refuses an EraVM CTM before anything is deployed. There is no Era counterpart to this
+    ///      release's per-chain upgrade, so a run that got further would either fail late or, worse,
+    ///      produce a bundle for an upgrade that cannot be applied.
+    function noGovernancePrepare(CTMUpgradeParams memory _params) public virtual override {
+        require(_params.isZKsyncOS, "v33 is a ZKsync OS-only release; EraVM CTMs are not supported");
+        super.noGovernancePrepare(_params);
+    }
+
     /// @notice Deploy the per-chain upgrade contract.
     /// @dev Only ZKsync OS chains can be upgraded onto this release. There is no Era counterpart, and
     ///      falling back to the v31 one would generate an upgrade that re-runs v31's one-time work, so this
     ///      refuses to produce anything for Era instead.
     function deployUsedUpgradeContract() internal virtual override returns (address) {
-        require(config.isZKsyncOS, "Upgrading Era chains onto this release is not supported");
-
         // The registry must exist first: the upgrade contract embeds its address as an immutable.
         priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound", false);
         console.log("Deployed PriorityOpLowerBound at", priorityOpLowerBound);

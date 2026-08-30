@@ -22,16 +22,14 @@ import {Utils} from "deploy-scripts/utils/Utils.sol";
 /// @dev Exposes the pre-v32 parity call builder and lets the test place the discovered addresses, which the
 /// script normally fills in from on-chain introspection.
 contract CoreUpgradeParityHarness is CoreUpgrade_v33 {
-    function setDiscoveredAddresses(
-        address _l1Nullifier,
-        address _l1AssetRouter,
-        address _l1InteropHandler,
-        bool _deployedL1InteropHandler
-    ) external {
+    function setDiscoveredAddresses(address _l1Nullifier, address _l1AssetRouter, address _l1InteropHandler) external {
         coreAddresses.bridges.proxies.l1Nullifier = _l1Nullifier;
         coreAddresses.bridges.proxies.l1AssetRouter = _l1AssetRouter;
         coreAddresses.bridges.proxies.l1InteropHandler = _l1InteropHandler;
-        deployedL1InteropHandler = _deployedL1InteropHandler;
+    }
+
+    function deployVersionSpecific() external {
+        deployVersionSpecificEcosystemContractsL1();
     }
 
     function buildInteropHandlerWiringCalls() external returns (Call[] memory) {
@@ -121,7 +119,7 @@ contract PreV32ParityCallsTest is Test {
     }
 
     function test_wiresTheNewInteropHandler() public {
-        upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(interopHandler), true);
+        upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(interopHandler));
 
         Call[] memory calls = upgradeScript.buildInteropHandlerWiringCalls();
         // Two calls, not three: the deploy step initializes the handler's proxy straight to the
@@ -137,24 +135,20 @@ contract PreV32ParityCallsTest is Test {
         assertEq(assetRouter.l1InteropHandler(), address(interopHandler), "asset router wired to the handler");
     }
 
-    function test_emitsNothingForAnAlreadyUpgradedEcosystem() public {
-        // Re-running the upgrade on a v32 ecosystem: the handler already exists, so the script did not
-        // deploy one and emits no wiring calls.
+    function test_refusesAnEcosystemThatAlreadyHasTheHandler() public {
+        // Re-running against an ecosystem that already has an interop handler is not a silent no-op:
+        // this release is the one that introduces the handler, so finding one means discovery or the
+        // target is not what the script expects.
+        upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(interopHandler));
 
-        upgradeScript.setDiscoveredAddresses(
-            address(l1Nullifier),
-            address(assetRouter),
-            address(interopHandler),
-            false
-        );
-
-        assertEq(upgradeScript.buildInteropHandlerWiringCalls().length, 0, "nothing left to wire");
+        vm.expectRevert(bytes("L1InteropHandler already exists; this release is the one that introduces it"));
+        upgradeScript.deployVersionSpecific();
     }
 
     function test_revertWhen_NoInteropHandlerAddress() public {
         // The handler must either be discovered or deployed by the upgrade; a zero address would silently
         // leave interop finalization dead.
-        upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(0), false);
+        upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(0));
 
         vm.expectRevert("L1InteropHandler proxy not deployed");
         upgradeScript.buildInteropHandlerWiringCalls();

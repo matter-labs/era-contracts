@@ -6,25 +6,29 @@ import {Test} from "forge-std/Test.sol";
 import {CoreUpgrade_v33} from "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
 import {CTMUpgrade_v33} from "deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {ICoreUpgrade, ICTMUpgrade} from "contracts/script-interfaces/IDefaultUpgrade.sol";
+import {ICoreUpgrade} from "contracts/script-interfaces/ICoreUpgrade.sol";
+import {ICTMUpgrade} from "contracts/script-interfaces/ICTMUpgrade.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 
 /// @dev Exposes the internal stage-1 builder and lets the test place the addresses the script
 ///      normally fills in from on-chain introspection.
 contract CoreUpgradeV33Harness is CoreUpgrade_v33 {
-    function setDiscoveredAddresses(
-        address _l1Nullifier,
-        address _l1AssetRouter,
-        address _l1InteropHandler,
-        bool _deployedL1InteropHandler
-    ) external {
+    function setDiscoveredAddresses(address _l1Nullifier, address _l1AssetRouter, address _l1InteropHandler) external {
         coreAddresses.bridges.proxies.l1Nullifier = _l1Nullifier;
         coreAddresses.bridges.proxies.l1AssetRouter = _l1AssetRouter;
         coreAddresses.bridges.proxies.l1InteropHandler = _l1InteropHandler;
-        deployedL1InteropHandler = _deployedL1InteropHandler;
+    }
+
+    function setOwner(address _owner) external {
+        config.ownerAddress = _owner;
+    }
+
+    function initializeCalldata(string memory _contractName) external returns (bytes memory) {
+        return getInitializeCalldata(_contractName, false);
     }
 
     function buildInteropHandlerWiringCalls() external returns (Call[] memory) {
@@ -64,7 +68,7 @@ contract V33UpgradeScriptsTest is Test {
 
     /// @notice A freshly deployed interop handler is claimed and wired into both bridges.
     function test_wiresFreshlyDeployedInteropHandler() public {
-        coreUpgrade.setDiscoveredAddresses(l1Nullifier, assetRouter, interopHandler, true);
+        coreUpgrade.setDiscoveredAddresses(l1Nullifier, assetRouter, interopHandler);
 
         Call[] memory calls = coreUpgrade.buildInteropHandlerWiringCalls();
 
@@ -87,19 +91,24 @@ contract V33UpgradeScriptsTest is Test {
         );
     }
 
-    /// @notice An ecosystem that already has an interop handler gets no wiring calls, so the script
-    ///         is idempotent across re-runs. Both setters are one-shot and would revert on a replay.
-    function test_noWiringWhenInteropHandlerAlreadyPresent() public {
-        coreUpgrade.setDiscoveredAddresses(l1Nullifier, assetRouter, interopHandler, false);
+    /// @notice The interop handler's proxy is initialized straight to governance.
+    /// @dev This is the assertion `PreV32ParityCalls` lost when the deploy-then-transfer dance went
+    ///      away: ownership is no longer established by a stage-1 call that a test can execute, it is
+    ///      baked into the proxy's initializer, so that is where it gets checked.
+    function test_interopHandlerIsOwnedByGovernanceFromTheStart() public {
+        address governance = makeAddr("governance");
+        coreUpgrade.setOwner(governance);
 
-        Call[] memory calls = coreUpgrade.buildInteropHandlerWiringCalls();
-
-        assertEq(calls.length, 0, "an existing handler needs no wiring");
+        assertEq(
+            coreUpgrade.initializeCalldata("L1InteropHandler"),
+            abi.encodeCall(L1InteropHandler.initialize, (governance)),
+            "the handler proxy must be initialized with governance as owner, not the deployer"
+        );
     }
 
     /// @notice A missing handler is a broken discovery run, not a no-op.
     function test_revertsWhenInteropHandlerMissing() public {
-        coreUpgrade.setDiscoveredAddresses(l1Nullifier, assetRouter, address(0), false);
+        coreUpgrade.setDiscoveredAddresses(l1Nullifier, assetRouter, address(0));
 
         vm.expectRevert(bytes("L1InteropHandler proxy not deployed"));
         coreUpgrade.buildInteropHandlerWiringCalls();

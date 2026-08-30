@@ -3,7 +3,10 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::common::abi::AdminFunctionsAbi;
+use alloy::network::Ethereum;
+use alloy::providers::{ProviderBuilder, RootProvider};
+
+use crate::common::abi::{AdminFunctionsAbi, IChainTypeManagerAbi, ZkChainAbi};
 use crate::common::addresses::ZERO_ADDRESS;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
@@ -44,6 +47,90 @@ pub struct ChainSetUpgradeTimestampArgs {
     pub shared: SharedRunArgs,
 }
 
+alloy::sol! {
+    /// The v33 per-chain upgrade contract and the registry it reads. Only the getters are needed:
+    /// recording goes through `chain record-priority-op-lower-bound`.
+    #[sol(rpc)]
+    interface IPriorityOpLowerBoundGate {
+        function PRIORITY_OP_LOWER_BOUND() external view returns (address);
+        function recorded(address chain) external view returns (bool);
+        function lowerBound(address chain) external view returns (uint256);
+    }
+}
+
+/// Refuse to schedule the upgrade while the chain would fail the per-chain upgrade's precondition.
+///
+/// Scheduling is the point of no return for the server: the `UpgradeTimestampUpdated` event makes it
+/// inject the L2 upgrade transaction and hold every subsequent batch until L1's protocol version
+/// moves. If the priority-op bound has not been recorded and drained by then, the diamond cut reverts
+/// with `LowerBoundNotRecorded()` / `PriorityQueueNotReady()` and the chain sits wedged in the
+/// meantime. Checking here turns that into a refusal before anything is sent.
+///
+/// Skipped when the CTM's default upgrade has no `PRIORITY_OP_LOWER_BOUND` — releases before v33 have
+/// no such precondition.
+async fn ensure_priority_op_bound_ready(
+    rpc_url: &str,
+    bridgehub: Address,
+    chain_id: u64,
+) -> anyhow::Result<()> {
+    let provider: RootProvider<Ethereum> =
+        ProviderBuilder::default().connect_http(rpc_url.parse()?);
+    let ctm = crate::common::l1_contracts::resolve_ctm_proxy(rpc_url, bridgehub, chain_id)
+        .await
+        .context("resolve CTM")?;
+    let diamond = crate::common::l1_contracts::resolve_zk_chain(rpc_url, bridgehub, chain_id)
+        .await
+        .context("resolve chain diamond")?;
+
+    let default_upgrade = IChainTypeManagerAbi::new(ctm, &provider)
+        .defaultUpgrade()
+        .call()
+        .await
+        .context("read CTM defaultUpgrade")?;
+
+    let gate = IPriorityOpLowerBoundGate::new(default_upgrade, &provider);
+    let registry = match gate.PRIORITY_OP_LOWER_BOUND().call().await {
+        Ok(addr) => addr,
+        Err(_) => {
+            logger::info(
+                "CTM default upgrade exposes no PRIORITY_OP_LOWER_BOUND — no bound precondition to check"
+                    .to_string(),
+            );
+            return Ok(());
+        }
+    };
+
+    let registry = IPriorityOpLowerBoundGate::new(registry, &provider);
+    anyhow::ensure!(
+        registry.recorded(diamond).call().await.context("registry.recorded")?,
+        "priority-op lower bound is not recorded for chain {chain_id}. Run \
+         `protocol-ops chain record-priority-op-lower-bound` first, let the queue drain past it, \
+         then schedule the upgrade — otherwise the diamond cut will revert with LowerBoundNotRecorded()"
+    );
+
+    let bound = registry
+        .lowerBound(diamond)
+        .call()
+        .await
+        .context("registry.lowerBound")?;
+    let processed = ZkChainAbi::new(diamond, &provider)
+        .getFirstUnprocessedPriorityTx()
+        .call()
+        .await
+        .context("chain.getFirstUnprocessedPriorityTx")?;
+    anyhow::ensure!(
+        processed >= bound,
+        "chain {chain_id} has not processed the priority ops below its recorded bound \
+         (processed {processed}, bound {bound}). Wait for them to execute on L1 before scheduling \
+         the upgrade — otherwise the diamond cut will revert with PriorityQueueNotReady()"
+    );
+
+    logger::info(format!(
+        "Priority-op lower bound satisfied for chain {chain_id} (processed {processed} >= bound {bound})"
+    ));
+    Ok(())
+}
+
 pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
@@ -51,6 +138,10 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         .upgrade_timestamp
         .parse::<U256>()
         .context("invalid upgrade_timestamp: expected decimal or hex uint256")?;
+
+    // Checked against the real chain, not the fork: this is a precondition of the upgrade the
+    // scheduled timestamp commits the server to.
+    ensure_priority_op_bound_ready(&args.shared.l1_rpc_url, bridgehub, chain_id).await?;
 
     let admin_address =
         crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)

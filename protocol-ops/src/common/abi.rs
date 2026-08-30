@@ -296,7 +296,7 @@ pub mod i_core_upgrade {
     alloy::sol!(
         #[sol(rpc)]
         ICoreUpgradeAbi,
-        "../l1-contracts/zkstack-out/IDefaultUpgrade.sol/ICoreUpgrade.json"
+        "../l1-contracts/zkstack-out/ICoreUpgrade.sol/ICoreUpgrade.json"
     );
 }
 pub use i_core_upgrade::ICoreUpgradeAbi;
@@ -305,7 +305,7 @@ pub mod i_ctm_upgrade {
     alloy::sol!(
         #[sol(rpc)]
         ICTMUpgradeAbi,
-        "../l1-contracts/zkstack-out/IDefaultUpgrade.sol/ICTMUpgrade.json"
+        "../l1-contracts/zkstack-out/ICTMUpgrade.sol/ICTMUpgrade.json"
     );
 }
 pub use i_ctm_upgrade::ICTMUpgradeAbi;
