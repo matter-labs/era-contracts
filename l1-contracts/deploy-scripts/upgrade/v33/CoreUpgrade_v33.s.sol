@@ -30,10 +30,18 @@ import {CoreUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
 ///      would at best no-op and at worst target live chains, so this release simply does not
 ///      expose them: there is no stage-2 override here and no `stage3` entry point.
 ///
-/// @dev What v33 *does* need, and therefore what this script supplies on top of the default
-///      scaffold (whose `deployNewEcosystemContractsL1` is an empty body):
-///        - refreshed L1 core implementations behind the existing proxies,
-///        - a refreshed `ChainRegistrationSender` implementation, and
+/// @dev What the default already does, so this script does not: {prepareUpgradeProxiesCalls}
+///      builds the stage-1 `ProxyAdmin.upgrade` calls for the seven core proxies (bridgehub,
+///      nullifier, asset router, native token vault, message root, CTM deployment tracker,
+///      chain asset handler). It builds them from `coreAddresses.*.implementations.*` though,
+///      and `DefaultCoreUpgrade.deployNewEcosystemContractsL1` is an empty body — so on the bare
+///      default those seven calls would point every proxy at `address(0)`. The deploy override
+///      below is what gives them something to point at.
+///
+/// @dev What this script therefore supplies:
+///        - the deployment of those seven core implementations,
+///        - a refreshed `ChainRegistrationSender` implementation *and* its proxy upgrade, which
+///          is not one of the default seven, and
 ///        - `L1InteropHandler`, which is new in this release: a pre-v33 ecosystem has no proxy
 ///          for it, so one is deployed and wired into the bridges in stage 1.
 contract CoreUpgrade_v33 is Script, DefaultCoreUpgrade, ICoreUpgradeV33 {
