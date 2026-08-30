@@ -7,7 +7,7 @@
 //!
 //! Real-world ecosystems also need governance-owned proxy preconditions and
 //! operational admin call execution around prepare; those live in
-//! [`super::v31_upgrade_full::V31UpgradeFull`], which composes this.
+//! [`super::upgrade_full::V31UpgradeFull`], which composes this.
 //!
 //! The governance phase is not on this struct — it's a free helper in
 //! [`super::upgrade`] because it has no state of its own (just file IO + ABI
@@ -25,7 +25,7 @@ use anyhow::Context;
 // `(CTMUpgradeParams)`), so this one driver serves both script generations; which one actually runs is
 // decided by the `--core-script-path` / `--ctm-script-path` inputs. Encoding against the v33 types
 // keeps the current release's interface authoritative.
-use crate::common::abi::{ICTMUpgradeV33Abi, ICoreUpgradeV33Abi};
+use crate::common::abi::{ICTMUpgradeAbi, ICoreUpgradeAbi};
 use crate::common::wallets::Wallet;
 use crate::common::{forge::ForgeRunner, logger};
 
@@ -127,7 +127,7 @@ impl<'a> V31UpgradeInner<'a> {
     /// supplied runner. Returns the per-step output TOML paths.
     ///
     /// `pub(super)` so production callers must go through
-    /// [`super::v31_upgrade_full::V31UpgradeFull::prepare`] — that wrapper
+    /// [`super::upgrade_full::V31UpgradeFull::prepare`] — that wrapper
     /// runs the governance-owned proxy precondition first and executes
     /// operational admin calls afterwards.
     pub(super) async fn prepare(
@@ -248,8 +248,8 @@ impl<'a> V31UpgradeInner<'a> {
                 Path::new(inputs.core_script_path.trim_start_matches('/')),
             )
             .with_calldata(&Bytes::from(
-                ICoreUpgradeV33Abi::noGovernancePrepareCall {
-                    _params: ICoreUpgradeV33Abi::CoreUpgradeParams {
+                ICoreUpgradeAbi::noGovernancePrepareCall {
+                    _params: ICoreUpgradeAbi::CoreUpgradeParams {
                         bridgehubProxyAddress: self.bridgehub,
                         isZKsyncOS: is_zk_sync_os,
                         create2FactorySalt: create2_salt,
@@ -410,13 +410,7 @@ impl<'a> V31UpgradeInner<'a> {
         ));
 
         // Per-CTM output path so back-to-back prepares don't clobber each other.
-        // Deliberately still `v31-…` while the core output moved to `v33-upgrade-core.toml`: unlike
-        // the core path this one is not caller-overridable, and the name is baked into the
-        // anvil-interop harnesses (`run-fork-upgrade-test.ts`, `v31-upgrade-test-runner.ts`) as well
-        // as the integration-test suite. It is an artifact filename shared by both script
-        // generations, not a claim about which release ran; renaming it is a coordinated change
-        // across those consumers.
-        let output_path_str = format!("/script-out/v31-upgrade-ctm-{ctm_proxy:#x}.toml");
+        let output_path_str = format!("/script-out/v33-upgrade-ctm-{ctm_proxy:#x}.toml");
         let ctm_output_path = self
             .contracts_path
             .join(output_path_str.trim_start_matches('/'));
@@ -428,8 +422,8 @@ impl<'a> V31UpgradeInner<'a> {
                 Path::new(inputs.ctm_script_path.trim_start_matches('/')),
             )
             .with_calldata(&Bytes::from(
-                ICTMUpgradeV33Abi::noGovernancePrepareCall {
-                    _params: ICTMUpgradeV33Abi::CTMUpgradeParams {
+                ICTMUpgradeAbi::noGovernancePrepareCall {
+                    _params: ICTMUpgradeAbi::CTMUpgradeParams {
                         ctmProxy: ctm_proxy,
                         bytecodesSupplier: bytecodes_supplier,
                         isZKsyncOS: is_zk_sync_os,

@@ -44,6 +44,9 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {DefaultL2UpgradeStrategy} from "./DefaultL2UpgradeStrategy.sol";
+import {ICTMUpgrade} from "contracts/script-interfaces/IDefaultUpgrade.sol";
+import {CTMUpgradeParams} from "./UpgradeParams.sol";
+import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
@@ -54,7 +57,7 @@ interface IAdminPreV31 {
 
 /// @notice Script used for default CTM upgrade flow. Should be run after Ecosystem upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
+contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     using stdToml for string;
 
     uint256 internal constant ERA_TEST_CREATE_CHAIN_ID = 555;
@@ -272,10 +275,129 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
     }
 
-    /// @notice Deploy everything that should be deployed
+    /// @notice Single-call entry point invoked by the protocol-ops CLI's `ecosystem
+    ///         upgrade-prepare-all`, once per CTM proxy. Drives the whole CTM-side prepare phase
+    ///         (deploy + bytecode publish + upgrade-cut generation + call serialization).
+    function noGovernancePrepare(CTMUpgradeParams memory _params) public virtual {
+        initializeWithArgs(
+            _params.ctmProxy,
+            _params.bytecodesSupplier,
+            _params.isZKsyncOS,
+            _params.rollupDAManager,
+            _params.create2FactorySalt,
+            _params.upgradeInputPath,
+            _params.outputPath,
+            _params.governance,
+            _params.zkTokenAssetId
+        );
+        if (_params.chainRegistrationSender != address(0)) {
+            coreAddresses.bridgehub.proxies.chainRegistrationSender = _params.chainRegistrationSender;
+        }
+        prepareCTMUpgrade();
+        prepareDefaultGovernanceCalls();
+        prepareDefaultCTMAdminCalls();
+        // Emit test-only calls (`test_create_chain`, `test_upgrade_chain`) into the CTM output TOML so
+        // protocol-ops can lift them into merged `ecosystem.toml` for tx-simulator checks.
+        prepareDefaultTestUpgradeCalls();
+    }
+
+    /// @notice Deploy everything that should be deployed.
+    /// @dev Every release refreshes the same CTM-side set, so it lives here; the per-chain upgrade
+    ///      contract is release-specific and comes from {deployUsedUpgradeContract}.
     function deployNewCTMContracts() public virtual {
+        (ctmAddresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
+        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
+
+        deployVerifiers();
+
+        deployEIP7702Checker();
         deployUpgradeStageValidator();
         deployGovernanceUpgradeTimer();
+
+        // Both proxies were introduced by the v31 upgrade, so every ecosystem this release can upgrade
+        // already has them: only their implementations are redeployed, and stage 1 points the discovered
+        // proxies at them. Deploying fresh proxies would move the addresses the new CTM implementation is
+        // constructed with, leaving each upgraded chain's `s.priorityModeInfo.permissionlessValidator`
+        // (written at its v31 upgrade) pointing at the old validator while new chains get the new one.
+        require(
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier != address(0),
+            "CTM has no BytecodesSupplier registered; it is expected from v31 on"
+        );
+        require(
+            ctmAddresses.stateTransition.proxies.permissionlessValidator != address(0),
+            "CTM has no PermissionlessValidator registered; it is expected from v31 on"
+        );
+        ctmAddresses.stateTransition.implementations.bytecodesSupplier = deploySimpleContract(
+            "BytecodesSupplier",
+            false
+        );
+        ctmAddresses.stateTransition.implementations.permissionlessValidator = deploySimpleContract(
+            "PermissionlessValidator",
+            false
+        );
+
+        // The constructor receives the new BytecodesSupplier and PermissionlessValidator proxy addresses.
+        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(
+            config.isZKsyncOS,
+            CTMContract.ChainTypeManager
+        );
+        console.log("Deploying ChainTypeManager:", ctmContractName);
+        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
+
+        ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier", false);
+
+        // Deploy `MultisigCommitter` (a superset of ValidatorTimelock) as the default validator impl so the
+        // upgrade does NOT downgrade proxies that already run a MultisigCommitter.
+        ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract(
+            "MultisigCommitter",
+            false
+        );
+
+        deployStateTransitionDiamondFacets();
+    }
+
+    /// @notice Point the CTM-side proxies this release keeps at their new implementations.
+    /// @dev Plain `ProxyAdmin.upgrade` (not `upgradeAndCall`) for all three: the new implementations are
+    ///      deployed with no reinitializer call. For the validator timelock in particular, proxies already
+    ///      running a `MultisigCommitter` are at `_initialized=2` with their multisig storage intact, so the
+    ///      swap just restores the multisig code; calling `reinitializeV2()` again would revert "already
+    ///      initialized".
+    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual returns (Call[] memory calls) {
+        calls = new Call[](3);
+        calls[0] = _buildProxyImplementationUpgrade(
+            ctmAddresses.stateTransition.proxies.validatorTimelock,
+            ctmAddresses.stateTransition.implementations.validatorTimelock,
+            "validatorTimelock"
+        );
+        calls[1] = _buildProxyImplementationUpgrade(
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier,
+            ctmAddresses.stateTransition.implementations.bytecodesSupplier,
+            "bytecodesSupplier"
+        );
+        calls[2] = _buildProxyImplementationUpgrade(
+            ctmAddresses.stateTransition.proxies.permissionlessValidator,
+            ctmAddresses.stateTransition.implementations.permissionlessValidator,
+            "permissionlessValidator"
+        );
+    }
+
+    function _buildProxyImplementationUpgrade(
+        address _proxy,
+        address _implementation,
+        string memory _name
+    ) private view returns (Call memory) {
+        require(_proxy != address(0), string.concat("ctm upgrade: ", _name, " proxy not set"));
+        require(_implementation != address(0), string.concat("ctm upgrade: ", _name, " impl not deployed"));
+
+        return
+            Call({
+                target: Utils.getProxyAdminAddress(_proxy),
+                data: abi.encodeCall(
+                    ProxyAdmin.upgrade,
+                    (ITransparentUpgradeableProxy(payable(_proxy)), _implementation)
+                ),
+                value: 0
+            });
     }
 
     function deployUpgradeSpecificContractsL1() internal virtual {
@@ -626,11 +748,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function prepareVersionSpecificStage0GovernanceCallsL1() public virtual returns (Call[] memory calls) {
-        // Empty by default.
-        return calls;
-    }
-
-    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual returns (Call[] memory calls) {
         // Empty by default.
         return calls;
     }

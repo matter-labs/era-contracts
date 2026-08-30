@@ -1,8 +1,9 @@
 //! Ecosystem-level commands.
 //!
-//! The v31 upgrade flow runs as Phase 1 (`UpgradePrepareAll`) → Phase 2
-//! (`UpgradeGovernance`) → Phase 3 (`Stage3`) → Phase 4 (per-chain
-//! `Admin.upgradeChainFromVersion` in [`crate::commands::chain::upgrade`]).
+//! The upgrade flow runs as Phase 1 (`UpgradePrepareAll`) → Phase 2
+//! (`UpgradeGovernance`) → Phase 3 (per-chain `Admin.upgradeChainFromVersion` in
+//! [`crate::commands::chain::upgrade`]). ZKsync OS chains additionally need
+//! [`crate::commands::chain::record_priority_op_lower_bound`] to have landed before Phase 3.
 //! Each `EcosystemCommands` variant carries the per-phase doc.
 //!
 //! Pre-flight (chains migrate off legacy GW back to L1) and the new GW
@@ -16,7 +17,6 @@ use crate::{
     commands::ecosystem::broadcast::UpgradeBroadcastArgs,
     commands::ecosystem::init::EcosystemInitArgs,
     commands::ecosystem::simulator::GovernanceTomlToSimulatorArgs,
-    commands::ecosystem::stage3::Stage3Args,
     commands::ecosystem::upgrade::{ListCtmsArgs, UpgradeGovernanceArgs, UpgradePrepareAllArgs},
     commands::ecosystem::verify_upgrade::VerifyUpgradeArgs,
 };
@@ -25,10 +25,9 @@ pub mod broadcast;
 pub mod init;
 pub mod new_gateway_prepare;
 pub mod simulator;
-pub mod stage3;
 pub mod upgrade;
-pub mod v31_upgrade_full;
-pub mod v31_upgrade_inner;
+pub mod upgrade_full;
+pub mod upgrade_inner;
 pub mod verify_upgrade;
 pub mod zk_governance;
 
@@ -60,10 +59,6 @@ pub enum EcosystemCommands {
     /// signed by its declared `target`. Direct EOA broadcast — no Safe UI.
     #[command(name = "upgrade-broadcast")]
     UpgradeBroadcast(UpgradeBroadcastArgs),
-    /// Phase 3 of the ecosystem upgrade: bridged-token registration via
-    /// `CoreUpgrade_v31.stage3(bridgehub)`. Runs *before* the per-chain
-    /// upgrades (Phase 4). Any signer.
-    Stage3(Stage3Args),
     /// Print a starter `--ctm-config` TOML by enumerating every CTM
     /// registered on the supplied bridgehub. Use this on stage / mainnet to
     /// discover the Atlas CTM address without having to look it up by hand.
@@ -81,7 +76,6 @@ pub async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
         EcosystemCommands::UpgradeGovernance(args) => upgrade::run_upgrade_governance(args).await,
         EcosystemCommands::VerifyUpgrade(args) => verify_upgrade::run(args).await,
         EcosystemCommands::UpgradeBroadcast(args) => broadcast::run(args).await,
-        EcosystemCommands::Stage3(args) => stage3::run(args).await,
         EcosystemCommands::ListCtms(args) => upgrade::run_list_ctms(args).await,
         EcosystemCommands::GovernanceTomlToSimulator(args) => simulator::run(args).await,
     }

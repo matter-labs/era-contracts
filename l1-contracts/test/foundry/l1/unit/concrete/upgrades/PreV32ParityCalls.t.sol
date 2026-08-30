@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {CoreUpgrade_v31} from "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
+import {CoreUpgrade_v33} from "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
 import {AddressIntrospector} from "deploy-scripts/utils/AddressIntrospector.sol";
 import {BridgesDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 
@@ -21,7 +21,7 @@ import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 /// @dev Exposes the pre-v32 parity call builder and lets the test place the discovered addresses, which the
 /// script normally fills in from on-chain introspection.
-contract CoreUpgradeParityHarness is CoreUpgrade_v31 {
+contract CoreUpgradeParityHarness is CoreUpgrade_v33 {
     function setDiscoveredAddresses(
         address _l1Nullifier,
         address _l1AssetRouter,
@@ -35,7 +35,7 @@ contract CoreUpgradeParityHarness is CoreUpgrade_v31 {
     }
 
     function buildInteropHandlerWiringCalls() external returns (Call[] memory) {
-        return _buildL1InteropHandlerWiringCalls();
+        return prepareVersionSpecificStage1GovernanceCallsL1();
     }
 }
 
@@ -121,20 +121,18 @@ contract PreV32ParityCallsTest is Test {
     }
 
     function test_wiresTheNewInteropHandler() public {
-        // Ownership of the freshly deployed handler is pending for governance, as the deploy step leaves it.
-        interopHandler.transferOwnership(owner);
-
         upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(interopHandler), true);
 
         Call[] memory calls = upgradeScript.buildInteropHandlerWiringCalls();
-        assertEq(calls.length, 3, "handler ownership + the two wirings");
+        // Two calls, not three: the deploy step initializes the handler's proxy straight to the
+        // governance address, so there is no pending owner for stage 1 to accept.
+        assertEq(calls.length, 2, "the two wirings");
 
         assertEq(l1Nullifier.l1InteropHandler(), address(0), "v31 nullifier starts unwired");
         assertEq(assetRouter.l1InteropHandler(), address(0), "v31 asset router starts unwired");
 
         _executeAsOwners(calls);
 
-        assertEq(interopHandler.owner(), owner, "handler ownership accepted by governance");
         assertEq(l1Nullifier.l1InteropHandler(), address(interopHandler), "nullifier wired to the handler");
         assertEq(assetRouter.l1InteropHandler(), address(interopHandler), "asset router wired to the handler");
     }

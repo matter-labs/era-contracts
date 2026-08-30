@@ -1,14 +1,13 @@
 # Upgrade input for the v33 release on a local anvil ecosystem.
 #
-# The v33 flow reads almost nothing from this file: the target protocol version and
-# chain-creation params come from `configs/genesis/zksync-os/latest.json`
-# (`DefaultCoreUpgrade.loadProtocolVersionFromGenesis`), the old version from the CTM on
-# chain, and the bridgehub/CTM addresses from the caller's `--bridgehub` / `--ctm-proxy`.
-# The values below are kept for parity with the other envs and for tooling that reports
-# them; they are not what drives the upgrade.
+# Almost nothing here drives the upgrade: the target protocol version and chain-creation params
+# come from `configs/genesis/zksync-os/latest.json`
+# (`DefaultCoreUpgrade.loadProtocolVersionFromGenesis`), the old version from the CTM on chain, and
+# the bridgehub/CTM addresses from the caller's `--bridgehub` / `--ctm-proxy`. The values below are
+# kept for parity with the other envs and for tooling that reports them.
 #
-# `CoreUpgrade_v33` pairs this file with `../permanent-values/<basename>.toml`, so the
-# basename chosen here selects the permanent-values file too.
+# The file's *name* is what matters: `protocol-ops ecosystem upgrade-prepare-all --env <name>`
+# resolves its upgrade input as `upgrade-envs/v0.33.0-atomic-interop/<name>.toml`.
 
 old_protocol_version = 0x1d00000000
 bridgehub_proxy_address = "0xC0F09Cb637DCfDe54D8B7b5170736Ec21aBB33ce"

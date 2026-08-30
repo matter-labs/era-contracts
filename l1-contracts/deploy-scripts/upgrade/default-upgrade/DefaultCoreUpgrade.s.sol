@@ -27,10 +27,12 @@ import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {Utils} from "../../utils/Utils.sol";
 
 import {ChainCreationParamsLib} from "../../ctm/ChainCreationParamsLib.sol";
+import {CoreUpgradeParams} from "./UpgradeParams.sol";
+import {ICoreUpgrade} from "contracts/script-interfaces/IDefaultUpgrade.sol";
 
 /// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
+contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
     using stdToml for string;
 
     /// @notice Internal state of the upgrade script
@@ -73,8 +75,47 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         console.log("Core upgrade output saved!");
     }
 
-    /// @notice Deploy everything that should be deployed
-    function deployNewEcosystemContractsL1() public virtual {}
+    /// @notice Single-call entry point invoked by the protocol-ops CLI's `ecosystem
+    ///         upgrade-prepare-all`. Runs the ecosystem-wide core deploys; CTM deploys are handled
+    ///         by the matching CTM upgrade script.
+    function noGovernancePrepare(CoreUpgradeParams memory _params) public virtual {
+        initializeWithArgs(
+            _params.bridgehubProxyAddress,
+            _params.isZKsyncOS,
+            _params.create2FactorySalt,
+            _params.upgradeInputPath,
+            _params.outputPath
+        );
+        prepareEcosystemUpgrade();
+        prepareDefaultGovernanceCalls();
+    }
+
+    /// @notice Deploy the L1 core implementations behind the proxies {prepareUpgradeProxiesCalls}
+    ///         upgrades. Every release refreshes all of them, so this lives here rather than being
+    ///         restated per version; a release adds only what is new to it (a new proxy, say) by
+    ///         overriding {deployVersionSpecificEcosystemContractsL1}.
+    function deployNewEcosystemContractsL1() public virtual {
+        coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
+        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
+        coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
+        coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter", false);
+        coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault", false);
+        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract(
+            "CTMDeploymentTracker",
+            false
+        );
+        coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler", false);
+        coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
+            "ChainRegistrationSender",
+            false
+        );
+
+        deployVersionSpecificEcosystemContractsL1();
+    }
+
+    /// @notice Hook for deploys that only one release needs — typically a proxy that did not exist
+    ///         before it. Implementation refreshes belong in {deployNewEcosystemContractsL1}.
+    function deployVersionSpecificEcosystemContractsL1() public virtual {}
 
     function getOwnerAddress() public virtual returns (address) {
         return config.ownerAddress;
@@ -422,7 +463,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](7);
+        calls = new Call[](8);
 
         calls[0] = _buildCallProxyUpgrade(
             coreAddresses.bridgehub.proxies.bridgehub,
@@ -460,6 +501,13 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         calls[6] = _buildCallProxyUpgrade(
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             coreAddresses.bridgehub.implementations.chainAssetHandler
+        );
+
+        // The sender's proxy is inherited rather than redeployed: it holds the registration history,
+        // and the bridgehub authorizes service transactions by that address.
+        calls[7] = _buildCallProxyUpgrade(
+            coreAddresses.bridgehub.proxies.chainRegistrationSender,
+            coreAddresses.bridgehub.implementations.chainRegistrationSender
         );
     }
 

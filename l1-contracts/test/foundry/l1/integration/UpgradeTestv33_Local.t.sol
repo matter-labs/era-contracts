@@ -5,8 +5,8 @@ pragma solidity ^0.8.24;
 
 import {console2 as console} from "forge-std/Script.sol";
 
-import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
-import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
+import {CTMUpgrade_v33} from "../../../../deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
+import {CoreUpgrade_v33} from "../../../../deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
@@ -27,7 +27,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 
 /// @notice Test-only CTM upgrade that mocks large bytecode reads to avoid MemoryOOG
-contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
+contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
     /// @notice This fixture is an Era ecosystem, which this release refuses to generate a per-chain upgrade
     ///         for (`deployUsedUpgradeContract` reverts). The fixture exists to exercise the ecosystem-side
     ///         flow — proxy upgrades, stage calls, wiring — so it falls back to the plain `DefaultUpgrade`
@@ -92,18 +92,12 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
     }
 }
 
-/// @notice Test-only Core upgrade that skips governance calls the local fixture cannot satisfy.
-contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
-    /// @notice Override to skip the ownership-acceptance and `setAddresses` calls, which need ownership
-    ///         hand-offs the fixture does not perform.
-    /// @dev The interop-handler wiring is kept: it is what makes a v31 ecosystem match a from-scratch v32
-    ///      one. In this fixture it collapses to nothing — the ecosystem already has a wired handler — so
-    ///      the calls themselves are covered by `PreV32ParityCalls.t.sol`, not here.
-    function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
-        console.log("Test mode: keeping only the L1InteropHandler wiring in stage 1");
-        return _buildL1InteropHandlerWiringCalls();
-    }
-}
+/// @notice Test-only Core upgrade.
+/// @dev v33's stage-1 override is already only the `L1InteropHandler` wiring — the core-proxy
+///      upgrades moved into `DefaultCoreUpgrade` — so there is nothing left for the fixture to skip
+///      and no override is needed. On this fixture the wiring collapses to nothing anyway (the
+///      ecosystem already has a handler); the calls themselves are covered by `PreV32ParityCalls.t.sol`.
+contract CoreUpgrade_v33_Test is CoreUpgrade_v33 {}
 
 // Note: there is no longer a separate `EcosystemUpgrade_v31_Test` orchestrator subclass.
 // The local-fork integration test injects mocked Core and CTM upgrades by overriding
@@ -145,13 +139,13 @@ contract UpgradeIntegrationTest_Local is
     address private _expectedServerNotifierProxyAdminOwner;
 
     /// @notice Override to inject the mocked Core upgrade (keeps only the interop-handler wiring in stage 1).
-    function createCoreUpgrade() internal override returns (CoreUpgrade_v31) {
-        return new CoreUpgrade_v31_Test();
+    function createCoreUpgrade() internal override returns (CoreUpgrade_v33) {
+        return new CoreUpgrade_v33_Test();
     }
 
     /// @notice Override to inject the mocked CTM upgrade (skips bytecode-heavy reads).
-    function createCTMUpgrade() internal override returns (CTMUpgrade_v31) {
-        return new CTMUpgrade_v31_Test();
+    function createCTMUpgrade() internal override returns (CTMUpgrade_v33) {
+        return new CTMUpgrade_v33_Test();
     }
 
     /// @notice Bump the CTM's protocol version from the upgrade input TOML so the local fixture

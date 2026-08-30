@@ -292,41 +292,32 @@ pub mod access_control_default_admin_rules {
 }
 pub use access_control_default_admin_rules::AccessControlDefaultAdminRulesAbi;
 
-pub mod i_core_upgrade_v31 {
+pub mod i_core_upgrade {
     alloy::sol!(
         #[sol(rpc)]
-        ICoreUpgradeV31Abi,
-        "../l1-contracts/zkstack-out/IUpgradeV31.sol/ICoreUpgradeV31.json"
+        ICoreUpgradeAbi,
+        "../l1-contracts/zkstack-out/IDefaultUpgrade.sol/ICoreUpgrade.json"
     );
 }
-pub use i_core_upgrade_v31::ICoreUpgradeV31Abi;
+pub use i_core_upgrade::ICoreUpgradeAbi;
 
-pub mod i_ctm_upgrade_v31 {
+pub mod i_ctm_upgrade {
     alloy::sol!(
         #[sol(rpc)]
-        ICTMUpgradeV31Abi,
-        "../l1-contracts/zkstack-out/IUpgradeV31.sol/ICTMUpgradeV31.json"
+        ICTMUpgradeAbi,
+        "../l1-contracts/zkstack-out/IDefaultUpgrade.sol/ICTMUpgrade.json"
     );
 }
-pub use i_ctm_upgrade_v31::ICTMUpgradeV31Abi;
+pub use i_ctm_upgrade::ICTMUpgradeAbi;
 
-pub mod i_core_upgrade_v33 {
+pub mod i_record_priority_op_lower_bound {
     alloy::sol!(
         #[sol(rpc)]
-        ICoreUpgradeV33Abi,
-        "../l1-contracts/zkstack-out/IUpgradeV33.sol/ICoreUpgradeV33.json"
+        IRecordPriorityOpLowerBoundAbi,
+        "../l1-contracts/zkstack-out/IRecordPriorityOpLowerBound.sol/IRecordPriorityOpLowerBound.json"
     );
 }
-pub use i_core_upgrade_v33::ICoreUpgradeV33Abi;
-
-pub mod i_ctm_upgrade_v33 {
-    alloy::sol!(
-        #[sol(rpc)]
-        ICTMUpgradeV33Abi,
-        "../l1-contracts/zkstack-out/IUpgradeV33.sol/ICTMUpgradeV33.json"
-    );
-}
-pub use i_ctm_upgrade_v33::ICTMUpgradeV33Abi;
+pub use i_record_priority_op_lower_bound::IRecordPriorityOpLowerBoundAbi;
 
 pub mod i_finalize_chain_init {
     // Hand-declared: the artifact JSON's `enum L2DACommitmentScheme`

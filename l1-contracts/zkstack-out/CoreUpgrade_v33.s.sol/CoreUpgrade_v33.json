@@ -98,13 +98,6 @@
   },
   {
     "type": "function",
-    "name": "deployNewEcosystemContractsL1NoConnections",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "deploySimpleContract",
     "inputs": [
       {
@@ -188,6 +181,13 @@
         "internalType": "address"
       }
     ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "deployVersionSpecificEcosystemContractsL1",
+    "inputs": [],
+    "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
@@ -1105,19 +1105,6 @@
     "inputs": [
       {
         "name": "owner",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "stage3",
-    "inputs": [
-      {
-        "name": "bridgehubProxy",
         "type": "address",
         "internalType": "address"
       }

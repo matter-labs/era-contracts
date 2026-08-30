@@ -1,16 +1,16 @@
 # Upgrade input for the frozen local chain committed in zksync-os-integration-tests
 # (`tests/local-chains/`, currently v31.0 / chain 506), used by its v31 -> v33 upgrade test.
 #
-# Value-for-value a copy of `local.toml` in this directory. It exists under its own basename
-# so that `CoreUpgrade_v33`'s basename pairing resolves to
-# `../permanent-values/zksync-os-integration-test.toml` rather than
-# `../permanent-values/local.toml`.
+# Value-for-value a copy of `local.toml` in this directory; it exists under its own basename so the
+# fixture is addressable as its own `--env zksync-os-integration-test`.
 #
-# Note that unlike the v31 flow, v33 never reads `[legacy_gateway]` — it has no stage-2
-# decommission step — so the separation is now about keeping the fixture's permanent values
-# addressable on their own, not about avoiding calls against chain 506.
+# Note for anyone porting the v31 flow's reasoning: v31 needed a separate basename because
+# `CoreUpgrade_v31` paired the input with `../permanent-values/<basename>.toml` and
+# `permanent-values/local.toml` declares chain 506 as the legacy gateway — the very chain being
+# upgraded. v33 has no stage-2 decommission step and reads permanent-values nowhere, so that hazard
+# is gone and only the env-name addressing remains.
 #
-# See `local.toml` above for why the values below are inert.
+# See `local.toml` for why the values below are inert.
 
 old_protocol_version = 0x1d00000000
 bridgehub_proxy_address = "0xC0F09Cb637DCfDe54D8B7b5170736Ec21aBB33ce"

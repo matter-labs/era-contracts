@@ -319,7 +319,7 @@ impl EnvConfig {
     /// Per-CTM CREATE2 salts from
     /// `upgrade-envs/v0.31.0-interopB/<env>.toml [create2_factory_salts]`,
     /// keyed by CTM proxy. Empty if the env doesn't declare any (legacy
-    /// local-fixture path — `v31_upgrade_inner` will fall back to random
+    /// local-fixture path — `upgrade_inner` will fall back to random
     /// salts in that case). Re-reads the TOML each call (see
     /// `v31_create2_factory_salt`).
     pub fn v31_create2_factory_salt_per_ctm(&self) -> anyhow::Result<HashMap<Address, B256>> {

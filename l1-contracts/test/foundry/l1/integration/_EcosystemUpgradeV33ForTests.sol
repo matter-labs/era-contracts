@@ -4,10 +4,10 @@ pragma solidity 0.8.28;
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {CoreUpgrade_v31} from "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
-import {CTMUpgrade_v31} from "deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
+import {CoreUpgrade_v33} from "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
+import {CTMUpgrade_v33} from "deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
 
-/// @notice Memory-trimmed test variants of the v31 Core/CTM upgrade scripts and a
+/// @notice Memory-trimmed test variants of the v33 Core/CTM upgrade scripts and a
 ///         small Stage-3 wrapper. Used by the anvil-interop fork-upgrade test and the
 ///         foundry integration tests. There is no `EcosystemUpgrade_v31` orchestrator
 ///         anymore — callers run Core and CTM scripts directly (or via `protocol-ops
@@ -17,7 +17,7 @@ import {CTMUpgrade_v31} from "deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 ///      not available) and writes only the minimal output the test harness needs
 ///      (`chain_upgrade_diamond_cut` + `state_transition.default_upgrade_addr`)
 ///      so accumulated `vm.serialize*` JSON does not blow forge's 128 MB EVM memory.
-contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
+contract CTMUpgradeV33ForTests is CTMUpgrade_v33 {
     using stdToml for string;
 
     function prepareCTMUpgrade() public override {
@@ -83,28 +83,13 @@ contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
     }
 }
 
-/// @dev Core upgrade for tests with a Stage-3 wrapper that reads bridgehub from env.
-///      Anvil-interop drives `stage3()` via direct `forge script`, separate from the
-///      protocol-ops driven prepare phase.
-contract CoreUpgradeV31ForTests is CoreUpgrade_v31 {
-    using stdToml for string;
+/// @dev Core upgrade for tests. v33 needs no test-only behaviour of its own — the v31 variant
+///      existed to expose a `stage3()` wrapper, and v33 has no stage 3 — but the name is kept so the
+///      harnesses have a single place to hang future overrides.
+contract CoreUpgradeV33ForTests is CoreUpgrade_v33 {}
 
-    /// @notice Stage 3 wrapper: reads bridgehub from `PERMANENT_VALUES_INPUT_OVERRIDE`
-    ///         and dispatches to `CoreUpgrade_v31.stage3(bridgehubProxy)`.
-    function stage3() public {
-        string memory permanentValuesPath = vm.envString("PERMANENT_VALUES_INPUT_OVERRIDE");
-        string memory pvToml = vm.readFile(string.concat(vm.projectRoot(), permanentValuesPath));
-        address bridgehubProxy = pvToml.readAddress("$.core_contracts.bridgehub_proxy_addr");
-        stage3(bridgehubProxy);
-    }
-}
-
-/// @dev Idempotent variant of CoreUpgradeV31ForTests: skips `updateContractConnections()`
-///      so a second run inside the same forge process does not redo `setAddresses` /
-///      `transferOwnership`. Required by tests that re-run core deploys to recompute
-///      create2 addresses for downstream pieces (e.g. MailboxFacet's chainAssetHandler).
-contract CoreUpgradeV31Idempotent is CoreUpgradeV31ForTests {
-    function deployNewEcosystemContractsL1() public virtual override {
-        super.deployNewEcosystemContractsL1NoConnections();
-    }
-}
+/// @dev Kept as a named alias for the tests that re-run core deploys to recompute create2 addresses.
+///      It used to skip `updateContractConnections()` so a second run would not redo `setAddresses` /
+///      `transferOwnership`; v33 has neither — the core deploys are pure CREATE2 and the interop
+///      handler is initialized straight to governance — so re-running is already idempotent.
+contract CoreUpgradeV33Idempotent is CoreUpgradeV33ForTests {}

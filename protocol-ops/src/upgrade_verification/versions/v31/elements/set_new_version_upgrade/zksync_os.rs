@@ -24,7 +24,7 @@ use crate::upgrade_verification::{
     verifiers::{VerificationResult, Verifiers},
 };
 
-use super::{verify_l2_v31_upgrade_inner_calldata, IComplexUpgrader};
+use super::{verify_l2_upgrade_inner_calldata, IComplexUpgrader};
 
 /// ZKsync OS upgrade type — mirrors IComplexUpgrader.ContractUpgradeType.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -399,7 +399,7 @@ pub(super) async fn verify_zksync_os_force_deploy_and_upgrade(
         )),
     }
 
-    verify_l2_v31_upgrade_inner_calldata(
+    verify_l2_upgrade_inner_calldata(
         verifiers,
         result,
         &decoded._calldata,

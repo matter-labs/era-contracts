@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { runV31UpgradeScenario, TARGET_PROTOCOL_VERSION } from "./src/helpers/v31-upgrade-test-runner";
+import { runV31UpgradeScenario, TARGET_PROTOCOL_VERSION } from "./src/helpers/upgrade-test-runner";
 
 // The upgrade this release actually performs: a v31 ecosystem (ZKsync OS chains, one of them a gateway)
 // onto the current contracts. Replaces the former v29 -> v31 scenario, which this release no longer

@@ -40,7 +40,7 @@ use anyhow::Context;
 use serde::Deserialize;
 
 use crate::commands::chain::gateway::convert::{stage_vote_prepare, VotePrepareInputs};
-use crate::commands::ecosystem::v31_upgrade_inner::CtmPrepareEntry;
+use crate::commands::ecosystem::upgrade_inner::CtmPrepareEntry;
 use crate::common::abi::{
     BridgehubAbi, IL1AssetRouterAbi, IL1NativeTokenVaultAbi, TestnetERC20TokenAbi,
 };

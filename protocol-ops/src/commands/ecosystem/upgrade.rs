@@ -30,13 +30,12 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::commands::ecosystem::v31_upgrade_full::V31UpgradeFull;
-use crate::commands::ecosystem::v31_upgrade_inner::{CtmInputs, V31PrepareInputs, V31UpgradeInner};
+use crate::commands::ecosystem::upgrade_full::V31UpgradeFull;
+use crate::commands::ecosystem::upgrade_inner::{CtmInputs, V31PrepareInputs, V31UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::forge::scripts::{
     ADMIN_FUNCTIONS_INVOCATION, CORE_UPGRADE_V33_SCRIPT_PATH, CTM_UPGRADE_V33_SCRIPT_PATH,
-    UPGRADE_V31_INTEROP_ENV_DIR, UPGRADE_V33_CORE_OUTPUT_PATH, UPGRADE_V33_ENV_DIR,
-    UPGRADE_V33_LOCAL_INPUT_PATH,
+    UPGRADE_V33_CORE_OUTPUT_PATH, UPGRADE_V33_ENV_DIR, UPGRADE_V33_LOCAL_INPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
@@ -546,38 +545,28 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // signer's private key — see `regen-and-verify-stage.sh` for an
         // example using `cast wallet address`).
         // Default --upgrade-input-path to the per-env file when running with `--env`. The CLI
-        // default is this release's `local.toml` (for local-anvil fixtures); on stage / mainnet /
-        // testnet the per-env file carries env-specific knobs such as the bridgehub address.
-        //
-        // The v33 env directory is preferred, falling back to the v31 one, which is still where the
-        // stage/mainnet/testnet inputs live — they are env descriptions, not release descriptions,
-        // and have not been re-cut per release. Only override when the caller hasn't explicitly
-        // passed `--upgrade-input-path`.
+        // default is the v33 `local.toml` (for local-anvil fixtures); on stage / mainnet / testnet
+        // the per-env file carries env-specific knobs such as the bridgehub address. Only override
+        // when the caller hasn't explicitly passed `--upgrade-input-path`.
         if args.upgrade_input_path == UPGRADE_V33_LOCAL_INPUT_PATH {
-            let candidates = [
-                format!("{UPGRADE_V33_ENV_DIR}/{}.toml", cfg.env),
-                format!("{UPGRADE_V31_INTEROP_ENV_DIR}/{}.toml", cfg.env),
-            ];
-            let found = candidates.iter().find(|rel| {
-                paths::contracts_root()
-                    .join("l1-contracts")
-                    .join(rel.trim_start_matches('/'))
-                    .exists()
-            });
-            match found {
-                Some(rel) => {
-                    logger::info(format!("Using per-env upgrade input: {rel}"));
-                    args.upgrade_input_path = rel.clone();
-                }
-                None => logger::info(format!(
-                    "Per-env upgrade input not found in {} or {} — falling back to default {}",
-                    UPGRADE_V33_ENV_DIR, UPGRADE_V31_INTEROP_ENV_DIR, UPGRADE_V33_LOCAL_INPUT_PATH
-                )),
+            let per_env_rel = format!("{UPGRADE_V33_ENV_DIR}/{}.toml", cfg.env);
+            let per_env_abs = paths::contracts_root()
+                .join("l1-contracts")
+                .join(per_env_rel.trim_start_matches('/'));
+            if per_env_abs.exists() {
+                logger::info(format!("Using per-env upgrade input: {per_env_rel}"));
+                args.upgrade_input_path = per_env_rel;
+            } else {
+                logger::info(format!(
+                    "Per-env upgrade input not found at {} — falling back to the v33 default {}",
+                    per_env_abs.display(),
+                    UPGRADE_V33_LOCAL_INPUT_PATH
+                ));
             }
         }
     }
     // Auto-fill the CREATE2 salt from the per-version upgrade input
-    // (`upgrade-envs/v0.31.0-interopB/<env>.toml [contracts]
+    // (`upgrade-envs/v0.33.0-atomic-interop/<env>.toml [contracts]
     // create2_factory_salt`). Recording the salt in version control makes
     // re-prepares reproducible (same addresses every run regardless of who
     // runs it), so deployer-bundle broadcasts can land at addresses that
@@ -938,7 +927,7 @@ fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> 
 /// ```
 fn write_merged_ecosystem_toml(
     core_toml: &Path,
-    ctm_entries: &[crate::commands::ecosystem::v31_upgrade_inner::CtmPrepareEntry],
+    ctm_entries: &[crate::commands::ecosystem::upgrade_inner::CtmPrepareEntry],
     extra_stage0: &[crate::common::governance_calls::GovernanceCall],
     zk_governance: Option<&crate::commands::ecosystem::zk_governance::ZkGovernanceOutcome>,
     new_gateway_tomls: &[PathBuf],
