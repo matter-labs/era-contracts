@@ -544,25 +544,30 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // `--deployer-address <real-EOA>` (or derive it from the broadcast
         // signer's private key — see `regen-and-verify-stage.sh` for an
         // example using `cast wallet address`).
-        // Default --upgrade-input-path to the per-env file when running with `--env`. The CLI
-        // default is the v33 `local.toml` (for local-anvil fixtures); on stage / mainnet / testnet
-        // the per-env file carries env-specific knobs such as the bridgehub address. Only override
-        // when the caller hasn't explicitly passed `--upgrade-input-path`.
+        // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly.
+        //
+        // Fails closed on a missing file rather than keeping the default. The basename does not just
+        // pick addresses: `DefaultCTMUpgrade` derives `permanent-values/<basename>.toml` from it, and
+        // that is where `testnet_verifier` lives. Silently falling back to `local.toml` for, say,
+        // `--env mainnet` would therefore prepare a mainnet upgrade that installs the *testnet*
+        // verifier, which accepts unproven batches.
         if args.upgrade_input_path == UPGRADE_V33_LOCAL_INPUT_PATH {
             let per_env_rel = format!("{UPGRADE_V33_ENV_DIR}/{}.toml", cfg.env);
             let per_env_abs = paths::contracts_root()
                 .join("l1-contracts")
                 .join(per_env_rel.trim_start_matches('/'));
-            if per_env_abs.exists() {
-                logger::info(format!("Using per-env upgrade input: {per_env_rel}"));
-                args.upgrade_input_path = per_env_rel;
-            } else {
-                logger::info(format!(
-                    "Per-env upgrade input not found at {} — falling back to the v33 default {}",
-                    per_env_abs.display(),
-                    UPGRADE_V33_LOCAL_INPUT_PATH
-                ));
-            }
+            anyhow::ensure!(
+                per_env_abs.exists(),
+                "no upgrade input for --env {} at {}. Add it (copying the same-named file from an \
+                 earlier upgrade-envs directory is usually right) — this command will not fall back \
+                 to another environment's input, because the basename also selects \
+                 `upgrade-envs/permanent-values/{}.toml` and with it `testnet_verifier`.",
+                cfg.env,
+                per_env_abs.display(),
+                cfg.env
+            );
+            logger::info(format!("Using per-env upgrade input: {per_env_rel}"));
+            args.upgrade_input_path = per_env_rel;
         }
     }
     // Auto-fill the CREATE2 salt from the per-version upgrade input

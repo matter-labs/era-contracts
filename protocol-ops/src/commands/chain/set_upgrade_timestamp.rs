@@ -47,6 +47,9 @@ pub struct ChainSetUpgradeTimestampArgs {
     pub shared: SharedRunArgs,
 }
 
+/// First protocol version whose per-chain upgrade gates on the recorded priority-op bound.
+const FIRST_VERSION_WITH_PRIORITY_OP_BOUND: u64 = 33;
+
 alloy::sol! {
     /// The v33 per-chain upgrade contract and the registry it reads. Only the getters are needed:
     /// recording goes through `chain record-priority-op-lower-bound`.
@@ -66,8 +69,9 @@ alloy::sol! {
 /// with `LowerBoundNotRecorded()` / `PriorityQueueNotReady()` and the chain sits wedged in the
 /// meantime. Checking here turns that into a refusal before anything is sent.
 ///
-/// Skipped when the CTM's default upgrade has no `PRIORITY_OP_LOWER_BOUND` — releases before v33 have
-/// no such precondition.
+/// Skipped only when the CTM is positively established to be on a pre-v33 protocol version, which has
+/// no such precondition. Every other failure — RPC, decoding, an unexpected upgrade contract — is
+/// fatal rather than treated as "nothing to check".
 async fn ensure_priority_op_bound_ready(
     rpc_url: &str,
     bridgehub: Address,
@@ -82,23 +86,38 @@ async fn ensure_priority_op_bound_ready(
         .await
         .context("resolve chain diamond")?;
 
+    // Decide whether the precondition applies from the protocol version the CTM will upgrade chains
+    // to — a positive signal — rather than from whether a getter call happened to succeed. Governance
+    // stage 1 has already moved the CTM to the new version by the time an upgrade is scheduled.
+    let packed = IChainTypeManagerAbi::new(ctm, &provider)
+        .protocolVersion()
+        .call()
+        .await
+        .context("read CTM protocolVersion")?;
+    let minor = (packed.wrapping_to::<u64>() >> 32) & 0xFFFF;
+    if minor < FIRST_VERSION_WITH_PRIORITY_OP_BOUND {
+        logger::info(format!(
+            "CTM is on protocol version 0.{minor}.x, which has no priority-op bound precondition — skipping the check"
+        ));
+        return Ok(());
+    }
+
     let default_upgrade = IChainTypeManagerAbi::new(ctm, &provider)
         .defaultUpgrade()
         .call()
         .await
         .context("read CTM defaultUpgrade")?;
 
-    let gate = IPriorityOpLowerBoundGate::new(default_upgrade, &provider);
-    let registry = match gate.PRIORITY_OP_LOWER_BOUND().call().await {
-        Ok(addr) => addr,
-        Err(_) => {
-            logger::info(
-                "CTM default upgrade exposes no PRIORITY_OP_LOWER_BOUND — no bound precondition to check"
-                    .to_string(),
-            );
-            return Ok(());
-        }
-    };
+    // From here on every failure is fatal: this is a safety check, and an RPC hiccup must not be
+    // mistaken for "no precondition to enforce".
+    let registry = IPriorityOpLowerBoundGate::new(default_upgrade, &provider)
+        .PRIORITY_OP_LOWER_BOUND()
+        .call()
+        .await
+        .context(
+            "read PRIORITY_OP_LOWER_BOUND from the CTM's default upgrade — expected on v33+, so a \
+             failure here means the upgrade contract or the RPC is not what this command assumes",
+        )?;
 
     let registry = IPriorityOpLowerBoundGate::new(registry, &provider);
     anyhow::ensure!(

@@ -153,6 +153,28 @@ contract V33UpgradeScriptsTest is Test {
         );
     }
 
+    /// @notice Every v33 upgrade input has the permanent-values file its basename resolves to.
+    /// @dev The basename does double duty: it selects the upgrade input *and*, through
+    ///      {DefaultCTMUpgrade._permanentValuesPath}, the permanent values that carry
+    ///      `testnet_verifier`. An environment with no v33 input is the dangerous half — `--env`
+    ///      would have to fall back to another environment's file and would silently pick up its
+    ///      verifier setting. This pins that the inputs exist; `upgrade-prepare-all` refuses the
+    ///      fallback outright.
+    function test_everyV33UpgradeInputHasItsPermanentValues() public view {
+        string[4] memory envs = ["local", "mainnet", "stage", "zksync-os-integration-test"];
+
+        for (uint256 i = 0; i < envs.length; ++i) {
+            assertTrue(
+                vm.isFile(string.concat(vm.projectRoot(), "/upgrade-envs/v0.33.0-atomic-interop/", envs[i], ".toml")),
+                string.concat("missing v33 upgrade input for env ", envs[i])
+            );
+            assertTrue(
+                vm.isFile(string.concat(vm.projectRoot(), "/upgrade-envs/permanent-values/", envs[i], ".toml")),
+                string.concat("missing permanent values for env ", envs[i])
+            );
+        }
+    }
+
     /// @notice Every environment declares `testnet_verifier`, and only mainnet runs the real one.
     /// @dev The flag decides whether the upgrade installs a verifier that accepts unproven batches,
     ///      so it is a declared per-env value rather than a default. This pins both halves of the
