@@ -13,13 +13,15 @@ struct RecordPriorityOpLowerBoundOutput {
     chain_id: u64,
     bridgehub: Address,
     priority_op_lower_bound: Address,
+    sender: Address,
 }
 
 /// Record a ZKsync OS chain's priority-op lower bound ahead of its upgrade.
 ///
-/// Drives `deploy-scripts/upgrade/v33/RecordPriorityOpLowerBound.s.sol` and **broadcasts** — unlike
-/// most `chain` subcommands this emits no Safe bundle, because the call is permissionless and must
-/// land in its own transaction rather than inside a governance bundle.
+/// Drives `deploy-scripts/upgrade/v33/RecordPriorityOpLowerBound.s.sol` against a forked anvil and
+/// emits a Safe bundle via `--out`, like the other prepare-only commands. Apply it with
+/// `protocol-ops dev execute-safe`. Keep it as its own bundle rather than folding it into the
+/// governance one: the call is permissionless and has to land in a separate, earlier transaction.
 ///
 /// This is a mandatory prerequisite of the v33 per-chain upgrade: `V32UpgradeZKsyncOS` rejects the
 /// diamond cut until the bound is recorded *and* every priority op below it has been processed on
@@ -41,6 +43,12 @@ pub struct ChainRecordPriorityOpLowerBoundArgs {
     #[clap(long)]
     pub priority_op_lower_bound: Address,
 
+    /// EOA that will send the recording transaction. Any funded address will do — the registry call
+    /// is permissionless and grants the sender nothing — but it must match the key used to apply the
+    /// emitted bundle, since that address is what lands in the bundle's `from`.
+    #[clap(long)]
+    pub sender: Address,
+
     #[clap(flatten)]
     #[serde(flatten)]
     pub shared: SharedRunArgs,
@@ -57,9 +65,11 @@ pub async fn run(args: ChainRecordPriorityOpLowerBoundArgs) -> anyhow::Result<()
             _chainId: U256::from(chain_id),
         })
         .with_broadcast()
-        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT);
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+        .with_sender(format!("{:#x}", args.sender))
+        .with_unlocked();
 
-    logger::step("Recording the chain's priority-op lower bound");
+    logger::step("Preparing the priority-op lower-bound recording bundle");
     logger::info(format!("Bridgehub: {:#x}", bridgehub));
     logger::info(format!("Chain ID: {chain_id}"));
     logger::info(format!(
@@ -80,10 +90,11 @@ pub async fn run(args: ChainRecordPriorityOpLowerBoundArgs) -> anyhow::Result<()
             chain_id,
             bridgehub,
             priority_op_lower_bound: args.priority_op_lower_bound,
+            sender: args.sender,
         },
     )
     .await?;
 
-    logger::success("priority-op lower bound recorded");
+    logger::success("priority-op lower-bound recording prepared");
     Ok(())
 }

@@ -444,7 +444,7 @@ impl<'a> V31UpgradeInner<'a> {
             .with_disable_labels()
             .with_wallet(deployer);
 
-        logger::step(format!("Running v31 ctm prepare for {ctm_proxy:#x}"));
+        logger::step(format!("Running CTM prepare for {ctm_proxy:#x}"));
         runner
             .run(script)
             .context("Failed to execute the CTM upgrade script's noGovernancePrepare")?;

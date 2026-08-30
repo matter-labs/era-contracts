@@ -174,10 +174,7 @@ impl<'a> V31UpgradeFull<'a> {
                 .with_context(|| {
                     format!("invalid CTM admin calls hex in {}", entry.toml.display())
                 })?;
-            logger::step(format!(
-                "Running v31 CTM admin calls for {:#x}",
-                entry.proxy
-            ));
+            logger::step(format!("Running CTM admin calls for {:#x}", entry.proxy));
             runner.run(
                 runner
                     .script_call(AdminFunctionsAbi::executeOwnableCallsWithWrapsCall {
