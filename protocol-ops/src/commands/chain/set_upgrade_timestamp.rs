@@ -47,8 +47,13 @@ pub struct ChainSetUpgradeTimestampArgs {
     pub shared: SharedRunArgs,
 }
 
-/// First protocol version whose per-chain upgrade gates on the recorded priority-op bound.
-const FIRST_VERSION_WITH_PRIORITY_OP_BOUND: u64 = 33;
+/// Protocol minor versions whose per-chain upgrade gates on the recorded priority-op bound.
+///
+/// Exactly v33 today: `PRIORITY_OP_LOWER_BOUND` exists because this release removes the L2 entry
+/// point of v31's base-token backfill, which is a one-time concern. A later release that keeps the
+/// registry should add itself here — assuming every future version has the getter would make this
+/// command fail on the first one that drops it.
+const VERSIONS_WITH_PRIORITY_OP_BOUND: [u64; 1] = [33];
 
 alloy::sol! {
     /// The v33 per-chain upgrade contract and the registry it reads. Only the getters are needed:
@@ -69,9 +74,9 @@ alloy::sol! {
 /// with `LowerBoundNotRecorded()` / `PriorityQueueNotReady()` and the chain sits wedged in the
 /// meantime. Checking here turns that into a refusal before anything is sent.
 ///
-/// Skipped only when the CTM is positively established to be on a pre-v33 protocol version, which has
-/// no such precondition. Every other failure — RPC, decoding, an unexpected upgrade contract — is
-/// fatal rather than treated as "nothing to check".
+/// Applies only to the protocol versions listed in {VERSIONS_WITH_PRIORITY_OP_BOUND}, established
+/// positively from the CTM's own version. Once the check does apply, every failure — RPC, decoding,
+/// an unexpected upgrade contract — is fatal rather than treated as "nothing to check".
 async fn ensure_priority_op_bound_ready(
     rpc_url: &str,
     bridgehub: Address,
@@ -95,7 +100,7 @@ async fn ensure_priority_op_bound_ready(
         .await
         .context("read CTM protocolVersion")?;
     let minor = (packed.wrapping_to::<u64>() >> 32) & 0xFFFF;
-    if minor < FIRST_VERSION_WITH_PRIORITY_OP_BOUND {
+    if !VERSIONS_WITH_PRIORITY_OP_BOUND.contains(&minor) {
         logger::info(format!(
             "CTM is on protocol version 0.{minor}.x, which has no priority-op bound precondition — skipping the check"
         ));
