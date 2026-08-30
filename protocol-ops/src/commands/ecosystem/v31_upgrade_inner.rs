@@ -410,6 +410,12 @@ impl<'a> V31UpgradeInner<'a> {
         ));
 
         // Per-CTM output path so back-to-back prepares don't clobber each other.
+        // Deliberately still `v31-…` while the core output moved to `v33-upgrade-core.toml`: unlike
+        // the core path this one is not caller-overridable, and the name is baked into the
+        // anvil-interop harnesses (`run-fork-upgrade-test.ts`, `v31-upgrade-test-runner.ts`) as well
+        // as the integration-test suite. It is an artifact filename shared by both script
+        // generations, not a claim about which release ran; renaming it is a coordinated change
+        // across those consumers.
         let output_path_str = format!("/script-out/v31-upgrade-ctm-{ctm_proxy:#x}.toml");
         let ctm_output_path = self
             .contracts_path
