@@ -21,7 +21,11 @@ use alloy::primitives::{Address, Bytes, B256};
 use alloy::sol_types::SolCall;
 use anyhow::Context;
 
-use crate::common::abi::{ICTMUpgradeV31Abi, ICoreUpgradeV31Abi};
+// The v31 and v33 entry points are calldata-compatible (`noGovernancePrepare(CoreUpgradeParams)` /
+// `(CTMUpgradeParams)`), so this one driver serves both script generations; which one actually runs is
+// decided by the `--core-script-path` / `--ctm-script-path` inputs. Encoding against the v33 types
+// keeps the current release's interface authoritative.
+use crate::common::abi::{ICTMUpgradeV33Abi, ICoreUpgradeV33Abi};
 use crate::common::wallets::Wallet;
 use crate::common::{forge::ForgeRunner, logger};
 
@@ -244,8 +248,8 @@ impl<'a> V31UpgradeInner<'a> {
                 Path::new(inputs.core_script_path.trim_start_matches('/')),
             )
             .with_calldata(&Bytes::from(
-                ICoreUpgradeV31Abi::noGovernancePrepareCall {
-                    _params: ICoreUpgradeV31Abi::CoreUpgradeParams {
+                ICoreUpgradeV33Abi::noGovernancePrepareCall {
+                    _params: ICoreUpgradeV33Abi::CoreUpgradeParams {
                         bridgehubProxyAddress: self.bridgehub,
                         isZKsyncOS: is_zk_sync_os,
                         create2FactorySalt: create2_salt,
@@ -261,10 +265,10 @@ impl<'a> V31UpgradeInner<'a> {
             .with_disable_labels()
             .with_wallet(deployer);
 
-        logger::step("Running v31 core prepare");
+        logger::step("Running core prepare");
         runner
             .run(script)
-            .context("Failed to execute CoreUpgrade_v31.noGovernancePrepare")?;
+            .context("Failed to execute the core upgrade script's noGovernancePrepare")?;
 
         Ok(core_output_path)
     }
@@ -418,8 +422,8 @@ impl<'a> V31UpgradeInner<'a> {
                 Path::new(inputs.ctm_script_path.trim_start_matches('/')),
             )
             .with_calldata(&Bytes::from(
-                ICTMUpgradeV31Abi::noGovernancePrepareCall {
-                    _params: ICTMUpgradeV31Abi::CTMUpgradeParams {
+                ICTMUpgradeV33Abi::noGovernancePrepareCall {
+                    _params: ICTMUpgradeV33Abi::CTMUpgradeParams {
                         ctmProxy: ctm_proxy,
                         bytecodesSupplier: bytecodes_supplier,
                         isZKsyncOS: is_zk_sync_os,
@@ -443,7 +447,7 @@ impl<'a> V31UpgradeInner<'a> {
         logger::step(format!("Running v31 ctm prepare for {ctm_proxy:#x}"));
         runner
             .run(script)
-            .context("Failed to execute CTMUpgrade_v31.noGovernancePrepare")?;
+            .context("Failed to execute the CTM upgrade script's noGovernancePrepare")?;
 
         Ok((ctm_output_path, is_zk_sync_os))
     }

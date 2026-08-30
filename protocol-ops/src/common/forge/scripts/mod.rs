@@ -19,8 +19,19 @@ pub const ADMIN_FUNCTIONS_SCRIPT_PATH: &str = "deploy-scripts/AdminFunctions.s.s
 pub const FINALIZE_CHAIN_INIT_SCRIPT_PATH: &str = "deploy-scripts/chain/FinalizeChainInit.s.sol";
 pub const CORE_UPGRADE_V31_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
 pub const CTM_UPGRADE_V31_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
+pub const UPGRADE_V31_INTEROP_ENV_DIR: &str = "/upgrade-envs/v0.31.0-interopB";
 pub const UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH: &str = "/upgrade-envs/v0.31.0-interopB/local.toml";
 pub const UPGRADE_V31_CORE_OUTPUT_PATH: &str = "/script-out/v31-upgrade-core.toml";
+
+/// v33 upgrade flow. Unlike the v31 scripts these extend the `Default*` bases directly: the
+/// v30 -> v31 one-off work (stage-2 legacy-Gateway decommission, stage-3 bridged-token
+/// migration) has no v33 counterpart and must not be replayed. See
+/// `deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol`.
+pub const CORE_UPGRADE_V33_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
+pub const CTM_UPGRADE_V33_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
+pub const UPGRADE_V33_ENV_DIR: &str = "/upgrade-envs/v0.33.0-atomic-interop";
+pub const UPGRADE_V33_LOCAL_INPUT_PATH: &str = "/upgrade-envs/v0.33.0-atomic-interop/local.toml";
+pub const UPGRADE_V33_CORE_OUTPUT_PATH: &str = "/script-out/v33-upgrade-core.toml";
 pub const GATEWAY_UTILS_SCRIPT_TARGET_PATH: &str =
     "deploy-scripts/gateway/GatewayUtils.s.sol:GatewayUtils";
 pub const DEPLOY_GATEWAY_TRANSACTION_FILTERER_SCRIPT_TARGET_PATH: &str =

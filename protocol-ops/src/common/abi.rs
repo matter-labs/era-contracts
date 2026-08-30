@@ -310,6 +310,24 @@ pub mod i_ctm_upgrade_v31 {
 }
 pub use i_ctm_upgrade_v31::ICTMUpgradeV31Abi;
 
+pub mod i_core_upgrade_v33 {
+    alloy::sol!(
+        #[sol(rpc)]
+        ICoreUpgradeV33Abi,
+        "../l1-contracts/zkstack-out/IUpgradeV33.sol/ICoreUpgradeV33.json"
+    );
+}
+pub use i_core_upgrade_v33::ICoreUpgradeV33Abi;
+
+pub mod i_ctm_upgrade_v33 {
+    alloy::sol!(
+        #[sol(rpc)]
+        ICTMUpgradeV33Abi,
+        "../l1-contracts/zkstack-out/IUpgradeV33.sol/ICTMUpgradeV33.json"
+    );
+}
+pub use i_ctm_upgrade_v33::ICTMUpgradeV33Abi;
+
 pub mod i_finalize_chain_init {
     // Hand-declared: the artifact JSON's `enum L2DACommitmentScheme`
     // internalType breaks sol!'s JSON path, so the struct is declared inline
