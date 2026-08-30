@@ -48,7 +48,9 @@ import type { ChainRole } from "../core/types";
 
 // Protocol version this release upgrades chains to. The upgrade inputs under `config/` carry it as a
 // literal too, since TOML cannot import it.
-export const TARGET_PROTOCOL_VERSION = "0x2000000000";
+// v33 (0x21 << 32). The scripts derive the target from the genesis config; this is what the
+// harness asserts the chains reached.
+export const TARGET_PROTOCOL_VERSION = "0x2100000000";
 
 // EIP-1967 admin slot: keccak256("eip1967.proxy.admin") - 1
 const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";

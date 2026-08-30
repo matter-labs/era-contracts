@@ -27,7 +27,7 @@
  *   FORK_PERMANENT_VALUES_PATH        — permanent-values template, relative to l1-contracts
  *                                        (default: upgrade-envs/permanent-values/local.toml)
  *   FORK_UPGRADE_INPUT_PATH           — upgrade-input template, relative to l1-contracts
- *                                        (default: upgrade-envs/v0.31.0-interopB/local.toml)
+ *                                        (default: upgrade-envs/v0.33.0-atomic-interop/local.toml)
  *   L2_FORK_URL_<chainId>             — per-chain L2 RPC override
  *
  * Per-chain L2 RPCs can also live in `config/fork-l2-rpcs.json` (gitignored):
@@ -255,11 +255,12 @@ async function main(): Promise<void> {
       prepareDir = result.prepareOutDir;
     } else {
       const scenario: V31UpgradeScenario = {
-        label: "fork-v31-to-v32",
+        label: "fork-v31-to-v33",
         stateVersion: "fork",
         permanentValuesTemplatePath:
           process.env.FORK_PERMANENT_VALUES_PATH ?? "upgrade-envs/permanent-values/local.toml",
-        upgradeInputTemplatePath: process.env.FORK_UPGRADE_INPUT_PATH ?? "upgrade-envs/v0.31.0-interopB/local.toml",
+        upgradeInputTemplatePath:
+          process.env.FORK_UPGRADE_INPUT_PATH ?? "upgrade-envs/v0.33.0-atomic-interop/local.toml",
         isZKsyncOS: true,
         targetRoles: ["directSettled"],
         expectedProtocolVersion: TARGET_PROTOCOL_VERSION,

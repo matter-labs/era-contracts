@@ -10,9 +10,14 @@
 era_chain_id = 6565
 is_zk_sync_os = true
 
+
 # Dummy ZK token asset ID for test fixtures. On mainnet this would be
 # DataEncoding.encodeNTVAssetId(l1ChainId, zkTokenL1Address).
 zk_token_asset_id = "0x0000000000000000000000000000000000000000000000000000000000000001"
+
+# Whether this environment's CTM verifier is the testnet one. Env-wide, not per-CTM.
+# Non-mainnet envs run `ZKsyncOSTestnetVerifier`, which accepts unproven batches.
+testnet_verifier = true
 
 [core_contracts]
 bridgehub_proxy_addr = "0xd8f8df05efacd52f28cdf11be22ce3d6ae0fabf7"

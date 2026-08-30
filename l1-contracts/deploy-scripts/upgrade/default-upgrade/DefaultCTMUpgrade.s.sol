@@ -111,6 +111,12 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         ///      MUST be non-zero — `InteropCenter.initL2` reverts otherwise, which would abort the
         ///      L2 upgrade transaction.
         bytes32 zkTokenAssetId;
+        /// @dev Whether the CTM's verifier is the testnet one, which accepts unproven batches.
+        ///      Read from `upgrade-envs/permanent-values/<env>.toml`: true for every env except
+        ///      mainnet. It cannot be introspected off the deployed verifier yet — pre-v31 L1 state
+        ///      predates `ZKsyncOSTestnetVerifier.IS_TESTNET_VERIFIER` — so it is declared per env
+        ///      rather than guessed.
+        bool testnetVerifier;
     }
 
     // The output of the script
@@ -158,6 +164,35 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         upgradeConfig.initialized = true;
     }
 
+    /// @notice Absolute path of the permanent-values file for the environment being upgraded.
+    /// @dev Paired with the upgrade input by basename: `.../<env>.toml` ->
+    ///      `upgrade-envs/permanent-values/<env>.toml`. Honors `PERMANENT_VALUES_INPUT_OVERRIDE`
+    ///      so harnesses that render the file into a scratch dir can point at it directly.
+    function _permanentValuesPath(string memory _upgradeInputAbsPath) internal view returns (string memory) {
+        string memory overridePath = vm.envOr("PERMANENT_VALUES_INPUT_OVERRIDE", string(""));
+        if (bytes(overridePath).length > 0) {
+            return string.concat(vm.projectRoot(), overridePath);
+        }
+
+        bytes memory p = bytes(_upgradeInputAbsPath);
+        require(p.length > 0, "upgrade input path empty");
+        uint256 lastSlash = 0;
+        bool found = false;
+        for (uint256 i = p.length; i > 0; --i) {
+            if (p[i - 1] == "/") {
+                lastSlash = i;
+                found = true;
+                break;
+            }
+        }
+        require(found, "upgrade input path has no `/` separator");
+        bytes memory basename = new bytes(p.length - lastSlash);
+        for (uint256 i = 0; i < basename.length; ++i) {
+            basename[i] = p[lastSlash + i];
+        }
+        return string.concat(vm.projectRoot(), "/upgrade-envs/permanent-values/", string(basename));
+    }
+
     function initializeConfig(
         ChainCreationParamsConfig memory chainCreationParams,
         PermanentCTMConfig memory permanentConfig,
@@ -196,15 +231,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
             ctmAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
-        // FIXME: need to provide the params as the input for the function, since
-        // on mainnet testnetVerifier must be false. Right now the introspection is not available
-        // due to the previous version being v29.
-        // TODO: restore introspection when L1 state is regenerated with ZKsyncOSTestnetVerifier.IS_TESTNET_VERIFIER
-        // (bool ok, bytes memory data) = ctmAddresses.stateTransition.verifiers.verifier.staticcall(
-        //     abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
-        // );
-        // config.testnetVerifier = ok;
-        config.testnetVerifier = true;
+        // Declared per environment rather than introspected off the deployed verifier: pre-v31 L1
+        // state predates `ZKsyncOSTestnetVerifier.IS_TESTNET_VERIFIER`. Getting this wrong on
+        // mainnet would install a verifier that accepts unproven batches, so it is a required key
+        // with no default.
+        config.testnetVerifier = permanentConfig.testnetVerifier;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
@@ -224,12 +255,18 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             config.eraChainId = toml.readUint("$.era_chain_id");
         }
 
+        string memory permanentValues = vm.readFile(_permanentValuesPath(newConfigPath));
+        require(
+            permanentValues.keyExists("$.testnet_verifier"),
+            "permanent-values is missing `testnet_verifier` (true for every env except mainnet)"
+        );
         PermanentCTMConfig memory permanentConfig = PermanentCTMConfig({
             ctmProxy: ctmProxy,
             bytecodesSupplier: bytecodesSupplier,
             isZKsyncOS: isZKsyncOS,
             create2FactorySalt: create2FactorySalt,
-            zkTokenAssetId: zkTokenAssetId
+            zkTokenAssetId: zkTokenAssetId,
+            testnetVerifier: permanentValues.readBool("$.testnet_verifier")
         });
         // Set config.isZKsyncOS before getChainCreationParamsConfig.
         config.isZKsyncOS = isZKsyncOS;

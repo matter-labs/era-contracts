@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {CoreUpgrade_v33} from "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
 import {CTMUpgrade_v33} from "deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
+import {stdToml} from "forge-std/StdToml.sol";
 import {ICoreUpgrade, ICTMUpgrade} from "contracts/script-interfaces/IDefaultUpgrade.sol";
 
 import {Call} from "contracts/governance/Common.sol";
@@ -28,6 +29,13 @@ contract CoreUpgradeV33Harness is CoreUpgrade_v33 {
 
     function buildInteropHandlerWiringCalls() external returns (Call[] memory) {
         return prepareVersionSpecificStage1GovernanceCallsL1();
+    }
+}
+
+/// @dev Exposes the permanent-values path derivation.
+contract CTMUpgradeV33Harness is CTMUpgrade_v33 {
+    function permanentValuesPath(string memory _upgradeInputAbsPath) external view returns (string memory) {
+        return _permanentValuesPath(_upgradeInputAbsPath);
     }
 }
 
@@ -116,6 +124,60 @@ contract V33UpgradeScriptsTest is Test {
     /// @notice Both scripts satisfy the entry-point interfaces protocol-ops encodes against.
     /// @dev Also the reason `CTMUpgrade_v33` is referenced at all in this file: it pulls the CTM
     ///      script into the compile graph.
+    /// @notice The upgrade input picks its permanent-values file by basename.
+    function test_permanentValuesPairsByBasename() public {
+        CTMUpgradeV33Harness ctm = new CTMUpgradeV33Harness();
+
+        assertEq(
+            ctm.permanentValuesPath(
+                string.concat(vm.projectRoot(), "/upgrade-envs/v0.33.0-atomic-interop/mainnet.toml")
+            ),
+            string.concat(vm.projectRoot(), "/upgrade-envs/permanent-values/mainnet.toml"),
+            "mainnet input pairs with the mainnet permanent values"
+        );
+        assertEq(
+            ctm.permanentValuesPath(
+                string.concat(vm.projectRoot(), "/upgrade-envs/v0.33.0-atomic-interop/zksync-os-integration-test.toml")
+            ),
+            string.concat(vm.projectRoot(), "/upgrade-envs/permanent-values/zksync-os-integration-test.toml"),
+            "fixture input pairs with its own permanent values"
+        );
+    }
+
+    /// @notice Every environment declares `testnet_verifier`, and only mainnet runs the real one.
+    /// @dev The flag decides whether the upgrade installs a verifier that accepts unproven batches,
+    ///      so it is a declared per-env value rather than a default. This pins both halves of the
+    ///      rule: the key is present everywhere, and mainnet alone is false.
+    function test_everyEnvDeclaresTestnetVerifierAndOnlyMainnetIsProduction() public view {
+        string[6] memory envs = [
+            "local",
+            "mainnet",
+            "stage",
+            "testnet",
+            "zksync-os-integration-test",
+            "foundry-upgrade"
+        ];
+
+        for (uint256 i = 0; i < envs.length; ++i) {
+            string memory toml = vm.readFile(
+                string.concat(vm.projectRoot(), "/upgrade-envs/permanent-values/", envs[i], ".toml")
+            );
+            assertTrue(
+                stdToml.keyExists(toml, "$.testnet_verifier"),
+                string.concat(envs[i], " permanent-values must declare testnet_verifier")
+            );
+            assertEq(
+                stdToml.readBool(toml, "$.testnet_verifier"),
+                !_isMainnet(envs[i]),
+                string.concat(envs[i], " has the wrong testnet_verifier")
+            );
+        }
+    }
+
+    function _isMainnet(string memory _env) private pure returns (bool) {
+        return keccak256(bytes(_env)) == keccak256(bytes("mainnet"));
+    }
+
     function test_implementsProtocolOpsEntryPoints() public {
         ICoreUpgrade core = ICoreUpgrade(address(coreUpgrade));
         ICTMUpgrade ctm = ICTMUpgrade(address(new CTMUpgrade_v33()));
