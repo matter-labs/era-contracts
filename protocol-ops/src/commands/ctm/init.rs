@@ -56,6 +56,9 @@ pub struct CtmInitArgs {
     /// Use testnet verifier
     #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_testnet_verifier: bool,
+    /// Require both a Boojum and an Airbender proof to settle a batch (Era only).
+    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
+    pub with_airbender_verifier: bool,
     /// Enable support for legacy bridge testing
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_legacy_bridge: bool,
@@ -119,6 +122,7 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
         vm_type: args.vm_type,
         reuse_gov_and_admin: args.reuse_gov_and_admin,
         with_testnet_verifier: args.with_testnet_verifier,
+        with_airbender_verifier: args.with_airbender_verifier,
         with_legacy_bridge: args.with_legacy_bridge,
         zk_token_asset_id,
         create2_factory_salt: args.create2_factory_salt,
@@ -158,6 +162,7 @@ pub async fn ctm_init(
         vm_type: input.vm_type,
         reuse_gov_and_admin: input.reuse_gov_and_admin,
         with_testnet_verifier: input.with_testnet_verifier,
+        with_airbender_verifier: input.with_airbender_verifier,
         with_legacy_bridge: input.with_legacy_bridge,
         zk_token_asset_id: input.zk_token_asset_id,
         create2_factory_salt: input.create2_factory_salt,
@@ -205,6 +210,7 @@ pub async fn ctm_init(
 pub struct CtmInitInput {
     pub bridgehub: Address,
     pub owner: Address,
+    pub with_airbender_verifier: bool,
     pub vm_type: VMOption,
     pub reuse_gov_and_admin: bool,
     pub with_testnet_verifier: bool,

@@ -20,6 +20,9 @@ pub struct DeployCTMConfig {
     pub contracts: ContractsDeployCTMConfig,
     pub is_zk_sync_os: bool,
     pub zk_token_asset_id: B256,
+    /// Deploy the Airbender lane and put the multi-proof gate in front of the chain's verifier, so batches
+    /// require both a Boojum and an Airbender proof. Era only.
+    pub airbender_verifier: bool,
 }
 
 impl FileConfigTrait for DeployCTMConfig {}
@@ -32,10 +35,13 @@ impl DeployCTMConfig {
         zk_token_asset_id: B256,
         support_l2_legacy_shared_bridge_test: bool,
         vm_option: VMOption,
+        airbender_verifier: bool,
     ) -> Self {
         Self {
             is_zk_sync_os: vm_option.is_zksync_os(),
             testnet_verifier,
+            // ZKsync OS has no Airbender lane; the Solidity side ignores the flag there, but do not claim it.
+            airbender_verifier: airbender_verifier && !vm_option.is_zksync_os(),
             owner_address,
             support_l2_legacy_shared_bridge_test,
             zk_token_asset_id,

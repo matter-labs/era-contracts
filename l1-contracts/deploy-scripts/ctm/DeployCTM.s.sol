@@ -214,6 +214,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         }
     }
 
+    /// @dev The production Boojum router, used as the gate's Boojum lane regardless of `testnetVerifier`.
+    function _eraDualVerifierName() private view returns (string memory name) {
+        (, name) = DeployCTML1OrGateway.resolve(false, CTMContract.DualVerifier);
+    }
+
     function deployVerifiers() internal {
         (, string memory fflonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierFflonk);
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierPlonk);
@@ -225,11 +230,16 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
 
-        // The Boojum router is deployed either way. With the Airbender lane it becomes one of the two lanes
-        // of the multi-proof gate rather than the chain's verifier.
-        ctmAddresses.stateTransition.verifiers.boojumVerifier = deploySimpleContract(boojumVerifierName, false);
-
         bool deployAirbenderLane = config.airbenderVerifier && !config.isZKsyncOS;
+
+        // The Boojum router is deployed either way. Behind the multi-proof gate it must be the production
+        // router even on testnets: the gate already provides the empty-proof skip, and a second skip inside
+        // the lane would let a non-empty envelope declare a zero-length Boojum slice and settle without a
+        // Boojum proof.
+        ctmAddresses.stateTransition.verifiers.boojumVerifier = deploySimpleContract(
+            deployAirbenderLane ? _eraDualVerifierName() : boojumVerifierName,
+            false
+        );
         if (deployAirbenderLane) {
             // Each contract must exist before the one that takes it as a constructor argument (see
             // `getCTMCoreDeploymentConfig`): generated PLONK verifier, then the wrapper that pins the guest

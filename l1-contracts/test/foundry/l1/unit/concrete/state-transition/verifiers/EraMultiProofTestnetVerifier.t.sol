@@ -98,4 +98,36 @@ contract EraMultiProofTestnetVerifierTest is Test {
         chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
         assertTrue(chain.callVerify(verifier, _publicInputs(), _proof()));
     }
+
+    /// A non-empty envelope must not be able to declare a zero-length Boojum slice and settle without a
+    /// Boojum proof. The inner router treating an empty proof as "skip" is exactly how that happened.
+    function test_rejectsEmptyBoojumSliceWhileBoojumEnabled() public {
+        EraMultiProofTestnetVerifier v = new EraMultiProofTestnetVerifier(
+            IVerifier(address(new AcceptingVerifier())),
+            IVerifier(address(new AcceptingVerifier()))
+        );
+
+        uint256[] memory proof = new uint256[](2 + AIRBENDER_SNARK_PROOF_LENGTH);
+        proof[0] = ERA_MULTI_PROOF_TYPE;
+        proof[1] = 0;
+
+        vm.expectRevert(EraMultiProofVerifier.BoojumVerificationFailed.selector);
+        chain.callVerify(v, _publicInputs(), proof);
+    }
+
+    /// The same envelope with Airbender also switched off must not settle a batch with nothing verified.
+    function test_rejectsEnvelopeThatWouldVerifyNothing() public {
+        EraMultiProofTestnetVerifier v = new EraMultiProofTestnetVerifier(
+            IVerifier(address(new AcceptingVerifier())),
+            IVerifier(address(new AcceptingVerifier()))
+        );
+        chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+
+        uint256[] memory proof = new uint256[](2 + AIRBENDER_SNARK_PROOF_LENGTH);
+        proof[0] = ERA_MULTI_PROOF_TYPE;
+        proof[1] = 0;
+
+        vm.expectRevert(EraMultiProofVerifier.BoojumVerificationFailed.selector);
+        chain.callVerify(v, _publicInputs(), proof);
+    }
 }

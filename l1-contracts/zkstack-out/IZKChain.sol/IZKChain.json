@@ -244,6 +244,19 @@
   },
   {
     "type": "function",
+    "name": "disabledProofSystems",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "executeBatchesSharedBridge",
     "inputs": [
       {
@@ -1945,6 +1958,19 @@
   },
   {
     "type": "function",
+    "name": "setDisabledProofSystems",
+    "inputs": [
+      {
+        "name": "_disabledProofSystems",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setPendingAdmin",
     "inputs": [
       {
@@ -2483,6 +2509,25 @@
         "type": "uint128",
         "indexed": false,
         "internalType": "uint128"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewDisabledProofSystems",
+    "inputs": [
+      {
+        "name": "oldDisabledProofSystems",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      },
+      {
+        "name": "newDisabledProofSystems",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
       }
     ],
     "anonymous": false
