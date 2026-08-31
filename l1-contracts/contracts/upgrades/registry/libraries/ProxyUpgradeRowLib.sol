@@ -9,12 +9,10 @@ import {CodehashPinLib} from "./CodehashPinLib.sol";
 import {
     CTM_DOMAIN_PROXY_COUNT,
     CTMDomainProxy,
-    CTMProxyUpgrades,
     ECOSYSTEM_PROXY_COUNT,
-    EcosystemProxy,
-    EcosystemProxyUpgrades,
-    ProxyUpgradeRow
-} from "../RegistryTypes.sol";
+    EcosystemProxy
+} from "./ContractIdentifiers.sol";
+import {CTMProxyUpgrades, EcosystemProxyUpgrades, ProxyUpgradeRow} from "../RegistryTypes.sol";
 import {ProxyUpgradeRowMismatch, RegistryDuplicateProxyRow, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs

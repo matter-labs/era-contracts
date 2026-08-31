@@ -74,3 +74,35 @@ enum ZKsyncOSUpgradeType {
     SystemProxy,
     Unsafe
 }
+
+/// @notice Canonical member list of the `EcosystemProxyUpgrades` named inventory
+///         (`RegistryTypes.sol`), one member per field. Exists so nothing is hand-counted: the
+///         slot counts derive from `type(...).max`, and the `ProxyUpgradeRowLib.toRows`
+///         flatteners index their slot arrays by these members (member order = flatten and
+///         application order). Deliberately NOT `CTMContract` / `L2EcosystemContract`: those
+///         are append-only rosters of everything deployable — facets, verifiers, non-proxies —
+///         while this is exactly the upgradeable-TUPP inventory, and it MUST mirror the struct
+///         field for field.
+enum EcosystemProxy {
+    Bridgehub,
+    ChainAssetHandler,
+    MessageRoot,
+    L1Nullifier,
+    L1AssetRouter,
+    L1NativeTokenVault,
+    L1InteropHandler,
+    CTMDeploymentTracker,
+    ChainRegistrationSender
+}
+
+/// @notice Canonical member list of the `CTMProxyUpgrades` named inventory — see
+///         {EcosystemProxy}.
+enum CTMDomainProxy {
+    ChainTypeManager,
+    ValidatorTimelock,
+    BytecodesSupplier,
+    PermissionlessValidator
+}
+
+uint256 constant ECOSYSTEM_PROXY_COUNT = uint256(type(EcosystemProxy).max) + 1;
+uint256 constant CTM_DOMAIN_PROXY_COUNT = uint256(type(CTMDomainProxy).max) + 1;

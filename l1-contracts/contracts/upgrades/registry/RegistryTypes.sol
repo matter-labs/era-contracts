@@ -118,36 +118,6 @@ struct ProxyUpgradeRow {
     bytes initCalldata;
 }
 
-/// @notice Canonical member list of {EcosystemProxyUpgrades}, one member per field. Exists so
-///         nothing is hand-counted: the slot counts derive from `type(...).max`, and the
-///         `ProxyUpgradeRowLib.toRows` flatteners index their slot arrays by these members
-///         (member order = flatten and application order). Deliberately NOT one of the
-///         deploy-tooling identifier enums (`CTMContract`, `L2EcosystemContract`): those are
-///         append-only rosters of everything deployable — facets, verifiers, non-proxies —
-///         while this is exactly the upgradeable-TUPP inventory.
-enum EcosystemProxy {
-    Bridgehub,
-    ChainAssetHandler,
-    MessageRoot,
-    L1Nullifier,
-    L1AssetRouter,
-    L1NativeTokenVault,
-    L1InteropHandler,
-    CTMDeploymentTracker,
-    ChainRegistrationSender
-}
-
-/// @notice Canonical member list of {CTMProxyUpgrades} — see {EcosystemProxy}.
-enum CTMDomainProxy {
-    ChainTypeManager,
-    ValidatorTimelock,
-    BytecodesSupplier,
-    PermissionlessValidator
-}
-
-uint256 constant ECOSYSTEM_PROXY_COUNT = uint256(type(EcosystemProxy).max) + 1;
-uint256 constant CTM_DOMAIN_PROXY_COUNT = uint256(type(CTMDomainProxy).max) + 1;
-
 /// @notice The COMPLETE, CLOSED inventory of ecosystem (shared-singleton) proxies, one NAMED
 ///         field per contract — the reviewer of an upgrade manifest sees every upgradeable
 ///         ecosystem contract by name, including the ones this upgrade does NOT touch (their
