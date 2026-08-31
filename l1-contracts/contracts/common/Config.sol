@@ -289,13 +289,7 @@ uint256 constant PACKED_NUMBER_OF_L1_TRANSACTIONS_LOG_MASK = 0xfffffffffffffffff
 /// @dev Bit offset for extracting the upper 128 bits (L2 tx count) from the packed log value.
 uint256 constant PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS = 128;
 
-/// @dev The maximal execution delay that can be configured in the `ValidatorTimelock`, i.e. the maximal
-/// amount of time that has to pass between a batch being committed and it becoming executable.
-/// @dev IMPORTANT: this cap is footgun prevention only, it is NOT a trust guarantee and must not be
-/// relied upon as one:
-/// - governance is able to upgrade the `ValidatorTimelock` and is therefore not bound by this constant;
-/// - unless a chain runs in stage 1 (which Era chains do not support), its admin can simply revoke the
-///   validator roles and stall execution indefinitely, no matter what delay is configured.
-/// What the cap does buy us is that a delay set through the regular flow cannot be accidentally set to
-/// an absurd value, which would otherwise be irreversible for the chain admin.
+/// @dev The maximal execution delay configurable in the `ValidatorTimelock`.
+/// @dev Footgun prevention only, not a trust guarantee: governance can upgrade the timelock, and outside
+/// stage 1 a chain admin can revoke the validator roles and stall execution anyway.
 uint32 constant MAX_VALIDATOR_TIMELOCK_EXECUTION_DELAY = 7 days;

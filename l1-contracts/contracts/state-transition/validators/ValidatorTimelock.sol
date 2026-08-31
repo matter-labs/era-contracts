@@ -28,12 +28,8 @@ import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
 /// @dev The contract overloads all of the 5 methods, that are used in state transition. When the batch is committed,
 /// the timestamp is stored for it. Later, when the owner calls the batch execution, the contract checks that batch
 /// was committed not earlier than X time ago.
-/// @dev The delay is configured on two levels. `executionDelay` is set by the owner of this contract and applies to
-/// the whole ecosystem, while `chainExecutionDelay` lets an individual chain opt into a longer delay than the
-/// ecosystem-wide one. The delay that is actually enforced is the maximum of the two, see `getExecutionDelay`.
-/// A chain admin may only ever raise its chain's delay: bringing it back down requires the owner of this contract,
-/// so that a chain cannot cheaply revoke the additional protection it has advertised to its users. Neither of the
-/// two values may exceed `MAX_EXECUTION_DELAY`.
+/// @dev The enforced delay is `max(executionDelay, chainExecutionDelay[chain])`, see `getExecutionDelay`.
+/// A chain admin can only raise its own delay; only the owner can lower it again.
 /// @dev Expected to be deployed as a TransparentUpgradeableProxy.
 contract ValidatorTimelock is
     IValidatorTimelock,
@@ -91,12 +87,10 @@ contract ValidatorTimelock is
     /// @dev The mapping of ZK chain address => batch number => timestamp when it was committed.
     mapping(address chainAddress => LibMap.Uint32Map batchNumberToTimestampMapping) internal committedBatchTimestamp;
 
-    /// @dev The backing storage of `executionDelay`. It is not public so that inheriting contracts
-    /// are able to override the getter, see `EraMultisigValidator`.
+    /// @dev Backing storage of `executionDelay`. Not public so that heirs can override the getter.
     uint32 internal _executionDelay;
 
-    /// @dev The backing storage of `chainExecutionDelay`. It is not public so that inheriting contracts
-    /// are able to override the getter, see `EraMultisigValidator`.
+    /// @dev Backing storage of `chainExecutionDelay`. Not public so that heirs can override the getter.
     mapping(address chainAddress => uint32 delay) internal _chainExecutionDelay;
 
     /// @dev Reserved storage space to allow for layout changes in future upgrades.
@@ -143,9 +137,7 @@ contract ValidatorTimelock is
     ) external virtual onlyRole(_chainAddress, DEFAULT_ADMIN_ROLE) {
         _checkExecutionDelayWithinBounds(_newExecutionDelay);
 
-        // Note, that the comparison is done against the currently enforced delay rather than against the
-        // stored chain-specific one. This way the chain admin can never lower the delay that the chain's
-        // users observe, not even down to the ecosystem-wide default.
+        // Compared against the enforced delay, not the stored one, so the admin can never lower it.
         uint32 currentDelay = getExecutionDelay(_chainAddress);
         if (_newExecutionDelay <= currentDelay) {
             revert ExecutionDelayNotIncreased(currentDelay, _newExecutionDelay);
@@ -169,7 +161,7 @@ contract ValidatorTimelock is
         return chainDelay > ecosystemDelay ? chainDelay : ecosystemDelay;
     }
 
-    /// @dev Reverts if `_executionDelay` exceeds the maximal allowed execution delay.
+    /// @dev Reverts if the delay exceeds `MAX_EXECUTION_DELAY`.
     function _checkExecutionDelayWithinBounds(uint32 _executionDelay) internal pure {
         if (_executionDelay > MAX_EXECUTION_DELAY) {
             revert ExecutionDelayTooLarge(_executionDelay, MAX_EXECUTION_DELAY);

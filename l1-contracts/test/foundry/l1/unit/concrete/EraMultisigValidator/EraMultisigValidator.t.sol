@@ -696,10 +696,7 @@ contract EraMultisigValidatorTest is Test {
                     EXECUTION DELAY READ-THROUGH
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev `EraMultisigValidator` does not enforce the timelock itself, so all of its execution delay
-    /// getters must report the values of the downstream `ValidatorTimelock` that does enforce it.
-    /// The downstream timelock here is a real contract (not a mock), so these tests exercise the
-    /// actual read-through path.
+    /// @dev The downstream timelock is a real contract here, so the read-through path is really exercised.
 
     function test_executionDelay_readsThroughToValidatorTimelock() public {
         vm.prank(owner);
@@ -719,8 +716,7 @@ contract EraMultisigValidatorTest is Test {
         assertEq(eraMultisig.chainExecutionDelay(makeAddr("otherChain")), 0);
     }
 
-    /// @dev The read-through must preserve the `max(ecosystem, chain)` semantics of the downstream
-    /// timelock rather than recomputing them from this contract's own storage.
+    /// @dev The read-through must preserve the downstream `max(ecosystem, chain)` semantics.
     function test_getExecutionDelay_readsThroughToValidatorTimelock() public {
         vm.startPrank(owner);
         validatorTimelock.setExecutionDelay(1 hours);
@@ -735,9 +731,7 @@ contract EraMultisigValidatorTest is Test {
         assertEq(eraMultisig.getExecutionDelay(chainAddress), 5 hours);
     }
 
-    /// @dev The delay setters are disabled here: the getters read through to the downstream
-    /// `ValidatorTimelock`, so writing a delay on this contract could never affect the enforced value.
-    /// Reverting is what keeps a caller from getting a successful transaction that changes nothing.
+    /// @dev The setters are disabled so a caller cannot get a successful tx that changes nothing.
     function test_RevertWhen_setExecutionDelay() public {
         vm.expectRevert(ExecutionDelayNotConfigurable.selector);
         vm.prank(owner);
@@ -745,7 +739,7 @@ contract EraMultisigValidatorTest is Test {
     }
 
     function test_RevertWhen_increaseChainExecutionDelay() public {
-        // `owner` is the chain admin here, i.e. the party that *would* be authorised to raise the delay.
+        // `owner` is the chain admin, i.e. the party that would otherwise be authorised.
         vm.expectRevert(ExecutionDelayNotConfigurable.selector);
         vm.prank(owner);
         eraMultisig.increaseChainExecutionDelay(chainAddress, 1 hours);
@@ -757,15 +751,14 @@ contract EraMultisigValidatorTest is Test {
         eraMultisig.setChainExecutionDelay(chainAddress, 1 hours);
     }
 
-    /// @dev The reverts must not depend on the caller: an unauthorised caller gets the same error rather
-    /// than an access-control one, since the function is unavailable on this contract entirely.
+    /// @dev The revert is caller-independent: no access-control error, the function is just unavailable.
     function test_RevertWhen_setExecutionDelayNonOwner() public {
         vm.expectRevert(ExecutionDelayNotConfigurable.selector);
         vm.prank(nonMember);
         eraMultisig.setExecutionDelay(1 hours);
     }
 
-    /// @dev Configuring the delay on the downstream timelock still works and is reflected here.
+    /// @dev Configuring the downstream timelock still works and is reflected here.
     function test_setExecutionDelayOnDownstreamTimelockIsReflected() public {
         vm.prank(owner);
         validatorTimelock.setExecutionDelay(90 minutes);

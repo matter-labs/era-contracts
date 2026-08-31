@@ -26,12 +26,8 @@ import {IEraMultisigValidator} from "./interfaces/IEraMultisigValidator.sol";
 /// calls are forwarded directly, while execute calls require that enough multisig members have
 /// pre-approved the exact execution parameters via `approveHash`.
 /// @dev Expected to be deployed as a TransparentUpgradeableProxy.
-/// @dev This contract itself does NOT enforce the timelock in any way, it just forwards the calls to the underlying
-/// `ValidatorTimelock` after checking for multisig approvals. Since the server reads the execution delay off whichever
-/// validator it talks to, all the execution delay getters are overridden to read through to the downstream
-/// `ValidatorTimelock`, which is the contract that actually enforces the delay. The matching setters are disabled
-/// here for the same reason: the delay must be configured on the contract that enforces it, otherwise a caller
-/// would get a successful transaction that changes nothing.
+/// @dev This contract does NOT enforce the timelock, it only forwards calls to the underlying `ValidatorTimelock`
+/// after checking multisig approvals. The delay getters therefore read through to it and the setters revert.
 contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP712Upgradeable {
     /// @dev EIP-712 typehash for the ExecuteBatches struct.
     bytes32 internal constant EXECUTE_BATCHES_TYPEHASH =
@@ -179,8 +175,7 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
     }
 
     /// @inheritdoc IValidatorTimelock
-    /// @dev Read through to the downstream `ValidatorTimelock`: it is the contract that enforces the
-    /// delay, so its value is the only one that matters. The delay stored in this contract is unused.
+    /// @dev Reads the downstream `ValidatorTimelock`, which enforces the delay. Local storage is unused.
     function executionDelay() public view override(ValidatorTimelock, IValidatorTimelock) returns (uint32) {
         return IValidatorTimelock(validatorTimelock).executionDelay();
     }
@@ -201,15 +196,12 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
         return IValidatorTimelock(validatorTimelock).getExecutionDelay(_chainAddress);
     }
 
-    /// @dev Disable the inherited `setExecutionDelay`. Since the getters read through to the downstream
-    /// `ValidatorTimelock`, writing the delay here would silently have no effect on the enforced delay.
-    /// The ecosystem-wide delay must be set on the downstream `ValidatorTimelock` instead.
+    /// @dev Disabled: writing here would not affect the enforced delay. Set it on the downstream timelock.
     function setExecutionDelay(uint32) external pure override(ValidatorTimelock, IValidatorTimelock) {
         revert ExecutionDelayNotConfigurable();
     }
 
-    /// @dev Disable the inherited `increaseChainExecutionDelay`, see `setExecutionDelay`.
-    /// A chain admin must raise the delay on the downstream `ValidatorTimelock` instead.
+    /// @dev Disabled, see `setExecutionDelay`.
     function increaseChainExecutionDelay(
         address,
         uint32
@@ -217,7 +209,7 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
         revert ExecutionDelayNotConfigurable();
     }
 
-    /// @dev Disable the inherited `setChainExecutionDelay`, see `setExecutionDelay`.
+    /// @dev Disabled, see `setExecutionDelay`.
     function setChainExecutionDelay(address, uint32) external pure override(ValidatorTimelock, IValidatorTimelock) {
         revert ExecutionDelayNotConfigurable();
     }

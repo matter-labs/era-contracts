@@ -125,7 +125,7 @@ contract ValidatorTimelockTest is Test {
         assertEq(validator.executionDelay(), executionDelay);
     }
 
-    /// @dev Commits a single batch `_batchNumber` at the current block timestamp through the timelock.
+    /// @dev Commits a single batch at the current block timestamp.
     function _commitSingleBatch(uint64 _batchNumber) internal {
         vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(chainId));
 
@@ -141,7 +141,7 @@ contract ValidatorTimelockTest is Test {
         validator.commitBatchesSharedBridge(zkSync, batchFrom, batchTo, commitData);
     }
 
-    /// @dev Encodes the `executeBatchesSharedBridge` arguments for a single batch `_batchNumber`.
+    /// @dev Encodes `executeBatchesSharedBridge` arguments for a single batch.
     function _encodeExecuteSingleBatch(
         uint64 _batchNumber
     ) internal returns (uint256 batchFrom, uint256 batchTo, bytes memory executeData) {
@@ -622,9 +622,8 @@ contract ValidatorTimelockTest is Test {
                         PER-CHAIN EXECUTION DELAY
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Re-points the mocked `getAdmin` of the ZK chain so that the chain admin is a different
-    /// address than the owner of the `ValidatorTimelock`. This is required to tell the two apart:
-    /// in `setUp` both roles are held by `owner`.
+    /// @dev Re-points the mocked `getAdmin` so the chain admin differs from the owner; in `setUp` both
+    /// roles are held by `owner`.
     function _setChainAdmin(address _newAdmin) internal {
         vm.mockCall(zkSync, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(_newAdmin));
     }
@@ -662,7 +661,7 @@ contract ValidatorTimelockTest is Test {
         assertEq(validator.getExecutionDelay(zkSync), 200);
     }
 
-    /// @dev The cap is an inclusive bound, so a chain may raise its delay exactly up to it.
+    /// @dev The cap is inclusive.
     function test_increaseChainExecutionDelay_upToMax() public {
         uint32 maxDelay = validator.MAX_EXECUTION_DELAY();
         assertEq(maxDelay, 7 days);
@@ -674,8 +673,7 @@ contract ValidatorTimelockTest is Test {
         assertEq(validator.getExecutionDelay(zkSync), maxDelay);
     }
 
-    /// @dev The ecosystem-wide delay is a lower bound: raising it above a chain's own value takes
-    /// precedence, while lowering it again leaves the chain's own choice in effect.
+    /// @dev Raising the ecosystem delay above the chain's value wins; lowering it restores the chain's.
     function test_getExecutionDelay_ecosystemDelayIsAFloor() public {
         _setChainAdmin(bob);
         vm.prank(bob);
@@ -697,8 +695,7 @@ contract ValidatorTimelockTest is Test {
         validator.increaseChainExecutionDelay(zkSync, 1000);
         assertEq(validator.getExecutionDelay(zkSync), 1000);
 
-        // The owner of the timelock is not the chain admin at this point, yet it is the only
-        // party able to bring the chain-specific delay back down.
+        // The owner is not the chain admin here, yet is the only party able to lower the delay.
         vm.expectEmit(true, true, true, true, address(validator));
         emit IValidatorTimelock.NewChainExecutionDelay(zkSync, 0);
         vm.prank(owner);
@@ -762,8 +759,7 @@ contract ValidatorTimelockTest is Test {
         validator.increaseChainExecutionDelay(zkSync, maxDelay + 1);
     }
 
-    /// @dev A chain that has not set its own delay yet must still clear the ecosystem-wide one,
-    /// otherwise the call would be a no-op.
+    /// @dev A chain with no delay of its own must still clear the ecosystem one, else it is a no-op.
     function test_RevertWhen_increaseChainExecutionDelayEqualToEcosystemDelay() public {
         _setChainAdmin(bob);
 
@@ -827,8 +823,7 @@ contract ValidatorTimelockTest is Test {
     function test_RevertWhen_initialExecutionDelayAboveMax() public {
         uint32 maxDelay = validator.MAX_EXECUTION_DELAY();
 
-        // The proxy admin and the implementation are deployed upfront so that `expectRevert`
-        // applies to the proxy deployment, i.e. to the initializer call itself.
+        // Deployed upfront so `expectRevert` applies to the proxy deployment, i.e. the initializer.
         ProxyAdmin admin = new ProxyAdmin();
         ValidatorTimelock timelockImplementation = new ValidatorTimelock(address(dummyBridgehub));
 
