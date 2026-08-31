@@ -97,7 +97,7 @@ import {
   installLegacyFacet,
 } from "./bootstrap-upgrade-stage";
 import type { ChainRole } from "../core/types";
-import { clearGenesisUpgradeTxHash, selectUpgradeChains, traceFailedTx } from "./v31-upgrade-test-runner";
+import { clearGenesisUpgradeTxHash, selectUpgradeChains, traceFailedTx } from "./upgrade-test-utils";
 
 // ── Constants ────────────────────────────────────────────────────────
 

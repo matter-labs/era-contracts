@@ -108,9 +108,9 @@ library BridgedOutPopulationLib {
 
     /// @notice All asset IDs known to the NTV that are native to L1.
     /// @dev The vault's `bridgedTokens` enumeration is the only on-chain list of its assets. Legacy tokens
-    ///      that predate the enumeration must be backfilled into it (see
-    ///      `TokenMigrationUtils.registerBridgedTokensInNTV`) before this runs, otherwise their amounts stay
-    ///      unpopulated and their withdrawals keep reverting.
+    ///      that predate the enumeration must have been backfilled into it (the v31 upgrade's
+    ///      bridged-token registration did this), otherwise their amounts stay unpopulated and
+    ///      their withdrawals keep reverting.
     function _l1NativeAssetIds(IL1NativeTokenVault _ntv) private view returns (bytes32[] memory assetIds) {
         uint256 tokenCount = _ntv.bridgedTokensCount();
         bytes32[] memory buffer = new bytes32[](tokenCount);

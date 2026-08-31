@@ -98,8 +98,7 @@ struct GeneratedData {
 }
 
 abstract contract DeployCTMUtils is DeployUtils {
-    /// @dev Deployed together with the v32 upgrade contract (see `CTMUpgrade_v31`), which embeds
-    /// it as an immutable.
+    /// @dev Deployed together with the v32 upgrade contract, which embeds it as an immutable.
     address internal priorityOpLowerBound;
 
     using stdToml for string;

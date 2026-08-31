@@ -12,9 +12,6 @@ import {Test} from "forge-std/Test.sol";
 import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
 import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
-import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
-import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
-import {ChainUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol";
 import {IOwnableSingleStep, IChainAdminMulticall} from "../../../../deploy-scripts/AdminFunctions.s.sol";
 import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 import {UpgradeUtils} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeUtils.sol";
@@ -27,7 +24,7 @@ import {LogFinder} from "./utils/LogFinder.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-contract UpgradeIntegrationTestBase is Test {
+abstract contract UpgradeIntegrationTestBase is Test {
     using stdToml for string;
     using LogFinder for Vm.Log[];
 
@@ -60,7 +57,7 @@ contract UpgradeIntegrationTestBase is Test {
     bool internal _ctmAdminCallsPrepared;
 
     function setupUpgrade(bool skipFactoryDepsCheck) public virtual {
-        console.log("setupUpgrade: Creating CoreUpgrade_v31 and CTMUpgrade_v31");
+        console.log("setupUpgrade: Creating the version-specific core + CTM upgrade scripts");
         coreUpgrade = createCoreUpgrade();
         ctmUpgrade = createCTMUpgrade();
 
@@ -116,20 +113,14 @@ contract UpgradeIntegrationTestBase is Test {
         console.log("setupUpgrade: Complete");
     }
 
-    /// @notice Override in child classes to use mocked / version-specific upgrades.
-    function createCoreUpgrade() internal virtual returns (DefaultCoreUpgrade) {
-        return new CoreUpgrade_v31();
-    }
+    /// @notice The version-specific (possibly mocked) core upgrade script under test.
+    function createCoreUpgrade() internal virtual returns (DefaultCoreUpgrade);
 
-    /// @notice Override in child classes to use mocked / version-specific upgrades.
-    function createCTMUpgrade() internal virtual returns (DefaultCTMUpgrade) {
-        return new CTMUpgrade_v31();
-    }
+    /// @notice The version-specific (possibly mocked) CTM upgrade script under test.
+    function createCTMUpgrade() internal virtual returns (DefaultCTMUpgrade);
 
-    /// @notice Override in child classes to use the version-specific chain upgrade.
-    function createChainUpgrade() internal virtual returns (DefaultChainUpgrade) {
-        return new ChainUpgrade_v31();
-    }
+    /// @notice The version-specific chain upgrade script under test.
+    function createChainUpgrade() internal virtual returns (DefaultChainUpgrade);
 
     /// @notice Hook for test-specific setup before chain upgrade.
     function beforeChainUpgrade() internal virtual {}

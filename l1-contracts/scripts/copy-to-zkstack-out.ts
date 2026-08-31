@@ -37,7 +37,6 @@ const REQUIRED_CONTRACTS = [
   "IFinalizeChainInit.sol",
   "IUpgradeV31.sol",
   "IFinalizeUpgrade.sol",
-  "CoreUpgrade_v31.s.sol",
   "IL1NativeTokenVault.sol",
   "IL2NativeTokenVault.sol",
   "IL1AssetRouter.sol",

@@ -95,63 +95,6 @@ jobs:
         run: |
           bash cleanup.sh
 
-  # V31 → V32 upgrade test: loads v31 chain states, runs this release's ecosystem upgrade,
-  # executes governance calls, and verifies protocol version is updated. Replaces the former
-  # v29 → v31 and v30 → v31 jobs: this release initializes the contracts introduced in v31 on
-  # the genesis path only, and its address discovery expects the v31 ABI, so a pre-v31
-  # ecosystem can no longer be upgraded straight onto it.
-  v31-to-v32-upgrade-test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - name: Install Foundry (for Anvil)
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: v1.5.1
-
-      - name: Install foundry-zksync (for forge --zksync)
-        uses: ./.github/actions/install-zksync-foundry
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn
-
-      - name: Build da-contracts artifacts
-        run: yarn da build:foundry
-
-      - name: Build system-contracts artifacts
-        run: yarn sc build:foundry
-
-      - name: Build l1-contracts artifacts
-        run: yarn l1 build:foundry
-
-      - name: Install anvil-interop dependencies
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn install
-
-      - name: Run V31 to V32 upgrade test
-        working-directory: l1-contracts/test/anvil-interop
-        run: |
-          echo "Running V31 -> V32 upgrade test..."
-          yarn ts-node run-v31-to-v32-upgrade-test.ts
-
-      - name: Cleanup
-        if: always()
-        working-directory: l1-contracts/test/anvil-interop
-        run: |
-          bash cleanup.sh
-
   registry-driven-upgrade-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30

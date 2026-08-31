@@ -31,8 +31,8 @@ struct CoreUpgradeParams {
     string outputPath;
 }
 
-/// @notice Parameters for the standalone CTM upgrade entry point.
-///         Used by `CTMUpgrade_v31.noGovernancePrepare` when running per-CTM in a multi-CTM
+/// @notice Parameters for the standalone CTM upgrade entry point
+///         (`DefaultCTMUpgrade.noGovernancePrepare`) when running per-CTM in a multi-CTM
 ///         ecosystem (e.g. ZKsyncOS + EraVM on stage).
 // solhint-disable-next-line gas-struct-packing
 struct CTMUpgradeParams {
