@@ -292,6 +292,8 @@ error MustBeEraChain();
 error NewDeadlineExceedsMaxDeadline();
 // 0x6eef58d1
 error NewDeadlineNotGreaterThanCurrent();
+// 0xe9e6b749
+error NoActiveRegistryUpgrade();
 // 0x79cc2d22
 error NoCallsProvided();
 // 0x88dfa474
@@ -406,6 +408,8 @@ error RegistryDuplicateSelector(bytes4 selector);
 error RegistryEmptySelectors(address facet);
 // 0xb130ce79
 error RegistryHashChangeToZero();
+// 0xd79000b2
+error RegistryInventoryLengthMismatch(uint256 expected, uint256 actual);
 // 0x30f6031b
 error RegistryMissingBaseSystemHash();
 // 0xa0c88a92

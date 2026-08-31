@@ -7,6 +7,7 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {ICTMTransition} from "./ICTMTransition.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
+import {CTM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 import {TransitionDeltaLib} from "../libraries/TransitionDeltaLib.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
@@ -65,7 +66,7 @@ contract CTMTransition is ICTMTransition {
         // CTM-domain implementation swaps ride on the transition (see {TransitionManifest});
         // an all-inert inventory is the common case — most upgrades change chain state, not the
         // CTM itself.
-        ProxyUpgradeRowLib.validateRows(ProxyUpgradeRowLib.toRows(_manifest.proxyUpgrades));
+        ProxyUpgradeRowLib.validateRows(ProxyUpgradeRowLib.toRows(_manifest.proxyUpgrades, CTM_CONTRACT_COUNT));
         // A transition only ever moves the version forward — the same rule chains enforce at
         // execution and the CTM enforces in `setNewVersionUpgrade`.
         if (_manifest.newProtocolVersion <= _manifest.oldProtocolVersion) {
@@ -209,7 +210,7 @@ contract CTMTransition is ICTMTransition {
     }
 
     function ctmProxyRows() external view returns (ProxyUpgradeRow[] memory) {
-        return ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades);
+        return ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, CTM_CONTRACT_COUNT);
     }
 
     function validate() external view {
@@ -217,7 +218,7 @@ contract CTMTransition is ICTMTransition {
         ICTMRelease(m.newRelease).validate();
         ICTMRelease(m.fromRelease).validate();
         _requirePin(m.upgradeEngine);
-        ProxyUpgradeRowLib.requireRowPins(ProxyUpgradeRowLib.toRows(m.proxyUpgrades));
+        ProxyUpgradeRowLib.requireRowPins(ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT));
     }
 
     function verifyAll() external view returns (bool) {
@@ -227,7 +228,15 @@ contract CTMTransition is ICTMTransition {
         }
         return
             CodehashPinLib.pinHolds(m.upgradeEngine) &&
-            ProxyUpgradeRowLib.rowPinsHold(ProxyUpgradeRowLib.toRows(m.proxyUpgrades));
+            ProxyUpgradeRowLib.rowPinsHold(ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT));
+    }
+
+    function upgradeInitData(address _proxy) external view returns (bytes memory) {
+        return
+            ProxyUpgradeRowLib.initDataFor(
+                ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, CTM_CONTRACT_COUNT),
+                _proxy
+            );
     }
 
     function _requirePin(PinnedContract memory _pinned) private view {

@@ -5,8 +5,9 @@ pragma solidity 0.8.28;
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {ICoreRegistry} from "../objects/ICoreRegistry.sol";
+import {IUpgradeInitDataProvider} from "../IUpgradeInit.sol";
 import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
-import {EmptyBytes32, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {EmptyBytes32, NoActiveRegistryUpgrade, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 
@@ -24,8 +25,13 @@ import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 ///      CTM-scoped is expressible here: the CTM's own implementation (and its per-CTM proxies)
 ///      upgrade through the transition's `ctmProxyRows`, under `CTMUpgradeExecutor`'s authority —
 ///      there may be several CTMs, each on its own cadence.
-contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
+contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IUpgradeInitDataProvider {
     using CodehashPinLib for address;
+
+    /// @dev Nonzero only WHILE `applyL1Upgrade` applies its rows: the pinned registry whose
+    ///      `initData` {upgradeInitData} serves to a reinitializing implementation. See
+    ///      {IUpgradeInit.sol} for the msg.sender-based resolution path.
+    ICoreRegistry private activeRegistry;
 
     /// @notice The one ecosystem `ProxyAdmin` this executor governs. Registries carry no proxy
     ///         admin pointer; the binding is this immutable.
@@ -65,6 +71,17 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
         _coreRegistry.validate();
 
         // One call returns complete typed rows; no per-key rescans of the registry.
+        activeRegistry = _coreRegistry;
         ProxyUpgradeRowLib.applyRows(PROXY_ADMIN, _coreRegistry.ecosystemRows());
+        delete activeRegistry;
+    }
+
+    /// @inheritdoc IUpgradeInitDataProvider
+    function upgradeInitData(address _proxy) external view returns (bytes memory) {
+        ICoreRegistry registry = activeRegistry;
+        if (address(registry) == address(0)) {
+            revert NoActiveRegistryUpgrade();
+        }
+        return registry.upgradeInitData(_proxy);
     }
 }

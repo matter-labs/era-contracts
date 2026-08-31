@@ -6,6 +6,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
+import {CTM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {CTMUpgradeExecutor} from "../executors/CTMUpgradeExecutor.sol";
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
@@ -63,7 +64,7 @@ contract RegistryBootstrapMigration {
         }
         // An edge with no implementation swaps is not a bootstrap; it would silently reduce to
         // "install anchors and hand over authority", which is a different (unreviewed) operation.
-        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_manifest.proxyUpgrades);
+        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_manifest.proxyUpgrades, CTM_CONTRACT_COUNT);
         if (rows.length == 0) {
             revert RegistryUnknownKey();
         }
@@ -129,7 +130,7 @@ contract RegistryBootstrapMigration {
 
         // Every implementation swap is source-checked: replaying a stale migration, or running it
         // against an ecosystem someone already moved, cannot silently re-point a proxy.
-        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(m.proxyUpgrades);
+        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT);
         uint256 rowsLength = rows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {
             ProxyUpgradeRow memory row = rows[i];
@@ -146,6 +147,18 @@ contract RegistryBootstrapMigration {
         // and the release it vouches for cannot be mismatched at the moment of installation.
         ICTMRelease(m.currentRelease.addr).validate();
         CodehashPinLib.requirePin(m.currentRelease);
+    }
+
+    /// @notice The pinned `initData` of the row upgrading `_proxy` — the bootstrap holds the
+    ///         CTM-domain ProxyAdmin during `migrate()`, so a freshly-upgraded implementation's
+    ///         `initializeUpgrade()` resolves its data provider to this object (see
+    ///         {IUpgradeInit.sol}). Reverts when no row upgrades `_proxy`.
+    function upgradeInitData(address _proxy) external view returns (bytes memory) {
+        return
+            ProxyUpgradeRowLib.initDataFor(
+                ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, CTM_CONTRACT_COUNT),
+                _proxy
+            );
     }
 
     /// @notice Performs the whole edge, then hands authority to the bound executors.
@@ -170,7 +183,7 @@ contract RegistryBootstrapMigration {
         }
         validate();
 
-        ProxyUpgradeRowLib.applyRows(m.ctmProxyAdmin, ProxyUpgradeRowLib.toRows(m.proxyUpgrades));
+        ProxyUpgradeRowLib.applyRows(m.ctmProxyAdmin, ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT));
 
         IChainTypeManager ctm = IChainTypeManager(m.ctm);
         // The cut-taking form, not `setNewVersionUpgradeFromTransition`: there is no transition for

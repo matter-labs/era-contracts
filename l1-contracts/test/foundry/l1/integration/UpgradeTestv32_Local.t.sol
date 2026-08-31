@@ -55,7 +55,7 @@ contract CTMUpgrade_v32_Test is CTMUpgrade_v32 {
         // The same wrapped payload the legacy cut carried: `SettlementLayerV32Upgrade` requires
         // the `forceDeployAndUpgradeUniversal(…, genesisUpgrade(...))` shape to rewrite the
         // per-chain placeholders, so the plan mirrors `getV32L2UpgradeCalldata`.
-        ProxyUpgradeRow[CTM_CONTRACT_COUNT] memory noProxyUpgrades;
+        ProxyUpgradeRow[] memory noProxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         CTMTransition transition = new CTMTransition(
             TransitionManifest({
                 oldProtocolVersion: getOldProtocolVersion(),

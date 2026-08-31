@@ -158,7 +158,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         uint256[] memory factoryDeps = new uint256[](1);
         factoryDeps[0] = 1;
 
-        ProxyUpgradeRow[CTM_CONTRACT_COUNT] memory noProxyUpgrades;
+        ProxyUpgradeRow[] memory noProxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         result = new CTMTransition(
             TransitionManifest({
                 oldProtocolVersion: _oldProtocolVersion,

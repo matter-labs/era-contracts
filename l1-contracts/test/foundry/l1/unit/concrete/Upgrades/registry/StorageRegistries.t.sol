@@ -34,6 +34,7 @@ import {
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
     RegistryHashChangeToZero,
+    RegistryInventoryLengthMismatch,
     RegistryPinTargetHasNoCode,
     RegistryUnknownKey,
     SameReleaseTransitionHasPayload,
@@ -57,7 +58,6 @@ import {
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 import {
     CTM_CONTRACT_COUNT,
-    CTMContract,
     L1_ECOSYSTEM_CONTRACT_COUNT,
     L1EcosystemContract
 } from "../../../../../../../contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
@@ -122,11 +122,12 @@ contract StorageRegistriesTest is Test {
     function _coreManifest() internal view returns (CoreRegistryManifest memory manifest) {
         // One participating slot in the enum-indexed inventory — every other slot's zero
         // `implNew` is the explicit "not upgraded" statement and produces no row.
+        manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = ProxyUpgradeRow({
             proxy: address(0xB001),
             expectedOldImpl: address(0xB101),
             implNew: PinnedContract({addr: coreImplNew, codehash: coreImplNew.codehash}),
-            initCalldata: ""
+            initData: ""
         });
     }
 
@@ -202,7 +203,7 @@ contract StorageRegistriesTest is Test {
 
     function _transitionManifest() internal view returns (TransitionManifest memory manifest) {
         // All CTM-domain inventory slots inert: this hop changes chain state, not the CTM itself.
-        ProxyUpgradeRow[CTM_CONTRACT_COUNT] memory noProxyUpgrades;
+        ProxyUpgradeRow[] memory noProxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         return
             TransitionManifest({
                 oldProtocolVersion: OLD_VERSION,
@@ -659,12 +660,33 @@ contract StorageRegistriesTest is Test {
 
     // ─────────────────────────── core registry inventory ───────────────────────────
 
-    /// @dev The counts size the manifests' fixed-length inventory arrays and cannot be written
-    ///      as `type(...).max + 1` (solc does not fold that in array-length position) — this is
-    ///      the guard that keeps them tied to the enums.
-    function test_inventoryCountsMatchTheEnums() public pure {
-        assertEq(L1_ECOSYSTEM_CONTRACT_COUNT, uint256(type(L1EcosystemContract).max) + 1);
-        assertEq(CTM_CONTRACT_COUNT, uint256(type(CTMContract).max) + 1);
+    function test_revertWhen_inventoryLengthDoesNotMatchTheEnum() public {
+        // The dynamic inventory must be COMPLETE: exactly one slot per enum member, so a
+        // manifest can neither omit a slot nor smuggle an extra one.
+        CoreRegistryManifest memory manifest = _coreManifest();
+        ProxyUpgradeRow[] memory tooShort = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT - 1);
+        tooShort[uint256(L1EcosystemContract.L1Bridgehub)] = manifest.proxyUpgrades[
+            uint256(L1EcosystemContract.L1Bridgehub)
+        ];
+        manifest.proxyUpgrades = tooShort;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryInventoryLengthMismatch.selector,
+                L1_ECOSYSTEM_CONTRACT_COUNT,
+                L1_ECOSYSTEM_CONTRACT_COUNT - 1
+            )
+        );
+        new CoreRegistry(manifest);
+    }
+
+    function test_upgradeInitDataIsServedByProxyAddress() public {
+        // The pinned row's data (empty here) is retrievable for the proxy it upgrades; a proxy
+        // with no row in the inventory reverts instead of returning silence.
+        assertEq(coreRegistry.upgradeInitData(address(0xB001)), bytes(""));
+
+        vm.expectRevert(RegistryUnknownKey.selector);
+        coreRegistry.upgradeInitData(address(0xBEEF));
     }
 
     function test_revertWhen_upgradingRowMissingSource() public {

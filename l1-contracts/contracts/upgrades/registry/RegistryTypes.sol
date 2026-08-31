@@ -81,7 +81,8 @@ struct L2UpgradePlan {
 ///        `upgradeFromTransition` — the registry-model name for what deploy tooling calls the
 ///        per-version "default upgrade" contract (`DefaultUpgrade` and its versioned subclasses).
 /// @param proxyUpgrades The CTM-DOMAIN inventory, indexed by {CTMContract} (same slot semantics
-///        as {CoreRegistryManifest}): implementation swaps for the CTM proxy itself and the
+///        and construction-time length check — `CTM_CONTRACT_COUNT` — as
+///        {CoreRegistryManifest}): implementation swaps for the CTM proxy itself and the
 ///        per-CTM proxies under its own ProxyAdmin. Applied by the CTM-bound executor BEFORE
 ///        the version commit, so a transition whose commit needs the new CTM implementation
 ///        carries that swap itself. Ecosystem singletons (bridges, Bridgehub, MessageRoot) are
@@ -95,7 +96,7 @@ struct TransitionManifest {
     address fromRelease;
     address newRelease;
     PinnedContract upgradeEngine;
-    ProxyUpgradeRow[CTM_CONTRACT_COUNT] proxyUpgrades;
+    ProxyUpgradeRow[] proxyUpgrades;
     uint256 oldProtocolVersionDeadline;
     uint256 upgradeTimestamp;
     L2UpgradePlan l2Plan;
@@ -108,15 +109,20 @@ struct TransitionManifest {
 ///        this row cannot silently downgrade it — the source no longer matches.
 /// @param implNew The pinned implementation the proxy points at afterwards. A ZERO address marks
 ///        an inventory slot as EXPLICITLY not upgraded; such a slot never becomes a row.
-/// @param initCalldata Optional PINNED reinitializer: empty executes a plain `ProxyAdmin.upgrade`;
-///        nonempty executes `upgradeAndCall` with exactly these bytes (e.g. a `reinitializeV2()`
-///        storage migration). The calldata is arbitrary by type but not by review: it is fixed in
-///        the manifest and committed by the manifest hash like every other pinned value.
+/// @param initData Optional PINNED reinitialization DATA — never calldata. Empty executes a
+///        plain `ProxyAdmin.upgrade`; nonempty executes `upgradeAndCall` with the FIXED,
+///        argument-less `IProxyUpgradeInitializable.initializeUpgrade()` selector, and the new
+///        implementation fetches these bytes back from the registry object through
+///        `IUpgradeInitDataProvider` (see {IUpgradeInit.sol}) and decodes them itself. A
+///        manifest can therefore never route the init call to an arbitrary function with
+///        arbitrary arguments: the selector is part of the audited machinery, the decoding
+///        lives in the audited implementation, and the data is committed by the manifest hash
+///        like every other pinned value.
 struct ProxyUpgradeRow {
     address proxy;
     address expectedOldImpl;
     PinnedContract implNew;
-    bytes initCalldata;
+    bytes initData;
 }
 
 /// @notice Everything a core registry instance pins, set exactly once at construction.
@@ -124,10 +130,11 @@ struct ProxyUpgradeRow {
 ///      and NO proxy admin (the `EcosystemUpgradeExecutor` is bound to its immutable
 ///      `ProxyAdmin`). A core registry pins ONLY the ecosystem inventory.
 /// @param proxyUpgrades The COMPLETE ecosystem inventory, indexed by {L1EcosystemContract}:
-///        slot `uint256(member)` is that contract's row, a zero `implNew` is the explicit
-///        "not upgraded" statement, and the fixed length means a manifest cannot omit a slot.
+///        slot `uint256(member)` is that contract's row and a zero `implNew` is the explicit
+///        "not upgraded" statement. The length MUST be exactly `L1_ECOSYSTEM_CONTRACT_COUNT`
+///        (enforced at construction), so a manifest cannot omit a slot.
 struct CoreRegistryManifest {
-    ProxyUpgradeRow[L1_ECOSYSTEM_CONTRACT_COUNT] proxyUpgrades;
+    ProxyUpgradeRow[] proxyUpgrades;
 }
 
 /// @param ctm The ChainTypeManager proxy this migration bootstraps.
@@ -157,7 +164,7 @@ struct BootstrapManifest {
     address ctm;
     uint256 expectedProtocolVersion;
     ProxyAdmin ctmProxyAdmin;
-    ProxyUpgradeRow[CTM_CONTRACT_COUNT] proxyUpgrades;
+    ProxyUpgradeRow[] proxyUpgrades;
     PinnedContract currentRelease;
     uint256 newProtocolVersion;
     uint256 oldProtocolVersionDeadline;

@@ -6,9 +6,15 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {CodehashPinLib} from "./CodehashPinLib.sol";
-import {CTM_CONTRACT_COUNT, L1_ECOSYSTEM_CONTRACT_COUNT} from "./ContractIdentifiers.sol";
+import {IProxyUpgradeInitializable} from "../IUpgradeInit.sol";
 import {ProxyUpgradeRow} from "../RegistryTypes.sol";
-import {ProxyUpgradeRowMismatch, RegistryDuplicateProxyRow, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {
+    ProxyUpgradeRowMismatch,
+    RegistryDuplicateProxyRow,
+    RegistryInventoryLengthMismatch,
+    RegistryUnknownKey,
+    ZeroAddress
+} from "../../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -18,38 +24,44 @@ import {ProxyUpgradeRowMismatch, RegistryDuplicateProxyRow, ZeroAddress} from ".
 ///         (idempotence); a proxy at `expectedOldImpl` is upgraded; a proxy at anything else
 ///         reverts, so replaying a stale object can never downgrade a proxy that a later upgrade
 ///         has already moved on.
-/// @dev Manifests carry rows as FIXED-LENGTH inventories indexed by the canonical contract
-///      enums (`L1EcosystemContract` for the ecosystem domain, `CTMContract` for the CTM
-///      domain — one enum per domain for deployment and upgrades alike); the `toRows`
-///      flatteners are the single point where those become the row arrays everything below
-///      consumes, dropping the slots explicitly marked "not upgraded" (zero `implNew.addr`).
-///      Appliers therefore never see the inventory shape and survive it growing.
+/// @dev Manifests carry rows as COMPLETE inventories indexed by the canonical contract enums
+///      (`L1EcosystemContract` for the ecosystem domain, `CTMContract` for the CTM domain — one
+///      enum per domain for deployment and upgrades alike), with the array length checked
+///      against the enum's member count. `toRows` is the single point where those become the
+///      row arrays everything below consumes, dropping the slots explicitly marked "not
+///      upgraded" (zero `implNew.addr`). Appliers therefore never see the inventory shape and
+///      survive it growing.
 library ProxyUpgradeRowLib {
     /// @notice Emitted (from the applying contract) for every proxy pointed at its new
     ///         implementation. The proxy ADDRESS is the row identity (human labels live in the
     ///         off-chain manifest).
     event ProxyImplementationUpgraded(address indexed proxy, address newImpl);
 
-    /// @notice Flattens the ecosystem inventory (indexed by `L1EcosystemContract`) into rows.
+    /// @notice Flattens an enum-indexed inventory into rows. The inventory is COMPLETE by
+    ///         construction: its length must be exactly the domain enum's member count
+    ///         (`L1_ECOSYSTEM_CONTRACT_COUNT` / `CTM_CONTRACT_COUNT` — the caller passes its
+    ///         domain's), so a manifest can neither omit a slot nor smuggle an extra one.
     function toRows(
-        ProxyUpgradeRow[L1_ECOSYSTEM_CONTRACT_COUNT] memory _slots
+        ProxyUpgradeRow[] memory _slots,
+        uint256 _inventoryLength
     ) internal pure returns (ProxyUpgradeRow[] memory) {
-        ProxyUpgradeRow[] memory slots = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
-        for (uint256 i = 0; i < L1_ECOSYSTEM_CONTRACT_COUNT; ++i) {
-            slots[i] = _slots[i];
+        if (_slots.length != _inventoryLength) {
+            revert RegistryInventoryLengthMismatch(_inventoryLength, _slots.length);
         }
-        return _dropInertSlots(slots);
+        return _dropInertSlots(_slots);
     }
 
-    /// @notice Flattens the CTM-domain inventory (indexed by `CTMContract`) into rows.
-    function toRows(
-        ProxyUpgradeRow[CTM_CONTRACT_COUNT] memory _slots
-    ) internal pure returns (ProxyUpgradeRow[] memory) {
-        ProxyUpgradeRow[] memory slots = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
-        for (uint256 i = 0; i < CTM_CONTRACT_COUNT; ++i) {
-            slots[i] = _slots[i];
+    /// @notice The pinned `initData` of the row upgrading `_proxy` — what
+    ///         `IUpgradeInitDataProvider.upgradeInitData` serves to a freshly-upgraded
+    ///         implementation's `initializeUpgrade()`.
+    function initDataFor(ProxyUpgradeRow[] memory _rows, address _proxy) internal pure returns (bytes memory) {
+        uint256 length = _rows.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (_rows[i].proxy == _proxy) {
+                return _rows[i].initData;
+            }
         }
-        return _dropInertSlots(slots);
+        revert RegistryUnknownKey();
     }
 
     /// @notice Shape discipline shared by every row-carrying manifest: every row is a REAL,
@@ -105,10 +117,13 @@ library ProxyUpgradeRowLib {
             if (liveImpl != _rows[i].expectedOldImpl) {
                 revert ProxyUpgradeRowMismatch(_rows[i].proxy, _rows[i].expectedOldImpl, liveImpl);
             }
-            if (_rows[i].initCalldata.length == 0) {
+            if (_rows[i].initData.length == 0) {
                 _admin.upgrade(proxy, newImpl);
             } else {
-                _admin.upgradeAndCall(proxy, newImpl, _rows[i].initCalldata);
+                // The reinitializer is NEVER the row's bytes: the call is the fixed,
+                // argument-less selector, and the implementation reads the pinned `initData`
+                // back through `IUpgradeInitDataProvider` — see {IUpgradeInit.sol}.
+                _admin.upgradeAndCall(proxy, newImpl, abi.encodeCall(IProxyUpgradeInitializable.initializeUpgrade, ()));
             }
             emit ProxyImplementationUpgraded(address(proxy), newImpl);
         }

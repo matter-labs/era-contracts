@@ -256,7 +256,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             l2Plan.delegateCalldata = hex"beef";
         }
 
-        ProxyUpgradeRow[CTM_CONTRACT_COUNT] memory noProxyUpgrades;
+        ProxyUpgradeRow[] memory noProxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         transition = new CTMTransition(
             TransitionManifest({
                 oldProtocolVersion: _oldVersion,

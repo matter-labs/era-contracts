@@ -41,32 +41,46 @@ All are storage-backed, built once from a manifest they take in the constructor,
 
 ### Enum-indexed proxy inventories
 
-Proxy upgrades are not carried as anonymous dynamic arrays. Each manifest carries a
-**fixed-length row array indexed by the canonical contract enum** — the SAME enum that
-identifies the contract for deployment, one enum per domain (`ContractIdentifiers.sol`):
+Proxy upgrades are not carried as anonymous row lists. Each manifest carries a **complete row
+array indexed by the canonical contract enum** — the SAME enum that identifies the contract for
+deployment, one enum per domain (`ContractIdentifiers.sol`) — whose length must be exactly the
+enum's member count (`L1_ECOSYSTEM_CONTRACT_COUNT` / `CTM_CONTRACT_COUNT`, both DERIVED as
+`type(...).max + 1`; the arrays are dynamic with a construction-time length check because solc
+cannot fold `type(...).max` in static array-length position):
 
-- `CoreRegistryManifest.proxyUpgrades` is `ProxyUpgradeRow[L1_ECOSYSTEM_CONTRACT_COUNT]`,
-  indexed by `L1EcosystemContract` (L1Bridgehub, L1ChainAssetHandler, L1MessageRoot,
-  L1Nullifier, L1AssetRouter, L1NativeTokenVault, L1InteropHandler, CTMDeploymentTracker,
-  ChainRegistrationSender).
-- `TransitionManifest.proxyUpgrades` and `BootstrapManifest.proxyUpgrades` are
-  `ProxyUpgradeRow[CTM_CONTRACT_COUNT]`, indexed by `CTMContract`. Only the members that are
-  TUPPs under the CTM-domain ProxyAdmin (ChainTypeManager, ValidatorTimelock,
-  BytecodesSupplier, PermissionlessValidator) can meaningfully participate — a row in a facet
-  or verifier slot can never apply, because the bound admin does not administer it.
+- `CoreRegistryManifest.proxyUpgrades` is indexed by `L1EcosystemContract` (L1Bridgehub,
+  L1ChainAssetHandler, L1MessageRoot, L1Nullifier, L1AssetRouter, L1NativeTokenVault,
+  L1InteropHandler, CTMDeploymentTracker, ChainRegistrationSender).
+- `TransitionManifest.proxyUpgrades` and `BootstrapManifest.proxyUpgrades` are indexed by
+  `CTMContract`. Only the members that are TUPPs under the CTM-domain ProxyAdmin
+  (ChainTypeManager, ValidatorTimelock, BytecodesSupplier, PermissionlessValidator) can
+  meaningfully participate — a row in a facet or verifier slot can never apply, because the
+  bound admin does not administer it.
 
 Slot `uint256(member)` IS that contract's row; a slot whose `implNew` is zero is the **explicit
 "not upgraded" statement**. The point is audit legibility plus structural completeness: the
-fixed length means a manifest literally cannot omit a slot, and the enum — being the same one
-deployment uses — is the single naming scheme end to end. (The `ServerNotifier` has no slot: it
-sits under its own chainAdmin-owned ProxyAdmin for operational upgrades outside this flow. The
-count constants are literals because solc cannot fold `type(...).max` in array-length position;
-a unit test pins them to the enums.)
+length check means a manifest cannot omit a slot, and the enum — being the same one deployment
+uses — is the single naming scheme end to end. (The `ServerNotifier` has no slot: it sits under
+its own chainAdmin-owned ProxyAdmin for operational upgrades outside this flow.)
 
-The fixed-array shape exists only at the manifest boundary — the audited constructor calldata.
+The inventory shape exists only at the manifest boundary — the audited constructor calldata.
 `ProxyUpgradeRowLib.toRows` flattens it into the `ProxyUpgradeRow[]` that `ecosystemRows()` /
 `ctmProxyRows()` return and the executors apply, dropping the inert slots, so the eternal
 executors never recompile when the inventory grows.
+
+### Reinitializers: a fixed call, pinned data
+
+A row never carries calldata. Its `initData` field is pinned DATA, and when it is nonempty the
+apply performs `upgradeAndCall` with the FIXED, argument-less
+`IProxyUpgradeInitializable.initializeUpgrade()` selector. The new implementation fetches its
+parameters itself: inside the call, `msg.sender` is the ProxyAdmin, whose `owner()` is the
+executor (or the bootstrap migration), which serves
+`IUpgradeInitDataProvider.upgradeInitData(address(this))` from the registry object it is
+CURRENTLY applying — the executors hold that pointer only for the duration of the row
+application, so outside a genuine registry-driven apply the provider reverts
+(`NoActiveRegistryUpgrade`). A manifest therefore cannot route the init call to an arbitrary
+function with arbitrary arguments: the selector is part of the audited machinery, the decoding
+lives in the audited implementation, and the data is committed by the manifest hash.
 
 Supporting libraries:
 
@@ -406,18 +420,18 @@ manifest data stays in storage rather than immutables — see [Provenance and pi
 
 ## Planned: follow-up calls live in the upgrade impl (v35)
 
-Today a row's `initCalldata` is offchain-authored bytes, and follow-up calls after an
-implementation swap (`setAddresses`-style wiring) are not expressible at all. That is the shape
-of the v31 incident — a new implementation whose initializer was forgotten, invisible to anyone
-auditing contracts rather than calldata blobs.
+Per-proxy reinitializers are already code, not calldata (see "Reinitializers: a fixed call,
+pinned data" above): the selector is fixed, and the parameters are pinned data the audited
+implementation fetches and decodes itself. What remains inexpressible is CROSS-CONTRACT
+follow-up wiring after a swap (`setAddresses`-style calls between contracts) — the other half
+of the v31 incident shape.
 
-The planned v35 model moves this into audited code: a **default upgrade impl** that performs the
-enumerated proxy swaps and calls no initializers, which a release with follow-up work
-**inherits** — the subclass overrides a hook and makes the `setAddresses` / `reinitializeV2()`
-calls as typed Solidity (`abi.encodeCall`), pinned by codehash in the manifest like every other
-object. Auditors then review the upgrade as a contract, not as bytes; a forgotten initializer is
-a missing line in an audited diff. Until then, `initCalldata` remains the reviewed-and-pinned
-escape hatch. Tracked in Linear (v35 project).
+The planned v35 model moves that into audited code too: a **default upgrade impl** that
+performs the enumerated proxy swaps and nothing else, which a release with follow-up work
+**inherits** — the subclass overrides a hook and makes the wiring calls as typed Solidity
+(`abi.encodeCall`), pinned by codehash in the manifest like every other object. Auditors then
+review the whole upgrade as a contract; a forgotten call is a missing line in an audited diff.
+Tracked in Linear (v35 project).
 
 ## Related
 

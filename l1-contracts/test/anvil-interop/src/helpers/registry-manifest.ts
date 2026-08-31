@@ -73,7 +73,7 @@ function zeroProxyUpgradeRow(): any {
     proxy: ethers.constants.AddressZero,
     expectedOldImpl: ethers.constants.AddressZero,
     implNew: { addr: ethers.constants.AddressZero, codehash: ethers.constants.HashZero },
-    initCalldata: "0x",
+    initData: "0x",
   };
 }
 
@@ -111,7 +111,7 @@ export function coreInitArgs(manifest: any): any {
           addr: e.implNew ?? ethers.constants.AddressZero,
           codehash: e.implNewCodehash ?? ethers.constants.HashZero,
         },
-        initCalldata: e.initCalldata ?? "0x",
+        initData: e.initData ?? "0x",
       },
     ])
   );

@@ -106,10 +106,9 @@ enum L1EcosystemContract {
     ChainRegistrationSender
 }
 
-/// @dev MUST equal `uint256(type(L1EcosystemContract).max) + 1` / the `CTMContract`
-///      equivalent. They cannot be WRITTEN that way: solc's constant evaluator does not fold
-///      `type(...).max` in array-length position, and these size the manifests' fixed-length
-///      inventory arrays. `StorageRegistries.t.sol` asserts both equalities, so a member
-///      appended without its count bump fails the suite immediately.
-uint256 constant L1_ECOSYSTEM_CONTRACT_COUNT = 9;
-uint256 constant CTM_CONTRACT_COUNT = 20;
+/// @dev The inventory lengths, DERIVED from the enums — never hand-counted. Manifest inventory
+///      arrays are dynamic (`ProxyUpgradeRow[]`) with their length checked against these at
+///      construction: solc cannot fold `type(...).max` in static array-length position, so a
+///      fixed-size array type would force these back to literals.
+uint256 constant L1_ECOSYSTEM_CONTRACT_COUNT = uint256(type(L1EcosystemContract).max) + 1;
+uint256 constant CTM_CONTRACT_COUNT = uint256(type(CTMContract).max) + 1;

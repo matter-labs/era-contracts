@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {ICoreRegistry} from "./ICoreRegistry.sol";
+import {L1_ECOSYSTEM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {RegistryUnknownKey} from "../../../common/L1ContractErrors.sol";
 import {CoreRegistryManifest, ProxyUpgradeRow} from "../RegistryTypes.sol";
@@ -32,12 +33,13 @@ contract CoreRegistry is ICoreRegistry {
     /// @notice Pins the full manifest. This contract has NO state-mutating function at all — the
     ///         manifest is written once, at construction, so write-once is structural rather than
     ///         a runtime guard, and `manifestHash` can never describe a stale object.
-    /// @param _manifest The manifest to pin. Its inventory is the complete fixed-length slot
-    ///        array indexed by `L1EcosystemContract` — every ecosystem contract has a slot, and
-    ///        a zero `implNew` is the explicit "not upgraded" statement, so the audited calldata
-    ///        shows what the upgrade leaves alone as clearly as what it changes.
+    /// @param _manifest The manifest to pin. Its inventory is the COMPLETE slot array indexed
+    ///        by `L1EcosystemContract` (length checked against the enum's member count in
+    ///        `toRows`) — every ecosystem contract has a slot, and a zero `implNew` is the
+    ///        explicit "not upgraded" statement, so the audited calldata shows what the upgrade
+    ///        leaves alone as clearly as what it changes.
     constructor(CoreRegistryManifest memory _manifest) {
-        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_manifest.proxyUpgrades);
+        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_manifest.proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT);
         // Sentinel against pinning an empty manifest: a registry that upgrades nothing is not a
         // registry, it is a mistake.
         if (rows.length == 0) {
@@ -65,16 +67,25 @@ contract CoreRegistry is ICoreRegistry {
 
     /// @inheritdoc ICoreRegistry
     function ecosystemRows() external view returns (ProxyUpgradeRow[] memory) {
-        return ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades);
+        return ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT);
     }
 
     /// @inheritdoc ICoreRegistry
     function verifyAll() external view returns (bool) {
-        return ProxyUpgradeRowLib.rowPinsHold(ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades));
+        return ProxyUpgradeRowLib.rowPinsHold(ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT));
     }
 
     /// @inheritdoc ICoreRegistry
     function validate() external view {
-        ProxyUpgradeRowLib.requireRowPins(ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades));
+        ProxyUpgradeRowLib.requireRowPins(ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT));
+    }
+
+    /// @inheritdoc ICoreRegistry
+    function upgradeInitData(address _proxy) external view returns (bytes memory) {
+        return
+            ProxyUpgradeRowLib.initDataFor(
+                ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT),
+                _proxy
+            );
     }
 }

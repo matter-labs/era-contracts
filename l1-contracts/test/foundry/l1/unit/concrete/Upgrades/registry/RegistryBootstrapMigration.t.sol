@@ -13,6 +13,7 @@ import {
 } from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {MockProxyUpgradeInitImpl} from "contracts/dev-contracts/test/MockProxyUpgradeInitImpl.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
@@ -146,12 +147,12 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     function _manifest() internal view returns (BootstrapManifest memory) {
         // The one participating slot in the enum-indexed CTM-domain inventory: the CTM's own
         // implementation swap. The remaining slots stay inert (explicitly not upgraded).
-        ProxyUpgradeRow[CTM_CONTRACT_COUNT] memory upgrades;
+        ProxyUpgradeRow[] memory upgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         upgrades[uint256(CTMContract.ChainTypeManager)] = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
             implNew: PinnedContract({addr: implV32, codehash: implV32.codehash}),
-            initCalldata: ""
+            initData: ""
         });
         Diamond.FacetCut[] memory noFacetCuts = new Diamond.FacetCut[](0);
         return
@@ -333,6 +334,38 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     /// @dev Two rows for one proxy would BOTH pass the source check (they compare against the same
     ///      pre-migration implementation) and the last would silently win — so the reviewed edge
     ///      and the executed edge would differ. Same rule {CoreRegistry} enforces.
+    function test_migrate_runsFixedInitializeUpgradeWithManifestData() public {
+        // A second participating slot whose new implementation must reinitialize: its
+        // parameters ride the row as pinned DATA, the apply invokes the fixed argument-less
+        // selector, and the implementation fetches the data from the migration itself (it holds
+        // the CTM-domain ProxyAdmin during `migrate()`).
+        MockProxyUpgradeInitImpl initImpl = new MockProxyUpgradeInitImpl();
+        TransparentUpgradeableProxy vtProxy = new TransparentUpgradeableProxy(
+            implV31,
+            address(ecosystemProxyAdmin),
+            hex""
+        );
+        BootstrapManifest memory manifest = _manifest();
+        manifest.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
+            proxy: address(vtProxy),
+            expectedOldImpl: implV31,
+            implNew: PinnedContract({addr: address(initImpl), codehash: address(initImpl).codehash}),
+            initData: abi.encode(uint256(31337))
+        });
+        RegistryBootstrapMigration withInit = new RegistryBootstrapMigration(manifest);
+        vm.prank(governor);
+        chainContractAddress.transferOwnership(address(withInit));
+        ecosystemProxyAdmin.transferOwnership(address(withInit));
+
+        withInit.migrate();
+
+        assertEq(
+            MockProxyUpgradeInitImpl(address(vtProxy)).initializedValue(),
+            31337,
+            "pinned initData must reach the reinitializer through the migration"
+        );
+    }
+
     function test_revertWhen_manifestCarriesDuplicateProxyRows() public {
         BootstrapManifest memory manifest = _manifest();
         // A second slot pointing at the same proxy, with a different target.
@@ -340,7 +373,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
             implNew: PinnedContract({addr: implV31, codehash: implV31.codehash}),
-            initCalldata: ""
+            initData: ""
         });
 
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateProxyRow.selector, address(ecosystemProxy)));

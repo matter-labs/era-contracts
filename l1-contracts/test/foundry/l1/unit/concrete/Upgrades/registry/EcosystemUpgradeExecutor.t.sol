@@ -9,13 +9,19 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
 import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
-import {ProxyUpgradeRowMismatch, RegistryCodehashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {MockProxyUpgradeInitImpl} from "contracts/dev-contracts/test/MockProxyUpgradeInitImpl.sol";
+import {
+    NoActiveRegistryUpgrade,
+    ProxyUpgradeRowMismatch,
+    RegistryCodehashMismatch
+} from "contracts/common/L1ContractErrors.sol";
 import {
     CoreRegistryManifest,
     ProxyUpgradeRow,
     PinnedContract
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 import {
+    L1_ECOSYSTEM_CONTRACT_COUNT,
     L1EcosystemContract
 } from "../../../../../../../contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
@@ -100,7 +106,7 @@ contract EcosystemUpgradeExecutorTest is Test {
                 proxy: _proxy,
                 expectedOldImpl: _expectedOldImpl,
                 implNew: PinnedContract({addr: _implNew, codehash: _implNew.codehash}),
-                initCalldata: ""
+                initData: ""
             });
     }
 
@@ -109,6 +115,7 @@ contract EcosystemUpgradeExecutorTest is Test {
     ///      slots (the slot is a label — the row's own proxy address is its identity).
     function _deployRegistry(ProxyUpgradeRow[] memory _rows) internal returns (ICoreRegistry) {
         CoreRegistryManifest memory manifest;
+        manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         if (_rows.length > 0) {
             manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = _rows[0];
         }
@@ -149,6 +156,45 @@ contract EcosystemUpgradeExecutorTest is Test {
             address(implNew),
             "implementation must stay at the pinned value after a replay"
         );
+    }
+
+    function test_applyL1Upgrade_runsFixedInitializeUpgradeWithRegistryData() public {
+        // Bridgehub moves to an implementation that must reinitialize. Its parameters ride the
+        // row as pinned DATA — the executor invokes the fixed, argument-less selector and the
+        // implementation fetches the data back through the provider chain (msg.sender =
+        // ProxyAdmin -> owner = executor -> active registry).
+        MockProxyUpgradeInitImpl initImpl = new MockProxyUpgradeInitImpl();
+        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](1);
+        rows[0] = ProxyUpgradeRow({
+            proxy: address(bridgehubProxy),
+            expectedOldImpl: address(implOld),
+            implNew: PinnedContract({addr: address(initImpl), codehash: address(initImpl).codehash}),
+            initData: abi.encode(uint256(777))
+        });
+        // Same audited bytecode as the fixture registry (no immutables), so the executor's
+        // codehash pin covers this instance too.
+        ICoreRegistry initRegistry = _deployRegistry(rows);
+
+        vm.prank(ecosystemGovernor);
+        ecosystemExecutor.applyL1Upgrade(initRegistry);
+
+        assertEq(
+            address(uint160(uint256(vm.load(address(bridgehubProxy), EIP1967_IMPL_SLOT)))),
+            address(initImpl),
+            "implementation must be swapped"
+        );
+        assertEq(
+            MockProxyUpgradeInitImpl(address(bridgehubProxy)).initializedValue(),
+            777,
+            "pinned initData must reach the reinitializer through the provider chain"
+        );
+    }
+
+    function test_revertWhen_upgradeInitDataQueriedOutsideAnApplication() public {
+        // The provider is live only WHILE rows are being applied: outside an application there
+        // is no active registry and the fixed reinitializer cannot source data.
+        vm.expectRevert(NoActiveRegistryUpgrade.selector);
+        ecosystemExecutor.upgradeInitData(address(bridgehubProxy));
     }
 
     function test_revertWhen_executorCalledByNonEcosystemGovernance() public {
