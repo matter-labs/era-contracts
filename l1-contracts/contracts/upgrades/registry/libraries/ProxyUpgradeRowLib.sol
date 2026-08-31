@@ -8,8 +8,10 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {CodehashPinLib} from "./CodehashPinLib.sol";
 import {
     CTM_DOMAIN_PROXY_COUNT,
+    CTMDomainProxy,
     CTMProxyUpgrades,
     ECOSYSTEM_PROXY_COUNT,
+    EcosystemProxy,
     EcosystemProxyUpgrades,
     ProxyUpgradeRow
 } from "../RegistryTypes.sol";
@@ -34,28 +36,28 @@ library ProxyUpgradeRowLib {
     ///         off-chain manifest).
     event ProxyImplementationUpgraded(address indexed proxy, address newImpl);
 
-    /// @notice Flattens the named ecosystem inventory into rows, in field-declaration order.
+    /// @notice Flattens the named ecosystem inventory into rows, in {EcosystemProxy} order.
     function toRows(EcosystemProxyUpgrades memory _upgrades) internal pure returns (ProxyUpgradeRow[] memory) {
         ProxyUpgradeRow[] memory slots = new ProxyUpgradeRow[](ECOSYSTEM_PROXY_COUNT);
-        slots[0] = _upgrades.bridgehub;
-        slots[1] = _upgrades.chainAssetHandler;
-        slots[2] = _upgrades.messageRoot;
-        slots[3] = _upgrades.l1Nullifier;
-        slots[4] = _upgrades.l1AssetRouter;
-        slots[5] = _upgrades.l1NativeTokenVault;
-        slots[6] = _upgrades.l1InteropHandler;
-        slots[7] = _upgrades.ctmDeploymentTracker;
-        slots[8] = _upgrades.chainRegistrationSender;
+        slots[uint256(EcosystemProxy.Bridgehub)] = _upgrades.bridgehub;
+        slots[uint256(EcosystemProxy.ChainAssetHandler)] = _upgrades.chainAssetHandler;
+        slots[uint256(EcosystemProxy.MessageRoot)] = _upgrades.messageRoot;
+        slots[uint256(EcosystemProxy.L1Nullifier)] = _upgrades.l1Nullifier;
+        slots[uint256(EcosystemProxy.L1AssetRouter)] = _upgrades.l1AssetRouter;
+        slots[uint256(EcosystemProxy.L1NativeTokenVault)] = _upgrades.l1NativeTokenVault;
+        slots[uint256(EcosystemProxy.L1InteropHandler)] = _upgrades.l1InteropHandler;
+        slots[uint256(EcosystemProxy.CTMDeploymentTracker)] = _upgrades.ctmDeploymentTracker;
+        slots[uint256(EcosystemProxy.ChainRegistrationSender)] = _upgrades.chainRegistrationSender;
         return _dropInertSlots(slots);
     }
 
-    /// @notice Flattens the named CTM-domain inventory into rows, in field-declaration order.
+    /// @notice Flattens the named CTM-domain inventory into rows, in {CTMDomainProxy} order.
     function toRows(CTMProxyUpgrades memory _upgrades) internal pure returns (ProxyUpgradeRow[] memory) {
         ProxyUpgradeRow[] memory slots = new ProxyUpgradeRow[](CTM_DOMAIN_PROXY_COUNT);
-        slots[0] = _upgrades.chainTypeManager;
-        slots[1] = _upgrades.validatorTimelock;
-        slots[2] = _upgrades.bytecodesSupplier;
-        slots[3] = _upgrades.permissionlessValidator;
+        slots[uint256(CTMDomainProxy.ChainTypeManager)] = _upgrades.chainTypeManager;
+        slots[uint256(CTMDomainProxy.ValidatorTimelock)] = _upgrades.validatorTimelock;
+        slots[uint256(CTMDomainProxy.BytecodesSupplier)] = _upgrades.bytecodesSupplier;
+        slots[uint256(CTMDomainProxy.PermissionlessValidator)] = _upgrades.permissionlessValidator;
         return _dropInertSlots(slots);
     }
 
