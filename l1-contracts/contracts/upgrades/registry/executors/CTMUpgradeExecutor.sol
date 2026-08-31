@@ -6,12 +6,10 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {ICTMTransition} from "../objects/ICTMTransition.sol";
-import {IActiveRegistryProvider} from "../IUpgradeInit.sol";
 import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {
     EmptyBytes32,
-    NoActiveRegistryUpgrade,
     TransitionNotCommitted,
     TransitionReleaseMismatch,
     UpgradeNotPermissionlessYet,
@@ -32,13 +30,8 @@ import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 /// @dev Fixed logic, no generic delegatecall. The break-glass `forward` (base) is gated by a
 ///      SEPARATE governor. The transition each entrypoint takes is a *pinned implementation
 ///      address* — the exact generated contract governance approved — never a proxy.
-contract CTMUpgradeExecutor is UpgradeExecutorBase, IActiveRegistryProvider {
+contract CTMUpgradeExecutor is UpgradeExecutorBase {
     using CodehashPinLib for address;
-
-    /// @dev Nonzero only WHILE `applyCTMUpgrade` applies its rows: the pinned object a
-    ///      reinitializing implementation may read. See {IUpgradeInit.sol} for the
-    ///      msg.sender-based resolution path.
-    ICTMTransition private activeTransition;
 
     /// @notice The one ChainTypeManager this executor governs. Transitions carry no CTM pointer;
     ///         the binding is this immutable, so a transition cannot be aimed at a foreign CTM.
@@ -122,9 +115,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, IActiveRegistryProvider {
         // CTM-domain implementation swaps FIRST — the commit below may need setters that only
         // exist on the implementation this very transition installs (the bootstrap's
         // "ordering is load-bearing" rule, made permanent).
-        activeTransition = _transition;
         ProxyUpgradeRowLib.applyRows(CTM_PROXY_ADMIN, _transition.ctmProxyRows());
-        delete activeTransition;
 
         // One argument, not four plus a cut: the CTM reads the version edge, the schedule and the
         // cut from the same pinned object, so they cannot be passed inconsistently.
@@ -171,12 +162,4 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, IActiveRegistryProvider {
         emit ChainUpgradeApplied(_chainId, _transition.newProtocolVersion());
     }
 
-    /// @inheritdoc IActiveRegistryProvider
-    function activeRegistry() external view returns (address) {
-        address transition = address(activeTransition);
-        if (transition == address(0)) {
-            revert NoActiveRegistryUpgrade();
-        }
-        return transition;
-    }
 }

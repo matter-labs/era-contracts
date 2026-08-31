@@ -10,11 +10,7 @@ import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/Ec
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
 import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
 import {MockProxyUpgradeInitImpl} from "contracts/dev-contracts/test/MockProxyUpgradeInitImpl.sol";
-import {
-    NoActiveRegistryUpgrade,
-    ProxyUpgradeRowMismatch,
-    RegistryCodehashMismatch
-} from "contracts/common/L1ContractErrors.sol";
+import {ProxyUpgradeRowMismatch, RegistryCodehashMismatch} from "contracts/common/L1ContractErrors.sol";
 import {
     CoreRegistryManifest,
     ProxyUpgradeRow,
@@ -158,12 +154,11 @@ contract EcosystemUpgradeExecutorTest is Test {
         );
     }
 
-    function test_applyL1Upgrade_runsFixedInitializeUpgradeAgainstTheActiveRegistry() public {
+    function test_applyL1Upgrade_runsFixedInitializeUpgradeExactlyOnce() public {
         // Bridgehub moves to an implementation that must reinitialize. The row carries only a
         // BOOLEAN — no calldata, no data: the executor invokes the fixed, argument-less
-        // selector, and the implementation reads what it needs from the registry object it
-        // discovers through the provider chain (msg.sender = ProxyAdmin -> owner = executor ->
-        // activeRegistry()).
+        // selector atomically with the swap, and everything the reinitializer needs lives in
+        // the implementation's own audited code.
         MockProxyUpgradeInitImpl initImpl = new MockProxyUpgradeInitImpl();
         ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](1);
         rows[0] = ProxyUpgradeRow({
@@ -185,17 +180,10 @@ contract EcosystemUpgradeExecutorTest is Test {
             "implementation must be swapped"
         );
         assertEq(
-            MockProxyUpgradeInitImpl(address(bridgehubProxy)).initializedFromManifest(),
-            initRegistry.manifestHash(),
-            "the reinitializer must reach the registry being applied through the provider chain"
+            MockProxyUpgradeInitImpl(address(bridgehubProxy)).initializeUpgradeCalls(),
+            1,
+            "the fixed reinitializer must run exactly once, atomically with the swap"
         );
-    }
-
-    function test_revertWhen_activeRegistryQueriedOutsideAnApplication() public {
-        // The provider is live only WHILE rows are being applied: outside an application there
-        // is no active registry for a reinitializer to read.
-        vm.expectRevert(NoActiveRegistryUpgrade.selector);
-        ecosystemExecutor.activeRegistry();
     }
 
     function test_revertWhen_executorCalledByNonEcosystemGovernance() public {

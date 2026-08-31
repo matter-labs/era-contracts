@@ -112,10 +112,9 @@ struct TransitionManifest {
 ///        data anywhere on the row: `true` executes `upgradeAndCall` with the FIXED,
 ///        argument-less `IProxyUpgradeInitializable.initializeUpgrade()` selector (`false` is a
 ///        plain `ProxyAdmin.upgrade`). Whatever the reinitializer needs lives in the audited
-///        implementation itself (constants/immutables — pinned by the row's codehash) or is
-///        read from the registry object being applied, discoverable through
-///        `IActiveRegistryProvider` (see {IUpgradeInit.sol}). A manifest can therefore never
-///        route the init call to an arbitrary function or smuggle arguments into it.
+///        implementation itself — constants, or immutables on L1, both pinned by the row's
+///        codehash (see {IUpgradeInit.sol}). A manifest can therefore never route the init call
+///        to an arbitrary function or smuggle arguments into it.
 // solhint-disable-next-line gas-struct-packing
 struct ProxyUpgradeRow {
     address proxy;

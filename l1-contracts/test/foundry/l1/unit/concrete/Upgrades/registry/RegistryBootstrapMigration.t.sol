@@ -334,11 +334,10 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     /// @dev Two rows for one proxy would BOTH pass the source check (they compare against the same
     ///      pre-migration implementation) and the last would silently win — so the reviewed edge
     ///      and the executed edge would differ. Same rule {CoreRegistry} enforces.
-    function test_migrate_runsFixedInitializeUpgradeAgainstTheMigration() public {
+    function test_migrate_runsFixedInitializeUpgradeExactlyOnce() public {
         // A second participating slot whose new implementation must reinitialize: the row
-        // carries only a BOOLEAN, the apply invokes the fixed argument-less selector, and the
-        // implementation reads the migration itself (it holds the CTM-domain ProxyAdmin during
-        // `migrate()` and answers `activeRegistry()` with the manifest object).
+        // carries only a BOOLEAN, and the apply invokes the fixed argument-less selector
+        // atomically with the swap.
         MockProxyUpgradeInitImpl initImpl = new MockProxyUpgradeInitImpl();
         TransparentUpgradeableProxy vtProxy = new TransparentUpgradeableProxy(
             implV31,
@@ -360,9 +359,9 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         withInit.migrate();
 
         assertEq(
-            MockProxyUpgradeInitImpl(address(vtProxy)).initializedFromManifest(),
-            withInit.manifestHash(),
-            "the reinitializer must reach the migration's manifest through the provider chain"
+            MockProxyUpgradeInitImpl(address(vtProxy)).initializeUpgradeCalls(),
+            1,
+            "the fixed reinitializer must run exactly once, atomically with the swap"
         );
     }
 

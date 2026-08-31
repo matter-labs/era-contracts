@@ -72,15 +72,13 @@ executors never recompile when the inventory grows.
 
 A row never carries calldata — or data. Its `callInitializeUpgrade` BOOLEAN is the entire
 reinitialization surface: when set, the apply performs `upgradeAndCall` with the FIXED,
-argument-less `IProxyUpgradeInitializable.initializeUpgrade()` selector. Whatever the
-reinitializer needs lives in the audited implementation itself (constants/immutables, pinned by
-the row's codehash) or is read from the registry object being applied: inside the call,
-`msg.sender` is the ProxyAdmin, whose `owner()` is the executor (or the bootstrap migration),
-which answers `IActiveRegistryProvider.activeRegistry()` with the manifest-committed object —
-the executors hold that pointer only for the duration of the row application, so outside a
-genuine registry-driven apply it reverts (`NoActiveRegistryUpgrade`). A manifest therefore
-cannot route the init call to an arbitrary function or smuggle arguments into it: the selector
-is audited machinery and every input is audited code or manifest-committed registry state.
+argument-less `IProxyUpgradeInitializable.initializeUpgrade()` selector. Everything the
+reinitializer needs lives in the new implementation's own audited code — constants, or
+immutables on L1, both pinned by the row's `implNew` codehash. There is no runtime data channel
+at all (and no discovery mechanism to serve one; the executors hold no state): a manifest
+cannot route the init call to an arbitrary function, cannot smuggle arguments into it, and
+there is nothing for the implementation to fetch — a forgotten or wrong reinitialization value
+is a missing line in an audited contract diff, never a wrong byte in offchain-authored data.
 
 Supporting libraries:
 

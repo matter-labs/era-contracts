@@ -149,13 +149,6 @@ contract RegistryBootstrapMigration {
         CodehashPinLib.requirePin(m.currentRelease);
     }
 
-    /// @notice The bootstrap holds the CTM-domain ProxyAdmin during `migrate()`, so a
-    ///         freshly-upgraded implementation's `initializeUpgrade()` resolves its registry
-    ///         provider to this object (see {IUpgradeInit.sol}) — which IS the manifest object.
-    function activeRegistry() external view returns (address) {
-        return address(this);
-    }
-
     /// @notice Performs the whole edge, then hands authority to the bound executors.
     /// @dev Ordering is load-bearing: the CTM implementation is swapped BEFORE the registry setters
     ///      are called, because those setters only exist on the new implementation.

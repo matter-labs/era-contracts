@@ -2,28 +2,19 @@
 
 pragma solidity 0.8.28;
 
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-
-import {IActiveRegistryProvider} from "../../upgrades/registry/IUpgradeInit.sol";
-
-interface IManifestHash {
-    function manifestHash() external view returns (bytes32);
-}
-
 /// @title MockProxyUpgradeInitImpl
 /// @notice Test-only implementation exercising the fixed `initializeUpgrade()` reinitializer
-///         path: it discovers the registry object being applied through the provider chain
-///         (`msg.sender` is the ProxyAdmin, its owner is the executor/migration answering
-///         `activeRegistry()`) and stores that object's manifest hash for assertions.
+///         path: a row's `callInitializeUpgrade` boolean must trigger exactly one argument-less
+///         call, atomically with the implementation swap. The stored counter is what the tests
+///         assert; a real implementation's reinitialization values live in its own audited code
+///         (constants/immutables, pinned by the row's codehash).
 /// @dev No reinitializer replay guard: production implementations MUST carry one (the function
-///      is external on the proxy); these tests never upgrade the same proxy twice.
+///      is external on the proxy); these tests assert the call count instead.
 contract MockProxyUpgradeInitImpl {
-    bytes32 public initializedFromManifest;
+    uint256 public initializeUpgradeCalls;
 
     function initializeUpgrade() external {
-        address provider = Ownable(msg.sender).owner();
-        address registry = IActiveRegistryProvider(provider).activeRegistry();
-        initializedFromManifest = IManifestHash(registry).manifestHash();
+        ++initializeUpgradeCalls;
     }
 
     function version() external pure returns (uint256) {

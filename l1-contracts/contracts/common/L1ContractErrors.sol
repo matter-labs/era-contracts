@@ -292,8 +292,6 @@ error MustBeEraChain();
 error NewDeadlineExceedsMaxDeadline();
 // 0x6eef58d1
 error NewDeadlineNotGreaterThanCurrent();
-// 0xe9e6b749
-error NoActiveRegistryUpgrade();
 // 0x79cc2d22
 error NoCallsProvided();
 // 0x88dfa474
