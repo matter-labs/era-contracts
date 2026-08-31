@@ -102,7 +102,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     let era_chain_id = env_cfg.era_chain_id().ok_or_else(|| {
         anyhow::anyhow!(
             "{} is missing top-level `era_chain_id`",
-            env_cfg.v31_input_path.display()
+            env_cfg.upgrade_input_toml_path.display()
         )
     })?;
     let legacy_gateway_chain_id = env_cfg.legacy_gateway_chain_id().ok_or_else(|| {
@@ -144,10 +144,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     // `[create2_factory_salts]`. PUVT hard-errors per deploy whose salt isn't
     // in this set.
     let mut expected_salts: Vec<FixedBytes<32>> = Vec::new();
-    if let Some(core_salt) = env_cfg.v31_create2_factory_salt()? {
+    if let Some(core_salt) = env_cfg.upgrade_create2_factory_salt()? {
         expected_salts.push(core_salt);
     }
-    for salt in env_cfg.v31_create2_factory_salt_per_ctm()?.values() {
+    for salt in env_cfg.upgrade_create2_factory_salt_per_ctm()?.values() {
         expected_salts.push(*salt);
     }
     if env_cfg.governance_kind() == GovernanceKind::Puh {
@@ -169,7 +169,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         "Permanent values: {}",
         env_cfg.permanent_values_path.display()
     ));
-    logger::info(format!("V31 input: {}", env_cfg.v31_input_path.display()));
+    logger::info(format!("V31 input: {}", env_cfg.upgrade_input_toml_path.display()));
     logger::info(format!("Ecosystem TOML: {}", args.ecosystem_toml.display()));
     logger::info(format!(
         "Transactions log: {}",

@@ -20,10 +20,10 @@ runPipelineUpgradeScenario({
   expectedProtocolVersion: "0x2200000000",
   coreScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests.sol:CoreUpgradeForTests",
   ctmScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests.sol:CTMUpgradeForTests",
-  // The proposed upgrade's L2 leg delegates to `L2V32Upgrade` (the upgrade-time re-init, force
+  // The proposed upgrade's L2 leg delegates to `L2V34Upgrade` (the upgrade-time re-init, force
   // deployed at a derived address); the anvil L2s cannot force-deploy, so the harness places
   // this bytecode at the decoded delegate target.
-  l2DelegateBytecodeName: "L2V32Upgrade",
+  l2DelegateBytecodeName: "L2V34Upgrade",
   // The fixture leaves the ChainAssetHandler with the deployer as owner; governance has to own
   // it to run the stage-0 `pauseMigration()` call.
   transferL1ChainAssetHandlerOwnership: true,

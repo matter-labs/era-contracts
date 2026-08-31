@@ -272,12 +272,12 @@ to preserve the deployed storage layout.
   registered lazily on their first bridge operation, or eagerly by anyone via `registerLegacyToken`.
 - **ZKsync OS base token**: the pre-v31 supply of an upgraded ZKsync OS chain lives in
   `L2BaseTokenZKOS.zkosPreV31TotalSupply`, populated while the chain ran v31 (via the since-removed backfill
-  service transaction), so `totalSupply()` is always available here. This release carries no backfill path:
-  the v32 upgrade of a ZKsync OS chain is forbidden on L1 (`V32UpgradeZKsyncOS`) unless
-  `baseTokenHasTotalSupply` was set by the v31 backfill _and_ its L2 execution is proven — a
-  `PriorityOpLowerBound` registry permissionlessly pins a priority-op count observed after the flag was set,
-  and the upgrade requires all ops below it to be processed. Fresh chains have no pre-v31 history and keep
-  zero. The tracker's own backfill flag and entry point are gone, and its slot is deprecated.
+  service transaction), so `totalSupply()` is always available here. The shipped v32 upgrade was forbidden
+  on L1 unless `baseTokenHasTotalSupply` was set by the v31 backfill _and_ its L2 execution was proven (its
+  `PriorityOpLowerBound` registry permissionlessly pinned a priority-op count observed after the flag was
+  set, and the upgrade required all ops below it to be processed), so every chain the current release can
+  upgrade already carries a final value. Fresh chains have no pre-v31 history and keep zero. The tracker's
+  own backfill flag and entry point are gone, and its slot is deprecated.
 
 ## L1Nullifier and failed-deposit recovery
 

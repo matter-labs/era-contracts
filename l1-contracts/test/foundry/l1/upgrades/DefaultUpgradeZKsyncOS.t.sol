@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
-import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
+import {IL2V34Upgrade} from "contracts/upgrades/IL2V34Upgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
@@ -143,7 +143,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
     }
 
     function test_revertWhen_theOuterSelectorIsNotForceDeployAndUpgradeUniversal() public {
-        bytes memory wrongOuter = abi.encodeCall(IL2V32Upgrade.upgrade, (true, ctmDeployer, hex"", hex""));
+        bytes memory wrongOuter = abi.encodeCall(IL2V34Upgrade.upgrade, (true, ctmDeployer, hex"", hex""));
 
         vm.expectRevert(UnexpectedUpgradeSelector.selector);
         upgradeContract.getL2UpgradeTxData(mockBridgehub, CHAIN_ID, true, wrongOuter);
@@ -175,7 +175,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
     /// @dev The flag encoded in the ecosystem-wide transaction must agree with the chain being upgraded.
     function test_revertWhen_theWrappedFlagDisagreesWithTheChain() public {
         bytes memory eraShapedInner = abi.encodeCall(
-            IL2V32Upgrade.upgrade,
+            IL2V34Upgrade.upgrade,
             (false, ctmDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, hex"00")
         );
         bytes memory placeholder = abi.encodeCall(
@@ -206,7 +206,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         // The ecosystem-wide parts are carried over untouched.
         assertEq(forceDeployments.length, 0, "force deployments changed");
         assertEq(rewrittenDelegateTo, delegateTo, "delegate target changed");
-        assertEq(bytes4(innerCalldata), IL2V32Upgrade.upgrade.selector);
+        assertEq(bytes4(innerCalldata), IL2V34Upgrade.upgrade.selector);
 
         (bool isZKsyncOS, address rewrittenCtmDeployer, bytes memory fixedData, bytes memory perChainData) = abi.decode(
             _sliceSelector(innerCalldata),
@@ -309,7 +309,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
 
     function _placeholderUpgradeTxData() internal view returns (bytes memory) {
         bytes memory innerCalldata = abi.encodeCall(
-            IL2V32Upgrade.upgrade,
+            IL2V34Upgrade.upgrade,
             (true, ctmDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, hex"00")
         );
         return

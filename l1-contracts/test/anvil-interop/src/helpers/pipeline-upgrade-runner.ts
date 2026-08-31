@@ -218,11 +218,11 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     // ── Per-chain legacy crossing + L2 relay ──
     // The cut + proposed upgrade come from the per-CTM light output the *ForTests CTM script
     // writes (`chain_upgrade_diamond_cut`); the file name is protocol-ops' convention
-    // (`v31_upgrade_inner.rs` — the prefix predates the version-independent runner).
+    // (`upgrade_inner.rs`).
     const ctmTomlPath = path.join(
       l1ContractsDir,
       "script-out",
-      `v31-upgrade-ctm-${upgradeHarnessInputs.ctmProxyAddress.toLowerCase()}.toml`
+      `upgrade-ctm-${upgradeHarnessInputs.ctmProxyAddress.toLowerCase()}.toml`
     );
     const { cut, proposedUpgrade, l2TxParamType, settlementLayerUpgradeAddr } = readCommittedCut(ctmTomlPath);
     await runLegacyChainLegAndRelayL2({

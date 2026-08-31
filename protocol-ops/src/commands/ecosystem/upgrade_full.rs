@@ -1,4 +1,4 @@
-//! Full v31 prepare flow: canonical [`V31UpgradeInner::prepare`] plus the
+//! Full v31 prepare flow: canonical [`UpgradeInner::prepare`] plus the
 //! governance-ownership precondition needed for governance-owned proxies and
 //! the operational-admin ServerNotifier upgrade step.
 //!
@@ -21,12 +21,12 @@ use crate::common::logger;
 use crate::common::wallets::Wallet;
 
 use super::new_gateway_prepare::prepare_new_gateway;
-use super::v31_upgrade_inner::{
-    CtmPrepareEntry, V31PrepareInputs, V31PrepareOutput, V31UpgradeInner,
+use super::upgrade_inner::{
+    CtmPrepareEntry, PrepareInputs, PrepareOutput, UpgradeInner,
 };
 
-pub struct V31UpgradeFull<'a> {
-    inner: V31UpgradeInner<'a>,
+pub struct UpgradeFull<'a> {
+    inner: UpgradeInner<'a>,
     /// Registry of contract owners that need ownership-transfer calls wrapped
     /// (see `OwnerWrap` in `IAdminFunctions.sol`). Empty for envs where every
     /// current owner is already an EOA.
@@ -34,13 +34,13 @@ pub struct V31UpgradeFull<'a> {
     /// Optional new-Gateway bring-up config from the env's `[new_gateway]`
     /// block. When present, the prepare phase runs
     /// `GatewayVotePreparation.s.sol` against this gateway on the same anvil
-    /// fork and stashes the output TOML path in `V31PrepareOutput` for the
+    /// fork and stashes the output TOML path in `PrepareOutput` for the
     /// stage-2 merge.
     new_gateway: Option<NewGatewayConfig>,
 }
 
-impl<'a> V31UpgradeFull<'a> {
-    pub fn new(inner: V31UpgradeInner<'a>) -> Self {
+impl<'a> UpgradeFull<'a> {
+    pub fn new(inner: UpgradeInner<'a>) -> Self {
         Self {
             inner,
             ownable_proxies: Vec::new(),
@@ -71,8 +71,8 @@ impl<'a> V31UpgradeFull<'a> {
         &self,
         runner: &mut ForgeRunner,
         deployer: &Wallet,
-        inputs: &V31PrepareInputs,
-    ) -> anyhow::Result<V31PrepareOutput> {
+        inputs: &PrepareInputs,
+    ) -> anyhow::Result<PrepareOutput> {
         self.run_pre_steps(runner, deployer).await?;
         let mut prepared = self.inner.prepare(runner, deployer, inputs).await?;
         self.run_ctm_admin_steps(runner, deployer, &prepared.ctm_tomls)?;

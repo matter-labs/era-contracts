@@ -51,14 +51,14 @@
  *      through the real `L2ComplexUpgrader` (impersonating the force deployer), reusing the
  *      existing runner's L2 patching approach.
  *
- * ── Harness patches (deviations from production, mirroring v31-upgrade-test-runner) ──
+ * ── Harness patches (deviations from production, mirroring pipeline-upgrade-runner) ──
  *
  * - `clearGenesisUpgradeTxHash` (L1 storage write, slot 0x22): the chains' genesis upgrade
  *   transaction is still pending because no server ever executed a batch on these anvil chains.
  *   In production the server clears this after executing the first batch;
  *   `BaseZkSyncUpgrade._setNewProtocolVersion` correctly reverts with
- *   `PreviousUpgradeNotFinalized` otherwise. Same patch (and justification) as the existing
- *   v31 runner — there is no public API to execute a batch on a sequencer-less anvil chain.
+ *   `PreviousUpgradeNotFinalized` otherwise. Same patch (and justification) as the pipeline
+ *   upgrade runner — there is no public API to execute a batch on a sequencer-less anvil chain.
  * - L2 delegate target: the transition pins `delegateTo` (the per-upgrade L2 upgrade
  *   implementation which production force-deploys within the same transaction) at a fixed
  *   address; the harness places a no-op contract there via `anvil_setCode` because the L2
@@ -399,7 +399,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     );
 
     // The chains' genesis upgrade tx is still pending on the sequencer-less anvil chains;
-    // clear it exactly like the v31 runner does (see module docs). Once, before the first bump.
+    // clear it exactly like the pipeline upgrade runner does (see module docs). Once, before the first bump.
     await clearGenesisUpgradeTxHash(l1Provider, upgradeChains);
 
     const bootstrapCut = buildBootstrapCut(manifestJson, packSemVer);

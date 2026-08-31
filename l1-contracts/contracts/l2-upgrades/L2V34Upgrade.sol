@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IL2V32Upgrade} from "../upgrades/IL2V32Upgrade.sol";
+import {IL2V34Upgrade} from "../upgrades/IL2V34Upgrade.sol";
 import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
-/// @title L2V32Upgrade, the L2 side of the v32 upgrade.
+/// @title L2V34Upgrade, the L2 side of the v34 upgrade.
 /// @dev This contract is neither predeployed nor a system contract. It resides in this folder to facilitate code reuse.
 /// @dev This contract is called during the forceDeployAndUpgrade function of the ComplexUpgrader system contract.
-contract L2V32Upgrade is IL2V32Upgrade {
-    /// @inheritdoc IL2V32Upgrade
+contract L2V34Upgrade is IL2V34Upgrade {
+    /// @inheritdoc IL2V34Upgrade
     function upgrade(
         bool _isZKsyncOS,
         address _ctmDeployer,

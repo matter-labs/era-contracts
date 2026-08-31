@@ -86,7 +86,7 @@ abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
     /// @notice Like `getComplexUpgraderTargetAndData` but ALWAYS uses the universal
     ///         `forceDeployAndUpgradeUniversal` entrypoint regardless of VM. From v32 both Era and
     ///         ZKsyncOS chains go through the universal path (the v31 Era-only `forceDeployAndUpgrade`
-    ///         selector is a v31 concern), and `SettlementLayerV32Upgrade` validates this selector.
+    ///         selector is a v31 concern), and `L2UpgradeTxLib` validates this selector at rewrite time.
     function getUniversalComplexUpgraderTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments,
         address _delegateTo,

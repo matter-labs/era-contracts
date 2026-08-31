@@ -7,7 +7,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
-import {IL2V32Upgrade} from "./IL2V32Upgrade.sol";
+import {IL2V34Upgrade} from "./IL2V34Upgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {UnexpectedUpgradeSelector} from "../common/L1ContractErrors.sol";
 import {UnexpectedZKsyncOSFlag} from "./ZkSyncUpgradeErrors.sol";
@@ -27,13 +27,13 @@ library L2UpgradeTxLib {
     using Bytes for bytes;
 
     /// @notice Replace the placeholder inner calldata with real per-chain data.
-    /// @dev The inner calldata is IL2V32Upgrade.upgrade() — we decode the placeholder to
+    /// @dev The inner calldata is IL2V34Upgrade.upgrade() — we decode the placeholder to
     /// extract ecosystem-wide fields, then re-encode with per-chain additionalForceDeploymentsData.
     /// @param _bridgehub The address of the bridgehub.
     /// @param _chainId The chain ID to build the upgrade data for.
     /// @param _zksyncOS Whether the chain is a ZKsyncOS chain, passed from diamond storage.
-    /// @param _existingUpgradeCalldata The placeholder L2V32Upgrade.upgrade() calldata.
-    function buildL2V32UpgradeCalldata(
+    /// @param _existingUpgradeCalldata The placeholder L2V34Upgrade.upgrade() calldata.
+    function buildL2V34UpgradeCalldata(
         address _bridgehub,
         uint256 _chainId,
         bool _zksyncOS,
@@ -57,15 +57,15 @@ library L2UpgradeTxLib {
 
         return
             abi.encodeCall(
-                IL2V32Upgrade.upgrade,
+                IL2V34Upgrade.upgrade,
                 (isZKsyncOS, ctmDeployer, fixedForceDeploymentsData, additionalForceDeploymentsData)
             );
     }
 
     /// @notice Rewrite a ZKsync OS chain's L2 upgrade transaction data with its per-chain data.
-    /// @dev The ecosystem-wide transaction wraps `IL2V32Upgrade.upgrade` in
+    /// @dev The ecosystem-wide transaction wraps `IL2V34Upgrade.upgrade` in
     /// `IComplexUpgrader.forceDeployAndUpgradeUniversal`; only the innermost per-chain field changes, so the
-    /// wrapper is unwrapped, `buildL2V32UpgradeCalldata` substitutes the data, and the wrapper is rebuilt.
+    /// wrapper is unwrapped, `buildL2V34UpgradeCalldata` substitutes the data, and the wrapper is rebuilt.
     /// @param _bridgehub The address of the bridgehub.
     /// @param _chainId The chain ID to build the upgrade data for.
     /// @param _zksyncOS Whether the chain is a ZKsyncOS chain, passed from diamond storage.
@@ -86,7 +86,7 @@ library L2UpgradeTxLib {
         ) = abi.decode(_existingTxData.slice(4), (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes));
 
         validateWrappedUpgrade(existingUpgradeCalldata);
-        bytes memory l2UpgradeCalldata = buildL2V32UpgradeCalldata(
+        bytes memory l2UpgradeCalldata = buildL2V34UpgradeCalldata(
             _bridgehub,
             _chainId,
             _zksyncOS,
@@ -150,9 +150,9 @@ library L2UpgradeTxLib {
             );
     }
 
-    /// @notice Validate that the inner calldata targets L2V32Upgrade.
+    /// @notice Validate that the inner calldata targets L2V34Upgrade.
     function validateWrappedUpgrade(bytes memory _existingUpgradeCalldata) internal pure {
-        if (bytes4(_existingUpgradeCalldata) != IL2V32Upgrade.upgrade.selector) {
+        if (bytes4(_existingUpgradeCalldata) != IL2V34Upgrade.upgrade.selector) {
             revert UnexpectedUpgradeSelector();
         }
     }

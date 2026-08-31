@@ -47,8 +47,6 @@ error BaseTokenHolderAlreadyInitialized();
 error BaseTokenHolderMintFailed();
 // 0x8361ff70
 error BaseTokenNativeToThisChain();
-// 0x00a6b592
-error BaseTokenPreV31TotalSupplyNotSet();
 // 0xe3ec2bc9
 error BaseTokenTransferFailed();
 // 0x55ad3fd3
@@ -248,10 +246,6 @@ error L2TimestampTooBig();
 error LengthIsNotDivisibleBy32(uint256 length);
 // 0x1b6825bb
 error LogAlreadyProcessed(uint8);
-// 0xe4623697
-error LowerBoundAlreadyRecorded();
-// 0x5c25a57b
-error LowerBoundNotRecorded();
 // 0x43e266b0
 error MalformedBytecode(BytecodeError);
 // 0x88b43745
@@ -376,8 +370,6 @@ error PriorityModeRequiresPermanentRollup();
 error PriorityOperationsRollingHashMismatch();
 // 0xbeda0935
 error PriorityOpsRequestTimestampMissing(uint256 requestId);
-// 0xa840274f
-error PriorityQueueNotReady();
 // 0x1a4d284a
 error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 // 0xa461f651
@@ -416,8 +408,6 @@ error RegistryPinTargetHasNoCode(address target);
 error RegistryReleaseCodehashAlreadySet(bytes32 current);
 // 0x1f20dafa
 error RegistryUnknownKey();
-// 0x364b629b
-error RegistryUnsortedSelectors(address facet, bytes4 selector);
 // 0x3ea1345a
 error RegistryWrongVM(bool expected, bool actual);
 // 0x667d17de

@@ -409,7 +409,7 @@ library SystemContractsProcessing {
         // ProxyAdmin already present from genesis (owned by the ComplexUpgrader), so re-deploying it
         // would require an unsafe overwrite. _setupProxyAdmin only reads its owner(), which is already
         // correct. (L2WrappedBaseToken is likewise excluded — it is no longer in
-        // getFixedAddressCoreContracts.) The L2V32Upgrade delegate target remains the only legitimate
+        // getFixedAddressCoreContracts.) The L2V34Upgrade delegate target remains the only legitimate
         // ZKsyncOS unsafe force deployment (added in CTMUpgrade_v31); the PUVT guards that no other
         // unsafe force deployment is present.
         // The removed v31 GWAssetTracker's proxy gets its implementation swapped for EmptyContract.

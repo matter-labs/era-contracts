@@ -30,12 +30,12 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::commands::ecosystem::v31_upgrade_full::V31UpgradeFull;
-use crate::commands::ecosystem::v31_upgrade_inner::{CtmInputs, V31PrepareInputs, V31UpgradeInner};
+use crate::commands::ecosystem::upgrade_full::UpgradeFull;
+use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::forge::scripts::{
     ADMIN_FUNCTIONS_INVOCATION, CORE_UPGRADE_SCRIPT_PATH, CTM_UPGRADE_SCRIPT_PATH,
-    UPGRADE_V31_CORE_OUTPUT_PATH, UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH,
+    UPGRADE_CORE_OUTPUT_PATH, UPGRADE_LOCAL_INPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
@@ -314,8 +314,8 @@ async fn stage_governance_execute(
 
 // ── upgrade-prepare-all (split-flow orchestrator) ──────────────────────────
 
-/// Unified split-flow prepare. Runs `CoreUpgrade_v31.noGovernancePrepare` once
-/// and `CTMUpgrade_v31.noGovernancePrepare` once per `--ctm-proxy`, all on a
+/// Unified split-flow prepare. Runs `the core script's noGovernancePrepare` once
+/// and `the CTM script's noGovernancePrepare` once per `--ctm-proxy`, all on a
 /// single anvil fork so deployer and operational admin broadcasts emit as one
 /// prepare bundle set. The downstream `upgrade-governance` consumes the
 /// per-step TOMLs (passed as `--governance-toml` once each).
@@ -351,14 +351,14 @@ pub struct UpgradePrepareAllArgs {
 
     #[clap(
         long,
-        default_value = UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH,
+        default_value = UPGRADE_LOCAL_INPUT_PATH,
         hide = true
     )]
     pub upgrade_input_path: String,
 
     /// Override the core-prepare output TOML path (relative to l1-contracts
     /// root). Defaults to the canonical `script-out/v31-upgrade-core.toml`.
-    #[clap(long, default_value = UPGRADE_V31_CORE_OUTPUT_PATH, hide = true)]
+    #[clap(long, default_value = UPGRADE_CORE_OUTPUT_PATH, hide = true)]
     pub core_output_path: String,
 
     #[clap(long, default_value = CORE_UPGRADE_SCRIPT_PATH, hide = true)]
@@ -550,8 +550,8 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // file carries env-specific knobs the upgrade scripts rely on, such as
         // the protocol versions and the bridgehub address. Only override when
         // the caller hasn't explicitly passed `--upgrade-input-path`.
-        if args.upgrade_input_path == UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH {
-            let per_env_rel = format!("/upgrade-envs/v0.31.0-interopB/{}.toml", cfg.env);
+        if args.upgrade_input_path == UPGRADE_LOCAL_INPUT_PATH {
+            let per_env_rel = format!("/upgrade-envs/v0.34.0-registry/{}.toml", cfg.env);
             let per_env_abs = paths::contracts_root()
                 .join("l1-contracts")
                 .join(per_env_rel.trim_start_matches('/'));
@@ -562,7 +562,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 logger::info(format!(
                     "Per-env upgrade input not found at {} — falling back to default {}",
                     per_env_abs.display(),
-                    UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH
+                    UPGRADE_LOCAL_INPUT_PATH
                 ));
             }
         }
@@ -576,10 +576,10 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // with explicit `--create2-factory-salt`.
     if args.create2_factory_salt.is_none() {
         if let Some(cfg) = env_cfg.as_ref() {
-            if let Some(salt) = cfg.v31_create2_factory_salt()? {
+            if let Some(salt) = cfg.upgrade_create2_factory_salt()? {
                 logger::info(format!(
                     "Using create2_factory_salt from {}: {salt:#x}",
-                    cfg.v31_input_path.display(),
+                    cfg.upgrade_input_toml_path.display(),
                 ));
                 args.create2_factory_salt = Some(salt);
             }
@@ -594,10 +594,10 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // `contracts/.claude/skills/regenerate-v31-stage-calldata/SKILL.md`
     // ("Core principle") for why a per-regen salt is required.
     if let Some(cfg) = env_cfg.as_ref() {
-        if let Some(salt) = cfg.v31_legacy_gov_salt()? {
+        if let Some(salt) = cfg.upgrade_legacy_gov_salt()? {
             logger::info(format!(
                 "Using legacy_gov_salt from {}: {salt:#x}",
-                cfg.v31_input_path.display(),
+                cfg.upgrade_input_toml_path.display(),
             ));
             std::env::set_var("LEGACY_GOV_SALT", format!("{salt:#x}"));
         }
@@ -684,14 +684,14 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 
     let create2_factory_salt_per_ctm = match env_cfg.as_ref() {
         Some(cfg) => {
-            let map = cfg.v31_create2_factory_salt_per_ctm()?;
+            let map = cfg.upgrade_create2_factory_salt_per_ctm()?;
             if map.is_empty() {
                 None
             } else {
                 logger::info(format!(
                     "Using {} per-CTM create2 salts from {}",
                     map.len(),
-                    cfg.v31_input_path.display()
+                    cfg.upgrade_input_toml_path.display()
                 ));
                 Some(map)
             }
@@ -699,7 +699,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         None => None,
     };
 
-    let inputs = V31PrepareInputs {
+    let inputs = PrepareInputs {
         ctms,
         create2_factory_salt: args.create2_factory_salt,
         create2_factory_salt_per_ctm,
@@ -715,7 +715,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         .map(|cfg| cfg.ownable_proxies().to_vec())
         .unwrap_or_default();
     let new_gateway_cfg = env_cfg.as_ref().and_then(|cfg| cfg.new_gateway().cloned());
-    let full = V31UpgradeFull::new(V31UpgradeInner::new(&contracts_path, bridgehub))
+    let full = UpgradeFull::new(UpgradeInner::new(&contracts_path, bridgehub))
         .with_ownable_proxies(proxies)
         .with_new_gateway(new_gateway_cfg);
     let prepared = full.prepare(&mut runner, &deployer, &inputs).await?;
@@ -929,7 +929,7 @@ fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> 
 /// ```
 fn write_merged_ecosystem_toml(
     core_toml: &Path,
-    ctm_entries: &[crate::commands::ecosystem::v31_upgrade_inner::CtmPrepareEntry],
+    ctm_entries: &[crate::commands::ecosystem::upgrade_inner::CtmPrepareEntry],
     extra_stage0: &[crate::common::governance_calls::GovernanceCall],
     zk_governance: Option<&crate::commands::ecosystem::zk_governance::ZkGovernanceOutcome>,
     new_gateway_tomls: &[PathBuf],

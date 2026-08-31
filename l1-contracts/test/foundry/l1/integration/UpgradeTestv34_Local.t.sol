@@ -37,7 +37,7 @@ import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils
 ///         UNMOCKED: that is what this file exists to test.
 contract CTMUpgrade_v34_Test is CTMUpgrade_v34 {
     /// @dev The shared local fixture is Era-flavored, but the release's real engine
-    ///      (`DefaultUpgradeZKsyncOS` + the `L2V32Upgrade` L2 leg) is ZKsyncOS-only. This
+    ///      (`DefaultUpgradeZKsyncOS` + the `L2V34Upgrade` L2 leg) is ZKsyncOS-only. This
     ///      fixture asserts the L1 side only and never relays an L2 leg, so it runs the plain
     ///      `DefaultUpgrade`; the real engine is exercised by the anvil bootstrap pipeline.
     function deployUsedUpgradeContract() internal override returns (address) {

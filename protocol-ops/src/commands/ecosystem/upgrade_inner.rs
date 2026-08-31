@@ -1,13 +1,13 @@
 //! Canonical v31 prepare-phase orchestration.
 //!
-//! `V31UpgradeInner::prepare` fires `CoreUpgrade_v31.noGovernancePrepare`
-//! once and `CTMUpgrade_v31.noGovernancePrepare` once per target CTM, all on
+//! `UpgradeInner::prepare` fires `the core script's noGovernancePrepare`
+//! once and `the CTM script's noGovernancePrepare` once per target CTM, all on
 //! the supplied `ForgeRunner` so deployer broadcasts merge into one Safe
 //! bundle.
 //!
 //! Real-world ecosystems also need governance-owned proxy preconditions and
 //! operational admin call execution around prepare; those live in
-//! [`super::v31_upgrade_full::V31UpgradeFull`], which composes this.
+//! [`super::upgrade_full::UpgradeFull`], which composes this.
 //!
 //! The governance phase is not on this struct — it's a free helper in
 //! [`super::upgrade`] because it has no state of its own (just file IO + ABI
@@ -43,7 +43,7 @@ pub struct CtmInputs {
 }
 
 /// Inputs to the prepare phase. The CLI handler builds this from clap args.
-pub struct V31PrepareInputs {
+pub struct PrepareInputs {
     /// Target CTMs. One forge invocation per entry.
     pub ctms: Vec<CtmInputs>,
     /// Optional CREATE2 salt for the Core prepare; random if `None`.
@@ -79,7 +79,7 @@ pub struct V31PrepareInputs {
 /// Output of the prepare phase: the TOMLs each forge invocation wrote, in
 /// the order the governance phase should replay them (core first, then per
 /// CTM in input order, then the optional new-Gateway bring-up bundle).
-pub struct V31PrepareOutput {
+pub struct PrepareOutput {
     pub core_toml: PathBuf,
     pub ctm_tomls: Vec<CtmPrepareEntry>,
     /// Empty when the env's `[new_gateway]` block isn't set. When present,
@@ -101,12 +101,12 @@ pub struct CtmPrepareEntry {
 
 // ── struct ────────────────────────────────────────────────────────────────
 
-pub struct V31UpgradeInner<'a> {
+pub struct UpgradeInner<'a> {
     contracts_path: &'a Path,
     bridgehub: Address,
 }
 
-impl<'a> V31UpgradeInner<'a> {
+impl<'a> UpgradeInner<'a> {
     pub fn new(contracts_path: &'a Path, bridgehub: Address) -> Self {
         Self {
             contracts_path,
@@ -118,22 +118,22 @@ impl<'a> V31UpgradeInner<'a> {
         self.bridgehub
     }
 
-    /// Run `CoreUpgrade_v31.noGovernancePrepare` then
-    /// `CTMUpgrade_v31.noGovernancePrepare` once per CTM, all on the
+    /// Run `the core script's noGovernancePrepare` then
+    /// `the CTM script's noGovernancePrepare` once per CTM, all on the
     /// supplied runner. Returns the per-step output TOML paths.
     ///
     /// `pub(super)` so production callers must go through
-    /// [`super::v31_upgrade_full::V31UpgradeFull::prepare`] — that wrapper
+    /// [`super::upgrade_full::UpgradeFull::prepare`] — that wrapper
     /// runs the governance-owned proxy precondition first and executes
     /// operational admin calls afterwards.
     pub(super) async fn prepare(
         &self,
         runner: &mut ForgeRunner,
         deployer: &Wallet,
-        inputs: &V31PrepareInputs,
-    ) -> anyhow::Result<V31PrepareOutput> {
+        inputs: &PrepareInputs,
+    ) -> anyhow::Result<PrepareOutput> {
         if inputs.ctms.is_empty() {
-            anyhow::bail!("V31UpgradeInner::prepare requires at least one CTM");
+            anyhow::bail!("UpgradeInner::prepare requires at least one CTM");
         }
 
         let core_toml = self
@@ -180,7 +180,7 @@ impl<'a> V31UpgradeInner<'a> {
             anyhow::bail!("no ZKsync OS CTMs to prepare — every configured CTM is Era");
         }
 
-        Ok(V31PrepareOutput {
+        Ok(PrepareOutput {
             core_toml,
             ctm_tomls,
             new_gateway_tomls: Vec::new(),
@@ -191,7 +191,7 @@ impl<'a> V31UpgradeInner<'a> {
         &self,
         runner: &mut ForgeRunner,
         deployer: &Wallet,
-        inputs: &V31PrepareInputs,
+        inputs: &PrepareInputs,
     ) -> anyhow::Result<PathBuf> {
         ensure_script_exists(self.contracts_path, &inputs.core_script_path)?;
 
@@ -261,10 +261,10 @@ impl<'a> V31UpgradeInner<'a> {
             .with_disable_labels()
             .with_wallet(deployer);
 
-        logger::step("Running v31 core prepare");
+        logger::step("Running core prepare");
         runner
             .run(script)
-            .context("Failed to execute CoreUpgrade_v31.noGovernancePrepare")?;
+            .context("Failed to execute the core script's noGovernancePrepare")?;
 
         Ok(core_output_path)
     }
@@ -273,7 +273,7 @@ impl<'a> V31UpgradeInner<'a> {
         &self,
         runner: &mut ForgeRunner,
         deployer: &Wallet,
-        inputs: &V31PrepareInputs,
+        inputs: &PrepareInputs,
         ctm: &CtmInputs,
     ) -> anyhow::Result<(PathBuf, bool)> {
         ensure_script_exists(self.contracts_path, &inputs.ctm_script_path)?;
@@ -406,7 +406,7 @@ impl<'a> V31UpgradeInner<'a> {
         ));
 
         // Per-CTM output path so back-to-back prepares don't clobber each other.
-        let output_path_str = format!("/script-out/v31-upgrade-ctm-{ctm_proxy:#x}.toml");
+        let output_path_str = format!("/script-out/upgrade-ctm-{ctm_proxy:#x}.toml");
         let ctm_output_path = self
             .contracts_path
             .join(output_path_str.trim_start_matches('/'));
@@ -440,10 +440,10 @@ impl<'a> V31UpgradeInner<'a> {
             .with_disable_labels()
             .with_wallet(deployer);
 
-        logger::step(format!("Running v31 ctm prepare for {ctm_proxy:#x}"));
+        logger::step(format!("Running CTM prepare for {ctm_proxy:#x}"));
         runner
             .run(script)
-            .context("Failed to execute CTMUpgrade_v31.noGovernancePrepare")?;
+            .context("Failed to execute the CTM script's noGovernancePrepare")?;
 
         Ok((ctm_output_path, is_zk_sync_os))
     }

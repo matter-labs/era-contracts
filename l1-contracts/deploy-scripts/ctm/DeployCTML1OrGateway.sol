@@ -127,11 +127,8 @@ library DeployCTML1OrGateway {
         ) {
             return CTMContract.DualVerifier;
         } else if (
-            _compareStrings(_contractName, "DefaultUpgrade") ||
-            _compareStrings(_contractName, "DefaultUpgradeZKsyncOS") ||
-            _compareStrings(_contractName, "SettlementLayerV32Upgrade")
+            _compareStrings(_contractName, "DefaultUpgrade") || _compareStrings(_contractName, "DefaultUpgradeZKsyncOS")
         ) {
-            // The per-version default-upgrade contract (v32's is `SettlementLayerV32Upgrade`).
             return CTMContract.DefaultUpgrade;
         } else if (_compareStrings(_contractName, "L1GenesisUpgrade")) {
             return CTMContract.L1GenesisUpgrade;

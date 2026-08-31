@@ -99,9 +99,7 @@ const ARTIFACTS = {
   MockL2MessageVerification: "MockL2MessageVerification.sol/MockL2MessageVerification.json",
   MockMintBaseTokenHook: "MockMintBaseTokenHook.sol/MockMintBaseTokenHook.json",
   Ownable2Step: "Ownable2Step.sol/Ownable2Step.json",
-  PriorityOpLowerBound: "PriorityOpLowerBound.sol/PriorityOpLowerBound.json",
   DefaultUpgradeZKsyncOS: "DefaultUpgradeZKsyncOS.sol/DefaultUpgradeZKsyncOS.json",
-  V32UpgradeZKsyncOS: "V32UpgradeZKsyncOS.sol/V32UpgradeZKsyncOS.json",
   SystemContractProxy: "SystemContractProxy.sol/SystemContractProxy.json",
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
@@ -112,7 +110,7 @@ const ARTIFACTS = {
   IAtomicFlowManager: "IAtomicFlowManager.sol/IAtomicFlowManager.json",
   L2MessageVerification: "L2MessageVerification.sol/L2MessageVerification.json",
   L2InteropRootStorage: "L2InteropRootStorage.sol/L2InteropRootStorage.json",
-  L2V32Upgrade: "L2V32Upgrade.sol/L2V32Upgrade.json",
+  L2V34Upgrade: "L2V34Upgrade.sol/L2V34Upgrade.json",
   UpgradeableBeaconDeployer: "UpgradeableBeaconDeployer.sol/UpgradeableBeaconDeployer.json",
 } as const;
 
@@ -158,13 +156,4 @@ export function getDeterministicCreationBytecode(name: ContractName): string {
  */
 export const LEGACY_ADMIN_ABI: string[] = [
   "function upgradeChainFromVersion(uint256, tuple(tuple(address,uint8,bool,bytes4[])[],address,bytes))",
-];
-
-/**
- * v31 Admin facet entry point removed in v32 (the backfill service-transaction request). The
- * harness calls it on forked v31 chains whose fixture never ran the backfill, so the current
- * AdminFacet artifact no longer carries the selector.
- */
-export const LEGACY_V31_ADMIN_BACKFILL_ABI: string[] = [
-  "function setZKsyncOSPreV31TotalSupply(uint256 _totalSupply) returns (bytes32)",
 ];

@@ -234,7 +234,7 @@ library CoreOnGatewayHelper {
         if (_c == L2EcosystemContract.L2MessageVerification) return "L2MessageVerification";
         if (_c == L2EcosystemContract.L2InteropRootStorage) return "L2InteropRootStorage";
         if (_c == L2EcosystemContract.BeaconProxy) return "BeaconProxy";
-        if (_c == L2EcosystemContract.L2V32Upgrade) return "L2V32Upgrade";
+        if (_c == L2EcosystemContract.L2V34Upgrade) return "L2V34Upgrade";
         if (_c == L2EcosystemContract.BridgedStandardERC20) return "BridgedStandardERC20";
         if (_c == L2EcosystemContract.DiamondProxy) return "DiamondProxy";
         if (_c == L2EcosystemContract.ProxyAdmin) return "ProxyAdmin";
@@ -274,7 +274,7 @@ library CoreOnGatewayHelper {
     /// @notice Resolve a L2EcosystemContract enum to its canonical L2 address.
     /// @dev Only covers contracts with well-known constant addresses.
     function _resolveAddress(L2EcosystemContract _c) internal pure returns (address) {
-        if (_c == L2EcosystemContract.L2V32Upgrade) {
+        if (_c == L2EcosystemContract.L2V34Upgrade) {
             return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
         }
         if (_c == L2EcosystemContract.L2Bridgehub) return L2_BRIDGEHUB_ADDR;

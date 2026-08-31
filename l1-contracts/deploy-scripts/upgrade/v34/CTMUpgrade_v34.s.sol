@@ -12,7 +12,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
+import {IL2V34Upgrade} from "contracts/upgrades/IL2V34Upgrade.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
@@ -63,7 +63,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     function getL2UpgradeCalldata() internal returns (bytes memory) {
         return
             abi.encodeCall(
-                IL2V32Upgrade.upgrade,
+                IL2V34Upgrade.upgrade,
                 (
                     config.isZKsyncOS,
                     coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
@@ -73,7 +73,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             );
     }
 
-    /// @notice The L2 delegate (`L2V32Upgrade`) rides the upgrade tx itself as an unsafe force
+    /// @notice The L2 delegate (`L2V34Upgrade`) rides the upgrade tx itself as an unsafe force
     ///         deployment at a bytecode-derived address, so it never overwrites live code.
     function getAdditionalUniversalForceDeployments()
         internal
@@ -85,7 +85,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             // the L1-only local fixture (see `CTMUpgrade_v34_Test`), which relays no L2 leg.
             return additional;
         }
-        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V32Upgrade.sol", "L2V32Upgrade");
+        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V34Upgrade.sol", "L2V34Upgrade");
         additional = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
         additional[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
             upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
@@ -97,8 +97,8 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     function getZKsyncOSL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual override returns (address, bytes memory) {
-        // The delegate address must match the force-deployed `L2V32Upgrade` entry above.
-        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V32Upgrade.sol", "L2V32Upgrade");
+        // The delegate address must match the force-deployed `L2V34Upgrade` entry above.
+        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V34Upgrade.sol", "L2V34Upgrade");
         address delegateTo = L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo);
         return getUniversalComplexUpgraderTargetAndData(_deployments, delegateTo, getL2UpgradeCalldata());
     }
