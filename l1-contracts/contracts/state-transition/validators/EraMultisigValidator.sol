@@ -5,6 +5,7 @@ import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/cr
 import {AddressHasNoCode} from "../../common/L1ContractErrors.sol";
 import {
     AlreadySigned,
+    ExecutionDelayNotConfigurable,
     InitializeNotAvailable,
     MemberAlreadyExists,
     MemberDoesNotExist,
@@ -28,7 +29,9 @@ import {IEraMultisigValidator} from "./interfaces/IEraMultisigValidator.sol";
 /// @dev This contract itself does NOT enforce the timelock in any way, it just forwards the calls to the underlying
 /// `ValidatorTimelock` after checking for multisig approvals. Since the server reads the execution delay off whichever
 /// validator it talks to, all the execution delay getters are overridden to read through to the downstream
-/// `ValidatorTimelock`, which is the contract that actually enforces the delay.
+/// `ValidatorTimelock`, which is the contract that actually enforces the delay. The matching setters are disabled
+/// here for the same reason: the delay must be configured on the contract that enforces it, otherwise a caller
+/// would get a successful transaction that changes nothing.
 contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP712Upgradeable {
     /// @dev EIP-712 typehash for the ExecuteBatches struct.
     bytes32 internal constant EXECUTE_BATCHES_TYPEHASH =
@@ -196,6 +199,27 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
         address _chainAddress
     ) public view override(ValidatorTimelock, IValidatorTimelock) returns (uint32) {
         return IValidatorTimelock(validatorTimelock).getExecutionDelay(_chainAddress);
+    }
+
+    /// @dev Disable the inherited `setExecutionDelay`. Since the getters read through to the downstream
+    /// `ValidatorTimelock`, writing the delay here would silently have no effect on the enforced delay.
+    /// The ecosystem-wide delay must be set on the downstream `ValidatorTimelock` instead.
+    function setExecutionDelay(uint32) external pure override(ValidatorTimelock, IValidatorTimelock) {
+        revert ExecutionDelayNotConfigurable();
+    }
+
+    /// @dev Disable the inherited `increaseChainExecutionDelay`, see `setExecutionDelay`.
+    /// A chain admin must raise the delay on the downstream `ValidatorTimelock` instead.
+    function increaseChainExecutionDelay(
+        address,
+        uint32
+    ) external pure override(ValidatorTimelock, IValidatorTimelock) {
+        revert ExecutionDelayNotConfigurable();
+    }
+
+    /// @dev Disable the inherited `setChainExecutionDelay`, see `setExecutionDelay`.
+    function setChainExecutionDelay(address, uint32) external pure override(ValidatorTimelock, IValidatorTimelock) {
+        revert ExecutionDelayNotConfigurable();
     }
 
     /// @inheritdoc IEraMultisigValidator

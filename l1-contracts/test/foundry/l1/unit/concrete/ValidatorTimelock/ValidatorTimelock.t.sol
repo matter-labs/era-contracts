@@ -125,6 +125,39 @@ contract ValidatorTimelockTest is Test {
         assertEq(validator.executionDelay(), executionDelay);
     }
 
+    /// @dev Commits a single batch `_batchNumber` at the current block timestamp through the timelock.
+    function _commitSingleBatch(uint64 _batchNumber) internal {
+        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(chainId));
+
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
+        batchesToCommit[0] = Utils.createCommitBatchInfo();
+        batchesToCommit[0].batchNumber = _batchNumber;
+
+        (uint256 batchFrom, uint256 batchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            Utils.createStoredBatchInfo(),
+            batchesToCommit
+        );
+        vm.prank(alice);
+        validator.commitBatchesSharedBridge(zkSync, batchFrom, batchTo, commitData);
+    }
+
+    /// @dev Encodes the `executeBatchesSharedBridge` arguments for a single batch `_batchNumber`.
+    function _encodeExecuteSingleBatch(
+        uint64 _batchNumber
+    ) internal returns (uint256 batchFrom, uint256 batchTo, bytes memory executeData) {
+        IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
+        storedBatches[0] = Utils.createStoredBatchInfo();
+        storedBatches[0].batchNumber = _batchNumber;
+
+        vm.mockCall(
+            zkSync,
+            abi.encodeWithSelector(IExecutor.executeBatchesSharedBridge.selector),
+            abi.encode(storedBatches)
+        );
+
+        return Utils.encodeExecuteBatchesData(storedBatches, Utils.emptyData());
+    }
+
     function _assertAllRoles(uint256 _chainId, address _addr, bool _expected) internal view {
         require(validator.hasRoleForChainId(_chainId, validator.PRECOMMITTER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.COMMITTER_ROLE(), _addr) == _expected);
@@ -318,43 +351,16 @@ contract ValidatorTimelockTest is Test {
     function test_executeBatchesSharedBridge() public {
         uint64 timestamp = 123456;
         uint64 batchNumber = 123;
+
         // Commit batches first to have the valid timestamp
-        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(zkSync));
-
-        IExecutor.StoredBatchInfo memory storedBatch1 = Utils.createStoredBatchInfo();
-        CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
-
-        batchToCommit.batchNumber = batchNumber;
-        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
-        batchesToCommit[0] = batchToCommit;
-
-        vm.prank(alice);
         vm.warp(timestamp);
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            storedBatch1,
-            batchesToCommit
-        );
-        validator.commitBatchesSharedBridge(zkSync, commitBatchFrom, commitBatchTo, commitData);
+        _commitSingleBatch(batchNumber);
 
-        // Execute batches
-        IExecutor.StoredBatchInfo memory storedBatch2 = Utils.createStoredBatchInfo();
-        storedBatch2.batchNumber = batchNumber;
-        IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
-        storedBatches[0] = storedBatch2;
+        (uint256 batchFrom, uint256 batchTo, bytes memory executeData) = _encodeExecuteSingleBatch(batchNumber);
 
-        vm.mockCall(
-            zkSync,
-            abi.encodeWithSelector(IExecutor.proveBatchesSharedBridge.selector),
-            abi.encode(storedBatches)
-        );
-
-        vm.prank(alice);
         vm.warp(timestamp + executionDelay + 1);
-        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
-            storedBatches,
-            Utils.emptyData()
-        );
-        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData);
+        vm.prank(alice);
+        validator.executeBatchesSharedBridge(zkSync, batchFrom, batchTo, executeData);
     }
 
     function test_RevertWhen_setExecutionDelayNotOwner() public {
@@ -426,57 +432,26 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_RevertWhen_executeBatchesSharedBridgeNotValidator() public {
-        IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
+        (uint256 batchFrom, uint256 batchTo, bytes memory executeData) = _encodeExecuteSingleBatch(123);
 
-        IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
-        storedBatches[0] = storedBatch;
-
-        vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, executorRole, bob));
-        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
-            storedBatches,
-            Utils.emptyData()
-        );
-        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData);
+        vm.prank(bob);
+        validator.executeBatchesSharedBridge(zkSync, batchFrom, batchTo, executeData);
     }
 
     function test_RevertWhen_executeBatchesSharedBridgeTooEarly() public {
         uint64 timestamp = 123456;
         uint64 batchNumber = 123;
-        // Prove batches first to have the valid timestamp
-        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(chainId));
 
-        IExecutor.StoredBatchInfo memory storedBatch1 = Utils.createStoredBatchInfo();
-        CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
-
-        batchToCommit.batchNumber = batchNumber;
-        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
-        batchesToCommit[0] = batchToCommit;
-
-        vm.prank(alice);
         vm.warp(timestamp);
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            storedBatch1,
-            batchesToCommit
-        );
-        validator.commitBatchesSharedBridge(zkSync, commitBatchFrom, commitBatchTo, commitData);
+        _commitSingleBatch(batchNumber);
 
-        // Execute batches
-        IExecutor.StoredBatchInfo memory storedBatch2 = Utils.createStoredBatchInfo();
-        storedBatch2.batchNumber = batchNumber;
-        IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
-        storedBatches[0] = storedBatch2;
+        (uint256 batchFrom, uint256 batchTo, bytes memory executeData) = _encodeExecuteSingleBatch(batchNumber);
 
-        vm.prank(alice);
         vm.warp(timestamp + executionDelay - 1);
-        vm.expectRevert(
-            abi.encodeWithSelector(TimeNotReached.selector, timestamp + executionDelay, timestamp + executionDelay - 1)
-        );
-        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
-            storedBatches,
-            Utils.emptyData()
-        );
-        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData);
+        vm.expectRevert(abi.encodeWithSelector(TimeNotReached.selector, timestamp + executionDelay, block.timestamp));
+        vm.prank(alice);
+        validator.executeBatchesSharedBridge(zkSync, batchFrom, batchTo, executeData);
     }
 
     function test_addValidatorRoles_PartialRoles() public {
@@ -597,16 +572,7 @@ contract ValidatorTimelockTest is Test {
         // execution is allowed as long as block.timestamp >= delay
         uint64 batchNumber = 999;
 
-        IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
-        storedBatch.batchNumber = batchNumber;
-        IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
-        storedBatches[0] = storedBatch;
-
-        vm.mockCall(
-            zkSync,
-            abi.encodeWithSelector(IExecutor.executeBatchesSharedBridge.selector),
-            abi.encode(storedBatches)
-        );
+        (uint256 batchFrom, uint256 batchTo, bytes memory executeData) = _encodeExecuteSingleBatch(batchNumber);
 
         // No commit was done, so timestamp is 0
         assertEq(validator.getCommittedBatchTimestamp(zkSync, batchNumber), 0);
@@ -615,11 +581,7 @@ contract ValidatorTimelockTest is Test {
         vm.warp(executionDelay + 1);
 
         vm.prank(alice);
-        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
-            storedBatches,
-            Utils.emptyData()
-        );
-        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData);
+        validator.executeBatchesSharedBridge(zkSync, batchFrom, batchTo, executeData);
     }
 
     function test_commitBatches_MultipleBatches() public {
@@ -744,39 +706,6 @@ contract ValidatorTimelockTest is Test {
 
         assertEq(validator.chainExecutionDelay(zkSync), 0);
         assertEq(validator.getExecutionDelay(zkSync), executionDelay);
-    }
-
-    /// @dev Commits a single batch `_batchNumber` at the current block timestamp through the timelock.
-    function _commitSingleBatch(uint64 _batchNumber) internal {
-        vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), abi.encode(chainId));
-
-        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
-        batchesToCommit[0] = Utils.createCommitBatchInfo();
-        batchesToCommit[0].batchNumber = _batchNumber;
-
-        (uint256 batchFrom, uint256 batchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            Utils.createStoredBatchInfo(),
-            batchesToCommit
-        );
-        vm.prank(alice);
-        validator.commitBatchesSharedBridge(zkSync, batchFrom, batchTo, commitData);
-    }
-
-    /// @dev Encodes the `executeBatchesSharedBridge` arguments for a single batch `_batchNumber`.
-    function _encodeExecuteSingleBatch(
-        uint64 _batchNumber
-    ) internal returns (uint256 batchFrom, uint256 batchTo, bytes memory executeData) {
-        IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
-        storedBatches[0] = Utils.createStoredBatchInfo();
-        storedBatches[0].batchNumber = _batchNumber;
-
-        vm.mockCall(
-            zkSync,
-            abi.encodeWithSelector(IExecutor.executeBatchesSharedBridge.selector),
-            abi.encode(storedBatches)
-        );
-
-        return Utils.encodeExecuteBatchesData(storedBatches, Utils.emptyData());
     }
 
     /// @dev The chain-specific delay is what `executeBatchesSharedBridge` actually enforces.

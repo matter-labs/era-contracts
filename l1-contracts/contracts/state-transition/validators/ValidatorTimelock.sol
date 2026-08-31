@@ -130,7 +130,7 @@ contract ValidatorTimelock is
     }
 
     /// @inheritdoc IValidatorTimelock
-    function setExecutionDelay(uint32 _newExecutionDelay) external onlyOwner {
+    function setExecutionDelay(uint32 _newExecutionDelay) external virtual onlyOwner {
         _checkExecutionDelayWithinBounds(_newExecutionDelay);
         _executionDelay = _newExecutionDelay;
         emit NewExecutionDelay(_newExecutionDelay);
@@ -140,7 +140,7 @@ contract ValidatorTimelock is
     function increaseChainExecutionDelay(
         address _chainAddress,
         uint32 _newExecutionDelay
-    ) external onlyRole(_chainAddress, DEFAULT_ADMIN_ROLE) {
+    ) external virtual onlyRole(_chainAddress, DEFAULT_ADMIN_ROLE) {
         _checkExecutionDelayWithinBounds(_newExecutionDelay);
 
         // Note, that the comparison is done against the currently enforced delay rather than against the
@@ -156,7 +156,7 @@ contract ValidatorTimelock is
     }
 
     /// @inheritdoc IValidatorTimelock
-    function setChainExecutionDelay(address _chainAddress, uint32 _newExecutionDelay) external onlyOwner {
+    function setChainExecutionDelay(address _chainAddress, uint32 _newExecutionDelay) external virtual onlyOwner {
         _checkExecutionDelayWithinBounds(_newExecutionDelay);
         _chainExecutionDelay[_chainAddress] = _newExecutionDelay;
         emit NewChainExecutionDelay(_chainAddress, _newExecutionDelay);
