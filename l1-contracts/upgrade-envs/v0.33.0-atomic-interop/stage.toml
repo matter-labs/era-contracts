@@ -8,6 +8,15 @@
 # The file must exist for `--env stage` to work at all: `upgrade-prepare-all` refuses to
 # fall back to another environment's input, because the basename also selects
 # `permanent-values/stage.toml` — and with it `testnet_verifier`.
+#
+# ⚠ Salts, `owner_address` and `era_chain_id` are NOT read from this file yet.
+# `EnvConfig` still resolves them from `upgrade-envs/v0.31.0-interopB/<env>.toml`
+# (`env_config.rs`'s `V31_UPGRADE_DIR`), so editing them here has no effect — and a v33
+# prepare consequently reuses the v31 CREATE2 salt, which the salt is explicitly not
+# supposed to be (it rotates per regen, or CREATE2 returns the previously deployed
+# contract). Moving that namespace per release also moves the canonical review-artifact
+# directory (`output/<env>/`), so it is left as a follow-up decision rather than folded
+# into this PR.
 
 era_chain_id = 270
 testnet_verifier = true
