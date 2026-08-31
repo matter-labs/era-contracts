@@ -91,7 +91,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         instantiateCreate2Factory();
         ctmAddresses.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade());
         ctmAddresses.stateTransition.verifiers.verifier = address(
-            new EraTestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE), IVerifier(ADDRESS_ONE))
+            new EraTestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE))
         );
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
         ctmAddresses.stateTransition.proxies.validatorTimelock = address(

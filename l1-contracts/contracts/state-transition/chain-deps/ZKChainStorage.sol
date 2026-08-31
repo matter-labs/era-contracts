@@ -266,4 +266,11 @@ struct ZKChainStorage {
     /// this field was introduced.
     /// @dev STORAGE SLOT: 68
     uint64 zksyncOSMaxTxGasLimit;
+    /// @dev Bit mask of the proof systems this Era chain does NOT require, so that the chain can keep
+    /// settling through a prover incident. `0` means every proof system is required, which is the value a
+    /// chain has until its admin changes it — so no upgrade-time write is needed.
+    /// @dev Era only; see `Admin.setDisabledProofSystems`. Read by `EraMultiProofVerifier` from the calling
+    /// chain, because one verifier instance serves every chain of a protocol version.
+    /// @dev STORAGE SLOT: 68
+    uint8 disabledProofSystems;
 }

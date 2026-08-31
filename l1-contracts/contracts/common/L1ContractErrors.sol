@@ -204,8 +204,12 @@ error InvalidNTVBurnData();
 error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 numHashes);
 // 0x99f6cc22
 error InvalidPackedPrecommitmentLength(uint256 length);
+// 0x1b6712bc
+error InvalidDisabledProofSystemsMask(uint8 mask);
 // 0x09bde339
 error InvalidProof();
+// 0x3e157423
+error InvalidPublicInputsLength();
 // 0x5a1c353a
 error InvalidProofFormat();
 // 0x48c5fa28

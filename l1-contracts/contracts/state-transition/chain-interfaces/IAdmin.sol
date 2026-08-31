@@ -42,6 +42,15 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// `ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`
     function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external;
 
+    /// @notice Set which proof systems this Era chain does NOT require in order to settle a batch.
+    /// @dev Chain-admin action, callable on the active settlement layer. The chain settles behind two
+    /// independent proof systems; this switches one of them off so the chain stays live through a prover
+    /// incident. Never both — a mask disabling everything is rejected.
+    /// @dev It deliberately applies while committed batches are still unverified, because that is exactly
+    /// the situation it exists for.
+    /// @param _disabledProofSystems Bit mask: 0 = both required, 1 = Boojum off, 2 = Airbender off.
+    function setDisabledProofSystems(uint8 _disabledProofSystems) external;
+
     /// @notice Change the fee params for L1->L2 transactions
     /// @param _newFeeParams The new fee params
     function changeFeeParams(FeeParams calldata _newFeeParams) external;
@@ -147,6 +156,9 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice ZKsync OS single-transaction gas limit (EIP-7825) changed
     event NewZKsyncOSMaxTxGasLimit(uint64 oldMaxTxGasLimit, uint64 newMaxTxGasLimit);
+
+    /// @notice The set of proof systems this chain does not require has changed
+    event NewDisabledProofSystems(uint8 oldDisabledProofSystems, uint8 newDisabledProofSystems);
 
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);

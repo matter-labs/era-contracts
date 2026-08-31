@@ -14,6 +14,32 @@ import {POINT_EVALUATION_PRECOMPILE_ADDR, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} fr
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {BatchHashMismatch, VerifiedBatchesExceedsCommittedBatches} from "contracts/common/L1ContractErrors.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
+import {
+    AIRBENDER_PROOF_SYSTEM_DISABLED,
+    AIRBENDER_SNARK_PROOF_LENGTH,
+    ERA_MULTI_PROOF_TYPE
+} from "contracts/common/Config.sol";
+
+/// @notice Stand-in verifier that reports back which public input and proof type the Executor handed it.
+/// @dev `IVerifier.verify` is `view`, so it cannot record to storage. Reverting with the values is the
+/// only way to observe them, and it asserts on the real argument the Executor passed rather than on a mock.
+contract PublicInputRevealingVerifier is IVerifier {
+    error RevealedPublicInput(uint256 publicInput, uint256 proofType);
+
+    function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) external pure returns (bool) {
+        revert RevealedPublicInput(_publicInputs[0], _proof.length == 0 ? type(uint256).max : _proof[0]);
+    }
+
+    function verificationKeyHash() external pure returns (bytes32) {
+        return bytes32(0);
+    }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
+}
 
 contract ProvingTest is ExecutorTest {
     bytes32 l2DAValidatorOutputHash;
@@ -196,5 +222,104 @@ contract ProvingTest is ExecutorTest {
         );
         validatorTimelock.proveBatchesSharedBridge(address(executor), proveBatchFrom, proveBatchTo, proveData);
         vm.snapshotGasLastCall("Executor", "prove");
+    }
+
+    // ============ Public input handed to the verifier ============
+
+    uint256 internal constant PLONK_VERIFICATION_TYPE = 1;
+
+    /// The Executor now emits the untruncated transition hash; `EraDualVerifier` and `AirbenderVerifier`
+    /// each apply their own derivation on top. Shifting here would discard the low bits the Airbender
+    /// binding consumes, so this pins the Executor to emitting the raw value.
+    function test_executorEmitsUntruncatedTransitionHash() public {
+        PublicInputRevealingVerifier revealer = new PublicInputRevealingVerifier();
+        vm.etch(getters.getVerifier(), address(revealer).code);
+
+        uint256 expectedRaw = uint256(
+            keccak256(abi.encodePacked(genesisStoredBatchInfo.commitment, newStoredBatchInfo.commitment))
+        );
+
+        uint256[] memory proof = new uint256[](2);
+        proof[0] = PLONK_VERIFICATION_TYPE;
+        proof[1] = 0xdeadbeef;
+
+        IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+        storedBatchInfoArray[0] = newStoredBatchInfo;
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
+            genesisStoredBatchInfo,
+            storedBatchInfoArray,
+            proof
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PublicInputRevealingVerifier.RevealedPublicInput.selector,
+                expectedRaw,
+                PLONK_VERIFICATION_TYPE
+            )
+        );
+        vm.prank(validator);
+        executor.proveBatchesSharedBridge(address(0), proveBatchFrom, proveBatchTo, proveData);
+    }
+
+    /// End-to-end through a real diamond: the Executor calls the multi-proof gate, which reads the kill
+    /// switch back off the chain's own Getters facet. The stubs in the verifier's own suite cannot catch a
+    /// missing `disabledProofSystems` selector in the production facet cut; this can.
+    function test_multiProofGateReadsKillSwitchFromTheChain() public {
+        AcceptingLane boojumLane = new AcceptingLane();
+        RejectingLane airbenderLane = new RejectingLane();
+        EraMultiProofVerifier gate = new EraMultiProofVerifier(
+            IVerifier(address(boojumLane)),
+            IVerifier(address(airbenderLane))
+        );
+        // Immutables live in runtime code, so etching carries the two lane addresses with it.
+        vm.etch(getters.getVerifier(), address(gate).code);
+
+        uint256[] memory proof = new uint256[](2 + 1 + AIRBENDER_SNARK_PROOF_LENGTH);
+        proof[0] = ERA_MULTI_PROOF_TYPE;
+        proof[1] = 1;
+        proof[2] = 1;
+
+        // Both required by default, and the Airbender lane rejects, so the batch must not settle.
+        vm.expectRevert(EraMultiProofVerifier.AirbenderVerificationFailed.selector);
+        _proveWith(proof);
+
+        // With Airbender switched off by the chain admin, the same batch settles on Boojum alone.
+        vm.prank(owner);
+        IAdmin(address(executor)).setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+        _proveWith(proof);
+        assertEq(getters.getTotalBlocksVerified(), 1);
+    }
+
+    function _proveWith(uint256[] memory _proof) internal {
+        IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+        storedBatchInfoArray[0] = newStoredBatchInfo;
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
+            genesisStoredBatchInfo,
+            storedBatchInfoArray,
+            _proof
+        );
+        vm.prank(validator);
+        executor.proveBatchesSharedBridge(address(0), proveBatchFrom, proveBatchTo, proveData);
+    }
+}
+
+contract AcceptingLane is IVerifier {
+    function verify(uint256[] calldata, uint256[] calldata) external pure returns (bool) {
+        return true;
+    }
+
+    function verificationKeyHash() external pure returns (bytes32) {
+        return bytes32(0);
+    }
+}
+
+contract RejectingLane is IVerifier {
+    function verify(uint256[] calldata, uint256[] calldata) external pure returns (bool) {
+        return false;
+    }
+
+    function verificationKeyHash() external pure returns (bytes32) {
+        return bytes32(0);
     }
 }

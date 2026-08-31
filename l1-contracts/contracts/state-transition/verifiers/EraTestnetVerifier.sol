@@ -17,10 +17,10 @@ contract EraTestnetVerifier is IVerifier, IEraDualVerifier {
     EraDualVerifier public immutable DUAL_VERIFIER;
     bool public constant IS_TESTNET_VERIFIER = true;
 
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, IVerifier _airbenderPlonkVerifier) {
+    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
         assert(block.chainid != 1);
 
-        DUAL_VERIFIER = new EraDualVerifier(_fflonkVerifier, _plonkVerifier, _airbenderPlonkVerifier);
+        DUAL_VERIFIER = new EraDualVerifier(_fflonkVerifier, _plonkVerifier);
     }
 
     /// @dev Verifies a zk-SNARK proof, skipping the verification if the proof is empty.
@@ -50,11 +50,5 @@ contract EraTestnetVerifier is IVerifier, IEraDualVerifier {
     // solhint-disable-next-line func-name-mixedcase
     function PLONK_VERIFIER() external view override returns (IVerifier) {
         return DUAL_VERIFIER.PLONK_VERIFIER();
-    }
-
-    /// @inheritdoc IEraDualVerifier
-    // solhint-disable-next-line func-name-mixedcase
-    function AIRBENDER_PLONK_VERIFIER() external view override returns (IVerifier) {
-        return DUAL_VERIFIER.AIRBENDER_PLONK_VERIFIER();
     }
 }

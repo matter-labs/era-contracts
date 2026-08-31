@@ -21,10 +21,15 @@ struct CTMCoreDeploymentConfig {
     address eip7702Checker;
     address verifierFflonk;
     address verifierPlonk;
-    /// @notice Address of the Airbender PLONK verifier wired into the third slot of the Era dual
-    ///         verifier. `address(0)` when Airbender support is not requested (or for ZKsyncOS,
-    ///         which registers sub-verifiers differently).
+    /// @notice Address of the generated Airbender PLONK verifier. `address(0)` when Airbender support is
+    ///         not requested (or for ZKsyncOS, which registers sub-verifiers differently).
     address airbenderVerifierPlonk;
+    /// @notice Address of `AirbenderVerifier`, the Airbender lane of the multi-proof gate.
+    ///         `address(0)` when Airbender support is not requested.
+    address airbenderVerifier;
+    /// @notice Address of the Boojum router (`EraDualVerifier` or `EraTestnetVerifier`), which becomes the
+    ///         Boojum lane of `EraMultiProofVerifier` when Airbender support is requested.
+    address boojumVerifier;
     address verifierOwner;
     address permissionlessValidator;
 }
@@ -47,7 +52,10 @@ enum CTMContract {
     VerifierFflonk,
     VerifierPlonk,
     DualVerifier,
+    AirbenderVerifier,
+    MultiProofVerifier,
     TestnetVerifier,
+    MultiProofTestnetVerifier,
     // ---- Gateway CTM deployers ----
     GatewayCTMDeployerCTM,
     GatewayCTMDeployerVerifiers,
@@ -73,6 +81,21 @@ library DeployCTML1OrGateway {
         bool _testnet
     ) internal view returns (string memory fileName, string memory contractName) {
         return resolve(_isZKsyncOS, _testnet ? CTMContract.TestnetVerifier : CTMContract.DualVerifier);
+    }
+
+    /// @notice Resolve the verifier the chain's diamond points at.
+    /// @dev With the Airbender lane deployed this is `EraMultiProofVerifier`, which requires both proof
+    ///      systems and holds the Boojum router as one of its two lanes. Without it, the Boojum router is
+    ///      the chain's verifier directly, exactly as before.
+    function resolveChainVerifier(
+        bool _isZKsyncOS,
+        bool _testnet,
+        bool _airbender
+    ) internal view returns (string memory fileName, string memory contractName) {
+        if (!_airbender || _isZKsyncOS) {
+            return resolveMainVerifier(_isZKsyncOS, _testnet);
+        }
+        return resolve(_isZKsyncOS, _testnet ? CTMContract.MultiProofTestnetVerifier : CTMContract.MultiProofVerifier);
     }
 
     // ======================== Creation calldata ========================
@@ -107,13 +130,13 @@ library DeployCTML1OrGateway {
             return abi.encode(_isZKsyncOS);
         } else if (_contractName == CTMContract.DualVerifier || _contractName == CTMContract.TestnetVerifier) {
             return
-                verifierCreationArgs(
-                    _isZKsyncOS,
-                    _config.verifierFflonk,
-                    _config.verifierPlonk,
-                    _config.verifierOwner,
-                    _config.airbenderVerifierPlonk
-                );
+                verifierCreationArgs(_isZKsyncOS, _config.verifierFflonk, _config.verifierPlonk, _config.verifierOwner);
+        } else if (_contractName == CTMContract.AirbenderVerifier) {
+            return abi.encode(_config.airbenderVerifierPlonk);
+        } else if (
+            _contractName == CTMContract.MultiProofVerifier || _contractName == CTMContract.MultiProofTestnetVerifier
+        ) {
+            return abi.encode(_config.boojumVerifier, _config.airbenderVerifier);
         } else if (_contractName == CTMContract.ChainTypeManager) {
             return
                 abi.encode(
@@ -162,6 +185,12 @@ library DeployCTML1OrGateway {
             _compareStrings(_contractName, "EraDualVerifier") || _compareStrings(_contractName, "ZKsyncOSDualVerifier")
         ) {
             return CTMContract.DualVerifier;
+        } else if (_compareStrings(_contractName, "AirbenderVerifier")) {
+            return CTMContract.AirbenderVerifier;
+        } else if (_compareStrings(_contractName, "EraMultiProofVerifier")) {
+            return CTMContract.MultiProofVerifier;
+        } else if (_compareStrings(_contractName, "EraMultiProofTestnetVerifier")) {
+            return CTMContract.MultiProofTestnetVerifier;
         } else {
             revert(string.concat("Contract ", _contractName, " not CTM contract, creation calldata could not be set"));
         }
@@ -172,23 +201,19 @@ library DeployCTML1OrGateway {
     // TODO: pass this value from zkstack_cli
     uint32 internal constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 6;
 
-    /// @notice Encode constructor arguments for the main verifier.
-    ///         ZKsyncOS verifiers require an extra `_owner` argument, while the Era dual verifier
-    ///         accepts the Airbender PLONK verifier in its third slot.
-    /// @param _airbenderPlonk Address of the Airbender PLONK verifier for the Era dual verifier's
-    ///        third slot. Pass `address(0)` to leave the slot empty (the default when Airbender
-    ///        support is not requested). Ignored for ZKsyncOS.
+    /// @notice Encode constructor arguments for the Boojum router.
+    ///         ZKsyncOS verifiers require an extra `_owner` argument; the Era router takes only its two
+    ///         Boojum sub-verifiers. The Airbender lane is constructed separately, as `AirbenderVerifier`.
     function verifierCreationArgs(
         bool _isZKsyncOS,
         address _fflonk,
         address _plonk,
-        address _owner,
-        address _airbenderPlonk
+        address _owner
     ) internal pure returns (bytes memory) {
         if (_isZKsyncOS) {
             return abi.encode(_fflonk, _plonk, _owner);
         }
-        return abi.encode(_fflonk, _plonk, _airbenderPlonk);
+        return abi.encode(_fflonk, _plonk);
     }
 
     /// @notice Perform any post-deploy steps required for the verifier.
@@ -240,9 +265,8 @@ library DeployCTML1OrGateway {
     /// @notice Retrieve sub-verifier addresses from a deployed dual verifier.
     /// @return fflonk The Boojum FFLONK sub-verifier.
     /// @return plonk The Boojum PLONK sub-verifier.
-    /// @return airbenderPlonk The Airbender PLONK sub-verifier. Always `address(0)` for ZKsyncOS
-    ///         (which has no dedicated Airbender slot) and may be `address(0)` for an Era dual
-    ///         verifier deployed without Airbender support.
+    /// @return airbenderPlonk Always `address(0)`. The Airbender lane is not a sub-verifier of either
+    ///         router; it hangs off `EraMultiProofVerifier`, which this helper does not introspect.
     function getSubVerifiers(
         address _verifier,
         bool _isZKsyncOS
@@ -259,7 +283,8 @@ library DeployCTML1OrGateway {
             IEraDualVerifier verifier = IEraDualVerifier(_verifier);
             fflonk = address(verifier.FFLONK_VERIFIER());
             plonk = address(verifier.PLONK_VERIFIER());
-            airbenderPlonk = address(verifier.AIRBENDER_PLONK_VERIFIER());
+            // The Airbender lane is not reachable through the Boojum router; it is introspected from
+            // `EraMultiProofVerifier` instead, so nothing to read here.
         }
     }
 
@@ -273,6 +298,9 @@ library DeployCTML1OrGateway {
         if (_c == CTMContract.VerifierFflonk) return _isZKsyncOS ? "ZKsyncOSVerifierFflonk" : "EraVerifierFflonk";
         if (_c == CTMContract.VerifierPlonk) return _isZKsyncOS ? "ZKsyncOSVerifierPlonk" : "EraVerifierPlonk";
         if (_c == CTMContract.DualVerifier) return _isZKsyncOS ? "ZKsyncOSDualVerifier" : "EraDualVerifier";
+        if (_c == CTMContract.AirbenderVerifier) return "AirbenderVerifier";
+        if (_c == CTMContract.MultiProofVerifier) return "EraMultiProofVerifier";
+        if (_c == CTMContract.MultiProofTestnetVerifier) return "EraMultiProofTestnetVerifier";
         if (_c == CTMContract.TestnetVerifier) return _isZKsyncOS ? "ZKsyncOSTestnetVerifier" : "EraTestnetVerifier";
         if (_c == CTMContract.GatewayCTMDeployerCTM) {
             return _isZKsyncOS ? "GatewayCTMDeployerCTMZKsyncOS" : "GatewayCTMDeployerCTM";

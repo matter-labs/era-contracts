@@ -217,7 +217,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function deployVerifiers() internal {
         (, string memory fflonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierFflonk);
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierPlonk);
-        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
+        (, string memory boojumVerifierName) = DeployCTML1OrGateway.resolveMainVerifier(
             config.isZKsyncOS,
             config.testnetVerifier
         );
@@ -225,18 +225,33 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
 
-        // The Airbender PLONK verifier occupies the third slot of the Era dual verifier. It must be
-        // deployed before the dual verifier so its address is included in the constructor args (see
-        // `getCTMCoreDeploymentConfig`). ZKsyncOS registers sub-verifiers separately, so the slot
-        // is skipped there.
-        if (config.airbenderVerifier && !config.isZKsyncOS) {
+        // The Boojum router is deployed either way. With the Airbender lane it becomes one of the two lanes
+        // of the multi-proof gate rather than the chain's verifier.
+        ctmAddresses.stateTransition.verifiers.boojumVerifier = deploySimpleContract(boojumVerifierName, false);
+
+        bool deployAirbenderLane = config.airbenderVerifier && !config.isZKsyncOS;
+        if (deployAirbenderLane) {
+            // Each contract must exist before the one that takes it as a constructor argument (see
+            // `getCTMCoreDeploymentConfig`): generated PLONK verifier, then the wrapper that pins the guest
+            // binary, then the gate that requires both proof systems.
             ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk = deploySimpleContract(
                 "AirbenderVerifierPlonk",
                 false
             );
+            ctmAddresses.stateTransition.verifiers.airbenderVerifier = deploySimpleContract("AirbenderVerifier", false);
         }
 
-        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
+        if (deployAirbenderLane) {
+            (, string memory gateName) = DeployCTML1OrGateway.resolveChainVerifier(
+                config.isZKsyncOS,
+                config.testnetVerifier,
+                true
+            );
+            ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(gateName, false);
+        } else {
+            // Without the Airbender lane the Boojum router is the chain's verifier, exactly as before.
+            ctmAddresses.stateTransition.verifiers.verifier = ctmAddresses.stateTransition.verifiers.boojumVerifier;
+        }
 
         // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
         vm.startBroadcast(getDeployerAddress());
@@ -364,10 +379,22 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.proxies.chainTypeManager
         );
         vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
+        // `airbender_verifier_addr` keeps naming the generated PLONK verifier, as it always has; the wrapper
+        // and the Boojum router are new addresses and are reported under their own keys.
         vm.serializeAddress(
             "state_transition",
             "airbender_verifier_addr",
             ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "airbender_verifier_wrapper_addr",
+            ctmAddresses.stateTransition.verifiers.airbenderVerifier
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "boojum_verifier_addr",
+            ctmAddresses.stateTransition.verifiers.boojumVerifier
         );
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);

@@ -220,6 +220,11 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
+    function disabledProofSystems() external view returns (uint8) {
+        return s.disabledProofSystems;
+    }
+
+    /// @inheritdoc IGetters
     function isFunctionFreezable(bytes4 _selector) external view returns (bool) {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
         if (ds.selectorToFacet[_selector].facetAddress == address(0)) {
