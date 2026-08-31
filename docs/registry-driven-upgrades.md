@@ -399,6 +399,15 @@ Two properties that look like omissions but are not:
 CTM ownership is transferred, not forced: `migrate()` nominates the executor, and
 `CTMUpgradeExecutor.acceptCTMOwnership()` — owner-gated — completes the handover.
 
+The prepare side of this edge is `deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol`: it rides the
+default pipeline for implementation deploys and cut composition, then deploys the executor and
+the migration (manifest pinned from the run's own outputs) and collapses the stage-1 CTM leg to
+FOUR governance calls — nominate the CTM, hand over its ProxyAdmin, `migrate()`, and
+`acceptCTMOwnership()`. The v31 upgrade surface (scripts, its anvil CI job, fork harness and
+fixtures) is deleted; the pre-registry history lives on the release branches. The remaining
+legacy machinery — `default-upgrade/`'s cut composition and the v32 scripts/tests that keep it
+honest — goes with EVM-1644 once the bootstrap manifest generator is fully self-contained.
+
 ## Deployment determinism
 
 Objects take their manifest as a constructor argument, so the manifest is part of the initcode and a
