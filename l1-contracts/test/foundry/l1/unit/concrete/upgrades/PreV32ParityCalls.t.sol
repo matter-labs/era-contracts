@@ -32,6 +32,16 @@ contract CoreUpgradeParityHarness is CoreUpgrade_v33 {
         deployVersionSpecificEcosystemContractsL1();
     }
 
+    /// @dev The initializer the deploy step hands the handler's proxy. Exposed so a test can deploy a
+    ///      proxy exactly as the script does and assert the resulting owner.
+    function interopHandlerInitializer() external returns (bytes memory) {
+        return getInitializeCalldata("L1InteropHandler", false);
+    }
+
+    function setOwner(address _owner) external {
+        config.ownerAddress = _owner;
+    }
+
     function buildInteropHandlerWiringCalls() external returns (Call[] memory) {
         return prepareVersionSpecificStage1GovernanceCallsL1();
     }
@@ -133,6 +143,27 @@ contract PreV32ParityCallsTest is Test {
 
         assertEq(l1Nullifier.l1InteropHandler(), address(interopHandler), "nullifier wired to the handler");
         assertEq(assetRouter.l1InteropHandler(), address(interopHandler), "asset router wired to the handler");
+    }
+
+    /// @notice A handler deployed the way the script deploys it ends up owned by governance.
+    /// @dev An outcome check, not a calldata one: the proxy is built with the initializer the script
+    ///      supplies and then asked who owns it. That is the property the upgrade depends on — there
+    ///      is no `acceptOwnership` in stage 1 to fall back on if the initializer is wrong.
+    function test_deployedInteropHandlerIsOwnedByGovernance() public {
+        upgradeScript.setOwner(owner);
+
+        L1InteropHandler impl = new L1InteropHandler(IMessageRootBase(makeAddr("messageRoot")), address(assetRouter));
+        L1InteropHandler deployed = L1InteropHandler(
+            payable(
+                new TransparentUpgradeableProxy(
+                    address(impl),
+                    makeAddr("proxyAdminForHandler"),
+                    upgradeScript.interopHandlerInitializer()
+                )
+            )
+        );
+
+        assertEq(deployed.owner(), owner, "governance owns the handler with no further calls");
     }
 
     function test_refusesAnEcosystemThatAlreadyHasTheHandler() public {

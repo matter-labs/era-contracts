@@ -47,13 +47,13 @@ pub struct ChainSetUpgradeTimestampArgs {
     pub shared: SharedRunArgs,
 }
 
-/// Protocol minor versions whose per-chain upgrade gates on the recorded priority-op bound.
+/// The protocol version a chain must currently be on for the priority-op bound to be required.
 ///
-/// Exactly v33 today: `PRIORITY_OP_LOWER_BOUND` exists because this release removes the L2 entry
-/// point of v31's base-token backfill, which is a one-time concern. A later release that keeps the
-/// registry should add itself here — assuming every future version has the getter would make this
-/// command fail on the first one that drops it.
-const VERSIONS_WITH_PRIORITY_OP_BOUND: [u64; 1] = [33];
+/// Keyed off the chain rather than the CTM: `PRIORITY_OP_LOWER_BOUND` exists to prove that v31's
+/// base-token backfill executed before this release removed its L2 entry point, so the precondition
+/// belongs to chains leaving v31. A CTM already bumped by a later release would otherwise make this
+/// check misfire.
+const VERSION_REQUIRING_PRIORITY_OP_BOUND: u64 = 31;
 
 alloy::sol! {
     /// The v33 per-chain upgrade contract and the registry it reads. Only the getters are needed:
@@ -74,9 +74,9 @@ alloy::sol! {
 /// with `LowerBoundNotRecorded()` / `PriorityQueueNotReady()` and the chain sits wedged in the
 /// meantime. Checking here turns that into a refusal before anything is sent.
 ///
-/// Applies only to the protocol versions listed in {VERSIONS_WITH_PRIORITY_OP_BOUND}, established
-/// positively from the CTM's own version. Once the check does apply, every failure — RPC, decoding,
-/// an unexpected upgrade contract — is fatal rather than treated as "nothing to check".
+/// Applies only to a chain currently on v31 (see {VERSION_REQUIRING_PRIORITY_OP_BOUND}). Once it does
+/// apply, every failure — RPC, decoding, an unexpected upgrade contract — is fatal rather than treated
+/// as "nothing to check".
 async fn ensure_priority_op_bound_ready(
     rpc_url: &str,
     bridgehub: Address,
@@ -91,18 +91,18 @@ async fn ensure_priority_op_bound_ready(
         .await
         .context("resolve chain diamond")?;
 
-    // Decide whether the precondition applies from the protocol version the CTM will upgrade chains
-    // to — a positive signal — rather than from whether a getter call happened to succeed. Governance
-    // stage 1 has already moved the CTM to the new version by the time an upgrade is scheduled.
-    let packed = IChainTypeManagerAbi::new(ctm, &provider)
-        .protocolVersion()
+    // Decide from the *chain's* current protocol version, not the CTM's. The CTM may already have
+    // been bumped past this release by a later one, whereas what actually matters is the version the
+    // chain is upgrading away from: the bound exists to prove v31's base-token backfill executed.
+    let packed = ZkChainAbi::new(diamond, &provider)
+        .getProtocolVersion()
         .call()
         .await
-        .context("read CTM protocolVersion")?;
+        .context("read chain protocolVersion")?;
     let minor = (packed.wrapping_to::<u64>() >> 32) & 0xFFFF;
-    if !VERSIONS_WITH_PRIORITY_OP_BOUND.contains(&minor) {
+    if minor != VERSION_REQUIRING_PRIORITY_OP_BOUND {
         logger::info(format!(
-            "CTM is on protocol version 0.{minor}.x, which has no priority-op bound precondition — skipping the check"
+            "Chain {chain_id} is on protocol version 0.{minor}.x, not 0.{VERSION_REQUIRING_PRIORITY_OP_BOUND}.x — no priority-op bound precondition to check"
         ));
         return Ok(());
     }

@@ -5,7 +5,7 @@ use alloy::sol_types::SolCall;
 use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{
-    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi, ICoreUpgradeAbi,
+    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi, ICoreUpgradeV33Abi,
     IDeployCTMAbi, IDeployL1CoreContractsAbi, IDeployPaymasterAbi, IEnableEvmEmulatorAbi,
     IFinalizeChainInitAbi, IGatewayVotePreparationAbi, IRecordPriorityOpLowerBoundAbi,
     IRegisterOnAllChainsAbi,
@@ -266,7 +266,7 @@ script_calls! {
     // DeployCTM
     IDeployCTMAbi::runInnerCall                                         => DEPLOY_CTM_INVOCATION,
     IRecordPriorityOpLowerBoundAbi::runCall                             => RECORD_PRIORITY_OP_LOWER_BOUND_INVOCATION,
-    ICoreUpgradeAbi::stage3Call                                         => STAGE3_CORE_UPGRADE_INVOCATION,
+    ICoreUpgradeV33Abi::stage3Call                                         => STAGE3_CORE_UPGRADE_INVOCATION,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

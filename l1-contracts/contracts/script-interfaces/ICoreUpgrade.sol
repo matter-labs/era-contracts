@@ -12,7 +12,4 @@ import {CoreUpgradeParams} from "deploy-scripts/upgrade/default-upgrade/UpgradeP
 ///         entry point the default does not have.
 interface ICoreUpgrade {
     function noGovernancePrepare(CoreUpgradeParams memory _params) external;
-
-    /// @notice Post-governance `bridgedOut` population; see `DefaultCoreUpgrade.stage3`.
-    function stage3(address _bridgehubProxy) external;
 }

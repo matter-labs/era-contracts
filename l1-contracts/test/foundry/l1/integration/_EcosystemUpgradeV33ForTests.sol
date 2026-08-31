@@ -99,9 +99,3 @@ contract CoreUpgradeV33ForTests is CoreUpgrade_v33 {
         stage3(bridgehubProxy);
     }
 }
-
-/// @dev Kept as a named alias for the tests that re-run core deploys to recompute create2 addresses.
-///      It used to skip `updateContractConnections()` so a second run would not redo `setAddresses` /
-///      `transferOwnership`; v33 has neither — the core deploys are pure CREATE2 and the interop
-///      handler is initialized straight to governance — so re-running is already idempotent.
-contract CoreUpgradeV33Idempotent is CoreUpgradeV33ForTests {}

@@ -301,6 +301,15 @@ pub mod i_core_upgrade {
 }
 pub use i_core_upgrade::ICoreUpgradeAbi;
 
+pub mod i_core_upgrade_v33 {
+    alloy::sol!(
+        #[sol(rpc)]
+        ICoreUpgradeV33Abi,
+        "../l1-contracts/zkstack-out/ICoreUpgradeV33.sol/ICoreUpgradeV33.json"
+    );
+}
+pub use i_core_upgrade_v33::ICoreUpgradeV33Abi;
+
 pub mod i_ctm_upgrade {
     alloy::sol!(
         #[sol(rpc)]

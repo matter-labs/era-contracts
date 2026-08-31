@@ -1,33 +1,18 @@
 # Upgrade input for the frozen local chain committed in zksync-os-integration-tests
 # (`tests/local-chains/`, currently v31.0 / chain 506), used by its v31 -> v33 upgrade test.
 #
-# Value-for-value a copy of `local.toml` in this directory; it exists under its own basename so the
-# fixture is addressable as its own `--env zksync-os-integration-test`.
+# Same shape as `local.toml` in this directory; it exists under its own basename so the
+# fixture is addressable as `--env zksync-os-integration-test`, which also selects
+# `permanent-values/zksync-os-integration-test.toml`.
 #
-# Note for anyone porting the v31 flow's reasoning: v31 needed a separate basename because
-# `CoreUpgrade_v31` paired the input with `../permanent-values/<basename>.toml` and
-# `permanent-values/local.toml` declares chain 506 as the legacy gateway — the very chain being
-# upgraded. v33 has no stage-2 decommission step and reads permanent-values nowhere, so that hazard
-# is gone and only the env-name addressing remains.
-#
-# See `local.toml` for why the values below are inert.
+# See `local.toml` for why so little is needed here.
 
-old_protocol_version = 0x1d00000000
-bridgehub_proxy_address = "0xC0F09Cb637DCfDe54D8B7b5170736Ec21aBB33ce"
+# v31 -> v33.
+old_protocol_version = 0x1f00000000
+latest_protocol_version = 0x2100000000
+new_protocol_version = 0x2100000000
+
+bridgehub_proxy_address = "0x70fe0ddb82adf1fe9ae7afe3047e1cbf6db7cfd1"
 
 [chain]
-chain_id = 270
-
-[contracts]
-
-genesis_root = "0xe167dcb28722cee8fc953ea70d8fb2adaffe2806d9fd194da79bd84e19adbae3"
-genesis_rollup_leaf_index = 84
-genesis_batch_commitment = "0xafde914ddb8d8a1e757fcbe6e7d7960723566e15fb7df11204bb15880d1a1a41"
-recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-bootloader_hash = "0x01000911c4db4fe62c98e180cfa7e9b3a22fb15f505905d4bf36192f481551e6"
-default_aa_hash = "0x010005f73e7c299ed73db937843643bdc276cbc2cc8596287e1e0cf3afc60252"
-evm_emulator_hash = "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63"
-latest_protocol_version = 0x1d00000002
-new_protocol_version = 0x1d00000002
+chain_id = 506

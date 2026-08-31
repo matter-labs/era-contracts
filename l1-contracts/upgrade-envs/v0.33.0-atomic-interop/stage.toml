@@ -17,6 +17,12 @@
 # contract). Moving that namespace per release also moves the canonical review-artifact
 # directory (`output/<env>/`), so it is left as a follow-up decision rather than folded
 # into this PR.
+#
+# Pruned for v33: the EraVM chain-creation params and v29-era leftovers earlier envs carried
+# (bootloader / default-AA / EVM-emulator hashes, `recursion_*_vk_hash`, `genesis_*`,
+# `diamond_init_*`, `v28_protocol_version`, the priority-tx gas knobs) are gone — v33 is
+# ZKsync OS-only and nothing on this path reads them. Chain-creation params come from
+# `configs/genesis/zksync-os/latest.json`.
 
 era_chain_id = 270
 testnet_verifier = true
@@ -25,10 +31,9 @@ owner_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
 
 support_l2_legacy_shared_bridge_test = false
 
-old_protocol_version = 0x1d00000000
+# v31 -> v33.
+old_protocol_version = 0x1f00000000
 
-priority_txs_l2_gas_limit = 2000000
-max_expected_l1_gas_price = 50000000000
 
 [contracts]
 governance_min_delay = 0
@@ -38,27 +43,11 @@ create2_factory_salt = "0xb41d84fc2f6ddcedd3b7f5ca9e2cb874316fb32e63a2bbf9ad406d
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 legacy_gov_salt = "0x0abb3e6da2ba65373370237dce4f0092f09f2f75d6d9af5cc7185f4404e8269a"
 validator_timelock_execution_delay = 0
-genesis_root = "0xe167dcb28722cee8fc953ea70d8fb2adaffe2806d9fd194da79bd84e19adbae3"
-genesis_rollup_leaf_index = 84
-genesis_batch_commitment = "0xafde914ddb8d8a1e757fcbe6e7d7960723566e15fb7df11204bb15880d1a1a41"
-recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-priority_tx_max_gas_limit = 72000000
-diamond_init_pubdata_pricing_mode = 0
-diamond_init_batch_overhead_l1_gas = 1000000
-diamond_init_max_pubdata_per_batch = 120000
-diamond_init_max_l2_gas_per_batch = 80000000
-diamond_init_priority_tx_max_pubdata = 99000
-diamond_init_minimal_l2_gas_price = 250000000
-bootloader_hash = "0x01000911c4db4fe62c98e180cfa7e9b3a22fb15f505905d4bf36192f481551e6"
-default_aa_hash = "0x010005f73e7c299ed73db937843643bdc276cbc2cc8596287e1e0cf3afc60252"
-evm_emulator_hash = "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63"
 bridgehub_proxy_address = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
 rollup_da_manager = "0xeb7c0daaddfb52afa05400b489e7497b271d6122"
 
 governance_security_council_address = "0xed04b1ac422251851a3EC953Ff4395e5c2443647"
-latest_protocol_version = 0x1d00000002
+latest_protocol_version = 0x2100000000
 l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
 protocol_upgrade_handler_proxy_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
 

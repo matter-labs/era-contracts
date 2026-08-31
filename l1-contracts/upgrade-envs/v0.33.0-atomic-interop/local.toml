@@ -1,30 +1,25 @@
 # Upgrade input for the v33 release on a local anvil ecosystem.
 #
-# Almost nothing here drives the upgrade: the target protocol version and chain-creation params
-# come from `configs/genesis/zksync-os/latest.json`
-# (`DefaultCoreUpgrade.loadProtocolVersionFromGenesis`), the old version from the CTM on chain, and
-# the bridgehub/CTM addresses from the caller's `--bridgehub` / `--ctm-proxy`. The values below are
-# kept for parity with the other envs and for tooling that reports them.
+# Deliberately minimal. The upgrade reads almost nothing from here: the target protocol
+# version and chain-creation params come from `configs/genesis/zksync-os/latest.json`
+# (`DefaultCoreUpgrade.loadProtocolVersionFromGenesis`), the old version from the chain
+# on L1, and the bridgehub/CTM addresses from the caller's `--bridgehub`/`--ctm-proxy`.
+# The versions below are recorded so tooling reporting on the upgrade is accurate.
 #
-# The file's *name* is what matters: `protocol-ops ecosystem upgrade-prepare-all --env <name>`
-# resolves its upgrade input as `upgrade-envs/v0.33.0-atomic-interop/<name>.toml`.
+# v33 is ZKsync OS-only, so the EraVM chain-creation params earlier envs carried
+# (bootloader/default-AA/EVM-emulator hashes, `recursion_*_vk_hash`, `diamond_init_*`)
+# are deliberately absent — nothing on this path reads them.
+#
+# The file's *name* matters: `--env <name>` resolves the input as
+# `upgrade-envs/v0.33.0-atomic-interop/<name>.toml` and the permanent values as
+# `permanent-values/<name>.toml`, which is where `testnet_verifier` lives.
 
-old_protocol_version = 0x1d00000000
+# v31 -> v33.
+old_protocol_version = 0x1f00000000
+latest_protocol_version = 0x2100000000
+new_protocol_version = 0x2100000000
+
 bridgehub_proxy_address = "0xC0F09Cb637DCfDe54D8B7b5170736Ec21aBB33ce"
 
 [chain]
 chain_id = 270
-
-[contracts]
-
-genesis_root = "0xe167dcb28722cee8fc953ea70d8fb2adaffe2806d9fd194da79bd84e19adbae3"
-genesis_rollup_leaf_index = 84
-genesis_batch_commitment = "0xafde914ddb8d8a1e757fcbe6e7d7960723566e15fb7df11204bb15880d1a1a41"
-recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-bootloader_hash = "0x01000911c4db4fe62c98e180cfa7e9b3a22fb15f505905d4bf36192f481551e6"
-default_aa_hash = "0x010005f73e7c299ed73db937843643bdc276cbc2cc8596287e1e0cf3afc60252"
-evm_emulator_hash = "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63"
-latest_protocol_version = 0x1d00000002
-new_protocol_version = 0x1d00000002

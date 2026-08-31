@@ -35,6 +35,7 @@ const REQUIRED_CONTRACTS = [
   "IRegisterOnAllChains.sol",
   "IFinalizeChainInit.sol",
   "ICoreUpgrade.sol",
+  "ICoreUpgradeV33.sol",
   "ICTMUpgrade.sol",
   "IRecordPriorityOpLowerBound.sol",
   "IFinalizeUpgrade.sol",

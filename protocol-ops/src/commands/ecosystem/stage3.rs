@@ -25,7 +25,7 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::common::abi::ICoreUpgradeAbi;
+use crate::common::abi::ICoreUpgradeV33Abi;
 use crate::common::env_config::default_protocol_ops_out_dir;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
@@ -107,7 +107,7 @@ pub async fn run(mut args: Stage3Args) -> anyhow::Result<()> {
         );
     }
     let mut script = runner
-        .script_call(ICoreUpgradeAbi::stage3Call {
+        .script_call(ICoreUpgradeV33Abi::stage3Call {
             _bridgehubProxy: bridgehub,
         })
         .with_wallet(&sender);

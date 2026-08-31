@@ -12,6 +12,8 @@ import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandl
 import {Call} from "contracts/governance/Common.sol";
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
+import {BridgedOutPopulationLib} from "../default-upgrade/BridgedOutPopulationLib.sol";
+import {ICoreUpgradeV33} from "contracts/script-interfaces/ICoreUpgradeV33.sol";
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 
 /// @notice Core (ecosystem-wide) half of the v33 upgrade flow. CTM-side deploys live in
@@ -19,9 +21,26 @@ import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 ///
 /// @dev Everything generic lives in {DefaultCoreUpgrade}: the `noGovernancePrepare` entry point, the
 ///      refresh of all L1 core implementations, the stage-1 `ProxyAdmin.upgrade` calls that point the
-///      core proxies at them, and `stage3`'s `bridgedOut` population. This file holds only what is
-///      genuinely new in v33 — `L1InteropHandler`, which has no proxy on an older ecosystem.
-contract CoreUpgrade_v33 is Script, DefaultCoreUpgrade {
+///      core proxies at them. This file holds what is specific to v33: `L1InteropHandler`, which has
+///      no proxy on an older ecosystem, and `stage3`'s `bridgedOut` population.
+contract CoreUpgrade_v33 is Script, DefaultCoreUpgrade, ICoreUpgradeV33 {
+    /// @notice Post-governance step: populate `L1NativeTokenVault.bridgedOut` from the per-chain
+    ///         legacy balances.
+    /// @dev Runs after the governance stages and before the per-chain diamond cuts, so withdrawals on
+    ///      each chain unblock as soon as its cut lands. Caller signs as any EOA — no governance
+    ///      privileges needed — and the population is additive and resumable, so an interrupted run
+    ///      can simply be repeated.
+    function stage3(address bridgehubProxy) public virtual {
+        console.log("Starting v33 stage3 post-governance bridgedOut population...");
+        console.log("Bridgehub proxy:", bridgehubProxy);
+
+        vm.startBroadcast();
+        BridgedOutPopulationLib.populateBridgedOutForAllAssets(bridgehubProxy);
+        vm.stopBroadcast();
+
+        console.log("v33 stage3 bridgedOut population complete!");
+    }
+
     /// @notice Deploy the interop handler, which this release introduces.
     /// @dev No "already deployed?" branch: v33 upgrades a v31 ecosystem, which by definition has no
     ///      handler. If one is found, discovery or the target ecosystem is not what this script

@@ -6,13 +6,10 @@ import {Test} from "forge-std/Test.sol";
 import {CoreUpgrade_v33} from "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
 import {CTMUpgrade_v33} from "deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {ICoreUpgrade} from "contracts/script-interfaces/ICoreUpgrade.sol";
+import {ICoreUpgradeV33} from "contracts/script-interfaces/ICoreUpgradeV33.sol";
 import {ICTMUpgrade} from "contracts/script-interfaces/ICTMUpgrade.sol";
 
 import {Call} from "contracts/governance/Common.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
 
 /// @dev Exposes the internal stage-1 builder and lets the test place the addresses the script
 ///      normally fills in from on-chain introspection.
@@ -23,20 +20,17 @@ contract CoreUpgradeV33Harness is CoreUpgrade_v33 {
         coreAddresses.bridges.proxies.l1InteropHandler = _l1InteropHandler;
     }
 
-    function setOwner(address _owner) external {
-        config.ownerAddress = _owner;
-    }
-
-    function initializeCalldata(string memory _contractName) external returns (bytes memory) {
-        return getInitializeCalldata(_contractName, false);
-    }
-
     function buildInteropHandlerWiringCalls() external returns (Call[] memory) {
         return prepareVersionSpecificStage1GovernanceCallsL1();
     }
 }
 
-/// @notice Guards the shape of the v33 upgrade scripts.
+/// @notice Guards the v33 upgrade scripts' refusal cases and the per-env inputs they depend on.
+///
+/// @dev Behavioural coverage of the interop-handler wiring — executing the calls and asserting the
+///      bridges end up pointed at the handler — lives in `PreV32ParityCalls.t.sol`, which builds real
+///      bridges and checks outcomes rather than calldata. This file holds only what needs the scripts
+///      themselves: the compile-graph pin, the refusal cases, and the env-file invariants.
 ///
 /// @dev These scripts are reached only through `forge script` (protocol-ops
 ///      `ecosystem upgrade-prepare-all`), so nothing else in the Foundry build imports them and
@@ -57,46 +51,6 @@ contract V33UpgradeScriptsTest is Test {
         interopHandler = makeAddr("interopHandler");
 
         coreUpgrade = new CoreUpgradeV33Harness();
-    }
-
-    /// @notice A freshly deployed interop handler is claimed and wired into both bridges.
-    function test_wiresFreshlyDeployedInteropHandler() public {
-        coreUpgrade.setDiscoveredAddresses(l1Nullifier, assetRouter, interopHandler);
-
-        Call[] memory calls = coreUpgrade.buildInteropHandlerWiringCalls();
-
-        // No accept-ownership call: the proxy is initialized straight to governance, so only the
-        // two one-shot bridge setters remain.
-        assertEq(calls.length, 2, "expected the two bridge setters");
-
-        assertEq(calls[0].target, l1Nullifier, "nullifier is pointed at the handler");
-        assertEq(
-            calls[0].data,
-            abi.encodeCall(IL1Nullifier.setL1InteropHandler, (interopHandler)),
-            "nullifier setter calldata"
-        );
-
-        assertEq(calls[1].target, assetRouter, "asset router is pointed at the handler");
-        assertEq(
-            calls[1].data,
-            abi.encodeCall(IL1AssetRouter.setL1InteropHandler, (interopHandler)),
-            "asset router setter calldata"
-        );
-    }
-
-    /// @notice The interop handler's proxy is initialized straight to governance.
-    /// @dev This is the assertion `PreV32ParityCalls` lost when the deploy-then-transfer dance went
-    ///      away: ownership is no longer established by a stage-1 call that a test can execute, it is
-    ///      baked into the proxy's initializer, so that is where it gets checked.
-    function test_interopHandlerIsOwnedByGovernanceFromTheStart() public {
-        address governance = makeAddr("governance");
-        coreUpgrade.setOwner(governance);
-
-        assertEq(
-            coreUpgrade.initializeCalldata("L1InteropHandler"),
-            abi.encodeCall(L1InteropHandler.initialize, (governance)),
-            "the handler proxy must be initialized with governance as owner, not the deployer"
-        );
     }
 
     /// @notice A missing handler is a broken discovery run, not a no-op.
@@ -163,7 +117,7 @@ contract V33UpgradeScriptsTest is Test {
     }
 
     function test_implementsProtocolOpsEntryPoints() public {
-        ICoreUpgrade core = ICoreUpgrade(address(coreUpgrade));
+        ICoreUpgradeV33 core = ICoreUpgradeV33(address(coreUpgrade));
         ICTMUpgrade ctm = ICTMUpgrade(address(new CTMUpgrade_v33()));
 
         assertTrue(address(core) != address(0), "core upgrade entry point");
