@@ -33,7 +33,7 @@ import {
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, USER_PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
@@ -303,7 +303,8 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
                 mintValue: 1 ether,
                 l2Value: 10,
                 l2Calldata: hex"",
-                l2GasLimit: 72_000_000,
+                // The most a caller-supplied L1->L2 tx may request.
+                l2GasLimit: USER_PRIORITY_TX_MAX_GAS_LIMIT,
                 l2GasPerPubdataByteLimit: 800,
                 factoryDeps: deps,
                 refundRecipient: address(0)
