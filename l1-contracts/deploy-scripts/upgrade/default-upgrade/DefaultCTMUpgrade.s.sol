@@ -50,6 +50,7 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {DefaultL2UpgradeStrategy} from "./DefaultL2UpgradeStrategy.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
+import {CTMUpgradeParams} from "./UpgradeParams.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
@@ -127,6 +128,33 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     L1Bridgehub internal bridgehub;
 
     PublishFactoryDepsResult internal factoryDepsResult;
+
+    /// @notice Single-call entry point invoked by the protocol-ops CLI's `upgrade-prepare-all`,
+    ///         once per CTM proxy (`ICTMUpgradeV31` in `contracts/script-interfaces/IUpgradeV31.sol`).
+    function noGovernancePrepare(CTMUpgradeParams memory _params) public virtual {
+        // solhint-disable-next-line func-named-parameters
+        initializeWithArgs(
+            _params.ctmProxy,
+            _params.bytecodesSupplier,
+            _params.isZKsyncOS,
+            _params.rollupDAManager,
+            _params.create2FactorySalt,
+            _params.upgradeInputPath,
+            _params.outputPath,
+            _params.governance,
+            _params.zkTokenAssetId
+        );
+        if (_params.chainRegistrationSender != address(0)) {
+            coreAddresses.bridgehub.proxies.chainRegistrationSender = _params.chainRegistrationSender;
+        }
+        prepareCTMUpgrade();
+        prepareDefaultGovernanceCalls();
+        prepareDefaultCTMAdminCalls();
+
+        // Test-only calls (`test_create_chain`, `test_upgrade_chain`) ride the CTM output TOML
+        // so protocol-ops can lift them into the merged `ecosystem.toml` for simulator checks.
+        prepareDefaultTestUpgradeCalls();
+    }
 
     function initializeWithArgs(
         address ctmProxy,

@@ -95,6 +95,59 @@ jobs:
         run: |
           bash cleanup.sh
 
+  # Bootstrap upgrade test (the v34 edge): loads the FROZEN departing-version chain states,
+  # runs the real CTMUpgrade_v34 / CoreUpgrade_v34 prepare through protocol-ops, replays the
+  # deployer + governance bundles (incl. the four-call bootstrap handover + migrate()), crosses
+  # the chains via the legacy handed-cut entrypoint and relays the L2 upgrade transactions.
+  bootstrap-upgrade-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Foundry (for Anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
+
+      - name: Build system-contracts artifacts
+        run: yarn sc build:foundry
+
+      - name: Build l1-contracts artifacts
+        run: yarn l1 build:foundry
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      - name: Run bootstrap upgrade test
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          echo "Running the v34 bootstrap upgrade test..."
+          yarn ts-node run-bootstrap-upgrade-test.ts
+
+      - name: Cleanup
+        if: always()
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          bash cleanup.sh
+
   registry-driven-upgrade-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30

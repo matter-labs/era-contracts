@@ -10,6 +10,7 @@
     "deploy:test-token": "ts-node src/helpers/deploy-test-token.ts",
     "setup-and-dump": "ts-node setup-and-dump-state.ts",
     "test:registry-upgrade": "ts-node run-registry-driven-upgrade-test.ts",
+    "test:bootstrap-upgrade": "ts-node run-bootstrap-upgrade-test.ts",
     "regen:registry-manifest": "REGEN_REGISTRIES=1 ts-node run-registry-driven-upgrade-test.ts",
     "coverage": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts",
     "coverage:html": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts --html",
