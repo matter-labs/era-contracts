@@ -231,12 +231,18 @@ contract L2V32UpgradeUnitTest is Test {
         assertEq(baseToken.initCalls(), 0, "base token must not be re-initialized on an upgrade");
     }
 
-    /// @dev The ZKsync OS path must forward `_isZKsyncOS == true` to the helper: the atomic-interop
-    /// built-ins arrive with the upgrade's force deployments and are initialized here for the first
-    /// time (the tree gets its sentinel leaf, the flow manager the L1 chain id).
-    function test_UpgradeViaComplexUpgrader_ZKOSInitializesAtomicInteropBuiltIns() public {
+    /// @dev The atomic-interop built-ins arrived in v32 and their `initL2`s are one-shot, so every
+    /// chain the current release can upgrade (v32 or later) already runs them initialized. The
+    /// upgrade must leave them alone: re-initializing would revert the whole upgrade transaction
+    /// (`IMTAlreadyInitialized`) — the regression the pre-initialized state below reproduces.
+    function test_UpgradeViaComplexUpgrader_ZKOSLeavesAtomicInteropBuiltInsAlone() public {
         vm.etch(L2_INTEROP_COMMITMENT_TREE_ADDR, address(new L2InteropCommitmentTree()).code);
         vm.etch(L2_ATOMIC_FLOW_MANAGER_ADDR, address(new AtomicFlowManager()).code);
+        // The pre-upgrade chain state: both built-ins initialized at the chain's v32 genesis.
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(L1_CHAIN_ID);
 
         bytes memory fixedData = abi.encode(_buildFixedForceDeploymentsData());
         bytes memory additionalData = abi.encode(_buildZKChainSpecificData());
@@ -250,12 +256,7 @@ contract L2V32UpgradeUnitTest is Test {
         assertEq(
             L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafCount(),
             1,
-            "the commitment tree must be seeded with its sentinel leaf"
-        );
-        assertEq(
-            AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).L1_CHAIN_ID(),
-            L1_CHAIN_ID,
-            "the flow manager must receive the L1 chain id"
+            "the commitment tree must keep exactly its genesis-time sentinel leaf"
         );
 
         // Pre-v32 contracts stay untouched on the ZKsync OS path too.

@@ -146,9 +146,14 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         _deployMockContract(L2_INTEROP_CENTER_ADDR);
         _deployMockContract(L2_INTEROP_HANDLER_ADDR);
         _deployMockContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
-        // The atomic-interop built-ins arrive with the upgrade's force deployments on a pre-existing chain;
-        // etch their real code so the helper initializing them is observable.
+        // On a pre-existing chain the atomic-interop built-ins are already live AND initialized
+        // (their one-shot `initL2`s ran at the chain's v32 genesis); reproduce that state so the
+        // helper leaving them alone is observable — re-initializing would revert.
         _etchAtomicInteropBuiltIns();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).initL2();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).initL2(fixedData.l1ChainId);
 
         vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
 
@@ -177,12 +182,10 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         );
         assertEq(etchedProxyAdmin.upgradeCallCount(), 0);
 
-        // The upgrade path initializes the atomic-interop built-ins, so an upgraded chain ends up with the
-        // same state a fresh one gets from genesis.
+        // The upgrade path leaves the built-ins alone: their `initL2`s are one-shot, and every
+        // chain the current release can upgrade already ran them at genesis. The state stays
+        // exactly what the pre-seeding above produced — a second init would have reverted.
         _assertAtomicInteropInitialized();
-
-        // Note: no ZKsync OS chain can arrive here with the built-ins already seeded — neither they nor
-        // their addresses existed in v31 — so the initialization is unconditional and one-shot.
     }
 
     function testEraForceDeployment() public {

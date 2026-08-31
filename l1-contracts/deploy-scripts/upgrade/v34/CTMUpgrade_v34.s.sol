@@ -11,6 +11,9 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {Call} from "contracts/governance/Common.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
+import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {BootstrapManifest, PinnedContract, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
@@ -44,6 +47,60 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         super.prepareCTMUpgrade();
         // AFTER `generateUpgradeData`: the manifest pins the composed upgrade cut.
         deployRegistryBootstrap();
+    }
+
+    /// @dev Only ZKsync OS chains can be upgraded onto this release (the registry model has no
+    ///      EraVM-deployable release yet); protocol-ops skips Era CTMs before this ever runs.
+    function deployUsedUpgradeContract() internal virtual override returns (address) {
+        require(config.isZKsyncOS, "Upgrading Era chains onto this release is not supported");
+        return deploySimpleContract("DefaultUpgradeZKsyncOS", false);
+    }
+
+    /// @notice The committed (ecosystem-wide) L2 upgrade calldata: the upgrade-time (re)init of
+    ///         the force-deployed system contracts — NOT the genesis path, these chains are
+    ///         already initialized. The additionalForceDeploymentsData placeholder is rewritten
+    ///         per chain by `DefaultUpgradeZKsyncOS.getL2UpgradeTxData` at upgrade time.
+    function getL2UpgradeCalldata() internal returns (bytes memory) {
+        return
+            abi.encodeCall(
+                IL2V32Upgrade.upgrade,
+                (
+                    config.isZKsyncOS,
+                    coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
+                    generatedData.forceDeploymentsData,
+                    ""
+                )
+            );
+    }
+
+    /// @notice The L2 delegate (`L2V32Upgrade`) rides the upgrade tx itself as an unsafe force
+    ///         deployment at a bytecode-derived address, so it never overwrites live code.
+    function getAdditionalUniversalForceDeployments()
+        internal
+        override
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
+    {
+        if (!config.isZKsyncOS) {
+            // Era chains cannot be upgraded onto this release; the Era branch exists only for
+            // the L1-only local fixture (see `CTMUpgrade_v34_Test`), which relays no L2 leg.
+            return additional;
+        }
+        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V32Upgrade.sol", "L2V32Upgrade");
+        additional = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
+        additional[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+            deployedBytecodeInfo: bytecodeInfo,
+            newAddress: L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo)
+        });
+    }
+
+    function getZKsyncOSL2UpgradeTargetAndData(
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
+    ) internal virtual override returns (address, bytes memory) {
+        // The delegate address must match the force-deployed `L2V32Upgrade` entry above.
+        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V32Upgrade.sol", "L2V32Upgrade");
+        address delegateTo = L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo);
+        return getUniversalComplexUpgraderTargetAndData(_deployments, delegateTo, getL2UpgradeCalldata());
     }
 
     function deployNewCTMContracts() public virtual override {
@@ -92,23 +149,38 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         // against it, so a stale book entry would fail loudly at the wrong time.
         ProxyAdmin ctmProxyAdmin = ProxyAdmin(Utils.getProxyAdminAddress(ctmProxy));
 
-        vm.broadcast(getBroadcasterAddress());
-        ctmUpgradeExecutor = new CTMUpgradeExecutor(
-            getOwnerAddress(),
-            getEmergencyUpgradeBoard(),
-            IChainTypeManager(ctmProxy),
-            ctmProxyAdmin,
-            // The audited-object anchor for every FUTURE transition this executor accepts. The
-            // registry objects carry no immutables, so the compiled runtime code IS the on-chain
-            // runtime code.
-            keccak256(vm.getDeployedCode("CTMTransition.sol:CTMTransition"))
+        // Both go through the CREATE2 factory like every other prepare deployment: the Safe
+        // bundle replays only factory transactions, so a plain CREATE here would leave the
+        // stage-1 `migrate()`/`acceptCTMOwnership()` calls pointing at codeless addresses on
+        // the real chain (a call to code-less address is a silent success).
+        ctmUpgradeExecutor = CTMUpgradeExecutor(
+            payable(
+                deployViaCreate2AndNotify(
+                    type(CTMUpgradeExecutor).creationCode,
+                    abi.encode(
+                        getOwnerAddress(),
+                        getEmergencyUpgradeBoard(),
+                        IChainTypeManager(ctmProxy),
+                        ctmProxyAdmin,
+                        // The audited-object anchor for every FUTURE transition this executor
+                        // accepts. The registry objects carry no immutables, so the compiled
+                        // runtime code IS the on-chain runtime code.
+                        keccak256(vm.getDeployedCode("CTMTransition.sol:CTMTransition"))
+                    ),
+                    "CTMUpgradeExecutor",
+                    false
+                )
+            )
         );
 
-        vm.broadcast(getBroadcasterAddress());
-        bootstrapMigration = new RegistryBootstrapMigration(_bootstrapManifest(ctmProxy, ctmProxyAdmin));
-
-        console.log("CTMUpgradeExecutor deployed at:", address(ctmUpgradeExecutor));
-        console.log("RegistryBootstrapMigration deployed at:", address(bootstrapMigration));
+        bootstrapMigration = RegistryBootstrapMigration(
+            deployViaCreate2AndNotify(
+                type(RegistryBootstrapMigration).creationCode,
+                abi.encode(_bootstrapManifest(ctmProxy, ctmProxyAdmin)),
+                "RegistryBootstrapMigration",
+                false
+            )
+        );
     }
 
     function _bootstrapManifest(
@@ -183,7 +255,11 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             data: abi.encodeCall(Ownable2Step.transferOwnership, (address(bootstrapMigration))),
             value: 0
         });
-        calls[2] = Call({target: address(bootstrapMigration), data: abi.encodeCall(bootstrapMigration.migrate, ()), value: 0});
+        calls[2] = Call({
+            target: address(bootstrapMigration),
+            data: abi.encodeCall(bootstrapMigration.migrate, ()),
+            value: 0
+        });
         calls[3] = Call({
             target: address(ctmUpgradeExecutor),
             data: abi.encodeCall(ctmUpgradeExecutor.acceptCTMOwnership, ()),

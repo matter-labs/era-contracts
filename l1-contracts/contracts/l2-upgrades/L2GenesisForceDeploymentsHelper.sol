@@ -260,9 +260,13 @@ library L2GenesisForceDeploymentsHelper {
             _initPreV32Contracts(fixedForceDeploymentsData, additionalForceDeploymentsData);
         }
 
-        // Contracts introduced in this release are initialized on both paths: they are uninitialized on a
-        // new chain and on an upgraded one alike.
-        _initializeV32Contracts(_isZKsyncOS, fixedForceDeploymentsData);
+        // Genesis only: the v32 contract set is brand new on a fresh chain, while every chain the
+        // current release can upgrade (v32 or later) already runs it initialized — their `initL2`s
+        // are one-shot. (The v31→v32 edge, where an UPGRADING chain received these contracts for
+        // the first time, shipped with its own release branch.)
+        if (_isGenesisUpgrade) {
+            _initializeV32Contracts(_isZKsyncOS, fixedForceDeploymentsData);
+        }
 
         emit ForceDeployedContractsInitialized(_isZKsyncOS, _isGenesisUpgrade);
     }
@@ -410,11 +414,10 @@ library L2GenesisForceDeploymentsHelper {
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
     }
 
-    /// @notice Initializes the contracts introduced in this release.
-    /// @dev Only the atomic-interop built-ins are new here, and they exist on ZKsync OS chains only (see
+    /// @notice Initializes the v32 atomic-interop built-ins; ZKsync OS chains only (see
     /// {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}).
-    /// Neither they nor their addresses existed in v31, so a chain always receives them here for the first
-    /// time — from its genesis when it is new, from this upgrade's force deployments when it predates them.
+    /// Genesis only: their `initL2`s are one-shot, and every chain the current release can upgrade
+    /// already runs them initialized.
     function _initializeV32Contracts(
         bool _isZKsyncOS,
         FixedForceDeploymentsData memory _fixedForceDeploymentsData

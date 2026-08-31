@@ -36,6 +36,14 @@ import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils
 ///         the migration deploy, the four-call stage-1 leg, the legacy cut-taking commit — runs
 ///         UNMOCKED: that is what this file exists to test.
 contract CTMUpgrade_v34_Test is CTMUpgrade_v34 {
+    /// @dev The shared local fixture is Era-flavored, but the release's real engine
+    ///      (`DefaultUpgradeZKsyncOS` + the `L2V32Upgrade` L2 leg) is ZKsyncOS-only. This
+    ///      fixture asserts the L1 side only and never relays an L2 leg, so it runs the plain
+    ///      `DefaultUpgrade`; the real engine is exercised by the anvil bootstrap pipeline.
+    function deployUsedUpgradeContract() internal override returns (address) {
+        return deploySimpleContract("DefaultUpgrade", false);
+    }
+
     /// @notice Return a dummy bytecode hash instead of reading huge JSON files.
     function getL2BytecodeHash(string memory /* contractName */) public view override returns (bytes32) {
         return bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001));
