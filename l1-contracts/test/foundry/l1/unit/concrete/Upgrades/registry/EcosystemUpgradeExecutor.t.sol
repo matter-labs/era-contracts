@@ -12,10 +12,12 @@ import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.s
 import {ProxyUpgradeRowMismatch, RegistryCodehashMismatch} from "contracts/common/L1ContractErrors.sol";
 import {
     CoreRegistryManifest,
-    EcosystemProxyUpgrades,
     ProxyUpgradeRow,
     PinnedContract
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    L1EcosystemContract
+} from "../../../../../../../contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @dev Not a `CoreRegistry`: exercises the executor's codehash provenance check.
 contract NotACoreRegistry {
@@ -102,18 +104,18 @@ contract EcosystemUpgradeExecutorTest is Test {
             });
     }
 
-    /// @dev The registry now takes the NAMED inventory; these tests exercise row semantics with
-    ///      two synthetic proxies, so they occupy the `bridgehub` and `messageRoot` slots (the
-    ///      slot name is a label — the row's own proxy address is its identity).
+    /// @dev The registry takes the enum-indexed inventory; these tests exercise row semantics
+    ///      with two synthetic proxies, so they occupy the `L1Bridgehub` and `L1MessageRoot`
+    ///      slots (the slot is a label — the row's own proxy address is its identity).
     function _deployRegistry(ProxyUpgradeRow[] memory _rows) internal returns (ICoreRegistry) {
-        EcosystemProxyUpgrades memory upgrades;
+        CoreRegistryManifest memory manifest;
         if (_rows.length > 0) {
-            upgrades.bridgehub = _rows[0];
+            manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = _rows[0];
         }
         if (_rows.length > 1) {
-            upgrades.messageRoot = _rows[1];
+            manifest.proxyUpgrades[uint256(L1EcosystemContract.L1MessageRoot)] = _rows[1];
         }
-        return ICoreRegistry(address(new CoreRegistry(CoreRegistryManifest({ecosystemProxyUpgrades: upgrades}))));
+        return ICoreRegistry(address(new CoreRegistry(manifest)));
     }
 
     function _applyL1Upgrade() internal {

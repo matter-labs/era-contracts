@@ -35,25 +35,35 @@ All are storage-backed, built once from a manifest they take in the constructor,
 | Contract                     | Holds                                                                                                                                                                                                                                                          |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, pin — routing is read from each pinned facet's own self-description), three base-system hashes, `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin              |
-| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine` + pin, `ctmProxyUpgrades` (the named CTM-domain inventory, incl. the CTM itself), deadline, `upgradeTimestamp`, `L2UpgradePlan`; **derived and stored:** final `Diamond.FacetCut[]` and base-system hash changes |
-| `CoreRegistry`               | `EcosystemProxyUpgrades` — the named ecosystem inventory of `(proxy, expectedOldImpl, implNew + pin)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot)                                                                                          |
+| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine` + pin, `proxyUpgrades` (the `CTMContract`-indexed CTM-domain inventory, incl. the CTM itself), deadline, `upgradeTimestamp`, `L2UpgradePlan`; **derived and stored:** final `Diamond.FacetCut[]` and base-system hash changes |
+| `CoreRegistry`               | the `L1EcosystemContract`-indexed ecosystem inventory of `(proxy, expectedOldImpl, implNew + pin)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot)                                                                                          |
 | `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                 |
 
-### Named proxy inventories
+### Enum-indexed proxy inventories
 
-Proxy upgrades are not carried as anonymous row arrays. Each manifest carries a **closed, named
-inventory struct** — `EcosystemProxyUpgrades` (bridgehub, chainAssetHandler, messageRoot,
-l1Nullifier, l1AssetRouter, l1NativeTokenVault, l1InteropHandler, ctmDeploymentTracker,
-chainRegistrationSender) for the core registry, `CTMProxyUpgrades` (chainTypeManager,
-validatorTimelock, bytecodesSupplier, permissionlessValidator) for transitions and the
-bootstrap. One field per upgradeable proxy; a slot whose `implNew` is zero is the **explicit
-"not upgraded" statement**. The point is audit legibility: an anonymous array cannot show what
-is missing from it, while the named struct forces every reviewed manifest to say something
-about every contract — and adding a new proxy to the system is a type change every manifest
-author and auditor sees. (The `ServerNotifier` has no slot: it sits under its own
-chainAdmin-owned ProxyAdmin for operational upgrades outside this flow.)
+Proxy upgrades are not carried as anonymous dynamic arrays. Each manifest carries a
+**fixed-length row array indexed by the canonical contract enum** — the SAME enum that
+identifies the contract for deployment, one enum per domain (`ContractIdentifiers.sol`):
 
-The named shape exists only at the manifest boundary — the audited `initialize` calldata.
+- `CoreRegistryManifest.proxyUpgrades` is `ProxyUpgradeRow[L1_ECOSYSTEM_CONTRACT_COUNT]`,
+  indexed by `L1EcosystemContract` (L1Bridgehub, L1ChainAssetHandler, L1MessageRoot,
+  L1Nullifier, L1AssetRouter, L1NativeTokenVault, L1InteropHandler, CTMDeploymentTracker,
+  ChainRegistrationSender).
+- `TransitionManifest.proxyUpgrades` and `BootstrapManifest.proxyUpgrades` are
+  `ProxyUpgradeRow[CTM_CONTRACT_COUNT]`, indexed by `CTMContract`. Only the members that are
+  TUPPs under the CTM-domain ProxyAdmin (ChainTypeManager, ValidatorTimelock,
+  BytecodesSupplier, PermissionlessValidator) can meaningfully participate — a row in a facet
+  or verifier slot can never apply, because the bound admin does not administer it.
+
+Slot `uint256(member)` IS that contract's row; a slot whose `implNew` is zero is the **explicit
+"not upgraded" statement**. The point is audit legibility plus structural completeness: the
+fixed length means a manifest literally cannot omit a slot, and the enum — being the same one
+deployment uses — is the single naming scheme end to end. (The `ServerNotifier` has no slot: it
+sits under its own chainAdmin-owned ProxyAdmin for operational upgrades outside this flow. The
+count constants are literals because solc cannot fold `type(...).max` in array-length position;
+a unit test pins them to the enums.)
+
+The fixed-array shape exists only at the manifest boundary — the audited constructor calldata.
 `ProxyUpgradeRowLib.toRows` flattens it into the `ProxyUpgradeRow[]` that `ecosystemRows()` /
 `ctmProxyRows()` return and the executors apply, dropping the inert slots, so the eternal
 executors never recompile when the inventory grows.
@@ -77,7 +87,7 @@ flowchart TB
     subgraph obj["Write-once objects — manifest fixed in the constructor"]
       REL["CTMRelease<br/>pinned facet rows, verifier,<br/>system hashes, genesis params"]
       TRA["CTMTransition<br/>version edge, engine, schedule,<br/>L2 plan + DERIVED cuts"]
-      CR["CoreRegistry<br/>named ecosystem inventory"]
+      CR["CoreRegistry<br/>enum-indexed ecosystem inventory"]
       BOOT["RegistryBootstrapMigration<br/>pre-registry entry edge"]
     end
 

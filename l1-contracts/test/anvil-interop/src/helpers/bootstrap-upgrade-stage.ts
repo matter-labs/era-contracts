@@ -32,7 +32,7 @@
 import { ethers } from "ethers";
 import { getAbi } from "../core/contracts";
 import { impersonateAndRun } from "../core/utils";
-import { namedProxyUpgrades } from "./registry-manifest";
+import { proxyUpgradeSlots } from "./registry-manifest";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -181,10 +181,10 @@ export async function bootstrapInitArgs(
     ctm: params.ctmProxy,
     expectedProtocolVersion: packSemVer(manifest.oldVersion),
     ctmProxyAdmin: params.proxyAdmin,
-    // The named CTM-domain inventory: this edge swaps only the CTM's own implementation, so the
-    // other slots encode as the explicit zero ("not upgraded") row.
-    proxyUpgrades: namedProxyUpgrades("CTMProxyUpgrades", {
-      chainTypeManager: {
+    // The CTM-domain inventory (indexed by `CTMContract`): this edge swaps only the CTM's own
+    // implementation, so the other slots encode as the explicit zero ("not upgraded") row.
+    proxyUpgrades: proxyUpgradeSlots("CTMContract", {
+      ChainTypeManager: {
         proxy: manifest.bootstrap.ctmImpl.proxy,
         expectedOldImpl: manifest.bootstrap.ctmImpl.expectedOldImpl,
         implNew: {

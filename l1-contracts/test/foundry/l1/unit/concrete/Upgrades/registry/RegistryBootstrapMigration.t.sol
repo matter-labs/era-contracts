@@ -32,13 +32,16 @@ import {
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {
     BootstrapManifest,
-    CTMProxyUpgrades,
     ProxyUpgradeRow,
     GenesisFacet,
     ReleaseGenesisData,
     ReleaseManifest,
     PinnedContract
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    CTM_CONTRACT_COUNT,
+    CTMContract
+} from "../../../../../../../contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @dev Two distinct implementations so a proxy row is a real `expectedOldImpl -> implNew` edge.
 contract ImplV31 {
@@ -141,10 +144,10 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     }
 
     function _manifest() internal view returns (BootstrapManifest memory) {
-        // The one participating slot in the named CTM-domain inventory: the CTM's own
+        // The one participating slot in the enum-indexed CTM-domain inventory: the CTM's own
         // implementation swap. The remaining slots stay inert (explicitly not upgraded).
-        CTMProxyUpgrades memory upgrades;
-        upgrades.chainTypeManager = ProxyUpgradeRow({
+        ProxyUpgradeRow[CTM_CONTRACT_COUNT] memory upgrades;
+        upgrades[uint256(CTMContract.ChainTypeManager)] = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
             implNew: PinnedContract({addr: implV32, codehash: implV32.codehash}),
@@ -332,8 +335,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     ///      and the executed edge would differ. Same rule {CoreRegistry} enforces.
     function test_revertWhen_manifestCarriesDuplicateProxyRows() public {
         BootstrapManifest memory manifest = _manifest();
-        // A second named slot pointing at the same proxy, with a different target.
-        manifest.proxyUpgrades.validatorTimelock = ProxyUpgradeRow({
+        // A second slot pointing at the same proxy, with a different target.
+        manifest.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
             implNew: PinnedContract({addr: implV31, codehash: implV31.codehash}),
@@ -346,7 +349,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
     function test_revertWhen_manifestCarriesAZeroRowField() public {
         BootstrapManifest memory manifest = _manifest();
-        manifest.proxyUpgrades.chainTypeManager.expectedOldImpl = address(0);
+        manifest.proxyUpgrades[uint256(CTMContract.ChainTypeManager)].expectedOldImpl = address(0);
 
         vm.expectRevert(ZeroAddress.selector);
         new RegistryBootstrapMigration(manifest);

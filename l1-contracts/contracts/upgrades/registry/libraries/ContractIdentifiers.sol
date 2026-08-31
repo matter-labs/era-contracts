@@ -39,6 +39,14 @@ enum L2EcosystemContract {
 ///         The enum value is VM-neutral; `DeployCTML1OrGateway.resolve` maps it to
 ///         the correct Era or ZKsyncOS contract / artifact name, and per-CTM
 ///         registries map it to the deployed address per protocol version.
+///         Also the index space of the CTM-domain upgrade inventory: transition and bootstrap
+///         manifests carry `ProxyUpgradeRow[CTM_CONTRACT_COUNT]` fixed arrays indexed by this
+///         enum (same slot semantics as `L1EcosystemContract`). Only the members that are
+///         TUPPs under the CTM-domain `ProxyAdmin` (ChainTypeManager, ValidatorTimelock,
+///         BytecodesSupplier, PermissionlessValidator) can meaningfully participate — a row in
+///         any other slot can never apply because the bound admin does not administer it. The
+///         `ServerNotifier` is deliberately absent from the upgrade flow: it sits under its own
+///         chainAdmin-owned `ProxyAdmin` (see `DeployCTM.deployServerNotifier`).
 /// @dev APPEND-ONLY (see `L1EcosystemContract`).
 enum CTMContract {
     // ---- Diamond facets ----
@@ -64,7 +72,9 @@ enum CTMContract {
     // ---- Appended variants (the enum is append-only) ----
     GettersFacet,
     DefaultUpgrade,
-    L1GenesisUpgrade
+    L1GenesisUpgrade,
+    BytecodesSupplier,
+    PermissionlessValidator
 }
 
 /// @notice How a built-in contract is deployed in ZKsyncOS upgrades.
@@ -75,18 +85,19 @@ enum ZKsyncOSUpgradeType {
     Unsafe
 }
 
-/// @notice Canonical member list of the `EcosystemProxyUpgrades` named inventory
-///         (`RegistryTypes.sol`), one member per field. Exists so nothing is hand-counted: the
-///         slot counts derive from `type(...).max`, and the `ProxyUpgradeRowLib.toRows`
-///         flatteners index their slot arrays by these members (member order = flatten and
-///         application order). Deliberately NOT `CTMContract` / `L2EcosystemContract`: those
-///         are append-only rosters of everything deployable — facets, verifiers, non-proxies —
-///         while this is exactly the upgradeable-TUPP inventory, and it MUST mirror the struct
-///         field for field.
-enum EcosystemProxy {
-    Bridgehub,
-    ChainAssetHandler,
-    MessageRoot,
+/// @notice Canonical identifier for L1 ecosystem (core) contracts — the shared singletons of
+///         the ecosystem domain. ONE enum for both deployment identity and upgrades: member
+///         names are the deploy artifact names, and a `CoreRegistryManifest` carries its
+///         upgrades as a `ProxyUpgradeRow[L1_ECOSYSTEM_CONTRACT_COUNT]` fixed array indexed by
+///         this enum — slot `uint256(member)` IS that contract's row, a zero `implNew` in it is
+///         the explicit "not upgraded" statement, and the fixed length makes completeness
+///         structural: a manifest cannot omit a slot.
+/// @dev APPEND-ONLY: numeric values are stable identifiers — never reorder or remove members.
+///      Appending one grows the manifest array, which the next release's objects pick up.
+enum L1EcosystemContract {
+    L1Bridgehub,
+    L1ChainAssetHandler,
+    L1MessageRoot,
     L1Nullifier,
     L1AssetRouter,
     L1NativeTokenVault,
@@ -95,14 +106,10 @@ enum EcosystemProxy {
     ChainRegistrationSender
 }
 
-/// @notice Canonical member list of the `CTMProxyUpgrades` named inventory — see
-///         {EcosystemProxy}.
-enum CTMDomainProxy {
-    ChainTypeManager,
-    ValidatorTimelock,
-    BytecodesSupplier,
-    PermissionlessValidator
-}
-
-uint256 constant ECOSYSTEM_PROXY_COUNT = uint256(type(EcosystemProxy).max) + 1;
-uint256 constant CTM_DOMAIN_PROXY_COUNT = uint256(type(CTMDomainProxy).max) + 1;
+/// @dev MUST equal `uint256(type(L1EcosystemContract).max) + 1` / the `CTMContract`
+///      equivalent. They cannot be WRITTEN that way: solc's constant evaluator does not fold
+///      `type(...).max` in array-length position, and these size the manifests' fixed-length
+///      inventory arrays. `StorageRegistries.t.sol` asserts both equalities, so a member
+///      appended without its count bump fails the suite immediately.
+uint256 constant L1_ECOSYSTEM_CONTRACT_COUNT = 9;
+uint256 constant CTM_CONTRACT_COUNT = 20;

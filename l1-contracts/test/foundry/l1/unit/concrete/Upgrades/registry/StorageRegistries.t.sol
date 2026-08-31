@@ -47,8 +47,6 @@ import {
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {
     CoreRegistryManifest,
-    CTMProxyUpgrades,
-    EcosystemProxyUpgrades,
     ProxyUpgradeRow,
     GenesisFacet,
     L2UpgradePlan,
@@ -57,6 +55,12 @@ import {
     TransitionManifest,
     PinnedContract
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    CTM_CONTRACT_COUNT,
+    CTMContract,
+    L1_ECOSYSTEM_CONTRACT_COUNT,
+    L1EcosystemContract
+} from "../../../../../../../contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @notice Unit tests for the write-once upgrade objects in the DERIVED model: releases carry
 ///         explicit routing + inline mandatory pins; transitions derive their facet/hash delta
@@ -116,9 +120,9 @@ contract StorageRegistriesTest is Test {
     }
 
     function _coreManifest() internal view returns (CoreRegistryManifest memory manifest) {
-        // One participating slot in the NAMED inventory — every other slot's zero `implNew` is
-        // the explicit "not upgraded" statement and produces no row.
-        manifest.ecosystemProxyUpgrades.bridgehub = ProxyUpgradeRow({
+        // One participating slot in the enum-indexed inventory — every other slot's zero
+        // `implNew` is the explicit "not upgraded" statement and produces no row.
+        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = ProxyUpgradeRow({
             proxy: address(0xB001),
             expectedOldImpl: address(0xB101),
             implNew: PinnedContract({addr: coreImplNew, codehash: coreImplNew.codehash}),
@@ -198,7 +202,7 @@ contract StorageRegistriesTest is Test {
 
     function _transitionManifest() internal view returns (TransitionManifest memory manifest) {
         // All CTM-domain inventory slots inert: this hop changes chain state, not the CTM itself.
-        CTMProxyUpgrades memory noCtmProxyUpgrades;
+        ProxyUpgradeRow[CTM_CONTRACT_COUNT] memory noProxyUpgrades;
         return
             TransitionManifest({
                 oldProtocolVersion: OLD_VERSION,
@@ -206,7 +210,7 @@ contract StorageRegistriesTest is Test {
                 fromRelease: address(fromRelease),
                 newRelease: address(newRelease),
                 upgradeEngine: PinnedContract({addr: upgradeEngine, codehash: upgradeEngine.codehash}),
-                ctmProxyUpgrades: noCtmProxyUpgrades,
+                proxyUpgrades: noProxyUpgrades,
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeTimestamp: 1234567,
                 l2Plan: _l2Plan()
@@ -655,20 +659,28 @@ contract StorageRegistriesTest is Test {
 
     // ─────────────────────────── core registry inventory ───────────────────────────
 
+    /// @dev The counts size the manifests' fixed-length inventory arrays and cannot be written
+    ///      as `type(...).max + 1` (solc does not fold that in array-length position) — this is
+    ///      the guard that keeps them tied to the enums.
+    function test_inventoryCountsMatchTheEnums() public pure {
+        assertEq(L1_ECOSYSTEM_CONTRACT_COUNT, uint256(type(L1EcosystemContract).max) + 1);
+        assertEq(CTM_CONTRACT_COUNT, uint256(type(CTMContract).max) + 1);
+    }
+
     function test_revertWhen_upgradingRowMissingSource() public {
         // A participating slot must be a full edge: known source implementation.
         CoreRegistryManifest memory manifest = _coreManifest();
-        manifest.ecosystemProxyUpgrades.bridgehub.expectedOldImpl = address(0);
+        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].expectedOldImpl = address(0);
 
         vm.expectRevert(ZeroAddress.selector);
         new CoreRegistry(manifest);
     }
 
     function test_inertSlotIsExplicitNotUpgradedAndProducesNoRow() public {
-        // A slot with zero `implNew` is the named inventory's explicit "not upgraded" statement:
+        // A slot with zero `implNew` is the inventory's explicit "not upgraded" statement:
         // it never becomes a row, even when it documents the proxy address it refers to.
         CoreRegistryManifest memory manifest = _coreManifest();
-        manifest.ecosystemProxyUpgrades.messageRoot.proxy = address(0xB002);
+        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1MessageRoot)].proxy = address(0xB002);
 
         CoreRegistry registry = new CoreRegistry(manifest);
         assertEq(registry.ecosystemRows().length, 1, "the inert slot must be dropped at the flatten boundary");
@@ -678,19 +690,28 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_everyInventorySlotIsInert() public {
         // A registry whose whole inventory is "not upgraded" upgrades nothing — refused.
         CoreRegistryManifest memory manifest = _coreManifest();
-        manifest.ecosystemProxyUpgrades.bridgehub.implNew = PinnedContract({addr: address(0), codehash: bytes32(0)});
+        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].implNew = PinnedContract({
+            addr: address(0),
+            codehash: bytes32(0)
+        });
 
         vm.expectRevert(RegistryUnknownKey.selector);
         new CoreRegistry(manifest);
     }
 
     function test_revertWhen_coreRegistryHasDuplicateProxyRow() public {
-        // A proxy is routed once: two named slots naming the same proxy are rejected.
+        // A proxy is routed once: two slots naming the same proxy are rejected.
         CoreRegistryManifest memory manifest = _coreManifest();
-        manifest.ecosystemProxyUpgrades.messageRoot = manifest.ecosystemProxyUpgrades.bridgehub; // same proxy again
+        // same proxy again, in another contract's slot
+        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1MessageRoot)] = manifest.proxyUpgrades[
+            uint256(L1EcosystemContract.L1Bridgehub)
+        ];
 
         vm.expectRevert(
-            abi.encodeWithSelector(RegistryDuplicateProxyRow.selector, manifest.ecosystemProxyUpgrades.bridgehub.proxy)
+            abi.encodeWithSelector(
+                RegistryDuplicateProxyRow.selector,
+                manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].proxy
+            )
         );
         new CoreRegistry(manifest);
     }

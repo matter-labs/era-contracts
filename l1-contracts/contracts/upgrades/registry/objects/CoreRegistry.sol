@@ -32,12 +32,12 @@ contract CoreRegistry is ICoreRegistry {
     /// @notice Pins the full manifest. This contract has NO state-mutating function at all — the
     ///         manifest is written once, at construction, so write-once is structural rather than
     ///         a runtime guard, and `manifestHash` can never describe a stale object.
-    /// @param _manifest The manifest to pin. Its inventory is the NAMED, complete
-    ///        {EcosystemProxyUpgrades} — every ecosystem proxy has a slot, and a zero `implNew`
-    ///        is the explicit "not upgraded" statement, so the audited calldata shows what the
-    ///        upgrade leaves alone as clearly as what it changes.
+    /// @param _manifest The manifest to pin. Its inventory is the complete fixed-length slot
+    ///        array indexed by `L1EcosystemContract` — every ecosystem contract has a slot, and
+    ///        a zero `implNew` is the explicit "not upgraded" statement, so the audited calldata
+    ///        shows what the upgrade leaves alone as clearly as what it changes.
     constructor(CoreRegistryManifest memory _manifest) {
-        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_manifest.ecosystemProxyUpgrades);
+        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_manifest.proxyUpgrades);
         // Sentinel against pinning an empty manifest: a registry that upgrades nothing is not a
         // registry, it is a mistake.
         if (rows.length == 0) {
@@ -65,16 +65,16 @@ contract CoreRegistry is ICoreRegistry {
 
     /// @inheritdoc ICoreRegistry
     function ecosystemRows() external view returns (ProxyUpgradeRow[] memory) {
-        return ProxyUpgradeRowLib.toRows(getManifest().ecosystemProxyUpgrades);
+        return ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades);
     }
 
     /// @inheritdoc ICoreRegistry
     function verifyAll() external view returns (bool) {
-        return ProxyUpgradeRowLib.rowPinsHold(ProxyUpgradeRowLib.toRows(getManifest().ecosystemProxyUpgrades));
+        return ProxyUpgradeRowLib.rowPinsHold(ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades));
     }
 
     /// @inheritdoc ICoreRegistry
     function validate() external view {
-        ProxyUpgradeRowLib.requireRowPins(ProxyUpgradeRowLib.toRows(getManifest().ecosystemProxyUpgrades));
+        ProxyUpgradeRowLib.requireRowPins(ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades));
     }
 }

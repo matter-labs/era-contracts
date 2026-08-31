@@ -950,11 +950,11 @@ async function buildRegistryManifest(
     core: {
       // Source-checked edges: the proxy must currently point at `expectedOldImpl` for the row
       // to apply — replaying a stale registry can never downgrade a proxy. No proxy admin: the
-      // ecosystem executor is BOUND to its immutable ProxyAdmin. Keys are the
-      // `EcosystemProxyUpgrades` SLOT NAMES (struct fields, parsed from the source at encode
-      // time); every slot the manifest omits encodes as the explicit "not upgraded" zero row.
+      // ecosystem executor is BOUND to its immutable ProxyAdmin. Keys are `L1EcosystemContract`
+      // MEMBER NAMES (parsed from the source at encode time); every slot the manifest omits
+      // encodes as the explicit "not upgraded" zero row.
       contracts: {
-        messageRoot: {
+        L1MessageRoot: {
           proxy: live.messageRootProxy,
           expectedOldImpl: live.messageRootImplOld,
           implNew: deployed.newMessageRootImpl,
@@ -1082,15 +1082,15 @@ function assertCommittedManifestMatchesLiveDeployment(
       ctmProxy,
       live.ctmImplOld
     ),
-    ["core.contracts.messageRoot.proxy", manifest.core?.contracts?.messageRoot?.proxy, live.messageRootProxy],
+    ["core.contracts.L1MessageRoot.proxy", manifest.core?.contracts?.L1MessageRoot?.proxy, live.messageRootProxy],
     [
-      "core.contracts.messageRoot.expectedOldImpl",
-      manifest.core?.contracts?.messageRoot?.expectedOldImpl,
+      "core.contracts.L1MessageRoot.expectedOldImpl",
+      manifest.core?.contracts?.L1MessageRoot?.expectedOldImpl,
       live.messageRootImplOld,
     ],
     [
-      "core.contracts.messageRoot.implNew",
-      manifest.core?.contracts?.messageRoot?.implNew,
+      "core.contracts.L1MessageRoot.implNew",
+      manifest.core?.contracts?.L1MessageRoot?.implNew,
       deployed.newMessageRootImpl,
     ],
     ["ctm.ctmProxy", ctm?.ctmProxy, ctmProxy],

@@ -10,6 +10,7 @@ import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgra
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
+import {CTM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
@@ -40,7 +41,7 @@ import {
     ReleaseManifest,
     TransitionManifest,
     PinnedContract,
-    CTMProxyUpgrades
+    ProxyUpgradeRow
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice The first full registry-driven upgrade, end to end: a real chain diamond is taken
@@ -255,7 +256,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             l2Plan.delegateCalldata = hex"beef";
         }
 
-        CTMProxyUpgrades memory noCtmProxyUpgrades;
+        ProxyUpgradeRow[CTM_CONTRACT_COUNT] memory noProxyUpgrades;
         transition = new CTMTransition(
             TransitionManifest({
                 oldProtocolVersion: _oldVersion,
@@ -263,7 +264,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
                 fromRelease: _fromRelease,
                 newRelease: release,
                 upgradeEngine: PinnedContract({addr: defaultUpgrade, codehash: defaultUpgrade.codehash}),
-                ctmProxyUpgrades: noCtmProxyUpgrades,
+                proxyUpgrades: noProxyUpgrades,
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: 0,
                 l2Plan: l2Plan

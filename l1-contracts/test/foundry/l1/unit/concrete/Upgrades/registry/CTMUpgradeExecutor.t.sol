@@ -9,6 +9,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {Call} from "contracts/governance/Common.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
+import {CTM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
@@ -33,7 +34,7 @@ import {
     ReleaseManifest,
     TransitionManifest,
     PinnedContract,
-    CTMProxyUpgrades
+    ProxyUpgradeRow
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Exercises the CTM-BOUND executor against real write-once release and transition
@@ -157,7 +158,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         uint256[] memory factoryDeps = new uint256[](1);
         factoryDeps[0] = 1;
 
-        CTMProxyUpgrades memory noCtmProxyUpgrades;
+        ProxyUpgradeRow[CTM_CONTRACT_COUNT] memory noProxyUpgrades;
         result = new CTMTransition(
             TransitionManifest({
                 oldProtocolVersion: _oldProtocolVersion,
@@ -167,7 +168,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                 fromRelease: _fromRelease,
                 newRelease: address(release),
                 upgradeEngine: PinnedContract({addr: upgradeEngineAddr, codehash: upgradeEngineAddr.codehash}),
-                ctmProxyUpgrades: noCtmProxyUpgrades,
+                proxyUpgrades: noProxyUpgrades,
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: _upgradeTimestamp,
                 l2Plan: L2UpgradePlan({

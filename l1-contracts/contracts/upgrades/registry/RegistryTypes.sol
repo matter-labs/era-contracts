@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
+import {CTM_CONTRACT_COUNT, L1_ECOSYSTEM_CONTRACT_COUNT} from "./libraries/ContractIdentifiers.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {Facets} from "../../common/StateTransitionTypes.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
@@ -79,13 +80,14 @@ struct L2UpgradePlan {
 /// @param upgradeEngine The diamond cut's init delegatecall target implementing
 ///        `upgradeFromTransition` — the registry-model name for what deploy tooling calls the
 ///        per-version "default upgrade" contract (`DefaultUpgrade` and its versioned subclasses).
-/// @param ctmProxyUpgrades The named CTM-DOMAIN inventory ({CTMProxyUpgrades}): implementation
-///        swaps for the CTM proxy itself and the per-CTM proxies under its own ProxyAdmin.
-///        Applied by the CTM-bound executor BEFORE the version commit, so a transition whose
-///        commit needs the new CTM implementation carries that swap itself. Ecosystem singletons
-///        (bridges, Bridgehub, MessageRoot) are NOT expressible here — a CTM is one of possibly
-///        many and upgrades on its own cadence; shared contracts belong to the core registry.
-///        All slots zero when the CTM domain's implementations do not change.
+/// @param proxyUpgrades The CTM-DOMAIN inventory, indexed by {CTMContract} (same slot semantics
+///        as {CoreRegistryManifest}): implementation swaps for the CTM proxy itself and the
+///        per-CTM proxies under its own ProxyAdmin. Applied by the CTM-bound executor BEFORE
+///        the version commit, so a transition whose commit needs the new CTM implementation
+///        carries that swap itself. Ecosystem singletons (bridges, Bridgehub, MessageRoot) are
+///        NOT expressible here — a CTM is one of possibly many and upgrades on its own cadence;
+///        shared contracts belong to the core registry. All slots zero when the CTM domain's
+///        implementations do not change.
 // solhint-disable-next-line gas-struct-packing
 struct TransitionManifest {
     uint256 oldProtocolVersion;
@@ -93,7 +95,7 @@ struct TransitionManifest {
     address fromRelease;
     address newRelease;
     PinnedContract upgradeEngine;
-    CTMProxyUpgrades ctmProxyUpgrades;
+    ProxyUpgradeRow[CTM_CONTRACT_COUNT] proxyUpgrades;
     uint256 oldProtocolVersionDeadline;
     uint256 upgradeTimestamp;
     L2UpgradePlan l2Plan;
@@ -105,8 +107,7 @@ struct TransitionManifest {
 ///        apply. This is the replay guard: after a later upgrade moves the proxy on, replaying
 ///        this row cannot silently downgrade it — the source no longer matches.
 /// @param implNew The pinned implementation the proxy points at afterwards. A ZERO address marks
-///        a named inventory slot as EXPLICITLY not upgraded (see the inventory structs below);
-///        such a slot never becomes a row.
+///        an inventory slot as EXPLICITLY not upgraded; such a slot never becomes a row.
 /// @param initCalldata Optional PINNED reinitializer: empty executes a plain `ProxyAdmin.upgrade`;
 ///        nonempty executes `upgradeAndCall` with exactly these bytes (e.g. a `reinitializeV2()`
 ///        storage migration). The calldata is arbitrary by type but not by review: it is fixed in
@@ -118,56 +119,24 @@ struct ProxyUpgradeRow {
     bytes initCalldata;
 }
 
-/// @notice The COMPLETE, CLOSED inventory of ecosystem (shared-singleton) proxies, one NAMED
-///         field per contract — the reviewer of an upgrade manifest sees every upgradeable
-///         ecosystem contract by name, including the ones this upgrade does NOT touch (their
-///         `implNew.addr` is zero). An anonymous row array cannot show what is missing from it;
-///         this struct makes "unchanged" an explicit, reviewable statement, and adding a new
-///         ecosystem proxy forces a type change every manifest author sees.
-/// @dev Inventory = every TUPP under the shared ecosystem `ProxyAdmin` that
-///      `EcosystemUpgradeExecutor` owns. Nothing CTM-scoped belongs here (see
-///      {CTMProxyUpgrades}), and non-proxy singletons (beacons, implementations) have no slot —
-///      they are replaced, not upgraded.
-struct EcosystemProxyUpgrades {
-    ProxyUpgradeRow bridgehub;
-    ProxyUpgradeRow chainAssetHandler;
-    ProxyUpgradeRow messageRoot;
-    ProxyUpgradeRow l1Nullifier;
-    ProxyUpgradeRow l1AssetRouter;
-    ProxyUpgradeRow l1NativeTokenVault;
-    ProxyUpgradeRow l1InteropHandler;
-    ProxyUpgradeRow ctmDeploymentTracker;
-    ProxyUpgradeRow chainRegistrationSender;
-}
-
-/// @notice The complete, closed inventory of CTM-DOMAIN proxies — the CTM proxy itself and the
-///         per-CTM proxies under the CTM domain's own `ProxyAdmin` — with the same named-slot
-///         semantics as {EcosystemProxyUpgrades}.
-/// @dev The `ServerNotifier` is deliberately ABSENT: it sits under its own chainAdmin-owned
-///      `ProxyAdmin` for operational upgrades outside the registry flow (see
-///      `DeployCTM.deployServerNotifier`), so a slot here could never be applied.
-struct CTMProxyUpgrades {
-    ProxyUpgradeRow chainTypeManager;
-    ProxyUpgradeRow validatorTimelock;
-    ProxyUpgradeRow bytecodesSupplier;
-    ProxyUpgradeRow permissionlessValidator;
-}
-
-/// @notice Everything a core registry instance pins, set exactly once by {initialize}.
+/// @notice Everything a core registry instance pins, set exactly once at construction.
 /// @dev Carries NO protocol version (version-schedule identity is owned by {CTMTransition})
 ///      and NO proxy admin (the `EcosystemUpgradeExecutor` is bound to its immutable
 ///      `ProxyAdmin`). A core registry pins ONLY the ecosystem inventory.
+/// @param proxyUpgrades The COMPLETE ecosystem inventory, indexed by {L1EcosystemContract}:
+///        slot `uint256(member)` is that contract's row, a zero `implNew` is the explicit
+///        "not upgraded" statement, and the fixed length means a manifest cannot omit a slot.
 struct CoreRegistryManifest {
-    EcosystemProxyUpgrades ecosystemProxyUpgrades;
+    ProxyUpgradeRow[L1_ECOSYSTEM_CONTRACT_COUNT] proxyUpgrades;
 }
 
 /// @param ctm The ChainTypeManager proxy this migration bootstraps.
 /// @param expectedProtocolVersion The version the CTM must currently be at (the departing one).
 /// @param ctmProxyAdmin The ProxyAdmin owning every proxy in `proxyUpgrades` (and the CTM proxy).
-/// @param proxyUpgrades The named CTM-domain inventory ({CTMProxyUpgrades}): each participating
-///        slot applies only if the proxy currently points at `expectedOldImpl`, and each
-///        `implNew` carries an inline pin. The CTM's own implementation swap is one of these
-///        slots.
+/// @param proxyUpgrades The CTM-domain inventory, indexed by {CTMContract} (same slot semantics
+///        as {CoreRegistryManifest}): each participating slot applies only if the proxy
+///        currently points at `expectedOldImpl`, and each `implNew` carries an inline pin. The
+///        CTM's own implementation swap is one of these slots.
 /// @param currentRelease The pinned genesis release installed as `currentRelease`. Its
 ///        `codehash` doubles as the CTM's canonical provenance anchor (`releaseCodehash`):
 ///        every release this CTM ever pins must run exactly that code.
@@ -188,7 +157,7 @@ struct BootstrapManifest {
     address ctm;
     uint256 expectedProtocolVersion;
     ProxyAdmin ctmProxyAdmin;
-    CTMProxyUpgrades proxyUpgrades;
+    ProxyUpgradeRow[CTM_CONTRACT_COUNT] proxyUpgrades;
     PinnedContract currentRelease;
     uint256 newProtocolVersion;
     uint256 oldProtocolVersionDeadline;

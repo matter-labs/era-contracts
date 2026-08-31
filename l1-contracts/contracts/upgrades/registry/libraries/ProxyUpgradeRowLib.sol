@@ -6,13 +6,8 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {CodehashPinLib} from "./CodehashPinLib.sol";
-import {
-    CTM_DOMAIN_PROXY_COUNT,
-    CTMDomainProxy,
-    ECOSYSTEM_PROXY_COUNT,
-    EcosystemProxy
-} from "./ContractIdentifiers.sol";
-import {CTMProxyUpgrades, EcosystemProxyUpgrades, ProxyUpgradeRow} from "../RegistryTypes.sol";
+import {CTM_CONTRACT_COUNT, L1_ECOSYSTEM_CONTRACT_COUNT} from "./ContractIdentifiers.sol";
+import {ProxyUpgradeRow} from "../RegistryTypes.sol";
 import {ProxyUpgradeRowMismatch, RegistryDuplicateProxyRow, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
@@ -23,39 +18,37 @@ import {ProxyUpgradeRowMismatch, RegistryDuplicateProxyRow, ZeroAddress} from ".
 ///         (idempotence); a proxy at `expectedOldImpl` is upgraded; a proxy at anything else
 ///         reverts, so replaying a stale object can never downgrade a proxy that a later upgrade
 ///         has already moved on.
-/// @dev Manifests carry rows as NAMED inventories ({EcosystemProxyUpgrades} /
-///      {CTMProxyUpgrades}); the `toRows` flatteners are the single point where those become the
-///      row arrays everything below consumes, dropping the slots explicitly marked "not
-///      upgraded" (zero `implNew.addr`). Appliers therefore never see the inventory shape and
-///      survive it growing.
+/// @dev Manifests carry rows as FIXED-LENGTH inventories indexed by the canonical contract
+///      enums (`L1EcosystemContract` for the ecosystem domain, `CTMContract` for the CTM
+///      domain — one enum per domain for deployment and upgrades alike); the `toRows`
+///      flatteners are the single point where those become the row arrays everything below
+///      consumes, dropping the slots explicitly marked "not upgraded" (zero `implNew.addr`).
+///      Appliers therefore never see the inventory shape and survive it growing.
 library ProxyUpgradeRowLib {
     /// @notice Emitted (from the applying contract) for every proxy pointed at its new
     ///         implementation. The proxy ADDRESS is the row identity (human labels live in the
     ///         off-chain manifest).
     event ProxyImplementationUpgraded(address indexed proxy, address newImpl);
 
-    /// @notice Flattens the named ecosystem inventory into rows, in {EcosystemProxy} order.
-    function toRows(EcosystemProxyUpgrades memory _upgrades) internal pure returns (ProxyUpgradeRow[] memory) {
-        ProxyUpgradeRow[] memory slots = new ProxyUpgradeRow[](ECOSYSTEM_PROXY_COUNT);
-        slots[uint256(EcosystemProxy.Bridgehub)] = _upgrades.bridgehub;
-        slots[uint256(EcosystemProxy.ChainAssetHandler)] = _upgrades.chainAssetHandler;
-        slots[uint256(EcosystemProxy.MessageRoot)] = _upgrades.messageRoot;
-        slots[uint256(EcosystemProxy.L1Nullifier)] = _upgrades.l1Nullifier;
-        slots[uint256(EcosystemProxy.L1AssetRouter)] = _upgrades.l1AssetRouter;
-        slots[uint256(EcosystemProxy.L1NativeTokenVault)] = _upgrades.l1NativeTokenVault;
-        slots[uint256(EcosystemProxy.L1InteropHandler)] = _upgrades.l1InteropHandler;
-        slots[uint256(EcosystemProxy.CTMDeploymentTracker)] = _upgrades.ctmDeploymentTracker;
-        slots[uint256(EcosystemProxy.ChainRegistrationSender)] = _upgrades.chainRegistrationSender;
+    /// @notice Flattens the ecosystem inventory (indexed by `L1EcosystemContract`) into rows.
+    function toRows(
+        ProxyUpgradeRow[L1_ECOSYSTEM_CONTRACT_COUNT] memory _slots
+    ) internal pure returns (ProxyUpgradeRow[] memory) {
+        ProxyUpgradeRow[] memory slots = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
+        for (uint256 i = 0; i < L1_ECOSYSTEM_CONTRACT_COUNT; ++i) {
+            slots[i] = _slots[i];
+        }
         return _dropInertSlots(slots);
     }
 
-    /// @notice Flattens the named CTM-domain inventory into rows, in {CTMDomainProxy} order.
-    function toRows(CTMProxyUpgrades memory _upgrades) internal pure returns (ProxyUpgradeRow[] memory) {
-        ProxyUpgradeRow[] memory slots = new ProxyUpgradeRow[](CTM_DOMAIN_PROXY_COUNT);
-        slots[uint256(CTMDomainProxy.ChainTypeManager)] = _upgrades.chainTypeManager;
-        slots[uint256(CTMDomainProxy.ValidatorTimelock)] = _upgrades.validatorTimelock;
-        slots[uint256(CTMDomainProxy.BytecodesSupplier)] = _upgrades.bytecodesSupplier;
-        slots[uint256(CTMDomainProxy.PermissionlessValidator)] = _upgrades.permissionlessValidator;
+    /// @notice Flattens the CTM-domain inventory (indexed by `CTMContract`) into rows.
+    function toRows(
+        ProxyUpgradeRow[CTM_CONTRACT_COUNT] memory _slots
+    ) internal pure returns (ProxyUpgradeRow[] memory) {
+        ProxyUpgradeRow[] memory slots = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
+        for (uint256 i = 0; i < CTM_CONTRACT_COUNT; ++i) {
+            slots[i] = _slots[i];
+        }
         return _dropInertSlots(slots);
     }
 

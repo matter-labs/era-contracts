@@ -19,7 +19,7 @@
   },
   "core": {
     "contracts": {
-      "messageRoot": {
+      "L1MessageRoot": {
         "proxy": "0x989dC32699ab2D6Bf394E5d43F26E204f4d8c7d1",
         "expectedOldImpl": "0x376e68283694feA8E46327a490Ba19F5657272E4",
         "implNew": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
