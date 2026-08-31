@@ -68,7 +68,7 @@ const contractsRootDir = path.resolve(l1ContractsDir, "..");
 // Memory-trimmed test variants of CoreUpgrade_v33 / CTMUpgrade_v33 used as
 // `--core-script-path` / `--ctm-script-path` overrides for `upgrade-prepare-all`.
 // Stage 3 still runs as a direct `forge script` invocation (no protocol-ops command),
-// against the same Core test variant.
+// against the same Core test variant which provides a no-arg `stage3()` wrapper.
 const CORE_UPGRADE_TEST_SCRIPT = "test/foundry/l1/integration/_EcosystemUpgradeV33ForTests.sol:CoreUpgradeV33ForTests";
 const CTM_UPGRADE_TEST_SCRIPT = "test/foundry/l1/integration/_EcosystemUpgradeV33ForTests.sol:CTMUpgradeV33ForTests";
 
@@ -178,8 +178,19 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       await clearGenesisUpgradeTxHash(l1Provider, upgradeChainAddresses);
     }
     // ── Stage 3: post-governance migration ──
-    // No stage 3 on this release: the v31 legacy bridged-token registration was one-time
-    // v30 -> v31 migration work and `CoreUpgrade_v33` does not expose a `stage3` entry point.
+    // ── Stage 3: post-governance bridgedOut population ──
+    // Runs BEFORE the per-chain upgrades, matching production sequencing (see protocol-ops
+    // `ecosystem stage3`): every withdrawable L1-native asset must be populated by the time a
+    // chain's diamond upgrade lands.
+    console.log("\n── Running stage3 post-governance population ──");
+    await runForgeScript({
+      scriptPath: CORE_UPGRADE_TEST_SCRIPT,
+      envVars: upgradeHarnessInputs.envVars,
+      rpcUrl: l1Chain.rpcUrl,
+      senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
+      projectRoot: l1ContractsDir,
+      sig: "stage3()",
+    });
 
     // ── Run per-chain upgrades (L1) and relay to L2 ──
     // `default_upgrade_addr` lives in the per-CTM output TOML written by
@@ -1476,7 +1487,7 @@ export function prepareUpgradeHarnessInputs(
     };
   };
 
-  // Kept for the legacy bridged-token config the v31 flow consumed; unused by the v33 scripts.
+  // stage3 reads a bridged-tokens config for legacy token migration.
   // In test environments there are no legacy bridged tokens, so provide an empty list.
   const bridgedTokensPath = path.join(tempDir, "v31-bridged-tokens.toml");
   fs.writeFileSync(bridgedTokensPath, "[tokens]\n");

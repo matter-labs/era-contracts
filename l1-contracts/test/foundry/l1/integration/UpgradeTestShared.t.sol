@@ -87,7 +87,9 @@ contract UpgradeIntegrationTestBase is Test {
             params.upgradeInputPath,
             CTM_OUTPUT,
             params.governance,
-            params.zkTokenAssetId
+            params.zkTokenAssetId,
+            // Anvil fixtures run the testnet verifier, as every non-mainnet env does.
+            true
         );
 
         console.log("setupUpgrade: Deploying new ecosystem contracts");

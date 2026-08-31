@@ -27,6 +27,7 @@ import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {Utils} from "../../utils/Utils.sol";
 
 import {ChainCreationParamsLib} from "../../ctm/ChainCreationParamsLib.sol";
+import {BridgedOutPopulationLib} from "./BridgedOutPopulationLib.sol";
 import {CoreUpgradeParams} from "./UpgradeParams.sol";
 import {ICoreUpgrade} from "contracts/script-interfaces/ICoreUpgrade.sol";
 
@@ -94,6 +95,9 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
     ///         upgrades. Every release refreshes all of them, so this lives here rather than being
     ///         restated per version; a release adds only what is new to it (a new proxy, say) by
     ///         overriding {deployVersionSpecificEcosystemContractsL1}.
+    /// @dev Includes the interop handler's implementation even though its *proxy* first appears in
+    ///      v33: the implementation is refreshed like any other core contract from then on, and the
+    ///      release that introduces the proxy reuses this deploy rather than repeating it.
     function deployNewEcosystemContractsL1() public virtual {
         coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
         coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
@@ -109,8 +113,28 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
             "ChainRegistrationSender",
             false
         );
+        coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler", false);
 
         deployVersionSpecificEcosystemContractsL1();
+    }
+
+    /// @notice Post-governance step: populate `L1NativeTokenVault.bridgedOut` from the per-chain
+    ///         legacy balances.
+    /// @dev Runs after the governance stages and before the per-chain diamond cuts, so withdrawals on
+    ///      each chain unblock as soon as its cut lands. Caller signs as any EOA — no governance
+    ///      privileges needed — and the population is additive and resumable, so an interrupted run
+    ///      can simply be repeated.
+    /// @dev Lives here rather than in a release directory: every release has to account for the
+    ///      chains added since the last one.
+    function stage3(address bridgehubProxy) public virtual {
+        console.log("Starting stage3 post-governance bridgedOut population...");
+        console.log("Bridgehub proxy:", bridgehubProxy);
+
+        vm.startBroadcast();
+        BridgedOutPopulationLib.populateBridgedOutForAllAssets(bridgehubProxy);
+        vm.stopBroadcast();
+
+        console.log("stage3 bridgedOut population complete!");
     }
 
     /// @notice Hook for deploys that only one release needs — typically a proxy that did not exist
@@ -503,8 +527,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils, ICoreUpgrade {
             coreAddresses.bridgehub.implementations.chainAssetHandler
         );
 
-        // The sender's proxy is inherited rather than redeployed: it holds the registration history,
-        // and the bridgehub authorizes service transactions by that address.
         calls[7] = _buildCallProxyUpgrade(
             coreAddresses.bridgehub.proxies.chainRegistrationSender,
             coreAddresses.bridgehub.implementations.chainRegistrationSender

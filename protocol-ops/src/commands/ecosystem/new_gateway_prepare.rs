@@ -1,7 +1,7 @@
 //! New-Gateway prepare step for the v31 ecosystem flow.
 //!
 //! When the env's `permanent-values/<env>.toml` carries a `[new_gateway]`
-//! block, `V31UpgradeFull::prepare` invokes this step on the same anvil fork
+//! block, `UpgradeFull::prepare` invokes this step on the same anvil fork
 //! as Core+CTM prepares. It wraps the existing
 //! `chain::gateway::convert::stage_vote_prepare` (which itself drives
 //! `deploy-scripts/gateway/GatewayVotePreparation.s.sol`) so we get the

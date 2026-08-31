@@ -36,13 +36,6 @@ contract CoreUpgradeV33Harness is CoreUpgrade_v33 {
     }
 }
 
-/// @dev Exposes the permanent-values path derivation.
-contract CTMUpgradeV33Harness is CTMUpgrade_v33 {
-    function permanentValuesPath(string memory _upgradeInputAbsPath) external view returns (string memory) {
-        return _permanentValuesPath(_upgradeInputAbsPath);
-    }
-}
-
 /// @notice Guards the shape of the v33 upgrade scripts.
 ///
 /// @dev These scripts are reached only through `forge script` (protocol-ops
@@ -114,52 +107,11 @@ contract V33UpgradeScriptsTest is Test {
         coreUpgrade.buildInteropHandlerWiringCalls();
     }
 
-    /// @notice v33 must not expose v31's `stage3`.
-    /// @dev The bridged-token registration and `bridgedOut` population behind it were one-time
-    ///      v30 -> v31 migration work, already executed by the v31 upgrade. Re-running them against
-    ///      a v31 ecosystem is not a no-op, so the entry point is absent by design — and
-    ///      `ICoreUpgrade` drops it. This asserts nobody reintroduces it by copying from v31.
-    function test_doesNotExposeV31Stage3() public {
-        (bool found, bytes memory returndata) = address(coreUpgrade).call(
-            abi.encodeWithSignature("stage3(address)", address(this))
-        );
-        assertFalse(found, "v33 must not carry the v30->v31 stage3 migration");
-        // The script has no fallback, so an unknown selector reverts with empty returndata. Checking
-        // that distinguishes "no such function" from "the function exists and reverted", which a bare
-        // success check would conflate — a reintroduced stage3 that reverted would otherwise pass.
-        assertEq(returndata.length, 0, "stage3 exists and reverted rather than being absent");
-    }
-
-    /// @notice Both scripts satisfy the entry-point interfaces protocol-ops encodes against.
-    /// @dev Also the reason `CTMUpgrade_v33` is referenced at all in this file: it pulls the CTM
-    ///      script into the compile graph.
-    /// @notice The upgrade input picks its permanent-values file by basename.
-    function test_permanentValuesPairsByBasename() public {
-        CTMUpgradeV33Harness ctm = new CTMUpgradeV33Harness();
-
-        assertEq(
-            ctm.permanentValuesPath(
-                string.concat(vm.projectRoot(), "/upgrade-envs/v0.33.0-atomic-interop/mainnet.toml")
-            ),
-            string.concat(vm.projectRoot(), "/upgrade-envs/permanent-values/mainnet.toml"),
-            "mainnet input pairs with the mainnet permanent values"
-        );
-        assertEq(
-            ctm.permanentValuesPath(
-                string.concat(vm.projectRoot(), "/upgrade-envs/v0.33.0-atomic-interop/zksync-os-integration-test.toml")
-            ),
-            string.concat(vm.projectRoot(), "/upgrade-envs/permanent-values/zksync-os-integration-test.toml"),
-            "fixture input pairs with its own permanent values"
-        );
-    }
-
     /// @notice Every v33 upgrade input has the permanent-values file its basename resolves to.
-    /// @dev The basename does double duty: it selects the upgrade input *and*, through
-    ///      {DefaultCTMUpgrade._permanentValuesPath}, the permanent values that carry
-    ///      `testnet_verifier`. An environment with no v33 input is the dangerous half — `--env`
-    ///      would have to fall back to another environment's file and would silently pick up its
-    ///      verifier setting. This pins that the inputs exist; `upgrade-prepare-all` refuses the
-    ///      fallback outright.
+    /// @dev `--env <name>` selects both halves by name: the upgrade input here and the permanent
+    ///      values protocol-ops reads `testnet_verifier` from. An environment missing either half is
+    ///      the dangerous case — a fallback would silently pick up another environment's verifier
+    ///      setting — so `upgrade-prepare-all` refuses to fall back and this pins that both exist.
     function test_everyV33UpgradeInputHasItsPermanentValues() public view {
         string[4] memory envs = ["local", "mainnet", "stage", "zksync-os-integration-test"];
 
@@ -177,8 +129,9 @@ contract V33UpgradeScriptsTest is Test {
 
     /// @notice Every environment declares `testnet_verifier`, and only mainnet runs the real one.
     /// @dev The flag decides whether the upgrade installs a verifier that accepts unproven batches,
-    ///      so it is a declared per-env value rather than a default. This pins both halves of the
-    ///      rule: the key is present everywhere, and mainnet alone is false.
+    ///      so it is a declared per-env value rather than a default. protocol-ops reads it from here
+    ///      and passes it to the CTM script as a parameter; this pins both halves of the rule — the
+    ///      key is present everywhere, and mainnet alone is false.
     function test_everyEnvDeclaresTestnetVerifierAndOnlyMainnetIsProduction() public view {
         string[6] memory envs = [
             "local",

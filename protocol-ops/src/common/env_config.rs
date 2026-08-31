@@ -41,6 +41,7 @@ pub struct PermanentValues {
     pub l1_chain_id: Option<u64>,
     #[serde(default)]
     pub zk_token_asset_id: Option<B256>,
+    pub testnet_verifier: Option<bool>,
     pub core_contracts: CoreContracts,
     #[serde(default)]
     pub ctm_contracts: Option<CtmContracts>,
@@ -368,6 +369,13 @@ impl EnvConfig {
 
     pub fn governance_kind(&self) -> GovernanceKind {
         self.permanent.core_contracts.governance_kind
+    }
+
+    /// Whether this environment's CTM verifier is the testnet one, which accepts unproven batches.
+    /// Declared per env — true everywhere except mainnet — and passed to the CTM upgrade script
+    /// rather than read there, so the decision lives in one place.
+    pub fn testnet_verifier(&self) -> Option<bool> {
+        self.permanent.testnet_verifier
     }
 
     pub fn zk_token_asset_id(&self) -> Option<B256> {

@@ -10,7 +10,7 @@
  *   3. Resolving bridgehub / governance / CTM addresses from the live forked state.
  *   4. Running the shared `upgrade-test-runner` helpers: ecosystem upgrade scripts,
  *      governance stage 0/1/2 execution, per-chain `DefaultChainUpgrade` + L2 relay
- *      (with force-deploy-driven anvil_setCode overrides),
+ *      (with force-deploy-driven anvil_setCode overrides), stage3 population,
  *      protocol-version verification.
  *
  * Unlike `run-v31-to-v32-upgrade-test.ts`, this does NOT load pre-generated chain states
@@ -78,7 +78,7 @@ function allocatePort(offset: number): number {
 /**
  * L1-only chain discovery: skips the L2 RPC requirement of `discoverForkChains`.
  * Used when `FORK_SKIP_L2=1` so the harness can still resolve diamond proxies
- * + chain admins for prepare/governance testing without spinning L2
+ * + chain admins for prepare/governance/stage3 testing without spinning L2
  * forks. Returns objects with `l2RpcUrl: ""` to keep the shape compatible.
  */
 async function discoverForkChainsL1Only(
@@ -142,13 +142,13 @@ async function main(): Promise<void> {
   const envPreset = process.env.FORK_ENV_PRESET?.trim();
   // L1-only smoke mode: skip L2 fork creation + L2 relay. Useful when L2
   // RPCs aren't available — exercises prepare + governance + per-chain L1
-  // upgrade tx only.
+  // upgrade tx + stage3 only.
   const skipL2 = process.env.FORK_SKIP_L2 === "1";
   // Skip the per-chain upgrade phase entirely. Use when targeted chains are
   // not on the `old_protocol_version` the prepare-input expects (e.g. stage
   // chains lagging behind v29 — `upgradeCutDataBlock[chainVersion]` is empty
   // and `GetDiamondCutData.getDiamondCutData` reverts with `NoLogsFound`).
-  // Lets us still reach + validate the governance phases on the same fork.
+  // Lets us still reach + validate `ecosystem stage3` on the same fork.
   const skipChainUpgrades = process.env.FORK_SKIP_CHAIN_UPGRADES === "1";
 
   try {
@@ -317,9 +317,32 @@ async function main(): Promise<void> {
 
     // NOTE: skip clearGenesisUpgradeTxHash — real fork state already has the correct value.
 
-    // NOTE: there is no stage 3 on this release. The v31 flow ran a legacy bridged-token
-    // registration + `bridgedOut` population here; that was one-time v30 -> v31 migration work and
-    // `CoreUpgrade_v33` deliberately does not expose a `stage3` entry point.
+    // ── Step 7: Stage 3 bridgedOut population ────────────────────
+    // Runs before per-chain upgrades so withdrawals on each chain unblock the instant its diamond
+    // upgrade lands — see the phase doc on `protocol-ops/src/commands/ecosystem/mod.rs`.
+    console.log(`\n=== Step 7: Running stage3 (${elapsed()}) ===\n`);
+    if (envPreset) {
+      // Production stage3 entry point on the real upgrade contract — the same forge script
+      // protocol-ops `ecosystem stage3` invokes. The bridgehub is the lone positional arg.
+      await runForgeScript({
+        scriptPath: "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol:CoreUpgrade_v33",
+        envVars: {},
+        rpcUrl: l1Chain.rpcUrl,
+        senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
+        projectRoot: l1ContractsDir,
+        sig: "stage3(address)",
+        args: cfg.bridgehubAddress,
+      });
+    } else {
+      await runForgeScript({
+        scriptPath: "test/foundry/l1/integration/_EcosystemUpgradeV33ForTests.sol:CoreUpgradeV33ForTests",
+        envVars: upgradeHarnessInputsRef!.envVars,
+        rpcUrl: l1Chain.rpcUrl,
+        senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
+        projectRoot: l1ContractsDir,
+        sig: "stage3()",
+      });
+    }
 
     // ── Step 8: Per-chain DefaultChainUpgrade (+ L2 relay if not skipL2) ──
     if (skipChainUpgrades) {

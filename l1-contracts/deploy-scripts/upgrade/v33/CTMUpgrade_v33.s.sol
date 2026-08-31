@@ -14,6 +14,7 @@ import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
 import {Call} from "contracts/governance/Common.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
+import {DeployCTMUtils} from "../../ctm/DeployCTMUtils.s.sol";
 import {CTMUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 
@@ -34,6 +35,31 @@ import {CoreContract} from "../../ecosystem/CoreContract.sol";
 ///      to `0.33.0`. The contracts are the v33 payload; only their names lag, and renaming them
 ///      would churn the bytecode vendored by zksync-os-server.
 contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
+    /// @notice Priority-op lower-bound registry, deployed alongside the per-chain upgrade contract
+    ///         which embeds it as an immutable. Lives here rather than in `DeployCTMUtils` because
+    ///         nothing outside this release knows about it.
+    address internal priorityOpLowerBound;
+
+    /// @inheritdoc DeployCTMUtils
+    /// @dev Supplies the registry to `V32UpgradeZKsyncOS`'s constructor; everything else falls
+    ///      through to the shared implementation.
+    function getCreationCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual override returns (bytes memory) {
+        if (keccak256(bytes(contractName)) == keccak256(bytes("V32UpgradeZKsyncOS"))) {
+            require(priorityOpLowerBound != address(0), "PriorityOpLowerBound not deployed");
+            return abi.encode(priorityOpLowerBound);
+        }
+        return super.getCreationCalldata(contractName, isZKBytecode);
+    }
+
+    /// @inheritdoc DefaultCTMUpgrade
+    function serializeVersionSpecificStateTransition() internal virtual override {
+        require(priorityOpLowerBound != address(0), "PriorityOpLowerBound not deployed");
+        vm.serializeAddress("state_transition", "priority_op_lower_bound_addr", priorityOpLowerBound);
+    }
+
     /// @inheritdoc DefaultCTMUpgrade
     /// @dev Refuses an EraVM CTM before anything is deployed. There is no Era counterpart to this
     ///      release's per-chain upgrade, so a run that got further would either fail late or, worse,

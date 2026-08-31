@@ -30,8 +30,8 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::commands::ecosystem::upgrade_full::V31UpgradeFull;
-use crate::commands::ecosystem::upgrade_inner::{CtmInputs, V31PrepareInputs, V31UpgradeInner};
+use crate::commands::ecosystem::upgrade_full::UpgradeFull;
+use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::forge::scripts::{
     ADMIN_FUNCTIONS_INVOCATION, CORE_UPGRADE_V33_SCRIPT_PATH, CTM_UPGRADE_V33_SCRIPT_PATH,
@@ -314,8 +314,8 @@ async fn stage_governance_execute(
 
 // ── upgrade-prepare-all (split-flow orchestrator) ──────────────────────────
 
-/// Unified split-flow prepare. Runs `CoreUpgrade_v31.noGovernancePrepare` once
-/// and `CTMUpgrade_v31.noGovernancePrepare` once per `--ctm-proxy`, all on a
+/// Unified split-flow prepare. Runs the core script's `noGovernancePrepare` once
+/// and the CTM script's `noGovernancePrepare` once per `--ctm-proxy`, all on a
 /// single anvil fork so deployer and operational admin broadcasts emit as one
 /// prepare bundle set. The downstream `upgrade-governance` consumes the
 /// per-step TOMLs (passed as `--governance-toml` once each).
@@ -680,6 +680,25 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         None => crate::types::L1Network::from_l1_rpc(&args.shared.l1_rpc_url)?
             .zk_token_asset_id()?,
     };
+    // Declared per environment: true everywhere except mainnet. Required rather than defaulted —
+    // guessing it wrong installs a verifier that accepts unproven batches.
+    let testnet_verifier = match env_cfg.as_ref() {
+        Some(cfg) => cfg.testnet_verifier().ok_or_else(|| {
+            anyhow::anyhow!(
+                "permanent-values/{}.toml is missing top-level `testnet_verifier`; it must be \
+                 declared explicitly (true for every env except mainnet)",
+                cfg.env
+            )
+        })?,
+        None => {
+            logger::info(
+                "No --env given: assuming a local/anvil ecosystem and the testnet verifier"
+                    .to_string(),
+            );
+            true
+        }
+    };
+
     let mut runner = ForgeRunner::new(&args.shared)?;
     let deployer = runner.prepare_sender(deployer_address).await?;
 
@@ -702,7 +721,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         None => None,
     };
 
-    let inputs = V31PrepareInputs {
+    let inputs = PrepareInputs {
         ctms,
         create2_factory_salt: args.create2_factory_salt,
         create2_factory_salt_per_ctm,
@@ -712,13 +731,14 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         ctm_script_path: args.ctm_script_path.clone(),
         core_is_zk_sync_os_override,
         zk_token_asset_id,
+        testnet_verifier,
     };
     let proxies: Vec<crate::common::env_config::OwnableProxyEntry> = env_cfg
         .as_ref()
         .map(|cfg| cfg.ownable_proxies().to_vec())
         .unwrap_or_default();
     let new_gateway_cfg = env_cfg.as_ref().and_then(|cfg| cfg.new_gateway().cloned());
-    let full = V31UpgradeFull::new(V31UpgradeInner::new(&contracts_path, bridgehub))
+    let full = UpgradeFull::new(UpgradeInner::new(&contracts_path, bridgehub))
         .with_ownable_proxies(proxies)
         .with_new_gateway(new_gateway_cfg);
     let prepared = full.prepare(&mut runner, &deployer, &inputs).await?;

@@ -40,7 +40,8 @@ contract CTMUpgradeV33ForTests is CTMUpgrade_v33 {
         string memory _newConfigPath,
         string memory _outputPath,
         address _governance,
-        bytes32 _zkTokenAssetId
+        bytes32 _zkTokenAssetId,
+        bool _testnetVerifier
     ) public virtual override {
         // solhint-disable-next-line func-named-parameters
         super.initializeWithArgs(
@@ -52,7 +53,8 @@ contract CTMUpgradeV33ForTests is CTMUpgrade_v33 {
             _newConfigPath,
             _outputPath,
             _governance,
-            _zkTokenAssetId
+            _zkTokenAssetId,
+            _testnetVerifier
         );
 
         string memory upgradeToml = vm.readFile(string.concat(vm.projectRoot(), _newConfigPath));
@@ -83,10 +85,20 @@ contract CTMUpgradeV33ForTests is CTMUpgrade_v33 {
     }
 }
 
-/// @dev Core upgrade for tests. v33 needs no test-only behaviour of its own — the v31 variant
-///      existed to expose a `stage3()` wrapper, and v33 has no stage 3 — but the name is kept so the
-///      harnesses have a single place to hang future overrides.
-contract CoreUpgradeV33ForTests is CoreUpgrade_v33 {}
+/// @dev Core upgrade for tests, with the no-arg Stage-3 wrapper the harnesses drive via a direct
+///      `forge script` call (separate from the protocol-ops driven prepare phase).
+contract CoreUpgradeV33ForTests is CoreUpgrade_v33 {
+    using stdToml for string;
+
+    /// @notice Stage 3 wrapper: reads bridgehub from `PERMANENT_VALUES_INPUT_OVERRIDE` and
+    ///         dispatches to `stage3(bridgehubProxy)`.
+    function stage3() public {
+        string memory permanentValuesPath = vm.envString("PERMANENT_VALUES_INPUT_OVERRIDE");
+        string memory pvToml = vm.readFile(string.concat(vm.projectRoot(), permanentValuesPath));
+        address bridgehubProxy = pvToml.readAddress("$.core_contracts.bridgehub_proxy_addr");
+        stage3(bridgehubProxy);
+    }
+}
 
 /// @dev Kept as a named alias for the tests that re-run core deploys to recompute create2 addresses.
 ///      It used to skip `updateContractConnections()` so a second run would not redo `setAddresses` /

@@ -112,10 +112,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         ///      L2 upgrade transaction.
         bytes32 zkTokenAssetId;
         /// @dev Whether the CTM's verifier is the testnet one, which accepts unproven batches.
-        ///      Read from `upgrade-envs/permanent-values/<env>.toml`: true for every env except
-        ///      mainnet. It cannot be introspected off the deployed verifier yet — pre-v31 L1 state
-        ///      predates `ZKsyncOSTestnetVerifier.IS_TESTNET_VERIFIER` — so it is declared per env
-        ///      rather than guessed.
+        ///      Supplied by the caller alongside `isZKsyncOS`; protocol-ops reads it from
+        ///      `upgrade-envs/permanent-values/<env>.toml` (true for every env except mainnet).
+        ///      Not introspected off the deployed verifier: only the *testnet* verifiers declare
+        ///      `IS_TESTNET_VERIFIER`, so the call reverts on a production one, and probing for that
+        ///      would need the try/catch this repo forbids.
         bool testnetVerifier;
     }
 
@@ -144,7 +145,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         string memory newConfigPath,
         string memory _outputPath,
         address governance,
-        bytes32 zkTokenAssetId
+        bytes32 zkTokenAssetId,
+        bool testnetVerifier
     ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
@@ -156,41 +158,13 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             create2FactorySalt,
             newConfigPath,
             governance,
-            zkTokenAssetId
+            zkTokenAssetId,
+            testnetVerifier
         );
 
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
         upgradeConfig.initialized = true;
-    }
-
-    /// @notice Absolute path of the permanent-values file for the environment being upgraded.
-    /// @dev Paired with the upgrade input by basename: `.../<env>.toml` ->
-    ///      `upgrade-envs/permanent-values/<env>.toml`. Honors `PERMANENT_VALUES_INPUT_OVERRIDE`
-    ///      so harnesses that render the file into a scratch dir can point at it directly.
-    function _permanentValuesPath(string memory _upgradeInputAbsPath) internal view returns (string memory) {
-        string memory overridePath = vm.envOr("PERMANENT_VALUES_INPUT_OVERRIDE", string(""));
-        if (bytes(overridePath).length > 0) {
-            return string.concat(vm.projectRoot(), overridePath);
-        }
-
-        bytes memory p = bytes(_upgradeInputAbsPath);
-        require(p.length > 0, "upgrade input path empty");
-        uint256 lastSlash = 0;
-        bool found = false;
-        for (uint256 i = p.length; i > 0; --i) {
-            if (p[i - 1] == "/") {
-                lastSlash = i;
-                found = true;
-                break;
-            }
-        }
-        require(found, "upgrade input path has no `/` separator");
-        bytes memory basename = new bytes(p.length - lastSlash);
-        for (uint256 i = 0; i < basename.length; ++i) {
-            basename[i] = p[lastSlash + i];
-        }
-        return string.concat(vm.projectRoot(), "/upgrade-envs/permanent-values/", string(basename));
     }
 
     function initializeConfig(
@@ -247,7 +221,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         bytes32 create2FactorySalt,
         string memory newConfigPath,
         address governance,
-        bytes32 zkTokenAssetId
+        bytes32 zkTokenAssetId,
+        bool testnetVerifier
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
@@ -255,18 +230,13 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             config.eraChainId = toml.readUint("$.era_chain_id");
         }
 
-        string memory permanentValues = vm.readFile(_permanentValuesPath(newConfigPath));
-        require(
-            permanentValues.keyExists("$.testnet_verifier"),
-            "permanent-values is missing `testnet_verifier` (true for every env except mainnet)"
-        );
         PermanentCTMConfig memory permanentConfig = PermanentCTMConfig({
             ctmProxy: ctmProxy,
             bytecodesSupplier: bytecodesSupplier,
             isZKsyncOS: isZKsyncOS,
             create2FactorySalt: create2FactorySalt,
             zkTokenAssetId: zkTokenAssetId,
-            testnetVerifier: permanentValues.readBool("$.testnet_verifier")
+            testnetVerifier: testnetVerifier
         });
         // Set config.isZKsyncOS before getChainCreationParamsConfig.
         config.isZKsyncOS = isZKsyncOS;
@@ -325,12 +295,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             _params.upgradeInputPath,
             _params.outputPath,
             _params.governance,
-            _params.zkTokenAssetId
+            _params.zkTokenAssetId,
+            _params.testnetVerifier
         );
-        // Always supplied: `upgrade-prepare-all` reads it from the core prepare output and errors if
-        // it is absent, so there is no discovery fallback left to guard for.
-        require(_params.chainRegistrationSender != address(0), "chainRegistrationSender not supplied");
-        coreAddresses.bridgehub.proxies.chainRegistrationSender = _params.chainRegistrationSender;
         prepareCTMUpgrade();
         prepareDefaultGovernanceCalls();
         prepareDefaultCTMAdminCalls();
@@ -393,6 +360,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
         deployStateTransitionDiamondFacets();
     }
+
+    /// @notice Extension point for a release that needs extra `[state_transition]` output keys.
+    /// @dev Empty by default; a release that deploys something of its own serializes it here.
+    function serializeVersionSpecificStateTransition() internal virtual {}
 
     /// @notice Extension point for a release that needs stage-1 calls no other release does.
     /// @dev Empty by design. Nothing in the default flow is version specific: anything that will also
@@ -1124,9 +1095,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
                 ctmAddresses.stateTransition.implementations.serverNotifier
             );
         }
-        if (priorityOpLowerBound != address(0)) {
-            vm.serializeAddress("state_transition", "priority_op_lower_bound_addr", priorityOpLowerBound);
-        }
+        serializeVersionSpecificStateTransition();
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",

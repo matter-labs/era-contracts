@@ -1113,6 +1113,19 @@
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "stage3",
+    "inputs": [
+      {
+        "name": "bridgehubProxy",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "error",
     "name": "AddressHasNoCode",
     "inputs": [

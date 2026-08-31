@@ -5,9 +5,10 @@ use alloy::sol_types::SolCall;
 use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{
-    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi, IDeployCTMAbi,
-    IDeployL1CoreContractsAbi, IDeployPaymasterAbi, IEnableEvmEmulatorAbi, IFinalizeChainInitAbi,
-    IGatewayVotePreparationAbi, IRecordPriorityOpLowerBoundAbi, IRegisterOnAllChainsAbi,
+    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi, ICoreUpgradeAbi,
+    IDeployCTMAbi, IDeployL1CoreContractsAbi, IDeployPaymasterAbi, IEnableEvmEmulatorAbi,
+    IFinalizeChainInitAbi, IGatewayVotePreparationAbi, IRecordPriorityOpLowerBoundAbi,
+    IRegisterOnAllChainsAbi,
 };
 
 pub mod deploy_ctm;
@@ -182,6 +183,15 @@ pub static DEPLOY_PAYMASTER_INVOCATION: ForgeScriptParams = ForgeScriptParams::n
 .with_ffi()
 .with_rpc_url();
 
+pub static STAGE3_CORE_UPGRADE_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
+    "",
+    "",
+    "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol:CoreUpgrade_v33",
+)
+.with_ffi()
+.with_rpc_url()
+.with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT);
+
 pub static RECORD_PRIORITY_OP_LOWER_BOUND_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
     "script-config/record-priority-op-lower-bound.toml",
     "script-out/output-record-priority-op-lower-bound.toml",
@@ -256,6 +266,7 @@ script_calls! {
     // DeployCTM
     IDeployCTMAbi::runInnerCall                                         => DEPLOY_CTM_INVOCATION,
     IRecordPriorityOpLowerBoundAbi::runCall                             => RECORD_PRIORITY_OP_LOWER_BOUND_INVOCATION,
+    ICoreUpgradeAbi::stage3Call                                         => STAGE3_CORE_UPGRADE_INVOCATION,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
