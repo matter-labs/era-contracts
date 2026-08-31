@@ -188,7 +188,7 @@ contract UpgradeIntegrationTest_v34_Local is
         chainId = eraZKChainId;
         acceptPendingAdmin();
 
-        ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml";
+        ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/foundry-upgrade.toml";
         ECOSYSTEM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
         ECOSYSTEM_OUTPUT = "/script-out/foundry-upgrade/local-v34-core-out.toml";
         CTM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml";

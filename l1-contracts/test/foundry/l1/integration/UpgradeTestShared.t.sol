@@ -38,9 +38,9 @@ abstract contract UpgradeIntegrationTestBase is Test {
 
     /// @notice Per-test fixed paths for the deploy outputs the upgrade scripts read.
     string public ECOSYSTEM_INPUT = "file_1.toml";
-    string public ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/shared.toml";
+    string public ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/foundry-upgrade.toml";
     string public ECOSYSTEM_OUTPUT = "file_3.toml";
-    string public CTM_INPUT = "/upgrade-envs/v0.31.0-interopB/shared.toml";
+    string public CTM_INPUT = "/upgrade-envs/foundry-upgrade.toml";
     string public CORE_OUTPUT = "/script-out/foundry-upgrade/upgrade-core.toml";
     string public CTM_OUTPUT = "/script-out/foundry-upgrade/mainnet-gateway.toml";
     string public CHAIN_INPUT;

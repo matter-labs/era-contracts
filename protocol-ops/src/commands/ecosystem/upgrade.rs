@@ -34,7 +34,7 @@ use crate::commands::ecosystem::v31_upgrade_full::V31UpgradeFull;
 use crate::commands::ecosystem::v31_upgrade_inner::{CtmInputs, V31PrepareInputs, V31UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::forge::scripts::{
-    ADMIN_FUNCTIONS_INVOCATION, CORE_UPGRADE_V31_SCRIPT_PATH, CTM_UPGRADE_V31_SCRIPT_PATH,
+    ADMIN_FUNCTIONS_INVOCATION, CORE_UPGRADE_SCRIPT_PATH, CTM_UPGRADE_SCRIPT_PATH,
     UPGRADE_V31_CORE_OUTPUT_PATH, UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
@@ -361,10 +361,10 @@ pub struct UpgradePrepareAllArgs {
     #[clap(long, default_value = UPGRADE_V31_CORE_OUTPUT_PATH, hide = true)]
     pub core_output_path: String,
 
-    #[clap(long, default_value = CORE_UPGRADE_V31_SCRIPT_PATH, hide = true)]
+    #[clap(long, default_value = CORE_UPGRADE_SCRIPT_PATH, hide = true)]
     pub core_script_path: String,
 
-    #[clap(long, default_value = CTM_UPGRADE_V31_SCRIPT_PATH, hide = true)]
+    #[clap(long, default_value = CTM_UPGRADE_SCRIPT_PATH, hide = true)]
     pub ctm_script_path: String,
 
     /// Path to a TOML file describing per-CTM inputs (proxy + optional

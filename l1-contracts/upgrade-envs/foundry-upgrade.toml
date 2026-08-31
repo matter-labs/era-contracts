@@ -1,13 +1,11 @@
-# Foundry-specific upgrade configuration for local testing.
+# Foundry-specific upgrade configuration for the local pipeline tests
+# (test/foundry/l1/integration/UpgradeTestv34_Local.t.sol).
 #
-# The harness deploys at whatever the genesis config declares and then upgrades to
+# The harness deploys at whatever `configs/genesis/*/latest.json` declares and then upgrades to
 # `new_protocol_version`, and `DefaultCTMUpgrade.initUpgrade` requires
-# `ctmProtocolVersion != getNewProtocolVersion()` — so this has to stay one minor ahead of genesis.
-# Genesis is at v32.0.0, so the fixture exercises a v32 -> v33 upgrade.
-#
-# The real v31 -> v32 transition is still covered: the anvil harness pins its own `stateVersion` and
-# `run-v31-to-v32-upgrade-test.ts` drives it from the committed `chain-states/v0.31.0` snapshots,
-# independent of this genesis version.
+# `ctmProtocolVersion != getNewProtocolVersion()` — so this has to stay ahead of genesis.
+# Genesis is at v34.0.0, so the fixture exercises a v34 -> v35 edge (numbers are parameters;
+# the SHAPE under test is the version pipeline, bootstrap included).
 
 old_protocol_version = 0x2200000000  # v34.0.0 (current genesis)
 
