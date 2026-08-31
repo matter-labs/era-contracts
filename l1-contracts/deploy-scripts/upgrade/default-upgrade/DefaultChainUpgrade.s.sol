@@ -61,7 +61,7 @@ contract DefaultChainUpgrade is Script {
         upgradeChain(diamondCutData);
     }
 
-    function upgradeChain(Diamond.DiamondCutData memory diamondCutData) public {
+    function upgradeChain(Diamond.DiamondCutData memory diamondCutData) public virtual {
         bytes memory callData = UpgradeChainCall.encode(
             config.chainDiamondProxyAddress,
             config.oldProtocolVersion,

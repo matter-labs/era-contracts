@@ -18,6 +18,7 @@ import {CTM_CONTRACT_COUNT, CTMContract} from "contracts/upgrades/registry/libra
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
+import {DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {Utils} from "../../utils/Utils.sol";
 
 /// @notice The v34 CTM upgrade: the ONE-TIME edge into the registry-driven model (see the
@@ -43,6 +44,33 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         super.prepareCTMUpgrade();
         // AFTER `generateUpgradeData`: the manifest pins the composed upgrade cut.
         deployRegistryBootstrap();
+    }
+
+    function deployNewCTMContracts() public virtual override {
+        super.deployNewCTMContracts();
+
+        // The MailboxFacet deployed by the base pipeline's facet step takes a live checker.
+        deployEIP7702Checker();
+
+        // The upgrade engine — the composed cut's init delegatecall target, pinned by the
+        // bootstrap manifest through `upgradeCutInitCodehash`.
+        ctmAddresses.stateTransition.defaultUpgrade = deployUsedUpgradeContract();
+
+        // The new ChainTypeManager implementation (per VM) — the bootstrap manifest's one
+        // participating inventory row.
+        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(
+            config.isZKsyncOS,
+            CTMContract.ChainTypeManager
+        );
+        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
+
+        // Deliberately OUTSIDE the registry flow (own chainAdmin-owned ProxyAdmin): the notifier
+        // upgrade rides the CTM-admin operational calls, not the bootstrap manifest.
+        ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier", false);
+
+        // The genesis release deployed by the base pipeline's `deployStateTransitionDiamondFacets`
+        // pins the force-deployments blob, so it must exist before that step runs.
+        getFixedForceDeploymentsData();
     }
 
     /// @notice The break-glass governor of the deployed `CTMUpgradeExecutor`.
