@@ -12,6 +12,7 @@ import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.s
 import {ProxyUpgradeRowMismatch, RegistryCodehashMismatch} from "contracts/common/L1ContractErrors.sol";
 import {
     CoreRegistryManifest,
+    EcosystemProxyUpgrades,
     ProxyUpgradeRow,
     PinnedContract
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
@@ -101,8 +102,18 @@ contract EcosystemUpgradeExecutorTest is Test {
             });
     }
 
+    /// @dev The registry now takes the NAMED inventory; these tests exercise row semantics with
+    ///      two synthetic proxies, so they occupy the `bridgehub` and `messageRoot` slots (the
+    ///      slot name is a label — the row's own proxy address is its identity).
     function _deployRegistry(ProxyUpgradeRow[] memory _rows) internal returns (ICoreRegistry) {
-        return ICoreRegistry(address(new CoreRegistry(CoreRegistryManifest({contractRows: _rows}))));
+        EcosystemProxyUpgrades memory upgrades;
+        if (_rows.length > 0) {
+            upgrades.bridgehub = _rows[0];
+        }
+        if (_rows.length > 1) {
+            upgrades.messageRoot = _rows[1];
+        }
+        return ICoreRegistry(address(new CoreRegistry(CoreRegistryManifest({ecosystemProxyUpgrades: upgrades}))));
     }
 
     function _applyL1Upgrade() internal {

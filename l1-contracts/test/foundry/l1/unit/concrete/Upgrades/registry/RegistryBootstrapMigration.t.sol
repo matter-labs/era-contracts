@@ -32,6 +32,7 @@ import {
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {
     BootstrapManifest,
+    CTMProxyUpgrades,
     ProxyUpgradeRow,
     GenesisFacet,
     ReleaseGenesisData,
@@ -140,8 +141,10 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     }
 
     function _manifest() internal view returns (BootstrapManifest memory) {
-        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](1);
-        rows[0] = ProxyUpgradeRow({
+        // The one participating slot in the named CTM-domain inventory: the CTM's own
+        // implementation swap. The remaining slots stay inert (explicitly not upgraded).
+        CTMProxyUpgrades memory upgrades;
+        upgrades.chainTypeManager = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
             implNew: PinnedContract({addr: implV32, codehash: implV32.codehash}),
@@ -153,7 +156,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 ctm: address(chainContractAddress),
                 expectedProtocolVersion: chainContractAddress.protocolVersion(),
                 ctmProxyAdmin: ecosystemProxyAdmin,
-                proxyRows: rows,
+                proxyUpgrades: upgrades,
                 currentRelease: PinnedContract({addr: address(genesisRelease), codehash: Utils.releaseCodehash()}),
                 newProtocolVersion: newVersion,
                 oldProtocolVersionDeadline: type(uint256).max,
@@ -328,36 +331,22 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     ///      pre-migration implementation) and the last would silently win — so the reviewed edge
     ///      and the executed edge would differ. Same rule {CoreRegistry} enforces.
     function test_revertWhen_manifestCarriesDuplicateProxyRows() public {
-        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](2);
-        rows[0] = ProxyUpgradeRow({
-            proxy: address(ecosystemProxy),
-            expectedOldImpl: implV31,
-            implNew: PinnedContract({addr: implV32, codehash: implV32.codehash}),
-            initCalldata: ""
-        });
-        rows[1] = ProxyUpgradeRow({
+        BootstrapManifest memory manifest = _manifest();
+        // A second named slot pointing at the same proxy, with a different target.
+        manifest.proxyUpgrades.validatorTimelock = ProxyUpgradeRow({
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
             implNew: PinnedContract({addr: implV31, codehash: implV31.codehash}),
             initCalldata: ""
         });
-        BootstrapManifest memory manifest = _manifest();
-        manifest.proxyRows = rows;
 
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateProxyRow.selector, address(ecosystemProxy)));
         new RegistryBootstrapMigration(manifest);
     }
 
     function test_revertWhen_manifestCarriesAZeroRowField() public {
-        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](1);
-        rows[0] = ProxyUpgradeRow({
-            proxy: address(ecosystemProxy),
-            expectedOldImpl: address(0),
-            implNew: PinnedContract({addr: implV32, codehash: implV32.codehash}),
-            initCalldata: ""
-        });
         BootstrapManifest memory manifest = _manifest();
-        manifest.proxyRows = rows;
+        manifest.proxyUpgrades.chainTypeManager.expectedOldImpl = address(0);
 
         vm.expectRevert(ZeroAddress.selector);
         new RegistryBootstrapMigration(manifest);

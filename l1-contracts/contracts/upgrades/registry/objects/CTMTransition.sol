@@ -63,8 +63,9 @@ contract CTMTransition is ICTMTransition {
             revert ZeroAddress();
         }
         // CTM-domain implementation swaps ride on the transition (see {TransitionManifest});
-        // empty is the common case — most upgrades change chain state, not the CTM itself.
-        ProxyUpgradeRowLib.validateRows(_manifest.ctmProxyRows);
+        // an all-inert inventory is the common case — most upgrades change chain state, not the
+        // CTM itself.
+        ProxyUpgradeRowLib.validateRows(ProxyUpgradeRowLib.toRows(_manifest.ctmProxyUpgrades));
         // A transition only ever moves the version forward — the same rule chains enforce at
         // execution and the CTM enforces in `setNewVersionUpgrade`.
         if (_manifest.newProtocolVersion <= _manifest.oldProtocolVersion) {
@@ -208,7 +209,7 @@ contract CTMTransition is ICTMTransition {
     }
 
     function ctmProxyRows() external view returns (ProxyUpgradeRow[] memory) {
-        return getManifest().ctmProxyRows;
+        return ProxyUpgradeRowLib.toRows(getManifest().ctmProxyUpgrades);
     }
 
     function validate() external view {
@@ -216,7 +217,7 @@ contract CTMTransition is ICTMTransition {
         ICTMRelease(m.newRelease).validate();
         ICTMRelease(m.fromRelease).validate();
         _requirePin(m.upgradeEngine);
-        ProxyUpgradeRowLib.requireRowPins(m.ctmProxyRows);
+        ProxyUpgradeRowLib.requireRowPins(ProxyUpgradeRowLib.toRows(m.ctmProxyUpgrades));
     }
 
     function verifyAll() external view returns (bool) {
@@ -224,7 +225,9 @@ contract CTMTransition is ICTMTransition {
         if (!ICTMRelease(m.newRelease).verifyAll() || !ICTMRelease(m.fromRelease).verifyAll()) {
             return false;
         }
-        return CodehashPinLib.pinHolds(m.upgradeEngine) && ProxyUpgradeRowLib.rowPinsHold(m.ctmProxyRows);
+        return
+            CodehashPinLib.pinHolds(m.upgradeEngine) &&
+            ProxyUpgradeRowLib.rowPinsHold(ProxyUpgradeRowLib.toRows(m.ctmProxyUpgrades));
     }
 
     function _requirePin(PinnedContract memory _pinned) private view {

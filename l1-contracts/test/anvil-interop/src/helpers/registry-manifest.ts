@@ -15,12 +15,13 @@
  *     Carries NO facet swaps and NO hash changes: the delta is DERIVED on-chain from the
  *     `(fromRelease, newRelease)` pair at initialization. What is authored: version edge,
  *     pinned verifier + upgrade engine, schedule, and the typed `L2UpgradePlan`.
- *   - `CoreRegistry.CoreRegistryManifest` — source-checked ecosystem rows
- *     (`expectedOldImpl -> implNew` with inline pins).
+ *   - `CoreRegistry.CoreRegistryManifest` — the NAMED ecosystem inventory
+ *     (`EcosystemProxyUpgrades`): one slot per ecosystem proxy, source-checked rows with inline
+ *     pins in the participating slots, zero `implNew` in the explicitly-not-upgraded ones.
  *
- * Enum identifiers in the manifest are NAMES; their numeric values are parsed from the
- * canonical Solidity sources at runtime (never hardcoded), so enum reordering upstream cannot
- * silently skew the encoding.
+ * Enum identifiers and inventory slot names in the manifest are NAMES; enum values and struct
+ * field lists are parsed from the canonical Solidity sources at runtime (never hardcoded), so
+ * upstream reordering or renaming cannot silently skew the encoding.
  */
 
 import * as fs from "fs";
@@ -56,6 +57,7 @@ function parseSolidityEnum(relSourcePath: string, enumName: string): Record<stri
 }
 
 const COMPLEX_UPGRADER_SOL = "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+const REGISTRY_TYPES_SOL = "contracts/upgrades/registry/RegistryTypes.sol";
 
 function enumValue(map: Record<string, number>, name: string, enumName: string): number {
   const value = map[name];
@@ -65,24 +67,81 @@ function enumValue(map: Record<string, number>, name: string, enumName: string):
   return value;
 }
 
+/** Parses `struct <name> { <type> <field>; ... }` into its ordered field-name list. */
+function parseSolidityStructFields(relSourcePath: string, structName: string): string[] {
+  const source = fs.readFileSync(path.join(l1ContractsDir, relSourcePath), "utf-8");
+  const match = source.match(new RegExp(`struct\\s+${structName}\\s*\\{([^}]*)\\}`));
+  if (!match) {
+    throw new Error(`struct ${structName} not found in ${relSourcePath}`);
+  }
+  return match[1]
+    .split(";")
+    .map((decl) =>
+      decl
+        .split("\n")
+        .filter((line) => !line.trim().startsWith("//"))
+        .join(" ")
+        .trim()
+    )
+    .filter((decl) => decl.length > 0)
+    .map((decl) => decl.split(/\s+/).pop() as string);
+}
+
+/** An inert named-inventory slot: the explicit "not upgraded" statement. */
+function zeroProxyUpgradeRow(): any {
+  return {
+    proxy: ethers.constants.AddressZero,
+    expectedOldImpl: ethers.constants.AddressZero,
+    implNew: { addr: ethers.constants.AddressZero, codehash: ethers.constants.HashZero },
+    initCalldata: "0x",
+  };
+}
+
+/**
+ * Builds a named proxy-upgrade inventory (`EcosystemProxyUpgrades` / `CTMProxyUpgrades`) from
+ * rows keyed by SLOT NAME. Slot names are the Solidity struct field names, parsed from the
+ * source; a row keyed by anything else refuses to encode, and every unnamed slot encodes as the
+ * explicit zero ("not upgraded") row.
+ */
+export function namedProxyUpgrades(structName: string, rows: Record<string, any>): any {
+  const fields = parseSolidityStructFields(REGISTRY_TYPES_SOL, structName);
+  const upgrades: Record<string, any> = {};
+  for (const field of fields) {
+    upgrades[field] = zeroProxyUpgradeRow();
+  }
+  for (const [name, row] of Object.entries(rows ?? {})) {
+    if (!fields.includes(name)) {
+      throw new Error(`unknown ${structName} slot "${name}" (known: ${fields.join(", ")})`);
+    }
+    upgrades[name] = row;
+  }
+  return upgrades;
+}
+
 // Loose manifest typing: the JSON schema is owned by the emit side of the upgrade runner.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /** `CoreRegistry.CoreRegistryManifest` initialize argument from the manifest JSON. */
 export function coreInitArgs(manifest: any): any {
-  // Row identity is the proxy ADDRESS; the manifest's contract names are human labels only.
+  // The JSON keys under `core.contracts` ARE the `EcosystemProxyUpgrades` slot names — one
+  // naming scheme end to end, with unknown keys refused at encode time.
   const entries: Array<[string, any]> = Object.entries(manifest.core.contracts);
-  const contractRows = entries.map(([, e]) => ({
-    proxy: e.proxy,
-    expectedOldImpl: e.expectedOldImpl ?? ethers.constants.AddressZero,
-    implNew: {
-      addr: e.implNew ?? ethers.constants.AddressZero,
-      codehash: e.implNewCodehash ?? ethers.constants.HashZero,
-    },
-    initCalldata: e.initCalldata ?? "0x",
-  }));
+  const rows = Object.fromEntries(
+    entries.map(([name, e]) => [
+      name,
+      {
+        proxy: e.proxy,
+        expectedOldImpl: e.expectedOldImpl ?? ethers.constants.AddressZero,
+        implNew: {
+          addr: e.implNew ?? ethers.constants.AddressZero,
+          codehash: e.implNewCodehash ?? ethers.constants.HashZero,
+        },
+        initCalldata: e.initCalldata ?? "0x",
+      },
+    ])
+  );
 
-  return { contractRows };
+  return { ecosystemProxyUpgrades: namedProxyUpgrades("EcosystemProxyUpgrades", rows) };
 }
 
 /** `CTMRelease.ReleaseManifest` initialize argument from one `manifest.ctms[]` entry. */
@@ -141,6 +200,9 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string):
     fromRelease: transition.fromRelease,
     newRelease,
     upgradeEngine: { addr: transition.upgradeEngine.address, codehash: transition.upgradeEngine.codehash },
+    // The named CTM-domain inventory; the local hop upgrades chain state only, so the manifest
+    // carries no slots and every one encodes as the explicit zero ("not upgraded") row.
+    ctmProxyUpgrades: namedProxyUpgrades("CTMProxyUpgrades", transition.ctmProxyUpgrades ?? {}),
     oldProtocolVersionDeadline: ethers.BigNumber.from(transition.oldProtocolVersionDeadline),
     upgradeTimestamp: transition.upgradeTimestamp,
     l2Plan: {

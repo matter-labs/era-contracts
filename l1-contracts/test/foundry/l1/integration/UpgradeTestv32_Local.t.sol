@@ -31,7 +31,7 @@ import {
     L2UpgradePlan,
     PinnedContract,
     TransitionManifest,
-    ProxyUpgradeRow
+    CTMProxyUpgrades
 } from "contracts/upgrades/registry/RegistryTypes.sol";
 import {UpgradeHelperLib} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeHelperLib.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
@@ -54,6 +54,7 @@ contract CTMUpgrade_v32_Test is CTMUpgrade_v32 {
         // The same wrapped payload the legacy cut carried: `SettlementLayerV32Upgrade` requires
         // the `forceDeployAndUpgradeUniversal(…, genesisUpgrade(...))` shape to rewrite the
         // per-chain placeholders, so the plan mirrors `getV32L2UpgradeCalldata`.
+        CTMProxyUpgrades memory noCtmProxyUpgrades;
         CTMTransition transition = new CTMTransition(
             TransitionManifest({
                 oldProtocolVersion: getOldProtocolVersion(),
@@ -61,7 +62,7 @@ contract CTMUpgrade_v32_Test is CTMUpgrade_v32 {
                 fromRelease: IChainTypeManager(ctmProxy).currentRelease(),
                 newRelease: ctmAddresses.stateTransition.currentRelease,
                 upgradeEngine: PinnedContract({addr: engine, codehash: engine.codehash}),
-                ctmProxyRows: new ProxyUpgradeRow[](0),
+                ctmProxyUpgrades: noCtmProxyUpgrades,
                 oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
                 upgradeTimestamp: 0,
                 l2Plan: L2UpgradePlan({

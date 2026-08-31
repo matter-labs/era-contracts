@@ -40,7 +40,7 @@ import {
     ReleaseManifest,
     TransitionManifest,
     PinnedContract,
-    ProxyUpgradeRow
+    CTMProxyUpgrades
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice The first full registry-driven upgrade, end to end: a real chain diamond is taken
@@ -255,6 +255,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             l2Plan.delegateCalldata = hex"beef";
         }
 
+        CTMProxyUpgrades memory noCtmProxyUpgrades;
         transition = new CTMTransition(
             TransitionManifest({
                 oldProtocolVersion: _oldVersion,
@@ -262,7 +263,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
                 fromRelease: _fromRelease,
                 newRelease: release,
                 upgradeEngine: PinnedContract({addr: defaultUpgrade, codehash: defaultUpgrade.codehash}),
-                ctmProxyRows: new ProxyUpgradeRow[](0),
+                ctmProxyUpgrades: noCtmProxyUpgrades,
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: 0,
                 l2Plan: l2Plan

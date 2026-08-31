@@ -63,12 +63,12 @@ contract RegistryBootstrapMigration {
         }
         // An edge with no implementation swaps is not a bootstrap; it would silently reduce to
         // "install anchors and hand over authority", which is a different (unreviewed) operation.
-        uint256 rowsLength = _manifest.proxyRows.length;
-        if (rowsLength == 0) {
+        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_manifest.proxyUpgrades);
+        if (rows.length == 0) {
             revert RegistryUnknownKey();
         }
         // Same row discipline as {CoreRegistry} and {CTMTransition} (shared lib).
-        ProxyUpgradeRowLib.validateRows(_manifest.proxyRows);
+        ProxyUpgradeRowLib.validateRows(rows);
 
         encodedManifest = abi.encode(_manifest);
     }
@@ -129,9 +129,10 @@ contract RegistryBootstrapMigration {
 
         // Every implementation swap is source-checked: replaying a stale migration, or running it
         // against an ecosystem someone already moved, cannot silently re-point a proxy.
-        uint256 rowsLength = m.proxyRows.length;
+        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(m.proxyUpgrades);
+        uint256 rowsLength = rows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {
-            ProxyUpgradeRow memory row = m.proxyRows[i];
+            ProxyUpgradeRow memory row = rows[i];
             address liveImpl = m.ctmProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(row.proxy));
             if (liveImpl != row.expectedOldImpl) {
                 revert ProxyUpgradeRowMismatch(row.proxy, row.expectedOldImpl, liveImpl);
@@ -169,10 +170,7 @@ contract RegistryBootstrapMigration {
         }
         validate();
 
-        uint256 rowsLength = m.proxyRows.length;
-        for (uint256 i = 0; i < rowsLength; ++i) {
-            m.ctmProxyAdmin.upgrade(ITransparentUpgradeableProxy(m.proxyRows[i].proxy), m.proxyRows[i].implNew.addr);
-        }
+        ProxyUpgradeRowLib.applyRows(m.ctmProxyAdmin, ProxyUpgradeRowLib.toRows(m.proxyUpgrades));
 
         IChainTypeManager ctm = IChainTypeManager(m.ctm);
         // The cut-taking form, not `setNewVersionUpgradeFromTransition`: there is no transition for

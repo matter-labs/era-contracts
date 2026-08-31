@@ -33,7 +33,7 @@ import {
     ReleaseManifest,
     TransitionManifest,
     PinnedContract,
-    ProxyUpgradeRow
+    CTMProxyUpgrades
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Exercises the CTM-BOUND executor against real write-once release and transition
@@ -157,6 +157,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         uint256[] memory factoryDeps = new uint256[](1);
         factoryDeps[0] = 1;
 
+        CTMProxyUpgrades memory noCtmProxyUpgrades;
         result = new CTMTransition(
             TransitionManifest({
                 oldProtocolVersion: _oldProtocolVersion,
@@ -166,7 +167,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                 fromRelease: _fromRelease,
                 newRelease: address(release),
                 upgradeEngine: PinnedContract({addr: upgradeEngineAddr, codehash: upgradeEngineAddr.codehash}),
-                ctmProxyRows: new ProxyUpgradeRow[](0),
+                ctmProxyUpgrades: noCtmProxyUpgrades,
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: _upgradeTimestamp,
                 l2Plan: L2UpgradePlan({

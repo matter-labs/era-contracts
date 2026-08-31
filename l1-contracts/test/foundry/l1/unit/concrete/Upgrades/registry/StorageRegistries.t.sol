@@ -35,6 +35,7 @@ import {
     RegistryEmptySelectors,
     RegistryHashChangeToZero,
     RegistryPinTargetHasNoCode,
+    RegistryUnknownKey,
     SameReleaseTransitionHasPayload,
     TransitionDeadlineBeforeUpgrade,
     ZeroAddress
@@ -46,6 +47,8 @@ import {
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {
     CoreRegistryManifest,
+    CTMProxyUpgrades,
+    EcosystemProxyUpgrades,
     ProxyUpgradeRow,
     GenesisFacet,
     L2UpgradePlan,
@@ -113,16 +116,14 @@ contract StorageRegistriesTest is Test {
     }
 
     function _coreManifest() internal view returns (CoreRegistryManifest memory manifest) {
-        // A single full source-checked edge — every core row must be a real, unique edge;
-        // placeholder (all-zero) rows are rejected at the registry boundary.
-        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](1);
-        rows[0] = ProxyUpgradeRow({
+        // One participating slot in the NAMED inventory — every other slot's zero `implNew` is
+        // the explicit "not upgraded" statement and produces no row.
+        manifest.ecosystemProxyUpgrades.bridgehub = ProxyUpgradeRow({
             proxy: address(0xB001),
             expectedOldImpl: address(0xB101),
             implNew: PinnedContract({addr: coreImplNew, codehash: coreImplNew.codehash}),
             initCalldata: ""
         });
-        return CoreRegistryManifest({contractRows: rows});
     }
 
     function _releaseManifest(
@@ -196,6 +197,8 @@ contract StorageRegistriesTest is Test {
     }
 
     function _transitionManifest() internal view returns (TransitionManifest memory manifest) {
+        // All CTM-domain inventory slots inert: this hop changes chain state, not the CTM itself.
+        CTMProxyUpgrades memory noCtmProxyUpgrades;
         return
             TransitionManifest({
                 oldProtocolVersion: OLD_VERSION,
@@ -203,7 +206,7 @@ contract StorageRegistriesTest is Test {
                 fromRelease: address(fromRelease),
                 newRelease: address(newRelease),
                 upgradeEngine: PinnedContract({addr: upgradeEngine, codehash: upgradeEngine.codehash}),
-                ctmProxyRows: new ProxyUpgradeRow[](0),
+                ctmProxyUpgrades: noCtmProxyUpgrades,
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeTimestamp: 1234567,
                 l2Plan: _l2Plan()
@@ -650,37 +653,45 @@ contract StorageRegistriesTest is Test {
         assertFalse(coreRegistry.verifyAll());
     }
 
-    // ─────────────────────────── core registry rows ───────────────────────────
+    // ─────────────────────────── core registry inventory ───────────────────────────
 
     function test_revertWhen_upgradingRowMissingSource() public {
-        // A row that upgrades must be a full edge: known source implementation.
+        // A participating slot must be a full edge: known source implementation.
         CoreRegistryManifest memory manifest = _coreManifest();
-        manifest.contractRows[0].expectedOldImpl = address(0);
+        manifest.ecosystemProxyUpgrades.bridgehub.expectedOldImpl = address(0);
 
         vm.expectRevert(ZeroAddress.selector);
         new CoreRegistry(manifest);
     }
 
-    function test_revertWhen_coreRegistryRowHasNoImplementation() public {
-        // Every core row is a real edge — a placeholder that pins no new implementation
-        // (implNew == 0) is refused; the old "skip zero rows" behavior is gone.
+    function test_inertSlotIsExplicitNotUpgradedAndProducesNoRow() public {
+        // A slot with zero `implNew` is the named inventory's explicit "not upgraded" statement:
+        // it never becomes a row, even when it documents the proxy address it refers to.
         CoreRegistryManifest memory manifest = _coreManifest();
-        manifest.contractRows[0].implNew.addr = address(0);
-        manifest.contractRows[0].implNew.codehash = bytes32(0);
+        manifest.ecosystemProxyUpgrades.messageRoot.proxy = address(0xB002);
 
-        vm.expectRevert(ZeroAddress.selector);
+        CoreRegistry registry = new CoreRegistry(manifest);
+        assertEq(registry.ecosystemRows().length, 1, "the inert slot must be dropped at the flatten boundary");
+        assertEq(registry.ecosystemRows()[0].proxy, address(0xB001), "the participating slot must survive");
+    }
+
+    function test_revertWhen_everyInventorySlotIsInert() public {
+        // A registry whose whole inventory is "not upgraded" upgrades nothing — refused.
+        CoreRegistryManifest memory manifest = _coreManifest();
+        manifest.ecosystemProxyUpgrades.bridgehub.implNew = PinnedContract({addr: address(0), codehash: bytes32(0)});
+
+        vm.expectRevert(RegistryUnknownKey.selector);
         new CoreRegistry(manifest);
     }
 
     function test_revertWhen_coreRegistryHasDuplicateProxyRow() public {
-        // A proxy is routed once: two rows naming the same proxy are rejected.
+        // A proxy is routed once: two named slots naming the same proxy are rejected.
         CoreRegistryManifest memory manifest = _coreManifest();
-        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](2);
-        rows[0] = manifest.contractRows[0];
-        rows[1] = manifest.contractRows[0]; // same proxy again
-        manifest.contractRows = rows;
+        manifest.ecosystemProxyUpgrades.messageRoot = manifest.ecosystemProxyUpgrades.bridgehub; // same proxy again
 
-        vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateProxyRow.selector, rows[0].proxy));
+        vm.expectRevert(
+            abi.encodeWithSelector(RegistryDuplicateProxyRow.selector, manifest.ecosystemProxyUpgrades.bridgehub.proxy)
+        );
         new CoreRegistry(manifest);
     }
 }
