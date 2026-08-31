@@ -233,6 +233,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         );
 
         // Optional override for v29 introspection selection
+        // Off unless the upgrade explicitly asks for it, so an upgrade of an existing ecosystem does not
+        // silently start demanding a second proof system from chains whose Airbender prover is not running.
+        if (toml.keyExists("$.airbender_verifier")) {
+            config.airbenderVerifier = toml.readBool("$.airbender_verifier");
+        }
         if (toml.keyExists("$.use_v29_introspection")) {
             newConfig.hasV29IntrospectionOverride = true;
             newConfig.useV29IntrospectionOverride = toml.readBool("$.use_v29_introspection");

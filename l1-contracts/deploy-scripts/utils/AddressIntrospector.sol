@@ -520,22 +520,19 @@ library AddressIntrospector {
         (address verifierFflonk, address verifierPlonk, address airbenderVerifierPlonk) = _isV29
             ? (address(0), address(0), address(0))
             : _getSubVerifiers(_verifier, _isZKsyncOS);
-        // With the multi-proof gate installed, the chain's verifier is the gate and these resolve to its two
-        // lanes. Without it they stay zero, which is what a Boojum-only deployment should report. Probed
-        // tolerantly so a verifier that predates the gate is reported rather than reverting the whole read.
-        address boojumVerifier = _tryAddress(_verifier, "BOOJUM_VERIFIER()");
-        address airbenderVerifier = _tryAddress(_verifier, "AIRBENDER_VERIFIER()");
-        if (airbenderVerifier != address(0)) {
-            airbenderVerifierPlonk = _tryAddress(airbenderVerifier, "AIRBENDER_PLONK_VERIFIER()");
-        }
+        // The multi-proof gate's lanes are deliberately not probed here. Detecting them would mean guessing
+        // at the topology with a fail-soft `staticcall`, which this repository forbids and which would turn a
+        // miswired verifier into a silent zero. They are reported by the deploy scripts instead
+        // (`airbender_verifier_wrapper_addr`, `boojum_verifier_addr`) and readable from the gate's own
+        // immutables, which revert loudly when the gate is not what it claims to be.
         return
             Verifiers({
                 verifier: _verifier,
                 verifierFflonk: verifierFflonk,
                 verifierPlonk: verifierPlonk,
                 airbenderVerifierPlonk: airbenderVerifierPlonk,
-                airbenderVerifier: airbenderVerifier,
-                boojumVerifier: boojumVerifier
+                airbenderVerifier: address(0),
+                boojumVerifier: address(0)
             });
     }
 }

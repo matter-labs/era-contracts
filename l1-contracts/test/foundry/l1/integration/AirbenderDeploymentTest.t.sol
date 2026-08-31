@@ -60,24 +60,24 @@ contract AirbenderDeploymentTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     }
 
     /// `AddressIntrospector` runs against the live chain verifier and is used by `RegisterZKChain` and by the
-    /// upgrade-calldata generator. It must survive the gate and report both lanes rather than zeros.
-    function test_addressIntrospectorResolvesTheLanes() public {
+    /// upgrade-calldata generator, so it has to survive the gate being the chain's verifier.
+    function test_addressIntrospectorSurvivesTheGate() public {
         CTMDeployedAddresses memory info = AddressIntrospector.getCTMAddresses(
             ChainTypeManagerBase(address(addresses.chainTypeManager))
         );
 
         assertTrue(info.stateTransition.verifiers.verifierFflonk != address(0), "fflonk not resolved");
         assertTrue(info.stateTransition.verifiers.verifierPlonk != address(0), "plonk not resolved");
-        assertEq(
-            info.stateTransition.verifiers.boojumVerifier,
-            address(_gate().BOOJUM_VERIFIER()),
-            "Boojum router not resolved"
-        );
-        assertEq(
-            info.stateTransition.verifiers.airbenderVerifier,
-            address(_gate().AIRBENDER_VERIFIER()),
-            "Airbender lane not resolved"
-        );
+        assertEq(info.stateTransition.verifiers.verifier, address(_gate()), "chain verifier not resolved");
+    }
+
+    /// The gate must not nest a second empty-proof skip inside its Boojum lane: the outer testnet gate
+    /// already provides that, and a nested one lets a non-empty envelope declare a zero-length Boojum slice
+    /// and settle with no Boojum proof.
+    function test_boojumLaneIsTheProductionRouter() public view {
+        address boojumLane = address(_gate().BOOJUM_VERIFIER());
+        (bool ok, ) = boojumLane.staticcall(abi.encodeWithSignature("IS_TESTNET_VERIFIER()"));
+        assertFalse(ok, "Boojum lane must be the production router, not the testnet one");
     }
 
     /// Registering a further chain runs introspection against an already-registered, up-to-date chain — the

@@ -99,6 +99,13 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
         }
 
         if (disabled & BOOJUM_PROOF_SYSTEM_DISABLED == 0) {
+            // An enabled lane must actually carry a proof. Without this, a zero-length Boojum slice reaches
+            // a sub-verifier that treats an empty proof as "skip" and the lane is silently not verified —
+            // the testnet router does exactly that. The Airbender slot is fixed-size so it cannot be empty,
+            // but the check is symmetric because the guarantee is.
+            if (boojumLength == 0) {
+                revert BoojumVerificationFailed();
+            }
             if (!BOOJUM_VERIFIER.verify(_publicInputs, _proof[2:2 + boojumLength])) {
                 revert BoojumVerificationFailed();
             }
