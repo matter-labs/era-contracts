@@ -173,7 +173,7 @@ const DEFAULT_GAS_LIMIT = 10_000_000;
 
 export type RegistryUpgradeScenario = {
   label: string;
-  /** chain-states/<stateVersion> to boot from (a fresh ecosystem at the current branch's code). */
+  /** chain-states/<stateVersion> to boot from — the FROZEN departing-version fixture for the bootstrap edge (see chain-states/README.md). */
   stateVersion: string;
   /** Which chain roles to upgrade. Only L1-settled chains are supported (see assertions). */
   targetRoles: ChainRole[];

@@ -4,7 +4,7 @@ import { runRegistryDrivenUpgradeScenario } from "./src/helpers/registry-upgrade
 
 runRegistryDrivenUpgradeScenario({
   label: "registry-v32",
-  stateVersion: "v0.32.0",
+  stateVersion: "v0.33.0",
   // Only chains that settle on L1 take the full upgrade (CTM bump + diamond cut + committed
   // L2 upgrade tx). directSettled = chain 10, gateway = the gateway chain itself (chain 11).
   targetRoles: ["directSettled", "gateway"],
