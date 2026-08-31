@@ -30,7 +30,9 @@ import {
     MAX_NEW_FACTORY_DEPS,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     SERVICE_TRANSACTION_SENDER,
+    SERVICE_TX_MAX_GAS_LIMIT,
     SETTLEMENT_LAYER_RELAY_SENDER,
+    USER_PRIORITY_TX_MAX_GAS_LIMIT,
     PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
     PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET
 } from "../../../common/Config.sol";
@@ -387,7 +389,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
                 mintValue: 0,
                 l2Value: 0,
                 // Very large amount
-                l2GasLimit: 72_000_000,
+                l2GasLimit: SERVICE_TX_MAX_GAS_LIMIT,
                 l2Calldata: data,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),
@@ -408,7 +410,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
                 mintValue: 0,
                 l2Value: 0,
                 // Very large amount
-                l2GasLimit: 72_000_000,
+                l2GasLimit: SERVICE_TX_MAX_GAS_LIMIT,
                 l2Calldata: _l2Calldata,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),
@@ -503,7 +505,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
             request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
         }
         L2CanonicalTransaction memory transaction;
-        (transaction, canonicalTxHash) = _validateTx(_params);
+        (transaction, canonicalTxHash) = _validateTx(_params, _userPriorityTxMaxGasLimit());
 
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash);
         if (s.settlementLayer != address(0)) {
@@ -535,7 +537,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
         });
 
         L2CanonicalTransaction memory transaction;
-        (transaction, canonicalTxHash) = _validateTx(params);
+        (transaction, canonicalTxHash) = _validateTx(params, s.priorityTxMaxGasLimit);
         _writePriorityOp(transaction, params.request.factoryDeps, canonicalTxHash);
     }
 
@@ -564,8 +566,12 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
         });
     }
 
+    /// @param _maxGasLimit The maximum transaction body gas limit to enforce. Callers whose gas
+    /// limit is user-supplied must pass `_userPriorityTxMaxGasLimit()`; callers that author the gas
+    /// limit themselves pass `s.priorityTxMaxGasLimit`.
     function _validateTx(
-        WritePriorityOpParams memory _priorityOpParams
+        WritePriorityOpParams memory _priorityOpParams,
+        uint256 _maxGasLimit
     ) internal view returns (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) {
         transaction = _serializeL2Transaction(_priorityOpParams);
         bytes memory transactionEncoding = abi.encode(transaction);
@@ -573,11 +579,29 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
         TransactionValidator.validateL1ToL2Transaction(
             transaction,
             transactionEncoding,
-            s.priorityTxMaxGasLimit,
+            _maxGasLimit,
             s.feeParams.priorityTxMaxPubdata,
             s.zksyncOS
         );
         canonicalTxHash = keccak256(transactionEncoding);
+    }
+
+    /// @notice The transaction body gas ceiling for L1->L2 transactions whose gas limit comes from
+    /// the caller.
+    /// @dev Such transactions must eventually be included by the operator and cannot be split
+    /// across batches, so anyone could otherwise force an arbitrarily expensive transaction onto
+    /// the chain. `USER_PRIORITY_TX_MAX_GAS_LIMIT` bounds that without needing to be configured per
+    /// chain, while a chain that has been set stricter than the constant keeps its own value.
+    /// @dev ZKsync OS chains are excluded: `Executor` commits `zksyncOSMaxTxGasLimit` to the batch
+    /// public input, so their per-transaction bound is enforced in-circuit for every transaction
+    /// rather than only at L1 admission, and a chain admin may deliberately raise it above the
+    /// EraVM constant. Applying the constant here would cap it back down unreachably.
+    function _userPriorityTxMaxGasLimit() internal view returns (uint256) {
+        uint256 chainLimit = s.priorityTxMaxGasLimit;
+        if (s.zksyncOS) {
+            return chainLimit;
+        }
+        return chainLimit < USER_PRIORITY_TX_MAX_GAS_LIMIT ? chainLimit : USER_PRIORITY_TX_MAX_GAS_LIMIT;
     }
 
     /// @notice Deposits are paused when a chain migrates to/from GW.
