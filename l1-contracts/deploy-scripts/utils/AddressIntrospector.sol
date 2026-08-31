@@ -501,7 +501,7 @@ library AddressIntrospector {
         return address(0);
     }
 
-    /// @notice Get fflonk, plonk and Airbender PLONK sub-verifiers from a dual verifier
+    /// @notice Get fflonk and plonk sub-verifiers from a dual verifier
     /// @param _verifier The verifier address
     /// @param _isZKsyncOS If true, uses ZKsyncOSDualVerifier interface; otherwise EraDualVerifier
     function _getSubVerifiers(
@@ -520,12 +520,22 @@ library AddressIntrospector {
         (address verifierFflonk, address verifierPlonk, address airbenderVerifierPlonk) = _isV29
             ? (address(0), address(0), address(0))
             : _getSubVerifiers(_verifier, _isZKsyncOS);
+        // With the multi-proof gate installed, the chain's verifier is the gate and these resolve to its two
+        // lanes. Without it they stay zero, which is what a Boojum-only deployment should report. Probed
+        // tolerantly so a verifier that predates the gate is reported rather than reverting the whole read.
+        address boojumVerifier = _tryAddress(_verifier, "BOOJUM_VERIFIER()");
+        address airbenderVerifier = _tryAddress(_verifier, "AIRBENDER_VERIFIER()");
+        if (airbenderVerifier != address(0)) {
+            airbenderVerifierPlonk = _tryAddress(airbenderVerifier, "AIRBENDER_PLONK_VERIFIER()");
+        }
         return
             Verifiers({
                 verifier: _verifier,
                 verifierFflonk: verifierFflonk,
                 verifierPlonk: verifierPlonk,
-                airbenderVerifierPlonk: airbenderVerifierPlonk
+                airbenderVerifierPlonk: airbenderVerifierPlonk,
+                airbenderVerifier: airbenderVerifier,
+                boojumVerifier: boojumVerifier
             });
     }
 }

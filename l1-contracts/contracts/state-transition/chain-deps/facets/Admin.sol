@@ -15,7 +15,8 @@ import {
     PRIORITY_EXPIRATION,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
-    ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT
+    ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT,
+    ALL_PROOF_SYSTEMS_DISABLED
 } from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
@@ -48,6 +49,7 @@ import {
     ProtocolIdMismatch,
     ProtocolIdNotGreater,
     TokenMultiplierChangeTooFrequent,
+    InvalidDisabledProofSystemsMask,
     TooMuchGas,
     Unauthorized,
     UpgradeTimestampNotReached,
@@ -189,6 +191,22 @@ contract AdminFacet is ZKChainBase, IAdmin {
         uint64 oldMaxTxGasLimit = _getZKsyncOSMaxTxGasLimit();
         s.zksyncOSMaxTxGasLimit = _newMaxTxGasLimit;
         emit NewZKsyncOSMaxTxGasLimit(oldMaxTxGasLimit, _newMaxTxGasLimit);
+    }
+
+    /// @inheritdoc IAdmin
+    function setDisabledProofSystems(uint8 _disabledProofSystems) external onlyAdmin onlySettlementLayer onlyEra {
+        // A mask above the known set would read as a configured policy while enabling nothing, and the
+        // all-disabled mask would let the chain settle with no proof system at all.
+        if (_disabledProofSystems >= ALL_PROOF_SYSTEMS_DISABLED) {
+            revert InvalidDisabledProofSystemsMask(_disabledProofSystems);
+        }
+        // Deliberately NOT gated on a drained batch queue: the switch exists for the case where committed
+        // batches cannot be proved, so it has to take effect while those batches are still waiting. Unlike
+        // the ZKsync OS chain config, this value never enters a batch proof public input, so changing it
+        // cannot invalidate an already committed batch.
+        uint8 oldDisabledProofSystems = s.disabledProofSystems;
+        s.disabledProofSystems = _disabledProofSystems;
+        emit NewDisabledProofSystems(oldDisabledProofSystems, _disabledProofSystems);
     }
 
     /// @dev The runtime chain config is read from storage when the batch proof public input is

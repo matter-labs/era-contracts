@@ -608,13 +608,13 @@ library GatewayCTMDeployerHelper {
                 _isZKsyncOS,
                 config.testnetVerifier
             );
+            // Gateway CTM deployment does not wire in the Airbender lane, so the chain's verifier there is
+            // the Boojum router itself rather than the multi-proof gate.
             bytes memory creationArgs = DeployCTML1OrGateway.verifierCreationArgs(
                 _isZKsyncOS,
                 result.verifierFflonk,
                 result.verifierPlonk,
-                config.aliasedGovernanceAddress,
-                // Gateway CTM deployment does not wire in the Airbender verifier.
-                address(0)
+                config.aliasedGovernanceAddress
             );
             result.verifier = _deployInternalWithParams(
                 mainVerifierName,
@@ -827,8 +827,10 @@ library GatewayCTMDeployerHelper {
                 eip7702Checker: address(0),
                 verifierFflonk: _deployedContracts.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
-                // Gateway CTM deployment does not wire in the Airbender verifier.
+                // Gateway CTM deployment does not wire in the Airbender lane at all.
                 airbenderVerifierPlonk: address(0),
+                airbenderVerifier: address(0),
+                boojumVerifier: address(0),
                 verifierOwner: _config.aliasedGovernanceAddress,
                 permissionlessValidator: address(0)
             });

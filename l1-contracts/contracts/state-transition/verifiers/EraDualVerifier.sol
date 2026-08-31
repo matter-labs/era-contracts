@@ -5,12 +5,13 @@ pragma solidity 0.8.28;
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IEraDualVerifier} from "../chain-interfaces/IEraDualVerifier.sol";
-import {EmptyProofLength, UnknownVerifierType} from "../../common/L1ContractErrors.sol";
+import {EmptyProofLength, InvalidPublicInputsLength, UnknownVerifierType} from "../../common/L1ContractErrors.sol";
+import {PUBLIC_INPUT_SHIFT} from "../../common/Config.sol";
 
 /// @title ZKsync Era Dual Verifier
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice This contract wraps multiple verifier contracts and routes zk-SNARK proof verification
+/// @notice This contract wraps the two Boojum verifier contracts and routes zk-SNARK proof verification
 /// to the correct verifier based on the provided proof type. It reuses the same interface as on the original `Verifier`
 /// contract, while abusing one of the fields (`_recursiveAggregationInput`) for proof verification type. The contract is
 /// needed for the smooth transition between verifier versions (e.g. Boojum PLONK → Boojum FFLONK → Airbender).
@@ -21,27 +22,17 @@ contract EraDualVerifier is IVerifier, IEraDualVerifier {
     /// @notice The Boojum PLONK verifier contract.
     IVerifier public immutable PLONK_VERIFIER;
 
-    /// @notice The Airbender PLONK verifier contract. Verifies Airbender (RISC-V) FRI proofs
-    /// wrapped into a PLONK SNARK, which uses a different verification key than the Boojum
-    /// PLONK verifier. A separate FFLONK-wrapped variant may be added in the future.
-    IVerifier public immutable AIRBENDER_PLONK_VERIFIER;
-
     /// @notice Type of verification for Boojum FFLONK verifier.
     uint256 internal constant FFLONK_VERIFICATION_TYPE = 0;
 
     /// @notice Type of verification for Boojum PLONK verifier.
     uint256 internal constant PLONK_VERIFICATION_TYPE = 1;
 
-    /// @notice Type of verification for the Airbender verifier wrapped into PLONK.
-    uint256 internal constant AIRBENDER_PLONK_VERIFICATION_TYPE = 2;
-
     /// @param _fflonkVerifier The address of the Boojum FFLONK verifier contract.
     /// @param _plonkVerifier The address of the Boojum PLONK verifier contract.
-    /// @param _airbenderPlonkVerifier The address of the Airbender PLONK verifier contract.
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, IVerifier _airbenderPlonkVerifier) {
+    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
         FFLONK_VERIFIER = _fflonkVerifier;
         PLONK_VERIFIER = _plonkVerifier;
-        AIRBENDER_PLONK_VERIFIER = _airbenderPlonkVerifier;
     }
 
     /// @notice Routes zk-SNARK proof verification to the appropriate verifier based on the proof type.
@@ -50,7 +41,10 @@ contract EraDualVerifier is IVerifier, IEraDualVerifier {
     /// @dev The first element of the `_proof` determines the verifier type.
     ///     - 0 indicates the Boojum FFLONK verifier should be used.
     ///     - 1 indicates the Boojum PLONK verifier should be used.
-    ///     - 2 indicates the Airbender PLONK verifier should be used.
+    /// @dev Airbender is deliberately not routable here. It is a separate proof system with its own
+    /// public-input binding, reached only through `AirbenderVerifier`. A second Airbender route inside this
+    /// router would let a caller satisfy the Boojum half of a two-proof-system requirement with an
+    /// Airbender proof, collapsing the guarantee to a single system.
     /// @return Returns `true` if the proof verification succeeds, otherwise throws an error.
     function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) public view virtual returns (bool) {
         // Ensure the proof has a valid length (at least one element
@@ -62,11 +56,9 @@ contract EraDualVerifier is IVerifier, IEraDualVerifier {
         // The first element of `_proof` determines the verifier type.
         uint256 verifierType = _proof[0];
         if (verifierType == FFLONK_VERIFICATION_TYPE) {
-            return FFLONK_VERIFIER.verify(_publicInputs, _extractProof(_proof));
+            return FFLONK_VERIFIER.verify(_boojumPublicInput(_publicInputs), _extractProof(_proof));
         } else if (verifierType == PLONK_VERIFICATION_TYPE) {
-            return PLONK_VERIFIER.verify(_publicInputs, _extractProof(_proof));
-        } else if (verifierType == AIRBENDER_PLONK_VERIFICATION_TYPE) {
-            return AIRBENDER_PLONK_VERIFIER.verify(_publicInputs, _extractProof(_proof));
+            return PLONK_VERIFIER.verify(_boojumPublicInput(_publicInputs), _extractProof(_proof));
         }
         // If the verifier type is unknown, revert with an error.
         else {
@@ -87,13 +79,27 @@ contract EraDualVerifier is IVerifier, IEraDualVerifier {
             return FFLONK_VERIFIER.verificationKeyHash();
         } else if (_verifierType == PLONK_VERIFICATION_TYPE) {
             return PLONK_VERIFIER.verificationKeyHash();
-        } else if (_verifierType == AIRBENDER_PLONK_VERIFICATION_TYPE) {
-            return AIRBENDER_PLONK_VERIFIER.verificationKeyHash();
         }
         // If the verifier type is unknown, revert with an error.
         else {
             revert UnknownVerifierType();
         }
+    }
+
+    /// @notice Applies `PUBLIC_INPUT_SHIFT` to the untruncated transition hash the Executor emitted.
+    /// @dev The Executor emits the per-batch transition hash untruncated so that each proof system can
+    /// apply its own derivation, so this verifier owns the shift for the Boojum lane.
+    /// @dev Unlike `ZKsyncOSVerifier.computeZKsyncOSHash` there is no range fold: Era proves one batch per
+    /// call (`CanOnlyProcessOneBatch`), and folding here would define an aggregation rule that no Era prover
+    /// implements. The length is checked here rather than trusted from the Executor because `verify` is
+    /// permissionless.
+    function _boojumPublicInput(uint256[] calldata _publicInputs) internal pure returns (uint256[] memory result) {
+        if (_publicInputs.length != 1) {
+            revert InvalidPublicInputsLength();
+        }
+
+        result = new uint256[](1);
+        result[0] = _publicInputs[0] >> PUBLIC_INPUT_SHIFT;
     }
 
     /// @notice Extract the proof by removing the first element (proof type differentiator).

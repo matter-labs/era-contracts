@@ -19,12 +19,11 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 contract AdminTest is UtilsCallMockerTest {
     IAdmin internal adminFacet;
     UtilsFacet internal utilsFacet;
-    address internal testnetVerifier =
-        address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](22);
+        bytes4[] memory selectors = new bytes4[](23);
         uint256 i = 0;
         selectors[i++] = IAdmin.setPendingAdmin.selector;
         selectors[i++] = IAdmin.acceptAdmin.selector;
@@ -32,6 +31,7 @@ contract AdminTest is UtilsCallMockerTest {
         selectors[i++] = IAdmin.setPorterAvailability.selector;
         selectors[i++] = IAdmin.setPriorityTxMaxGasLimit.selector;
         selectors[i++] = IAdmin.setZKsyncOSMaxTxGasLimit.selector;
+        selectors[i++] = IAdmin.setDisabledProofSystems.selector;
         selectors[i++] = IAdmin.changeFeeParams.selector;
         selectors[i++] = IAdmin.setTokenMultiplier.selector;
         selectors[i++] = IAdmin.upgradeChainFromVersion.selector;

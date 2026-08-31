@@ -132,6 +132,11 @@ interface IGetters is IZKChainBase {
     /// substituted when the value was never set explicitly.
     function getZKsyncOSMaxTxGasLimit() external view returns (uint64);
 
+    /// @return Bit mask of the proof systems this Era chain does not require in order to settle.
+    /// @dev `0` means every proof system is required. Read by `EraMultiProofVerifier` from the calling
+    /// chain, since one verifier instance serves every chain of a protocol version.
+    function disabledProofSystems() external view returns (uint8);
+
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
     /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.

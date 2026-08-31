@@ -65,4 +65,21 @@ library AirbenderPlonkProofFixture {
     function programOutput() internal pure returns (uint32[8] memory words) {
         words = [uint32(2778610126), 1164044285, 1318004684, 1957468797, 2907006409, 607801966, 752516650, 2556250368];
     }
+
+    /// The same program output as a single `uint256`, i.e. the untruncated `keccak256(prev | curr)` the
+    /// Executor emits for this batch. Shifting it by `PUBLIC_INPUT_SHIFT` yields `publicInputs()[0]`.
+    function packedProgramOutput() internal pure returns (uint256 packed) {
+        uint32[8] memory words = programOutput();
+        bytes memory le = new bytes(32);
+        for (uint256 i = 0; i < 8; ++i) {
+            uint32 w = words[i];
+            le[i * 4 + 0] = bytes1(uint8(w));
+            le[i * 4 + 1] = bytes1(uint8(w >> 8));
+            le[i * 4 + 2] = bytes1(uint8(w >> 16));
+            le[i * 4 + 3] = bytes1(uint8(w >> 24));
+        }
+        assembly {
+            packed := mload(add(le, 32))
+        }
+    }
 }

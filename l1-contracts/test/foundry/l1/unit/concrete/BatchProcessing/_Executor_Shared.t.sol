@@ -84,13 +84,14 @@ contract ExecutorTest is UtilsCallMockerTest {
     uint256[] internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](15);
+        bytes4[] memory selectors = new bytes4[](16);
         uint256 i = 0;
         selectors[i++] = admin.setPendingAdmin.selector;
         selectors[i++] = admin.acceptAdmin.selector;
         selectors[i++] = admin.setValidator.selector;
         selectors[i++] = admin.setPorterAvailability.selector;
         selectors[i++] = admin.setPriorityTxMaxGasLimit.selector;
+        selectors[i++] = admin.setDisabledProofSystems.selector;
         selectors[i++] = admin.changeFeeParams.selector;
         selectors[i++] = admin.setTokenMultiplier.selector;
         selectors[i++] = admin.upgradeChainFromVersion.selector;
@@ -125,9 +126,10 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](33);
+        bytes4[] memory selectors = new bytes4[](34);
         uint256 i = 0;
         selectors[i++] = getters.getVerifier.selector;
+        selectors[i++] = getters.disabledProofSystems.selector;
         selectors[i++] = getters.getAdmin.selector;
         selectors[i++] = getters.getPendingAdmin.selector;
         selectors[i++] = getters.getTotalBlocksCommitted.selector;
@@ -287,11 +289,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encode(bool(true))
         );
         DiamondInit diamondInit = new DiamondInit(isZKsyncOS());
-        EraTestnetVerifier testnetVerifier = new EraTestnetVerifier(
-            IVerifierV2(address(0)),
-            IVerifier(address(0)),
-            IVerifier(address(0))
-        );
+        EraTestnetVerifier testnetVerifier = new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
         // Mock the CTM to return a verifier for protocol version 0
         vm.mockCall(
             address(chainTypeManager),

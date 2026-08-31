@@ -388,9 +388,10 @@ library Utils {
     }
 
     function getGettersSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](34);
+        bytes4[] memory selectors = new bytes4[](35);
         uint256 i = 0;
         selectors[i++] = GettersFacet.getVerifier.selector;
+        selectors[i++] = GettersFacet.disabledProofSystems.selector;
         selectors[i++] = GettersFacet.getAdmin.selector;
         selectors[i++] = GettersFacet.getPendingAdmin.selector;
         selectors[i++] = GettersFacet.getTotalBlocksCommitted.selector;
@@ -446,7 +447,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](75);
+        bytes4[] memory selectors = new bytes4[](77);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -523,6 +524,8 @@ library Utils {
         selectors[i++] = UtilsFacet.util_setZksyncOS.selector;
         selectors[i++] = UtilsFacet.util_setZKsyncOSMaxTxGasLimit.selector;
         selectors[i++] = UtilsFacet.util_getZKsyncOSMaxTxGasLimit.selector;
+        selectors[i++] = UtilsFacet.util_setDisabledProofSystems.selector;
+        selectors[i++] = UtilsFacet.util_getDisabledProofSystems.selector;
         selectors[i++] = UtilsFacet.util_setBaseTokenHasTotalSupply.selector;
 
         return selectors;
