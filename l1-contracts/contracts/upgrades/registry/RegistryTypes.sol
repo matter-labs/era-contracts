@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
-import {CTM_CONTRACT_COUNT, L1_ECOSYSTEM_CONTRACT_COUNT} from "./libraries/ContractIdentifiers.sol";
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {Facets} from "../../common/StateTransitionTypes.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";

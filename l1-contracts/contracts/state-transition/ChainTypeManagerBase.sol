@@ -125,6 +125,8 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     ///      chain-creation params changed; under the registry model the genesis data is read
     ///      directly from `currentRelease` and pin moves are announced by `NewCurrentRelease`.
     ///      Served read-only ({newChainCreationParamsBlock}) for versions written pre-v34.
+    // Never written by THIS implementation by design — live chains carry pre-v34 values in it.
+    // slither-disable-next-line uninitialized-state
     mapping(uint256 protocolVersion => uint256) internal __DEPRECATED_newChainCreationParamsBlock;
 
     /// @dev Retained only to preserve the upgradeable storage layout. The verifier is part of the
