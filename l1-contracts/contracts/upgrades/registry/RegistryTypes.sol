@@ -109,20 +109,20 @@ struct TransitionManifest {
 ///        this row cannot silently downgrade it — the source no longer matches.
 /// @param implNew The pinned implementation the proxy points at afterwards. A ZERO address marks
 ///        an inventory slot as EXPLICITLY not upgraded; such a slot never becomes a row.
-/// @param initData Optional PINNED reinitialization DATA — never calldata. Empty executes a
-///        plain `ProxyAdmin.upgrade`; nonempty executes `upgradeAndCall` with the FIXED,
-///        argument-less `IProxyUpgradeInitializable.initializeUpgrade()` selector, and the new
-///        implementation fetches these bytes back from the registry object through
-///        `IUpgradeInitDataProvider` (see {IUpgradeInit.sol}) and decodes them itself. A
-///        manifest can therefore never route the init call to an arbitrary function with
-///        arbitrary arguments: the selector is part of the audited machinery, the decoding
-///        lives in the audited implementation, and the data is committed by the manifest hash
-///        like every other pinned value.
+/// @param callInitializeUpgrade Whether the swap reinitializes. There is NO calldata and NO
+///        data anywhere on the row: `true` executes `upgradeAndCall` with the FIXED,
+///        argument-less `IProxyUpgradeInitializable.initializeUpgrade()` selector (`false` is a
+///        plain `ProxyAdmin.upgrade`). Whatever the reinitializer needs lives in the audited
+///        implementation itself (constants/immutables — pinned by the row's codehash) or is
+///        read from the registry object being applied, discoverable through
+///        `IActiveRegistryProvider` (see {IUpgradeInit.sol}). A manifest can therefore never
+///        route the init call to an arbitrary function or smuggle arguments into it.
+// solhint-disable-next-line gas-struct-packing
 struct ProxyUpgradeRow {
     address proxy;
     address expectedOldImpl;
     PinnedContract implNew;
-    bytes initData;
+    bool callInitializeUpgrade;
 }
 
 /// @notice Everything a core registry instance pins, set exactly once at construction.

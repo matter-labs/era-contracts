@@ -30,9 +30,4 @@ interface ICoreRegistry {
 
     /// @notice The reverting counterpart of {verifyAll}, used on execution paths.
     function validate() external view;
-
-    /// @notice The pinned `initData` of the row upgrading `_proxy` — served (through the
-    ///         executor) to the new implementation's fixed `initializeUpgrade()`; see
-    ///         {IUpgradeInit.sol}. Reverts when no row upgrades `_proxy`.
-    function upgradeInitData(address _proxy) external view returns (bytes memory);
 }

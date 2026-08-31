@@ -191,7 +191,7 @@ export async function bootstrapInitArgs(
           addr: manifest.bootstrap.ctmImpl.implNew,
           codehash: manifest.bootstrap.ctmImpl.implNewCodehash,
         },
-        initData: "0x",
+        callInitializeUpgrade: false,
       },
     }),
     currentRelease: { addr: params.currentRelease, codehash: params.releaseCodehash },

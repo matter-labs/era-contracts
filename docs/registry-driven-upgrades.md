@@ -68,19 +68,19 @@ The inventory shape exists only at the manifest boundary — the audited constru
 `ctmProxyRows()` return and the executors apply, dropping the inert slots, so the eternal
 executors never recompile when the inventory grows.
 
-### Reinitializers: a fixed call, pinned data
+### Reinitializers: a fixed call, no data
 
-A row never carries calldata. Its `initData` field is pinned DATA, and when it is nonempty the
-apply performs `upgradeAndCall` with the FIXED, argument-less
-`IProxyUpgradeInitializable.initializeUpgrade()` selector. The new implementation fetches its
-parameters itself: inside the call, `msg.sender` is the ProxyAdmin, whose `owner()` is the
-executor (or the bootstrap migration), which serves
-`IUpgradeInitDataProvider.upgradeInitData(address(this))` from the registry object it is
-CURRENTLY applying — the executors hold that pointer only for the duration of the row
-application, so outside a genuine registry-driven apply the provider reverts
-(`NoActiveRegistryUpgrade`). A manifest therefore cannot route the init call to an arbitrary
-function with arbitrary arguments: the selector is part of the audited machinery, the decoding
-lives in the audited implementation, and the data is committed by the manifest hash.
+A row never carries calldata — or data. Its `callInitializeUpgrade` BOOLEAN is the entire
+reinitialization surface: when set, the apply performs `upgradeAndCall` with the FIXED,
+argument-less `IProxyUpgradeInitializable.initializeUpgrade()` selector. Whatever the
+reinitializer needs lives in the audited implementation itself (constants/immutables, pinned by
+the row's codehash) or is read from the registry object being applied: inside the call,
+`msg.sender` is the ProxyAdmin, whose `owner()` is the executor (or the bootstrap migration),
+which answers `IActiveRegistryProvider.activeRegistry()` with the manifest-committed object —
+the executors hold that pointer only for the duration of the row application, so outside a
+genuine registry-driven apply it reverts (`NoActiveRegistryUpgrade`). A manifest therefore
+cannot route the init call to an arbitrary function or smuggle arguments into it: the selector
+is audited machinery and every input is audited code or manifest-committed registry state.
 
 Supporting libraries:
 

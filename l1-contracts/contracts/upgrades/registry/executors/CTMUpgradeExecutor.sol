@@ -6,7 +6,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {ICTMTransition} from "../objects/ICTMTransition.sol";
-import {IUpgradeInitDataProvider} from "../IUpgradeInit.sol";
+import {IActiveRegistryProvider} from "../IUpgradeInit.sol";
 import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {
@@ -32,12 +32,12 @@ import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 /// @dev Fixed logic, no generic delegatecall. The break-glass `forward` (base) is gated by a
 ///      SEPARATE governor. The transition each entrypoint takes is a *pinned implementation
 ///      address* — the exact generated contract governance approved — never a proxy.
-contract CTMUpgradeExecutor is UpgradeExecutorBase, IUpgradeInitDataProvider {
+contract CTMUpgradeExecutor is UpgradeExecutorBase, IActiveRegistryProvider {
     using CodehashPinLib for address;
 
-    /// @dev Nonzero only WHILE `applyCTMUpgrade` applies its rows: the pinned object whose
-    ///      `initData` {upgradeInitData} serves to a reinitializing implementation. See
-    ///      {IUpgradeInit.sol} for the msg.sender-based resolution path.
+    /// @dev Nonzero only WHILE `applyCTMUpgrade` applies its rows: the pinned object a
+    ///      reinitializing implementation may read. See {IUpgradeInit.sol} for the
+    ///      msg.sender-based resolution path.
     ICTMTransition private activeTransition;
 
     /// @notice The one ChainTypeManager this executor governs. Transitions carry no CTM pointer;
@@ -171,12 +171,12 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, IUpgradeInitDataProvider {
         emit ChainUpgradeApplied(_chainId, _transition.newProtocolVersion());
     }
 
-    /// @inheritdoc IUpgradeInitDataProvider
-    function upgradeInitData(address _proxy) external view returns (bytes memory) {
-        ICTMTransition transition = activeTransition;
-        if (address(transition) == address(0)) {
+    /// @inheritdoc IActiveRegistryProvider
+    function activeRegistry() external view returns (address) {
+        address transition = address(activeTransition);
+        if (transition == address(0)) {
             revert NoActiveRegistryUpgrade();
         }
-        return transition.upgradeInitData(_proxy);
+        return transition;
     }
 }

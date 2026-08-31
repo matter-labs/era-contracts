@@ -152,7 +152,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
             implNew: PinnedContract({addr: implV32, codehash: implV32.codehash}),
-            initData: ""
+            callInitializeUpgrade: false
         });
         Diamond.FacetCut[] memory noFacetCuts = new Diamond.FacetCut[](0);
         return
@@ -334,11 +334,11 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     /// @dev Two rows for one proxy would BOTH pass the source check (they compare against the same
     ///      pre-migration implementation) and the last would silently win — so the reviewed edge
     ///      and the executed edge would differ. Same rule {CoreRegistry} enforces.
-    function test_migrate_runsFixedInitializeUpgradeWithManifestData() public {
-        // A second participating slot whose new implementation must reinitialize: its
-        // parameters ride the row as pinned DATA, the apply invokes the fixed argument-less
-        // selector, and the implementation fetches the data from the migration itself (it holds
-        // the CTM-domain ProxyAdmin during `migrate()`).
+    function test_migrate_runsFixedInitializeUpgradeAgainstTheMigration() public {
+        // A second participating slot whose new implementation must reinitialize: the row
+        // carries only a BOOLEAN, the apply invokes the fixed argument-less selector, and the
+        // implementation reads the migration itself (it holds the CTM-domain ProxyAdmin during
+        // `migrate()` and answers `activeRegistry()` with the manifest object).
         MockProxyUpgradeInitImpl initImpl = new MockProxyUpgradeInitImpl();
         TransparentUpgradeableProxy vtProxy = new TransparentUpgradeableProxy(
             implV31,
@@ -350,7 +350,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             proxy: address(vtProxy),
             expectedOldImpl: implV31,
             implNew: PinnedContract({addr: address(initImpl), codehash: address(initImpl).codehash}),
-            initData: abi.encode(uint256(31337))
+            callInitializeUpgrade: true
         });
         RegistryBootstrapMigration withInit = new RegistryBootstrapMigration(manifest);
         vm.prank(governor);
@@ -360,9 +360,9 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         withInit.migrate();
 
         assertEq(
-            MockProxyUpgradeInitImpl(address(vtProxy)).initializedValue(),
-            31337,
-            "pinned initData must reach the reinitializer through the migration"
+            MockProxyUpgradeInitImpl(address(vtProxy)).initializedFromManifest(),
+            withInit.manifestHash(),
+            "the reinitializer must reach the migration's manifest through the provider chain"
         );
     }
 
@@ -373,7 +373,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
             implNew: PinnedContract({addr: implV31, codehash: implV31.codehash}),
-            initData: ""
+            callInitializeUpgrade: false
         });
 
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateProxyRow.selector, address(ecosystemProxy)));

@@ -12,7 +12,6 @@ import {
     ProxyUpgradeRowMismatch,
     RegistryDuplicateProxyRow,
     RegistryInventoryLengthMismatch,
-    RegistryUnknownKey,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 
@@ -49,19 +48,6 @@ library ProxyUpgradeRowLib {
             revert RegistryInventoryLengthMismatch(_inventoryLength, _slots.length);
         }
         return _dropInertSlots(_slots);
-    }
-
-    /// @notice The pinned `initData` of the row upgrading `_proxy` — what
-    ///         `IUpgradeInitDataProvider.upgradeInitData` serves to a freshly-upgraded
-    ///         implementation's `initializeUpgrade()`.
-    function initDataFor(ProxyUpgradeRow[] memory _rows, address _proxy) internal pure returns (bytes memory) {
-        uint256 length = _rows.length;
-        for (uint256 i = 0; i < length; ++i) {
-            if (_rows[i].proxy == _proxy) {
-                return _rows[i].initData;
-            }
-        }
-        revert RegistryUnknownKey();
     }
 
     /// @notice Shape discipline shared by every row-carrying manifest: every row is a REAL,
@@ -117,13 +103,11 @@ library ProxyUpgradeRowLib {
             if (liveImpl != _rows[i].expectedOldImpl) {
                 revert ProxyUpgradeRowMismatch(_rows[i].proxy, _rows[i].expectedOldImpl, liveImpl);
             }
-            if (_rows[i].initData.length == 0) {
-                _admin.upgrade(proxy, newImpl);
-            } else {
-                // The reinitializer is NEVER the row's bytes: the call is the fixed,
-                // argument-less selector, and the implementation reads the pinned `initData`
-                // back through `IUpgradeInitDataProvider` — see {IUpgradeInit.sol}.
+            if (_rows[i].callInitializeUpgrade) {
+                // The reinitializer carries no arguments and no data — see {IUpgradeInit.sol}.
                 _admin.upgradeAndCall(proxy, newImpl, abi.encodeCall(IProxyUpgradeInitializable.initializeUpgrade, ()));
+            } else {
+                _admin.upgrade(proxy, newImpl);
             }
             emit ProxyImplementationUpgraded(address(proxy), newImpl);
         }

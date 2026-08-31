@@ -149,16 +149,11 @@ contract RegistryBootstrapMigration {
         CodehashPinLib.requirePin(m.currentRelease);
     }
 
-    /// @notice The pinned `initData` of the row upgrading `_proxy` — the bootstrap holds the
-    ///         CTM-domain ProxyAdmin during `migrate()`, so a freshly-upgraded implementation's
-    ///         `initializeUpgrade()` resolves its data provider to this object (see
-    ///         {IUpgradeInit.sol}). Reverts when no row upgrades `_proxy`.
-    function upgradeInitData(address _proxy) external view returns (bytes memory) {
-        return
-            ProxyUpgradeRowLib.initDataFor(
-                ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, CTM_CONTRACT_COUNT),
-                _proxy
-            );
+    /// @notice The bootstrap holds the CTM-domain ProxyAdmin during `migrate()`, so a
+    ///         freshly-upgraded implementation's `initializeUpgrade()` resolves its registry
+    ///         provider to this object (see {IUpgradeInit.sol}) — which IS the manifest object.
+    function activeRegistry() external view returns (address) {
+        return address(this);
     }
 
     /// @notice Performs the whole edge, then hands authority to the bound executors.

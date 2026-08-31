@@ -127,7 +127,7 @@ contract StorageRegistriesTest is Test {
             proxy: address(0xB001),
             expectedOldImpl: address(0xB101),
             implNew: PinnedContract({addr: coreImplNew, codehash: coreImplNew.codehash}),
-            initData: ""
+            callInitializeUpgrade: false
         });
     }
 
@@ -678,15 +678,6 @@ contract StorageRegistriesTest is Test {
             )
         );
         new CoreRegistry(manifest);
-    }
-
-    function test_upgradeInitDataIsServedByProxyAddress() public {
-        // The pinned row's data (empty here) is retrievable for the proxy it upgrades; a proxy
-        // with no row in the inventory reverts instead of returning silence.
-        assertEq(coreRegistry.upgradeInitData(address(0xB001)), bytes(""));
-
-        vm.expectRevert(RegistryUnknownKey.selector);
-        coreRegistry.upgradeInitData(address(0xBEEF));
     }
 
     function test_revertWhen_upgradingRowMissingSource() public {

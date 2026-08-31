@@ -231,14 +231,6 @@ contract CTMTransition is ICTMTransition {
             ProxyUpgradeRowLib.rowPinsHold(ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT));
     }
 
-    function upgradeInitData(address _proxy) external view returns (bytes memory) {
-        return
-            ProxyUpgradeRowLib.initDataFor(
-                ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, CTM_CONTRACT_COUNT),
-                _proxy
-            );
-    }
-
     function _requirePin(PinnedContract memory _pinned) private view {
         CodehashPinLib.requirePin(_pinned);
     }

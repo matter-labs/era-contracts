@@ -79,13 +79,4 @@ contract CoreRegistry is ICoreRegistry {
     function validate() external view {
         ProxyUpgradeRowLib.requireRowPins(ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT));
     }
-
-    /// @inheritdoc ICoreRegistry
-    function upgradeInitData(address _proxy) external view returns (bytes memory) {
-        return
-            ProxyUpgradeRowLib.initDataFor(
-                ProxyUpgradeRowLib.toRows(getManifest().proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT),
-                _proxy
-            );
-    }
 }

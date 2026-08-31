@@ -50,11 +50,6 @@ interface ICTMTransition {
     /// @notice CTM-domain implementation swaps applied by the bound executor before the commit.
     function ctmProxyRows() external view returns (ProxyUpgradeRow[] memory);
 
-    /// @notice The pinned `initData` of the row upgrading `_proxy` — served (through the
-    ///         executor) to the new implementation's fixed `initializeUpgrade()`; see
-    ///         {IUpgradeInit.sol}. Reverts when no row upgrades `_proxy`.
-    function upgradeInitData(address _proxy) external view returns (bytes memory);
-
     function l2Plan() external view returns (L2UpgradePlan memory);
 
     /// @notice Reverts unless the transition, BOTH its releases, and all codehash pins are valid.

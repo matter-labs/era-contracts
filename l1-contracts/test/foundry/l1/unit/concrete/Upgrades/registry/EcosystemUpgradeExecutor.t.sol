@@ -106,7 +106,7 @@ contract EcosystemUpgradeExecutorTest is Test {
                 proxy: _proxy,
                 expectedOldImpl: _expectedOldImpl,
                 implNew: PinnedContract({addr: _implNew, codehash: _implNew.codehash}),
-                initData: ""
+                callInitializeUpgrade: false
             });
     }
 
@@ -158,18 +158,19 @@ contract EcosystemUpgradeExecutorTest is Test {
         );
     }
 
-    function test_applyL1Upgrade_runsFixedInitializeUpgradeWithRegistryData() public {
-        // Bridgehub moves to an implementation that must reinitialize. Its parameters ride the
-        // row as pinned DATA — the executor invokes the fixed, argument-less selector and the
-        // implementation fetches the data back through the provider chain (msg.sender =
-        // ProxyAdmin -> owner = executor -> active registry).
+    function test_applyL1Upgrade_runsFixedInitializeUpgradeAgainstTheActiveRegistry() public {
+        // Bridgehub moves to an implementation that must reinitialize. The row carries only a
+        // BOOLEAN — no calldata, no data: the executor invokes the fixed, argument-less
+        // selector, and the implementation reads what it needs from the registry object it
+        // discovers through the provider chain (msg.sender = ProxyAdmin -> owner = executor ->
+        // activeRegistry()).
         MockProxyUpgradeInitImpl initImpl = new MockProxyUpgradeInitImpl();
         ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](1);
         rows[0] = ProxyUpgradeRow({
             proxy: address(bridgehubProxy),
             expectedOldImpl: address(implOld),
             implNew: PinnedContract({addr: address(initImpl), codehash: address(initImpl).codehash}),
-            initData: abi.encode(uint256(777))
+            callInitializeUpgrade: true
         });
         // Same audited bytecode as the fixture registry (no immutables), so the executor's
         // codehash pin covers this instance too.
@@ -184,17 +185,17 @@ contract EcosystemUpgradeExecutorTest is Test {
             "implementation must be swapped"
         );
         assertEq(
-            MockProxyUpgradeInitImpl(address(bridgehubProxy)).initializedValue(),
-            777,
-            "pinned initData must reach the reinitializer through the provider chain"
+            MockProxyUpgradeInitImpl(address(bridgehubProxy)).initializedFromManifest(),
+            initRegistry.manifestHash(),
+            "the reinitializer must reach the registry being applied through the provider chain"
         );
     }
 
-    function test_revertWhen_upgradeInitDataQueriedOutsideAnApplication() public {
+    function test_revertWhen_activeRegistryQueriedOutsideAnApplication() public {
         // The provider is live only WHILE rows are being applied: outside an application there
-        // is no active registry and the fixed reinitializer cannot source data.
+        // is no active registry for a reinitializer to read.
         vm.expectRevert(NoActiveRegistryUpgrade.selector);
-        ecosystemExecutor.upgradeInitData(address(bridgehubProxy));
+        ecosystemExecutor.activeRegistry();
     }
 
     function test_revertWhen_executorCalledByNonEcosystemGovernance() public {
