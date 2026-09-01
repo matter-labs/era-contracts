@@ -14,12 +14,11 @@
 # `upgrade-envs/v0.33.0-atomic-interop/<name>.toml` and the permanent values as
 # `permanent-values/<name>.toml`, which is where `testnet_verifier` lives.
 
+# The bridgehub is not repeated here: it comes from the caller's `--bridgehub` and is recorded
+# in `permanent-values/<env>.toml` under `[core_contracts]`. The chain id is not read on this
+# path either, so both are omitted rather than kept in sync in three places.
+
 # v31 -> v33.
 old_protocol_version = 0x1f00000000
 latest_protocol_version = 0x2100000000
 new_protocol_version = 0x2100000000
-
-bridgehub_proxy_address = "0xC0F09Cb637DCfDe54D8B7b5170736Ec21aBB33ce"
-
-[chain]
-chain_id = 270

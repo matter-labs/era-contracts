@@ -7,12 +7,11 @@
 #
 # See `local.toml` for why so little is needed here.
 
+# The bridgehub is not repeated here: it comes from the caller's `--bridgehub` and is recorded
+# in `permanent-values/<env>.toml` under `[core_contracts]`. The chain id is not read on this
+# path either, so both are omitted rather than kept in sync in three places.
+
 # v31 -> v33.
 old_protocol_version = 0x1f00000000
 latest_protocol_version = 0x2100000000
 new_protocol_version = 0x2100000000
-
-bridgehub_proxy_address = "0x70fe0ddb82adf1fe9ae7afe3047e1cbf6db7cfd1"
-
-[chain]
-chain_id = 506

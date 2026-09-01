@@ -885,30 +885,32 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     function prepareUpgradeCTMCalls() public virtual returns (Call[] memory calls) {
         calls = new Call[](4);
 
-        calls[0] = _buildCallProxyUpgrade(
+        calls[0] = _buildProxyUpgrade(
             ctmAddresses.stateTransition.proxies.chainTypeManager,
-            ctmAddresses.stateTransition.implementations.chainTypeManager
+            ctmAddresses.stateTransition.implementations.chainTypeManager,
+            "chainTypeManager"
         );
-        calls[1] = _buildKeptProxyUpgrade(
+        calls[1] = _buildProxyUpgrade(
             ctmAddresses.stateTransition.proxies.validatorTimelock,
             ctmAddresses.stateTransition.implementations.validatorTimelock,
             "validatorTimelock"
         );
-        calls[2] = _buildKeptProxyUpgrade(
+        calls[2] = _buildProxyUpgrade(
             ctmAddresses.stateTransition.proxies.bytecodesSupplier,
             ctmAddresses.stateTransition.implementations.bytecodesSupplier,
             "bytecodesSupplier"
         );
-        calls[3] = _buildKeptProxyUpgrade(
+        calls[3] = _buildProxyUpgrade(
             ctmAddresses.stateTransition.proxies.permissionlessValidator,
             ctmAddresses.stateTransition.implementations.permissionlessValidator,
             "permissionlessValidator"
         );
     }
 
-    /// @dev These three proxies live under their own `ProxyAdmin`, resolved per proxy, unlike the CTM
-    ///      proxy which uses the CTM-wide one.
-    function _buildKeptProxyUpgrade(
+    /// @dev Resolves the `ProxyAdmin` per proxy. That is required for the three kept proxies, which
+    ///      have their own admin instances, and equally correct for the CTM proxy, whose admin is the
+    ///      CTM-wide one — so there is no need for a second variant that hard-codes it.
+    function _buildProxyUpgrade(
         address _proxy,
         address _implementation,
         string memory _name
@@ -925,22 +927,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
                 ),
                 value: 0
             });
-    }
-
-    function _buildCallProxyUpgrade(
-        address proxyAddress,
-        address newImplementationAddress
-    ) internal virtual returns (Call memory call) {
-        require(ctmAddresses.admin.transparentProxyAdmin != address(0), "ctm transparentProxyAdmin not set");
-
-        call = Call({
-            target: ctmAddresses.admin.transparentProxyAdmin,
-            data: abi.encodeCall(
-                ProxyAdmin.upgrade,
-                (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress)
-            ),
-            value: 0
-        });
     }
 
     /// @notice Additional calls to newConfigure contracts

@@ -54,14 +54,14 @@ protocol_upgrade_handler_implementation_address = "0x36625Bd3dDB469377C6e9893712
 [tokens]
 token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
 
+# Kept deliberately: `DefaultCoreUpgrade` reads this into `config.legacyGatewayChainId`, which is
+# baked into the redeployed `L1MessageRoot` as its `ERA_GATEWAY_CHAIN_ID` immutable. Dropping it
+# would silently redeploy that implementation with 0.
+# The `[gateway.gateway_state_transition]` addresses that used to sit here are gone — they are
+# *written* by `GatewayVotePreparation`, never read from the upgrade input.
 [gateway]
 chain_id = 9075
 
-[gateway.gateway_state_transition]
-chain_type_manager_proxy_addr = "0x912B84EEEEBeca74d307b9a2b09c68332aa5426C"
-rollup_da_manager = "0x5E12D7E0bB68029afbeC83ccB9E8eDE6019ef073"
-chain_type_manager_proxy_admin = "0x0A8a176B6F5962122C6E8F8815278f873D74021f"
-rollup_sl_da_validator = "0x595b8C88B9e5f3a4c596C3e81BE6e11D53Bb9200"
 
 [create2_factory_salts]
 "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C" = "0xd93600da02313bab9de70ef4ca32f1397e32764b5c1d4fcec317717fff515cc9"
