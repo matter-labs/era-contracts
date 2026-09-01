@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 // TODO(EVM-1644): LEGACY UPGRADE PROCESS — remove once the registry-driven upgrade process
 // (contracts/upgrades/registry: CTMUpgradeExecutor / EcosystemUpgradeExecutor +
 // release/transition registries) has fully replaced off-chain governance-calldata generation. Kept for the
-// current (v31) upgrade, which still ships hand-composed stage0/1/2 calls.
+// v34 bootstrap edge, whose L2 payload is still script-composed.
 
 import "../SystemContractsProcessing.s.sol";
 
@@ -14,8 +14,6 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {L2EcosystemContract} from "../../ecosystem/CoreContract.sol";
-import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
 import {EraForceDeploymentsLib} from "./EraForceDeploymentsLib.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
@@ -62,31 +60,9 @@ abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
         return UpgradeHelperLib.getUpgradeTxType(config.isZKsyncOS);
     }
 
-    function getComplexUpgraderTargetAndData(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments,
-        address _delegateTo,
-        bytes memory _upgradeCalldata
-    ) internal view returns (address, bytes memory) {
-        bytes memory complexUpgraderCalldata;
-        if (config.isZKsyncOS) {
-            complexUpgraderCalldata = abi.encodeCall(
-                IComplexUpgrader.forceDeployAndUpgradeUniversal,
-                (_deployments, _delegateTo, _upgradeCalldata)
-            );
-        } else {
-            complexUpgraderCalldata = abi.encodeCall(
-                IComplexUpgrader.forceDeployAndUpgrade,
-                (EraForceDeploymentsLib.unwrap(_deployments), _delegateTo, _upgradeCalldata)
-            );
-        }
-
-        return (address(L2_COMPLEX_UPGRADER_ADDR), complexUpgraderCalldata);
-    }
-
-    /// @notice Like `getComplexUpgraderTargetAndData` but ALWAYS uses the universal
-    ///         `forceDeployAndUpgradeUniversal` entrypoint regardless of VM. From v32 both Era and
-    ///         ZKsyncOS chains go through the universal path (the v31 Era-only `forceDeployAndUpgrade`
-    ///         selector is a v31 concern), and `L2UpgradeTxLib` validates this selector at rewrite time.
+    /// @notice Composes the `ComplexUpgrader` target and calldata via the universal
+    ///         `forceDeployAndUpgradeUniversal` entrypoint (from v32 both VMs use it), which
+    ///         `L2UpgradeTxLib` validates at rewrite time.
     function getUniversalComplexUpgraderTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments,
         address _delegateTo,
@@ -123,17 +99,5 @@ abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
             address(L2_COMPLEX_UPGRADER_ADDR),
             abi.encodeCall(IComplexUpgrader.forceDeployAndUpgradeUniversal, (_deployments, address(0), ""))
         );
-    }
-
-    /// @notice Build Era universal force deployments from fixed-address core-contract IDs.
-    /// @dev Concrete Era plans can use this when the same L2EcosystemContract list is also
-    ///      published as factory deps.
-    function buildEraUniversalForceDeployments(
-        L2EcosystemContract[] memory _contracts
-    ) internal view returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
-        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](_contracts.length);
-        for (uint256 i; i < _contracts.length; i++) {
-            deployments[i] = CoreOnGatewayHelper.getEraForceDeployment(_contracts[i]);
-        }
     }
 }

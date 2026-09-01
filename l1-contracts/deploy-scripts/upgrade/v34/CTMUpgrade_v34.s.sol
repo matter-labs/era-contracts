@@ -21,10 +21,6 @@ import {CTM_CONTRACT_COUNT, CTMContract} from "contracts/upgrades/registry/libra
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
-import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
-import {PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {Utils} from "../../utils/Utils.sol";
 
@@ -70,34 +66,6 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         // The bootstrap engine: derives the facet reinstall on-chain from the genesis release it
         // pins as an immutable, then runs the storage/L2 part of `DefaultUpgradeZKsyncOS`.
         return deploySimpleContract("BootstrapUpgradeZKsyncOS", false);
-    }
-
-    /// @notice The bootstrap's committed cut carries NO facet cuts: the engine derives the full
-    ///         facet reinstall on-chain from its pinned genesis release
-    ///         ({BootstrapUpgradeZKsyncOS}) — the same two-step shape as a registry-driven edge,
-    ///         with no hand-composed selector lists in the committed calldata.
-    function generateUpgradeCutData(
-        StateTransitionDeployedAddresses memory _stateTransition,
-        ChainCreationParamsConfig memory _chainCreationParams,
-        uint256 _l1ChainId,
-        address _ownerAddress,
-        PublishFactoryDepsResult memory _factoryDepsResult,
-        address /* _registeredChainIdDiamondProxy */
-    ) public override returns (Diamond.DiamondCutData memory upgradeCutData) {
-        uint256 nonce = UpgradeHelperLib.getProtocolUpgradeNonce(_chainCreationParams.latestProtocolVersion);
-        ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(
-            _stateTransition,
-            _chainCreationParams,
-            _l1ChainId,
-            _ownerAddress,
-            _factoryDepsResult,
-            nonce
-        );
-        upgradeCutData = Diamond.DiamondCutData({
-            facetCuts: new Diamond.FacetCut[](0),
-            initAddress: _stateTransition.defaultUpgrade,
-            initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
-        });
     }
 
     /// @notice The committed (ecosystem-wide) L2 upgrade calldata: the upgrade-time (re)init of

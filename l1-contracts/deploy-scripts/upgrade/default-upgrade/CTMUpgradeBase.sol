@@ -18,7 +18,6 @@ import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../..
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
-import {FacetCutsLib} from "./FacetCutsLib.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {Utils} from "../../utils/Utils.sol";
 
@@ -104,66 +103,18 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         }
     }
 
-    /// @notice The six facet Add-cuts of the legacy upgrade pipeline, with explicit selector
-    /// lists read from the deployed facet code. Kept only for this banner-marked pipeline: the
-    /// registry-driven path (and chain creation, which is registry-driven everywhere now) lets
-    /// the diamond-side code read selectors from the facets themselves.
-    function getLegacyUpgradeFacetCuts(
-        StateTransitionDeployedAddresses memory _stateTransition
-    ) internal returns (Diamond.FacetCut[] memory facetCuts) {
-        facetCuts = new Diamond.FacetCut[](6);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: _stateTransition.facets.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(_stateTransition.facets.adminFacet.code)
-        });
-        facetCuts[1] = Diamond.FacetCut({
-            facet: _stateTransition.facets.gettersFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(_stateTransition.facets.gettersFacet.code)
-        });
-        facetCuts[2] = Diamond.FacetCut({
-            facet: _stateTransition.facets.mailboxFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(_stateTransition.facets.mailboxFacet.code)
-        });
-        facetCuts[3] = Diamond.FacetCut({
-            facet: _stateTransition.facets.executorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(_stateTransition.facets.executorFacet.code)
-        });
-        facetCuts[4] = Diamond.FacetCut({
-            facet: _stateTransition.facets.migratorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(_stateTransition.facets.migratorFacet.code)
-        });
-        facetCuts[5] = Diamond.FacetCut({
-            facet: _stateTransition.facets.committerFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(_stateTransition.facets.committerFacet.code)
-        });
-    }
-
-    /// @notice Generate upgrade cut data.
+    /// @notice Generate the committed upgrade cut: NO facet cuts, only the engine init — the
+    ///         engine performs the facet changes itself (the bootstrap engine derives the full
+    ///         reinstall from its pinned genesis release; `upgradeFromTransition` applies the
+    ///         transition's derived delta), so no hand-composed selector list ever rides the
+    ///         committed calldata.
     function generateUpgradeCutData(
         StateTransitionDeployedAddresses memory _stateTransition,
         ChainCreationParamsConfig memory _chainCreationParams,
         uint256 _l1ChainId,
         address _ownerAddress,
-        PublishFactoryDepsResult memory _factoryDepsResult,
-        address _registeredChainIdDiamondProxy
+        PublishFactoryDepsResult memory _factoryDepsResult
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
-        Diamond.FacetCut[] memory facetCutsForDeletion = FacetCutsLib.getDeletionCuts(_registeredChainIdDiamondProxy);
-
-        Diamond.FacetCut[] memory facetCuts;
-        facetCuts = getLegacyUpgradeFacetCuts(_stateTransition);
-        facetCuts = FacetCutsLib.merge(facetCutsForDeletion, facetCuts);
         uint256 nonce = UpgradeHelperLib.getProtocolUpgradeNonce(_chainCreationParams.latestProtocolVersion);
         ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(
             _stateTransition,
@@ -175,7 +126,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         );
 
         upgradeCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
+            facetCuts: new Diamond.FacetCut[](0),
             initAddress: _stateTransition.defaultUpgrade,
             initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
         });
