@@ -127,7 +127,9 @@ library DeployCTML1OrGateway {
         ) {
             return CTMContract.DualVerifier;
         } else if (
-            _compareStrings(_contractName, "DefaultUpgrade") || _compareStrings(_contractName, "DefaultUpgradeZKsyncOS")
+            _compareStrings(_contractName, "DefaultUpgrade") ||
+            _compareStrings(_contractName, "DefaultUpgradeZKsyncOS") ||
+            _compareStrings(_contractName, "BootstrapUpgradeZKsyncOS")
         ) {
             return CTMContract.DefaultUpgrade;
         } else if (_compareStrings(_contractName, "L1GenesisUpgrade")) {

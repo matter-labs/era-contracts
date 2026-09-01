@@ -21,18 +21,23 @@ import {CTM_CONTRACT_COUNT, CTMContract} from "contracts/upgrades/registry/libra
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
+import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
+import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
+import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
+import {PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {Utils} from "../../utils/Utils.sol";
 
 /// @notice The v34 CTM upgrade: the ONE-TIME edge into the registry-driven model (see the
-///         Bootstrap section of {docs/registry-driven-upgrades.md}). The pipeline still deploys
-///         the new implementations and composes the legacy upgrade cut — chains crossing this
-///         edge run pre-v34 facets and take the cut by hand — but the stage-1 CTM call soup is
-///         GONE: everything the CTM must do (its own implementation swap, the version commit,
-///         the provenance anchors, the authority handover) is pinned in a write-once
-///         `RegistryBootstrapMigration` deployed at prepare time, and executed by its single
-///         `migrate()` call. Governance reviews a manifest and FOUR calls — nominate the CTM,
-///         hand over its ProxyAdmin, migrate, accept — instead of a dozen setters, and every
+///         Bootstrap section of {docs/registry-driven-upgrades.md}). Chains crossing this edge
+///         run pre-v34 facets and take the committed cut by hand, but the cut itself already
+///         has the registry shape: NO facet cuts, just the `BootstrapUpgradeZKsyncOS` init,
+///         which derives the facet reinstall on-chain from the pinned genesis release. The
+///         stage-1 CTM call soup is GONE too: everything the CTM must do (its own
+///         implementation swap, the version commit, the provenance anchors, the authority
+///         handover) is pinned in a write-once `RegistryBootstrapMigration` deployed at prepare
+///         time, and executed by its single `migrate()` call. Governance reviews a manifest and
+///         FOUR calls — nominate the CTM, hand over its ProxyAdmin, migrate, accept — and every
 ///         later upgrade is a `CTMTransition` under the bound `CTMUpgradeExecutor`.
 contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     /// @notice The bound executor the whole CTM domain lands under. Deployed by this prepare
@@ -49,11 +54,50 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         deployRegistryBootstrap();
     }
 
+    /// @notice The upgrade engine — the composed cut's init delegatecall target, pinned by the
+    ///         bootstrap manifest through `upgradeCutInitCodehash`. Deployed HERE, not in
+    ///         `deployNewCTMContracts`: the engine pins the genesis release as an immutable, and
+    ///         the release only exists once `deployStateTransitionDiamondFacets` has run.
+    function generateUpgradeData() public virtual override {
+        ctmAddresses.stateTransition.defaultUpgrade = deployUsedUpgradeContract();
+        super.generateUpgradeData();
+    }
+
     /// @dev Only ZKsync OS chains can be upgraded onto this release (the registry model has no
     ///      EraVM-deployable release yet); protocol-ops skips Era CTMs before this ever runs.
     function deployUsedUpgradeContract() internal virtual override returns (address) {
         require(config.isZKsyncOS, "Upgrading Era chains onto this release is not supported");
-        return deploySimpleContract("DefaultUpgradeZKsyncOS", false);
+        // The bootstrap engine: derives the facet reinstall on-chain from the genesis release it
+        // pins as an immutable, then runs the storage/L2 part of `DefaultUpgradeZKsyncOS`.
+        return deploySimpleContract("BootstrapUpgradeZKsyncOS", false);
+    }
+
+    /// @notice The bootstrap's committed cut carries NO facet cuts: the engine derives the full
+    ///         facet reinstall on-chain from its pinned genesis release
+    ///         ({BootstrapUpgradeZKsyncOS}) — the same two-step shape as a registry-driven edge,
+    ///         with no hand-composed selector lists in the committed calldata.
+    function generateUpgradeCutData(
+        StateTransitionDeployedAddresses memory _stateTransition,
+        ChainCreationParamsConfig memory _chainCreationParams,
+        uint256 _l1ChainId,
+        address _ownerAddress,
+        PublishFactoryDepsResult memory _factoryDepsResult,
+        address /* _registeredChainIdDiamondProxy */
+    ) public override returns (Diamond.DiamondCutData memory upgradeCutData) {
+        uint256 nonce = UpgradeHelperLib.getProtocolUpgradeNonce(_chainCreationParams.latestProtocolVersion);
+        ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(
+            _stateTransition,
+            _chainCreationParams,
+            _l1ChainId,
+            _ownerAddress,
+            _factoryDepsResult,
+            nonce
+        );
+        upgradeCutData = Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: _stateTransition.defaultUpgrade,
+            initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
+        });
     }
 
     /// @notice The committed (ecosystem-wide) L2 upgrade calldata: the upgrade-time (re)init of
@@ -108,10 +152,6 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
 
         // The MailboxFacet deployed by the base pipeline's facet step takes a live checker.
         deployEIP7702Checker();
-
-        // The upgrade engine — the composed cut's init delegatecall target, pinned by the
-        // bootstrap manifest through `upgradeCutInitCodehash`.
-        ctmAddresses.stateTransition.defaultUpgrade = deployUsedUpgradeContract();
 
         // The new ChainTypeManager implementation (per VM) — the bootstrap manifest's one
         // participating inventory row.
