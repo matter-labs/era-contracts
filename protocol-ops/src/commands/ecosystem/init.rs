@@ -53,6 +53,7 @@ pub struct EcosystemInitArgs {
     #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_testnet_verifier: bool,
     /// Require both a Boojum and an Airbender proof to settle a batch (Era only).
+    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_airbender_verifier: bool,
     /// Enable support for legacy bridge testing (default: false)
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]

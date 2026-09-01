@@ -4,6 +4,8 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
+import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {
     AIRBENDER_PROOF_SYSTEM_DISABLED,
@@ -220,13 +222,16 @@ contract EraMultiProofVerifierTest is Test {
         chain.callVerify(verifier, _publicInputs(), tooLong);
     }
 
-    /// The Boojum segment must not smuggle an Airbender-typed proof: it reaches the Boojum router, which
-    /// only knows types 0 and 1, so this is refused there rather than silently satisfying both lanes.
+    /// The Boojum segment must not smuggle an Airbender-typed proof. Asserted against the REAL
+    /// `EraDualVerifier`, not a stand-in: a stub that reimplements the type check would pass even if the
+    /// production router had started accepting type 2.
     function test_boojumSegmentCannotCarryAirbenderType() public {
-        EraMultiProofVerifier v = new EraMultiProofVerifier(
-            IVerifier(address(new RejectingRouter())),
-            IVerifier(address(airbender))
+        EraDualVerifier router = new EraDualVerifier(
+            IVerifierV2(address(new LaneVerifier(false, true))),
+            IVerifier(address(new LaneVerifier(false, true)))
         );
+        EraMultiProofVerifier v = new EraMultiProofVerifier(IVerifier(address(router)), IVerifier(address(airbender)));
+
         vm.expectRevert(UnknownVerifierType.selector);
         chain.callVerify(v, _publicInputs(), _proof(2, BOOJUM_SEGMENT_LENGTH));
     }
@@ -266,19 +271,5 @@ contract EraMultiProofVerifierTest is Test {
             )
         );
         chain.callVerify(verifier, _publicInputs(), _default());
-    }
-}
-
-/// @notice Stands in for `EraDualVerifier`, which rejects anything that is not a Boojum type.
-contract RejectingRouter is IVerifier {
-    function verify(uint256[] calldata, uint256[] calldata _proof) external pure returns (bool) {
-        if (_proof[0] > 1) {
-            revert UnknownVerifierType();
-        }
-        return true;
-    }
-
-    function verificationKeyHash() external pure returns (bytes32) {
-        return bytes32(0);
     }
 }
