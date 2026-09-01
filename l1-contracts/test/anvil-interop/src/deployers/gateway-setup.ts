@@ -1,4 +1,5 @@
-import { Contract, ethers, providers } from "ethers";
+import type { providers } from "ethers";
+import { Contract, ethers } from "ethers";
 import * as path from "path";
 import type { CoreDeployedAddresses, CTMDeployedAddresses } from "../core/types";
 import { GatewayDeployer } from "./gateway-deployer";
@@ -9,7 +10,13 @@ import {
   L2_CHAIN_ASSET_HANDLER_ADDR,
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
-import { applyL1ToL2Alias, impersonateAndRun, scanAndRelayPriorityRequests, timeIt } from "../core/utils";
+import {
+  applyL1ToL2Alias,
+  impersonateAndRun,
+  scanAndRelayPriorityRequests,
+  timeIt,
+  createProvider,
+} from "../core/utils";
 import {
   installL1ChainAssetHandlerDev,
   installL2ChainAssetHandlerDev,
@@ -55,7 +62,7 @@ export class GatewaySetup {
 
   constructor(l1RpcUrl: string, l1Addresses: CoreDeployedAddresses, ctmAddresses: CTMDeployedAddresses) {
     this.l1RpcUrl = l1RpcUrl;
-    this.l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
+    this.l1Provider = createProvider(l1RpcUrl);
     this.l1Addresses = l1Addresses;
     this.ctmAddresses = ctmAddresses;
     this.projectRoot = path.resolve(__dirname, "../../../..");
@@ -198,7 +205,7 @@ export class GatewaySetup {
   private getProvider(rpcUrl: string): providers.JsonRpcProvider {
     let provider = this.providerCache.get(rpcUrl);
     if (!provider) {
-      provider = new providers.JsonRpcProvider(rpcUrl);
+      provider = createProvider(rpcUrl);
       this.providerCache.set(rpcUrl, provider);
     }
     return provider;

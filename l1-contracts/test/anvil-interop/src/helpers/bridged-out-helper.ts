@@ -1,6 +1,7 @@
 import type { BigNumber } from "ethers";
-import { Contract, providers } from "ethers";
+import { Contract } from "ethers";
 import { getAbi } from "../core/contracts";
+import { createProvider } from "../core/utils";
 
 /**
  * Helpers for asserting L1NativeTokenVault.bridgedOut in bridge tests. See
@@ -8,7 +9,7 @@ import { getAbi } from "../core/contracts";
  * across chains), so tests assert the delta around a single operation, not an absolute balance.
  */
 function l1NativeTokenVault(l1RpcUrl: string, l1NativeTokenVaultAddr: string): Contract {
-  return new Contract(l1NativeTokenVaultAddr, getAbi("L1NativeTokenVault"), new providers.JsonRpcProvider(l1RpcUrl));
+  return new Contract(l1NativeTokenVaultAddr, getAbi("L1NativeTokenVault"), createProvider(l1RpcUrl));
 }
 
 /** Reads L1NativeTokenVault.bridgedOut(assetId) on L1. */

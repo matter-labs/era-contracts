@@ -47,7 +47,9 @@ import { getBridgehubAddress, loadAbiFromFoundryOutput } from "./upgrade-script-
 // ─── Paths / constants ────────────────────────────────────────────────────
 
 /** Default destination dir for the per-env tokens file. */
-const V31_UPGRADE_DIR = path.join(__dirname, "../upgrade-envs/v0.31.0-interopB");
+// Historical: this script discovers the *legacy* bridged tokens the v31 upgrade registered, so
+// its output belongs with that release's inputs. v33 has no bridged-token registration step.
+const LEGACY_UPGRADE_DIR = path.join(__dirname, "../upgrade-envs/v0.31.0-interopB");
 
 /** Conservative default — covers most public RPCs without log-size pushback. */
 const DEFAULT_BLOCK_STEP = 10_000;
@@ -380,7 +382,7 @@ function writeTomlOutput(filePath: string, env: string, result: DiscoveryResult,
 // ─── CLI ─────────────────────────────────────────────────────────────────
 
 function defaultOutPath(envName: string): string {
-  return path.join(V31_UPGRADE_DIR, `${envName}-bridged-tokens.toml`);
+  return path.join(LEGACY_UPGRADE_DIR, `${envName}-bridged-tokens.toml`);
 }
 
 async function main(): Promise<void> {

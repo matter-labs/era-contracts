@@ -8,12 +8,12 @@
  *   1. Forking an upstream L1 RPC via anvil (--fork-url).
  *   2. Forking up to two L2 zkOS chains via anvil against their real RPCs.
  *   3. Resolving bridgehub / governance / CTM addresses from the live forked state.
- *   4. Running the shared `v31-upgrade-test-runner` helpers: ecosystem upgrade scripts,
- *      governance stage 0/1/2 execution, per-chain `ChainUpgrade_v31` + L2 relay
- *      (with force-deploy-driven anvil_setCode overrides), stage3 migration,
+ *   4. Running the shared `upgrade-test-runner` helpers: ecosystem upgrade scripts,
+ *      governance stage 0/1/2 execution, per-chain `DefaultChainUpgrade` + L2 relay
+ *      (with force-deploy-driven anvil_setCode overrides), stage3 population,
  *      protocol-version verification.
  *
- * Unlike `run-v31-to-v32-upgrade-test.ts`, this does NOT load pre-generated chain states
+ * Unlike `run-upgrade-test.ts`, this does NOT load pre-generated chain states
  * and does NOT perform the synthetic-state setup steps (ownership transfer, ChainAdmin
  * deploy, diamond storage patches) — real forked state already has all of those.
  *
@@ -27,7 +27,7 @@
  *   FORK_PERMANENT_VALUES_PATH        — permanent-values template, relative to l1-contracts
  *                                        (default: upgrade-envs/permanent-values/local.toml)
  *   FORK_UPGRADE_INPUT_PATH           — upgrade-input template, relative to l1-contracts
- *                                        (default: upgrade-envs/v0.31.0-interopB/local.toml)
+ *                                        (default: upgrade-envs/v0.33.0-atomic-interop/local.toml)
  *   L2_FORK_URL_<chainId>             — per-chain L2 RPC override
  *
  * Per-chain L2 RPCs can also live in `config/fork-l2-rpcs.json` (gitignored):
@@ -35,6 +35,7 @@
  */
 
 import * as fs from "fs";
+import { createProvider } from "./src/core/utils";
 import * as path from "path";
 import { ethers } from "ethers";
 import { AnvilManager } from "./src/daemons/anvil-manager";
@@ -56,9 +57,9 @@ import {
   runEcosystemUpgradeScriptsForEnv,
   verifyProtocolVersions,
   TARGET_PROTOCOL_VERSION,
-} from "./src/helpers/v31-upgrade-test-runner";
+} from "./src/helpers/upgrade-test-runner";
 
-import type { V31UpgradeScenario } from "./src/helpers/v31-upgrade-test-runner";
+import type { V31UpgradeScenario } from "./src/helpers/upgrade-test-runner";
 import { advanceL1TimePastUpgradeDeadline } from "./src/helpers/harness-shims";
 
 const anvilInteropDir = __dirname;
@@ -171,7 +172,7 @@ async function main(): Promise<void> {
     // block.chainid` routes the lookup down the bridged-token branch. Matching
     // the real chain ID makes the production short-circuit fire correctly.
     console.log(`\n=== Step 1: Starting forked L1 anvil (${elapsed()}) ===\n`);
-    const upstreamProvider = new ethers.providers.JsonRpcProvider(cfg.l1ForkUrl);
+    const upstreamProvider = createProvider(cfg.l1ForkUrl);
     const upstreamChainId = (await upstreamProvider.getNetwork()).chainId;
     runtimeConfig.l1ChainId = upstreamChainId;
     console.log(`  Upstream L1 chain ID: ${upstreamChainId}`);
@@ -184,7 +185,7 @@ async function main(): Promise<void> {
     });
     const l1Chain = anvilManager.getL1Chain();
     if (!l1Chain) throw new Error("L1 chain failed to start");
-    const l1Provider = new ethers.providers.JsonRpcProvider(l1Chain.rpcUrl);
+    const l1Provider = createProvider(l1Chain.rpcUrl);
 
     // ── Step 2: Discover chains from forked Bridgehub ────────────
     console.log(`\n=== Step 2: Discovering chains from Bridgehub (${elapsed()}) ===\n`);
@@ -254,11 +255,12 @@ async function main(): Promise<void> {
       prepareDir = result.prepareOutDir;
     } else {
       const scenario: V31UpgradeScenario = {
-        label: "fork-v31-to-v32",
+        label: "fork-v31-to-v33",
         stateVersion: "fork",
         permanentValuesTemplatePath:
           process.env.FORK_PERMANENT_VALUES_PATH ?? "upgrade-envs/permanent-values/local.toml",
-        upgradeInputTemplatePath: process.env.FORK_UPGRADE_INPUT_PATH ?? "upgrade-envs/v0.31.0-interopB/local.toml",
+        upgradeInputTemplatePath:
+          process.env.FORK_UPGRADE_INPUT_PATH ?? "upgrade-envs/v0.33.0-atomic-interop/local.toml",
         isZKsyncOS: true,
         targetRoles: ["directSettled"],
         expectedProtocolVersion: TARGET_PROTOCOL_VERSION,
@@ -315,17 +317,15 @@ async function main(): Promise<void> {
 
     // NOTE: skip clearGenesisUpgradeTxHash — real fork state already has the correct value.
 
-    // ── Step 7: Stage 3 legacy-token registration ────────────────
-    // Runs before per-chain upgrades so withdrawals on each chain unblock
-    // the instant its diamond upgrade lands — see the phase doc on
-    // `protocol-ops/src/commands/ecosystem/mod.rs`.
+    // ── Step 7: Stage 3 bridgedOut population ────────────────────
+    // Runs before per-chain upgrades so withdrawals on each chain unblock the instant its diamond
+    // upgrade lands — see the phase doc on `protocol-ops/src/commands/ecosystem/mod.rs`.
     console.log(`\n=== Step 7: Running stage3 (${elapsed()}) ===\n`);
     if (envPreset) {
-      // Production stage3 entry point on the real upgrade contract — same
-      // forge script protocol-ops `ecosystem stage3` invokes. The bridgehub
-      // is passed as the lone positional arg.
+      // Production stage3 entry point on the real upgrade contract — the same forge script
+      // protocol-ops `ecosystem stage3` invokes. The bridgehub is the lone positional arg.
       await runForgeScript({
-        scriptPath: "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol:CoreUpgrade_v31",
+        scriptPath: "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol:CoreUpgrade_v33",
         envVars: {},
         rpcUrl: l1Chain.rpcUrl,
         senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
@@ -335,7 +335,7 @@ async function main(): Promise<void> {
       });
     } else {
       await runForgeScript({
-        scriptPath: "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:CoreUpgradeV31ForTests",
+        scriptPath: "test/foundry/l1/integration/_EcosystemUpgradeV33ForTests.sol:CoreUpgradeV33ForTests",
         envVars: upgradeHarnessInputsRef!.envVars,
         rpcUrl: l1Chain.rpcUrl,
         senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
@@ -344,11 +344,11 @@ async function main(): Promise<void> {
       });
     }
 
-    // ── Step 8: Per-chain ChainUpgrade_v31 (+ L2 relay if not skipL2) ──
+    // ── Step 8: Per-chain DefaultChainUpgrade (+ L2 relay if not skipL2) ──
     if (skipChainUpgrades) {
       console.log("\n=== Step 8: Skipped (FORK_SKIP_CHAIN_UPGRADES=1) ===\n");
     } else {
-      console.log(`\n=== Step 8: Per-chain ChainUpgrade_v31 (${elapsed()}) ===\n`);
+      console.log(`\n=== Step 8: Per-chain DefaultChainUpgrade (${elapsed()}) ===\n`);
       const chainsOutDir = upgradeHarnessInputsRef
         ? path.join(upgradeHarnessInputsRef.protocolOpsOutDir, "chains")
         : path.join(anvilInteropDir, "outputs", `fork-upgrade-${envPreset!}`, "chains");
@@ -367,7 +367,7 @@ async function main(): Promise<void> {
         const ctmTomlPath = path.join(
           l1ContractsDir,
           "script-out",
-          `v31-upgrade-ctm-${chainTypeManager.toLowerCase()}.toml`
+          `v33-upgrade-ctm-${chainTypeManager.toLowerCase()}.toml`
         );
         const ctmOutputToml = readEcosystemOutput(ctmTomlPath);
         const settlementLayerUpgradeAddr = readNestedString(

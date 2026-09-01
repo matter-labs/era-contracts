@@ -1,0 +1,72 @@
+# Upgrade input for the mainnet environment on the v33 release.
+#
+# Copied from the v0.31.0-interopB entry of the same name: these values describe the
+# *environment* (bridgehub address, chain id, create2 salt), not the release. The target
+# protocol version and chain-creation params come from
+# `configs/genesis/zksync-os/latest.json`.
+#
+# The file must exist for `--env <name>` to work at all: `upgrade-prepare-all` refuses to fall
+# back to the local default, which would silently substitute local's values for the keys this
+# file does supply.
+#
+# ⚠ Salts, `owner_address` and `era_chain_id` are NOT read from this file yet.
+# `EnvConfig` still resolves them from `upgrade-envs/v0.31.0-interopB/<env>.toml`
+# (`env_config.rs`'s `V31_UPGRADE_DIR`), so editing them here has no effect — and a v33
+# prepare consequently reuses the v31 CREATE2 salt, which the salt is explicitly not
+# supposed to be (it rotates per regen, or CREATE2 returns the previously deployed
+# contract). Moving that namespace per release also moves the canonical review-artifact
+# directory (`output/<env>/`), so it is left as a follow-up decision rather than folded
+# into this PR.
+#
+# Pruned for v33: the EraVM chain-creation params and v29-era leftovers earlier envs carried
+# (bootloader / default-AA / EVM-emulator hashes, `recursion_*_vk_hash`, `genesis_*`,
+# `diamond_init_*`, `v28_protocol_version`, the priority-tx gas knobs) are gone — v33 is
+# ZKsync OS-only and nothing on this path reads them. Chain-creation params come from
+# `configs/genesis/zksync-os/latest.json`.
+
+era_chain_id = 324
+testnet_verifier = false
+governance_upgrade_timer_initial_delay = 172800
+owner_address = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
+
+support_l2_legacy_shared_bridge_test = false
+
+# v31 -> v33.
+old_protocol_version = 0x1f00000000
+
+
+[contracts]
+governance_min_delay = 0
+
+max_number_of_chains = 100
+create2_factory_salt = "0x55de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb5"
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+validator_timelock_execution_delay = 10800
+bridgehub_proxy_address = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"
+rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
+
+governance_security_council_address = "0x66E4431266DC7E04E7d8b7FE9d2181253df7F410"
+latest_protocol_version = 0x2100000000
+l1_bytecodes_supplier_addr = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
+protocol_upgrade_handler_proxy_address = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
+protocol_upgrade_handler_implementation_address = "0x36625Bd3dDB469377C6e9893712158cA3c0cC14B"
+
+[tokens]
+token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+
+# Kept deliberately: `DefaultCoreUpgrade` reads this into `config.legacyGatewayChainId`, which is
+# baked into the redeployed `L1MessageRoot` as its `ERA_GATEWAY_CHAIN_ID` immutable. Dropping it
+# would silently redeploy that implementation with 0.
+# The `[gateway.gateway_state_transition]` addresses that used to sit here are gone — they are
+# *written* by `GatewayVotePreparation`, never read from the upgrade input.
+[gateway]
+chain_id = 9075
+
+
+[create2_factory_salts]
+"0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C" = "0xd93600da02313bab9de70ef4ca32f1397e32764b5c1d4fcec317717fff515cc9"
+"0x1adf137f59949c9081157d5dE1e002D1c992071F" = "0x2bb3435f739fae8c8edc3d8b91f33261b972ef3301ab8edcc3cd48237ca6bbd9"
+
+[V29]
+encoded_old_validator_timelocks = "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000050000000000000000000000003db52ce065f728011ac6732222270b3f2360d919000000000000000000000000a0425d71cb1d6fb80e65a5361a04096e0672de03000000000000000000000000a8cb082a5a689e0d594d7da1e2d72a3d63adc1bd0000000000000000000000005d8ba173dc6c3c90c8f7c04c9288bef5fdbad06e0000000000000000000000008c0bfc04ada21fd496c55b8c50331f904306f564"
+encoded_old_gateway_validator_timelocks = "0x00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000001000000000000000000000000b83fdd24f40cb2aa5cc9c2a2a0c06e50fa9b4cea"

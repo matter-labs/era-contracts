@@ -177,7 +177,7 @@ pub struct VotePrepareInputs<'a> {
     /// hex). When `Some`, `stage_vote_prepare` skips the on-chain dump and
     /// uses this value directly. Required on pre-v31 ecosystems where the
     /// CTM doesn't yet expose `newChainCreationParamsBlock`; readable from
-    /// the v31 CTM prepare's output TOML
+    /// the CTM prepare's output TOML
     /// (`contracts_newConfig.force_deployments_data`, see
     /// `DefaultCTMUpgrade.s.sol:913`).
     pub force_deployments_data_override: Option<Bytes>,
