@@ -105,7 +105,7 @@ library ContractsBytecodesLib {
             "DiamondProxy",
             "DefaultUpgrade",
             "DefaultUpgradeZKsyncOS",
-            "V32UpgradeZKsyncOS",
+            "V33UpgradeZKsyncOS",
             "InteropCenter",
             "InteropAttributeParser",
             "L2InteropHandler",
@@ -133,7 +133,7 @@ library ContractsBytecodesLib {
             "ValidiumL1DAValidator",
             "L2InteropRootStorage",
             "L2MessageVerification",
-            "L2V32Upgrade",
+            "L2V33Upgrade",
             "UpgradeableBeaconDeployer",
             "SystemContractProxyAdmin"
         ];

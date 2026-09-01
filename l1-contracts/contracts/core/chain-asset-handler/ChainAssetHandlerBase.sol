@@ -130,8 +130,8 @@ abstract contract ChainAssetHandlerBase is
     }
 
     /// @notice Only when chain migrations are enabled in the current release.
-    /// @dev A release-level ban (unlike the runtime `migrationPaused` flag); disabled in v32.
-    /// See {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}.
+    /// @dev A release-level ban (unlike the runtime `migrationPaused` flag); disabled in v33.
+    /// See {protocol-docs/chain-lifecycle.md#v33-chain-migrations-are-explicitly-disabled}.
     modifier whenMigrationsEnabled() {
         if (!_chainMigrationsEnabled()) {
             revert ChainMigrationsDisabled();

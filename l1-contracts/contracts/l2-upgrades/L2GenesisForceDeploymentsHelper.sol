@@ -257,12 +257,12 @@ library L2GenesisForceDeploymentsHelper {
         _finalizeDeployments(_ctmDeployer, fixedForceDeploymentsData);
 
         if (_isGenesisUpgrade) {
-            _initPreV32Contracts(fixedForceDeploymentsData, additionalForceDeploymentsData);
+            _initPreV33Contracts(fixedForceDeploymentsData, additionalForceDeploymentsData);
         }
 
         // Contracts introduced in this release are initialized on both paths: they are uninitialized on a
         // new chain and on an upgraded one alike.
-        _initializeV32Contracts(_isZKsyncOS, fixedForceDeploymentsData);
+        _initializeV33Contracts(_isZKsyncOS, fixedForceDeploymentsData);
 
         emit ForceDeployedContractsInitialized(_isZKsyncOS, _isGenesisUpgrade);
     }
@@ -279,7 +279,7 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     /// @notice Calls initL2() on the contracts that have to be initialized before the bridgehub wiring in
-    /// `_finalizeDeployments`. Used during genesis only; see `_initPreV32Contracts` for the rest.
+    /// `_finalizeDeployments`. Used during genesis only; see `_initPreV33Contracts` for the rest.
     function _initContractsBeforeWiring(
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,
         ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
@@ -388,7 +388,7 @@ library L2GenesisForceDeploymentsHelper {
     /// release, even where the signature is not (`L2AssetTracker.initL2` lost its backfill argument). Kept
     /// at the position v31 called them from, after `_finalizeDeployments`, so the genesis sequence is
     /// unchanged; none of them reads the bridgehub wiring that step establishes.
-    function _initPreV32Contracts(
+    function _initPreV33Contracts(
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,
         ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
     ) private {
@@ -415,7 +415,7 @@ library L2GenesisForceDeploymentsHelper {
     /// {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}).
     /// Neither they nor their addresses existed in v31, so a chain always receives them here for the first
     /// time — from its genesis when it is new, from this upgrade's force deployments when it predates them.
-    function _initializeV32Contracts(
+    function _initializeV33Contracts(
         bool _isZKsyncOS,
         FixedForceDeploymentsData memory _fixedForceDeploymentsData
     ) private {

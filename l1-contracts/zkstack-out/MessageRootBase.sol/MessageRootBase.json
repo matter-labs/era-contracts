@@ -50,7 +50,7 @@
   },
   {
     "type": "function",
-    "name": "addChainBatchRootV32",
+    "name": "addChainBatchRootV33",
     "inputs": [
       {
         "name": "_chainId",

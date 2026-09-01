@@ -122,7 +122,7 @@ library L2UtilsBase {
             vm.etch(L2_INTEROP_ATTRIBUTE_PARSER_ADDR, l2InteropAttributeParser.code);
             address l2MessageRootStorage = address(new DummyL2InteropRootStorage());
             vm.etch(address(L2_INTEROP_ROOT_STORAGE), l2MessageRootStorage.code);
-            // The Dev variant re-enables chain migrations (disabled in production for v32, see
+            // The Dev variant re-enables chain migrations (disabled in production for v33, see
             // `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`) so the L2 migration machinery stays covered.
             address l2ChainAssetHandler = address(new L2ChainAssetHandlerDev());
             vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, l2ChainAssetHandler.code);

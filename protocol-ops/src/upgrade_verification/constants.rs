@@ -52,13 +52,13 @@ pub const ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR: Address =
     address!("0x4e59b44847b379578588920ca78fbf26c0b4956c");
 /// Alias of `L2_GENESIS_UPGRADE_ADDR` in Solidity — same on-chain address
 /// (`BUILT_IN_CONTRACTS_OFFSET + 0x01`), exposed under the version-specific
-/// name because v31 force-deploys `L2V32Upgrade` there.
+/// name because v31 force-deploys `L2V33Upgrade` there.
 pub const L2_VERSION_SPECIFIC_UPGRADER_ADDR: Address = l2_addr(0x01);
 pub const L2_BRIDGEHUB_ADDR: Address = l2_addr(0x02);
 pub const L2_ASSET_ROUTER_ADDR: Address = l2_addr(0x03);
 pub const L2_NATIVE_TOKEN_VAULT_ADDR: Address = l2_addr(0x04);
 pub const L2_MESSAGE_ROOT_ADDR: Address = l2_addr(0x05);
-/// The removed v31 GWAssetTracker's address: the v32 upgrade swaps its system proxy's
+/// The removed v31 GWAssetTracker's address: the v33 upgrade swaps its system proxy's
 /// implementation for `EmptyContract` (see `getRemovedTrackerNeutralizations`).
 pub const L2_REMOVED_GW_ASSET_TRACKER_ADDR: Address = l2_addr(0x10);
 pub const SLOAD_CONTRACT_ADDR: Address = l2_addr(0x06);
@@ -121,7 +121,7 @@ pub const L2_UPGRADE_GAS_LIMIT: u64 = 72_000_000;
 pub const L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT: u64 = 800;
 
 /// AllContractsHashes file-name keys consulted by the bytecode verifier.
-pub const L2_V32_UPGRADE_CONTRACT: &str = "l1-contracts/L2V32Upgrade";
+pub const L2_V33_UPGRADE_CONTRACT: &str = "l1-contracts/L2V33Upgrade";
 pub const BOOTLOADER_CONTRACT: &str = "Bootloader";
 pub const DEFAULT_ACCOUNT_CONTRACT: &str = "system-contracts/DefaultAccount";
 pub const EVM_EMULATOR_CONTRACT: &str = "EvmEmulator";

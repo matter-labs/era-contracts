@@ -60,7 +60,7 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
 
     /// @dev Slot previously holding `needBaseTokenTotalSupplyBackfill`. The ZKsync OS base-token
     /// backfill it gated is complete on every chain that can take this upgrade, which is enforced on
-    /// L1 (see {V32UpgradeZKsyncOS}), so this release has no backfill entry point left.
+    /// L1 (see {V33UpgradeZKsyncOS}), so this release has no backfill entry point left.
     // slither-disable-next-line unused-state
     bool private __DEPRECATED_needBaseTokenTotalSupplyBackfill;
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The v31 upgrade test runner (`v31-upgrade-test-runner.ts`) tests the full v31->v32 protocol upgrade
+The v31 upgrade test runner (`v31-upgrade-test-runner.ts`) tests the full v31->v33 protocol upgrade
 flow on local Anvil chains. It is named after the v31 upgrade scripts it drives
 (`CoreUpgrade_v31` / `CTMUpgrade_v31`), which this release still uses. It exercises the **production Solidity upgrade scripts**
 end-to-end, but patches around Anvil EVM limitations that prevent the real L2 ZKsync execution
@@ -27,7 +27,7 @@ In production, a v31 protocol upgrade proceeds as:
 5. **Stage 3**: Post-governance, pre-chain-upgrade. Registers legacy bridged tokens in the NTV
    bridged-tokens list (`TokenMigrationUtils`) and populates the NTV's `bridgedOut` accounting
    (`BridgedOutPopulationLib`). Must run before per-chain upgrades so L1-native withdrawals work
-   as soon as a chain is on v32.
+   as soon as a chain is on v33.
 
 6. **Per-chain upgrade**: For each ZK chain, the chain admin calls
    `upgradeChainFromVersion()` on the diamond proxy. This records an L2 upgrade transaction
@@ -38,10 +38,10 @@ In production, a v31 protocol upgrade proceeds as:
    `forceDeployAndUpgrade()` shape is only reachable from fork runs against older ecosystems) which:
    - Force-deploys new L2 system contract bytecodes (via ContractDeployer on Era, or the
      bytecode deployer on ZKsyncOS)
-   - Delegatecalls to `L2V32Upgrade.upgrade()` which initializes new contracts (NTV, Bridgehub,
+   - Delegatecalls to `L2V33Upgrade.upgrade()` which initializes new contracts (NTV, Bridgehub,
      AssetRouter, L2AssetTracker, ChainAssetHandler, InteropCenter, BaseToken, etc.)
 
-8. **Verification**: Protocol version on each chain is now `0x2000000000` (v32).
+8. **Verification**: Protocol version on each chain is now `0x2000000000` (v33).
 
 ## Architecture notes
 
@@ -195,7 +195,7 @@ The L1 side runs the **production** `ChainUpgrade_v31` Forge script -- no patche
 The L2 relay is the **biggest deviation from production**. In production, the bootloader sends
 a system transaction to ComplexUpgrader, which force-deploys new L2 bytecodes via the
 ContractDeployer (Era) or the ZKsyncOS bytecode deployer, then delegatecalls to
-`L2V32Upgrade.upgrade()`. On Anvil EVM, the ContractDeployer and ZKsyncOS deployer require the
+`L2V33Upgrade.upgrade()`. On Anvil EVM, the ContractDeployer and ZKsyncOS deployer require the
 ZKsync VM (bytecode hashing, validation, etc.) and do not work. The test patches around this:
 
 **Patch: Pre-deploy L2 contracts + MockContractDeployer** (`deployL2Contracts`)
@@ -204,7 +204,7 @@ ZKsync VM (bytecode hashing, validation, etc.) and do not work. The test patches
   1. The **outer** force deploys: `ComplexUpgrader.forceDeployAndUpgrade()` (Era) or
      `forceDeployAndUpgradeUniversal()` (ZKsyncOS) iterates `_forceDeployments[]` and calls
      ContractDeployer for each entry.
-  2. The **inner** force deploys: `L2V32Upgrade.upgrade()` calls
+  2. The **inner** force deploys: `L2V33Upgrade.upgrade()` calls
      `performForceDeployedContractsInit(false)` which calls `conductContractUpgrade()` for
      each contract -- this also calls ContractDeployer (Era) or the ZKsyncOS deployer.
 
@@ -221,14 +221,14 @@ ZKsync VM (bytecode hashing, validation, etc.) and do not work. The test patches
 
 - What gets pre-deployed: All addresses from the force deployment list in the calldata,
   mapped to EVM contract names via the `ADDRESS_TO_CONTRACT` map. Also:
-  - `L2V32Upgrade` bytecode at the delegateTo address
+  - `L2V33Upgrade` bytecode at the delegateTo address
   - `MockContractDeployer` at 0x8006
   - `SystemContractProxyAdmin` at the proxy admin address (owner set to ComplexUpgrader)
   - `L2BaseTokenEra` (Era) or `L2BaseTokenZKOS` behind SystemContractProxy (ZKsyncOS) at 0x800A
 
 ### L2BaseToken per VM type
 
-- Production: `L2V32Upgrade.upgrade()` calls `L2BaseToken.initL2(l1ChainId)`.
+- Production: `L2V33Upgrade.upgrade()` calls `L2BaseToken.initL2(l1ChainId)`.
   On Era, `L2BaseTokenEra.initL2()` reads `__DEPRECATED_totalSupply` from storage.
   On ZKsyncOS, `L2BaseTokenZKOS.initL2()` calls `MINT_BASE_TOKEN_HOOK`.
 - Test: Era uses `L2BaseTokenEra` directly. ZKsyncOS uses `L2BaseTokenZKOS` behind
@@ -248,7 +248,7 @@ No patches. Reads on-chain state to assert:
 - `L2AssetTracker.L1_CHAIN_ID` is set correctly on each L2 chain
 - The base token's bookkeeping is initialized in the L2AssetTracker of each L2 chain
 - `getProtocolVersion()` on each diamond proxy returns the scenario's `expectedProtocolVersion`
-  (`0x2000000000` for v32)
+  (`0x2000000000` for v33)
 - The recorded `getL2SystemContractsUpgradeTxHash()` equals the hash of the upgrade transaction the
   harness relayed to L2, i.e. the per-chain data really was substituted on L1. This one is asserted during
   step 7, inside `runChainUpgradesAndRelayL2`, and only on the single-CTM path
@@ -275,7 +275,7 @@ No patches. Reads on-chain state to assert:
 - All L1 Solidity upgrade scripts (`CoreUpgrade_v31`, `CTMUpgrade_v31`, `ChainUpgrade_v31`)
 - Governance call generation and execution (stages 0-2)
 - Proxy upgrades for all L1 core contracts
-- L2 upgrade initialization logic (`L2V32Upgrade.upgrade()` delegatecall path)
+- L2 upgrade initialization logic (`L2V33Upgrade.upgrade()` delegatecall path)
 - New contract configuration (ownership transfers for newly deployed proxies)
 - Bridged-token registration in the NTV (stage 3 via `TokenMigrationUtils.registerBridgedTokensInNTV`)
 - Protocol version advancement on all target chains

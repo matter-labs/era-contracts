@@ -506,7 +506,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     /// @dev Must be executed after `prepareCTMImplementationUpgrade`, as `setDefaultUpgrade` is only present
-    /// starting from v32.
+    /// starting from v33.
     function prepareSetDefaultUpgradeCallForGateway(
         uint256 l2GasLimit,
         uint256 l1GasPrice

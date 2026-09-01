@@ -14,8 +14,8 @@ import {L1ChainAssetHandlerDev} from "contracts/dev-contracts/L1ChainAssetHandle
 contract GatewayDeployer is L1ContractDeployer {
     GatewayPreparationForTests gatewayScript;
 
-    /// @dev v32 disables chain migrations in production (`CHAIN_MIGRATIONS_ENABLED` in `Config.sol`;
-    /// see {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}), but the gateway tests exercise the migration machinery
+    /// @dev v33 disables chain migrations in production (`CHAIN_MIGRATIONS_ENABLED` in `Config.sol`;
+    /// see {protocol-docs/chain-lifecycle.md#v33-chain-migrations-are-explicitly-disabled}), but the gateway tests exercise the migration machinery
     /// kept for future releases, so the chain asset handler proxy is upgraded to the Dev variant that
     /// re-enables them. Only the implementation is swapped; proxy state and immutable values stay
     /// identical to production.

@@ -150,7 +150,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @param _messageRoot The root of the merkle tree of the messages to L1.
     function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
         IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
-        messageRootContract.addChainBatchRootV32(s.chainId, _batchNumber, _messageRoot);
+        messageRootContract.addChainBatchRootV33(s.chainId, _batchNumber, _messageRoot);
     }
 
     /// @inheritdoc IExecutor
@@ -176,7 +176,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         // Cross-chain asset correctness is enforced by the ZK proof, so no per-batch log
-        // reconstruction / balance accounting happens here. See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+        // reconstruction / balance accounting happens here. See {protocol-docs/message-root.md#v31-vs-v33-append-flows}.
         for (uint256 i = 0; i < nBatches; ++i) {
             _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
         }

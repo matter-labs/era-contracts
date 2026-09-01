@@ -91,7 +91,7 @@ The timeout proof relies on three preconditions, each enforced on chain:
    every co-leg's declared source chain (see {protocol-docs/atomicity/flow.md#1-atomic-send-append}).
 
 3. **Every batch leaf carries the timestamp at which it entered the shared root.** Enforced by
-   `MessageRootBase.addChainBatchRootV32`, which folds the settlement-layer `block.timestamp` into the
+   `MessageRootBase.addChainBatchRootV33`, which folds the settlement-layer `block.timestamp` into the
    batch leaf (`MessageHashing.batchLeafHash`); the timestamp (`t`) is therefore proven by the same
    inclusion proof that authenticates the IMT root. Aggregated roots additionally carry their own
    creation timestamp (`T`) — one `(blockNumber, root, timestamp)` tuple exposed by

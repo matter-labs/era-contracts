@@ -14,7 +14,7 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 /// withdrawals of those assets work again after an in-place upgrade onto the `bridgedOut` accounting.
 /// See {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}.
 /// @dev Callable by any EOA — the amounts come from legacy storage that nothing writes anymore, so the
-/// caller cannot influence them. Version-neutral: usable by any pre-v32 -> v32 upgrade script.
+/// caller cannot influence them. Version-neutral: usable by any pre-v33 -> v33 upgrade script.
 library BridgedOutPopulationLib {
     VmSafe private constant vm = VmSafe(address(uint160(uint256(keccak256("hevm cheat code")))));
 

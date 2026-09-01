@@ -88,7 +88,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
     /// their first settled batch. Settle one batch root through the real executor entry point.
     function _settleFirstBatchRoot(uint256 _chainId) internal {
         vm.prank(getZKChainAddress(_chainId));
-        IMessageRootBase(address(ecosystemAddresses.bridgehub.proxies.messageRoot)).addChainBatchRootV32(
+        IMessageRootBase(address(ecosystemAddresses.bridgehub.proxies.messageRoot)).addChainBatchRootV33(
             _chainId,
             1,
             keccak256("first-settled-chain-batch-root")

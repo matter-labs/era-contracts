@@ -1640,11 +1640,11 @@
     "evmDeployedBytecodeLength": 85
   },
   {
-    "contractName": "l1-contracts/L2V32Upgrade",
+    "contractName": "l1-contracts/L2V33Upgrade",
     "zkBytecodeHash": "0x010002e5862312aa20fcda40bc765aecc3c4965b56f5a85cc4e68bb683b1c18f",
-    "zkBytecodePath": "/l1-contracts/zkout/L2V32Upgrade.sol/L2V32Upgrade.json",
+    "zkBytecodePath": "/l1-contracts/zkout/L2V33Upgrade.sol/L2V33Upgrade.json",
     "evmBytecodeHash": "0xb725b1ec81485ce56683a9752062de4ca7ea4a86aa88fe83629aebe1267e728c",
-    "evmBytecodePath": "/l1-contracts/out/L2V32Upgrade.sol/L2V32Upgrade.json",
+    "evmBytecodePath": "/l1-contracts/out/L2V33Upgrade.sol/L2V33Upgrade.json",
     "evmDeployedBytecodeHash": "0xd5b53d20621f56921d9658efe484f4ccc10bb01570ae351e3e729ef1ac773214",
     "evmDeployedBytecodeBlakeHash": "0xd74886e590ba83cf9d07e07b36213cf6e28e1149ca658514e3c4d1df65ad69f0",
     "evmDeployedBytecodeLength": 11005
@@ -2200,11 +2200,11 @@
     "evmDeployedBytecodeLength": 14727
   },
   {
-    "contractName": "l1-contracts/V32UpgradeZKsyncOS",
+    "contractName": "l1-contracts/V33UpgradeZKsyncOS",
     "zkBytecodeHash": "0x0100054b56748b48f0511ca11afc3ec97c9db48446ec67bb96ad2391efb620c0",
-    "zkBytecodePath": "/l1-contracts/zkout/V32UpgradeZKsyncOS.sol/V32UpgradeZKsyncOS.json",
+    "zkBytecodePath": "/l1-contracts/zkout/V33UpgradeZKsyncOS.sol/V33UpgradeZKsyncOS.json",
     "evmBytecodeHash": "0xc641c813917bdf54d855f9736c2fad023a29dfc327bfad0c00475e5199c276bb",
-    "evmBytecodePath": "/l1-contracts/out/V32UpgradeZKsyncOS.sol/V32UpgradeZKsyncOS.json",
+    "evmBytecodePath": "/l1-contracts/out/V33UpgradeZKsyncOS.sol/V33UpgradeZKsyncOS.json",
     "evmDeployedBytecodeHash": "0x466d1d5203204bf205cc49bab3aac199c630ffb0f5c8b1ea985c8bf5885af702",
     "evmDeployedBytecodeBlakeHash": "0x3b5584e08035adb665e59a491f6f9bcaf4f4d8672524031fb4fff66a3ccb3329",
     "evmDeployedBytecodeLength": 12963

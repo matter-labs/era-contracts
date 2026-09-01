@@ -72,8 +72,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         uint256 oldProtocolVersion;
         address ecosystemAdminAddress;
         uint256 governanceUpgradeTimerInitialDelay;
-        bool hasPreV32IntrospectionOverride;
-        bool usePreV32IntrospectionOverride;
+        bool hasPreV33IntrospectionOverride;
+        bool usePreV33IntrospectionOverride;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -234,10 +234,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             Utils.genesisConfigPath(isZKsyncOS)
         );
 
-        // Optional override for pre-v32 introspection selection
-        if (toml.keyExists("$.pre_v32_introspection")) {
-            newConfig.hasPreV32IntrospectionOverride = true;
-            newConfig.usePreV32IntrospectionOverride = toml.readBool("$.pre_v32_introspection");
+        // Optional override for pre-v33 introspection selection
+        if (toml.keyExists("$.pre_v33_introspection")) {
+            newConfig.hasPreV33IntrospectionOverride = true;
+            newConfig.usePreV33IntrospectionOverride = toml.readBool("$.pre_v33_introspection");
         }
 
         initializeConfig(chainCreationParams, permanentConfig, governance);
@@ -386,18 +386,18 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         address bridgehubAddr = ChainTypeManagerBase(ctm).BRIDGE_HUB();
         bridgehub = L1Bridgehub(bridgehubAddr);
 
-        bool preV32Ecosystem;
-        if (newConfig.hasPreV32IntrospectionOverride) {
-            preV32Ecosystem = newConfig.usePreV32IntrospectionOverride;
+        bool preV33Ecosystem;
+        if (newConfig.hasPreV33IntrospectionOverride) {
+            preV33Ecosystem = newConfig.usePreV33IntrospectionOverride;
         } else if (!AddressIntrospector.hasRegisteredChains(bridgehubAddr)) {
             // A chainless ecosystem has no protocol version to inspect. It cannot have been upgraded into
             // existence either, so it was deployed from scratch with the current contracts.
-            preV32Ecosystem = false;
+            preV33Ecosystem = false;
         } else {
-            preV32Ecosystem = AddressIntrospector.shouldUsePreV32Introspection(bridgehubAddr);
+            preV33Ecosystem = AddressIntrospector.shouldUsePreV33Introspection(bridgehubAddr);
         }
 
-        if (preV32Ecosystem) {
+        if (preV33Ecosystem) {
             ctmAddresses = AddressIntrospector.getCTMAddressesV31(ctm, config.isZKsyncOS);
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubAddr);
         } else {
@@ -715,7 +715,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     /// @notice Points the CTM at the upgrade contract deployed by this release, so that later upgrades that need
     /// no custom upgrade logic (e.g. verifier-only ones) can reuse it.
     /// @dev Must be executed after the CTM implementation upgrade, as `setDefaultUpgrade` is only present
-    /// starting from v32.
+    /// starting from v33.
     function prepareSetDefaultUpgradeCall() public virtual returns (Call[] memory calls) {
         require(
             ctmAddresses.stateTransition.proxies.chainTypeManager != address(0),

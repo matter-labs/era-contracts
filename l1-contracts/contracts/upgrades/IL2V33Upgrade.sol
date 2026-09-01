@@ -3,8 +3,8 @@ pragma solidity ^0.8.24;
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL2V32Upgrade {
-    /// @notice Executes the one-time v32 upgrade on L2.
+interface IL2V33Upgrade {
+    /// @notice Executes the one-time v33 upgrade on L2.
     /// @dev Intended to be delegate-called by the `ComplexUpgrader` contract.
     /// @param _isZKsyncOS Whether this is a ZKsync OS chain.
     /// @param _ctmDeployer The address of the CTM deployer.

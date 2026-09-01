@@ -79,7 +79,7 @@ abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
     }
 
     /// @notice Get Era L2 upgrade target and data.
-    /// @dev From V32 onwards, both Era and ZKsyncOS should use forceDeployAndUpgradeUniversal
+    /// @dev From V33 onwards, both Era and ZKsyncOS should use forceDeployAndUpgradeUniversal
     /// (via L2_COMPLEX_UPGRADER_ADDR) since it supports both chain types via ContractUpgradeType.
     /// This default uses forceDeployOnAddresses only because V31 Era chains do not yet
     /// have forceDeployAndUpgradeUniversal deployed.

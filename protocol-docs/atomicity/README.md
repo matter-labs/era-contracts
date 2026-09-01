@@ -103,13 +103,13 @@ The flow's entry points live outside this directory: `InteropCenter`
 ## ZKsync OS genesis
 
 The two L2 contracts are predeployed in the ZKsync OS genesis (settlement-layer support lives in the
-core protocol: the `Executor` pushes batch roots via `addChainBatchRootV32` and verifies imported
+core protocol: the `Executor` pushes batch roots via `addChainBatchRootV33` and verifies imported
 dependency roots; the genesis batch leaf is seeded by `MessageRootBase.seedGenesisRoot`):
 
 - registered in the genesis-gen tool (`tools/zksync-os-genesis-gen`) at `0x10012`
   (`L2InteropCommitmentTree`) and `0x10014` (`AtomicFlowManager`) — constants in
   `l1-contracts/contracts/common/l2-helpers/L2ContractAddresses.sol`;
-- seeded in `l1-contracts/contracts/l2-upgrades/L2GenesisForceDeploymentsHelper._initializeV32Contracts`
+- seeded in `l1-contracts/contracts/l2-upgrades/L2GenesisForceDeploymentsHelper._initializeV33Contracts`
   for every ZKsync OS chain, on the genesis and the upgrade path alike: neither the built-ins nor their
   addresses existed in v31, so a chain always receives them here for the first time — from its genesis when
   it is new, from this release's force deployments when it predates them. The commitment tree's `initL2`

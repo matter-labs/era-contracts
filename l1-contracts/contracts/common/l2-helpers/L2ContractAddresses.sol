@@ -139,8 +139,8 @@ address payable constant L2_INTEROP_HANDLER_ADDR = payable(address(BUILT_IN_CONT
 address constant L2_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0f);
 
 /// @dev The removed v31 GWAssetTracker's address, kept as a gap so the following addresses keep
-/// their positions. v31 released with the tracker deployed here, so the v32 upgrade swaps its
-/// system proxy's implementation for `EmptyContract`; chains created on v32 get the same
+/// their positions. v31 released with the tracker deployed here, so the v33 upgrade swaps its
+/// system proxy's implementation for `EmptyContract`; chains created on v33 get the same
 /// EmptyContract-backed proxy from genesis, so fresh and upgraded chains match at this address.
 address constant L2_REMOVED_GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x10);
 

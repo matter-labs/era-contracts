@@ -42,8 +42,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     struct AdditionalConfigParams {
         uint256 newProtocolVersion;
         bool isZKsyncOS;
-        bool hasPreV32IntrospectionOverride;
-        bool usePreV32IntrospectionOverride;
+        bool hasPreV33IntrospectionOverride;
+        bool usePreV33IntrospectionOverride;
     }
     AdditionalConfigParams internal additionalConfig;
 
@@ -123,13 +123,13 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
         additionalConfig.isZKsyncOS = isZKsyncOS;
 
-        // Optional override for pre-v32 introspection selection. Autodetection reads the protocol version of
-        // a registered chain, which lags the L1 contracts: an ecosystem whose core contracts are already v32
+        // Optional override for pre-v33 introspection selection. Autodetection reads the protocol version of
+        // a registered chain, which lags the L1 contracts: an ecosystem whose core contracts are already v33
         // while its chains have not upgraded yet (mid-upgrade, or a fixture deployed from current code with a
         // v31 genesis) must state so here.
-        if (upgradeToml.keyExists("$.pre_v32_introspection")) {
-            additionalConfig.hasPreV32IntrospectionOverride = true;
-            additionalConfig.usePreV32IntrospectionOverride = upgradeToml.readBool("$.pre_v32_introspection");
+        if (upgradeToml.keyExists("$.pre_v33_introspection")) {
+            additionalConfig.hasPreV33IntrospectionOverride = true;
+            additionalConfig.usePreV33IntrospectionOverride = upgradeToml.readBool("$.pre_v33_introspection");
         }
 
         // Protocol version comes from genesis config
@@ -169,18 +169,18 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     function setAddressesBasedOnBridgehub() internal virtual {
         address bridgehubProxy = coreAddresses.bridgehub.proxies.bridgehub;
 
-        bool preV32Ecosystem;
-        if (additionalConfig.hasPreV32IntrospectionOverride) {
-            preV32Ecosystem = additionalConfig.usePreV32IntrospectionOverride;
+        bool preV33Ecosystem;
+        if (additionalConfig.hasPreV33IntrospectionOverride) {
+            preV33Ecosystem = additionalConfig.usePreV33IntrospectionOverride;
         } else if (!AddressIntrospector.hasRegisteredChains(bridgehubProxy)) {
             // A chainless ecosystem has no protocol version to inspect. It cannot have been upgraded into
             // existence either, so it was deployed from scratch with the current contracts.
-            preV32Ecosystem = false;
+            preV33Ecosystem = false;
         } else {
-            preV32Ecosystem = AddressIntrospector.shouldUsePreV32Introspection(bridgehubProxy);
+            preV33Ecosystem = AddressIntrospector.shouldUsePreV33Introspection(bridgehubProxy);
         }
 
-        if (preV32Ecosystem) {
+        if (preV33Ecosystem) {
             // v31 ecosystem: the nullifier has no `l1InteropHandler` getter yet, so the discovered
             // address stays zero and the upgrade deploys the handler itself.
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubProxy);

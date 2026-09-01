@@ -33,7 +33,7 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
     ///         flow — proxy upgrades, stage calls, wiring — so it falls back to the plain `DefaultUpgrade`
     ///         for the chain step rather than skipping the chain upgrade entirely. The per-chain
     ///         force-deployments-data substitution that ZKsync OS chains get is covered by the anvil
-    ///         v31 -> v32 scenario.
+    ///         v31 -> v33 scenario.
     function deployUsedUpgradeContract() internal override returns (address) {
         return deploySimpleContract("DefaultUpgrade", false);
     }
@@ -96,9 +96,9 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
 contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
     /// @notice Override to skip the ownership-acceptance and `setAddresses` calls, which need ownership
     ///         hand-offs the fixture does not perform.
-    /// @dev The interop-handler wiring is kept: it is what makes a v31 ecosystem match a from-scratch v32
+    /// @dev The interop-handler wiring is kept: it is what makes a v31 ecosystem match a from-scratch v33
     ///      one. In this fixture it collapses to nothing — the ecosystem already has a wired handler — so
-    ///      the calls themselves are covered by `PreV32ParityCalls.t.sol`, not here.
+    ///      the calls themselves are covered by `PreV33ParityCalls.t.sol`, not here.
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
         console.log("Test mode: keeping only the L1InteropHandler wiring in stage 1");
         return _buildL1InteropHandlerWiringCalls();
@@ -116,7 +116,7 @@ contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
 // placeholder) that production reaches via real batch commits and the v31 upgrade
 // this ecosystem is assumed to have been through. In a freshly-deployed local
 // fixture neither has happened yet, and there is no public API to drive them —
-// v32 has no writer for the placeholder at all. The overrides below substitute
+// v33 has no writer for the placeholder at all. The overrides below substitute
 // for that history; they are scoped to this `setUp`/`beforeChainUpgrade` and
 // never run against a real chain.
 //
@@ -282,9 +282,9 @@ contract UpgradeIntegrationTest_Local is
             "Base token assetId not registered"
         );
 
-        // The wiring a v32 ecosystem has to end up with. This fixture starts from current contracts, so it
+        // The wiring a v33 ecosystem has to end up with. This fixture starts from current contracts, so it
         // is already wired and the upgrade emits no wiring calls: these assertions pin the invariant, while
-        // the calls that establish it on a real v31 ecosystem are covered by `PreV32ParityCalls.t.sol`
+        // the calls that establish it on a real v31 ecosystem are covered by `PreV33ParityCalls.t.sol`
         // (`test_wiresTheNewInteropHandler`).
         address l1InteropHandler = coreUpgrade.getCoreAddresses().bridges.proxies.l1InteropHandler;
         assertTrue(l1InteropHandler != address(0), "No L1InteropHandler after the upgrade");

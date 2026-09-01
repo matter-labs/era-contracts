@@ -9,7 +9,7 @@
     "test:hardhat": "yarn --cwd ../.. test:hardhat:interop",
     "deploy:test-token": "ts-node src/helpers/deploy-test-token.ts",
     "setup-and-dump": "ts-node setup-and-dump-state.ts",
-    "test:v31-to-v32": "ts-node run-v31-to-v32-upgrade-test.ts",
+    "test:v31-to-v33": "ts-node run-v31-to-v33-upgrade-test.ts",
     "test:unit": "ts-node test/unit/run-all.ts",
     "coverage": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts",
     "coverage:serial": "ANVIL_COVERAGE_MODE=1 ts-node run-coverage.ts --serial",

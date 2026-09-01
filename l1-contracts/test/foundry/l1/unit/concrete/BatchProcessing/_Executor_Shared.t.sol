@@ -256,7 +256,7 @@ contract ExecutorTest is UtilsCallMockerTest {
 
         vm.mockCall(
             address(messageRoot),
-            abi.encodeWithSelector(MessageRootBase.addChainBatchRootV32.selector, 9, 1, bytes32(0)),
+            abi.encodeWithSelector(MessageRootBase.addChainBatchRootV33.selector, 9, 1, bytes32(0)),
             abi.encode()
         );
 

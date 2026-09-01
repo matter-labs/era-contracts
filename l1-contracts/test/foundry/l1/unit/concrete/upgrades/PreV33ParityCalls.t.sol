@@ -19,7 +19,7 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 
-/// @dev Exposes the pre-v32 parity call builder and lets the test place the discovered addresses, which the
+/// @dev Exposes the pre-v33 parity call builder and lets the test place the discovered addresses, which the
 /// script normally fills in from on-chain introspection.
 contract CoreUpgradeParityHarness is CoreUpgrade_v31 {
     function setDiscoveredAddresses(
@@ -39,9 +39,9 @@ contract CoreUpgradeParityHarness is CoreUpgrade_v31 {
     }
 }
 
-/// @notice Covers the stage-1 calls that bring a v31 ecosystem to the wiring a from-scratch v32 deployment
-/// has: the interop handler, which is new in v32.
-contract PreV32ParityCallsTest is Test {
+/// @notice Covers the stage-1 calls that bring a v31 ecosystem to the wiring a from-scratch v33 deployment
+/// has: the interop handler, which is new in v33.
+contract PreV33ParityCallsTest is Test {
     CoreUpgradeParityHarness internal upgradeScript;
     L1Nullifier internal l1Nullifier;
     L1AssetRouter internal assetRouter;
@@ -61,7 +61,7 @@ contract PreV32ParityCallsTest is Test {
         address eraDiamondProxy = makeAddr("eraDiamondProxy");
 
         // A v31-shaped pair of bridges: deployed and initialized, but with no interop handler, since that
-        // storage only exists from v32 on.
+        // storage only exists from v33 on.
         L1NullifierDev nullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
             _messageRoot: IMessageRootBase(messageRoot)
@@ -140,7 +140,7 @@ contract PreV32ParityCallsTest is Test {
     }
 
     function test_emitsNothingForAnAlreadyUpgradedEcosystem() public {
-        // Re-running the upgrade on a v32 ecosystem: the handler already exists, so the script did not
+        // Re-running the upgrade on a v33 ecosystem: the handler already exists, so the script did not
         // deploy one and emits no wiring calls.
 
         upgradeScript.setDiscoveredAddresses(
@@ -175,7 +175,7 @@ contract PreV32ParityCallsTest is Test {
 
     /// @dev A v31 nullifier has no `l1InteropHandler()` at all, which a call into the missing function
     /// surfaces as a revert — exactly what the version-aware discovery has to avoid.
-    function _makeNullifierLookPreV32() internal {
+    function _makeNullifierLookPreV33() internal {
         vm.mockCallRevert(
             address(l1Nullifier),
             abi.encodeWithSignature("l1InteropHandler()"),
@@ -185,7 +185,7 @@ contract PreV32ParityCallsTest is Test {
 
     function test_discovery_v31PathSkipsTheInteropHandlerGetter() public {
         _mockNativeTokenVaultForDiscovery();
-        _makeNullifierLookPreV32();
+        _makeNullifierLookPreV33();
 
         BridgesDeployedAddresses memory bridges = AddressIntrospector.getBridgesDeployedAddressesV31(
             address(assetRouter)
@@ -196,17 +196,17 @@ contract PreV32ParityCallsTest is Test {
         assertEq(bridges.implementations.l1InteropHandler, address(0), "no implementation either");
     }
 
-    function test_discovery_v32PathNeedsTheInteropHandlerGetter() public {
-        // The same discovery a v32 ecosystem uses cannot be applied to a v31 one: it reads a getter that
-        // only exists from v32 on. This is what made the upgrade impossible to prepare.
+    function test_discovery_v33PathNeedsTheInteropHandlerGetter() public {
+        // The same discovery a v33 ecosystem uses cannot be applied to a v31 one: it reads a getter that
+        // only exists from v33 on. This is what made the upgrade impossible to prepare.
         _mockNativeTokenVaultForDiscovery();
-        _makeNullifierLookPreV32();
+        _makeNullifierLookPreV33();
 
         vm.expectRevert("function does not exist");
         AddressIntrospector.getBridgesDeployedAddresses(address(assetRouter));
     }
 
-    function test_discovery_v32PathIsUsedOnceTheGetterExists() public {
+    function test_discovery_v33PathIsUsedOnceTheGetterExists() public {
         _mockNativeTokenVaultForDiscovery();
 
         BridgesDeployedAddresses memory bridges = AddressIntrospector.getBridgesDeployedAddresses(address(assetRouter));
