@@ -16,6 +16,8 @@ import {
     BootstrapAlreadyExecuted,
     BootstrapAuthorityNotHeld,
     BootstrapExecutorNotBound,
+    BootstrapNotYetExecuted,
+    BootstrapReleaseNotInstalled,
     ProxyUpgradeRowMismatch,
     RegistryUnknownKey,
     ZeroAddress
@@ -154,6 +156,47 @@ contract RegistryBootstrapMigration {
         // and the release it vouches for cannot be mismatched at the moment of installation.
         ICTMRelease(m.currentRelease.addr).validate();
         CodehashPinLib.requirePin(m.currentRelease);
+    }
+
+    /// @notice Reverts unless the edge has been APPLIED end to end: `migrate()` ran, the CTM sits
+    ///         at the new version with the pinned release and anchor installed, every proxy row
+    ///         points at its pinned `implNew`, and the whole CTM domain is owned by the bound
+    ///         executor. The stage-2 gate for the bundle whose stage 1 ran `migrate()` — deeper
+    ///         than a bare version check, and readable by any tooling afterwards.
+    /// @dev The row check describes this one edge: a later transition legitimately moves the
+    ///      CTM-domain proxies (and `currentRelease`) on, after which this reverts by design.
+    function validateApplied() external view {
+        if (!executed) {
+            revert BootstrapNotYetExecuted();
+        }
+        BootstrapManifest memory m = getManifest();
+
+        IChainTypeManager ctm = IChainTypeManager(m.ctm);
+        uint256 liveVersion = ctm.protocolVersion();
+        if (liveVersion != m.newProtocolVersion) {
+            revert OutdatedProtocolVersion(liveVersion, m.newProtocolVersion);
+        }
+        address liveRelease = ctm.currentRelease();
+        if (liveRelease != m.currentRelease.addr) {
+            revert BootstrapReleaseNotInstalled(m.currentRelease.addr, liveRelease);
+        }
+        CodehashPinLib.requirePin(m.currentRelease);
+
+        ProxyUpgradeRowLib.requireRowsApplied(
+            m.ctmProxyAdmin,
+            ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT)
+        );
+
+        // The whole CTM domain must have LANDED under the bound executor — the accept inside
+        // `migrate()` completed, nothing is parked on this spent object.
+        address ctmOwner = Ownable2Step(m.ctm).owner();
+        if (ctmOwner != m.ctmExecutor.addr) {
+            revert BootstrapAuthorityNotHeld(m.ctm, ctmOwner);
+        }
+        address proxyAdminOwner = m.ctmProxyAdmin.owner();
+        if (proxyAdminOwner != m.ctmExecutor.addr) {
+            revert BootstrapAuthorityNotHeld(address(m.ctmProxyAdmin), proxyAdminOwner);
+        }
     }
 
     /// @notice Performs the whole edge, then hands authority to the bound executors.

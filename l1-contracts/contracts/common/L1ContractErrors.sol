@@ -61,6 +61,10 @@ error BootstrapAlreadyExecuted();
 error BootstrapAuthorityNotHeld(address target, address actualOwner);
 // 0xb772460f
 error BootstrapExecutorNotBound(address executor, address expectedTarget, address actualTarget);
+// 0x447aee1e
+error BootstrapNotYetExecuted();
+// 0x24c8e294
+error BootstrapReleaseNotInstalled(address expected, address actual);
 // 0x6cf12312
 error BridgeHubAlreadyRegistered();
 // 0xdb538614

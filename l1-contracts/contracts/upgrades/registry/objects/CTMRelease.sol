@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
+import {ReleaseFacetReader} from "../libraries/ReleaseFacetReader.sol";
 import {
     RegistryEmptySelectors,
     RegistryInventoryLengthMismatch,
@@ -108,6 +109,13 @@ contract CTMRelease is ICTMRelease {
             m.genesis.genesisBatchCommitment,
             m.genesis.genesisIndexRepeatedStorageChanges
         );
+    }
+
+    /// @notice Whether `_chain`'s live diamond routing is EXACTLY this release's: same facets,
+    ///         same per-facet selector sets, nothing extra. The on-chain form of the "upgrade
+    ///         path equals genesis path" guarantee, for post-upgrade checks and monitoring.
+    function verifyChainRouting(address _chain) external view returns (bool) {
+        return ReleaseFacetReader.chainMatchesFacetRows(getManifest().genesisFacets, _chain);
     }
 
     function validate() external view {

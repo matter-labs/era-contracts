@@ -138,6 +138,28 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
         emit CTMUpgradeApplied(address(_transition), oldProtocolVersion, newProtocolVersion);
     }
 
+    /// @notice Reverts unless `_transition` has been APPLIED on the bound CTM: it is the
+    ///         committed transition for its version edge, the CTM has moved to (at least) its new
+    ///         version, and every CTM-domain proxy row points at its pinned `implNew`, read live
+    ///         through the bound `ProxyAdmin`. The stage-2 gate for the same bundle whose stage 1
+    ///         ran `applyCTMUpgrade`.
+    /// @dev The row check describes one edge, not a standing invariant: a later upgrade moves
+    ///      proxies past these rows and this then reverts by design.
+    function validateTransitionApplied(ICTMTransition _transition) external view {
+        _requireGenuineTransition(_transition);
+        uint256 oldProtocolVersion = _transition.oldProtocolVersion();
+        address committed = CHAIN_TYPE_MANAGER.upgradeTransition(oldProtocolVersion);
+        if (committed != address(_transition)) {
+            revert TransitionNotCommitted(address(_transition), committed);
+        }
+        uint256 newProtocolVersion = _transition.newProtocolVersion();
+        uint256 currentProtocolVersion = CHAIN_TYPE_MANAGER.protocolVersion();
+        if (currentProtocolVersion < newProtocolVersion) {
+            revert OutdatedProtocolVersion(currentProtocolVersion, newProtocolVersion);
+        }
+        ProxyUpgradeRowLib.requireRowsApplied(CTM_PROXY_ADMIN, _transition.ctmProxyRows());
+    }
+
     /// @notice Upgrades a single chain diamond to the transition's new protocol version with the
     ///         same composed cut that `applyCTMUpgrade` committed to.
     /// @dev Execution policy, in order of precedence:

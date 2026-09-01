@@ -211,6 +211,23 @@ empty account can never satisfy one.
 `verifyAll()` returns `bool` and is for inspection and deployment tooling. Enforcement is never left
 to an advisory predicate.
 
+**Post-state verification.** Pins prove the objects; a second, deeper layer proves the upgrade
+LANDED, and stage 2 gates on it instead of composed per-target checks:
+
+- `ProxyUpgradeRowLib.requireRowsApplied` — every row's proxy points at its pinned `implNew`, read
+  live through the applying `ProxyAdmin` (the EIP-1967 state, not a paper trail).
+- `EcosystemUpgradeExecutor.validateUpgradeApplied(registry)` and
+  `CTMUpgradeExecutor.validateTransitionApplied(transition)` — the applied form of the two apply
+  entrypoints (committed edge, version reached, rows applied).
+- `RegistryBootstrapMigration.validateApplied()` — the whole bootstrap edge: executed, version,
+  installed release + anchor pin, rows, and the CTM domain landed under the bound executor.
+- `CTMRelease.verifyChainRouting(chain)` — a live diamond's loupe output set-equals the release's
+  self-described routing: the on-chain form of the "upgrade path equals genesis path" guarantee,
+  for per-chain post-upgrade checks and monitoring.
+
+These describe ONE edge, not a standing invariant: a later upgrade legitimately moves proxies (and
+`currentRelease`) on, after which the applied-checks revert by design.
+
 ## Chain-type manager state
 
 The CTM stores one release pointer and derives genesis data from it:

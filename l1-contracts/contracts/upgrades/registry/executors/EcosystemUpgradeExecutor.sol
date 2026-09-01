@@ -67,4 +67,15 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
         // One call returns complete typed rows; no per-key rescans of the registry.
         ProxyUpgradeRowLib.applyRows(PROXY_ADMIN, _coreRegistry.ecosystemRows());
     }
+
+    /// @notice Reverts unless the registry's inventory has been APPLIED: every row's proxy points
+    ///         at its pinned `implNew`, read live through the bound `ProxyAdmin`. The stage-2
+    ///         gate for the same bundle whose stage 1 ran `applyL1Upgrade` — a proposal cannot
+    ///         conclude with a swap silently missing.
+    /// @dev One edge, not a standing invariant: a later upgrade moves proxies past these rows and
+    ///      this then reverts by design.
+    function validateUpgradeApplied(ICoreRegistry _coreRegistry) external view {
+        address(_coreRegistry).requirePin(CORE_REGISTRY_CODEHASH);
+        ProxyUpgradeRowLib.requireRowsApplied(PROXY_ADMIN, _coreRegistry.ecosystemRows());
+    }
 }

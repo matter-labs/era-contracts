@@ -295,4 +295,23 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     function prepareCheckMigrationsPausedCalls() public virtual override returns (Call[] memory calls) {
         return new Call[](0);
     }
+
+    /// @notice Subsumed by the migration's own stage-2 gate (`validateApplied`, below) — a strict
+    ///         superset of the validator's version-presence read.
+    function prepareCheckUpgradeIsPresent() public virtual override returns (Call[] memory calls) {
+        return new Call[](0);
+    }
+
+    /// @notice The stage-2 CTM gate is the pinned object's own post-state check: version,
+    ///         installed release + anchor pin, applied proxy rows, and the authority landing
+    ///         under the bound executor — one reverting view call instead of composed checks.
+    function prepareVersionSpecificStage2GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
+        require(address(bootstrapMigration) != address(0), "bootstrap migration not deployed");
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: address(bootstrapMigration),
+            data: abi.encodeCall(bootstrapMigration.validateApplied, ()),
+            value: 0
+        });
+    }
 }

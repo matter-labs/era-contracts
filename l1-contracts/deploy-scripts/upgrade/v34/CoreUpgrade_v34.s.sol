@@ -175,6 +175,22 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
         });
     }
 
+    /// @notice The stage-2 ecosystem gate is the executor's own post-state check: every registry
+    ///         row's proxy points at its pinned implementation, read live through the bound
+    ///         `ProxyAdmin` — one reverting view call instead of composed per-proxy checks.
+    function prepareVersionSpecificStage2GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
+        require(address(coreRegistry) != address(0), "core registry not deployed");
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: address(ecosystemUpgradeExecutor),
+            data: abi.encodeCall(
+                EcosystemUpgradeExecutor.validateUpgradeApplied,
+                (ICoreRegistry(address(coreRegistry)))
+            ),
+            value: 0
+        });
+    }
+
     /// @notice Override to properly set deployerAddress in upgrade context.
     /// @dev In Forge scripts with vm.broadcast(), msg.sender is the script address, but the
     ///      actual deployer is the broadcast key — same fix as every upgrade script needs.

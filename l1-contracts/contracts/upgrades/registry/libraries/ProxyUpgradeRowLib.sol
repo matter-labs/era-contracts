@@ -79,6 +79,24 @@ library ProxyUpgradeRowLib {
         }
     }
 
+    /// @notice Reverts unless every row has been APPLIED: the proxy's live implementation (read
+    ///         through `_admin`, the same authority that applied it) is `implNew` and the pin
+    ///         still holds. The post-state counterpart of `applyRows`' source check — a stage-2
+    ///         gate calls this so a bundle cannot conclude with a swap silently missing.
+    /// @dev Meaningful right after the upgrade that carries the rows: a LATER upgrade legitimately
+    ///      moves proxies past `implNew`, after which this reverts by design (the rows describe
+    ///      one edge, not a standing invariant).
+    function requireRowsApplied(ProxyAdmin _admin, ProxyUpgradeRow[] memory _rows) internal view {
+        uint256 length = _rows.length;
+        for (uint256 i = 0; i < length; ++i) {
+            address liveImpl = _admin.getProxyImplementation(ITransparentUpgradeableProxy(_rows[i].proxy));
+            if (liveImpl != _rows[i].implNew.addr) {
+                revert ProxyUpgradeRowMismatch(_rows[i].proxy, _rows[i].implNew.addr, liveImpl);
+            }
+            CodehashPinLib.requirePin(_rows[i].implNew);
+        }
+    }
+
     /// @notice Non-reverting variant for `verifyAll()` tooling reads.
     function rowPinsHold(ProxyUpgradeRow[] memory _rows) internal view returns (bool) {
         uint256 length = _rows.length;
