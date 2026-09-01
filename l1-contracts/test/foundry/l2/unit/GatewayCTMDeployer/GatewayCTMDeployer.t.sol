@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
+import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 import {Verifiers} from "contracts/common/StateTransitionTypes.sol";
 
@@ -220,7 +221,9 @@ contract GatewayCTMDeployerTest is Test {
                     genesisBatchHash: bytes32(uint256(4)),
                     genesisBatchCommitment: bytes32(uint256(5)),
                     genesisIndexRepeatedStorageChanges: 1
-                })
+                }),
+                // Length-checked inventory; content is irrelevant to this fixture.
+                l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
             })
         );
     }

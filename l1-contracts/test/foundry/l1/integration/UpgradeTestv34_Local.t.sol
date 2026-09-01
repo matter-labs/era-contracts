@@ -11,6 +11,7 @@ import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upg
 import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
 import {Call} from "contracts/governance/Common.sol";
+import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../../../deploy-scripts/utils/Types.sol";
@@ -47,6 +48,12 @@ contract CTMUpgrade_v34_Test is CTMUpgrade_v34 {
     /// @notice Return a dummy bytecode hash instead of reading huge JSON files.
     function getL2BytecodeHash(string memory /* contractName */) public view override returns (bytes32) {
         return bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001));
+    }
+
+    /// @dev Same MemoryOOG avoidance: the real builder reads every L2 contract's bytecode.
+    ///      Correct length, empty rows.
+    function getL2BytecodeInfoTable() internal override returns (bytes[] memory) {
+        return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
     }
 
     /// @notice Skip bytecode publishing (reads large JSON files).

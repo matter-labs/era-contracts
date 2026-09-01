@@ -67,8 +67,16 @@ function enumValue(map: Record<string, number>, name: string, enumName: string):
   return value;
 }
 
+/** One `ProxyUpgradeRow` in the shape ethers encodes against the contract ABI. */
+interface ProxyUpgradeRowArg {
+  proxy: string;
+  expectedOldImpl: string;
+  implNew: { addr: string; codehash: string };
+  callInitializeUpgrade: boolean;
+}
+
 /** An inert inventory slot: the explicit "not upgraded" statement. */
-function zeroProxyUpgradeRow(): any {
+function zeroProxyUpgradeRow(): ProxyUpgradeRowArg {
   return {
     proxy: ethers.constants.AddressZero,
     expectedOldImpl: ethers.constants.AddressZero,
@@ -84,11 +92,25 @@ function zeroProxyUpgradeRow(): any {
  * deployment), parsed from the Solidity source; a row keyed by anything else refuses to encode,
  * and every unnamed slot encodes as the explicit zero ("not upgraded") row.
  */
-export function proxyUpgradeSlots(enumName: string, rows: Record<string, any>): any[] {
+export function proxyUpgradeSlots(enumName: string, rows: Record<string, ProxyUpgradeRowArg>): ProxyUpgradeRowArg[] {
   const members = parseSolidityEnum(CONTRACT_IDENTIFIERS_SOL, enumName);
   const slots = Array.from({ length: Object.keys(members).length }, () => zeroProxyUpgradeRow());
   for (const [name, row] of Object.entries(rows ?? {})) {
     slots[enumValue(members, name, enumName)] = row;
+  }
+  return slots;
+}
+
+/**
+ * Builds the release's fixed-length L2 bytecode table (`ReleaseManifest.l2BytecodeInfos`) from
+ * rows keyed by `L2EcosystemContract` MEMBER NAME; every unnamed slot encodes as the explicit
+ * empty row ("not part of this release's force-deployed set").
+ */
+export function l2BytecodeInfoSlots(rows: Record<string, string>): string[] {
+  const members = parseSolidityEnum(CONTRACT_IDENTIFIERS_SOL, "L2EcosystemContract");
+  const slots = Array.from({ length: Object.keys(members).length }, () => "0x");
+  for (const [name, info] of Object.entries(rows ?? {})) {
+    slots[enumValue(members, name, "L2EcosystemContract")] = info;
   }
   return slots;
 }
@@ -145,6 +167,7 @@ export function releaseInitArgs(ctm: any): any {
       genesisBatchCommitment: release.genesis.batchCommitment,
       genesisIndexRepeatedStorageChanges: release.genesis.indexRepeatedStorageChanges,
     },
+    l2BytecodeInfos: l2BytecodeInfoSlots(release.l2BytecodeInfos ?? {}),
   };
 }
 

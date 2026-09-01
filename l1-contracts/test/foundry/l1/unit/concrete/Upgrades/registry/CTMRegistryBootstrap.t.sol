@@ -3,6 +3,11 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {RegistryInventoryLengthMismatch} from "contracts/common/L1ContractErrors.sol";
+import {
+    L2EcosystemContract,
+    L2_ECOSYSTEM_CONTRACT_COUNT
+} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 
@@ -84,7 +89,9 @@ contract CTMRegistryBootstrapTest is Test {
                         genesisBatchHash: bytes32(uint256(1)),
                         genesisBatchCommitment: bytes32(uint256(1)),
                         genesisIndexRepeatedStorageChanges: 1
-                    })
+                    }),
+                    // Length-checked inventory; content is irrelevant to these fixtures.
+                    l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
                 })
             );
     }
@@ -156,7 +163,9 @@ contract CTMRegistryBootstrapTest is Test {
                         genesisBatchHash: bytes32(uint256(1)),
                         genesisBatchCommitment: bytes32(uint256(1)),
                         genesisIndexRepeatedStorageChanges: 1
-                    })
+                    }),
+                    // Length-checked inventory; content is irrelevant to these fixtures.
+                    l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
                 })
             )
         );
@@ -167,5 +176,33 @@ contract CTMRegistryBootstrapTest is Test {
         assertEq(defaultAccountHash, bytes32(0), "default account hash");
         assertEq(evmEmulatorHash, bytes32(0), "evm emulator hash");
         assertEq(release.genesisFacets().length, 6, "facet list");
+    }
+
+    // ---- L2 bytecode table ----
+
+    // The table is an enum-indexed inventory: a wrong-length table cannot construct, so every
+    // slot is an explicit statement.
+    function test_revertWhen_l2BytecodeTableHasWrongLength() public {
+        ReleaseManifest memory manifest = _genesisManifest();
+        manifest.l2BytecodeInfos = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT - 1);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryInventoryLengthMismatch.selector,
+                L2_ECOSYSTEM_CONTRACT_COUNT,
+                L2_ECOSYSTEM_CONTRACT_COUNT - 1
+            )
+        );
+        new CTMRelease(manifest);
+    }
+
+    function test_l2BytecodeTableIsServed() public {
+        ReleaseManifest memory manifest = _genesisManifest();
+        manifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = hex"beef";
+        CTMRelease release = new CTMRelease(manifest);
+
+        bytes[] memory rows = release.l2BytecodeInfos();
+        assertEq(rows.length, L2_ECOSYSTEM_CONTRACT_COUNT, "table length");
+        assertEq(rows[uint256(L2EcosystemContract.L2Bridgehub)], hex"beef", "pinned row");
+        assertEq(rows[uint256(L2EcosystemContract.L2AssetRouter)].length, 0, "inert slot");
     }
 }

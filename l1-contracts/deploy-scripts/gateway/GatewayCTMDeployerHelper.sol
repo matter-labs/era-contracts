@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 // solhint-disable no-console
 
 import {console2 as console} from "forge-std/Script.sol";
+import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
@@ -158,6 +159,31 @@ library GatewayCTMDeployerHelper {
     )
         internal
         returns (
+            DeployedContracts memory,
+            DeployerCreate2Calldata memory,
+            DeployerAddresses memory,
+            DirectCreate2Calldata memory,
+            address
+        )
+    {
+        return
+            calculateAddresses(
+                _create2Salt,
+                config,
+                SystemContractsProcessing.buildL2BytecodeInfoTable(config.isZKsyncOS)
+            );
+    }
+
+    /// @param _l2BytecodeInfos The release's L2 bytecode table (`ReleaseManifest.l2BytecodeInfos`),
+    ///        taken as an argument so bytecode-light callers can substitute it — the default
+    ///        builder reads every L2 contract's bytecode from artifacts.
+    function calculateAddresses(
+        bytes32 _create2Salt,
+        GatewayCTMDeployerConfig memory config,
+        bytes[] memory _l2BytecodeInfos
+    )
+        internal
+        returns (
             DeployedContracts memory contracts,
             DeployerCreate2Calldata memory deployerCalldata,
             DeployerAddresses memory deployers,
@@ -168,12 +194,17 @@ library GatewayCTMDeployerHelper {
         // Use Arachnid deterministic CREATE2 by default (GW path),
         // unless the env override switches to EraVM factory mode.
         create2FactoryAddress = _getDeploymentTarget(_isGatewayEvmEquivalentInCurrentContext());
-        (contracts, deployerCalldata, deployers, directCalldata) = _calculateAddressesInner(_create2Salt, config);
+        (contracts, deployerCalldata, deployers, directCalldata) = _calculateAddressesInner(
+            _create2Salt,
+            config,
+            _l2BytecodeInfos
+        );
     }
 
     function _calculateAddressesInner(
         bytes32 _create2Salt,
-        GatewayCTMDeployerConfig memory config
+        GatewayCTMDeployerConfig memory config,
+        bytes[] memory _l2BytecodeInfos
     )
         internal
         returns (
@@ -211,7 +242,7 @@ library GatewayCTMDeployerHelper {
             directAddresses.currentRelease,
             directAddresses.currentReleaseCodehash,
             directCalldata.currentReleaseCalldata
-        ) = _calculateBootstrapRelease(_create2Salt, config, directAddresses);
+        ) = _calculateBootstrapRelease(_create2Salt, config, directAddresses, _l2BytecodeInfos);
 
         GatewayCTMFinalResult memory ctmResult;
         (deployers.ctmDeployer, deployerCalldata.ctmCalldata, ctmResult) = _calculateCTMDeployer(
@@ -612,9 +643,10 @@ library GatewayCTMDeployerHelper {
     function _calculateBootstrapRelease(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory _config,
-        DirectDeployedAddresses memory _direct
+        DirectDeployedAddresses memory _direct,
+        bytes[] memory _l2BytecodeInfos
     ) internal returns (address releaseAddr, bytes32 releaseCodehash, bytes memory calldataOut) {
-        bytes memory manifestArgs = abi.encode(_reconstructGenesisManifest(_direct, _config));
+        bytes memory manifestArgs = abi.encode(_reconstructGenesisManifest(_direct, _config, _l2BytecodeInfos));
         (releaseAddr, calldataOut) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
             "CTMRelease.sol",
@@ -639,8 +671,9 @@ library GatewayCTMDeployerHelper {
     ///      embeds) and codehashes from `_simulatedCodehash` (see {DirectDeployedAddresses}).
     function _reconstructGenesisManifest(
         DirectDeployedAddresses memory _direct,
-        GatewayCTMDeployerConfig memory _baseConfig
-    ) private returns (ReleaseManifest memory) {
+        GatewayCTMDeployerConfig memory _baseConfig,
+        bytes[] memory _l2BytecodeInfos
+    ) private pure returns (ReleaseManifest memory) {
         (
             address[GENESIS_FACET_COUNT_LOCAL] memory addrs,
             bool[GENESIS_FACET_COUNT_LOCAL] memory freezable
@@ -670,7 +703,8 @@ library GatewayCTMDeployerHelper {
                         genesisBatchHash: _baseConfig.genesisRoot,
                         genesisBatchCommitment: _baseConfig.genesisBatchCommitment,
                         genesisIndexRepeatedStorageChanges: uint64(_baseConfig.genesisRollupLeafIndex)
-                    })
+                    }),
+                    l2BytecodeInfos: _l2BytecodeInfos
                 }),
                 rows,
                 _direct.diamondInitCodehash,

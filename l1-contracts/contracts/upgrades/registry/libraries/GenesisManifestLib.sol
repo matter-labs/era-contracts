@@ -64,6 +64,7 @@ library GenesisManifestLib {
         manifest.genesisFacets = _genesisFacets;
         // The shared block travels verbatim: config and manifest describe it with the same type.
         manifest.genesis = _cfg.genesis;
+        manifest.l2BytecodeInfos = _cfg.l2BytecodeInfos;
     }
 
     /// @notice The canonical genesis facet slot order + freezability. Shared by the live builder

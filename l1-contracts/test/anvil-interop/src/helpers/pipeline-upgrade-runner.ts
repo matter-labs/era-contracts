@@ -651,7 +651,7 @@ async function runLegacyChainLegAndRelayL2(params: {
     if (rewrittenData.toLowerCase() === (l2Tx.data as string).toLowerCase()) {
       throw new Error(
         `Chain ${chain.chainId}: the rewritten L2 upgrade tx is identical to the committed placeholder — ` +
-          `the per-chain rewrite did nothing, so the recorded-hash check below would prove nothing.`
+          "the per-chain rewrite did nothing, so the recorded-hash check below would prove nothing."
       );
     }
 

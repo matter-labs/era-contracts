@@ -984,6 +984,9 @@ async function buildRegistryManifest(
           // Chain-creation payload for chains created at this release. No new chain is created
           // in this test, so a synthetic payload (mirroring the foundry e2e test) suffices.
           fixedForceDeploymentsData: "0xf1f2",
+          // Keys are `L2EcosystemContract` member names; empty = every slot an explicit empty
+          // row (synthetic, like the payload above — no chain is created at this release here).
+          l2BytecodeInfos: {},
           genesis: {
             genesisUpgrade: { address: live.genesisUpgrade, codehash: await codehash(live.genesisUpgrade) },
             batchHash: ethers.utils.hexZeroPad("0x01", 32),

@@ -9,7 +9,10 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {Call} from "contracts/governance/Common.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
-import {CTM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {
+    CTM_CONTRACT_COUNT,
+    L2_ECOSYSTEM_CONTRACT_COUNT
+} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
@@ -131,7 +134,9 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                     genesisBatchHash: bytes32(uint256(1)),
                     genesisBatchCommitment: bytes32(_commitmentNonce),
                     genesisIndexRepeatedStorageChanges: 54
-                })
+                }),
+                // Length-checked inventory; content is irrelevant to this fixture.
+                l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
             });
     }
 

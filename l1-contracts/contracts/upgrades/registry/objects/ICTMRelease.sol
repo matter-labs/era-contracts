@@ -31,6 +31,10 @@ interface ICTMRelease {
 
     function fixedForceDeploymentsData() external view returns (bytes memory);
 
+    /// @notice The release's L2 contract set, indexed by `L2EcosystemContract` — see
+    ///         `ReleaseManifest.l2BytecodeInfos`.
+    function l2BytecodeInfos() external view returns (bytes[] memory);
+
     function genesisParams() external view returns (address, bytes32, bytes32, uint64);
 
     /// @notice Reverts unless the release is initialized and every pinned L1 codehash (facets,

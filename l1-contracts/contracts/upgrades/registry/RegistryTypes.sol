@@ -15,7 +15,7 @@ import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.
 ///         manifests governance audits, the rows they are made of, and the deploy-time config a
 ///         bootstrap manifest is assembled from.
 /// @dev They live here rather than next to their contracts because they are the reviewable
-///      artifact of the whole model — see {protocol-docs} and {docs/registry-driven-upgrades.md}.
+///      artifact of the whole model — see {protocol-docs/README.md} and {docs/registry-driven-upgrades.md}.
 
 /// @notice An address together with the MANDATORY `EXTCODEHASH` pin of the code it must run —
 ///         the unit every manifest names contracts in. Pins sit beside the address they protect
@@ -53,6 +53,17 @@ struct ReleaseGenesisData {
     uint64 genesisIndexRepeatedStorageChanges;
 }
 
+/// @param l2BytecodeInfos The release's L2 contract set, indexed by {L2EcosystemContract}
+///        (length == `L2_ECOSYSTEM_CONTRACT_COUNT` at construction, same slot semantics as the
+///        L1 inventories): per member, the VM-specific deployed-bytecode descriptor a force
+///        deployment of this release's code at the member's fixed address carries
+///        (`UniversalContractUpgradeInfo.deployedBytecodeInfo`); an empty row means the member
+///        is not part of this release's force-deployed set. Pinned so transitions can derive
+///        their L2 deployments from the release pair instead of a parallel script-side
+///        composition (TODO(EVM-1644): the derivation; until then the table is pinned data
+///        only). The kernel built-ins not yet in the enum join by appending members — a release
+///        built before an append keeps its shorter table, so consumers must index by member,
+///        not assume the current count.
 // solhint-disable-next-line gas-struct-packing
 struct ReleaseManifest {
     PinnedContract diamondInit;
@@ -60,6 +71,7 @@ struct ReleaseManifest {
     PinnedContract genesisUpgrade;
     GenesisFacet[] genesisFacets;
     ReleaseGenesisData genesis;
+    bytes[] l2BytecodeInfos;
 }
 
 /// @notice The complete, typed L2 side of one transition: the force-deployments, the delegate
@@ -184,4 +196,5 @@ struct GenesisConfig {
     address verifier;
     address genesisUpgrade;
     ReleaseGenesisData genesis;
+    bytes[] l2BytecodeInfos;
 }

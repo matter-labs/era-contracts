@@ -4,8 +4,13 @@ pragma solidity 0.8.28;
 
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
-import {RegistryEmptySelectors, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {
+    RegistryEmptySelectors,
+    RegistryInventoryLengthMismatch,
+    ZeroAddress
+} from "../../../common/L1ContractErrors.sol";
 import {GenesisFacet, PinnedContract, ReleaseManifest} from "../RegistryTypes.sol";
+import {L2_ECOSYSTEM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 
 /// @notice Storage-backed, write-once description of one CTM release.
 /// @dev Every pinned address carries its expected `EXTCODEHASH` INLINE and MANDATORILY — the
@@ -41,6 +46,13 @@ contract CTMRelease is ICTMRelease {
         // a remove-everything delta in any transition departing toward it.
         if (_manifest.genesisFacets.length == 0) {
             revert RegistryEmptySelectors(address(0));
+        }
+        // The L2 table is an enum-indexed inventory: the length check makes every slot an
+        // explicit statement (content is governance-reviewed data, like the rest of the
+        // manifest). Checked against the count at THIS release's construction — later enum
+        // appends grow the table of later releases only.
+        if (_manifest.l2BytecodeInfos.length != L2_ECOSYSTEM_CONTRACT_COUNT) {
+            revert RegistryInventoryLengthMismatch(L2_ECOSYSTEM_CONTRACT_COUNT, _manifest.l2BytecodeInfos.length);
         }
         // NO routing validation here — the release does not own the routing concept at all. It
         // pins facet rows; the selectors live in the facets' own self-description, and routing
@@ -82,6 +94,10 @@ contract CTMRelease is ICTMRelease {
 
     function fixedForceDeploymentsData() external view returns (bytes memory) {
         return getManifest().genesis.fixedForceDeploymentsData;
+    }
+
+    function l2BytecodeInfos() external view returns (bytes[] memory) {
+        return getManifest().l2BytecodeInfos;
     }
 
     function genesisParams() external view returns (address, bytes32, bytes32, uint64) {

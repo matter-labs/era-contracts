@@ -28,6 +28,7 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
+import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
@@ -120,6 +121,12 @@ abstract contract DeployCTMUtils is DeployUtils {
         ctmAddresses.stateTransition.currentRelease = deployCurrentRelease();
     }
 
+    /// @dev Virtual so bytecode-light test harnesses can substitute the table: the real builder
+    ///      reads every L2 contract's bytecode from artifacts.
+    function getL2BytecodeInfoTable() internal virtual returns (bytes[] memory) {
+        return SystemContractsProcessing.buildL2BytecodeInfoTable(config.isZKsyncOS);
+    }
+
     /// @notice Deploys the storage-backed genesis registry and pins the freshly deployed facet
     /// set plus the base system contract hashes into it. The chain-creation params point at it
     /// (the CTM's `currentRelease`), and `DiamondInit` reads everything chain-independent
@@ -152,7 +159,8 @@ abstract contract DeployCTMUtils is DeployUtils {
                     genesisIndexRepeatedStorageChanges: uint64(
                         config.contracts.chainCreationParams.genesisRollupLeafIndex
                     )
-                })
+                }),
+                l2BytecodeInfos: getL2BytecodeInfoTable()
             })
         );
 
@@ -316,6 +324,10 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "DefaultUpgradeZKsyncOS")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "BootstrapUpgradeZKsyncOS")) {
+            // The bootstrap engine pins the genesis release it installs as an immutable.
+            require(ctmAddresses.stateTransition.currentRelease != address(0), "current release is not deployed");
+            return abi.encode(ctmAddresses.stateTransition.currentRelease);
         } else if (compareStrings(contractName, "Governance")) {
             return
                 abi.encode(

@@ -59,7 +59,8 @@ import {
 import {
     CTM_CONTRACT_COUNT,
     L1_ECOSYSTEM_CONTRACT_COUNT,
-    L1EcosystemContract
+    L1EcosystemContract,
+    L2_ECOSYSTEM_CONTRACT_COUNT
 } from "../../../../../../../contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @notice Unit tests for the write-once upgrade objects in the DERIVED model: releases carry
@@ -162,7 +163,9 @@ contract StorageRegistriesTest is Test {
                     genesisBatchHash: bytes32(uint256(1)),
                     genesisBatchCommitment: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 54
-                })
+                }),
+                // Length-checked inventory; content is irrelevant to this fixture.
+                l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
             });
     }
 

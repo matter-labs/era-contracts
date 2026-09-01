@@ -112,3 +112,4 @@ enum L1EcosystemContract {
 ///      fixed-size array type would force these back to literals.
 uint256 constant L1_ECOSYSTEM_CONTRACT_COUNT = uint256(type(L1EcosystemContract).max) + 1;
 uint256 constant CTM_CONTRACT_COUNT = uint256(type(CTMContract).max) + 1;
+uint256 constant L2_ECOSYSTEM_CONTRACT_COUNT = uint256(type(L2EcosystemContract).max) + 1;

@@ -38,6 +38,7 @@ import {
     DeployerAddresses,
     DirectDeployedAddresses
 } from "./GatewayCTMDeployerHelper.sol";
+import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 import {
     DeployedContracts,
     GatewayCTMDeployerConfig
@@ -154,7 +155,11 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             ,
             DirectCreate2Calldata memory directCalldata,
             address create2FactoryAddress
-        ) = GatewayCTMDeployerHelper.calculateAddresses(gatewayCTMDeployerConfig.salt, gatewayCTMDeployerConfig);
+        ) = GatewayCTMDeployerHelper.calculateAddresses(
+                gatewayCTMDeployerConfig.salt,
+                gatewayCTMDeployerConfig,
+                getL2BytecodeInfoTable(gatewayCTMDeployerConfig.isZKsyncOS)
+            );
 
         // Deploy all factory dependencies
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps(gatewayCTMDeployerConfig);
@@ -436,5 +441,11 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         string memory toml = vm.serializeBytes("root", "diamond_cut_data", output.diamondCutData);
         string memory path = string.concat(vm.projectRoot(), vm.envString("GATEWAY_VOTE_PREPARATION_OUTPUT"));
         vm.writeToml(toml, path);
+    }
+
+    /// @dev Virtual so bytecode-light test harnesses can substitute the release's L2 bytecode
+    ///      table: the real builder reads every L2 contract's bytecode from artifacts.
+    function getL2BytecodeInfoTable(bool _isZKsyncOS) internal virtual returns (bytes[] memory) {
+        return SystemContractsProcessing.buildL2BytecodeInfoTable(_isZKsyncOS);
     }
 }

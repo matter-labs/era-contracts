@@ -41,7 +41,8 @@ import {
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 import {
     CTM_CONTRACT_COUNT,
-    CTMContract
+    CTMContract,
+    L2_ECOSYSTEM_CONTRACT_COUNT
 } from "../../../../../../../contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @dev Two distinct implementations so a proxy row is a real `expectedOldImpl -> implNew` edge.
@@ -139,7 +140,9 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                     genesisBatchHash: bytes32(uint256(1)),
                     genesisBatchCommitment: bytes32(uint256(7)),
                     genesisIndexRepeatedStorageChanges: 54
-                })
+                }),
+                // Length-checked inventory; content is irrelevant to this fixture.
+                l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
             })
         );
     }

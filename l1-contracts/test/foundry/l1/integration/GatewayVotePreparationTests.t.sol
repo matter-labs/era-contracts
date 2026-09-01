@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
+import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 import {GatewayVotePreparation} from "deploy-scripts/gateway/GatewayVotePreparation.s.sol";
 import {
@@ -43,13 +44,21 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
 
         (contracts, , , directCalldata, ) = GatewayCTMDeployerHelper.calculateAddresses(
             bytes32(uint256(1)),
-            gatewayCTMDeployerConfig
+            gatewayCTMDeployerConfig,
+            getL2BytecodeInfoTable(gatewayCTMDeployerConfig.isZKsyncOS)
         );
     }
 
     /// @notice Exposes the populated config for test assertions.
     function getDeployerConfig() public view returns (GatewayCTMDeployerConfig memory) {
         return gatewayCTMDeployerConfig;
+    }
+
+    /// @dev The real builder reads every L2 contract's bytecode from artifacts, which pushes this
+    ///      test over the gas limit (MemoryOOG). The table's content is irrelevant to the address
+    ///      calculation under test, so an empty enum-length table stands in.
+    function getL2BytecodeInfoTable(bool) internal override returns (bytes[] memory) {
+        return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
     }
 }
 
@@ -269,7 +278,9 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
                         genesisBatchHash: config.genesisRoot,
                         genesisBatchCommitment: config.genesisBatchCommitment,
                         genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex)
-                    })
+                    }),
+                    // Length-checked inventory; content is irrelevant to this fixture.
+                    l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
                 })
             )
         );

@@ -34,6 +34,7 @@ import {
     ZkSyncOsSystemContract,
     ZKsyncOSUpgradeType
 } from "../ecosystem/CoreContract.sol";
+import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 import {DeduplicateBytecodesCountMismatch} from "../ecosystem/DeployScriptErrors.sol";
 import {EraForceDeploymentsLib} from "./default-upgrade/EraForceDeploymentsLib.sol";
@@ -441,6 +442,29 @@ library SystemContractsProcessing {
 
         for (uint256 i = 0; i < neutralizations.length; i++) {
             deployments[index++] = neutralizations[i];
+        }
+    }
+
+    /// @notice Builds the release manifest's enum-indexed L2 bytecode table
+    ///         (`ReleaseManifest.l2BytecodeInfos`): per genesis-force-deployed member, the
+    ///         deployed-bytecode descriptor its force deployment carries; every other slot stays
+    ///         an explicit empty. The kernel built-ins (`ZkSyncOsSystemContract`) and the
+    ///         removed-tracker neutralization are not `L2EcosystemContract` members yet; they
+    ///         join the table when the enum is appended for the transition-side derivation
+    ///         (EVM-1644).
+    function buildL2BytecodeInfoTable(bool _isZKsyncOS) internal returns (bytes[] memory rows) {
+        rows = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
+        L2EcosystemContract[] memory core = getFixedAddressCoreContracts();
+        for (uint256 i = 0; i < core.length; i++) {
+            rows[uint256(core[i])] = _isZKsyncOS
+                ? _buildZKsyncOSEntry(core[i]).deployedBytecodeInfo
+                : CoreOnGatewayHelper.getEraForceDeployment(core[i]).deployedBytecodeInfo;
+        }
+        if (_isZKsyncOS) {
+            L2EcosystemContract[] memory zkosOnly = getZKsyncOSOnlyContracts();
+            for (uint256 i = 0; i < zkosOnly.length; i++) {
+                rows[uint256(zkosOnly[i])] = _buildZKsyncOSEntry(zkosOnly[i]).deployedBytecodeInfo;
+            }
         }
     }
 
