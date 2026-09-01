@@ -401,7 +401,7 @@ impl<'a> UpgradeInner<'a> {
         // same address. The downstream gov-replay then calls
         // `startTimer()` twice on the same contract and the second one
         // reverts. The CLI / env config plumbs a distinct salt per CTM
-        // proxy from `upgrade-envs/v0.31.0-interopB/<env>.toml
+        // proxy from `upgrade-envs/v0.33.0-atomic-interop/<env>.toml
         // [create2_salts.per_ctm]`; if not provided we fall back to a
         // fresh random (legacy local-fixture path).
         let create2_salt = inputs

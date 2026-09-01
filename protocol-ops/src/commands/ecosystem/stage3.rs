@@ -30,7 +30,6 @@ use crate::common::env_config::default_protocol_ops_out_dir;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::output::write_output_if_requested;
-use crate::common::paths::resolve_l1_contracts_path;
 use crate::common::SharedRunArgs;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
@@ -73,24 +72,6 @@ pub async fn run(mut args: Stage3Args) -> anyhow::Result<()> {
     })?;
 
     let bridgehub = args.topology.resolve()?;
-    let l1_contracts_path = resolve_l1_contracts_path()?;
-
-    // If a per-env tokens file exists under
-    // `upgrade-envs/v0.31.0-interopB/<env>-bridged-tokens.toml` (produced by
-    // `scripts/discover-legacy-bridged-tokens.ts`), point the forge script at
-    // it via `UPGRADE_BRIDGED_TOKENS_INPUT_OVERRIDE`. That way the discovered
-    // list flows into `registerBridgedTokensInNTV` without anyone hand-editing
-    // the committed default. We only set the override when the file actually
-    // exists so local fixtures still fall back to the committed
-    // `upgrade-envs/v0.31.0-interopB/local-bridged-tokens.toml` default.
-    let bridged_tokens_override = env_cfg.as_ref().and_then(|cfg| {
-        let rel = format!(
-            "/upgrade-envs/v0.31.0-interopB/{}-bridged-tokens.toml",
-            cfg.env
-        );
-        let absolute = l1_contracts_path.join(rel.trim_start_matches('/'));
-        absolute.exists().then_some(rel)
-    });
 
     let mut runner = ForgeRunner::new(&args.shared)?;
     let sender = runner.prepare_sender(sender_address).await?;
@@ -99,21 +80,13 @@ pub async fn run(mut args: Stage3Args) -> anyhow::Result<()> {
         "ecosystem stage3 → the core upgrade script's stage3({:#x}) on bridgehub {bridgehub:#x}",
         bridgehub
     ));
-    if let Some(ref rel) = bridged_tokens_override {
-        logger::info(format!("Bridged tokens input (per-env override): {rel}"));
-    } else {
-        logger::info(
-            "Bridged tokens input: upgrade-envs/v0.31.0-interopB/local-bridged-tokens.toml (committed default)",
-        );
-    }
-    let mut script = runner
+    // No bridged-tokens input: v33's stage 3 only populates `L1NativeTokenVault.bridgedOut`. The
+    // legacy bridged-token registration that consumed such a list was v31's, and is gone.
+    let script = runner
         .script_call(ICoreUpgradeV33Abi::stage3Call {
             _bridgehubProxy: bridgehub,
         })
         .with_wallet(&sender);
-    if let Some(rel) = bridged_tokens_override {
-        script = script.with_env("UPGRADE_BRIDGED_TOKENS_INPUT_OVERRIDE", rel);
-    }
     runner
         .run(script)
         .context("Failed to execute the core upgrade script's stage3 forge script")?;

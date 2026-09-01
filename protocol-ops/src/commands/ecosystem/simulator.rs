@@ -333,7 +333,7 @@ pub struct GovernanceTomlToSimulatorArgs {
     pub topology: crate::common::EcosystemArgs,
 
     /// Path to a protocol-ops governance TOML. Defaults to
-    /// `upgrade-envs/v0.31.0-interopB/output/<env>/ecosystem.toml`
+    /// `upgrade-envs/v0.33.0-atomic-interop/output/<env>/ecosystem.toml`
     /// when `--env` is set — that's where `upgrade-prepare-all` writes the
     /// merged TOML (canonical tracked path).
     #[clap(long)]
@@ -345,7 +345,7 @@ pub struct GovernanceTomlToSimulatorArgs {
     pub network: Option<String>,
 
     /// Sender to put into every transaction. Defaults to the env's
-    /// `owner_address` from `upgrade-envs/v0.31.0-interopB/<env>.toml`.
+    /// `owner_address` from `upgrade-envs/v0.33.0-atomic-interop/<env>.toml`.
     #[clap(long)]
     pub from: Option<Address>,
 
@@ -385,7 +385,7 @@ pub struct GovernanceTomlToSimulatorArgs {
     /// Optional path to a `sim-descriptions.toml` that overrides each
     /// emitted tx's `description` field with a human-readable string keyed by
     /// `(target, selector)` (+ optional discriminators). Auto-discovered at
-    /// `upgrade-envs/v0.31.0-interopB/<env>/sim-descriptions.toml` when
+    /// `upgrade-envs/v0.33.0-atomic-interop/<env>/sim-descriptions.toml` when
     /// `--env` is set and the file exists.
     #[clap(long)]
     pub descriptions: Option<PathBuf>,
@@ -600,7 +600,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
     // Resolve descriptions registry: explicit `--descriptions` wins; otherwise
     // auto-discover the file alongside the env config TOML (one level up from
     // `<env-out>/`). For the v31 stage env that's
-    // `upgrade-envs/v0.31.0-interopB/sim-descriptions.toml`.
+    // `upgrade-envs/v0.33.0-atomic-interop/sim-descriptions.toml`.
     let descriptions_path = args.descriptions.or_else(|| {
         env_cfg.as_ref().and_then(|cfg| {
             crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)

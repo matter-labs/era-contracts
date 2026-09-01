@@ -130,7 +130,7 @@ mod tests {
         let Ok(l1) = resolve_l1_contracts_path() else {
             return;
         };
-        let log = l1.join("upgrade-envs/v0.31.0-interopB/output/stage/transactions.txt");
+        let log = l1.join("upgrade-envs/v0.33.0-atomic-interop/output/stage/transactions.txt");
         let hashes = read(&log).expect("real stage transactions.txt must parse");
         assert!(
             !hashes.is_empty(),

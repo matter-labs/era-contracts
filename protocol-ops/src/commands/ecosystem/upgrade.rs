@@ -528,7 +528,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // ── env preset auto-fills ────────────────────────────────────────
     let env_cfg = args.topology.env_config()?;
     if let Some(ref cfg) = env_cfg {
-        // Default --out to upgrade-envs/v0.31.0-interopB/output/<env>/protocol-ops/prepare/
+        // Default --out to upgrade-envs/v0.33.0-atomic-interop/output/<env>/protocol-ops/prepare/
         if args.shared.out.is_none() {
             args.shared.out = Some(
                 crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)?.join("prepare"),
@@ -579,10 +579,10 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // with explicit `--create2-factory-salt`.
     if args.create2_factory_salt.is_none() {
         if let Some(cfg) = env_cfg.as_ref() {
-            if let Some(salt) = cfg.v31_create2_factory_salt()? {
+            if let Some(salt) = cfg.create2_factory_salt_for_upgrade()? {
                 logger::info(format!(
                     "Using create2_factory_salt from {}: {salt:#x}",
-                    cfg.v31_input_path.display(),
+                    cfg.upgrade_input_path.display(),
                 ));
                 args.create2_factory_salt = Some(salt);
             }
@@ -600,7 +600,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         if let Some(salt) = cfg.v31_legacy_gov_salt()? {
             logger::info(format!(
                 "Using legacy_gov_salt from {}: {salt:#x}",
-                cfg.v31_input_path.display(),
+                cfg.upgrade_input_path.display(),
             ));
             std::env::set_var("LEGACY_GOV_SALT", format!("{salt:#x}"));
         }
@@ -706,14 +706,14 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 
     let create2_factory_salt_per_ctm = match env_cfg.as_ref() {
         Some(cfg) => {
-            let map = cfg.v31_create2_factory_salt_per_ctm()?;
+            let map = cfg.create2_factory_salt_for_upgrade_per_ctm()?;
             if map.is_empty() {
                 None
             } else {
                 logger::info(format!(
                     "Using {} per-CTM create2 salts from {}",
                     map.len(),
-                    cfg.v31_input_path.display()
+                    cfg.upgrade_input_path.display()
                 ));
                 Some(map)
             }

@@ -1,17 +1,7 @@
 # Upgrade input for the frozen local chain committed in zksync-os-integration-tests
 # (`tests/local-chains/`, currently v31.0 / chain 506), used by its v31 -> v33 upgrade test.
 #
-# Same shape as `local.toml` in this directory; it exists under its own basename so the
-# fixture is addressable as `--env zksync-os-integration-test`, which also selects
+# Intentionally empty of values, for the reasons given in `local.toml` in this directory —
+# nothing on the v33 path reads a key from an upgrade input. It exists under its own basename so
+# the fixture is addressable as `--env zksync-os-integration-test`, which also selects
 # `permanent-values/zksync-os-integration-test.toml`.
-#
-# See `local.toml` for why so little is needed here.
-
-# The bridgehub is not repeated here: it comes from the caller's `--bridgehub` and is recorded
-# in `permanent-values/<env>.toml` under `[core_contracts]`. The chain id is not read on this
-# path either, so both are omitted rather than kept in sync in three places.
-
-# v31 -> v33.
-old_protocol_version = 0x1f00000000
-latest_protocol_version = 0x2100000000
-new_protocol_version = 0x2100000000

@@ -1,24 +1,17 @@
 # Upgrade input for the v33 release on a local anvil ecosystem.
 #
-# Deliberately minimal. The upgrade reads almost nothing from here: the target protocol
-# version and chain-creation params come from `configs/genesis/zksync-os/latest.json`
-# (`DefaultCoreUpgrade.loadProtocolVersionFromGenesis`), the old version from the chain
-# on L1, and the bridgehub/CTM addresses from the caller's `--bridgehub`/`--ctm-proxy`.
-# The versions below are recorded so tooling reporting on the upgrade is accurate.
+# Intentionally empty of values. Nothing on the v33 path reads a key from this file:
+#   - the target protocol version and chain-creation params come from
+#     `configs/genesis/zksync-os/latest.json` (`DefaultCoreUpgrade.loadProtocolVersionFromGenesis`);
+#   - the old version comes from the chain on L1;
+#   - the bridgehub and CTM come from the caller's `--bridgehub` / `--ctm-proxy`;
+#   - `era_chain_id`, `testnet_verifier` and the CREATE2 salts come from
+#     `permanent-values/<env>.toml`.
 #
-# v33 is ZKsync OS-only, so the EraVM chain-creation params earlier envs carried
-# (bootloader/default-AA/EVM-emulator hashes, `recursion_*_vk_hash`, `diamond_init_*`)
-# are deliberately absent — nothing on this path reads them.
+# What the file is for is its *name*: `upgrade-prepare-all --env local` resolves its input as
+# `upgrade-envs/v0.33.0-atomic-interop/local.toml` and refuses to fall back to another
+# environment's file, because the same name also selects `permanent-values/local.toml` — and
+# with it `testnet_verifier`. So the file has to exist; it does not have to say anything.
 #
-# The file's *name* matters: `--env <name>` resolves the input as
-# `upgrade-envs/v0.33.0-atomic-interop/<name>.toml` and the permanent values as
-# `permanent-values/<name>.toml`, which is where `testnet_verifier` lives.
-
-# The bridgehub is not repeated here: it comes from the caller's `--bridgehub` and is recorded
-# in `permanent-values/<env>.toml` under `[core_contracts]`. The chain id is not read on this
-# path either, so both are omitted rather than kept in sync in three places.
-
-# v31 -> v33.
-old_protocol_version = 0x1f00000000
-latest_protocol_version = 0x2100000000
-new_protocol_version = 0x2100000000
+# If a future consumer needs a value here, note that `new_protocol_version` is read as
+# `$.contracts.new_protocol_version` (nested), not at the top level.

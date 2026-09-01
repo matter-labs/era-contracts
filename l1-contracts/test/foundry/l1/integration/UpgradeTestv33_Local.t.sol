@@ -192,7 +192,7 @@ contract UpgradeIntegrationTest_Local is
         chainId = eraZKChainId;
         acceptPendingAdmin();
         console.log("setUp: Pending admin accepted");
-        ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml";
+        ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.33.0-atomic-interop/foundry-upgrade.toml";
         ECOSYSTEM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
         ECOSYSTEM_OUTPUT = "/script-out/foundry-upgrade/local-core.toml";
         CTM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml";
