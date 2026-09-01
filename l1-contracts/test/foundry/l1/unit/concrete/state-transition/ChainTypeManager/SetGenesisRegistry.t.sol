@@ -9,8 +9,8 @@ import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
 import {
-    RegistryMissingBaseSystemHash,
     RegistryReleaseCodehashAlreadySet,
+    RegistryWrongVM,
     ZeroAddress,
     EmptyBytes32
 } from "contracts/common/L1ContractErrors.sol";
@@ -42,7 +42,8 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
             abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
         );
         vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
-        // Era releases must carry all three base-system hashes; the CTM rejects a zero one.
+        // Keep the mocked release structurally complete for the same downstream readers as a real
+        // release, even though VM compatibility is determined by DiamondInit.
         vm.mockCall(
             _registry,
             abi.encodeWithSelector(ICTMRelease.baseSystemContractHashes.selector),
@@ -51,7 +52,7 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
         // VM identity is single-sourced from the release's DiamondInit; the mocked registry's
         // diamondInit placeholder is the registry itself, so mock the flag there.
         vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.diamondInit.selector), abi.encode(_registry));
-        vm.mockCall(_registry, abi.encodeWithSelector(IDiamondInit.IS_ZKSYNC_OS.selector), abi.encode(false));
+        vm.mockCall(_registry, abi.encodeWithSelector(IDiamondInit.IS_ZKSYNC_OS.selector), abi.encode(true));
         // From v32 the CTM enforces release provenance by CODEHASH, so a mocked release has to
         // carry the audited `CTMRelease` runtime code to be accepted as `currentRelease`.
         vm.etch(_registry, type(CTMRelease).runtimeCode);
@@ -67,7 +68,7 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
         address newGenesisUpgrade = makeAddr("newGenesisUpgrade");
         bytes32 genesisBatchHash = bytes32(uint256(0x02));
         uint64 genesisIndexRepeatedStorageChanges = 2;
-        bytes32 genesisBatchCommitment = bytes32(uint256(0x02));
+        bytes32 genesisBatchCommitment = bytes32(uint256(0x01));
 
         _mockRegistry(
             newRegistry,
@@ -126,23 +127,16 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
     // (upgraded proxies never re-run `initialize`); v32 stage calldata invokes it right before
     // the first `setCurrentRelease`.
 
-    /// @dev Regression: an Era release that leaves a base-system hash at zero must be rejected when
-    ///      it is pinned. Accepting it would split the two paths the model promises cannot diverge —
-    ///      `DiamondInit` refuses zero hashes, so NEW chains could not be created, while EXISTING
-    ///      chains would silently keep the old hash (an upgrade reads a zero change as "unchanged").
-    function test_RevertWhen_EraReleaseHasZeroBaseSystemHash() public {
-        address zeroHashRelease = makeAddr("zeroHashRelease");
-        _mockRegistry(zeroHashRelease, makeAddr("gu"), bytes32(uint256(2)), bytes32(uint256(2)), 2);
-        // Blank the EVM emulator hash; the other two stay set.
-        vm.mockCall(
-            zeroHashRelease,
-            abi.encodeWithSelector(ICTMRelease.baseSystemContractHashes.selector),
-            abi.encode(bytes32(uint256(0xB0)), bytes32(uint256(0xDA)), bytes32(0))
-        );
+    /// @dev A ZKsync OS CTM must reject a release whose pinned DiamondInit identifies itself as
+    ///      Era VM. VM identity is read from DiamondInit rather than duplicated in the manifest.
+    function test_RevertWhen_ReleaseHasWrongVM() public {
+        address eraRelease = makeAddr("eraRelease");
+        _mockRegistry(eraRelease, makeAddr("gu"), bytes32(uint256(2)), bytes32(uint256(1)), 2);
+        vm.mockCall(eraRelease, abi.encodeWithSelector(IDiamondInit.IS_ZKSYNC_OS.selector), abi.encode(false));
 
-        vm.expectRevert(RegistryMissingBaseSystemHash.selector);
+        vm.expectRevert(abi.encodeWithSelector(RegistryWrongVM.selector, true, false));
         vm.prank(governor);
-        chainContractAddress.setCurrentRelease(zeroHashRelease);
+        chainContractAddress.setCurrentRelease(eraRelease);
     }
 
     /// @dev Re-setting the anchor to the value it ALREADY holds is a no-op, so one upgrade bundle

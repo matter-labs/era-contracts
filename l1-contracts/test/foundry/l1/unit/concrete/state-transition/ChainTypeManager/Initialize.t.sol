@@ -7,7 +7,7 @@ import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChain
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {
-    GenesisBatchCommitmentZero,
+    GenesisBatchCommitmentIncorrect,
     GenesisBatchHashZero,
     GenesisUpgradeZero
 } from "contracts/common/L1ContractErrors.sol";
@@ -93,7 +93,7 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             bytes32(uint256(0x01)),
             bytes32(uint256(0)),
             0x01,
-            GenesisBatchCommitmentZero.selector
+            GenesisBatchCommitmentIncorrect.selector
         );
     }
 }
