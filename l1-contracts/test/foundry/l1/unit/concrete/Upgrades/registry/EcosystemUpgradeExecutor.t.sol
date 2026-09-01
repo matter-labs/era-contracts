@@ -194,6 +194,44 @@ contract EcosystemUpgradeExecutorTest is Test {
         ecosystemExecutor.applyL1Upgrade(coreRegistry);
     }
 
+    // ─────────────────────────── post-state verification ───────────────────────────
+
+    function test_validateUpgradeApplied_revertsBeforeAndPassesAfterApply() public {
+        // Before the upgrade, the bridgehub row's proxy still points at the old implementation.
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ProxyUpgradeRowMismatch.selector,
+                address(bridgehubProxy),
+                address(implNew),
+                address(implOld)
+            )
+        );
+        ecosystemExecutor.validateUpgradeApplied(coreRegistry);
+
+        _applyL1Upgrade();
+
+        // A view over live state — anyone may run the post-state check.
+        vm.prank(makeAddr("stranger"));
+        ecosystemExecutor.validateUpgradeApplied(coreRegistry);
+    }
+
+    function test_revertWhen_validateUpgradeAppliedAgainstNonGenuineRegistry() public {
+        // The check reads rows from the registry, so it enforces the same code provenance as the
+        // apply path — an impostor is rejected before any row is trusted.
+        _applyL1Upgrade();
+        NotACoreRegistry impostor = new NotACoreRegistry();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryCodehashMismatch.selector,
+                address(impostor),
+                coreRegistryCodehash,
+                address(impostor).codehash
+            )
+        );
+        ecosystemExecutor.validateUpgradeApplied(ICoreRegistry(address(impostor)));
+    }
+
     function test_revertWhen_registryIsNotTheAuditedCode() public {
         // Type provenance is a codehash check: an object that does not run the audited
         // `CoreRegistry` code is rejected before any row is read, whatever it claims to be.

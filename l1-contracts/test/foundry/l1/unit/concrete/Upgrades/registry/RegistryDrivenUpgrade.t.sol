@@ -338,6 +338,40 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         ctmExecutor.upgradeChain(ICTMTransition(address(transitionV32)), chainId);
     }
 
+    /// @dev The release's live routing check against the chain loupe, across every chain state
+    ///      this suite produces: freshly genesised, and having crossed a transition. The v33
+    ///      release replaces the AdminFacet ADDRESS (same selectors), so each side of the hop is
+    ///      a missing-facet mismatch for the other side's release.
+    function test_verifyChainRoutingTracksTheLiveChain() public {
+        CTMRelease genesisRelease = CTMRelease(chainContractAddress.currentRelease());
+        CTMRelease releaseV33 = CTMRelease(transitionV33.newRelease());
+
+        // Freshly genesised chain runs exactly its release's routing — and not yet the v33
+        // release's, whose replacement AdminFacet is not installed.
+        assertTrue(genesisRelease.verifyChainRouting(chainAddress), "genesis chain must match its release");
+        assertFalse(releaseV33.verifyChainRouting(chainAddress), "target release must not match pre-hop");
+
+        _runHop(transitionV32);
+        _runHop(transitionV33);
+
+        // After crossing, the chain matches the release it transitioned to; the departed
+        // release (still routing the replaced AdminFacet address) no longer matches.
+        assertTrue(releaseV33.verifyChainRouting(chainAddress), "post-hop chain must match the target release");
+        assertFalse(genesisRelease.verifyChainRouting(chainAddress), "departed release must not match");
+
+        // Same facet ADDRESS, different selector set: the check compares full selector sets, so
+        // a drifted self-description fails even when the address is live. Mocked drift — with
+        // real flows the release always reads the facet's own (matching) self-description.
+        bytes4[] memory drifted = new bytes4[](1);
+        drifted[0] = bytes4(uint32(0xdeadbeef));
+        vm.mockCall(
+            newAdminFacet,
+            abi.encodeWithSelector(ISelfDescribingFacet.selectors.selector),
+            abi.encode(drifted)
+        );
+        assertFalse(releaseV33.verifyChainRouting(chainAddress), "drifted selector set must not match");
+    }
+
     function test_permissionlessUpgradeChainAfterDeadline() public {
         // Governance commits the hop but never executes the chain upgrade. Once the old-version
         // deadline (1000, pinned by the transition) passes, the upgrade is operationally

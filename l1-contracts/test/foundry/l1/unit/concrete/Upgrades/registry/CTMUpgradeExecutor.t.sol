@@ -361,6 +361,41 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         );
     }
 
+    // ─────────────────────────── post-state verification ───────────────────────────
+
+    function test_validateTransitionApplied_revertsBeforeAndPassesAfterApply() public {
+        // Nothing is committed for the transition's departing version yet.
+        vm.expectRevert(abi.encodeWithSelector(TransitionNotCommitted.selector, address(transition), address(0)));
+        ctmExecutor.validateTransitionApplied(ICTMTransition(address(transition)));
+
+        _applyCTMUpgrade();
+
+        // A view over live state — anyone may run the post-state check.
+        vm.prank(makeAddr("stranger"));
+        ctmExecutor.validateTransitionApplied(ICTMTransition(address(transition)));
+    }
+
+    /// @dev `>=` semantics: the check verifies the transition LANDED, not that it is still the
+    ///      newest — a later hop moving the CTM's version further must not invalidate it, as
+    ///      long as the transition's CTM-domain rows (inert here) still hold.
+    function test_validateTransitionApplied_survivesALaterVersionBump() public {
+        _applyCTMUpgrade();
+        CTMTransition first = transition;
+        uint256 firstVersion = newVersion;
+
+        // Second hop: departs from the now-current release and version toward a fresh release.
+        address appliedRelease = address(release);
+        release = _deployRelease(4);
+        newVersion = SemVer.packSemVer(0, 2, 0);
+        CTMTransition second = _deployTransitionFrom(880, appliedRelease, firstVersion);
+        vm.prank(governor);
+        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(second)));
+        assertEq(chainContractAddress.protocolVersion(), newVersion, "second hop must move the CTM beyond");
+
+        ctmExecutor.validateTransitionApplied(ICTMTransition(address(first)));
+        ctmExecutor.validateTransitionApplied(ICTMTransition(address(second)));
+    }
+
     function test_upgradeChain_rejectsDifferentTransition() public {
         _applyCTMUpgrade();
         // Same edges as the committed transition, but a different object. The chain executes the

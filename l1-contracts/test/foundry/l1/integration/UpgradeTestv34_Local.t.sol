@@ -288,5 +288,18 @@ contract UpgradeIntegrationTest_v34_Local is
         // New chain created AFTER the edge geneses from the pinned release at the new version.
         assertTrue(_newChainDiamond != address(0), "new chain not registered");
         assertEq(IGetters(_newChainDiamond).getProtocolVersion(), _expectedNewVersion, "new chain wrong version");
+
+        // Stage 2's version-specific CTM leg IS the migration's own post-state gate — the
+        // harness already executed the prepared stage-2 bundle green in `internalTest`; assert
+        // the emitted call list shape and that the gate still holds against the final state.
+        Call[] memory stage2 = v34.prepareVersionSpecificStage2GovernanceCallsL1();
+        assertEq(stage2.length, 1, "v34 CTM stage 2 must be the single post-state gate");
+        assertEq(stage2[0].target, address(v34.bootstrapMigration()), "stage 2 must target the migration");
+        assertEq(
+            stage2[0].data,
+            abi.encodeCall(v34.bootstrapMigration().validateApplied, ()),
+            "stage 2 must call validateApplied"
+        );
+        v34.bootstrapMigration().validateApplied();
     }
 }

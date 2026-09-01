@@ -26,6 +26,7 @@ import {
     BootstrapAlreadyExecuted,
     BootstrapAuthorityNotHeld,
     BootstrapExecutorNotBound,
+    BootstrapNotYetExecuted,
     DeadlineNotYetPassed,
     ProxyUpgradeRowMismatch,
     RegistryCodehashMismatch,
@@ -205,6 +206,10 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         migration.migrate();
         _assertBootstrappedEventEmitted();
 
+        // The object's own post-state check covers the whole edge (version, release pin, rows,
+        // authority landing); the granular asserts below then pin the exact expected values.
+        migration.validateApplied();
+
         // The ecosystem proxy moved to its pinned implementation.
         assertEq(
             ecosystemProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(address(ecosystemProxy))),
@@ -238,6 +243,15 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         vm.expectRevert(BootstrapAlreadyExecuted.selector);
         migration.migrate();
+    }
+
+    // ─────────────────────────── post-state verification ───────────────────────────
+
+    /// @dev Stage 2 runs `validateApplied()` as a governance call: before the edge it must fail
+    ///      loudly, so a mis-sequenced bundle cannot report success on an unapplied bootstrap.
+    function test_revertWhen_validateAppliedBeforeMigrate() public {
+        vm.expectRevert(BootstrapNotYetExecuted.selector);
+        migration.validateApplied();
     }
 
     // ─────────────────────────── timer gating ───────────────────────────
