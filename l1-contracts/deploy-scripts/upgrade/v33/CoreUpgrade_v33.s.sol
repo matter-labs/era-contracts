@@ -24,6 +24,10 @@ import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 ///      core proxies at them. This file holds what is specific to v33: `L1InteropHandler`, which has
 ///      no proxy on an older ecosystem, and `stage3`'s `bridgedOut` population.
 contract CoreUpgrade_v33 is Script, DefaultCoreUpgrade, ICoreUpgradeV33 {
+    /// @dev Whether this run created the `L1InteropHandler` proxy, as opposed to finding one already
+    ///      deployed. Gates the one-shot bridge setters in stage 1.
+    bool internal deployedL1InteropHandler;
+
     /// @notice Post-governance step: populate `L1NativeTokenVault.bridgedOut` from the per-chain
     ///         legacy balances.
     /// @dev Runs after the governance stages and before the per-chain diamond cuts, so withdrawals on
@@ -42,26 +46,29 @@ contract CoreUpgrade_v33 is Script, DefaultCoreUpgrade, ICoreUpgradeV33 {
     }
 
     /// @notice Deploy the interop handler, which this release introduces.
-    /// @dev No "already deployed?" branch: v33 upgrades a v31 ecosystem, which by definition has no
-    ///      handler. If one is found, discovery or the target ecosystem is not what this script
-    ///      expects, and guessing is worse than stopping.
-    /// @dev Ownership: the proxy is initialized straight to governance via the
-    ///      {getInitializeCalldata} override below, rather than to the deployer followed by a
+    /// @dev Two shapes have to work. Upgrading a v31 ecosystem, the intended production case, finds no
+    ///      handler proxy and gets a fresh one that stage 1 wires into the bridges. An ecosystem that
+    ///      already has the handler — a from-scratch deployment of these contracts, which the
+    ///      integration suite upgrades in place, or a re-run — keeps its proxy, since that is where the
+    ///      handler's state lives, and only has its implementation refreshed; the generic
+    ///      `ProxyAdmin.upgrade` call in stage 1 points the proxy at it.
+    /// @dev Ownership (fresh-deploy branch only): the proxy is initialized straight to governance via
+    ///      the {getInitializeCalldata} override below, rather than to the deployer followed by a
     ///      transfer. `L1InteropHandler.initialize` sets the owner outright (`_transferOwnership`),
     ///      so there is no pending-owner step and nothing to accept in stage 1.
     ///      `Create2AndTransfer` does not apply here — it transfers from the CREATE2 deployer, which
     ///      only owns contracts that take ownership in their constructor (as `ProxyAdmin` does), not
     ///      a transparent proxy whose owner comes from an `initialize` call.
     function deployVersionSpecificEcosystemContractsL1() public virtual override {
-        require(
-            coreAddresses.bridges.proxies.l1InteropHandler == address(0),
-            "L1InteropHandler already exists; this release is the one that introduces it"
-        );
-
-        (
-            coreAddresses.bridges.implementations.l1InteropHandler,
-            coreAddresses.bridges.proxies.l1InteropHandler
-        ) = deployTuppWithContract("L1InteropHandler", false);
+        if (coreAddresses.bridges.proxies.l1InteropHandler == address(0)) {
+            (
+                coreAddresses.bridges.implementations.l1InteropHandler,
+                coreAddresses.bridges.proxies.l1InteropHandler
+            ) = deployTuppWithContract("L1InteropHandler", false);
+            deployedL1InteropHandler = true;
+        } else {
+            coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler", false);
+        }
     }
 
     /// @inheritdoc DeployL1CoreUtils
@@ -78,11 +85,19 @@ contract CoreUpgrade_v33 is Script, DefaultCoreUpgrade, ICoreUpgradeV33 {
     }
 
     /// @notice Stage-1 calls that wire a freshly deployed `L1InteropHandler` into the bridges.
-    /// @dev Both setters are one-shot, which is consistent with the deploy step refusing to run
-    ///      against an ecosystem that already has a handler.
+    /// @dev Empty when the ecosystem already had a handler: both setters are one-shot, so re-issuing
+    ///      them against an already-wired ecosystem would revert. Emitting them only for the branch of
+    ///      {deployVersionSpecificEcosystemContractsL1} that created the proxy lets the same script
+    ///      serve a v31 upgrade and a re-run.
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
+        // Checked before the early return: a zero address here means discovery failed to report the
+        // handler, which is a broken run whether or not this script deployed it.
         address l1InteropHandlerProxy = coreAddresses.bridges.proxies.l1InteropHandler;
         require(l1InteropHandlerProxy != address(0), "L1InteropHandler proxy not deployed");
+
+        if (!deployedL1InteropHandler) {
+            return calls;
+        }
 
         console.log("Wiring the freshly deployed L1InteropHandler:", l1InteropHandlerProxy);
         calls = new Call[](2);

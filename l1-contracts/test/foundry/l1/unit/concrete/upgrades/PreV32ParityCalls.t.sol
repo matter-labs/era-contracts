@@ -45,6 +45,23 @@ contract CoreUpgradeParityHarness is CoreUpgrade_v33 {
     function buildInteropHandlerWiringCalls() external returns (Call[] memory) {
         return prepareVersionSpecificStage1GovernanceCallsL1();
     }
+
+    /// @dev The state the deploy step leaves behind on a v31 ecosystem: the proxy it just created, plus
+    ///      the flag that tells stage 1 the one-shot bridge setters still have to be issued. Set here
+    ///      rather than by calling the deploy step, which needs the full script machinery (bytecode
+    ///      publishing, a CREATE2 factory) that a unit test does not stand up.
+    function setFreshlyDeployedInteropHandler(address _l1InteropHandler) external {
+        coreAddresses.bridges.proxies.l1InteropHandler = _l1InteropHandler;
+        deployedL1InteropHandler = true;
+    }
+
+    function getDiscoveredInteropHandlerProxy() external view returns (address) {
+        return coreAddresses.bridges.proxies.l1InteropHandler;
+    }
+
+    function getDiscoveredInteropHandlerImplementation() external view returns (address) {
+        return coreAddresses.bridges.implementations.l1InteropHandler;
+    }
 }
 
 /// @notice Covers the stage-1 calls that bring a v31 ecosystem to the wiring a from-scratch v32 deployment
@@ -129,7 +146,9 @@ contract PreV32ParityCallsTest is Test {
     }
 
     function test_wiresTheNewInteropHandler() public {
-        upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(interopHandler));
+        upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(0));
+        // The v31 case: the deploy step created this proxy, so stage 1 owes the bridges their setters.
+        upgradeScript.setFreshlyDeployedInteropHandler(address(interopHandler));
 
         Call[] memory calls = upgradeScript.buildInteropHandlerWiringCalls();
         // Two calls, not three: the deploy step initializes the handler's proxy straight to the
@@ -166,14 +185,28 @@ contract PreV32ParityCallsTest is Test {
         assertEq(deployed.owner(), owner, "governance owns the handler with no further calls");
     }
 
-    function test_refusesAnEcosystemThatAlreadyHasTheHandler() public {
-        // Re-running against an ecosystem that already has an interop handler is not a silent no-op:
-        // this release is the one that introduces the handler, so finding one means discovery or the
-        // target is not what the script expects.
+    /// @notice An ecosystem that already has the handler keeps its proxy and only gets a new
+    ///         implementation, and emits none of the one-shot wiring calls.
+    /// @dev This is the shape a from-scratch deployment of these contracts has, which the integration
+    ///      suite upgrades in place. Replacing the proxy would abandon the handler's state, and
+    ///      re-issuing the setters would revert because both are one-shot — so the run must be a
+    ///      no-op apart from refreshing the implementation behind the existing proxy.
+    function test_refreshesImplementationWhenHandlerAlreadyExists() public {
         upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(interopHandler));
 
-        vm.expectRevert(bytes("L1InteropHandler already exists; this release is the one that introduces it"));
         upgradeScript.deployVersionSpecific();
+
+        assertEq(
+            upgradeScript.getDiscoveredInteropHandlerProxy(),
+            address(interopHandler),
+            "the existing handler proxy must be kept: it holds the handler's state"
+        );
+        address refreshedImpl = upgradeScript.getDiscoveredInteropHandlerImplementation();
+        assertTrue(refreshedImpl != address(0), "a fresh implementation must be deployed");
+        assertTrue(refreshedImpl != address(interopHandler), "the implementation is not the proxy");
+
+        Call[] memory calls = upgradeScript.buildInteropHandlerWiringCalls();
+        assertEq(calls.length, 0, "the one-shot setters must not be re-issued on an already-wired ecosystem");
     }
 
     function test_revertWhen_NoInteropHandlerAddress() public {

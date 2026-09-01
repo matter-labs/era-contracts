@@ -28,15 +28,22 @@ import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 
 /// @notice Test-only CTM upgrade that mocks large bytecode reads to avoid MemoryOOG
 contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
-    /// @notice This fixture is an Era ecosystem, which this release refuses to generate a per-chain upgrade
-    ///         for (`deployUsedUpgradeContract` reverts). The fixture exists to exercise the ecosystem-side
-    ///         flow — proxy upgrades, stage calls, wiring — so it falls back to the plain `DefaultUpgrade`
-    ///         for the chain step rather than skipping the chain upgrade entirely. The per-chain
-    ///         force-deployments-data substitution that ZKsync OS chains get is covered by the anvil
-    ///         v31 -> v32 scenario.
+    /// @notice This fixture is an Era ecosystem, and this release's per-chain upgrade
+    ///         (`V32UpgradeZKsyncOS`) is ZKsync OS-only. The fixture exists to exercise the
+    ///         ecosystem-side flow — proxy upgrades, stage calls, wiring — so it falls back to the plain
+    ///         `DefaultUpgrade` for the chain step rather than skipping the chain upgrade entirely. The
+    ///         per-chain force-deployments-data substitution that ZKsync OS chains get is covered by the
+    ///         anvil v31 -> v33 scenario (`test/anvil-interop/run-upgrade-test.ts`).
     function deployUsedUpgradeContract() internal override returns (address) {
         return deploySimpleContract("DefaultUpgrade", false);
     }
+
+    /// @dev Substituting `DefaultUpgrade` above means no `PriorityOpLowerBound` registry is deployed —
+    ///      it exists only to be embedded as an immutable in `V32UpgradeZKsyncOS`. There is therefore no
+    ///      address to record, so this fixture records none. The production hook keeps its
+    ///      `require(priorityOpLowerBound != address(0))`: on a real ZKsync OS run a missing registry
+    ///      means the upgrade contract was built against address zero, which must fail loudly.
+    function serializeVersionSpecificStateTransition() internal override {}
 
     /// @notice Override to return dummy bytecode hashes instead of reading huge JSON files
     function getL2BytecodeHash(string memory /* contractName */) public view override returns (bytes32) {
