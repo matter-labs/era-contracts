@@ -2,6 +2,6 @@
 # (`tests/local-chains/`, currently v31.0 / chain 506), used by its v31 -> v33 upgrade test.
 #
 # Intentionally empty of values, for the reasons given in `local.toml` in this directory —
-# nothing on the v33 path reads a key from an upgrade input. It exists under its own basename so
-# the fixture is addressable as `--env zksync-os-integration-test`, which also selects
-# `permanent-values/zksync-os-integration-test.toml`.
+# nothing on the v33 path reads a key from an upgrade input. It exists because
+# `--env zksync-os-integration-test` requires an input file to be present (see `local.toml` for
+# why absence is refused rather than defaulted).

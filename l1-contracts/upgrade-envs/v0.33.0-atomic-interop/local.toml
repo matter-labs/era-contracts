@@ -8,10 +8,16 @@
 #   - `era_chain_id`, `testnet_verifier` and the CREATE2 salts come from
 #     `permanent-values/<env>.toml`.
 #
-# What the file is for is its *name*: `upgrade-prepare-all --env local` resolves its input as
-# `upgrade-envs/v0.33.0-atomic-interop/local.toml` and refuses to fall back to another
-# environment's file, because the same name also selects `permanent-values/local.toml` — and
-# with it `testnet_verifier`. So the file has to exist; it does not have to say anything.
+# It still has to exist, though: `upgrade-prepare-all --env local` resolves its input as
+# `upgrade-envs/v0.33.0-atomic-interop/local.toml` and errors if that file is absent rather than
+# falling back to a default. The fallback is what is dangerous — for a *real* environment it would
+# quietly substitute local's `era_chain_id`, `governance_upgrade_timer_initial_delay` and gateway
+# chain id (the last of which is baked into `L1MessageRoot` as `ERA_GATEWAY_CHAIN_ID`). Requiring
+# the file also catches a mistyped `--env`. So an empty file is this environment stating, on the
+# record, that it needs nothing from the input.
+#
+# Note that `permanent-values/local.toml` is selected by the `--env` name directly, not by this
+# file — so this file's contents cannot affect which `testnet_verifier` is used.
 #
 # If a future consumer needs a value here, note that `new_protocol_version` is read as
 # `$.contracts.new_protocol_version` (nested), not at the top level.

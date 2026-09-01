@@ -5,9 +5,9 @@
 # protocol version and chain-creation params come from
 # `configs/genesis/zksync-os/latest.json`.
 #
-# The file must exist for `--env stage` to work at all: `upgrade-prepare-all` refuses to
-# fall back to another environment's input, because the basename also selects
-# `permanent-values/stage.toml` — and with it `testnet_verifier`.
+# The file must exist for `--env <name>` to work at all: `upgrade-prepare-all` refuses to fall
+# back to the local default, which would silently substitute local's values for the keys this
+# file does supply.
 #
 # ⚠ Salts, `owner_address` and `era_chain_id` are NOT read from this file yet.
 # `EnvConfig` still resolves them from `upgrade-envs/v0.31.0-interopB/<env>.toml`

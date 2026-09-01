@@ -546,11 +546,12 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // example using `cast wallet address`).
         // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly.
         //
-        // Fails closed on a missing file rather than keeping the default. The basename does not just
-        // pick addresses: `DefaultCTMUpgrade` derives `permanent-values/<basename>.toml` from it, and
-        // that is where `testnet_verifier` lives. Silently falling back to `local.toml` for, say,
-        // `--env mainnet` would therefore prepare a mainnet upgrade that installs the *testnet*
-        // verifier, which accepts unproven batches.
+        // Fails closed on a missing file rather than keeping the CLI default. The default is the
+        // *local* input, so a silent fallback would hand a real environment local's values for the
+        // keys the input does supply — `era_chain_id`, `pre_v32_introspection`,
+        // `governance_upgrade_timer_initial_delay`, and the gateway chain id that is baked into
+        // `L1MessageRoot` as `ERA_GATEWAY_CHAIN_ID`. Losing that last one would redeploy the message
+        // root with 0. Failing here also catches a mistyped `--env`.
         if args.upgrade_input_path == UPGRADE_V33_LOCAL_INPUT_PATH {
             let per_env_rel = format!("{UPGRADE_V33_ENV_DIR}/{}.toml", cfg.env);
             let per_env_abs = paths::contracts_root()
@@ -558,13 +559,12 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 .join(per_env_rel.trim_start_matches('/'));
             anyhow::ensure!(
                 per_env_abs.exists(),
-                "no upgrade input for --env {} at {}. Add it (copying the same-named file from an \
-                 earlier upgrade-envs directory is usually right) — this command will not fall back \
-                 to another environment's input, because the basename also selects \
-                 `upgrade-envs/permanent-values/{}.toml` and with it `testnet_verifier`.",
+                "no upgrade input for --env {} at {}. Add it — an empty file is fine if the \
+                 environment needs nothing from the input — because this command will not fall back \
+                 to the local default, which would silently give this environment local's \
+                 `era_chain_id`, `governance_upgrade_timer_initial_delay` and gateway chain id.",
                 cfg.env,
-                per_env_abs.display(),
-                cfg.env
+                per_env_abs.display()
             );
             logger::info(format!("Using per-env upgrade input: {per_env_rel}"));
             args.upgrade_input_path = per_env_rel;
