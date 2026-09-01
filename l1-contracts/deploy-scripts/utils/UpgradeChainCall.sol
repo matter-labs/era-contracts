@@ -22,13 +22,16 @@ interface IAdminV31 {
 /// @title Upgrade-call encoder for chain diamonds of any protocol generation.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice `upgradeChainFromVersion` changed shape twice. From v32 the chain reads the cut from
+/// @notice `upgradeChainFromVersion` changed shape twice. From v34 the chain reads the cut from
 ///         its own ChainTypeManager, so the call carries no cut at all.
 /// @dev Calling the wrong shape hits the DiamondProxy fallback and reverts with `"F"`, so the
 ///      selection is by the version the chain is CURRENTLY on, never the one it moves to.
+/// @dev The cut-reading 2-arg form first ships with the v34 facets: v31-v33 chains all route the
+///      3-arg cut-taking form (the shipped v32 release kept it), so the boundary is the version
+///      that first ships the new Admin facet, not the one where the CTM stopped needing the cut.
 library UpgradeChainCall {
     uint256 internal constant V31_THRESHOLD = uint256(31) << 32;
-    uint256 internal constant V32_THRESHOLD = uint256(32) << 32;
+    uint256 internal constant V34_THRESHOLD = uint256(34) << 32;
 
     function encode(
         address _chainAddress,
@@ -38,7 +41,7 @@ library UpgradeChainCall {
         if (_protocolVersion < V31_THRESHOLD) {
             return abi.encodeCall(IAdminPreV31.upgradeChainFromVersion, (_protocolVersion, _cutData));
         }
-        if (_protocolVersion < V32_THRESHOLD) {
+        if (_protocolVersion < V34_THRESHOLD) {
             return abi.encodeCall(IAdminV31.upgradeChainFromVersion, (_chainAddress, _protocolVersion, _cutData));
         }
         return abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainAddress, _protocolVersion));

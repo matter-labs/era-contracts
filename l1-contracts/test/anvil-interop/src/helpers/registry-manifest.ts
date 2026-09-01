@@ -184,7 +184,10 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string):
   const upgradeType = parseSolidityEnum(COMPLEX_UPGRADER_SOL, "ContractUpgradeType");
   const transition = ctm.transition;
 
-  const deployments = transition.l2Plan.deployments.map((d: any) => ({
+  // The manifest's authored list is the plan's EXTRA deployments — the table-derived set is
+  // computed on-chain at transition initialization. (Older manifest JSONs name the key
+  // `deployments`; both spellings carry the same authored list.)
+  const extraDeployments = (transition.l2Plan.extraDeployments ?? transition.l2Plan.deployments).map((d: any) => ({
     upgradeType: enumValue(upgradeType, d.upgradeType, "ContractUpgradeType"),
     deployedBytecodeInfo: d.deployedBytecodeInfo,
     newAddress: d.newAddress,
@@ -205,7 +208,7 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string):
     oldProtocolVersionDeadline: ethers.BigNumber.from(transition.oldProtocolVersionDeadline),
     upgradeTimestamp: transition.upgradeTimestamp,
     l2Plan: {
-      deployments,
+      extraDeployments,
       delegateTo: transition.l2Plan.delegateTo,
       delegateCalldata: transition.l2Plan.delegateCalldata,
       factoryDepHashes: transition.l2Plan.factoryDepHashes.map((h: string) => ethers.BigNumber.from(h)),

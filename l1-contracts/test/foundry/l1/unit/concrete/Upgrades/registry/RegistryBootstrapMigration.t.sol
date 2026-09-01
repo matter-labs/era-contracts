@@ -17,6 +17,7 @@ import {MockProxyUpgradeInitImpl} from "contracts/dev-contracts/test/MockProxyUp
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
+import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -25,9 +26,11 @@ import {
     BootstrapAlreadyExecuted,
     BootstrapAuthorityNotHeld,
     BootstrapExecutorNotBound,
+    DeadlineNotYetPassed,
     ProxyUpgradeRowMismatch,
     RegistryCodehashMismatch,
     RegistryDuplicateProxyRow,
+    TimerNotStarted,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
@@ -71,6 +74,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     ProxyAdmin internal ecosystemProxyAdmin;
 
     CTMRelease internal genesisRelease;
+    GovernanceUpgradeTimer internal upgradeTimer;
     TransparentUpgradeableProxy internal ecosystemProxy;
     address internal implV31;
     address internal implV32;
@@ -110,6 +114,11 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         );
 
         newVersion = SemVer.packSemVer(0, 1, 0);
+        // The pinned timer gates `migrate()`: stage 0 starts it, the edge runs after its window.
+        // Zero delays make the window pass immediately in the fixture.
+        upgradeTimer = new GovernanceUpgradeTimer(0, 0, governor, governor);
+        vm.prank(governor);
+        upgradeTimer.startTimer();
         // The release constructor reads each facet's self-description (see the shared fixture).
         _mockFacetSelfDescriptions(facetCuts);
         genesisRelease = _deployGenesisRelease();
@@ -173,7 +182,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                     initCalldata: hex""
                 }),
                 upgradeCutInitCodehash: upgradeCutInit.codehash,
-                ctmExecutor: PinnedContract({addr: address(ctmExecutor), codehash: address(ctmExecutor).codehash})
+                ctmExecutor: PinnedContract({addr: address(ctmExecutor), codehash: address(ctmExecutor).codehash}),
+                upgradeTimer: PinnedContract({addr: address(upgradeTimer), codehash: address(upgradeTimer).codehash})
             });
     }
 
@@ -194,9 +204,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         vm.recordLogs();
         migration.migrate();
         _assertBootstrappedEventEmitted();
-        // Final call of the governance bundle: the executor claims the CTM it was nominated for.
-        vm.prank(governor);
-        ctmExecutor.acceptCTMOwnership();
 
         // The ecosystem proxy moved to its pinned implementation.
         assertEq(
@@ -213,8 +220,10 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         assertEq(CTMRelease(chainContractAddress.currentRelease()).verifier(), address(testnetVerifier));
 
         // The WHOLE CTM domain ended up with the one CTM-bound executor — never left resting in
-        // the migration.
+        // the migration. `migrate()` itself ends with the executor's `acceptCTMOwnership()`, so
+        // the handover is COMPLETE when the call returns: no pending owner survives.
         assertEq(chainContractAddress.owner(), address(ctmExecutor), "CTM must be owned by its executor");
+        assertEq(chainContractAddress.pendingOwner(), address(0), "the accept must happen inside migrate()");
         assertEq(
             ecosystemProxyAdmin.owner(),
             address(ctmExecutor),
@@ -226,11 +235,44 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     function test_migrate_isOneShot() public {
         _handOverAuthority();
         migration.migrate();
-        vm.prank(governor);
-        ctmExecutor.acceptCTMOwnership();
 
         vm.expectRevert(BootstrapAlreadyExecuted.selector);
         migration.migrate();
+    }
+
+    // ─────────────────────────── timer gating ───────────────────────────
+
+    /// @dev The pinned timer proves stage 0 ran: an edge whose timer was never started must not
+    ///      execute, regardless of authority.
+    function test_revertWhen_timerNeverStarted() public {
+        GovernanceUpgradeTimer unstarted = new GovernanceUpgradeTimer(0, 0, governor, governor);
+        BootstrapManifest memory manifest = _manifest();
+        manifest.upgradeTimer = PinnedContract({addr: address(unstarted), codehash: address(unstarted).codehash});
+        RegistryBootstrapMigration gated = new RegistryBootstrapMigration(manifest);
+
+        vm.prank(governor);
+        chainContractAddress.transferOwnership(address(gated));
+        ecosystemProxyAdmin.transferOwnership(address(gated));
+
+        vm.expectRevert(TimerNotStarted.selector);
+        gated.migrate();
+    }
+
+    function test_revertWhen_timerDeadlineNotYetPassed() public {
+        GovernanceUpgradeTimer pending = new GovernanceUpgradeTimer(1000, 0, governor, governor);
+        vm.prank(governor);
+        pending.startTimer();
+        BootstrapManifest memory manifest = _manifest();
+        manifest.upgradeTimer = PinnedContract({addr: address(pending), codehash: address(pending).codehash});
+        RegistryBootstrapMigration gated = new RegistryBootstrapMigration(manifest);
+
+        vm.prank(governor);
+        chainContractAddress.transferOwnership(address(gated));
+        ecosystemProxyAdmin.transferOwnership(address(gated));
+
+        // The window has not passed (no warp), so the edge is not yet executable.
+        vm.expectRevert(DeadlineNotYetPassed.selector);
+        gated.migrate();
     }
 
     // ─────────────────────────── source checks ───────────────────────────

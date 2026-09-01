@@ -33,8 +33,8 @@
  *   4. BOOTSTRAP STAGE ("v33 -> v34", see bootstrap-upgrade-stage.ts): cross the one-time entry
  *      edge into the registry model through `RegistryBootstrapMigration` — legacy cut-taking
  *      commit (the ONLY writer of the deprecated `upgradeCutHash`), the CTM implementation swap
- *      as a source-checked proxy row, and the authority handover to both bound executors,
- *      completed by the fixed `acceptCTMOwnership` entrypoint. Each chain crosses the edge
+ *      as a source-checked proxy row, and the authority handover to both bound executors —
+ *      `migrate()` itself completes the executor's accept. Each chain crosses the edge
  *      through the legacy 3-arg `upgradeChainFromVersion`, HANDED the committed cut, exactly
  *      like production pre-v34 chains.
  *   5. Execute the registry-driven hop ("v34 -> v35") purely through the executors' fixed entrypoints
@@ -362,6 +362,21 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     console.log("\n── Pausing chain migrations ──");
     await setMigrationPaused(l1Provider, live.chainAssetHandler, true);
 
+    // The pinned timer gates migrate(): stage 0 starts it, and the edge only runs once its
+    // window has passed. Zero delays make the window pass immediately in the harness.
+    const timerFactory = new ethers.ContractFactory(
+      getAbi("GovernanceUpgradeTimer"),
+      getCreationBytecode("GovernanceUpgradeTimer"),
+      deployer
+    );
+    const upgradeTimer = await timerFactory.deploy(0, 0, deployer.address, deployer.address);
+    await upgradeTimer.deployed();
+    await sendAndCheck(
+      l1Provider,
+      upgradeTimer.connect(deployer).startTimer({ gasLimit: DEFAULT_GAS_LIMIT }),
+      "upgradeTimer.startTimer()"
+    );
+
     const migrationFactory = new ethers.ContractFactory(
       getAbi("RegistryBootstrapMigration"),
       getCreationBytecode("RegistryBootstrapMigration"),
@@ -374,6 +389,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
         releaseCodehash: ctmAddresses.releaseCodehash,
         currentRelease: live.fromRelease,
         ctmExecutor: deployed.ctmExecutor,
+        upgradeTimer: upgradeTimer.address,
       })
     );
     await migration.deployed();
@@ -391,12 +407,8 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       migration.connect(deployer).migrate({ gasLimit: DEFAULT_GAS_LIMIT }),
       "migration.migrate()"
     );
+    // migrate() itself completes the executor's accept: the handover is done when it returns.
     console.log("  ✓ migrate() executed (impl swap + legacy commit + release pin + handover)");
-    await sendAndCheck(
-      l1Provider,
-      ctmExecutor.acceptCTMOwnership({ gasLimit: DEFAULT_GAS_LIMIT }),
-      "ctmExecutor.acceptCTMOwnership()"
-    );
 
     // The chains' genesis upgrade tx is still pending on the sequencer-less anvil chains;
     // clear it exactly like the pipeline upgrade runner does (see module docs). Once, before the first bump.

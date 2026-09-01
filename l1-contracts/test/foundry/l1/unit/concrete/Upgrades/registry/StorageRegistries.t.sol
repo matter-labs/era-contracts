@@ -14,6 +14,8 @@ import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {ReleaseFacetReader} from "contracts/upgrades/registry/libraries/ReleaseFacetReader.sol";
+import {TransitionDerivationLib} from "contracts/upgrades/registry/libraries/TransitionDerivationLib.sol";
+import {L2InventoryLib} from "contracts/upgrades/registry/libraries/L2InventoryLib.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
@@ -35,6 +37,7 @@ import {
     RegistryEmptySelectors,
     RegistryHashChangeToZero,
     RegistryInventoryLengthMismatch,
+    RegistryMemberHasNoFixedAddress,
     RegistryPinTargetHasNoCode,
     RegistryUnknownKey,
     SameReleaseTransitionHasPayload,
@@ -47,6 +50,7 @@ import {
     ProtocolVersionTooSmall
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {
+    AuthoredL2Plan,
     CoreRegistryManifest,
     ProxyUpgradeRow,
     GenesisFacet,
@@ -60,7 +64,8 @@ import {
     CTM_CONTRACT_COUNT,
     L1_ECOSYSTEM_CONTRACT_COUNT,
     L1EcosystemContract,
-    L2_ECOSYSTEM_CONTRACT_COUNT
+    L2_ECOSYSTEM_CONTRACT_COUNT,
+    L2EcosystemContract
 } from "../../../../../../../contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @notice Unit tests for the write-once upgrade objects in the DERIVED model: releases carry
@@ -179,15 +184,15 @@ contract StorageRegistriesTest is Test {
         return _releaseManifest(facetNewAdmin, BOOTLOADER_NEW);
     }
 
-    function _l2Plan() internal pure returns (L2UpgradePlan memory plan) {
+    function _l2Plan() internal pure returns (AuthoredL2Plan memory plan) {
         IComplexUpgrader.UniversalContractUpgradeInfo[]
-            memory deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](2);
-        deployments[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
+            memory extraDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](2);
+        extraDeployments[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
             upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
             deployedBytecodeInfo: hex"aa01",
             newAddress: address(0x10002)
         });
-        deployments[1] = IComplexUpgrader.UniversalContractUpgradeInfo({
+        extraDeployments[1] = IComplexUpgrader.UniversalContractUpgradeInfo({
             upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
             deployedBytecodeInfo: hex"aa02",
             newAddress: address(0x10003)
@@ -196,8 +201,8 @@ contract StorageRegistriesTest is Test {
         factoryDeps[0] = 1;
         factoryDeps[1] = 2;
         return
-            L2UpgradePlan({
-                deployments: deployments,
+            AuthoredL2Plan({
+                extraDeployments: extraDeployments,
                 delegateTo: address(0x10004),
                 delegateCalldata: hex"beef",
                 factoryDepHashes: factoryDeps
@@ -315,7 +320,7 @@ contract StorageRegistriesTest is Test {
     ///      transaction — previously such committed data was silently discarded.
     function test_composerBuildsDelegateOnlyL2Tx() public {
         TransitionManifest memory manifest = _transitionManifest();
-        manifest.l2Plan.deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
+        manifest.l2Plan.extraDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
         manifest.l2Plan.factoryDepHashes = new uint256[](0);
         CTMTransition delegateOnly = new CTMTransition(manifest);
 
@@ -327,7 +332,7 @@ contract StorageRegistriesTest is Test {
             transaction.data,
             abi.encodeCall(
                 IComplexUpgrader.forceDeployAndUpgradeUniversal,
-                (manifest.l2Plan.deployments, address(0x10004), hex"beef")
+                (manifest.l2Plan.extraDeployments, address(0x10004), hex"beef")
             )
         );
     }
@@ -341,8 +346,8 @@ contract StorageRegistriesTest is Test {
         manifest.oldProtocolVersion = NEW_VERSION;
         manifest.newProtocolVersion = NEW_VERSION + 1;
         manifest.fromRelease = address(newRelease);
-        manifest.l2Plan = L2UpgradePlan({
-            deployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
+        manifest.l2Plan = AuthoredL2Plan({
+            extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
             delegateTo: address(0),
             delegateCalldata: "",
             factoryDepHashes: new uint256[](0)
@@ -352,8 +357,10 @@ contract StorageRegistriesTest is Test {
     function test_patchTransitionVerifierOnlyInitializes() public {
         CTMTransition patchTransition = new CTMTransition(_patchManifest());
         assertEq(patchTransition.fromRelease(), patchTransition.newRelease());
-        // The derived delta of a same-release hop is empty by construction.
+        // The derived delta of a same-release hop is empty by construction — the L2 force
+        // deployments included, even though the release's table is only read cross-release.
         assertEq(patchTransition.facetCuts().length, 0);
+        assertEq(patchTransition.l2Plan().deployments.length, 0, "same-release pair must derive no deployments");
         (bytes32 bootloaderChange, , ) = patchTransition.baseSystemContractHashChanges();
         assertEq(bootloaderChange, bytes32(0));
         // Both edges are live releases, so runtime validation holds.
@@ -363,6 +370,23 @@ contract StorageRegistriesTest is Test {
 
     function test_revertWhen_sameReleaseTransitionCarriesL2Payload() public {
         TransitionManifest memory manifest = _patchManifest();
+        manifest.l2Plan.delegateTo = address(0x10004);
+
+        vm.expectRevert(SameReleaseTransitionHasPayload.selector);
+        new CTMTransition(manifest);
+    }
+
+    function test_revertWhen_sameReleaseTransitionCarriesAuthoredExtras() public {
+        TransitionManifest memory manifest = _patchManifest();
+        IComplexUpgrader.UniversalContractUpgradeInfo[]
+            memory extras = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
+        extras[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
+            deployedBytecodeInfo: hex"aa01",
+            newAddress: address(0x10002)
+        });
+        manifest.l2Plan.extraDeployments = extras;
+        // A delegate target keeps the plan SHAPE valid, so only the same-release rule can fire.
         manifest.l2Plan.delegateTo = address(0x10004);
 
         vm.expectRevert(SameReleaseTransitionHasPayload.selector);
@@ -504,7 +528,7 @@ contract StorageRegistriesTest is Test {
 
     function test_revertWhen_factoryDepsWithoutL2Side() public {
         TransitionManifest memory manifest = _transitionManifest();
-        manifest.l2Plan.deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
+        manifest.l2Plan.extraDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
         manifest.l2Plan.delegateTo = address(0);
         manifest.l2Plan.delegateCalldata = "";
         // factoryDepHashes stay non-empty with no transaction to ride in.
@@ -520,6 +544,105 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _transitionManifest();
         manifest.l2Plan.delegateTo = address(0);
         manifest.l2Plan.delegateCalldata = "";
+
+        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        new CTMTransition(manifest);
+    }
+
+    // ─────────────────────────── derived L2 deployments ───────────────────────────
+
+    /// @dev A target release whose table carries nonempty rows at two fixed-address members.
+    ///      Distinct bytecode-info bytes from the authored extras so the two sets are
+    ///      distinguishable in the combined plan.
+    function _tableRelease() internal returns (CTMRelease) {
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = hex"dd01";
+        manifest.l2BytecodeInfos[uint256(L2EcosystemContract.SystemContext)] = hex"dd02";
+        return new CTMRelease(manifest);
+    }
+
+    function test_deriveL2DeploymentsFromTableSkipsEmptyRowsAndResolvesMembers() public {
+        bytes[] memory table = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
+        table[uint256(L2EcosystemContract.L2Bridgehub)] = hex"dd01";
+        table[uint256(L2EcosystemContract.SystemContext)] = hex"dd02";
+
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory derived = TransitionDerivationLib
+            .deriveL2DeploymentsFromTable(table, true);
+
+        // Only the nonempty rows become deployments, in enum order, each at its member's
+        // canonical fixed address.
+        assertEq(derived.length, 2, "empty rows must derive no deployment");
+        assertTrue(derived[0].upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade);
+        assertEq(derived[0].deployedBytecodeInfo, hex"dd01");
+        assertEq(derived[0].newAddress, L2InventoryLib.fixedAddress(L2EcosystemContract.L2Bridgehub));
+        assertEq(derived[1].deployedBytecodeInfo, hex"dd02");
+        assertEq(derived[1].newAddress, L2InventoryLib.fixedAddress(L2EcosystemContract.SystemContext));
+
+        // The Era flavour of the same table derives force deployments instead of proxy upgrades.
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory derivedEra = TransitionDerivationLib
+            .deriveL2DeploymentsFromTable(table, false);
+        assertTrue(derivedEra[0].upgradeType == IComplexUpgrader.ContractUpgradeType.EraForceDeployment);
+        assertEq(derivedEra.length, 2);
+    }
+
+    function test_revertWhen_transitionDerivesRowForAddresslessMember() public {
+        // BeaconProxy is a bytecode-identity member: it has no fixed L2 address, so a table row
+        // for it is unexecutable and must refuse to derive — at transition construction, before
+        // anything is committed.
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.l2BytecodeInfos[uint256(L2EcosystemContract.BeaconProxy)] = hex"dd03";
+        CTMRelease rowRelease = new CTMRelease(releaseManifest);
+
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(rowRelease);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(RegistryMemberHasNoFixedAddress.selector, uint256(L2EcosystemContract.BeaconProxy))
+        );
+        new CTMTransition(manifest);
+    }
+
+    function test_transitionL2PlanIsDerivedPlusExtras() public {
+        CTMRelease tableRelease = _tableRelease();
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(tableRelease);
+        CTMTransition combined = new CTMTransition(manifest);
+
+        // The FINAL plan: the target release's table-derived set first, the authored extras
+        // appended after.
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory expectedDerived = TransitionDerivationLib
+            .deriveL2DeploymentsFromTable(tableRelease.l2BytecodeInfos(), true);
+        L2UpgradePlan memory plan = combined.l2Plan();
+        assertEq(
+            plan.deployments.length,
+            expectedDerived.length + manifest.l2Plan.extraDeployments.length,
+            "final plan must be derived ++ extras"
+        );
+        for (uint256 i = 0; i < expectedDerived.length; ++i) {
+            assertEq(abi.encode(plan.deployments[i]), abi.encode(expectedDerived[i]), "derived prefix mismatch");
+        }
+        for (uint256 i = 0; i < manifest.l2Plan.extraDeployments.length; ++i) {
+            assertEq(
+                abi.encode(plan.deployments[expectedDerived.length + i]),
+                abi.encode(manifest.l2Plan.extraDeployments[i]),
+                "authored extras suffix mismatch"
+            );
+        }
+        // The authored remainder rides through unchanged.
+        assertEq(plan.delegateTo, address(0x10004));
+        assertEq(plan.delegateCalldata, hex"beef");
+        assertEq(plan.factoryDepHashes.length, 2);
+    }
+
+    function test_revertWhen_derivedDeploymentsWithoutDelegateTarget() public {
+        // The shape rules run against the COMBINED plan: a derived-nonempty transition with no
+        // delegate target is unexecutable on L2 even when the manifest authors NO extras.
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(_tableRelease());
+        manifest.l2Plan.extraDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
+        manifest.l2Plan.delegateTo = address(0);
+        manifest.l2Plan.delegateCalldata = "";
+        manifest.l2Plan.factoryDepHashes = new uint256[](0);
 
         vm.expectRevert(MalformedL2UpgradePlan.selector);
         new CTMTransition(manifest);

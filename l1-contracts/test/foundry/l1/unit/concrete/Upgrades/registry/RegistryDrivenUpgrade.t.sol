@@ -38,8 +38,8 @@ import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/
 import {ProtocolIdMismatch} from "contracts/common/L1ContractErrors.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {
+    AuthoredL2Plan,
     GenesisFacet,
-    L2UpgradePlan,
     ReleaseGenesisData,
     ReleaseManifest,
     TransitionManifest,
@@ -253,8 +253,8 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         }
         // A nonempty L2 plan MUST carry a delegate target: `L2ComplexUpgrader` always ends with
         // the final delegatecall, so a deployments-only plan (no target) would revert on L2.
-        L2UpgradePlan memory l2Plan;
-        l2Plan.deployments = deployments;
+        AuthoredL2Plan memory l2Plan;
+        l2Plan.extraDeployments = deployments;
         l2Plan.factoryDepHashes = new uint256[](0);
         if (hasL2Side) {
             l2Plan.delegateTo = makeAddr("l2UpgradeTarget");

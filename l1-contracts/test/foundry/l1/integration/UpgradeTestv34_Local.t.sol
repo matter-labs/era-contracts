@@ -133,9 +133,10 @@ contract ChainUpgrade_v34_Test is DefaultChainUpgrade {
 
 /// @notice Local (non-fork) test of the v34 BOOTSTRAP edge through the real prepare pipeline:
 ///         a fresh ecosystem + Era chain at the baseline version, `CTMUpgrade_v34` deploying
-///         the executor + `RegistryBootstrapMigration`, and the collapsed four-call stage-1 leg
-///         (nominate the CTM, hand over its ProxyAdmin, `migrate()`, `acceptCTMOwnership()`)
-///         performing the whole edge. Complements the anvil two-stage test: same flow, but
+///         the executor + `RegistryBootstrapMigration`, and the collapsed three-call stage-1 leg
+///         (nominate the CTM, hand over its ProxyAdmin, `migrate()` — which itself completes
+///         the executor's accept) performing the whole edge. Complements the anvil two-stage
+///         test: same flow, but
 ///         driven end to end by the production prepare script.
 /// @dev Heavy execution + event assertions run in `setUp -> internalTest()` (RAM constraint);
 ///      the body checks persisted state — the version bump, the authority handover to the
@@ -258,8 +259,8 @@ contract UpgradeIntegrationTest_v34_Local is
         // The edge is one-shot and spent.
         assertTrue(v34.bootstrapMigration().executed(), "migration must be spent");
 
-        // The WHOLE CTM domain landed under the bound executor: CTM ownership (completed by
-        // acceptCTMOwnership in the same stage) and the CTM-domain ProxyAdmin.
+        // The WHOLE CTM domain landed under the bound executor: CTM ownership (the accept runs
+        // inside `migrate()` itself) and the CTM-domain ProxyAdmin.
         address executor = address(v34.ctmUpgradeExecutor());
         assertEq(Ownable(ctm).owner(), executor, "CTM must be owned by the executor");
         assertEq(

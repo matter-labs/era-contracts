@@ -174,6 +174,7 @@ export async function bootstrapInitArgs(
     releaseCodehash: string;
     currentRelease: string;
     ctmExecutor: string;
+    upgradeTimer: string;
   }
 ): Promise<any> {
   const codehash = async (addr: string) => ethers.utils.keccak256(await l1Provider.getCode(addr));
@@ -199,9 +200,10 @@ export async function bootstrapInitArgs(
     oldProtocolVersionDeadline: ethers.BigNumber.from(manifest.bootstrap.oldProtocolVersionDeadline),
     upgradeCut: buildBootstrapCut(manifest, packSemVer),
     upgradeCutInitCodehash: manifest.bootstrap.upgradeEngine.codehash,
-    // The executor is deployed by this run (regular build), so its codehash is read live
-    // rather than committed — the manifest pins only cross-machine-stable values.
+    // The executor and timer are deployed by this run (regular build), so their codehashes are
+    // read live rather than committed — the manifest pins only cross-machine-stable values.
     ctmExecutor: { addr: params.ctmExecutor, codehash: await codehash(params.ctmExecutor) },
+    upgradeTimer: { addr: params.upgradeTimer, codehash: await codehash(params.upgradeTimer) },
   };
 }
 

@@ -49,6 +49,7 @@ const ARTIFACTS = {
   // registry-driven model, plus the legacy cut-taking entrypoint the harness installs and the
   // CTM implementation the bootstrap's proxy row swaps in.
   RegistryBootstrapMigration: "RegistryBootstrapMigration.sol/RegistryBootstrapMigration.json",
+  GovernanceUpgradeTimer: "GovernanceUpgradeTimer.sol/GovernanceUpgradeTimer.json",
   LegacyTestAdminFacet: "LegacyTestAdminFacet.sol/LegacyTestAdminFacet.json",
   ZKsyncOSChainTypeManager: "ZKsyncOSChainTypeManager.sol/ZKsyncOSChainTypeManager.json",
   BridgedStandardERC20: "BridgedStandardERC20.sol/BridgedStandardERC20.json",

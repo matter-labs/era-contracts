@@ -31,8 +31,8 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {
+    AuthoredL2Plan,
     GenesisFacet,
-    L2UpgradePlan,
     ReleaseGenesisData,
     ReleaseManifest,
     TransitionManifest,
@@ -176,8 +176,8 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                 proxyUpgrades: noProxyUpgrades,
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: _upgradeTimestamp,
-                l2Plan: L2UpgradePlan({
-                    deployments: deployments,
+                l2Plan: AuthoredL2Plan({
+                    extraDeployments: deployments,
                     delegateTo: makeAddr("l2UpgradeDelegate"),
                     delegateCalldata: hex"beef",
                     factoryDepHashes: factoryDeps
@@ -242,6 +242,36 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         });
         vm.prank(emergencyUpgradeBoard);
         ctmExecutor.forward(calls);
+    }
+
+    /// @dev `acceptCTMOwnership` is deliberately permissionless: it can only ever COMPLETE a
+    ///      transfer already initiated toward this executor — Ownable2Step's pending-owner edge
+    ///      is the real gate, so a caller restriction adds nothing.
+    function test_acceptCTMOwnershipPermissionlessButGatedByNomination() public {
+        // Without a pending nomination, any caller just hits the Ownable2Step edge.
+        vm.prank(makeAddr("stranger"));
+        vm.expectRevert("Ownable2Step: caller is not the new owner");
+        ctmExecutor.acceptCTMOwnership();
+
+        // Break-glass hands the CTM back to governance, which nominates the executor again;
+        // a stranger may then complete the handover — the accept only ever lands on the executor.
+        Call[] memory giveBack = new Call[](1);
+        giveBack[0] = Call({
+            target: address(chainContractAddress),
+            value: 0,
+            data: abi.encodeWithSignature("transferOwnership(address)", governor)
+        });
+        vm.prank(emergencyUpgradeBoard);
+        ctmExecutor.forward(giveBack);
+        vm.prank(governor);
+        chainContractAddress.acceptOwnership();
+        vm.prank(governor);
+        chainContractAddress.transferOwnership(address(ctmExecutor));
+
+        vm.prank(makeAddr("stranger"));
+        ctmExecutor.acceptCTMOwnership();
+        assertEq(chainContractAddress.owner(), address(ctmExecutor), "accept must land ownership on the executor");
+        assertEq(chainContractAddress.pendingOwner(), address(0), "no pending owner may survive the accept");
     }
 
     // The transition pins the deadline its edge was approved with (1000 in this fixture), but the
