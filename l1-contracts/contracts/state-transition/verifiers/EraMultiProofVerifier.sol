@@ -30,23 +30,20 @@ import {
 /// @dev Proof encoding received from the Executor:
 ///      `_proof[0]` = proof type. The type occupies the low 8 bits; bits 8-255 are reserved and must be zero.
 ///      `_proof[1]` = N, the number of words in the Boojum sub-proof.
-///      `_proof[2 .. 2+N]`   = the Boojum sub-proof, in the envelope `EraDualVerifier` parses — its own
-///                             leading word selects the FFLONK (0) or PLONK (1) wrapper. Both are Boojum, so
-///                             that choice is not a proof-system choice.
+///      `_proof[2 .. 2+N]`   = the Boojum sub-proof, in the envelope `EraDualVerifier` parses; its leading
+///                             word selects the FFLONK (0) or PLONK (1) wrapper.
 ///      `_proof[2+N .. end]` = the Airbender SNARK, exactly `AIRBENDER_SNARK_PROOF_LENGTH` words.
 ///      The total length is therefore exact, and an envelope with anything trailing is refused.
 ///
-/// @dev Unlike the ZKsync OS multi-proof envelope there is no carried-hash slot: Era has no continuation
-/// proofs, so a permanently-zero reserved word would be surface with no meaning.
+/// @dev There is no carried-hash slot, unlike the ZKsync OS envelope: Era has no continuation proofs, so a
+/// permanently-zero reserved word would be audited surface with no meaning.
 ///
-/// @dev The batch public inputs reach both lanes whole and untruncated. Each sub-verifier owns its own
-/// derivation — each lane applies `PUBLIC_INPUT_SHIFT` itself, and the Airbender lane is the seam where a future
-/// guest-bound derivation would live — so folding or shifting here would corrupt one of them.
+/// @dev The batch public inputs reach both lanes whole and untruncated, because each lane applies
+/// `PUBLIC_INPUT_SHIFT` itself. Shifting here would double-shift them.
 contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
     /// @notice The Boojum router (`EraDualVerifier`), which dispatches the FFLONK and PLONK wrappers.
-    /// @dev Immutable: a settable sub-verifier would let one key point either lane at a contract that
-    /// accepts everything, which is the one thing requiring two proof systems exists to prevent. Replacing a
-    /// lane means deploying this contract again and repointing the chain's verifier slot.
+    /// @dev Immutable: a settable lane would let one key point it at a contract that accepts everything,
+    /// which is the one thing requiring two proof systems exists to prevent.
     IVerifier public immutable BOOJUM_VERIFIER;
 
     /// @notice The Airbender verifier, which owns that lane's public-input derivation.
@@ -75,10 +72,9 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
         if ((_proof[0] & 255) != ERA_MULTI_PROOF_TYPE) {
             revert UnknownVerifierType();
         }
-        // Exact, not minimum: the Airbender SNARK is fixed-size, so the total length is fully determined by
-        // the declared Boojum length. Compared by subtracting from `_proof.length` rather than adding to the
-        // attacker-supplied `_proof[1]`, so an absurd declared length reverts with this error instead of a
-        // checked-arithmetic panic.
+        // Exact, not minimum: the Airbender SNARK is fixed-size, so the length is fully determined. Derived
+        // by subtracting from `_proof.length` rather than adding to the caller-supplied `_proof[1]`, so an
+        // absurd declared length reverts here instead of panicking on overflow.
         if (_proof.length < 2 + AIRBENDER_SNARK_PROOF_LENGTH) {
             revert InvalidProofFormat();
         }
@@ -87,23 +83,18 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
             revert InvalidProofFormat();
         }
 
-        // One verifier instance serves every chain of a protocol version, so which proof systems are
-        // required is read from the calling chain rather than held here. In settlement the caller is that
-        // chain's diamond, because the Executor facet calls its verifier directly.
+        // One verifier instance serves every chain of a protocol version, so the policy is read from the
+        // calling chain, which in settlement is that chain's diamond.
         uint8 disabled = IGetters(msg.sender).disabledProofSystems();
-        // `Admin.setDisabledProofSystems` already rejects anything but 0, 1 and 2, but that guard lives in
-        // another contract. This is the gate the two-prover guarantee actually rests on, so it re-checks
-        // rather than trusting a value written elsewhere — with the same predicate as the setter, so an
-        // unknown bit is rejected here too instead of being tolerated.
+        // Re-checked with the setter's own predicate: the guarantee rests on this contract, so it does not
+        // trust a value written elsewhere.
         if (disabled >= ALL_PROOF_SYSTEMS_DISABLED) {
             revert InvalidDisabledProofSystemsMask(disabled);
         }
 
         if (disabled & BOOJUM_PROOF_SYSTEM_DISABLED == 0) {
-            // An enabled lane must actually carry a proof. Without this, a zero-length Boojum slice reaches
-            // a sub-verifier that treats an empty proof as "skip" and the lane is silently not verified —
-            // the testnet router does exactly that. The Airbender slot is fixed-size so it cannot be empty,
-            // but the check is symmetric because the guarantee is.
+            // An enabled lane must carry a proof: a zero-length slice reaches a router that treats an empty
+            // proof as "skip", silently leaving the lane unverified.
             if (boojumLength == 0) {
                 revert BoojumVerificationFailed();
             }

@@ -12,30 +12,16 @@ import {PUBLIC_INPUT_SHIFT} from "../../common/Config.sol";
 /// @notice The Airbender lane of the Era dual-prover gate. Derives the public input an Airbender proof was
 /// generated against and hands it to the generated Airbender PLONK verifier.
 ///
-/// @dev The Airbender verifier guest emits `program_output = keccak(prevCommitment | currentCommitment)` —
-/// the same transition hash the Boojum lane uses, which the Executor now passes through untruncated. The
-/// SNARK public input is that value shifted by `PUBLIC_INPUT_SHIFT`.
+/// @dev The guest emits `program_output = keccak(prevCommitment | currentCommitment)` — the untruncated
+/// transition hash the Executor passes through — and the SNARK public input is that value shifted by
+/// `PUBLIC_INPUT_SHIFT`. The audited guest binary is bound inside the recursion circuit rather than carried
+/// in the public input, so there is nothing here to re-derive from it.
 ///
-/// @dev WHERE THE AUDITED GUEST BINARY IS BOUND. The commitment to the guest binary is constrained inside
-/// the recursion circuit — the guest's final registers are bound to the audited binary there — so it is not
-/// carried in the SNARK public input and there is nothing for this contract to re-derive.
-///
-/// @dev The prover also supports a mode that lifts the commitment into the SNARK public input. Adopting it
-/// means a new lane contract deriving `keccak(programOutput | guestBinaryCommitment) >> PUBLIC_INPUT_SHIFT`
-/// from its own pinned commitment, a new gate pointing at it, and a `protocolVersionVerifier` repoint —
-/// `EraMultiProofVerifier` holds this lane as an `IVerifier` immutable, so nothing in the Executor, the chain
-/// storage, the Admin facet or the kill switch changes. No extension point is kept here for it: the switch
-/// redeploys this contract either way.
-///
-/// @dev The derivation currently coincides with the Boojum lane's. That is expected — both proof systems
-/// attest to the same state transition — and it is not what separates the lanes: they are separate because
-/// they are different circuits behind different verification keys, reached through two fixed immutables that
-/// no caller can re-aim.
+/// @dev The prover also supports binding the guest commitment into the public input. Adopting that mode
+/// means a new lane contract and a new gate, so no extension point is kept here for it.
 contract AirbenderVerifier is IVerifier {
     /// @notice The generated Airbender PLONK verifier.
-    /// @dev Immutable: a settable sub-verifier would let one key point this lane at a contract that accepts
-    /// everything, which is the one thing requiring two proof systems exists to prevent. Replacing it means
-    /// deploying this contract again and repointing the chain's verifier slot.
+    /// @dev Immutable, for the reason given on `EraMultiProofVerifier`'s lanes.
     IVerifier public immutable AIRBENDER_PLONK_VERIFIER;
 
     /// @param _airbenderPlonkVerifier The generated Airbender PLONK verifier.
