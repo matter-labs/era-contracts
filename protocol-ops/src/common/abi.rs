@@ -226,15 +226,6 @@ pub mod i_register_on_all_chains {
 }
 pub use i_register_on_all_chains::IRegisterOnAllChainsAbi;
 
-pub mod i_finalize_upgrade {
-    alloy::sol!(
-        #[sol(rpc)]
-        IFinalizeUpgradeAbi,
-        "../l1-contracts/zkstack-out/IFinalizeUpgrade.sol/IFinalizeUpgrade.json"
-    );
-}
-pub use i_finalize_upgrade::IFinalizeUpgradeAbi;
-
 pub mod il1_native_token_vault {
     alloy::sol!(
         #[sol(rpc)]

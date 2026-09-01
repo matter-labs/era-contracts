@@ -14,8 +14,6 @@ The upgrade model (releases, transitions, executors, the v34 bootstrap edge) is 
   stage-1 CTM leg to four governance calls).
 - `SystemContractsProcessing.s.sol` — builds the L2 force-deployment set shared by genesis and
   upgrades.
-- `FinalizeUpgrade.s.sol` — post-upgrade chain/token initialization, driven by zkstack /
-  protocol-ops.
 
 One-off scripts of shipped upgrades (the v31 stage emergency tooling, PUH governance one-offs)
 live on their release branches, not here.
