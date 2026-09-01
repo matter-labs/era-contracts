@@ -388,7 +388,7 @@ contract StorageRegistriesTest is Test {
 
     /// @dev The release does NOT own the routing concept: a split-row (same facet twice) release
     ///      constructs — routing well-formedness is enforced where routing executes. Here: the
-    ///      transition deriving toward it rejects the duplicated selectors (`TransitionDeltaLib`),
+    ///      transition deriving toward it rejects the duplicated selectors (`TransitionDerivationLib`),
     ///      BEFORE anything is committed. (Genesis would equally revert in `Diamond.diamondCut`.)
     function test_revertWhen_transitionDerivesTowardSplitRowRelease() public {
         ReleaseManifest memory manifest = _newReleaseManifest();

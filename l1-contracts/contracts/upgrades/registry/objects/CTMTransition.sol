@@ -8,7 +8,7 @@ import {ICTMRelease} from "./ICTMRelease.sol";
 import {ICTMTransition} from "./ICTMTransition.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {CTM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
-import {TransitionDeltaLib} from "../libraries/TransitionDeltaLib.sol";
+import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
@@ -31,7 +31,7 @@ import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 /// @notice Storage-backed, write-once transition between two CTM releases.
 /// @dev The facet cuts and base-system hash changes are NOT part of the manifest: they are
 ///      DERIVED from the `(fromRelease, newRelease)` pair at initialization (see
-///      {TransitionDeltaLib}) and stored. Transition and release state cannot diverge because
+///      {TransitionDerivationLib}) and stored. Transition and release state cannot diverge because
 ///      the delta is a pure function of the two pinned releases.
 /// @dev What IS authored: the version edge, upgrade engine, schedule and the L2 plan — each either
 ///      derived-checked or codehash-pinned inline. The verifier is NOT authored here: it is part of
@@ -145,7 +145,7 @@ contract CTMTransition is ICTMTransition {
         encodedManifest = abi.encode(_manifest);
 
         // Derive the L1 delta from the release pair and freeze it as final diamond cuts.
-        Diamond.FacetCut[] memory facetCutsMemory = TransitionDeltaLib.deriveFacetCuts(
+        Diamond.FacetCut[] memory facetCutsMemory = TransitionDerivationLib.deriveFacetCuts(
             ICTMRelease(_manifest.fromRelease),
             ICTMRelease(_manifest.newRelease)
         );
@@ -153,7 +153,7 @@ contract CTMTransition is ICTMTransition {
         for (uint256 i = 0; i < length; ++i) {
             derivedFacetCuts.push(facetCutsMemory[i]);
         }
-        (derivedBootloaderChange, derivedDefaultAccountChange, derivedEvmEmulatorChange) = TransitionDeltaLib
+        (derivedBootloaderChange, derivedDefaultAccountChange, derivedEvmEmulatorChange) = TransitionDerivationLib
             .deriveHashChanges(ICTMRelease(_manifest.fromRelease), ICTMRelease(_manifest.newRelease));
     }
 

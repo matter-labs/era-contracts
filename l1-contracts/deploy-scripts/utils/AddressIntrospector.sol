@@ -256,6 +256,10 @@ library AddressIntrospector {
             verifiers: Verifiers({verifier: verifier, verifierFflonk: verifierFflonk, verifierPlonk: verifierPlonk}),
             facets: facets,
             genesisUpgrade: ctm.l1GenesisUpgrade(),
+            // No live source exists: the engine is a per-upgrade deploy the CTM keeps no stable
+            // pointer to (a committed transition pins its own engine, but is keyed by departing
+            // version). Every prepare overwrites this with the engine it deploys, and
+            // `DefaultCTMUpgrade.saveOutput` refuses to serialize it unassigned.
             defaultUpgrade: address(0),
             chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr),
             // The release registry only exists on the CTM from v34 on — every earlier

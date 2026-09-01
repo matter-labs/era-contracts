@@ -163,7 +163,7 @@ Copy-paste into a terminal (while chains are still running) to get the full exec
 ```
 test/anvil-interop/
 ├── run-hardhat-interop-test.ts    # Main entry: deployment + hardhat test runner
-├── run-bootstrap-upgrade-test.ts  # V34 bootstrap edge via the real prepare scripts (protocol-ops)
+├── run-v33-to-v34-upgrade-test.ts  # V34 bootstrap edge via the real prepare scripts (protocol-ops)
 ├── setup-and-dump-state.ts        # Generate pregenerated chain state snapshots
 ├── cleanup.sh                     # Kill Anvil processes, reset state
 ├── config/

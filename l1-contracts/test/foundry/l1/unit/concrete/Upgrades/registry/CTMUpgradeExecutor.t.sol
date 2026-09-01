@@ -239,6 +239,29 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         ctmExecutor.forward(calls);
     }
 
+    // The transition pins the deadline its edge was approved with (1000 in this fixture), but the
+    // deadline is operational state that keeps moving after the commit — the executor's fixed
+    // entrypoint must keep overriding it, repeatedly, without break-glass.
+    function test_setProtocolVersionDeadline_overridesTransitionPinnedDeadline() public {
+        _applyCTMUpgrade();
+        assertEq(chainContractAddress.protocolVersionDeadline(0), 1000);
+
+        vm.prank(governor);
+        ctmExecutor.setProtocolVersionDeadline(0, 5000);
+        assertEq(chainContractAddress.protocolVersionDeadline(0), 5000);
+
+        vm.prank(governor);
+        ctmExecutor.setProtocolVersionDeadline(0, 8000);
+        assertEq(chainContractAddress.protocolVersionDeadline(0), 8000);
+    }
+
+    function test_revertWhen_setProtocolVersionDeadlineByStranger() public {
+        _applyCTMUpgrade();
+        vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(makeAddr("stranger"));
+        ctmExecutor.setProtocolVersionDeadline(0, 5000);
+    }
+
     function test_revertWhen_applyCTMUpgradeFromWrongRelease() public {
         _applyCTMUpgrade();
 

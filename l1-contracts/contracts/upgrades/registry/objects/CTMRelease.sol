@@ -45,7 +45,7 @@ contract CTMRelease is ICTMRelease {
         // NO routing validation here — the release does not own the routing concept at all. It
         // pins facet rows; the selectors live in the facets' own self-description, and routing
         // well-formedness is enforced where routing actually executes: `Diamond.diamondCut`
-        // rejects duplicate or empty routing when a chain is created, and `TransitionDeltaLib`
+        // rejects duplicate or empty routing when a chain is created, and `TransitionDerivationLib`
         // re-walks both releases' routing when a transition derives its delta — both before
         // anything is committed.
         encodedManifest = abi.encode(_manifest);

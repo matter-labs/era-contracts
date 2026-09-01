@@ -88,6 +88,14 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
         Ownable2Step(address(CHAIN_TYPE_MANAGER)).acceptOwnership();
     }
 
+    /// @notice Moves a departed protocol version's deadline on the bound CTM.
+    /// @dev A fixed entrypoint rather than break-glass: the deadline is routine operational state
+    ///      that keeps changing after a transition commits (extended while chains lag, shortened
+    ///      to retire a version), and the transition's pinned value is only its starting point.
+    function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
+        CHAIN_TYPE_MANAGER.setProtocolVersionDeadline(_protocolVersion, _timestamp);
+    }
+
     /// @notice Installs the transition and points new-chain genesis at its target release.
     /// @dev Both transition edges are asserted independently BEFORE any mutation:
     ///      - the release edge (`currentRelease == fromRelease`) rejects execution from the wrong
@@ -161,5 +169,4 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
 
         emit ChainUpgradeApplied(_chainId, _transition.newProtocolVersion());
     }
-
 }

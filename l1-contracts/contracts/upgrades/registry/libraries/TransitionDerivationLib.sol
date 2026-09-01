@@ -20,7 +20,7 @@ import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/I
 /// @dev Scope: L1 diamond routing + the three base-system hashes. The L2 payload
 ///      (`L2UpgradePlan`) is reviewed-and-pinned data, not derived — L1 cannot verify L2
 ///      execution effects, and the guarantee is deliberately not overstated.
-library TransitionDeltaLib {
+library TransitionDerivationLib {
     /// @dev One facet row with its routing read from the facet's own self-description
     ///      (see {GenesisFacet} — routing is not stored in the manifest).
     struct FacetRouting {

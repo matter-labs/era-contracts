@@ -79,11 +79,12 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// @dev The current packed protocolVersion. To access human-readable version, use `getSemverProtocolVersion` function.
     uint256 public protocolVersion;
 
-    /// @dev Deadlines for versions with no committed transition: versions departed via the legacy
-    ///      cut-taking path (the bootstrap edge and everything before it). Registry-driven edges
-    ///      never write here — their deadline lives on the transition, and the
-    ///      {protocolVersionDeadline} view resolves it from there.
-    mapping(uint256 _protocolVersion => uint256) internal __DEPRECATED_protocolVersionDeadline;
+    /// @dev The stored per-version deadline. Written by the legacy cut-taking commit path (which
+    ///      has no transition to resolve a deadline from) and by {setProtocolVersionDeadline},
+    ///      which lets governance keep moving a deadline after the commit. When set (nonzero) it
+    ///      takes precedence over a committed transition's pinned deadline — see
+    ///      {protocolVersionDeadline}.
+    mapping(uint256 _protocolVersion => uint256) internal storedProtocolVersionDeadline;
 
     /// @dev The validatorTimelock contract address.
     /// @dev Note, that address contains validator timelock for pre-v29 protocol versions. It is deprecated and will be removed in the future.
@@ -121,12 +122,12 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     ///      ({upgradeCutDataBlock}) otherwise.
     mapping(uint256 protocolVersion => uint256) internal __DEPRECATED_upgradeCutDataBlock;
 
-    /// @dev Deprecated, no longer written. Off-chain tooling used it to locate the block where
-    ///      chain-creation params changed; under the registry model the genesis data is read
-    ///      directly from `currentRelease` and pin moves are announced by `NewCurrentRelease`.
-    ///      Served read-only ({newChainCreationParamsBlock}) for versions written pre-v34.
-    // Never written by THIS implementation by design — live chains carry pre-v34 values in it.
-    // slither-disable-next-line uninitialized-state
+    /// @dev Retained only to preserve the upgradeable storage layout. Pre-v34 code recorded the
+    ///      block of a chain-creation-params change here; under the registry model the genesis
+    ///      data is read directly from `currentRelease` and pin moves are announced by
+    ///      `NewCurrentRelease`, so nothing writes or serves it any more.
+    // Never touched by THIS implementation by design — live chains carry pre-v34 values in it.
+    // slither-disable-next-line uninitialized-state,unused-state
     mapping(uint256 protocolVersion => uint256) internal __DEPRECATED_newChainCreationParamsBlock;
 
     /// @dev Retained only to preserve the upgradeable storage layout. The verifier is part of the
@@ -372,16 +373,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         emit NewAdmin(previousAdmin, msg.sender);
     }
 
-    /// @dev Used to set legacy validatorTimelock.
-    /// @dev Note, that the validator timelock that this function sets is only used for pre-v29 protocol versions.
-    /// It is kept only for convenience.
-    /// @param _validatorTimelock the new validatorTimelock address
-    function setLegacyValidatorTimelock(address _validatorTimelock) external onlyOwner {
-        address oldValidatorTimelock = __DEPRECATED_validatorTimelock;
-        __DEPRECATED_validatorTimelock = _validatorTimelock;
-        emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
-    }
-
     /// @dev Used to set post-V29 validator timelock. Cannot do it during initialization, as validatorTimelockPostV29 is deployed after CTM.
     /// @param _validatorTimelockPostV29 the new post-V29 upgradeable validatorTimelock address
     function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external onlyOwner {
@@ -421,30 +412,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         emit NewUpgradeCutData(newProtocolVersion, _transitionUpgradeCut(_transition));
     }
 
-    /// @dev set New Version with upgrade from old version
-    /// @param _cutData the new diamond cut data
-    /// @param _oldProtocolVersion the old protocol version
-    /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
-    /// @param _newProtocolVersion the new protocol version
-    /// @dev Kept for edges whose cut cannot be derived — the pre-registry bootstrap, whose departing
-    ///      version has no `fromRelease` to diff against. Registry-driven upgrades use
-    ///      {setNewVersionUpgradeFromTransition}.
-    function setNewVersionUpgrade(
-        Diamond.DiamondCutData calldata _cutData,
-        uint256 _oldProtocolVersion,
-        uint256 _oldProtocolVersionDeadline,
-        uint256 _newProtocolVersion
-    ) external onlyOwner {
-        _commitVersionEdge(_oldProtocolVersion, _newProtocolVersion);
-        // The departing version has no transition to resolve a deadline from, so this path is the
-        // one writer of the legacy deadline storage.
-        __DEPRECATED_protocolVersionDeadline[_oldProtocolVersion] = _oldProtocolVersionDeadline;
-        emit UpdateProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
-        setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
-        // Emit event with backward compatible hack.
-        emit NewUpgradeCutData(_newProtocolVersion, _cutData);
-    }
-
     /// @dev The version-edge commit shared by both entrypoints: checks the edge and moves
     ///      `protocolVersion` forward.
     /// @dev Note: non-sequential protocol versions are allowed (e.g., minor/patch jumps).
@@ -469,7 +436,16 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     }
 
     /// @inheritdoc IChainTypeManager
+    /// @dev Resolution order: the stored deadline when set (a legacy commit or a later
+    ///      {setProtocolVersionDeadline} override), the committed transition's pinned deadline,
+    ///      no-deadline for the current version, expired otherwise. Zero means "not set" in the
+    ///      stored slot — to expire a transition-committed version immediately, set a past
+    ///      nonzero timestamp.
     function protocolVersionDeadline(uint256 _protocolVersion) public view returns (uint256) {
+        uint256 storedDeadline = storedProtocolVersionDeadline[_protocolVersion];
+        if (storedDeadline != 0) {
+            return storedDeadline;
+        }
         address transition = upgradeTransition[_protocolVersion];
         if (transition != address(0)) {
             return ICTMTransition(transition).oldProtocolVersionDeadline();
@@ -477,52 +453,21 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         if (_protocolVersion == protocolVersion) {
             return type(uint256).max;
         }
-        return __DEPRECATED_protocolVersionDeadline[_protocolVersion];
+        return 0;
     }
 
-    /// @notice Deprecated. The block of a LEGACY cut commit, where its tooling finds the
-    ///         `NewUpgradeCutData` log; zero for registry-driven edges (read the cut from
-    ///         {upgradeCutForVersion} instead).
-    function upgradeCutDataBlock(uint256 _protocolVersion) public view returns (uint256) {
-        return __DEPRECATED_upgradeCutDataBlock[_protocolVersion];
-    }
-
-    /// @notice Deprecated. The block where pre-v34 code recorded a chain-creation-params change;
-    ///         nothing writes it any more — genesis data is read from `currentRelease`.
-    function newChainCreationParamsBlock(uint256 _protocolVersion) public view returns (uint256) {
-        return __DEPRECATED_newChainCreationParamsBlock[_protocolVersion];
+    /// @inheritdoc IChainTypeManager
+    /// @dev Zero means "not set" in the stored slot (the getter falls back to the transition), so
+    ///      pass a nonzero timestamp; a past one expires the version immediately.
+    function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
+        storedProtocolVersionDeadline[_protocolVersion] = _timestamp;
+        emit UpdateProtocolVersionDeadline(_protocolVersion, _timestamp);
     }
 
     /// @dev check that the protocolVersion is active
     /// @param _protocolVersion the protocol version to check
     function protocolVersionIsActive(uint256 _protocolVersion) external view override returns (bool) {
         return block.timestamp <= protocolVersionDeadline(_protocolVersion);
-    }
-
-    /// @dev set upgrade for some protocolVersion
-    /// @param _cutData the new diamond cut data
-    /// @param _oldProtocolVersion the old protocol version
-    function setUpgradeDiamondCut(
-        Diamond.DiamondCutData calldata _cutData,
-        uint256 _oldProtocolVersion
-    ) external onlyOwner {
-        setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
-    }
-
-    /// @dev set upgrade for some protocolVersion
-    /// @param _cutData the new diamond cut data
-    /// @param _oldProtocolVersion the old protocol version
-    function setUpgradeDiamondCutInner(Diamond.DiamondCutData memory _cutData, uint256 _oldProtocolVersion) internal {
-        bytes32 newCutHash = keccak256(abi.encode(_cutData));
-        __DEPRECATED_upgradeCutHash[_oldProtocolVersion] = newCutHash;
-        __DEPRECATED_upgradeCutDataBlock[_oldProtocolVersion] = block.number;
-        emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
-        emit NewUpgradeCutData(_oldProtocolVersion, _cutData);
-    }
-
-    /// @inheritdoc IChainTypeManager
-    function upgradeCutHash(uint256 _protocolVersion) public view returns (bytes32) {
-        return __DEPRECATED_upgradeCutHash[_protocolVersion];
     }
 
     /// @dev freezes the specified chain
@@ -744,9 +689,98 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
     /*//////////////////////////////////////////////////////////////
                             Legacy functions
+
+        Every function below serves versions that predate the registry
+        model, each tagged with the condition under which it can go.
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Commits a version edge with a hand-composed cut instead of a transition.
+    /// @param _cutData the new diamond cut data
+    /// @param _oldProtocolVersion the old protocol version
+    /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
+    /// @param _newProtocolVersion the new protocol version
+    /// @dev Kept for edges whose cut cannot be derived — the pre-registry bootstrap, whose departing
+    ///      version has no `fromRelease` to diff against. Registry-driven upgrades use
+    ///      {setNewVersionUpgradeFromTransition}.
+    // TODO(v35): DELETE — the v34 bootstrap is the last edge committed through this path; every
+    //            later edge has a `fromRelease` and commits a transition.
+    function setNewVersionUpgrade(
+        Diamond.DiamondCutData calldata _cutData,
+        uint256 _oldProtocolVersion,
+        uint256 _oldProtocolVersionDeadline,
+        uint256 _newProtocolVersion
+    ) external onlyOwner {
+        _commitVersionEdge(_oldProtocolVersion, _newProtocolVersion);
+        // The departing version has no transition to resolve a deadline from, so the deadline is
+        // stored directly.
+        storedProtocolVersionDeadline[_oldProtocolVersion] = _oldProtocolVersionDeadline;
+        emit UpdateProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
+        setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
+        // Emit event with backward compatible hack.
+        emit NewUpgradeCutData(_newProtocolVersion, _cutData);
+    }
+
+    /// @dev Re-commits the cut for a legacy-committed version (operational fix-up while pre-v34
+    ///      chains still have to cross such an edge).
+    /// @param _cutData the new diamond cut data
+    /// @param _oldProtocolVersion the old protocol version
+    // TODO(v35): DELETE with {setNewVersionUpgrade} — meaningless once no version is committed
+    //            through the legacy path.
+    function setUpgradeDiamondCut(
+        Diamond.DiamondCutData calldata _cutData,
+        uint256 _oldProtocolVersion
+    ) external onlyOwner {
+        setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
+    }
+
+    /// @dev Stores the commitment pre-v34 chains verify their handed cut against
+    ///      ({upgradeCutHash}), plus the block number legacy tooling scans for the
+    ///      `NewUpgradeCutData` log ({upgradeCutDataBlock}). These legacy values ARE the point:
+    ///      a chain departing a pre-v34 version runs pre-v34 facets, and this is the only
+    ///      commitment shape those facets (and their scripts) can consume.
+    // TODO(v35): DELETE with {setNewVersionUpgrade}.
+    function setUpgradeDiamondCutInner(Diamond.DiamondCutData memory _cutData, uint256 _oldProtocolVersion) internal {
+        bytes32 newCutHash = keccak256(abi.encode(_cutData));
+        __DEPRECATED_upgradeCutHash[_oldProtocolVersion] = newCutHash;
+        __DEPRECATED_upgradeCutDataBlock[_oldProtocolVersion] = block.number;
+        emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
+        emit NewUpgradeCutData(_oldProtocolVersion, _cutData);
+    }
+
+    /// @inheritdoc IChainTypeManager
+    // TODO(v35+): DELETE once no chain on this CTM can depart a pre-v34 version (their Admin
+    //             facets verify the handed cut against this; v34+ chains read
+    //             {upgradeCutForVersion} instead). In practice: after every chain has crossed
+    //             the bootstrap edge and the pre-v34 deadlines have passed.
+    function upgradeCutHash(uint256 _protocolVersion) public view returns (bytes32) {
+        return __DEPRECATED_upgradeCutHash[_protocolVersion];
+    }
+
+    /// @notice The block of a LEGACY cut commit, where its tooling finds the
+    ///         `NewUpgradeCutData` log; zero for registry-driven edges (read the cut from
+    ///         {upgradeCutForVersion} instead).
+    // TODO(v35+): DELETE with {upgradeCutHash} — chain-side scripts need it only to recover a
+    //             legacy-committed cut from logs (`GetDiamondCutData.getDiamondCutData`).
+    function upgradeCutDataBlock(uint256 _protocolVersion) public view returns (uint256) {
+        return __DEPRECATED_upgradeCutDataBlock[_protocolVersion];
+    }
+
+    /// @dev Used to set legacy validatorTimelock.
+    /// @dev Note, that the validator timelock that this function sets is only used for pre-v29 protocol versions.
+    /// It is kept only for convenience.
+    /// @param _validatorTimelock the new validatorTimelock address
+    // TODO: DELETE with {validatorTimelock} once no chain settles batches under a pre-v29
+    //       protocol version (from v29 on only `validatorTimelockPostV29` is consulted).
+    function setLegacyValidatorTimelock(address _validatorTimelock) external onlyOwner {
+        address oldValidatorTimelock = __DEPRECATED_validatorTimelock;
+        __DEPRECATED_validatorTimelock = _validatorTimelock;
+        emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
+    }
+
     /// @notice return the chain contract address for a chainId
+    // TODO: DELETE once no deployed ValidatorTimelock still resolves chains through this getter
+    //       (kept for the upgrade window in which the bridgehub's zkChains mapping is not yet
+    //       filled while the old ValidatorTimelock still queries by chain id).
     function getHyperchain(uint256 _chainId) public view returns (address) {
         // During upgrade, there will be a period when the zkChains mapping on
         // bridgehub will not be filled yet, while the ValidatorTimelock
@@ -754,7 +788,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         //
         // To cover this case, we firstly use the existing storage and only then
         // we use the bridgehub if the former was not present.
-        // This logic should be deleted in one of the future upgrades.
         address legacyAddress = getZKChainLegacy(_chainId);
         if (legacyAddress != address(0)) {
             return legacyAddress;
@@ -764,7 +797,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
     /// @notice Returns the legacy validator timelock address.
     /// @dev This function is used to return the validator timelock address for pre-v29 protocol versions.
-    /// @dev This function is deprecated and will be removed in the future.
+    // TODO: DELETE with {setLegacyValidatorTimelock}.
     function validatorTimelock() external view returns (address) {
         return __DEPRECATED_validatorTimelock;
     }

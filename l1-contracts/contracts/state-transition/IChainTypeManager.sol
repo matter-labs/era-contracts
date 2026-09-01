@@ -104,11 +104,16 @@ interface IChainTypeManager {
     function protocolVersion() external view returns (uint256);
 
     /// @notice The timestamp until which `_protocolVersion` can be used.
-    /// @dev Single-sourced from the committed transition departing that version. There is no
-    ///      setter: a version's schedule is part of the write-once transition governance approved.
-    ///      The current version has no departing transition and is usable indefinitely; versions
-    ///      departed via the legacy cut-taking path read the legacy storage that path wrote.
+    /// @dev The committed transition pins the deadline its edge was approved with; the current
+    ///      version has no departing transition and is usable indefinitely; versions departed via
+    ///      the legacy cut-taking path read the storage that path wrote. A deadline set via
+    ///      {setProtocolVersionDeadline} takes precedence over all of these.
     function protocolVersionDeadline(uint256 _protocolVersion) external view returns (uint256);
+
+    /// @notice Moves the deadline of a departed protocol version — operational state that keeps
+    ///         changing after the commit (extended while chains lag, shortened to retire a
+    ///         version), for legacy and registry-committed versions alike.
+    function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external;
 
     function protocolVersionIsActive(uint256 _protocolVersion) external view returns (bool);
     function currentRelease() external view returns (address);

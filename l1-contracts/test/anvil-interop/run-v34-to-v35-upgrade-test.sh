@@ -7,7 +7,7 @@ done
 sleep 1
 
 cd "$(dirname "$0")"
-npx ts-node run-registry-driven-upgrade-test.ts > /tmp/registry-upgrade-test-output.txt 2>&1
+npx ts-node run-v34-to-v35-upgrade-test.ts > /tmp/registry-upgrade-test-output.txt 2>&1
 EXIT_CODE=$?
 echo "EXIT CODE: $EXIT_CODE"
 tail -40 /tmp/registry-upgrade-test-output.txt

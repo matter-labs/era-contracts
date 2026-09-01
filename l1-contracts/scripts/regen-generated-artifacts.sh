@@ -31,7 +31,7 @@ echo "==> [3/5] regenerating anvil-interop chain states (port offset ${PORT_OFFS
 
 echo "==> [4/5] regenerating the registry manifest from the fresh chain states"
 (cd test/anvil-interop && ANVIL_INTEROP_PORT_OFFSET="${PORT_OFFSET}" REGEN_REGISTRIES=1 \
-    npx ts-node run-registry-driven-upgrade-test.ts)
+    npx ts-node run-v34-to-v35-upgrade-test.ts)
 
 echo "==> [5/5] regenerating selectors"
 yarn selectors --fix

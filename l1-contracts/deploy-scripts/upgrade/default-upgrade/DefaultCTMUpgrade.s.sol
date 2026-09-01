@@ -979,6 +979,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
                 ctmAddresses.stateTransition.implementations.serverNotifier
             );
         }
+        // Introspection reports the engine as zero (nothing on-chain to read it from), so an
+        // unassigned engine surviving to serialization means the prepare never deployed one —
+        // downstream that zero silently becomes a dead upgrade cut.
+        require(ctmAddresses.stateTransition.defaultUpgrade != address(0), "default upgrade not deployed");
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",

@@ -84,7 +84,7 @@ Supporting libraries:
 
 | Library              | Role                                                                                  |
 | -------------------- | ------------------------------------------------------------------------------------- |
-| `TransitionDeltaLib` | `deriveFacetCuts` / `deriveHashChanges` from a release pair                           |
+| `TransitionDerivationLib` | `deriveFacetCuts` / `deriveHashChanges` from a release pair                           |
 | `ReleaseFacetReader` | `newChainInstallations(release)` — genesis cuts from a release's routing              |
 | `CTMUpgradeComposer` | `buildUpgradeCutData`, `buildL2UpgradeTx`, `buildProposedUpgrade` from a transition   |
 | `GenesisManifestLib` | `GenesisConfig` → genesis `ReleaseManifest`, capturing routing and pins at build time |
@@ -109,7 +109,7 @@ flowchart TB
     end
 
     subgraph lib["Libraries"]
-      TDL["TransitionDeltaLib"]
+      TDL["TransitionDerivationLib"]
       RFR["ReleaseFacetReader"]
       CUC["CTMUpgradeComposer"]
       GML["GenesisManifestLib"]
