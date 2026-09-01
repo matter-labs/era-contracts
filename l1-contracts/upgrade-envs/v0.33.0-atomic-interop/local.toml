@@ -1,23 +1,19 @@
 # Upgrade input for the v33 release on a local anvil ecosystem.
 #
-# Intentionally empty of values. Nothing on the v33 path reads a key from this file:
-#   - the target protocol version and chain-creation params come from
-#     `configs/genesis/zksync-os/latest.json` (`DefaultCoreUpgrade.loadProtocolVersionFromGenesis`);
-#   - the old version comes from the chain on L1;
-#   - the bridgehub and CTM come from the caller's `--bridgehub` / `--ctm-proxy`;
-#   - `era_chain_id`, `testnet_verifier` and the CREATE2 salts come from
-#     `permanent-values/<env>.toml`.
-#
-# It still has to exist, though: `upgrade-prepare-all --env local` resolves its input as
-# `upgrade-envs/v0.33.0-atomic-interop/local.toml` and errors if that file is absent rather than
-# falling back to a default. The fallback is what is dangerous — for a *real* environment it would
-# quietly substitute local's `era_chain_id`, `governance_upgrade_timer_initial_delay` and gateway
-# chain id (the last of which is baked into `L1MessageRoot` as `ERA_GATEWAY_CHAIN_ID`). Requiring
-# the file also catches a mistyped `--env`. So an empty file is this environment stating, on the
-# record, that it needs nothing from the input.
-#
-# Note that `permanent-values/local.toml` is selected by the `--env` name directly, not by this
-# file — so this file's contents cannot affect which `testnet_verifier` is used.
-#
-# If a future consumer needs a value here, note that `new_protocol_version` is read as
-# `$.contracts.new_protocol_version` (nested), not at the top level.
+# Same shape as `stage.toml` / `mainnet.toml`, minus the recorded addresses: a local ecosystem is
+# deployed fresh, so its bridgehub, bytecodes supplier, DA manager, security council and CREATE2
+# salts are discovered at run time or randomised per regen rather than committed. `--bridgehub` and
+# `--ctm-proxy` supply the first two on the command line.
+
+era_chain_id = 6565
+testnet_verifier = true
+governance_upgrade_timer_initial_delay = 0
+support_l2_legacy_shared_bridge_test = false
+old_protocol_version = 0x1f00000000  # v31.0.0
+
+[contracts]
+governance_min_delay = 0
+max_number_of_chains = 100
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+validator_timelock_execution_delay = 0
+latest_protocol_version = 0x2100000000  # v33.0.0
