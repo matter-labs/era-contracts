@@ -13,7 +13,7 @@
  *      (with force-deploy-driven anvil_setCode overrides), stage3 population,
  *      protocol-version verification.
  *
- * Unlike `run-v31-to-v32-upgrade-test.ts`, this does NOT load pre-generated chain states
+ * Unlike `run-upgrade-test.ts`, this does NOT load pre-generated chain states
  * and does NOT perform the synthetic-state setup steps (ownership transfer, ChainAdmin
  * deploy, diamond storage patches) — real forked state already has all of those.
  *

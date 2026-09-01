@@ -218,7 +218,7 @@ pub async fn prepare_new_gateway(
     // harness's* anvil (this nested fork dies when `ForgeRunner` drops).
     // Note also: no need to re-fund anything on this fork post-revert —
     // the harness-owned anvil is where bundle replay happens; funding for
-    // that lives in `v31-upgrade-test-runner.ts:fundDeployerZkForBundleReplay`.
+    // that lives in `upgrade-test-runner.ts:fundDeployerZkForBundleReplay`.
     evm_revert(&runner.rpc_url, &snap_id)
         .await
         .context("evm_revert after GW prep")?;

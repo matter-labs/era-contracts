@@ -26,10 +26,11 @@ contract CTMUpgradeV33ForTests is CTMUpgrade_v33 {
     }
 
     /// @dev Reads the optional `contracts.new_protocol_version` from the upgrade input and uses it as the
-    ///      upgrade target. The production flow reads the target from the genesis config, which pins the
-    ///      release the foundry suite is built against (v31); a harness scenario upgrading a v31 ecosystem
-    ///      onto this release has to say which version it is moving to, the same way the local foundry
-    ///      fixture does with `ctmUpgrade.setNewProtocolVersion`.
+    ///      upgrade target. The production flow reads the target from the genesis config
+    ///      (`configs/genesis/zksync-os/latest.json`, currently v33); a harness scenario upgrading a v31
+    ///      ecosystem onto this release states its target explicitly, the same way the local foundry
+    ///      fixture does with `ctmUpgrade.setNewProtocolVersion`. Keep the value in the scenario's input
+    ///      in step with that genesis config — a stale one silently upgrades to the wrong version.
     // solhint-disable-next-line func-named-parameters
     function initializeWithArgs(
         address _ctmProxy,
