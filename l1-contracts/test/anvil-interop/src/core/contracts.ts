@@ -66,7 +66,7 @@ const ARTIFACTS = {
   PriorityOpLowerBound: "PriorityOpLowerBound.sol/PriorityOpLowerBound.json",
   ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
   DefaultUpgradeZKsyncOS: "DefaultUpgradeZKsyncOS.sol/DefaultUpgradeZKsyncOS.json",
-  V32UpgradeZKsyncOS: "V32UpgradeZKsyncOS.sol/V32UpgradeZKsyncOS.json",
+  V33UpgradeZKsyncOS: "V33UpgradeZKsyncOS.sol/V33UpgradeZKsyncOS.json",
   SystemContractProxy: "SystemContractProxy.sol/SystemContractProxy.json",
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
@@ -77,7 +77,7 @@ const ARTIFACTS = {
   IAtomicFlowManager: "IAtomicFlowManager.sol/IAtomicFlowManager.json",
   L2MessageVerification: "L2MessageVerification.sol/L2MessageVerification.json",
   L2InteropRootStorage: "L2InteropRootStorage.sol/L2InteropRootStorage.json",
-  L2V32Upgrade: "L2V32Upgrade.sol/L2V32Upgrade.json",
+  L2V33Upgrade: "L2V33Upgrade.sol/L2V33Upgrade.json",
   UpgradeableBeaconDeployer: "UpgradeableBeaconDeployer.sol/UpgradeableBeaconDeployer.json",
 } as const;
 
@@ -112,7 +112,7 @@ export const LEGACY_ADMIN_ABI: string[] = [
 ];
 
 /**
- * v31 Admin facet entry point removed in v32 (the backfill service-transaction request). The
+ * v31 Admin facet entry point removed in v33 (the backfill service-transaction request). The
  * harness calls it on forked v31 chains whose fixture never ran the backfill, so the current
  * AdminFacet artifact no longer carries the selector.
  */

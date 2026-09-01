@@ -9,7 +9,7 @@ name: Verify merged commit (clean build)
 on:
   # Every push is considered, and the `gate` job below decides. Branch protection alone would not
   # do: of the branches PRs actually merge into, main, atomic-imt-interop-release and draft-v31 are
-  # protected, but atomic-imt-reduced — the busiest base — and draft-v32 are not. Protection alone
+  # protected, but atomic-imt-reduced — the busiest base — and draft-v33 are not. Protection alone
   # would skip the busiest base; a glob list alone goes stale as new bases appear. So: either.
   push:
     branches: ["**"]

@@ -475,7 +475,7 @@ fn deploy_paymaster_step(
 }
 
 /// Registers the chain on every other chain of the ecosystem and vice versa, through
-/// `ChainRegistrationSender`. Both directions of a pair are registrable as of v32 even when both chains
+/// `ChainRegistrationSender`. Both directions of a pair are registrable as of v33 even when both chains
 /// settle directly on L1.
 fn register_on_all_chains_step(
     runner: &mut ForgeRunner,

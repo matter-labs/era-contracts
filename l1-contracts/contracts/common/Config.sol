@@ -42,7 +42,7 @@ uint256 constant MAX_ALLOWED_MINOR_VERSION_DELTA = 100;
 
 /// @dev By convention, tokens native to a chain are treated as if an infinite amount was deposited at the
 /// chain's inception, so their tracked balances start at this value and decrease as tokens are bridged out.
-/// Load-bearing on L1 as well: the removed pre-v32 asset tracker's L1 entry is read as the complement of
+/// Load-bearing on L1 as well: the removed pre-v33 asset tracker's L1 entry is read as the complement of
 /// this value (see {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}).
 uint256 constant MAX_TOKEN_BALANCE = type(uint256).max;
 
@@ -301,8 +301,8 @@ uint256 constant INITIAL_BASE_TOKEN_HOLDER_BALANCE = (2 ** 127) - 1;
 uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 7;
 
 /// @dev Whether chain migrations between settlement layers are enabled in the current release.
-/// @dev Release-level switch (disabled in v32): lifting the ban requires a protocol upgrade, unlike
-/// the runtime `migrationPaused` flag. See {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}.
+/// @dev Release-level switch (disabled in v33): lifting the ban requires a protocol upgrade, unlike
+/// the runtime `migrationPaused` flag. See {protocol-docs/chain-lifecycle.md#v33-chain-migrations-are-explicitly-disabled}.
 bool constant CHAIN_MIGRATIONS_ENABLED = false;
 
 /// @dev Migration number used when a chain migrates from L1 to a settlement layer.

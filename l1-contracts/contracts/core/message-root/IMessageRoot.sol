@@ -77,18 +77,18 @@ interface IMessageRootBase is IMessageVerification {
     function addNewChain(uint256 _chainId, uint256 _startingBatchNumber) external;
 
     /// @notice Records a chainBatchRoot WITHOUT pushing it into the interop trees — the v31,
-    /// record-only flow kept for pre-upgrade executor facets. See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+    /// record-only flow kept for pre-upgrade executor facets. See {protocol-docs/message-root.md#v31-vs-v33-append-flows}.
     /// @param _chainId The ID of the chain whose chainBatchRoot is being recorded.
     /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
     /// @param _chainBatchRoot The value of chainBatchRoot which is being recorded.
     function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
 
     /// @notice Records a chainBatchRoot AND pushes it into the chain tree and the aggregated shared
-    /// tree — the v32 flow, called by v32 executors while settling. See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+    /// tree — the v33 flow, called by v33 executors while settling. See {protocol-docs/message-root.md#v31-vs-v33-append-flows}.
     /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
     /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
     /// @param _chainBatchRoot The value of chainBatchRoot which is being added.
-    function addChainBatchRootV32(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
+    function addChainBatchRootV33(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
 
     /// @notice One-time, Bridgehub-only seeding of a freshly created chain's genesis (batch 0) chain
     /// batch root, pulled from the chain itself; a no-op for EraVM chains.

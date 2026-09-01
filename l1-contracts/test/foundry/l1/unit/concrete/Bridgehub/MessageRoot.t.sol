@@ -319,13 +319,13 @@ contract MessageRootTest is Test {
 
         vm.prank(alphaChainSender);
         vm.expectRevert(MessageRootNotRegistered.selector);
-        messageRoot.addChainBatchRootV32(alphaChainId, 1, bytes32(alphaChainId));
+        messageRoot.addChainBatchRootV33(alphaChainId, 1, bytes32(alphaChainId));
     }
 
     /// @notice The legacy (v31) entry point records the root and advances the batch counter but does
-    /// NOT touch the interop trees: only v32 executors (via `addChainBatchRootV32`) populate them, so
-    /// a non-empty chain tree implies v32-format roots. Pre-upgrade executor facets keep calling this
-    /// name, and the consecutive numbering continues seamlessly after the switch to the V32 flow.
+    /// NOT touch the interop trees: only v33 executors (via `addChainBatchRootV33`) populate them, so
+    /// a non-empty chain tree implies v33-format roots. Pre-upgrade executor facets keep calling this
+    /// name, and the consecutive numbering continues seamlessly after the switch to the V33 flow.
     function test_addChainBatchRoot_v31RecordsWithoutTreePush() public {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
@@ -350,11 +350,11 @@ contract MessageRootTest is Test {
         assertEq(messageRoot.getAggregatedRoot(), sharedRootBefore, "shared tree must be untouched");
         assertEq(messageRoot.chainBatchRootTimestamp(alphaChainId, 1), 0, "no leaf timestamp recorded");
 
-        // The V32 flow continues the same numbering afterwards (post-upgrade switch).
+        // The V33 flow continues the same numbering afterwards (post-upgrade switch).
         vm.prank(alphaChainSender);
-        messageRoot.addChainBatchRootV32(alphaChainId, 2, keccak256("v32-root-2"));
+        messageRoot.addChainBatchRootV33(alphaChainId, 2, keccak256("v33-root-2"));
         assertEq(messageRoot.currentChainBatchNumber(alphaChainId), 2);
-        assertTrue(messageRoot.getChainRoot(alphaChainId) != chainRootBefore, "v32 push must move the chain tree");
+        assertTrue(messageRoot.getChainRoot(alphaChainId) != chainRootBefore, "v33 push must move the chain tree");
     }
 
     function test_addChainBatchRoot_1() public {
@@ -377,7 +377,7 @@ contract MessageRootTest is Test {
         vm.chainId(L1_CHAIN_ID);
         vm.prank(alphaChainSender);
         vm.expectRevert();
-        l2MessageRoot.addChainBatchRootV32(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID));
+        l2MessageRoot.addChainBatchRootV33(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID));
 
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(alphaChainId, 0);
@@ -407,7 +407,7 @@ contract MessageRootTest is Test {
         emit IMessageRootBase.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId), block.timestamp);
         vm.expectEmit(true, false, false, false);
         emit IMessageRootBase.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
-        l2MessageRoot.addChainBatchRootV32(alphaChainId, 1, bytes32(alphaChainId));
+        l2MessageRoot.addChainBatchRootV33(alphaChainId, 1, bytes32(alphaChainId));
 
         // The settlement-layer timestamp is recorded per (chainId, batchNumber) — the value the atomic
         // deadline check is compared against.
@@ -469,7 +469,7 @@ contract MessageRootTest is Test {
         assertEq(initialBatchNumber, 0, "Initial batch number should be 0");
 
         vm.prank(alphaChainSender);
-        messageRoot.addChainBatchRootV32(
+        messageRoot.addChainBatchRootV33(
             alphaChainId,
             1,
             bytes32(hex"63c4d39ce8f2410a1e65b0ad1209fe8b368928a7124bfa6e10e0d4f0786129dd")
@@ -479,7 +479,7 @@ contract MessageRootTest is Test {
         assertEq(batchNumberAfterBatch1, 1, "Batch number should be 1 after adding first batch");
 
         vm.prank(alphaChainSender);
-        messageRoot.addChainBatchRootV32(
+        messageRoot.addChainBatchRootV33(
             alphaChainId,
             2,
             bytes32(hex"bcc3a5584fe0f85e968c0bae082172061e3f3a8a47ff9915adae4a3e6174fc12")
@@ -489,7 +489,7 @@ contract MessageRootTest is Test {
         assertEq(batchNumberAfterBatch2, 2, "Batch number should be 2 after adding second batch");
 
         vm.prank(alphaChainSender);
-        messageRoot.addChainBatchRootV32(
+        messageRoot.addChainBatchRootV33(
             alphaChainId,
             3,
             bytes32(hex"8d1ced168691d5e8a2dc778350a2c40a2714cc7d64bff5b8da40a96c47dc5f3e")

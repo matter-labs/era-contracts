@@ -197,7 +197,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         IChainAssetHandlerBase(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
     }
 
-    // Chain migrations are explicitly disabled in the v32 release, in which all chains settle
+    // Chain migrations are explicitly disabled in the v33 release, in which all chains settle
     // on L1 (see `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`). The following tests pin the
     // release-level ban on the production (non-Dev) chain asset handlers on both layers.
 

@@ -51,7 +51,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     ///         so that stage-2 helpers can re-read the optional `[legacy_gateway]` section.
     string internal v31UpgradeInputRelPath;
 
-    /// @notice Whether this run deployed the `L1InteropHandler` proxy, i.e. the ecosystem was pre-v32.
+    /// @notice Whether this run deployed the `L1InteropHandler` proxy, i.e. the ecosystem was pre-v33.
     ///         Its ownership then has to be handed to governance and its address wired into the bridges.
     bool internal deployedL1InteropHandler;
 
@@ -114,8 +114,8 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
             false
         );
 
-        // The interop handler is new in v32: a pre-v32 ecosystem has no proxy for it, so deploy one and let
-        // stage 1 wire it into the bridges. An ecosystem already on v32 only gets a fresh implementation.
+        // The interop handler is new in v33: a pre-v33 ecosystem has no proxy for it, so deploy one and let
+        // stage 1 wire it into the bridges. An ecosystem already on v33 only gets a fresh implementation.
         if (coreAddresses.bridges.proxies.l1InteropHandler == address(0)) {
             (
                 coreAddresses.bridges.implementations.l1InteropHandler,
@@ -171,7 +171,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     /// @dev Emits the ChainRegistrationSender proxy upgrade, L1ChainAssetHandler.setAddresses,
     ///      and the L1InteropHandler wiring calls (see `_buildL1InteropHandlerWiringCalls`).
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
-        console.log("Preparing v32-specific stage1 governance calls...");
+        console.log("Preparing v33-specific stage1 governance calls...");
 
         address chainAssetHandlerProxy = coreAddresses.bridgehub.proxies.chainAssetHandler;
         require(chainAssetHandlerProxy != address(0), "ChainAssetHandler proxy address not found");
@@ -201,7 +201,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     }
 
     /// @notice Stage-1 calls that wire a freshly deployed `L1InteropHandler` into the bridges.
-    /// @dev Empty on an ecosystem that already runs v32, so the same script serves an upgrade and a re-run.
+    /// @dev Empty on an ecosystem that already runs v33, so the same script serves an upgrade and a re-run.
     ///      Both setters are one-shot and only exist on the new implementations, hence stage 1 rather than
     ///      the deploy step.
     function _buildL1InteropHandlerWiringCalls() internal virtual returns (Call[] memory calls) {
@@ -255,7 +255,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     /// @dev The registration has to come first: the population only sees assets that are present in the
     ///      vault's `bridgedTokens` enumeration.
     function stage3(address bridgehubProxy) public {
-        console.log("Starting v32 stage3 post-governance registration...");
+        console.log("Starting v33 stage3 post-governance registration...");
         console.log("Bridgehub proxy:", bridgehubProxy);
 
         vm.startBroadcast();
@@ -263,7 +263,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         BridgedOutPopulationLib.populateBridgedOutForAllAssets(bridgehubProxy);
         vm.stopBroadcast();
 
-        console.log("v32 stage3 registration complete!");
+        console.log("v33 stage3 registration complete!");
     }
 
     /// @notice Build the legacy-GW decommission calls (historical intervals + blacklist).

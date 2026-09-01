@@ -73,7 +73,7 @@ library MessageHashing {
     /// @param batchNumber The number of the batch.
     /// @param l1Timestamp The settlement-layer block timestamp at which the batch root was aggregated.
     /// Bound into the leaf so the timestamp is provable via the same inclusion proof; see
-    /// {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+    /// {protocol-docs/message-root.md#v31-vs-v33-append-flows}.
     function batchLeafHash(
         bytes32 batchRoot,
         uint256 batchNumber,

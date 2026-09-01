@@ -13,7 +13,7 @@
  *      (with force-deploy-driven anvil_setCode overrides), stage3 migration,
  *      protocol-version verification.
  *
- * Unlike `run-v31-to-v32-upgrade-test.ts`, this does NOT load pre-generated chain states
+ * Unlike `run-v31-to-v33-upgrade-test.ts`, this does NOT load pre-generated chain states
  * and does NOT perform the synthetic-state setup steps (ownership transfer, ChainAdmin
  * deploy, diamond storage patches) — real forked state already has all of those.
  *
@@ -255,7 +255,7 @@ async function main(): Promise<void> {
       prepareDir = result.prepareOutDir;
     } else {
       const scenario: V31UpgradeScenario = {
-        label: "fork-v31-to-v32",
+        label: "fork-v31-to-v33",
         stateVersion: "fork",
         permanentValuesTemplatePath:
           process.env.FORK_PERMANENT_VALUES_PATH ?? "upgrade-envs/permanent-values/local.toml",

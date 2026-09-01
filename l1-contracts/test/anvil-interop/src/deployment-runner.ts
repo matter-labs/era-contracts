@@ -74,7 +74,7 @@ export class DeploymentRunner {
    * Protocol version string used to name the chain-states folder (e.g. "v0.32.0"). Read from the
    * harness's OWN config (`stateVersion`), NOT the shared `configs/genesis/era/latest.json`: the
    * shared genesis pins the L1 foundry suite's base version (v31) while the anvil harness runs
-   * atomic-interop (v32), and keeping the harness version local decouples the two.
+   * atomic-interop (v33), and keeping the harness version local decouples the two.
    */
   getProtocolVersionString(): string {
     const cfg = JSON.parse(fs.readFileSync(this.configPath, "utf-8")) as { stateVersion?: string };

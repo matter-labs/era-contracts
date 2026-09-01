@@ -80,7 +80,7 @@ function collectSkipStorageAccounts(versionDir: string): Set<string> {
 // and 167, per `forge inspect ChainTypeManagerBase storage-layout`) map a *packed* protocol version
 // to the block at which that version's data was registered. The stored value is a block number, so
 // it drifts run-to-run like the slots below — and the keccak slot itself moves on every genesis
-// protocol-version bump, since the version is the mapping key: the v31 and v32 keys were listed here
+// protocol-version bump, since the version is the mapping key: the v31 and v33 keys were listed here
 // as raw hashes and the bump to v33 (#2429) broke the check again. Derive the slots from the version
 // instead, over a range wide enough that the next bump needs no new hash here.
 const CTM_VERSION_KEYED_BLOCK_SLOT_INDICES = [166, 167];
@@ -111,7 +111,7 @@ const BLOCK_NUMBER_STORAGE_SLOTS = new Set([
   // The CTM version-keyed block slots, on the L1 ChainTypeManager and the gateway's L2 one. This
   // check compares committed against freshly generated state for the SAME tree, so a difference here
   // can only be run-to-run drift; `newChainCreationParamsBlock` was observed as 44 -> 53 (L1) and
-  // 197 -> 222 (L2 chain 11) under the v32 key, and 43 -> 46 / 192 -> 203 under the v33 one.
+  // 197 -> 222 (L2 chain 11) under the v33 key, and 43 -> 46 / 192 -> 203 under the v33 one.
   ...ctmVersionKeyedBlockSlots(),
 ]);
 

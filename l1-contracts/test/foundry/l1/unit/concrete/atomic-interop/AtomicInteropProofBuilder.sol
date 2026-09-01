@@ -69,7 +69,7 @@ contract AtomicInteropProofWrapper {
 ///     protocol's settlement-layer interop root `(root, timestamp)` tuples are served by the real storage — no mocked
 ///     root values.
 ///   - A REAL {L2MessageVerification} and a REAL {L1MessageRoot} aggregation oracle: the `_real*`
-///     builders below aggregate a chain batch root through the production `addChainBatchRootV32`, read
+///     builders below aggregate a chain batch root through the production `addChainBatchRootV33`, read
 ///     the shared-tree path from the live MessageRoot, import the shared root, and authenticate the
 ///     assembled proof through the real verifier. This is the DEFAULT — happy proofs are fully
 ///     un-mocked end to end.
@@ -192,7 +192,7 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
     }
 
     /// @dev Aggregates a chain batch root embedding `(_imtBegin, _imtEnd)` for `_sourceChainId` at batch
-    /// time `_batchTs`, through the real `addChainBatchRootV32`. Returns the batch number used and the
+    /// time `_batchTs`, through the real `addChainBatchRootV33`. Returns the batch number used and the
     /// chain root immediately before the new batch leaf is pushed. Unlike the `_real*` proof builders,
     /// this low-level aggregation helper can advance a source chain beyond its first batch.
     function _aggregateBatch(
@@ -210,7 +210,7 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
         vm.warp(_batchTs);
         vm.roll(++_slBlockCursor);
         vm.prank(chainSender);
-        slMessageRoot.addChainBatchRootV32(_sourceChainId, batchNumber, chainBatchRoot);
+        slMessageRoot.addChainBatchRootV33(_sourceChainId, batchNumber, chainBatchRoot);
     }
 
     /// @dev Imports the MessageRoot's CURRENT aggregated shared root into the real L2InteropRootStorage

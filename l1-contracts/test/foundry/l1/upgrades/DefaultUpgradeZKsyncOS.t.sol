@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
-import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
+import {IL2V33Upgrade} from "contracts/upgrades/IL2V33Upgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
@@ -46,7 +46,7 @@ contract DummyDefaultUpgradeZKsyncOS is DefaultUpgradeZKsyncOS, BaseUpgradeUtils
 ///         before the generic upgrade runs, and the per-chain force-deployments-data substitution it does.
 /// @dev The ecosystem contracts the substitution reads (bridgehub, asset router, native token vault) are
 ///      mocked: the behaviour under test is which values end up in the rewritten transaction, not how the
-///      vault stores them. The end-to-end composition is covered by the anvil `v31 -> v32` scenario.
+///      vault stores them. The end-to-end composition is covered by the anvil `v31 -> v33` scenario.
 contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
     DummyDefaultUpgradeZKsyncOS internal upgradeContract;
 
@@ -56,7 +56,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
     address internal mockAssetRouter = makeAddr("mockAssetRouter");
     address internal mockNativeTokenVault = makeAddr("mockNativeTokenVault");
     address internal ctmDeployer = makeAddr("ctmDeployer");
-    address internal delegateTo = makeAddr("l2V32UpgradeDelegate");
+    address internal delegateTo = makeAddr("l2V33UpgradeDelegate");
 
     uint256 internal constant CHAIN_ID = 271;
     uint256 internal constant BASE_TOKEN_ORIGIN_CHAIN_ID = 1;
@@ -141,7 +141,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
     }
 
     function test_revertWhen_theOuterSelectorIsNotForceDeployAndUpgradeUniversal() public {
-        bytes memory wrongOuter = abi.encodeCall(IL2V32Upgrade.upgrade, (true, ctmDeployer, hex"", hex""));
+        bytes memory wrongOuter = abi.encodeCall(IL2V33Upgrade.upgrade, (true, ctmDeployer, hex"", hex""));
 
         vm.expectRevert(UnexpectedUpgradeSelector.selector);
         upgradeContract.getL2UpgradeTxData(mockBridgehub, CHAIN_ID, true, wrongOuter);
@@ -173,7 +173,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
     /// @dev The flag encoded in the ecosystem-wide transaction must agree with the chain being upgraded.
     function test_revertWhen_theWrappedFlagDisagreesWithTheChain() public {
         bytes memory eraShapedInner = abi.encodeCall(
-            IL2V32Upgrade.upgrade,
+            IL2V33Upgrade.upgrade,
             (false, ctmDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, hex"00")
         );
         bytes memory placeholder = abi.encodeCall(
@@ -204,7 +204,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         // The ecosystem-wide parts are carried over untouched.
         assertEq(forceDeployments.length, 0, "force deployments changed");
         assertEq(rewrittenDelegateTo, delegateTo, "delegate target changed");
-        assertEq(bytes4(innerCalldata), IL2V32Upgrade.upgrade.selector);
+        assertEq(bytes4(innerCalldata), IL2V33Upgrade.upgrade.selector);
 
         (bool isZKsyncOS, address rewrittenCtmDeployer, bytes memory fixedData, bytes memory perChainData) = abi.decode(
             _sliceSelector(innerCalldata),
@@ -307,7 +307,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
 
     function _placeholderUpgradeTxData() internal view returns (bytes memory) {
         bytes memory innerCalldata = abi.encodeCall(
-            IL2V32Upgrade.upgrade,
+            IL2V33Upgrade.upgrade,
             (true, ctmDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, hex"00")
         );
         return

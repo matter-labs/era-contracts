@@ -3,8 +3,8 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {V32UpgradeZKsyncOS} from "contracts/upgrades/V32UpgradeZKsyncOS.sol";
-import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
+import {V33UpgradeZKsyncOS} from "contracts/upgrades/V33UpgradeZKsyncOS.sol";
+import {IL2V33Upgrade} from "contracts/upgrades/IL2V33Upgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -24,8 +24,8 @@ import {PriorityOpLowerBound} from "contracts/upgrades/PriorityOpLowerBound.sol"
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 
-contract DummyV32UpgradeZKsyncOS is V32UpgradeZKsyncOS, BaseUpgradeUtils {
-    constructor(IPriorityOpLowerBound _priorityOpLowerBound) V32UpgradeZKsyncOS(_priorityOpLowerBound) {}
+contract DummyV33UpgradeZKsyncOS is V33UpgradeZKsyncOS, BaseUpgradeUtils {
+    constructor(IPriorityOpLowerBound _priorityOpLowerBound) V33UpgradeZKsyncOS(_priorityOpLowerBound) {}
 
     function setBridgehub(address _bridgehub) public {
         s.bridgehub = _bridgehub;
@@ -57,11 +57,11 @@ contract DummyV32UpgradeZKsyncOS is V32UpgradeZKsyncOS, BaseUpgradeUtils {
     }
 }
 
-/// @notice Unit tests for the v32-specific ZKsync OS per-chain upgrade: the v31 base-token backfill
+/// @notice Unit tests for the v33-specific ZKsync OS per-chain upgrade: the v31 base-token backfill
 ///         prerequisite it adds on top of {DefaultUpgradeZKsyncOS} (whose behavior is covered in
 ///         `DefaultUpgradeZKsyncOS.t.sol`).
-contract V32UpgradeZKsyncOSTest is BaseUpgrade {
-    DummyV32UpgradeZKsyncOS internal upgradeContract;
+contract V33UpgradeZKsyncOSTest is BaseUpgrade {
+    DummyV33UpgradeZKsyncOS internal upgradeContract;
     PriorityOpLowerBound internal priorityOpLowerBound;
 
     address internal mockChainTypeManager = makeAddr("mockChainTypeManager");
@@ -70,7 +70,7 @@ contract V32UpgradeZKsyncOSTest is BaseUpgrade {
     address internal mockAssetRouter = makeAddr("mockAssetRouter");
     address internal mockNativeTokenVault = makeAddr("mockNativeTokenVault");
     address internal ctmDeployer = makeAddr("ctmDeployer");
-    address internal delegateTo = makeAddr("l2V32UpgradeDelegate");
+    address internal delegateTo = makeAddr("l2V33UpgradeDelegate");
 
     uint256 internal constant CHAIN_ID = 271;
     uint256 internal constant BASE_TOKEN_ORIGIN_CHAIN_ID = 1;
@@ -80,7 +80,7 @@ contract V32UpgradeZKsyncOSTest is BaseUpgrade {
 
     function setUp() public {
         priorityOpLowerBound = new PriorityOpLowerBound();
-        upgradeContract = new DummyV32UpgradeZKsyncOS(priorityOpLowerBound);
+        upgradeContract = new DummyV33UpgradeZKsyncOS(priorityOpLowerBound);
 
         _prepareProposedUpgrade();
 
@@ -138,7 +138,7 @@ contract V32UpgradeZKsyncOSTest is BaseUpgrade {
         assertTrue(upgradeContract.getBaseTokenHasTotalSupply(), "the tracked-supply flag must survive the upgrade");
     }
 
-    /// @notice The upgrade is forbidden until the chain's pre-v32 base-token total supply was
+    /// @notice The upgrade is forbidden until the chain's pre-v33 base-token total supply was
     /// backfilled while it ran v31 (this release has no backfill path).
     function test_revertWhen_baseTokenTotalSupplyNotBackfilled() public {
         upgradeContract.setBaseTokenHasTotalSupply(false);
@@ -151,7 +151,7 @@ contract V32UpgradeZKsyncOSTest is BaseUpgrade {
     /// execution must have been recorded in the registry.
     function test_revertWhen_lowerBoundNotRecorded() public {
         priorityOpLowerBound = new PriorityOpLowerBound(); // fresh registry: nothing recorded
-        upgradeContract = new DummyV32UpgradeZKsyncOS(priorityOpLowerBound);
+        upgradeContract = new DummyV33UpgradeZKsyncOS(priorityOpLowerBound);
         upgradeContract.setBaseTokenHasTotalSupply(true);
         upgradeContract.setBatchCounters(7, 7);
 
@@ -174,7 +174,7 @@ contract V32UpgradeZKsyncOSTest is BaseUpgrade {
     function test_upgradesWithZeroLowerBoundAndNoPriorityOpsProcessed() public {
         // Fresh registry + upgrade contract, so the zero bound is recorded from scratch.
         priorityOpLowerBound = new PriorityOpLowerBound();
-        upgradeContract = new DummyV32UpgradeZKsyncOS(priorityOpLowerBound);
+        upgradeContract = new DummyV33UpgradeZKsyncOS(priorityOpLowerBound);
 
         upgradeContract.setPriorityTxMaxGasLimit(1 ether);
         upgradeContract.setPriorityTxMaxPubdata(1000000);
@@ -228,7 +228,7 @@ contract V32UpgradeZKsyncOSTest is BaseUpgrade {
 
     function _placeholderUpgradeTxData() internal view returns (bytes memory) {
         bytes memory innerCalldata = abi.encodeCall(
-            IL2V32Upgrade.upgrade,
+            IL2V33Upgrade.upgrade,
             (true, ctmDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, hex"00")
         );
         return

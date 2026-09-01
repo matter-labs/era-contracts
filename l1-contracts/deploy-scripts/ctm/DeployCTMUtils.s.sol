@@ -95,7 +95,7 @@ struct GeneratedData {
 }
 
 abstract contract DeployCTMUtils is DeployUtils {
-    /// @dev Deployed together with the v32 upgrade contract (see `CTMUpgrade_v31`), which embeds
+    /// @dev Deployed together with the v33 upgrade contract (see `CTMUpgrade_v31`), which embeds
     /// it as an immutable.
     address internal priorityOpLowerBound;
 
@@ -327,8 +327,8 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "DefaultUpgradeZKsyncOS")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "V32UpgradeZKsyncOS")) {
-            // The v32 upgrade contract pins the priority-op lower-bound registry as an immutable.
+        } else if (compareStrings(contractName, "V33UpgradeZKsyncOS")) {
+            // The v33 upgrade contract pins the priority-op lower-bound registry as an immutable.
             require(priorityOpLowerBound != address(0), "PriorityOpLowerBound not deployed");
             return abi.encode(priorityOpLowerBound);
         } else if (compareStrings(contractName, "PriorityOpLowerBound")) {

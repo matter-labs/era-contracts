@@ -377,7 +377,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     }
 
     /// @dev The atomic-interop built-ins are etched with their real code, not the generic mock, so that
-    ///      `_initializeV32Contracts` initializing them is observable (`leafCount` / `L1_CHAIN_ID`).
+    ///      `_initializeV33Contracts` initializing them is observable (`leafCount` / `L1_CHAIN_ID`).
     function _etchAtomicInteropBuiltIns() internal {
         if (L2_INTEROP_COMMITMENT_TREE_ADDR.code.length == 0) {
             vm.etch(L2_INTEROP_COMMITMENT_TREE_ADDR, address(new L2InteropCommitmentTree()).code);

@@ -75,7 +75,7 @@ enum CoreContract {
     L2MessageVerification,
     L2InteropRootStorage,
     BeaconProxy,
-    L2V32Upgrade,
+    L2V33Upgrade,
     BridgedStandardERC20,
     DiamondProxy,
     ProxyAdmin,

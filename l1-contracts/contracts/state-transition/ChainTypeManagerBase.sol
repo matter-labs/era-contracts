@@ -120,7 +120,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     mapping(uint256 protocolVersion => address) public protocolVersionVerifier;
 
     /// @dev The upgrade contract used for upgrades that need no custom upgrade logic.
-    /// @dev Populated starting from v32.
+    /// @dev Populated starting from v33.
     address public defaultUpgrade;
 
     /// @dev Contract is expected to be used as proxy implementation.

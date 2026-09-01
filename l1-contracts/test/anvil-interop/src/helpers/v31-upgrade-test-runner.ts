@@ -681,7 +681,7 @@ export async function runChainUpgradesAndRelayL2(params: {
 
   const settlementLayerUpgrade = new ethers.Contract(
     settlementLayerUpgradeAddr,
-    getAbi("V32UpgradeZKsyncOS"),
+    getAbi("V33UpgradeZKsyncOS"),
     l1Provider
   );
   const l1Chain = anvilManager.getL1Chain()!;
@@ -888,7 +888,7 @@ async function prepareAndRelayL2Upgrade(
 
   // Send the original upgrade calldata to ComplexUpgrader.
   // The outer force deployments no-op (MockContractDeployer), then upgrade() delegatecalls
-  // to L2V32Upgrade which runs performForceDeployedContractsInit (inner deploys also no-op).
+  // to L2V33Upgrade which runs performForceDeployedContractsInit (inner deploys also no-op).
   const txHash = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
     const tx = await signer.sendTransaction({
       to: L2_COMPLEX_UPGRADER_ADDR,
@@ -952,7 +952,7 @@ async function deployL2Contracts(
   const contractMap = buildAddressToContract(isZKsyncOS);
   for (const entry of forceDeployEntries) {
     // ZKsyncOSUnsafeForceDeployment entries are direct deployments (e.g. the SystemContractProxyAdmin
-    // at L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, and L2V32Upgrade at a random delegate address).
+    // at L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, and L2V33Upgrade at a random delegate address).
     // Both are already set up above (anvil_setCode for the proxy admin, and the delegateTo code
     // is set separately below), so we skip them here.
     if (entry.upgradeType === UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY) {
@@ -982,8 +982,8 @@ async function deployL2Contracts(
     }
   }
 
-  // Deploy the delegateTo target (L2V32Upgrade).
-  await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V32Upgrade")]);
+  // Deploy the delegateTo target (L2V33Upgrade).
+  await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V33Upgrade")]);
 
   // L2BaseToken: for Era it's deployed directly as L2BaseTokenEra (not in force deployment list).
   // For ZKsyncOS it's in the force deployment list as ZKsyncOSSystemProxyUpgrade and handled above.
@@ -1167,7 +1167,7 @@ function decodeLatestL2UpgradeTx(broadcastPath: string): {
   // Legacy ABI: v29/v30 states have upgradeChainFromVersion(uint256, DiamondCutData) (2 params).
   // Current ABI has upgradeChainFromVersion(address, uint256, DiamondCutData) (3 params).
   const legacyAdminIface = new ethers.utils.Interface(LEGACY_ADMIN_ABI);
-  const settlementLayerIface = new ethers.utils.Interface(getAbi("V32UpgradeZKsyncOS"));
+  const settlementLayerIface = new ethers.utils.Interface(getAbi("V33UpgradeZKsyncOS"));
 
   const errors: string[] = [];
 

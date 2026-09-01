@@ -409,7 +409,7 @@ library SystemContractsProcessing {
         // ProxyAdmin already present from genesis (owned by the ComplexUpgrader), so re-deploying it
         // would require an unsafe overwrite. _setupProxyAdmin only reads its owner(), which is already
         // correct. (L2WrappedBaseToken is likewise excluded — it is no longer in
-        // getFixedAddressCoreContracts.) The L2V32Upgrade delegate target remains the only legitimate
+        // getFixedAddressCoreContracts.) The L2V33Upgrade delegate target remains the only legitimate
         // ZKsyncOS unsafe force deployment (added in CTMUpgrade_v31); the PUVT guards that no other
         // unsafe force deployment is present.
         // The removed v31 GWAssetTracker's proxy gets its implementation swapped for EmptyContract.
@@ -429,7 +429,7 @@ library SystemContractsProcessing {
         }
         // ZKsync-OS-only contracts (currently the atomic-interop built-ins at 0x10012 / 0x10014).
         // Predeployed in the ZKsync OS genesis, so a from-scratch chain already has them; a chain that
-        // predates the release gets them here, which is what lets `_initializeV32Contracts` initialize
+        // predates the release gets them here, which is what lets `_initializeV33Contracts` initialize
         // them on the upgrade path too.
         for (uint256 i = 0; i < zksyncOSOnlyContracts.length; i++) {
             deployments[index++] = _buildZKsyncOSEntry(zksyncOSOnlyContracts[i]);
@@ -446,8 +446,8 @@ library SystemContractsProcessing {
 
     /// @notice Proxy upgrades that neutralize the removed v31 GWAssetTracker.
     /// @dev v31 deployed the GWAssetTracker as a system-proxied built-in on every ZKsync OS chain.
-    /// v32 deletes the contract, so the upgrade swaps its proxy's implementation for `EmptyContract`
-    /// — otherwise the retired tracker code would stay callable. Chains created on v32 get the same
+    /// v33 deletes the contract, so the upgrade swaps its proxy's implementation for `EmptyContract`
+    /// — otherwise the retired tracker code would stay callable. Chains created on v33 get the same
     /// EmptyContract-backed proxy from genesis, so fresh and upgraded chains match at the reserved
     /// address.
     /// @dev The v31 GWAssetTracker could collect wrapped-ZK settlement fees on a live gateway, but no

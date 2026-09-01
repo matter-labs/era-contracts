@@ -179,7 +179,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     }
 
     /// @inheritdoc IMessageRootBase
-    function addChainBatchRootV32(
+    function addChainBatchRootV33(
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
@@ -206,7 +206,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     }
 
     /// @dev Pushes an already-recorded chainBatchRoot into the chain tree and propagates the new chain
-    /// root into the shared tree (the interop half of the v32 flow). See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+    /// root into the shared tree (the interop half of the v33 flow). See {protocol-docs/message-root.md#v31-vs-v33-append-flows}.
     function _pushChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) internal {
         uint256 l1Timestamp = block.timestamp;
         chainBatchRootTimestamp[_chainId][_batchNumber] = l1Timestamp;

@@ -2,7 +2,7 @@ Create a new version upgrade script following the ZK Stack upgrade architecture.
 
 ## Usage
 
-Invoke with: `/upgrade-script <version_number>` (e.g., `/upgrade-script v32`)
+Invoke with: `/upgrade-script <version_number>` (e.g., `/upgrade-script v33`)
 
 ## What this skill does
 

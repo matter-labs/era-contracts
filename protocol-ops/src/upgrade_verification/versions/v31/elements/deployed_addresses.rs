@@ -1234,7 +1234,7 @@ fn verify_ctm_base_provenance(
             "l1-contracts/PriorityOpLowerBound",
         );
 
-        // V32UpgradeZKsyncOS(IPriorityOpLowerBound) — the per-chain upgrade contract embeds the
+        // V33UpgradeZKsyncOS(IPriorityOpLowerBound) — the per-chain upgrade contract embeds the
         // registry address as its single constructor argument, encoded as a left-padded 32-byte word.
         let default_upgrade = required_address(
             &ctm.value,
@@ -1247,7 +1247,7 @@ fn verify_ctm_base_provenance(
             verifiers,
             &default_upgrade,
             default_upgrade_ctor,
-            "l1-contracts/V32UpgradeZKsyncOS",
+            "l1-contracts/V33UpgradeZKsyncOS",
         );
     }
 

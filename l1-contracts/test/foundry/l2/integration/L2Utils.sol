@@ -157,7 +157,7 @@ library L2Utils {
 
     function forceDeployChainAssetHandler(SystemContractsArgs memory _args) internal {
         // The Dev variant re-enables chain migrations, which are explicitly disabled in the
-        // production contracts for the v32 release (see `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`),
+        // production contracts for the v33 release (see `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`),
         // so that the L2 migration machinery stays covered by these tests.
         new L2ChainAssetHandlerDev();
         forceDeployWithoutConstructor("L2ChainAssetHandlerDev", L2_CHAIN_ASSET_HANDLER_ADDR);

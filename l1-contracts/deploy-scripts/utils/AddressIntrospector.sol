@@ -123,14 +123,14 @@ library AddressIntrospector {
 
     function _getBridgesDeployedAddressesInternal(
         address _assetRouter,
-        bool _isPreV32
+        bool _isPreV33
     ) private view returns (BridgesDeployedAddresses memory info) {
         L1AssetRouter assetRouter = L1AssetRouter(_assetRouter);
 
         address l1NullifierProxy = address(assetRouter.L1_NULLIFIER());
         address l1NativeTokenVaultProxy = address(assetRouter.nativeTokenVault());
-        // `l1InteropHandler()` only exists on the nullifier from v32 onward; skip the call for pre-v32 deployments.
-        address l1InteropHandlerProxy = _isPreV32 ? address(0) : L1Nullifier(l1NullifierProxy).l1InteropHandler();
+        // `l1InteropHandler()` only exists on the nullifier from v33 onward; skip the call for pre-v33 deployments.
+        address l1InteropHandlerProxy = _isPreV33 ? address(0) : L1Nullifier(l1NullifierProxy).l1InteropHandler();
 
         require(l1NativeTokenVaultProxy != address(0), "NativeTokenVault address is zero");
         NativeTokenVaultBase ntv = NativeTokenVaultBase(l1NativeTokenVaultProxy);
@@ -178,7 +178,7 @@ library AddressIntrospector {
     }
 
     /// @notice Discovery for a v31 ecosystem: the bridgehub already exposes `chainRegistrationSender`,
-    /// but the nullifier has no `l1InteropHandler` yet — that arrives with the v32 implementations.
+    /// but the nullifier has no `l1InteropHandler` yet — that arrives with the v33 implementations.
     /// @dev Calling `getCoreDeployedAddresses` on a v31 ecosystem reverts on the missing nullifier getter.
     function getCoreDeployedAddressesV31(
         address _bridgehubProxy
@@ -206,7 +206,7 @@ library AddressIntrospector {
 
     /// @notice CTM discovery for a v31 ecosystem.
     /// @dev The sub-verifier getters differ: a v31 ZKsync OS verifier exposes `fflonkVerifiers(i)` /
-    /// `plonkVerifiers(i)`, while this release's exposes a single `PLONK_VERIFIER()`. Reading the v32 shape
+    /// `plonkVerifiers(i)`, while this release's exposes a single `PLONK_VERIFIER()`. Reading the v33 shape
     /// off a v31 verifier reverts, and the upgrade deploys fresh verifiers anyway, so the sub-verifiers are
     /// reported as absent — the same thing the v29 path used to do.
     function getCTMAddressesV31(
@@ -222,7 +222,7 @@ library AddressIntrospector {
     function _getCTMAddressesInternal(
         address _ctmAddr,
         bool _isZKsyncOS,
-        bool _isPreV32
+        bool _isPreV33
     ) private view returns (CTMDeployedAddresses memory info) {
         ChainTypeManagerBase ctm = ChainTypeManagerBase(_ctmAddr);
 
@@ -232,7 +232,7 @@ library AddressIntrospector {
         address verifier = _getVerifierFromUptoDateZkChain(ctm);
         // The bytecodes supplier and the permissionless validator exist from v31 on, which is the oldest
         // ecosystem this release can upgrade; the sub-verifier shape does not (see `getCTMAddressesV31`).
-        (address verifierFflonk, address verifierPlonk) = _isPreV32
+        (address verifierFflonk, address verifierPlonk) = _isPreV33
             ? (address(0), address(0))
             : _getSubVerifiers(verifier, _isZKsyncOS);
         address bytecodesSupplier = ctm.L1_BYTECODES_SUPPLIER();
@@ -256,8 +256,8 @@ library AddressIntrospector {
             verifiers: Verifiers({verifier: verifier, verifierFflonk: verifierFflonk, verifierPlonk: verifierPlonk}),
             facets: facets,
             genesisUpgrade: ctm.l1GenesisUpgrade(),
-            // `defaultUpgrade` is only stored in the CTM from v32 on.
-            defaultUpgrade: _isPreV32 ? address(0) : ctm.defaultUpgrade(),
+            // `defaultUpgrade` is only stored in the CTM from v33 on.
+            defaultUpgrade: _isPreV33 ? address(0) : ctm.defaultUpgrade(),
             chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr)
         });
         info.l1Specific = L1SpecificStateTransitionAddresses({
@@ -355,12 +355,12 @@ library AddressIntrospector {
         return _zkChain.facetAddresses();
     }
 
-    /// @notice Whether the ecosystem predates v32, i.e. its nullifier has no `l1InteropHandler` getter and
+    /// @notice Whether the ecosystem predates v33, i.e. its nullifier has no `l1InteropHandler` getter and
     /// the upgrade still has to deploy and wire the interop handler.
     /// @dev Reverts on an ecosystem with no registered chains: there is nothing to read a protocol version
     /// from, and answering anyway would silently pick a discovery path. Callers decide what such an
     /// ecosystem means for them — see `hasRegisteredChains`.
-    function shouldUsePreV32Introspection(address _bridgehubProxy) public view returns (bool) {
+    function shouldUsePreV33Introspection(address _bridgehubProxy) public view returns (bool) {
         require(_bridgehubProxy != address(0) && _bridgehubProxy.code.length > 0, "Bridgehub contract does not exist");
 
         address[] memory zkChains = IL1Bridgehub(_bridgehubProxy).getAllZKChains();

@@ -99,7 +99,7 @@ contract MessageHashingTest is Test {
         assertEq(leafHash, expected);
     }
 
-    /// @dev `l1Timestamp` must be part of the leaf preimage. See {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+    /// @dev `l1Timestamp` must be part of the leaf preimage. See {protocol-docs/message-root.md#v31-vs-v33-append-flows}.
     function test_batchLeafHash_bindsL1Timestamp() public pure {
         bytes32 batchRoot = keccak256("batchRoot");
         uint256 batchNumber = 100;

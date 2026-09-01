@@ -99,14 +99,14 @@ export async function forceBatchExecutedEqualsCommitted(
 /**
  * Harness-only shim: model the v31 base-token backfill prerequisite for a ZKsync OS chain.
  *
- * The v32 upgrade of a ZKsync OS chain requires (a) `s.baseTokenHasTotalSupply`, which v31
+ * The v33 upgrade of a ZKsync OS chain requires (a) `s.baseTokenHasTotalSupply`, which v31
  * sets when the backfill service transaction is requested, and (b) a bound recorded in the
  * upgrade's `PriorityOpLowerBound` registry proving that transaction also executed on L2.
  *
  * On a forked v31 chain that was really backfilled, (a) already holds and (b) goes through
  * the registry's real permissionless entry point. A forked v30 state predates the v31 backfill entirely
  * (its facets lack `baseTokenSupportsTotalSupply`, so even the registry's guard cannot run).
- * A direct v30 -> v32 upgrade is intentionally NOT a supported production path — real chains
+ * A direct v30 -> v33 upgrade is intentionally NOT a supported production path — real chains
  * acquire this state by passing through v31 and its backfill — but the v30 fixture is the
  * only ZKsync OS state available for exercising the upgrade machinery end to end, so we
  * substitute that unreachable history with direct writes, same rationale as
@@ -133,7 +133,7 @@ export async function modelV31BackfillPrerequisite(params: {
     // service transaction it enqueues cannot execute here — the harness has no sequencer — which
     // is what the registry substitution below stands in for.
     const admin: string = await getters.getAdmin();
-    // The setter only exists on the forked chain's v31 facets — v32 removed it — so the current
+    // The setter only exists on the forked chain's v31 facets — v33 removed it — so the current
     // AdminFacet artifact cannot encode the call.
     const adminFacet = new Contract(diamondProxyAddr, LEGACY_V31_ADMIN_BACKFILL_ABI, l1Provider);
     await impersonateAndRun(l1Provider, admin, async (signer) => {
@@ -142,7 +142,7 @@ export async function modelV31BackfillPrerequisite(params: {
     });
   }
 
-  const settlementLayerUpgrade = new Contract(settlementLayerUpgradeAddr, getAbi("V32UpgradeZKsyncOS"), l1Provider);
+  const settlementLayerUpgrade = new Contract(settlementLayerUpgradeAddr, getAbi("V33UpgradeZKsyncOS"), l1Provider);
   const registryAddr: string = await settlementLayerUpgrade.PRIORITY_OP_LOWER_BOUND();
   const registry = new Contract(registryAddr, getAbi("PriorityOpLowerBound"), l1Provider);
   if (await registry.recorded(diamondProxyAddr)) {
@@ -228,7 +228,7 @@ export async function setSettlementLayerViaBootloader(params: {
  * Deploy the `L2ChainAssetHandlerDev` implementation at `L2_CHAIN_ASSET_HANDLER_ADDR`
  * on the given provider via `anvil_setCode`.
  *
- * The production v32 implementation disables chain migrations at bridgeBurn/bridgeMint; the Dev
+ * The production v33 implementation disables chain migrations at bridgeBurn/bridgeMint; the Dev
  * variant re-enables them so the preserved migration machinery stays covered by tests.
  *
  * Reverse TBM testing needs to drive the chain's `migrationNumber` counter on the
@@ -314,7 +314,7 @@ export async function simulateGWChainMigrationBurn(params: {
  * `L1ChainAssetHandler` TransparentUpgradeableProxy on L1 via the real upgrade
  * surface (no `anvil_setCode` on the impl slot, no storage writes).
  *
- * The production v32 implementation disables chain migrations at bridgeBurn/bridgeMint; the Dev
+ * The production v33 implementation disables chain migrations at bridgeBurn/bridgeMint; the Dev
  * variant re-enables them so the preserved migration machinery stays covered by tests.
  *
  * L1 `_getChainMigrationNumber(chainId)` reads `L1ChainAssetHandler.migrationNumber[chainId]`,

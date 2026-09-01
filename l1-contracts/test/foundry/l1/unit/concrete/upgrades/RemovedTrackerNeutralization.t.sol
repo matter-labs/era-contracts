@@ -30,7 +30,7 @@ contract MockV31TrackerImpl {
 }
 
 /// @dev Inert delegate target for the dispatcher call: the upgrade payload itself is covered by
-/// the L2V32Upgrade tests, this suite only exercises the force-deployment loop before it.
+/// the L2V33Upgrade tests, this suite only exercises the force-deployment loop before it.
 contract NoopUpgradeDelegate {
     function noop() external {}
 }

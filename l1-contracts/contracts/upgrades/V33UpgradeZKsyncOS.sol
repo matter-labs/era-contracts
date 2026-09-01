@@ -14,10 +14,10 @@ import {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @title V32UpgradeZKsyncOS
-/// @notice The v32-specific per-chain upgrade: {DefaultUpgradeZKsyncOS} plus the v31 base-token
-/// backfill prerequisite that only this upgrade needs (v32 removes the backfill's L2 entry point).
-contract V32UpgradeZKsyncOS is DefaultUpgradeZKsyncOS {
+/// @title V33UpgradeZKsyncOS
+/// @notice The v33-specific per-chain upgrade: {DefaultUpgradeZKsyncOS} plus the v31 base-token
+/// backfill prerequisite that only this upgrade needs (v33 removes the backfill's L2 entry point).
+contract V33UpgradeZKsyncOS is DefaultUpgradeZKsyncOS {
     /// @notice Standalone registry of per-chain priority-op lower bounds; see `upgrade` below.
     IPriorityOpLowerBound public immutable PRIORITY_OP_LOWER_BOUND;
 
@@ -27,7 +27,7 @@ contract V32UpgradeZKsyncOS is DefaultUpgradeZKsyncOS {
 
     /// @inheritdoc DefaultUpgradeZKsyncOS
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
-        // The pre-v32 base-token total supply must have been backfilled on v31, and — since the flag
+        // The pre-v33 base-token total supply must have been backfilled on v31, and — since the flag
         // below is set eagerly when the backfill service transaction is *requested* while this release
         // removes its L2 entry point — the transaction must also have *executed*.
         // `PRIORITY_OP_LOWER_BOUND` pins (permissionlessly, while the flag is already set) a priority-op

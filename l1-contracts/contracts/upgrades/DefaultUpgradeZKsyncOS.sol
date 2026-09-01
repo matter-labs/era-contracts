@@ -13,7 +13,7 @@ import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors
 /// @notice The default per-chain upgrade for ZKsync OS chains: {DefaultUpgrade} plus the per-chain
 /// substitution their L2 upgrade transaction needs.
 /// @dev The CTM upgrade emits a single ecosystem-wide L2 upgrade transaction whose inner
-/// `IL2V32Upgrade.upgrade` calldata carries a placeholder for the chain-specific force-deployments data.
+/// `IL2V33Upgrade.upgrade` calldata carries a placeholder for the chain-specific force-deployments data.
 /// Substituting the real data can only happen per chain, which is what this contract adds.
 contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
     /// @inheritdoc DefaultUpgrade

@@ -13,7 +13,7 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {Utils} from "../../utils/Utils.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 
-import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
+import {IL2V33Upgrade} from "contracts/upgrades/IL2V33Upgrade.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 
@@ -166,12 +166,12 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     function deployUsedUpgradeContract() internal virtual override returns (address) {
         require(config.isZKsyncOS, "Upgrading Era chains onto this release is not supported");
 
-        // The registry must exist first: the v32 upgrade contract embeds its address as an immutable.
+        // The registry must exist first: the v33 upgrade contract embeds its address as an immutable.
         priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound", false);
         console.log("Deployed PriorityOpLowerBound at", priorityOpLowerBound);
 
-        console.log("Deploying V32UpgradeZKsyncOS");
-        return deploySimpleContract("V32UpgradeZKsyncOS", false);
+        console.log("Deploying V33UpgradeZKsyncOS");
+        return deploySimpleContract("V33UpgradeZKsyncOS", false);
     }
 
     function getV31AdditionalFactoryDependencyContracts()
@@ -180,7 +180,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         returns (CoreContract[] memory additionalDependencyContracts)
     {
         additionalDependencyContracts = new CoreContract[](1);
-        additionalDependencyContracts[0] = CoreContract.L2V32Upgrade;
+        additionalDependencyContracts[0] = CoreContract.L2V33Upgrade;
     }
 
     function getAdditionalFactoryDependencyContracts()
@@ -209,7 +209,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // DefaultUpgradeZKsyncOS.getL2UpgradeTxData at upgrade time.
         return
             abi.encodeCall(
-                IL2V32Upgrade.upgrade,
+                IL2V33Upgrade.upgrade,
                 (
                     config.isZKsyncOS,
                     coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
@@ -226,15 +226,15 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             getComplexUpgraderTargetAndData(_deployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, getV31L2UpgradeCalldata());
     }
 
-    /// @notice V31-specific: include L2V32Upgrade as an additional ZKsyncOS force deployment.
-    /// @dev L2V32Upgrade is deployed as a standalone contract at the derived random address used as
+    /// @notice V31-specific: include L2V33Upgrade as an additional ZKsyncOS force deployment.
+    /// @dev L2V33Upgrade is deployed as a standalone contract at the derived random address used as
     /// the delegate target in `forceDeployAndUpgradeUniversal`, so it uses `ZKsyncOSUnsafeForceDeployment`
     /// rather than `ZKsyncOSSystemProxyUpgrade`.
     function getV31AdditionalZKsyncOSUniversalForceDeployments()
         internal
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
     {
-        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V32Upgrade.sol", "L2V32Upgrade");
+        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V33Upgrade.sol", "L2V33Upgrade");
         additional = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
         additional[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
             upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
@@ -249,7 +249,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // For ZKsyncOS, the delegateTo address is a derived address (not the constant
         // L2_VERSION_SPECIFIC_UPGRADER_ADDR) to avoid overwriting existing bytecode.
         // Must match the newAddress in getV31AdditionalZKsyncOSUniversalForceDeployments.
-        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V32Upgrade.sol", "L2V32Upgrade");
+        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V33Upgrade.sol", "L2V33Upgrade");
         address delegateTo = L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo);
 
         return getComplexUpgraderTargetAndData(_deployments, delegateTo, getV31L2UpgradeCalldata());

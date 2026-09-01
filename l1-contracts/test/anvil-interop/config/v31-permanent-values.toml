@@ -1,4 +1,4 @@
-# Permanent values for the v31 -> v32 upgrade scenario. `era_chain_id`, `bridgehub_proxy_addr`,
+# Permanent values for the v31 -> v33 upgrade scenario. `era_chain_id`, `bridgehub_proxy_addr`,
 # `ctm_proxy_addr` and `is_zk_sync_os` are substituted by the harness from the loaded chain states.
 era_chain_id = 10
 
