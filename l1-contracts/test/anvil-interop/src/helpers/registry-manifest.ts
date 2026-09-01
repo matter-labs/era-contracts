@@ -44,14 +44,13 @@ function parseSolidityEnum(relSourcePath: string, enumName: string): Record<stri
     throw new Error(`enum ${enumName} not found in ${relSourcePath}`);
   }
   const members = match[1]
+    // Strip comments before splitting: commas inside explanatory comments are not enum
+    // separators. Filtering line-by-line after the split misclassifies the text following such
+    // a comma as an additional member and shifts every appended inventory slot.
+    .replace(/\/\/.*$/gm, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
     .split(",")
-    .map((m) =>
-      m
-        .split("\n")
-        .filter((line) => !line.trim().startsWith("//"))
-        .join("")
-        .trim()
-    )
+    .map((m) => m.trim())
     .filter((m) => m.length > 0);
   return Object.fromEntries(members.map((m, i) => [m, i]));
 }

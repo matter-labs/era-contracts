@@ -67,6 +67,9 @@ export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFf
 // grows the tree and rehashes the populated path, so `sendBundle` needs a generous gas cap.
 export const ATOMIC_SEND_BUNDLE_GAS_LIMIT = 3_000_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
+// The CTM deployment builds the release's complete L2 bytecode inventory in script memory.
+// Foundry's default execution-memory cap is too small for that deterministic artifact pass.
+export const CTM_DEPLOYMENT_FORGE_MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024;
 // 7 gwei, used by Anvil interop specs to exercise the non-zero dynamic fee path.
 export const ANVIL_INTEROP_PROTOCOL_FEE_WEI = "7000000000";
 

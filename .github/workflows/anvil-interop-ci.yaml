@@ -27,7 +27,7 @@ on:
 
 jobs:
   # Fast job: uses pre-generated chain states from the repo.
-  # We still compile DummyInteropRecipient so deploy bytecode is available in out/.
+  # We still compile the runtime deployment artifacts that are not part of those states.
   integration-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -49,6 +49,9 @@ jobs:
 
       - name: Install dependencies
         run: yarn
+
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
 
       - name: Build anvil-interop dev artifacts
         run: yarn l1 build:anvil-interop-dev-artifacts

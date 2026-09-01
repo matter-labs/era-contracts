@@ -9,9 +9,9 @@ inputs:
     description: >
       Which contract artifacts to build:
       "dev" — anvil-interop dev artifacts only (interop tests on preloaded state);
-      "full" — da + system + l1 foundry builds, including foundry-zksync (upgrade tests);
+      "full" — da + l1 Foundry builds (upgrade tests);
       "deterministic" — da + l1 builds with FOUNDRY_PROFILE=anvil-interop and no
-      foundry-zksync, for reproducible bytecode (state-generation check).
+      CBOR metadata, for reproducible bytecode (state-generation check).
     required: true
 
 runs:
@@ -21,10 +21,6 @@ runs:
       uses: foundry-rs/foundry-toolchain@v1
       with:
         version: v1.5.1
-
-    - name: Install foundry-zksync (for forge --zksync)
-      if: ${{ inputs.artifacts == 'full' }}
-      uses: ./.github/actions/install-zksync-foundry
 
     - name: Use Node.js
       uses: actions/setup-node@v4
@@ -45,11 +41,6 @@ runs:
       if: ${{ inputs.artifacts == 'full' }}
       shell: bash
       run: yarn da build:foundry
-
-    - name: Build system-contracts artifacts
-      if: ${{ inputs.artifacts == 'full' }}
-      shell: bash
-      run: yarn sc build:foundry
 
     - name: Build l1-contracts artifacts
       if: ${{ inputs.artifacts == 'full' }}

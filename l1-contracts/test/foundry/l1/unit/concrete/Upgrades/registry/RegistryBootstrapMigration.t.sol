@@ -249,7 +249,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     // ─────────────────────────── post-state verification ───────────────────────────
 
     /// @dev Stage 2 runs `validateApplied()` as a governance call: before the edge it must fail
-    ///      loudly, so a mis-sequenced bundle cannot report success on an unapplied bootstrap.
+    ///      loudly, so an incorrectly sequenced bundle cannot report success on an unapplied bootstrap.
     function test_revertWhen_validateAppliedBeforeMigrate() public {
         vm.expectRevert(BootstrapNotYetExecuted.selector);
         migration.validateApplied();

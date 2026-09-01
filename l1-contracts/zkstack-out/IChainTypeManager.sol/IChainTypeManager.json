@@ -706,6 +706,24 @@
   },
   {
     "type": "function",
+    "name": "setProtocolVersionDeadline",
+    "inputs": [
+      {
+        "name": "_protocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_timestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setReleaseCodehash",
     "inputs": [
       {

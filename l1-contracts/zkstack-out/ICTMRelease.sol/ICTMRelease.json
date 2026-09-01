@@ -60,23 +60,25 @@
         "components": [
           {
             "name": "facet",
-            "type": "address",
-            "internalType": "address"
+            "type": "tuple",
+            "internalType": "struct PinnedContract",
+            "components": [
+              {
+                "name": "addr",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "codehash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
           },
           {
             "name": "isFreezable",
             "type": "bool",
             "internalType": "bool"
-          },
-          {
-            "name": "selectors",
-            "type": "bytes4[]",
-            "internalType": "bytes4[]"
-          },
-          {
-            "name": "codehash",
-            "type": "bytes32",
-            "internalType": "bytes32"
           }
         ]
       }
@@ -107,6 +109,19 @@
         "name": "",
         "type": "uint64",
         "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "l2BytecodeInfos",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
       }
     ],
     "stateMutability": "view"
@@ -148,6 +163,25 @@
     "type": "function",
     "name": "verifyAll",
     "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "verifyChainRouting",
+    "inputs": [
+      {
+        "name": "_chain",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "outputs": [
       {
         "name": "",
