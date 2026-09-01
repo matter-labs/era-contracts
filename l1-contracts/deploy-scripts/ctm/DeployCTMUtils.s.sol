@@ -155,11 +155,7 @@ abstract contract DeployCTMUtils is DeployUtils {
 
         // Via the CREATE2 factory, like every other pipeline deployment — upgrade prepares reach
         // the real chain through the Safe bundle, which replays factory transactions only.
-        address release = deployViaCreate2AndNotify(
-            type(CTMRelease).creationCode,
-            abi.encode(manifest),
-            "CTMRelease"
-        );
+        address release = deployViaCreate2AndNotify(type(CTMRelease).creationCode, abi.encode(manifest), "CTMRelease");
 
         // Deploy + initialize ran in one transaction inside the factory, so the release is already
         // initialized here with no front-runnable window; this is now a pure sanity assertion.

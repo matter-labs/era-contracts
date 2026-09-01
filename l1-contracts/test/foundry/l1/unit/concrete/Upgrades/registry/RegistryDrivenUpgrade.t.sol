@@ -27,10 +27,7 @@ import {AcceptingVerifier} from "contracts/dev-contracts/test/AcceptingVerifier.
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {
-    PRIORITY_TX_MAX_GAS_LIMIT,
-    ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
-} from "contracts/common/Config.sol";
+import {PRIORITY_TX_MAX_GAS_LIMIT, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {ProtocolIdMismatch} from "contracts/common/L1ContractErrors.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";

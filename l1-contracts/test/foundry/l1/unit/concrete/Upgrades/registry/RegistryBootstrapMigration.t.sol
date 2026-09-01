@@ -148,7 +148,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                     evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                     fixedForceDeploymentsData: hex"f1f2",
                     genesisBatchHash: bytes32(uint256(1)),
-                    genesisBatchCommitment: bytes32(uint256(7)),
+                    // ZKsyncOSChainTypeManager requires the commitment to be exactly 1.
+                    genesisBatchCommitment: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 54
                 }),
                 // Length-checked inventory; content is irrelevant to this fixture.

@@ -29,7 +29,9 @@ library CoreOnGatewayHelper {
     // ======================== Name resolution ========================
 
     /// @notice Resolve a L2EcosystemContract to its (fileName, contractName).
-    function resolve(L2EcosystemContract _c) internal view returns (string memory fileName, string memory contractName) {
+    function resolve(
+        L2EcosystemContract _c
+    ) internal view returns (string memory fileName, string memory contractName) {
         contractName = _resolveContractName(_c);
         fileName = string.concat(contractName, ".sol");
     }
@@ -73,7 +75,11 @@ library CoreOnGatewayHelper {
 
     // ======================== Private helpers ========================
 
-    function _getSharedFactoryDependencyContracts() private pure returns (L2EcosystemContract[] memory dependencyContracts) {
+    function _getSharedFactoryDependencyContracts()
+        private
+        pure
+        returns (L2EcosystemContract[] memory dependencyContracts)
+    {
         // Reuse the canonical fixed-address core contract list - the same contract
         // IDs `getBaseZKsyncOSForceDeployments` upgrades on L2 at upgrade
         // time. Every bytecode hash the upgrade tx's force-deploy path
@@ -85,11 +91,14 @@ library CoreOnGatewayHelper {
         // Plus `UpgradeableBeaconDeployer`, which
         // `FixedForceDeploymentsData.beaconDeployerInfo` references but
         // which is not one of the fixed-address core contracts.
-        L2EcosystemContract[] memory fixedAddressCoreContracts = SystemContractsProcessing.getFixedAddressCoreContracts();
+        L2EcosystemContract[] memory fixedAddressCoreContracts = SystemContractsProcessing
+            .getFixedAddressCoreContracts();
         // The ZKsync-OS-only contracts are force-deployed by `getBaseZKsyncOSForceDeployments` from a
         // separate list, so their preimages have to be merged in here as well.
         L2EcosystemContract[] memory zksyncOSOnlyContracts = SystemContractsProcessing.getZKsyncOSOnlyContracts();
-        dependencyContracts = new L2EcosystemContract[](fixedAddressCoreContracts.length + zksyncOSOnlyContracts.length + 1);
+        dependencyContracts = new L2EcosystemContract[](
+            fixedAddressCoreContracts.length + zksyncOSOnlyContracts.length + 1
+        );
         uint256 index;
         for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
             dependencyContracts[index++] = fixedAddressCoreContracts[i];

@@ -84,7 +84,7 @@ import {
   getDeterministicBytecode,
   getDeterministicCreationBytecode,
 } from "../core/contracts";
-import { impersonateAndRun } from "../core/utils";
+import { createProvider, impersonateAndRun } from "../core/utils";
 import { coreInitArgs, packSemVer, releaseInitArgs, transitionInitArgs } from "./registry-manifest";
 import {
   assertBootstrapEndState,
@@ -246,7 +246,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     if (!l1Chain) {
       throw new Error("L1 chain not started");
     }
-    const l1Provider = new ethers.providers.JsonRpcProvider(l1Chain.rpcUrl);
+    const l1Provider = createProvider(l1Chain.rpcUrl);
     const deployer = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
     const l1ChainId = (await l1Provider.getNetwork()).chainId;
 
@@ -563,7 +563,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       if (!l2Chain) {
         throw new Error(`Missing running L2 chain ${chain.chainId}`);
       }
-      const l2Provider = new ethers.providers.JsonRpcProvider(l2Chain.rpcUrl);
+      const l2Provider = createProvider(l2Chain.rpcUrl);
       await relayL2UpgradeTx(l2Provider, composedTx.data, chain.chainId);
     }
 

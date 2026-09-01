@@ -47,6 +47,7 @@ library ReleaseFacetReader {
         // for them), so only routed facets are expected in the loupe output.
         uint256 expectedRouted = 0;
         uint256 expectedLength = expected.length;
+        uint256 liveLength = live.length;
         for (uint256 i = 0; i < expectedLength; ++i) {
             bytes4[] memory selectors = ISelfDescribingFacet(expected[i].facet.addr).selectors();
             if (selectors.length == 0) {
@@ -54,7 +55,7 @@ library ReleaseFacetReader {
             }
             ++expectedRouted;
             bool found = false;
-            for (uint256 j = 0; j < live.length; ++j) {
+            for (uint256 j = 0; j < liveLength; ++j) {
                 if (live[j].addr != expected[i].facet.addr) {
                     continue;
                 }
@@ -67,7 +68,7 @@ library ReleaseFacetReader {
         }
         // No extra facets: every live facet was matched above iff the counts agree (release rows
         // are unique per address — enforced at transition derivation and by `Diamond.diamondCut`).
-        return live.length == expectedRouted;
+        return liveLength == expectedRouted;
     }
 
     /// @dev Order-insensitive set equality; both lists are duplicate-free (the diamond routes a

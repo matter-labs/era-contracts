@@ -53,11 +53,11 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
         coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier");
         coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter");
         coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault");
-        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract(
-            "CTMDeploymentTracker");
+        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract("CTMDeploymentTracker");
         coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler");
         coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
-            "ChainRegistrationSender");
+            "ChainRegistrationSender"
+        );
     }
 
     function prepareEcosystemUpgrade() public virtual override {

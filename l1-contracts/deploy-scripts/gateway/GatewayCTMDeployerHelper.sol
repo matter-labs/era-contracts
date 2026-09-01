@@ -161,12 +161,7 @@ library GatewayCTMDeployerHelper {
             address
         )
     {
-        return
-            calculateAddresses(
-                _create2Salt,
-                config,
-                SystemContractsProcessing.buildL2BytecodeInfoTable()
-            );
+        return calculateAddresses(_create2Salt, config, SystemContractsProcessing.buildL2BytecodeInfoTable());
     }
 
     /// @param _l2BytecodeInfos The release's L2 bytecode table (`ReleaseManifest.l2BytecodeInfos`),
@@ -459,11 +454,7 @@ library GatewayCTMDeployerHelper {
             "DiamondInit",
             diamondInitArgs
         );
-        addresses.diamondInitCodehash = _simulatedCodehash(
-            "DiamondInit.sol",
-            "DiamondInit",
-            diamondInitArgs
-        );
+        addresses.diamondInitCodehash = _simulatedCodehash("DiamondInit.sol", "DiamondInit", diamondInitArgs);
 
         // L1GenesisUpgrade
         (addresses.genesisUpgrade, data.genesisUpgradeCalldata) = _calculateCreate2AddressAndCalldata(
@@ -472,11 +463,7 @@ library GatewayCTMDeployerHelper {
             "L1GenesisUpgrade",
             hex""
         );
-        addresses.genesisUpgradeCodehash = _simulatedCodehash(
-            "L1GenesisUpgrade.sol",
-            "L1GenesisUpgrade",
-            hex""
-        );
+        addresses.genesisUpgradeCodehash = _simulatedCodehash("L1GenesisUpgrade.sol", "L1GenesisUpgrade", hex"");
 
         // Multicall3
         (addresses.multicall3, data.multicall3Calldata) = _calculateCreate2AddressAndCalldata(
@@ -963,7 +950,6 @@ library GatewayCTMDeployerHelper {
     ) external returns (bytes[] memory dependencies) {
         return dependencies;
     }
-
 
     // ======================== Deployment utilities ========================
 

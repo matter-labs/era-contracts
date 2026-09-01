@@ -108,11 +108,12 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         transition = _deployTransition(777);
     }
 
-    /// @param _commitmentNonce Differentiates otherwise-identical release manifests.
+    /// @param _manifestNonce Differentiates otherwise-identical release manifests (via the
+    ///        genesis batch hash — the COMMITMENT must be exactly 1 for the ZKsync OS CTM).
     /// @dev The release describes the complete chain state after the (facet-neutral) hop this
     ///      suite drives: the fixture's full facet routing (explicit selectors, inline pins) and
     ///      the carried base-system hashes — the transition derives an EMPTY delta from it.
-    function _releaseManifest(uint256 _commitmentNonce) internal view returns (ReleaseManifest memory) {
+    function _releaseManifest(uint256 _manifestNonce) internal view returns (ReleaseManifest memory) {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
             genesisFacets[i] = GenesisFacet({
@@ -131,8 +132,8 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                     defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                     evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                     fixedForceDeploymentsData: hex"f1f2",
-                    genesisBatchHash: bytes32(uint256(1)),
-                    genesisBatchCommitment: bytes32(_commitmentNonce),
+                    genesisBatchHash: bytes32(_manifestNonce),
+                    genesisBatchCommitment: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 54
                 }),
                 // Length-checked inventory; content is irrelevant to this fixture.
@@ -140,8 +141,8 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
             });
     }
 
-    function _deployRelease(uint256 _commitmentNonce) internal returns (CTMRelease result) {
-        result = new CTMRelease(_releaseManifest(_commitmentNonce));
+    function _deployRelease(uint256 _manifestNonce) internal returns (CTMRelease result) {
+        result = new CTMRelease(_releaseManifest(_manifestNonce));
     }
 
     function _deployTransition(uint256 _upgradeTimestamp) internal returns (CTMTransition result) {

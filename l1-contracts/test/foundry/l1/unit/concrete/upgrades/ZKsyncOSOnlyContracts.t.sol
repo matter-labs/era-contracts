@@ -94,9 +94,7 @@ contract ZKsyncOSOnlyContractsTest is Test {
         }
         assertEq(matches, 1, "expected exactly one neutralization for the removed tracker");
 
-        bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
-            new L2EcosystemContract[](0)
-        );
+        bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(new L2EcosystemContract[](0));
         bytes32 emptyContractCodeHash = keccak256(
             BytecodeUtils.readDeployedBytecodeL1("EmptyContract.sol", "EmptyContract")
         );
@@ -108,9 +106,7 @@ contract ZKsyncOSOnlyContractsTest is Test {
     }
 
     function test_zkSyncOSFactoryDependenciesIncludeTheNewBuiltInImplementations() public {
-        bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
-            new L2EcosystemContract[](0)
-        );
+        bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(new L2EcosystemContract[](0));
 
         // The implementation preimages of the two new built-ins, which is what this release adds to the
         // list. Their `SystemContractProxy` preimage is shared with every other ZKsync OS force deployment

@@ -68,7 +68,7 @@ import type { ContractName } from "../core/contracts";
 import { forceBatchExecutedEqualsCommitted, transferOwnable2Step } from "./harness-shims";
 import { clearGenesisUpgradeTxHash, selectUpgradeChains, traceFailedTx } from "./upgrade-test-utils";
 import { installLegacyFacet, crossBootstrapEdgeOnChains } from "./bootstrap-upgrade-stage";
-import { impersonateAndRun } from "../core/utils";
+import { createProvider, impersonateAndRun } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
 
@@ -149,7 +149,7 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     if (!l1Chain) {
       throw new Error("L1 chain not started");
     }
-    const l1Provider = new ethers.providers.JsonRpcProvider(l1Chain.rpcUrl);
+    const l1Provider = createProvider(l1Chain.rpcUrl);
     const defaultSigner = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
 
     const ctm = new ethers.Contract(ctmAddresses.chainTypeManager, getAbi("IChainTypeManager"), l1Provider);
@@ -438,7 +438,7 @@ async function executeSafeBundles(outDir: string, rpcUrl: string): Promise<void>
   if (safeBundles.length === 0) {
     throw new Error(`No protocol-ops Safe bundles found in ${outDir}`);
   }
-  const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+  const provider = createProvider(rpcUrl);
 
   for (const bundle of safeBundles) {
     const safeFile = JSON.parse(fs.readFileSync(bundle.file, "utf8")) as {
@@ -690,7 +690,7 @@ async function runLegacyChainLegAndRelayL2(params: {
     if (!l2Chain) {
       throw new Error(`Missing running L2 chain ${chain.chainId}`);
     }
-    const l2Provider = new ethers.providers.JsonRpcProvider(l2Chain.rpcUrl);
+    const l2Provider = createProvider(l2Chain.rpcUrl);
 
     const l2TxHash = await prepareAndRelayL2Upgrade(
       l2Provider,
@@ -799,12 +799,6 @@ async function deployL2Contracts(
 
   // Deploy the delegate target of the ComplexUpgrader call.
   await l2Provider.send("anvil_setCode", [delegateTo, getBytecode(l2DelegateBytecodeName)]);
-
-  // L2BaseToken: for Era it's deployed directly (not in the force deployment list). For
-  // ZKsyncOS it's in the list as ZKsyncOSSystemProxyUpgrade and handled above.
-  if (!isZKsyncOS) {
-    await l2Provider.send("anvil_setCode", [L2_BASE_TOKEN_ADDR, getBytecode("L2BaseTokenEra")]);
-  }
 
   // L2BaseToken.initL2 mints an initial balance into the BaseTokenHolder and then transfers
   // ETH to it, so the token needs a non-zero balance on the anvil chain.
