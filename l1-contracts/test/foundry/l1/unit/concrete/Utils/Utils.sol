@@ -37,9 +37,6 @@ import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundr
 import {Utils as DeployUtils} from "deploy-scripts/utils/Utils.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
-import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
-import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
-import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -63,16 +60,19 @@ library Utils {
     ///      and a `CTMUpgradeExecutor` pin. `TEST_GENESIS_REGISTRY` is etched with the release
     ///      runtime code (see `UtilsCallMocker`) so the mocked genesis release passes the same
     ///      check a real one does.
-    function releaseCodehash() internal pure returns (bytes32) {
-        return keccak256(type(CTMRelease).runtimeCode);
+    /// @dev Read from the artifacts (`vm.getDeployedCode`) instead of `type(T).runtimeCode`:
+    ///      this file is in the zksync test compile closure and zksolc rejects `runtimeCode`.
+    ///      The objects carry no immutables, so the artifact bytes equal the deployed bytes.
+    function releaseCodehash() internal view returns (bytes32) {
+        return keccak256(vm.getDeployedCode("CTMRelease.sol:CTMRelease"));
     }
 
-    function transitionCodehash() internal pure returns (bytes32) {
-        return keccak256(type(CTMTransition).runtimeCode);
+    function transitionCodehash() internal view returns (bytes32) {
+        return keccak256(vm.getDeployedCode("CTMTransition.sol:CTMTransition"));
     }
 
-    function coreRegistryCodehash() internal pure returns (bytes32) {
-        return keccak256(type(CoreRegistry).runtimeCode);
+    function coreRegistryCodehash() internal view returns (bytes32) {
+        return keccak256(vm.getDeployedCode("CoreRegistry.sol:CoreRegistry"));
     }
     bytes32 internal constant TEST_BASE_SYSTEM_CONTRACT_HASH =
         0x0100000000000000000000000000000000000000000000000000000000000000;

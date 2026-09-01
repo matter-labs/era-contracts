@@ -169,7 +169,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         "Permanent values: {}",
         env_cfg.permanent_values_path.display()
     ));
-    logger::info(format!("V31 input: {}", env_cfg.upgrade_input_toml_path.display()));
+    logger::info(format!(
+        "V31 input: {}",
+        env_cfg.upgrade_input_toml_path.display()
+    ));
     logger::info(format!("Ecosystem TOML: {}", args.ecosystem_toml.display()));
     logger::info(format!(
         "Transactions log: {}",

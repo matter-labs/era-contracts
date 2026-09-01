@@ -32,12 +32,12 @@ written.
 All are storage-backed, built once from a manifest they take in the constructor, and commit
 `manifestHash = keccak256(abi.encode(manifest))`.
 
-| Contract                     | Holds                                                                                                                                                                                                                                                          |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, pin — routing is read from each pinned facet's own self-description), three base-system hashes, `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin              |
+| Contract                     | Holds                                                                                                                                                                                                                                                                                    |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, pin — routing is read from each pinned facet's own self-description), three base-system hashes, `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin                                        |
 | `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine` + pin, `proxyUpgrades` (the `CTMContract`-indexed CTM-domain inventory, incl. the CTM itself), deadline, `upgradeTimestamp`, `L2UpgradePlan`; **derived and stored:** final `Diamond.FacetCut[]` and base-system hash changes |
-| `CoreRegistry`               | the `L1EcosystemContract`-indexed ecosystem inventory of `(proxy, expectedOldImpl, implNew + pin)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot)                                                                                          |
-| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                 |
+| `CoreRegistry`               | the `L1EcosystemContract`-indexed ecosystem inventory of `(proxy, expectedOldImpl, implNew + pin)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot)                                                                                                                      |
+| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                                           |
 
 ### Enum-indexed proxy inventories
 
@@ -82,13 +82,13 @@ is a missing line in an audited contract diff, never a wrong byte in offchain-au
 
 Supporting libraries:
 
-| Library              | Role                                                                                  |
-| -------------------- | ------------------------------------------------------------------------------------- |
+| Library                   | Role                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------- |
 | `TransitionDerivationLib` | `deriveFacetCuts` / `deriveHashChanges` from a release pair                           |
-| `ReleaseFacetReader` | `newChainInstallations(release)` — genesis cuts from a release's routing              |
-| `CTMUpgradeComposer` | `buildUpgradeCutData`, `buildL2UpgradeTx`, `buildProposedUpgrade` from a transition   |
-| `GenesisManifestLib` | `GenesisConfig` → genesis `ReleaseManifest`, capturing routing and pins at build time |
-| `CodehashPinLib`     | `requirePin` (reverts) / `pinHolds` (bool)                                            |
+| `ReleaseFacetReader`      | `newChainInstallations(release)` — genesis cuts from a release's routing              |
+| `CTMUpgradeComposer`      | `buildUpgradeCutData`, `buildL2UpgradeTx`, `buildProposedUpgrade` from a transition   |
+| `GenesisManifestLib`      | `GenesisConfig` → genesis `ReleaseManifest`, capturing routing and pins at build time |
+| `CodehashPinLib`          | `requirePin` (reverts) / `pinHolds` (bool)                                            |
 
 ## Contract map
 

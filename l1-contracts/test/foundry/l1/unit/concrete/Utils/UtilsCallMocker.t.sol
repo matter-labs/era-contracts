@@ -15,7 +15,6 @@ import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {GenesisFacet} from "../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 // solhint-enable max-line-length
@@ -238,8 +237,10 @@ contract UtilsCallMockerTest is Test {
     function mockGenesisRegistryContract() public {
         address genesisRegistry = Utils.TEST_GENESIS_REGISTRY;
         // Release provenance is a codehash check, so the mocked release must actually CARRY the
-        // audited `CTMRelease` runtime code; its behaviour is then mocked on top.
-        vm.etch(genesisRegistry, type(CTMRelease).runtimeCode);
+        // audited `CTMRelease` runtime code; its behaviour is then mocked on top. The code is
+        // read from the artifacts (zksolc rejects `type(T).runtimeCode`), matching
+        // `Utils.releaseCodehash()`.
+        vm.etch(genesisRegistry, vm.getDeployedCode("CTMRelease.sol:CTMRelease"));
         vm.mockCall(genesisRegistry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
         vm.mockCall(
             genesisRegistry,

@@ -21,9 +21,7 @@ use crate::common::logger;
 use crate::common::wallets::Wallet;
 
 use super::new_gateway_prepare::prepare_new_gateway;
-use super::upgrade_inner::{
-    CtmPrepareEntry, PrepareInputs, PrepareOutput, UpgradeInner,
-};
+use super::upgrade_inner::{CtmPrepareEntry, PrepareInputs, PrepareOutput, UpgradeInner};
 
 pub struct UpgradeFull<'a> {
     inner: UpgradeInner<'a>,
