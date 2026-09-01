@@ -241,9 +241,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             false
         );
         if (deployAirbenderLane) {
-            // Each contract must exist before the one that takes it as a constructor argument (see
-            // `getCTMCoreDeploymentConfig`): generated PLONK verifier, then the wrapper that pins the guest
-            // binary, then the gate that requires both proof systems.
+            // Each contract must exist before the one that takes it as a constructor argument: generated
+            // PLONK verifier, then the Airbender lane, then the gate.
             ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk = deploySimpleContract(
                 "AirbenderVerifierPlonk",
                 false
