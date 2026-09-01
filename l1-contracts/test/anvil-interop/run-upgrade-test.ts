@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { runV31UpgradeScenario, TARGET_PROTOCOL_VERSION } from "./src/helpers/v31-upgrade-test-runner";
+import { runV31UpgradeScenario, TARGET_PROTOCOL_VERSION } from "./src/helpers/upgrade-test-runner";
 
 // The upgrade this release actually performs: a v31 ecosystem (ZKsync OS chains, one of them a gateway)
 // onto the current contracts. Replaces the former v29 -> v31 scenario, which this release no longer
@@ -9,7 +9,7 @@ runV31UpgradeScenario({
   label: "v31-zksync-os",
   stateVersion: "v0.31.0",
   permanentValuesTemplatePath: "test/anvil-interop/config/v31-permanent-values.toml",
-  upgradeInputTemplatePath: "test/anvil-interop/config/v31-to-v32-upgrade.toml",
+  upgradeInputTemplatePath: "test/anvil-interop/config/v31-to-v33-upgrade.toml",
   isZKsyncOS: true,
   expectedProtocolVersion: TARGET_PROTOCOL_VERSION,
   // The fixture leaves the ChainAssetHandler with the deployer as owner; governance has to own it to run

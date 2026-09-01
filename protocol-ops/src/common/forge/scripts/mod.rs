@@ -5,9 +5,10 @@ use alloy::sol_types::SolCall;
 use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{
-    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi, ICoreUpgradeV31Abi,
+    AdminFunctionsAbi, DeployGatewayTransactionFiltererAbi, GatewayUtilsAbi, ICoreUpgradeV33Abi,
     IDeployCTMAbi, IDeployL1CoreContractsAbi, IDeployPaymasterAbi, IEnableEvmEmulatorAbi,
-    IFinalizeChainInitAbi, IGatewayVotePreparationAbi, IRegisterOnAllChainsAbi,
+    IFinalizeChainInitAbi, IGatewayVotePreparationAbi, IRecordPriorityOpLowerBoundAbi,
+    IRegisterOnAllChainsAbi,
 };
 
 pub mod deploy_ctm;
@@ -17,10 +18,18 @@ pub mod register_chain;
 
 pub const ADMIN_FUNCTIONS_SCRIPT_PATH: &str = "deploy-scripts/AdminFunctions.s.sol";
 pub const FINALIZE_CHAIN_INIT_SCRIPT_PATH: &str = "deploy-scripts/chain/FinalizeChainInit.s.sol";
-pub const CORE_UPGRADE_V31_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
-pub const CTM_UPGRADE_V31_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
-pub const UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH: &str = "/upgrade-envs/v0.31.0-interopB/local.toml";
-pub const UPGRADE_V31_CORE_OUTPUT_PATH: &str = "/script-out/v31-upgrade-core.toml";
+
+/// v33 upgrade flow. Unlike the v31 scripts these extend the `Default*` bases directly: the
+/// v30 -> v31 one-off work (stage-2 legacy-Gateway decommission, stage-3 bridged-token
+/// migration) has no v33 counterpart and must not be replayed. See
+/// `deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol`.
+pub const CORE_UPGRADE_V33_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
+pub const CTM_UPGRADE_V33_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
+pub const UPGRADE_V33_ENV_DIR: &str = "/upgrade-envs/v0.33.0-atomic-interop";
+pub const UPGRADE_V33_LOCAL_INPUT_PATH: &str = "/upgrade-envs/v0.33.0-atomic-interop/local.toml";
+pub const UPGRADE_V33_CORE_OUTPUT_PATH: &str = "/script-out/v33-upgrade-core.toml";
+pub const RECORD_PRIORITY_OP_LOWER_BOUND_SCRIPT_PATH: &str =
+    "deploy-scripts/upgrade/v33/RecordPriorityOpLowerBound.s.sol";
 pub const GATEWAY_UTILS_SCRIPT_TARGET_PATH: &str =
     "deploy-scripts/gateway/GatewayUtils.s.sol:GatewayUtils";
 pub const DEPLOY_GATEWAY_TRANSACTION_FILTERER_SCRIPT_TARGET_PATH: &str =
@@ -174,6 +183,23 @@ pub static DEPLOY_PAYMASTER_INVOCATION: ForgeScriptParams = ForgeScriptParams::n
 .with_ffi()
 .with_rpc_url();
 
+pub static STAGE3_CORE_UPGRADE_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
+    "",
+    "",
+    "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol:CoreUpgrade_v33",
+)
+.with_ffi()
+.with_rpc_url()
+.with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT);
+
+pub static RECORD_PRIORITY_OP_LOWER_BOUND_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
+    "script-config/record-priority-op-lower-bound.toml",
+    "script-out/output-record-priority-op-lower-bound.toml",
+    RECORD_PRIORITY_OP_LOWER_BOUND_SCRIPT_PATH,
+)
+.with_ffi()
+.with_rpc_url();
+
 pub static ENABLE_EVM_EMULATOR_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
     "script-config/enable-evm-emulator.toml",
     "script-out/output-enable-evm-emulator.toml",
@@ -189,15 +215,6 @@ pub static REGISTER_ON_ALL_CHAINS_INVOCATION: ForgeScriptParams = ForgeScriptPar
 )
 .with_ffi()
 .with_rpc_url();
-
-pub static STAGE3_CORE_UPGRADE_V31_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
-    "",
-    "",
-    "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol:CoreUpgrade_v31",
-)
-.with_ffi()
-.with_rpc_url()
-.with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT);
 
 /// Links a typed [`SolCall`] to its [`ForgeScriptParams`] invocation.
 /// Implemented via the [`script_calls!`] table — do not implement by hand.
@@ -248,8 +265,8 @@ script_calls! {
     IDeployL1CoreContractsAbi::runInnerCall                             => DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,
     // DeployCTM
     IDeployCTMAbi::runInnerCall                                         => DEPLOY_CTM_INVOCATION,
-    // v31 upgrade scripts
-    ICoreUpgradeV31Abi::stage3Call                                      => STAGE3_CORE_UPGRADE_V31_INVOCATION,
+    IRecordPriorityOpLowerBoundAbi::runCall                             => RECORD_PRIORITY_OP_LOWER_BOUND_INVOCATION,
+    ICoreUpgradeV33Abi::stage3Call                                         => STAGE3_CORE_UPGRADE_INVOCATION,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

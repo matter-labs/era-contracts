@@ -48,7 +48,9 @@ import type { ChainRole } from "../core/types";
 
 // Protocol version this release upgrades chains to. The upgrade inputs under `config/` carry it as a
 // literal too, since TOML cannot import it.
-export const TARGET_PROTOCOL_VERSION = "0x2000000000";
+// v33 (0x21 << 32). The scripts derive the target from the genesis config; this is what the
+// harness asserts the chains reached.
+export const TARGET_PROTOCOL_VERSION = "0x2100000000";
 
 // EIP-1967 admin slot: keccak256("eip1967.proxy.admin") - 1
 const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
@@ -63,12 +65,12 @@ const UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY = 2;
 const anvilInteropDir = path.resolve(__dirname, "../..");
 const l1ContractsDir = path.resolve(anvilInteropDir, "../..");
 const contractsRootDir = path.resolve(l1ContractsDir, "..");
-// Memory-trimmed test variants of CoreUpgrade_v31 / CTMUpgrade_v31 used as
+// Memory-trimmed test variants of CoreUpgrade_v33 / CTMUpgrade_v33 used as
 // `--core-script-path` / `--ctm-script-path` overrides for `upgrade-prepare-all`.
 // Stage 3 still runs as a direct `forge script` invocation (no protocol-ops command),
 // against the same Core test variant which provides a no-arg `stage3()` wrapper.
-const CORE_UPGRADE_TEST_SCRIPT = "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:CoreUpgradeV31ForTests";
-const CTM_UPGRADE_TEST_SCRIPT = "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:CTMUpgradeV31ForTests";
+const CORE_UPGRADE_TEST_SCRIPT = "test/foundry/l1/integration/_EcosystemUpgradeV33ForTests.sol:CoreUpgradeV33ForTests";
+const CTM_UPGRADE_TEST_SCRIPT = "test/foundry/l1/integration/_EcosystemUpgradeV33ForTests.sol:CTMUpgradeV33ForTests";
 
 // Function selectors for the ComplexUpgrader entry points.
 // Used to decode the final L2 upgrade tx data (output of getL2UpgradeTxData).
@@ -176,10 +178,11 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       await clearGenesisUpgradeTxHash(l1Provider, upgradeChainAddresses);
     }
     // ── Stage 3: post-governance migration ──
-    // Runs BEFORE the per-chain upgrades, matching production sequencing (see
-    // protocol-ops ecosystem stage3): every withdrawable L1-native asset must be registered and
-    // populated by the time a chain's diamond upgrade lands.
-    console.log("\n── Running stage3 post-governance migration ──");
+    // ── Stage 3: post-governance bridgedOut population ──
+    // Runs BEFORE the per-chain upgrades, matching production sequencing (see protocol-ops
+    // `ecosystem stage3`): every withdrawable L1-native asset must be populated by the time a
+    // chain's diamond upgrade lands.
+    console.log("\n── Running stage3 post-governance population ──");
     await runForgeScript({
       scriptPath: CORE_UPGRADE_TEST_SCRIPT,
       envVars: upgradeHarnessInputs.envVars,
@@ -191,12 +194,12 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
 
     // ── Run per-chain upgrades (L1) and relay to L2 ──
     // `default_upgrade_addr` lives in the per-CTM output TOML written by
-    // `CTMUpgradeV31ForTests.saveOutput` directly to `script-out/` (forge
+    // `CTMUpgradeV33ForTests.saveOutput` directly to `script-out/` (forge
     // writes it there; protocol-ops no longer copies it into `prepare/`).
     const ctmTomlPath = path.join(
       l1ContractsDir,
       "script-out",
-      `v31-upgrade-ctm-${upgradeHarnessInputs.ctmProxyAddress.toLowerCase()}.toml`
+      `v33-upgrade-ctm-${upgradeHarnessInputs.ctmProxyAddress.toLowerCase()}.toml`
     );
     const ctmOutputToml = readEcosystemOutput(ctmTomlPath);
     const settlementLayerUpgradeAddr = readNestedString(
@@ -426,7 +429,7 @@ async function executeSafeBundles(outDir: string, rpcUrl: string): Promise<void>
  * etc. We override only the ones that change per fork run: `--out` (temp dir)
  * and `--l1-rpc-url` (the forked anvil instance).
  *
- * Uses the production CoreUpgrade_v31 / CTMUpgrade_v31 forge scripts via
+ * Uses the production CoreUpgrade_v33 / CTMUpgrade_v33 forge scripts via
  * protocol-ops defaults. Returns the dir the prepare phase wrote to.
  */
 export async function runEcosystemUpgradeScriptsForEnv(params: {
@@ -771,12 +774,12 @@ export async function runChainUpgradesAndRelayL2(params: {
  * Multi-CTM aware variant of `runChainUpgradesAndRelayL2`. Used by env-preset
  * fork tests (e.g. stage) where the bridgehub has both an Era CTM and an
  * Atlas (zkOS) CTM, each with its own per-chain upgrade contract address. This release only produces one
- * for the ZKsync OS CTM (`CTMUpgrade_v31.deployUsedUpgradeContract` refuses Era), so the Era half of the
+ * for the ZKsync OS CTM (`CTMUpgrade_v33.deployUsedUpgradeContract` refuses Era), so the Era half of the
  * grouping stays empty here and is exercised only by fork runs against older ecosystems.
  *
  * Groups chains by their on-chain CTM, looks up the per-CTM
- * `script-out/v31-upgrade-ctm-<ctm>.toml` (written by
- * `CTMUpgrade_v31.noGovernancePrepare`) to get the settlement-layer-upgrade
+ * `script-out/v33-upgrade-ctm-<ctm>.toml` (written by
+ * `CTMUpgrade_v33.noGovernancePrepare`) to get the settlement-layer-upgrade
  * address + isZKsyncOS flag, then delegates to `runChainUpgradesAndRelayL2`
  * per group.
  *
@@ -840,7 +843,7 @@ export async function runChainUpgradesPerCtm(params: {
 
     // Full path: read per-CTM toml for the settlement-layer-upgrade addr
     // + isZKsyncOS flag, then delegate to the existing single-CTM helper.
-    const ctmTomlPath = path.join(contractsRootDir, "l1-contracts", "script-out", `v31-upgrade-ctm-${ctmAddr}.toml`);
+    const ctmTomlPath = path.join(contractsRootDir, "l1-contracts", "script-out", `v33-upgrade-ctm-${ctmAddr}.toml`);
     if (!fs.existsSync(ctmTomlPath)) {
       throw new Error(`Missing per-CTM prepare output ${ctmTomlPath}. Did upgrade-prepare-all run for this CTM?`);
     }
@@ -1144,7 +1147,7 @@ function decodeUpgradeTxData(upgradeTxData: string): {
 }
 
 /**
- * Extract the L2 upgrade tx data from a ChainUpgrade_v31 broadcast file.
+ * Extract the L2 upgrade tx data from a DefaultChainUpgrade broadcast file.
  *
  * Walks transactions in reverse looking for a ChainAdminOwnable.multicall
  * containing a single upgradeChainFromVersion call, then extracts the

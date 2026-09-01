@@ -4,10 +4,10 @@ pragma solidity 0.8.28;
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {CoreUpgrade_v31} from "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
-import {CTMUpgrade_v31} from "deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
+import {CoreUpgrade_v33} from "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
+import {CTMUpgrade_v33} from "deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
 
-/// @notice Memory-trimmed test variants of the v31 Core/CTM upgrade scripts and a
+/// @notice Memory-trimmed test variants of the v33 Core/CTM upgrade scripts and a
 ///         small Stage-3 wrapper. Used by the anvil-interop fork-upgrade test and the
 ///         foundry integration tests. There is no `EcosystemUpgrade_v31` orchestrator
 ///         anymore — callers run Core and CTM scripts directly (or via `protocol-ops
@@ -17,7 +17,7 @@ import {CTMUpgrade_v31} from "deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 ///      not available) and writes only the minimal output the test harness needs
 ///      (`chain_upgrade_diamond_cut` + `state_transition.default_upgrade_addr`)
 ///      so accumulated `vm.serialize*` JSON does not blow forge's 128 MB EVM memory.
-contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
+contract CTMUpgradeV33ForTests is CTMUpgrade_v33 {
     using stdToml for string;
 
     function prepareCTMUpgrade() public override {
@@ -26,10 +26,11 @@ contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
     }
 
     /// @dev Reads the optional `contracts.new_protocol_version` from the upgrade input and uses it as the
-    ///      upgrade target. The production flow reads the target from the genesis config, which pins the
-    ///      release the foundry suite is built against (v31); a harness scenario upgrading a v31 ecosystem
-    ///      onto this release has to say which version it is moving to, the same way the local foundry
-    ///      fixture does with `ctmUpgrade.setNewProtocolVersion`.
+    ///      upgrade target. The production flow reads the target from the genesis config
+    ///      (`configs/genesis/zksync-os/latest.json`, currently v33); a harness scenario upgrading a v31
+    ///      ecosystem onto this release states its target explicitly, the same way the local foundry
+    ///      fixture does with `ctmUpgrade.setNewProtocolVersion`. Keep the value in the scenario's input
+    ///      in step with that genesis config — a stale one silently upgrades to the wrong version.
     // solhint-disable-next-line func-named-parameters
     function initializeWithArgs(
         address _ctmProxy,
@@ -40,7 +41,8 @@ contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
         string memory _newConfigPath,
         string memory _outputPath,
         address _governance,
-        bytes32 _zkTokenAssetId
+        bytes32 _zkTokenAssetId,
+        bool _testnetVerifier
     ) public virtual override {
         // solhint-disable-next-line func-named-parameters
         super.initializeWithArgs(
@@ -52,7 +54,8 @@ contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
             _newConfigPath,
             _outputPath,
             _governance,
-            _zkTokenAssetId
+            _zkTokenAssetId,
+            _testnetVerifier
         );
 
         string memory upgradeToml = vm.readFile(string.concat(vm.projectRoot(), _newConfigPath));
@@ -83,28 +86,17 @@ contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
     }
 }
 
-/// @dev Core upgrade for tests with a Stage-3 wrapper that reads bridgehub from env.
-///      Anvil-interop drives `stage3()` via direct `forge script`, separate from the
-///      protocol-ops driven prepare phase.
-contract CoreUpgradeV31ForTests is CoreUpgrade_v31 {
+/// @dev Core upgrade for tests, with the no-arg Stage-3 wrapper the harnesses drive via a direct
+///      `forge script` call (separate from the protocol-ops driven prepare phase).
+contract CoreUpgradeV33ForTests is CoreUpgrade_v33 {
     using stdToml for string;
 
-    /// @notice Stage 3 wrapper: reads bridgehub from `PERMANENT_VALUES_INPUT_OVERRIDE`
-    ///         and dispatches to `CoreUpgrade_v31.stage3(bridgehubProxy)`.
+    /// @notice Stage 3 wrapper: reads bridgehub from `PERMANENT_VALUES_INPUT_OVERRIDE` and
+    ///         dispatches to `stage3(bridgehubProxy)`.
     function stage3() public {
         string memory permanentValuesPath = vm.envString("PERMANENT_VALUES_INPUT_OVERRIDE");
         string memory pvToml = vm.readFile(string.concat(vm.projectRoot(), permanentValuesPath));
         address bridgehubProxy = pvToml.readAddress("$.core_contracts.bridgehub_proxy_addr");
         stage3(bridgehubProxy);
-    }
-}
-
-/// @dev Idempotent variant of CoreUpgradeV31ForTests: skips `updateContractConnections()`
-///      so a second run inside the same forge process does not redo `setAddresses` /
-///      `transferOwnership`. Required by tests that re-run core deploys to recompute
-///      create2 addresses for downstream pieces (e.g. MailboxFacet's chainAssetHandler).
-contract CoreUpgradeV31Idempotent is CoreUpgradeV31ForTests {
-    function deployNewEcosystemContractsL1() public virtual override {
-        super.deployNewEcosystemContractsL1NoConnections();
     }
 }

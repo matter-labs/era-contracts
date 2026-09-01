@@ -16,7 +16,7 @@
 //! This module owns the shared `sol!` types (re-exported under the module
 //! path for external consumers like `governance_stage_calls`), the
 //! `ProposedUpgrade` impl that dispatches by flavor, `verify_factory_deps`,
-//! and `verify_l2_v31_upgrade_inner_calldata` (used by both flavors).
+//! and `verify_l2_upgrade_inner_calldata` (used by both flavors).
 
 use alloy::{
     hex,
@@ -559,7 +559,7 @@ async fn verify_factory_deps(
 /// `forceDeployAndUpgrade(Universal)` `_calldata` argument and validates each
 /// field. Shared by both Era and ZKsync OS paths — they only differ in the
 /// expected value of `_isZKsyncOS`.
-pub(super) async fn verify_l2_v31_upgrade_inner_calldata(
+pub(super) async fn verify_l2_upgrade_inner_calldata(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
     calldata: &[u8],

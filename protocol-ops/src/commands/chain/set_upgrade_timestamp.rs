@@ -3,7 +3,10 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::common::abi::AdminFunctionsAbi;
+use alloy::network::Ethereum;
+use alloy::providers::{ProviderBuilder, RootProvider};
+
+use crate::common::abi::{AdminFunctionsAbi, IChainTypeManagerAbi, ZkChainAbi};
 use crate::common::addresses::ZERO_ADDRESS;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
@@ -44,6 +47,114 @@ pub struct ChainSetUpgradeTimestampArgs {
     pub shared: SharedRunArgs,
 }
 
+/// The protocol version a chain must currently be on for the priority-op bound to be required.
+///
+/// Keyed off the chain rather than the CTM: `PRIORITY_OP_LOWER_BOUND` exists to prove that v31's
+/// base-token backfill executed before this release removed its L2 entry point, so the precondition
+/// belongs to chains leaving v31. A CTM already bumped by a later release would otherwise make this
+/// check misfire.
+const VERSION_REQUIRING_PRIORITY_OP_BOUND: u64 = 31;
+
+alloy::sol! {
+    /// The v33 per-chain upgrade contract and the registry it reads. Only the getters are needed:
+    /// recording goes through `chain record-priority-op-lower-bound`.
+    #[sol(rpc)]
+    interface IPriorityOpLowerBoundGate {
+        function PRIORITY_OP_LOWER_BOUND() external view returns (address);
+        function recorded(address chain) external view returns (bool);
+        function lowerBound(address chain) external view returns (uint256);
+    }
+}
+
+/// Refuse to schedule the upgrade while the chain would fail the per-chain upgrade's precondition.
+///
+/// Scheduling is the point of no return for the server: the `UpgradeTimestampUpdated` event makes it
+/// inject the L2 upgrade transaction and hold every subsequent batch until L1's protocol version
+/// moves. If the priority-op bound has not been recorded and drained by then, the diamond cut reverts
+/// with `LowerBoundNotRecorded()` / `PriorityQueueNotReady()` and the chain sits wedged in the
+/// meantime. Checking here turns that into a refusal before anything is sent.
+///
+/// Applies only to a chain currently on v31 (see {VERSION_REQUIRING_PRIORITY_OP_BOUND}). Once it does
+/// apply, every failure — RPC, decoding, an unexpected upgrade contract — is fatal rather than treated
+/// as "nothing to check".
+async fn ensure_priority_op_bound_ready(
+    rpc_url: &str,
+    bridgehub: Address,
+    chain_id: u64,
+) -> anyhow::Result<()> {
+    let provider: RootProvider<Ethereum> =
+        ProviderBuilder::default().connect_http(rpc_url.parse()?);
+    let ctm = crate::common::l1_contracts::resolve_ctm_proxy(rpc_url, bridgehub, chain_id)
+        .await
+        .context("resolve CTM")?;
+    let diamond = crate::common::l1_contracts::resolve_zk_chain(rpc_url, bridgehub, chain_id)
+        .await
+        .context("resolve chain diamond")?;
+
+    // Decide from the *chain's* current protocol version, not the CTM's. The CTM may already have
+    // been bumped past this release by a later one, whereas what actually matters is the version the
+    // chain is upgrading away from: the bound exists to prove v31's base-token backfill executed.
+    let packed = ZkChainAbi::new(diamond, &provider)
+        .getProtocolVersion()
+        .call()
+        .await
+        .context("read chain protocolVersion")?;
+    let minor = (packed.wrapping_to::<u64>() >> 32) & 0xFFFF;
+    if minor != VERSION_REQUIRING_PRIORITY_OP_BOUND {
+        logger::info(format!(
+            "Chain {chain_id} is on protocol version 0.{minor}.x, not 0.{VERSION_REQUIRING_PRIORITY_OP_BOUND}.x — no priority-op bound precondition to check"
+        ));
+        return Ok(());
+    }
+
+    let default_upgrade = IChainTypeManagerAbi::new(ctm, &provider)
+        .defaultUpgrade()
+        .call()
+        .await
+        .context("read CTM defaultUpgrade")?;
+
+    // From here on every failure is fatal: this is a safety check, and an RPC hiccup must not be
+    // mistaken for "no precondition to enforce".
+    let registry = IPriorityOpLowerBoundGate::new(default_upgrade, &provider)
+        .PRIORITY_OP_LOWER_BOUND()
+        .call()
+        .await
+        .context(
+            "read PRIORITY_OP_LOWER_BOUND from the CTM's default upgrade — expected on v33+, so a \
+             failure here means the upgrade contract or the RPC is not what this command assumes",
+        )?;
+
+    let registry = IPriorityOpLowerBoundGate::new(registry, &provider);
+    anyhow::ensure!(
+        registry.recorded(diamond).call().await.context("registry.recorded")?,
+        "priority-op lower bound is not recorded for chain {chain_id}. Run \
+         `protocol-ops chain record-priority-op-lower-bound` first, let the queue drain past it, \
+         then schedule the upgrade — otherwise the diamond cut will revert with LowerBoundNotRecorded()"
+    );
+
+    let bound = registry
+        .lowerBound(diamond)
+        .call()
+        .await
+        .context("registry.lowerBound")?;
+    let processed = ZkChainAbi::new(diamond, &provider)
+        .getFirstUnprocessedPriorityTx()
+        .call()
+        .await
+        .context("chain.getFirstUnprocessedPriorityTx")?;
+    anyhow::ensure!(
+        processed >= bound,
+        "chain {chain_id} has not processed the priority ops below its recorded bound \
+         (processed {processed}, bound {bound}). Wait for them to execute on L1 before scheduling \
+         the upgrade — otherwise the diamond cut will revert with PriorityQueueNotReady()"
+    );
+
+    logger::info(format!(
+        "Priority-op lower bound satisfied for chain {chain_id} (processed {processed} >= bound {bound})"
+    ));
+    Ok(())
+}
+
 pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
@@ -51,6 +162,10 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         .upgrade_timestamp
         .parse::<U256>()
         .context("invalid upgrade_timestamp: expected decimal or hex uint256")?;
+
+    // Checked against the real chain, not the fork: this is a precondition of the upgrade the
+    // scheduled timestamp commits the server to.
+    ensure_priority_op_bound_ready(&args.shared.l1_rpc_url, bridgehub, chain_id).await?;
 
     let admin_address =
         crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
