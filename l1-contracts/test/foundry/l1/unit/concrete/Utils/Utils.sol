@@ -545,6 +545,25 @@ library Utils {
         return address(diamondProxy);
     }
 
+    /// @dev Registry-model twin of {makeDiamondProxy} with a ZKsync OS `DiamondInit`: everything
+    ///      but (chainId, admin) is derived from the (mocked) CTM and its genesis registry.
+    function makeZKsyncOSDiamondProxy(Diamond.FacetCut[] memory _facetCuts, address) public returns (address) {
+        DiamondInit diamondInit = new DiamondInit(true);
+        bytes memory diamondInitData = abi.encodeCall(diamondInit.initialize, (TEST_CHAIN_ID, TEST_CHAIN_ADMIN));
+
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: _facetCuts,
+            initAddress: address(diamondInit),
+            initCalldata: diamondInitData
+        });
+
+        // DiamondInit treats the proxy deployer as the CTM; callers must have mocked the fake
+        // CTM's getters beforehand (UtilsCallMocker).
+        vm.prank(TEST_CHAIN_TYPE_MANAGER);
+        DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
+        return address(diamondProxy);
+    }
+
     function makeEmptyL2CanonicalTransaction() public returns (L2CanonicalTransaction memory) {
         uint256[4] memory reserved;
         uint256[] memory factoryDeps = new uint256[](1);

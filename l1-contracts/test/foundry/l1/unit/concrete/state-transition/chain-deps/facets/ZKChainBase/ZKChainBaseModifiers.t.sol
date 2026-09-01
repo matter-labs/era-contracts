@@ -15,8 +15,7 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 import {NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
@@ -29,7 +28,7 @@ contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
     IMailbox internal mailboxFacet;
     UtilsFacet internal utilsFacet;
     DummyBridgehub internal dummyBridgehub;
-    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
     uint256 constant eraChainId = 9;
 
     function getAdminSelectors() internal pure returns (bytes4[] memory) {
@@ -86,7 +85,7 @@ contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
         dummyBridgehub = new DummyBridgehub();
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), bytes32(0));
         mockChainTypeManagerVerifier(testnetVerifier);
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, address(dummyBridgehub));
+        address diamondProxy = Utils.makeZKsyncOSDiamondProxy(facetCuts, address(dummyBridgehub));
         adminFacet = IAdmin(diamondProxy);
         executorFacet = IExecutor(diamondProxy);
         mailboxFacet = IMailbox(diamondProxy);

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+/// @dev No `isZKsyncOS` field: the flavor is resolved authoritatively from L1 by the caller
+///      (`protocol-ops` reads `ctm.isZKsyncOS()` and skips Era CTMs), so a caller-supplied
+///      bool could only ever restate or contradict it.
 /// @notice Parameters for the ecosystem upgrade entry point.
 ///         Passed as a struct to avoid stack-depth issues as the parameter list grows.
 // solhint-disable-next-line gas-struct-packing
@@ -9,7 +12,6 @@ struct EcosystemUpgradeParams {
     address ctmProxy;
     address bytecodesSupplier;
     address rollupDAManager;
-    bool isZKsyncOS;
     bytes32 create2FactorySalt;
     string upgradeInputPath;
     string ecosystemOutputPath;
@@ -25,7 +27,6 @@ struct EcosystemUpgradeParams {
 // solhint-disable-next-line gas-struct-packing
 struct CoreUpgradeParams {
     address bridgehubProxyAddress;
-    bool isZKsyncOS;
     bytes32 create2FactorySalt;
     string upgradeInputPath;
     string outputPath;
@@ -38,7 +39,6 @@ struct CoreUpgradeParams {
 struct CTMUpgradeParams {
     address ctmProxy;
     address bytecodesSupplier;
-    bool isZKsyncOS;
     address rollupDAManager;
     bytes32 create2FactorySalt;
     string upgradeInputPath;

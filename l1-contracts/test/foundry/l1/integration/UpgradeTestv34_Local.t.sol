@@ -43,12 +43,7 @@ contract CTMUpgrade_v34_Test is CTMUpgrade_v34 {
     ///      fixture asserts the L1 side only and never relays an L2 leg, so it runs the plain
     ///      `DefaultUpgrade`; the real engine is exercised by the anvil bootstrap pipeline.
     function deployUsedUpgradeContract() internal override returns (address) {
-        return deploySimpleContract("DefaultUpgrade", false);
-    }
-
-    /// @notice Return a dummy bytecode hash instead of reading huge JSON files.
-    function getL2BytecodeHash(string memory /* contractName */) public view override returns (bytes32) {
-        return bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001));
+        return deploySimpleContract("DefaultUpgrade");
     }
 
     /// @dev Same MemoryOOG avoidance: the real builder reads every L2 contract's bytecode.
@@ -57,16 +52,22 @@ contract CTMUpgrade_v34_Test is CTMUpgrade_v34 {
         return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
     }
 
+    /// @dev The production override reads the `L2V34Upgrade` zkout bytecode to derive the L2
+    ///      delegate address (MemoryOOG here). This fixture relays no L2 leg, so route through
+    ///      the plain universal call with no delegate — the pre-merge default for this harness.
+    function getL2UpgradeTargetAndData(
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
+    ) internal override returns (address, bytes memory) {
+        return getUniversalComplexUpgraderTargetAndData(_deployments, address(0), "");
+    }
+
     /// @notice Skip bytecode publishing (reads large JSON files).
     function publishBytecodes() public override {
         console.log("Test mode: Skipping bytecode publishing to avoid MemoryOOG");
 
         factoryDepsResult.factoryDepsHashes = new uint256[](45);
-        factoryDepsResult.factoryDepsHashes[0] = uint256(config.contracts.chainCreationParams.bootloaderHash);
-        factoryDepsResult.factoryDepsHashes[1] = uint256(config.contracts.chainCreationParams.defaultAAHash);
-        factoryDepsResult.factoryDepsHashes[2] = uint256(config.contracts.chainCreationParams.evmEmulatorHash);
         bytes32 dummyHash = bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001));
-        for (uint256 i = 3; i < 45; i++) {
+        for (uint256 i = 0; i < 45; i++) {
             factoryDepsResult.factoryDepsHashes[i] = uint256(dummyHash);
         }
         upgradeConfig.factoryDepsPublished = true;
@@ -88,9 +89,11 @@ contract CTMUpgrade_v34_Test is CTMUpgrade_v34 {
                 _factoryDepsResult,
                 protocolUpgradeNonce
             ),
-            bootloaderHash: chainCreationParams.bootloaderHash,
-            defaultAccountHash: chainCreationParams.defaultAAHash,
-            evmEmulatorHash: chainCreationParams.evmEmulatorHash,
+            // ZKsync OS has no bootloader, default-account or EVM-emulator bytecode; the
+            // audited struct keeps the fields and requires them to be zero.
+            bootloaderHash: bytes32(0),
+            defaultAccountHash: bytes32(0),
+            evmEmulatorHash: bytes32(0),
             verifier: address(0),
             verifierParams: ProposedUpgradeLib.emptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),

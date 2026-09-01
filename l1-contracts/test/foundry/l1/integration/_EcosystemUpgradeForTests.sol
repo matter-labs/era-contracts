@@ -30,7 +30,6 @@ contract CTMUpgradeForTests is CTMUpgrade_v34 {
     function initializeWithArgs(
         address _ctmProxy,
         address _bytecodesSupplier,
-        bool _isZKsyncOS,
         address _rollupDAManager,
         bytes32 _create2FactorySalt,
         string memory _newConfigPath,
@@ -42,7 +41,6 @@ contract CTMUpgradeForTests is CTMUpgrade_v34 {
         super.initializeWithArgs(
             _ctmProxy,
             _bytecodesSupplier,
-            _isZKsyncOS,
             _rollupDAManager,
             _create2FactorySalt,
             _newConfigPath,

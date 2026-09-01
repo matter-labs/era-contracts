@@ -820,7 +820,13 @@ contract ExperimentalBridgeTest is Test {
         chainId = bound(chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
         vm.assume(randomCaller != deployerAddress && randomCaller != bridgeOwner);
-        vm.assume(newChainAddress != address(0));
+        // `newChainAddress` gets a vm.mockCall below, and forge's own addresses cannot be mocked:
+        // with newChainAddress = address(vm), the Bridgehub's getZKsyncOS() call is intercepted as a
+        // cheatcode instead of returning the mocked `false`, so it takes the ZKsyncOS branch and
+        // emits NewInteropRoot before NewChain — failing the expectEmit with
+        // "NewInteropRoot != expected NewChain". Precompiles cannot be mocked usefully either.
+        // Excluding them keeps this about the Bridgehub rather than about what the fuzzer picked.
+        assumeAddressIsNot(newChainAddress, AddressType.ZeroAddress, AddressType.Precompile, AddressType.ForgeAddress);
 
         _initializeBridgehub();
 

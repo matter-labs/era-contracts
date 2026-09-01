@@ -13,7 +13,6 @@ use crate::common::forge::scripts::deploy_ecosystem::DeployL1CoreContractsOutput
 use crate::common::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
-use crate::types::VMOption;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -43,12 +42,6 @@ pub struct EcosystemInitArgs {
     pub shared: SharedRunArgs,
 
     // Advanced input
-    /// Era chain ID (default: 270, or env's `era_chain_id` when `--env` is set).
-    #[clap(long, help_heading = "Advanced input")]
-    pub era_chain_id: Option<u64>,
-    /// VM type: zksyncos (default) or eravm
-    #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM, help_heading = "Advanced input")]
-    pub vm_type: VMOption,
     /// Use testnet verifier (default: true)
     #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_testnet_verifier: bool,
@@ -76,10 +69,6 @@ pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
         .or_else(|| env_cfg.as_ref().and_then(|c| c.owner_address()));
     let owner = Wallet::resolve(owner_override, None, &sender)?;
 
-    let era_chain_id = args
-        .era_chain_id
-        .or_else(|| env_cfg.as_ref().and_then(|c| c.era_chain_id()))
-        .unwrap_or(270);
     let zk_token_asset_id = args
         .zk_token_asset_id
         .or_else(|| env_cfg.as_ref().and_then(|c| c.zk_token_asset_id()));
@@ -87,8 +76,6 @@ pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
     let input = EcosystemInitInput {
         sender: sender.address,
         owner: owner.address,
-        era_chain_id,
-        vm_type: args.vm_type,
         with_testnet_verifier: args.with_testnet_verifier,
         zk_token_asset_id,
         create2_factory_salt: args.create2_factory_salt,
@@ -126,7 +113,6 @@ pub async fn ecosystem_init(
     // Initialize Bridgehub contracts
     let hub_input = HubInitInput {
         owner: owner.address,
-        era_chain_id: input.era_chain_id,
         create2_factory_salt: input.create2_factory_salt,
     };
     let hub_output = hub_init(runner, sender, owner, &hub_input).await?;
@@ -136,7 +122,6 @@ pub async fn ecosystem_init(
     let ctm_input = CtmInitInput {
         bridgehub: bridgehub_addr,
         owner: owner.address,
-        vm_type: input.vm_type,
         reuse_gov_and_admin: true,
         with_testnet_verifier: input.with_testnet_verifier,
         zk_token_asset_id: input.zk_token_asset_id,
@@ -156,8 +141,6 @@ pub async fn ecosystem_init(
 pub struct EcosystemInitInput {
     pub sender: Address,
     pub owner: Address,
-    pub era_chain_id: u64,
-    pub vm_type: VMOption,
     pub with_testnet_verifier: bool,
     pub zk_token_asset_id: Option<B256>,
     pub create2_factory_salt: Option<B256>,

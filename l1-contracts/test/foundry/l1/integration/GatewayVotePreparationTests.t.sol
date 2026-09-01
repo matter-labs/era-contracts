@@ -45,7 +45,7 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
         (contracts, , , directCalldata, ) = GatewayCTMDeployerHelper.calculateAddresses(
             bytes32(uint256(1)),
             gatewayCTMDeployerConfig,
-            getL2BytecodeInfoTable(gatewayCTMDeployerConfig.isZKsyncOS)
+            getL2BytecodeInfoTable()
         );
     }
 
@@ -57,7 +57,7 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
     /// @dev The real builder reads every L2 contract's bytecode from artifacts, which pushes this
     ///      test over the gas limit (MemoryOOG). The table's content is irrelevant to the address
     ///      calculation under test, so an empty enum-length table stands in.
-    function getL2BytecodeInfoTable(bool) internal override returns (bytes[] memory) {
+    function getL2BytecodeInfoTable() internal override returns (bytes[] memory) {
         return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
     }
 }
@@ -327,8 +327,6 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
 
         vm.serializeAddress("gw_vote_prep", "owner_address", addresses.bridgehub.owner());
         vm.serializeBool("gw_vote_prep", "testnet_verifier", true);
-        vm.serializeBool("gw_vote_prep", "support_l2_legacy_shared_bridge_test", false);
-        vm.serializeBool("gw_vote_prep", "is_zk_sync_os", true);
         vm.serializeAddress("gw_vote_prep", "refund_recipient", address(0xBEEF));
         vm.serializeUint("gw_vote_prep", "gateway_chain_id", GATEWAY_CHAIN_ID);
         vm.serializeBytes("gw_vote_prep", "force_deployments_data", hex"00");

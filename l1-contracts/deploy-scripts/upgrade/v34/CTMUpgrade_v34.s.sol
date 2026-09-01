@@ -59,13 +59,11 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         super.generateUpgradeData();
     }
 
-    /// @dev Only ZKsync OS chains can be upgraded onto this release (the registry model has no
-    ///      EraVM-deployable release yet); protocol-ops skips Era CTMs before this ever runs.
+    /// @dev The repo is ZKsync-OS-only: every CTM this prepare runs against is a ZKsync OS CTM.
     function deployUsedUpgradeContract() internal virtual override returns (address) {
-        require(config.isZKsyncOS, "Upgrading Era chains onto this release is not supported");
         // The bootstrap engine: derives the facet reinstall on-chain from the genesis release it
         // pins as an immutable, then runs the storage/L2 part of `DefaultUpgradeZKsyncOS`.
-        return deploySimpleContract("BootstrapUpgradeZKsyncOS", false);
+        return deploySimpleContract("BootstrapUpgradeZKsyncOS");
     }
 
     /// @notice The committed (ecosystem-wide) L2 upgrade calldata: the upgrade-time (re)init of
@@ -77,7 +75,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             abi.encodeCall(
                 IL2V34Upgrade.upgrade,
                 (
-                    config.isZKsyncOS,
+                    true, // the repo is ZKsync-OS-only
                     coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
                     generatedData.forceDeploymentsData,
                     ""
@@ -92,11 +90,6 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         override
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
     {
-        if (!config.isZKsyncOS) {
-            // Era chains cannot be upgraded onto this release; the Era branch exists only for
-            // the L1-only local fixture (see `CTMUpgrade_v34_Test`), which relays no L2 leg.
-            return additional;
-        }
         bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V34Upgrade.sol", "L2V34Upgrade");
         additional = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
         additional[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
@@ -106,7 +99,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         });
     }
 
-    function getZKsyncOSL2UpgradeTargetAndData(
+    function getL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual override returns (address, bytes memory) {
         // The delegate address must match the force-deployed `L2V34Upgrade` entry above.
@@ -123,15 +116,12 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
 
         // The new ChainTypeManager implementation (per VM) — the bootstrap manifest's one
         // participating inventory row.
-        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(
-            config.isZKsyncOS,
-            CTMContract.ChainTypeManager
-        );
-        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
+        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
+        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName);
 
         // Deliberately OUTSIDE the registry flow (own chainAdmin-owned ProxyAdmin): the notifier
         // upgrade rides the CTM-admin operational calls, not the bootstrap manifest.
-        ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier", false);
+        ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier");
 
         // The genesis release deployed by the base pipeline's `deployStateTransitionDiamondFacets`
         // pins the force-deployments blob, so it must exist before that step runs.
@@ -184,8 +174,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                         // runtime code IS the on-chain runtime code.
                         keccak256(vm.getDeployedCode("CTMTransition.sol:CTMTransition"))
                     ),
-                    "CTMUpgradeExecutor",
-                    false
+                    "CTMUpgradeExecutor"
                 )
             )
         );
@@ -194,8 +183,7 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             deployViaCreate2AndNotify(
                 type(RegistryBootstrapMigration).creationCode,
                 abi.encode(_bootstrapManifest(ctmProxy, ctmProxyAdmin)),
-                "RegistryBootstrapMigration",
-                false
+                "RegistryBootstrapMigration"
             )
         );
     }

@@ -20,7 +20,7 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {ADDRESS_ONE, Utils} from "../utils/Utils.sol";
+import {ADDRESS_ONE} from "../utils/Utils.sol";
 import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
@@ -28,8 +28,6 @@ import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerB
 
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-
-import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
@@ -54,15 +52,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
     function getDeployerAddress() public view returns (address) {
         return tx.origin;
     }
-
-    struct LegacySharedBridgeParams {
-        bytes implementationConstructorParams;
-        address implementationAddress;
-        bytes proxyConstructorParams;
-        address proxyAddress;
-    }
-
-    LegacySharedBridgeParams internal legacySharedBridgeParams;
 
     CTMDeployedAddresses internal ctmAddresses;
     CoreDeployedAddresses internal coreAddresses;
@@ -92,7 +81,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         string memory path = string.concat(root, inputPath);
         initializeConfig(path, _chainTypeManagerProxy, _chainChainId);
         loadChainCreationData(_chainTypeManagerProxy);
-        // TODO: some chains may not want to have a legacy shared bridge
         runInner(outputPath);
     }
 
@@ -213,10 +201,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
             config.validatorSenderOperatorExecute = toml.readAddress("$.chain.validator_sender_operator_execute");
         } else {
             config.validatorSenderOperatorExecute = address(0);
-        }
-
-        if (vm.keyExistsToml(toml, "$.initialize_legacy_bridge")) {
-            config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
         }
 
         config.l1SharedBridgeProxy = coreAddresses.bridges.proxies.l1AssetRouter;
@@ -489,15 +473,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         console.log("Owner for ", output.diamondProxy, "set to", output.chainAdmin);
     }
 
-    function unpauseDeposits() internal {
-        IZKChain zkChain = IZKChain(output.diamondProxy);
-        if (zkChain.depositsPaused()) {
-            vm.broadcast(msg.sender);
-            zkChain.unpauseDeposits();
-            console.log("Deposits unpaused");
-        }
-    }
-
     function deployChainProxyAddress() internal {
         address proxyAdmin = create2WithDeterministicOwner(type(ProxyAdmin).creationCode, output.chainAdmin);
 
@@ -513,9 +488,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
     function saveOutput(string memory outputPath) internal {
         vm.serializeAddress("root", "diamond_proxy_addr", output.diamondProxy);
         vm.serializeAddress("root", "chain_admin_addr", output.chainAdmin);
-        if (output.l2LegacySharedBridge != address(0)) {
-            vm.serializeAddress("root", "l2_legacy_shared_bridge_addr", output.l2LegacySharedBridge);
-        }
         vm.serializeAddress("root", "access_control_restriction_addr", output.accessControlRestrictionAddress);
         vm.serializeAddress("root", "chain_proxy_admin_addr", output.chainProxyAdmin);
 

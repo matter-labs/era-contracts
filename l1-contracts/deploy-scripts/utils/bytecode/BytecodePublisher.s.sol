@@ -7,15 +7,13 @@ import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {Utils} from "../Utils.sol";
 
 /// @notice Result of publishing and processing factory dependencies.
 struct PublishFactoryDepsResult {
-    /// @dev Factory dep hashes for the upgrade transaction.
-    ///      Era: `L2ContractHelper.hashL2Bytecode` (padded-bytes L2 hash).
-    ///      ZKsyncOS: keccak256 of the raw bytecode — the same key
+    /// @dev Factory dep hashes for the upgrade transaction:
+    ///      keccak256 of the raw bytecode — the same key
     ///      `BytecodesSupplier` uses for `evmPublishingBlock` and the topic1
     ///      of `EVMBytecodePublished`, so the server can filter events by
     ///      topic1 directly and load matching preimages. The server then
@@ -32,15 +30,10 @@ library BytecodePublisher {
     /// @notice Maximal size of bytecodes' batch to be published at once
     uint256 constant MAX_BATCH_SIZE = 126_000;
 
-    /// @notice Publishes bytecodes in batches, each not exceeding `MAX_BATCH_SIZE`
+    /// @notice Publishes EVM bytecodes in batches, each not exceeding `MAX_BATCH_SIZE`
     /// @param bytecodesSupplier The BytecodesSupplier contract
     /// @param bytecodes The array of bytecodes to publish
-    /// @param isEVM If true, publish as EVM bytecodes (using keccak256 hash), otherwise as Era bytecodes
-    function publishBytecodesInBatches(
-        BytecodesSupplier bytecodesSupplier,
-        bytes[] memory bytecodes,
-        bool isEVM
-    ) internal {
+    function publishBytecodesInBatches(BytecodesSupplier bytecodesSupplier, bytes[] memory bytecodes) internal {
         uint256 totalBytecodes = bytecodes.length;
         require(totalBytecodes > 0, "No bytecodes to publish");
 
@@ -51,12 +44,8 @@ library BytecodePublisher {
         uint256 toPublishPtr = 0;
 
         for (uint256 i = 0; i < totalBytecodes; i++) {
-            bytes32 hash = isEVM
-                ? ZKSyncOSBytecodeInfo.hashEVMBytecode(bytecodes[i])
-                : L2ContractHelper.hashL2Bytecode(bytecodes[i]);
-            uint256 publishedBlock = isEVM
-                ? bytecodesSupplier.evmPublishingBlock(hash)
-                : bytecodesSupplier.publishingBlock(hash);
+            bytes32 hash = ZKSyncOSBytecodeInfo.hashEVMBytecode(bytecodes[i]);
+            uint256 publishedBlock = bytecodesSupplier.evmPublishingBlock(hash);
 
             if (publishedBlock != 0) {
                 console.log("The following bytecode has already been published:");
@@ -80,7 +69,7 @@ library BytecodePublisher {
             if (currentBatchSize + bytecodeSize > MAX_BATCH_SIZE) {
                 // Publish the current batch
                 bytes[] memory currentBatch = slice(toPublish, 0, toPublishPtr);
-                _publishBatch(bytecodesSupplier, currentBatch, isEVM);
+                _publishBatch(bytecodesSupplier, currentBatch);
 
                 // Reset for the next batch
                 batchStartIndex = i;
@@ -95,70 +84,44 @@ library BytecodePublisher {
         // Publish the last batch if any
         if (toPublishPtr != 0) {
             bytes[] memory lastBatch = slice(toPublish, 0, toPublishPtr);
-            _publishBatch(bytecodesSupplier, lastBatch, isEVM);
+            _publishBatch(bytecodesSupplier, lastBatch);
         }
-    }
-
-    /// @notice Publishes Era bytecodes in batches, each not exceeding `MAX_BATCH_SIZE`
-    /// @param bytecodesSupplier The BytecodesSupplier contract
-    /// @param bytecodes The array of bytecodes to publish
-    function publishEraBytecodesInBatches(BytecodesSupplier bytecodesSupplier, bytes[] memory bytecodes) internal {
-        publishBytecodesInBatches(bytecodesSupplier, bytecodes, false);
     }
 
     /// @notice Publishes EVM bytecodes in batches, each not exceeding `MAX_BATCH_SIZE`
     /// @param bytecodesSupplier The BytecodesSupplier contract
     /// @param bytecodes The array of bytecodes to publish
     function publishEVMBytecodesInBatches(BytecodesSupplier bytecodesSupplier, bytes[] memory bytecodes) internal {
-        publishBytecodesInBatches(bytecodesSupplier, bytecodes, true);
+        publishBytecodesInBatches(bytecodesSupplier, bytecodes);
     }
 
     /// @notice Internal function to publish a single batch of bytecodes
     /// @param bytecodesSupplier The BytecodesSupplier contract
     /// @param batch The batch of bytecodes to publish
-    /// @param isEVM If true, publish as EVM bytecodes, otherwise as Era bytecodes
-    function _publishBatch(BytecodesSupplier bytecodesSupplier, bytes[] memory batch, bool isEVM) internal {
+    function _publishBatch(BytecodesSupplier bytecodesSupplier, bytes[] memory batch) internal {
         vm.broadcast(Utils.getBroadcasterAddress());
-        if (isEVM) {
-            bytecodesSupplier.publishEVMBytecodes(batch);
-        } else {
-            bytecodesSupplier.publishEraBytecodes(batch);
-        }
+        bytecodesSupplier.publishEVMBytecodes(batch);
     }
 
     /// @notice Publish bytecodes and compute factory dependency hashes in one call.
-    ///         Era: publishes bytecodes, computes L2 bytecode hashes, returns populated result.
-    ///         EVM bytecodes: publishes bytecodes, returns empty array (no factory deps concept).
     function publishAndProcessFactoryDeps(
-        bool _isEVMBytecode,
         BytecodesSupplier _supplier,
         bytes[] memory _allDeps
     ) internal returns (PublishFactoryDepsResult memory result) {
-        if (_isEVMBytecode) {
-            publishEVMBytecodesInBatches(_supplier, _allDeps);
-        } else {
-            publishEraBytecodesInBatches(_supplier, _allDeps);
-        }
+        publishEVMBytecodesInBatches(_supplier, _allDeps);
 
         uint256 depsLen = _allDeps.length;
         require(depsLen <= 64, "Too many deps");
 
         result.factoryDepsHashes = new uint256[](depsLen);
-        if (_isEVMBytecode) {
-            // Use the EVM-native keccak256 here. It matches the key
-            // `BytecodesSupplier.evmPublishingBlock` uses and the indexed
-            // topic1 of `EVMBytecodePublished`, so the server can filter
-            // events by topic directly. Server-side translation into the
-            // Blake2s256 store key happens after the event payload arrives,
-            // keeping the ZKsyncOS-specific hash layer off the contract.
-            for (uint256 i = 0; i < depsLen; i++) {
-                result.factoryDepsHashes[i] = uint256(keccak256(_allDeps[i]));
-            }
-            return result;
-        }
-
+        // Use the EVM-native keccak256 here. It matches the key
+        // `BytecodesSupplier.evmPublishingBlock` uses and the indexed
+        // topic1 of `EVMBytecodePublished`, so the server can filter
+        // events by topic directly. Server-side translation into the
+        // Blake2s256 store key happens after the event payload arrives,
+        // keeping the ZKsyncOS-specific hash layer off the contract.
         for (uint256 i = 0; i < depsLen; i++) {
-            result.factoryDepsHashes[i] = uint256(L2ContractHelper.hashL2Bytecode(_allDeps[i]));
+            result.factoryDepsHashes[i] = uint256(keccak256(_allDeps[i]));
         }
     }
 

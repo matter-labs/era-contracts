@@ -16,8 +16,6 @@ const CONTRACTS_DIRECTORIES: Record<string, string[]> = {
     "upgrades/ZkSyncUpgradeErrors.sol",
   ],
   "./deploy-scripts": ["utils/ZkSyncScriptErrors.sol"],
-  "../l2-contracts/contracts": ["errors/L2ContractErrors.sol"],
-  "../system-contracts/contracts": ["SystemContractErrors.sol"],
   "../da-contracts/contracts": ["DAContractsErrors.sol"],
 };
 
@@ -448,7 +446,33 @@ async function main() {
       }
       collectErrorUsages(searchPaths, usedErrors, declaredNames);
 
-      const unusedErrors = [...declaredErrors].filter(([, [errorName]]) => !usedErrors.has(errorName));
+      // Declarations whose only consumers were Era-only contracts removed from this
+      // branch. The declarations themselves must stay: the contract set is audited
+      // and frozen, and deleting even an unused file-level error shifts solc's
+      // internal code ordering in every importing compilation unit (same-length,
+      // different-bytes bytecode drift across ~93 contracts — measured, not
+      // hypothetical). Remove entries here only together with a re-audit.
+      //
+      // TODO: drop this allowlist, and the nine declarations it covers, in the next
+      // release. It is cheapest to do together with the rest of the audited Era cut
+      // rather than on its own: touching `L1ContractErrors.sol` alone already moves
+      // 93 of 157 frozen hash rows, while the entire 33-file cut moves 95 — the churn
+      // unions rather than adds, so splitting it out multiplies the regeneration and
+      // re-audit work without making any single change cheaper.
+      const FROZEN_UNUSED_ERRORS = new Set([
+        "GenesisBatchCommitmentZero()",
+        "GenesisIndexStorageZero()",
+        "InsufficientFunds(uint256,uint256)",
+        "AlreadySigned()",
+        "InitializeNotAvailable()",
+        "MemberAlreadyExists(address)",
+        "MemberDoesNotExist(address)",
+        "NotEnoughSignatures()",
+        "NotSigner()",
+      ]);
+      const unusedErrors = [...declaredErrors].filter(
+        ([errorSig, [errorName]]) => !usedErrors.has(errorName) && !FROZEN_UNUSED_ERRORS.has(errorSig)
+      );
       if (unusedErrors.length > 0) {
         for (const [errorSig, [, filePath]] of unusedErrors) {
           console.error(`Error "${errorSig}" from ${filePath} is declared but never used.`);

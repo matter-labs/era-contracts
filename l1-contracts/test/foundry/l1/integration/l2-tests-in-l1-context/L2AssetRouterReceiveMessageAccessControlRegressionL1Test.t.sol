@@ -6,49 +6,122 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
-
-import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
-import {L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract} from "../l2-tests-abstract/L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract.t.sol";
-
-import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
-import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
-import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {Unauthorized, InvalidSelector} from "contracts/common/L1ContractErrors.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+import {SharedL2ContractL1Deployer} from "./_SharedL2ContractL1Deployer.sol";
 
 /// @title L2AssetRouterReceiveMessageAccessControlRegressionL1Test
 /// @notice Concrete test for receiveMessage access control regression tests in L1 context
 /// @dev This test verifies the fix for the bug where receiveMessage could be called by anyone,
 ///      potentially allowing arbitrary token minting
-contract L2AssetRouterReceiveMessageAccessControlRegressionL1Test is
-    Test,
-    SharedL2ContractL1Deployer,
-    L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
-{
-    function setUp()
-        public
-        override(SharedL2ContractDeployer, L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract)
-    {
-        L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract.setUp();
+contract L2AssetRouterReceiveMessageAccessControlRegressionL1Test is Test, SharedL2ContractL1Deployer {
+    address internal attacker;
+
+    function setUp() public virtual override {
+        super.setUp();
+        attacker = makeAddr("attacker");
     }
 
-    function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
+    function test_regression_receiveMessageRevertsForUnauthorizedCaller() public {
+        // Prepare a valid-looking payload (finalizeDeposit selector + data)
+        bytes memory payload = abi.encodeWithSelector(
+            AssetRouterBase.finalizeDeposit.selector,
+            block.chainid, // originChainId
+            bytes32(uint256(1)), // assetId
+            abi.encode(address(0), address(attacker), address(0), uint256(1000), bytes("")) // transferData
+        );
 
-    function initSystemContracts(
-        SystemContractsArgs memory _args
-    ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {
-        super.initSystemContracts(_args);
+        // Create sender bytes (ERC-7930 format) - pretending to be L2AssetRouter on another chain
+        bytes memory sender = InteroperableAddress.formatEvmV1(block.chainid + 1, L2_ASSET_ROUTER_ADDR);
+
+        // Attacker tries to call receiveMessage directly
+        vm.prank(attacker);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, attacker));
+        IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage(
+            bytes32(0), // receiveId
+            sender,
+            payload
+        );
     }
 
-    function deployL2Contracts(
-        uint256 _l1ChainId
-    ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {
-        super.deployL2Contracts(_l1ChainId);
+    /// @notice Test that receiveMessage reverts for any address that is not L2InteropHandler
+    /// @dev Tests various addresses to ensure none can bypass the access control
+    function test_regression_receiveMessageRevertsForVariousUnauthorizedAddresses() public {
+        bytes memory payload = abi.encodeWithSelector(
+            AssetRouterBase.finalizeDeposit.selector,
+            block.chainid,
+            bytes32(uint256(1)),
+            abi.encode(address(0), address(attacker), address(0), uint256(1000), bytes(""))
+        );
+        bytes memory sender = InteroperableAddress.formatEvmV1(block.chainid + 1, L2_ASSET_ROUTER_ADDR);
+
+        // Test with various addresses
+        address[] memory unauthorizedAddresses = new address[](5);
+        unauthorizedAddresses[0] = address(0x1);
+        unauthorizedAddresses[1] = address(this);
+        unauthorizedAddresses[2] = makeAddr("randomUser");
+        unauthorizedAddresses[3] = makeAddr("maliciousContract");
+        unauthorizedAddresses[4] = address(l2AssetRouter); // Even the asset router itself can't call it
+
+        for (uint256 i = 0; i < unauthorizedAddresses.length; i++) {
+            vm.prank(unauthorizedAddresses[i]);
+            vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, unauthorizedAddresses[i]));
+            IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage(bytes32(0), sender, payload);
+        }
     }
 
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName, isZKBytecode);
+    /// @notice Test that receiveMessage does not revert with Unauthorized when called by L2InteropHandler
+    /// @dev We craft a payload with a deliberately wrong selector. Reaching the InvalidSelector revert in
+    ///      `AssetRouterBase.receiveMessage` is causally downstream of:
+    ///        - the `msg.sender == _interopHandler()` gate, and
+    ///        - the `_isValidInteropSender` sender validation.
+    ///      Therefore an InvalidSelector revert proves the access-control gate is open for L2InteropHandler.
+    function test_regression_receiveMessageAllowedForInteropHandler() public {
+        bytes4 bogusSelector = bytes4(0xdeadbeef);
+
+        // Sender bytes that pass `_isValidInteropSender`: senderChainId != L1_CHAIN_ID and
+        // senderAddress == address(this).
+        bytes memory sender = InteroperableAddress.formatEvmV1(block.chainid + 1, L2_ASSET_ROUTER_ADDR);
+
+        // Payload with a non-finalizeDeposit selector so the selector check is the deterministic next failure.
+        bytes memory payload = abi.encodeWithSelector(
+            bogusSelector,
+            block.chainid + 1, // originChainId (different from L1 and current chain)
+            bytes32(uint256(1)), // assetId
+            abi.encode(address(0), address(this), address(0), uint256(1000), bytes(""))
+        );
+
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, bogusSelector));
+        IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage(bytes32(0), sender, payload);
+    }
+
+    /// @notice Test that a contract trying to impersonate L2InteropHandler still fails
+    /// @dev Ensures that the access control cannot be bypassed by contract tricks
+    function test_regression_contractCannotImpersonateInteropHandler() public {
+        bytes memory payload = abi.encodeWithSelector(
+            AssetRouterBase.finalizeDeposit.selector,
+            block.chainid,
+            bytes32(uint256(1)),
+            abi.encode(address(0), address(attacker), address(0), uint256(1000), bytes(""))
+        );
+        bytes memory sender = InteroperableAddress.formatEvmV1(block.chainid + 1, L2_ASSET_ROUTER_ADDR);
+
+        // Deploy a malicious contract that tries to call receiveMessage
+        MaliciousInteropCaller maliciousContract = new MaliciousInteropCaller();
+
+        // The malicious contract should also be rejected
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(maliciousContract)));
+        maliciousContract.tryCallReceiveMessage(L2_ASSET_ROUTER_ADDR, sender, payload);
+    }
+}
+
+/// @notice Malicious contract that attempts to call receiveMessage
+contract MaliciousInteropCaller {
+    function tryCallReceiveMessage(address assetRouter, bytes memory sender, bytes memory payload) external {
+        IERC7786Recipient(assetRouter).receiveMessage(bytes32(0), sender, payload);
     }
 }

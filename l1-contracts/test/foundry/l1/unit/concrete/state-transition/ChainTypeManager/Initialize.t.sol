@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
-import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {
@@ -52,7 +52,7 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             serverNotifier: serverNotifier
         });
 
-        EraChainTypeManager ctm = new EraChainTypeManager(
+        ZKsyncOSChainTypeManager ctm = new ZKsyncOSChainTypeManager(
             address(bridgehub),
             interopCenterAddress,
             address(0),

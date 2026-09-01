@@ -5,7 +5,8 @@
 - `protocol-ops/src/commands/ecosystem/verify_upgrade.rs` - PUVT entry point.
 - `protocol-ops/src/upgrade_verification/` - PUVT calldata and state verifiers.
 - `protocol-ops/README.md` - current PUVT build and run commands.
-- `l1-contracts/test/anvil-interop/regen-and-verify-stage.sh` - stage calldata regeneration, replay, and PUVT flow.
+- `l1-contracts/test/anvil-interop/run-fork-upgrade-test.ts` - stage calldata regeneration, replay, and PUVT flow
+  (`FORK_ENV_PRESET=stage`; replaces the removed `regen-and-verify-stage.sh` wrapper).
 - `l1-contracts/deploy-scripts/upgrade/v31/` - v31 upgrade script entry points.
 - `l1-contracts/deploy-scripts/upgrade/default-upgrade/` - shared v31 upgrade payload construction.
 - `l1-contracts/contracts/upgrades/` - governance and L2 upgrade structs used for decoding.
@@ -989,8 +990,8 @@ cast calldata-decode "registerLegacyToken(bytes32)" <call_data>
 Use these only for Sepolia stage review. They are repo-local anchors in the
 reviewed commit.
 
-- stage generation and PUVT replay script:
-  `l1-contracts/test/anvil-interop/regen-and-verify-stage.sh`
+- stage generation and PUVT replay harness:
+  `l1-contracts/test/anvil-interop/run-fork-upgrade-test.ts` with `FORK_ENV_PRESET=stage`
 - stage v31 input:
   `l1-contracts/upgrade-envs/v0.31.0-interopB/stage.toml`
 - stage permanent values:

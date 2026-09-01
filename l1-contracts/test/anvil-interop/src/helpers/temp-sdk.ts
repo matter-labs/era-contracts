@@ -1,4 +1,5 @@
 import { createViemClient, createViemSdk } from "@matterlabs/zksync-js/viem";
+import { createProvider } from "../core/utils";
 import type { BytesLike, providers } from "ethers";
 import { Contract, ethers } from "ethers";
 import { createPublicClient, createWalletClient, http } from "viem";
@@ -518,7 +519,7 @@ function getGatewayProvider(): providers.JsonRpcProvider {
   if (!gwRpcUrl) {
     throw new Error("LIVE_GW_RPC is required when ANVIL_INTEROP_LIVE=1");
   }
-  return new ethers.providers.JsonRpcProvider(gwRpcUrl);
+  return createProvider(gwRpcUrl);
 }
 
 function normalizeHex(value: string): string {

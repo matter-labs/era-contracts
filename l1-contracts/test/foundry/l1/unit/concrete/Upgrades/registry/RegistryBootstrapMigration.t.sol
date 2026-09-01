@@ -65,7 +65,7 @@ contract ImplV32 {
 /// @notice Tests the single source-checked edge from a pre-registry ecosystem into the
 ///         registry-driven model: implementation swaps, provenance anchor + genesis release,
 ///         version edge, and the authority handover to the bound executors.
-/// @dev Driven against a REAL `EraChainTypeManager` and a real OpenZeppelin `ProxyAdmin` — the two
+/// @dev Driven against a REAL `ZKsyncOSChainTypeManager` and a real OpenZeppelin `ProxyAdmin` — the two
 ///      contracts whose ownership the migration actually needs — rather than mocks, because the
 ///      property under test IS the authority movement.
 contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {

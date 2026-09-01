@@ -153,9 +153,11 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
 
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: composeUpgradeTx(deployments, _factoryDepsResult, _protocolUpgradeNonce),
-            bootloaderHash: _chainCreationParams.bootloaderHash,
-            defaultAccountHash: _chainCreationParams.defaultAAHash,
-            evmEmulatorHash: _chainCreationParams.evmEmulatorHash,
+            // ZKsync OS has no bootloader, default-account or EVM-emulator bytecode; the audited
+            // struct keeps the fields and requires them to be zero.
+            bootloaderHash: bytes32(0),
+            defaultAccountHash: bytes32(0),
+            evmEmulatorHash: bytes32(0),
             // The verifier now rides in the proposal itself: the CTM no longer keeps a
             // version-keyed verifier map (registry-driven upgrades read it from the release).
             verifier: _stateTransition.verifiers.verifier,

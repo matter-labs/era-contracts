@@ -9,20 +9,24 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { providers } from "ethers";
-import { collectChainTraces, mergeTraces } from "./trace-collector";
+import type { providers } from "ethers";
+import { assertTracesUsable, collectChainTraces, mergeTraces } from "./trace-collector";
 import { resolveContracts, resolveByBytecode } from "./artifact-resolver";
 import {
-  loadSourceIdMap,
+  allSourcePaths,
+  loadBuildInfos,
+  buildInfoById,
+  loadArtifactBuildIds,
   loadSourceContents,
   resolveSourceLocations,
   getExecutableLines,
   extractFunctions,
   resolveFunctionHits,
 } from "./source-map-decoder";
-import type { ContractSourceMap } from "./source-map-decoder";
+import type { DecodedContract, SourceIdMap } from "./source-map-decoder";
 import { generateLcov, writeLcov, generateSummary, filterCoverageFiles } from "./lcov-generator";
 import type { FileCoverage } from "./lcov-generator";
+import { createProvider } from "../core/utils";
 
 export interface CoverageOptions {
   /** Path to the l1-contracts directory */
@@ -61,9 +65,18 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
 
   // 2. Load source maps and build info
   console.log("\n🔍 Step 2: Loading compilation artifacts...");
-  const sourceIdMap = loadSourceIdMap(outDir);
-  const sourceContents = loadSourceContents(sourceIdMap, projectRoot);
-  console.log(`  Loaded ${Object.keys(sourceIdMap).length} source IDs, ${sourceContents.size} source files`);
+  // One map per compilation, and artifacts are matched to their own — see selectBuildInfo. A single
+  // global map silently misattributes whenever more than one compilation contributed artifacts.
+  const buildInfos = loadBuildInfos(outDir);
+  const knownSourcePaths = allSourcePaths(buildInfos);
+  const sourceContents = loadSourceContents(
+    Object.fromEntries([...knownSourcePaths].map((p, i) => [String(i), p])),
+    projectRoot
+  );
+  console.log(
+    `  Loaded ${buildInfos.length} build-info file(s), ${knownSourcePaths.size} source paths, ` +
+      `${sourceContents.size} source files`
+  );
 
   // 3. Resolve known contract addresses to artifacts
   console.log("\n🔍 Step 3: Resolving contract artifacts...");
@@ -83,16 +96,22 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
   // 4. Collect traces from all chains
   console.log("\n🔍 Step 4: Collecting execution traces...");
   const chainTraces = [];
+  let totalTransactions = 0;
+  let totalTraceFailures = 0;
 
   if (state.chains?.l1?.rpcUrl) {
     const l1Traces = await collectChainTraces(state.chains.l1.rpcUrl, "L1");
-    chainTraces.push(l1Traces);
+    chainTraces.push(l1Traces.contractPCs);
+    totalTransactions += l1Traces.transactions;
+    totalTraceFailures += l1Traces.traceFailures;
   }
 
   if (!options.l1Only && state.chains?.l2) {
     for (const l2 of state.chains.l2) {
       const l2Traces = await collectChainTraces(l2.rpcUrl, `L2-${l2.chainId}`);
-      chainTraces.push(l2Traces);
+      chainTraces.push(l2Traces.contractPCs);
+      totalTransactions += l2Traces.transactions;
+      totalTraceFailures += l2Traces.traceFailures;
     }
   }
 
@@ -103,7 +122,7 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
   console.log("\n🔍 Step 5: Resolving remaining contract addresses...");
   const allProviders = new Map<string, providers.JsonRpcProvider>();
   for (const [label, url] of rpcUrls) {
-    allProviders.set(label, new providers.JsonRpcProvider(url));
+    allProviders.set(label, createProvider(url));
   }
 
   // Build a set of already-resolved addresses
@@ -129,9 +148,35 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
   console.log("\n🔍 Step 6: Mapping traces to source locations...");
   const fileHitLines = new Map<string, Set<number>>();
 
+  // Forge records which build each artifact came from; that linkage is exact, so nothing here has to
+  // guess. Decoding an artifact with any other compilation's map silently attributes its lines to
+  // the wrong files, because source ids are numbered per compilation.
+  const artifactBuildIds = loadArtifactBuildIds(projectRoot);
+  const mapForArtifact = new Map<string, SourceIdMap | null>();
+  const sourceIdMapOf = (artifactPath: string): SourceIdMap | null => {
+    if (mapForArtifact.has(artifactPath)) return mapForArtifact.get(artifactPath) ?? null;
+
+    const relative = path.relative(outDir, artifactPath);
+    const buildId = artifactBuildIds.get(relative);
+    const resolved = buildId ? (buildInfoById(buildInfos, buildId)?.sourceIdMap ?? null) : null;
+    mapForArtifact.set(artifactPath, resolved);
+    return resolved;
+  };
+
   for (const contract of resolvedContracts) {
     const pcs = allTraces.get(contract.address);
     if (!pcs || pcs.size === 0) continue;
+
+    const sourceIdMap = sourceIdMapOf(contract.artifactPath);
+    if (!sourceIdMap) {
+      // Its executed lines cannot be placed. Decoding through another compilation's map would put
+      // them on the wrong files, which is worse than failing, and skipping silently would under-report.
+      throw new Error(
+        `No build-info linkage for ${path.relative(outDir, contract.artifactPath)} (${contract.name}), ` +
+          "which has execution traces. cache-forge/solidity-files-cache.json must accompany the " +
+          "artifacts it describes — restore both from the same cache, or build from scratch."
+      );
+    }
 
     const locations = resolveSourceLocations(contract.sourceMap, pcs, sourceIdMap, sourceContents);
 
@@ -149,11 +194,36 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
 
   console.log(`  Coverage data for ${fileHitLines.size} source files`);
 
+  // Refuse to write a report that would look like "this ran and covered nothing".
+  assertTracesUsable({
+    transactions: totalTransactions,
+    traceFailures: totalTraceFailures,
+    tracedContracts: allTraces.size,
+    hitSourceFiles: fileHitLines.size,
+  });
+
   // 7. Compute executable lines and extract function data
   console.log("\n🔍 Step 7: Computing executable lines and extracting functions...");
-  const allContractMaps: ContractSourceMap[] = resolvedContracts
-    .map((c) => c.sourceMap)
-    .filter((sm): sm is ContractSourceMap => sm !== null);
+  const decodedContracts: DecodedContract[] = [];
+  let withoutLinkage = 0;
+  for (const contract of resolvedContracts) {
+    if (contract.sourceMap === null) continue;
+    const sourceIdMap = sourceIdMapOf(contract.artifactPath);
+    if (!sourceIdMap) {
+      // No traces reached it (that case threw above), so it only affects the denominator. Left out
+      // rather than counted through the wrong map, and reported so the omission is visible.
+      withoutLinkage++;
+      continue;
+    }
+    decodedContracts.push({ contractMap: contract.sourceMap, sourceIdMap });
+  }
+
+  if (withoutLinkage > 0) {
+    console.warn(
+      `  ⚠️  ${withoutLinkage} artifact(s) have no build-info linkage and were excluded from the ` +
+        "executable-line totals. They had no execution traces, so no hits are lost."
+    );
+  }
 
   // Build a map of source file -> list of contract names that compile from it
   // (used for function extraction — we need the contract name for qualified names)
@@ -189,11 +259,11 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
   let totalFunctionsHit = 0;
 
   // Include all source files that have contract code (not just hit files)
-  for (const [, filePath] of Object.entries(sourceIdMap)) {
+  for (const filePath of knownSourcePaths) {
     // Only process contract source files
     if (!filePath.startsWith("contracts/") && !filePath.includes("/contracts/")) continue;
 
-    const executableLines = getExecutableLines(filePath, sourceIdMap, allContractMaps, sourceContents);
+    const executableLines = getExecutableLines(filePath, decodedContracts, sourceContents);
     if (executableLines.size === 0) continue;
 
     const hitLines = fileHitLines.get(filePath) || new Set<number>();

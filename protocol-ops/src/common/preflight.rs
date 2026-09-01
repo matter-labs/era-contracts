@@ -30,18 +30,6 @@ pub fn check_required_artifacts() -> Result<()> {
     Ok(())
 }
 
-/// Ensure `l2-contracts/out/` is present, building it if missing.
-///
-/// Only needed when `skip_priority_txs: false` (EraVM chains). For ZKsync OS
-/// chains set `skip_priority_txs: true` — L2 system contracts live in genesis.
-pub fn check_l2_artifacts() -> Result<()> {
-    let l2 = contracts_root().join("l2-contracts");
-    if !l2.join("out").exists() {
-        forge_build(&l2)?;
-    }
-    Ok(())
-}
-
 /// Verify that the L1 RPC endpoint is reachable. Emits a clear, actionable
 /// error when the connection fails — including the exact `anvil` command for
 /// local development setups.

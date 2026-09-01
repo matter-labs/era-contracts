@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {IEraDualVerifier} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
 import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
 // The canonical definition of `CTMContract` lives in the production contracts tree (it keys the
 // per-CTM upgrade registries); it is re-exported here so that all deploy-script importers keep
@@ -10,7 +9,6 @@ import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZK
 import {CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 struct CTMCoreDeploymentConfig {
-    bool isZKsyncOS;
     bool testnetVerifier;
     uint256 l1ChainId;
     address bridgehubProxy;
@@ -27,21 +25,17 @@ struct CTMCoreDeploymentConfig {
 library DeployCTML1OrGateway {
     // ======================== Name resolution ========================
 
-    /// @notice Resolve a CTMContract to its (fileName, contractName) for the active VM.
-    function resolve(
-        bool _isZKsyncOS,
-        CTMContract _c
-    ) internal view returns (string memory fileName, string memory contractName) {
-        contractName = _resolveCTMContractName(_isZKsyncOS, _c);
+    /// @notice Resolve a CTMContract to its (fileName, contractName).
+    function resolve(CTMContract _c) internal view returns (string memory fileName, string memory contractName) {
+        contractName = _resolveCTMContractName(_c);
         fileName = string.concat(contractName, ".sol");
     }
 
-    /// @notice Resolve the main or testnet verifier for the active VM.
+    /// @notice Resolve the main verifier (dual or testnet).
     function resolveMainVerifier(
-        bool _isZKsyncOS,
         bool _testnet
     ) internal view returns (string memory fileName, string memory contractName) {
-        return resolve(_isZKsyncOS, _testnet ? CTMContract.TestnetVerifier : CTMContract.DualVerifier);
+        return resolve(_testnet ? CTMContract.TestnetVerifier : CTMContract.DualVerifier);
     }
 
     // ======================== Creation calldata ========================
@@ -49,9 +43,7 @@ library DeployCTML1OrGateway {
     // solhint-disable-next-line code-complexity
     function getCreationCalldata(
         CTMCoreDeploymentConfig memory _config,
-        bool _isZKsyncOS,
-        CTMContract _contractName,
-        bool /* _isZKBytecode */
+        CTMContract _contractName
     ) internal view returns (bytes memory) {
         if (_contractName == CTMContract.AdminFacet) {
             return abi.encode(_config.l1ChainId, _config.rollupDAManager);
@@ -72,12 +64,12 @@ library DeployCTML1OrGateway {
         } else if (_contractName == CTMContract.CommitterFacet) {
             return abi.encode(_config.l1ChainId);
         } else if (_contractName == CTMContract.DiamondInit) {
-            return abi.encode(_isZKsyncOS);
+            // `DiamondInit(bool _isZKOS)` — always ZKsync OS.
+            // TODO: drop the `_isZKOS` constructor input in the next release; it cannot change here
+            // without re-auditing the frozen contract.
+            return abi.encode(true);
         } else if (_contractName == CTMContract.DualVerifier || _contractName == CTMContract.TestnetVerifier) {
-            return
-                _isZKsyncOS
-                    ? abi.encode(_config.verifierPlonk)
-                    : abi.encode(_config.verifierFflonk, _config.verifierPlonk);
+            return abi.encode(_config.verifierPlonk);
         } else if (_contractName == CTMContract.ChainTypeManager) {
             return
                 abi.encode(
@@ -110,21 +102,13 @@ library DeployCTML1OrGateway {
             return CTMContract.CommitterFacet;
         } else if (_compareStrings(_contractName, "ValidatorTimelock")) {
             return CTMContract.ValidatorTimelock;
-        } else if (
-            _compareStrings(_contractName, "ZKsyncOSChainTypeManager") ||
-            _compareStrings(_contractName, "EraChainTypeManager")
-        ) {
+        } else if (_compareStrings(_contractName, "ZKsyncOSChainTypeManager")) {
             return CTMContract.ChainTypeManager;
         } else if (_compareStrings(_contractName, "BlobsL1DAValidatorZKsyncOS")) {
             return CTMContract.BlobsL1DAValidatorZKsyncOS;
-        } else if (
-            _compareStrings(_contractName, "EraTestnetVerifier") ||
-            _compareStrings(_contractName, "ZKsyncOSTestnetVerifier")
-        ) {
+        } else if (_compareStrings(_contractName, "ZKsyncOSTestnetVerifier")) {
             return CTMContract.TestnetVerifier;
-        } else if (
-            _compareStrings(_contractName, "EraDualVerifier") || _compareStrings(_contractName, "ZKsyncOSVerifier")
-        ) {
+        } else if (_compareStrings(_contractName, "ZKsyncOSVerifier")) {
             return CTMContract.DualVerifier;
         } else if (
             _compareStrings(_contractName, "DefaultUpgrade") ||
@@ -142,51 +126,29 @@ library DeployCTML1OrGateway {
     // ======================== Verifier helpers ========================
 
     /// @notice Retrieve sub-verifier addresses from a deployed verifier.
-    function getSubVerifiers(
-        address _verifier,
-        bool _isZKsyncOS
-    ) internal view returns (address fflonk, address plonk) {
+    ///         ZKsync OS uses a single PLONK sub-verifier; there is no FFLONK.
+    function getSubVerifiers(address _verifier) internal view returns (address fflonk, address plonk) {
         if (_verifier == address(0)) {
             return (address(0), address(0));
         }
 
-        if (_isZKsyncOS) {
-            IZKsyncOSVerifier verifier = IZKsyncOSVerifier(_verifier);
-            plonk = address(verifier.PLONK_VERIFIER());
-        } else {
-            IEraDualVerifier verifier = IEraDualVerifier(_verifier);
-            fflonk = address(verifier.FFLONK_VERIFIER());
-            plonk = address(verifier.PLONK_VERIFIER());
-        }
+        fflonk = address(0);
+        plonk = address(IZKsyncOSVerifier(_verifier).PLONK_VERIFIER());
     }
 
     // ======================== Private helpers ========================
 
-    /// @notice Resolve a CTMContract enum to its contract name for the active VM.
+    /// @notice Resolve a CTMContract enum to its contract name.
     // solhint-disable-next-line code-complexity
-    function _resolveCTMContractName(bool _isZKsyncOS, CTMContract _c) private view returns (string memory) {
-        // Contracts with different names per VM
-        if (_c == CTMContract.ChainTypeManager) {
-            return _isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
-        }
-        if (_c == CTMContract.DefaultUpgrade) {
-            return _isZKsyncOS ? "DefaultUpgradeZKsyncOS" : "DefaultUpgrade";
-        }
-        if (_c == CTMContract.VerifierFflonk) {
-            if (_isZKsyncOS) revert("DeployCTML1OrGateway: ZKsync OS does not use FFLONK");
-            return "EraVerifierFflonk";
-        }
-        if (_c == CTMContract.VerifierPlonk) return _isZKsyncOS ? "ZKsyncOSVerifierPlonk" : "EraVerifierPlonk";
-        if (_c == CTMContract.DualVerifier) return _isZKsyncOS ? "ZKsyncOSVerifier" : "EraDualVerifier";
-        if (_c == CTMContract.TestnetVerifier) return _isZKsyncOS ? "ZKsyncOSTestnetVerifier" : "EraTestnetVerifier";
-        if (_c == CTMContract.GatewayCTMDeployerCTM) {
-            return _isZKsyncOS ? "GatewayCTMDeployerCTMZKsyncOS" : "GatewayCTMDeployerCTM";
-        }
-        if (_c == CTMContract.GatewayCTMDeployerVerifiers) {
-            return _isZKsyncOS ? "GatewayCTMDeployerVerifiersZKsyncOS" : "GatewayCTMDeployerVerifiers";
-        }
+    function _resolveCTMContractName(CTMContract _c) private view returns (string memory) {
+        if (_c == CTMContract.ChainTypeManager) return "ZKsyncOSChainTypeManager";
+        if (_c == CTMContract.DefaultUpgrade) return "DefaultUpgradeZKsyncOS";
+        if (_c == CTMContract.VerifierPlonk) return "ZKsyncOSVerifierPlonk";
+        if (_c == CTMContract.DualVerifier) return "ZKsyncOSVerifier";
+        if (_c == CTMContract.TestnetVerifier) return "ZKsyncOSTestnetVerifier";
+        if (_c == CTMContract.GatewayCTMDeployerCTM) return "GatewayCTMDeployerCTMZKsyncOS";
+        if (_c == CTMContract.GatewayCTMDeployerVerifiers) return "GatewayCTMDeployerVerifiersZKsyncOS";
 
-        // Contracts with the same name across both VMs
         if (_c == CTMContract.AdminFacet) return "AdminFacet";
         if (_c == CTMContract.MailboxFacet) return "MailboxFacet";
         if (_c == CTMContract.ExecutorFacet) return "ExecutorFacet";
@@ -194,9 +156,6 @@ library DeployCTML1OrGateway {
         if (_c == CTMContract.CommitterFacet) return "CommitterFacet";
         if (_c == CTMContract.DiamondInit) return "DiamondInit";
         if (_c == CTMContract.ValidatorTimelock) return "ValidatorTimelock";
-        if (_c == CTMContract.DefaultUpgrade) {
-            return _isZKsyncOS ? "DefaultUpgradeZKsyncOS" : "DefaultUpgrade";
-        }
         if (_c == CTMContract.BlobsL1DAValidatorZKsyncOS) return "BlobsL1DAValidatorZKsyncOS";
 
         revert("DeployCTML1OrGateway: unknown CTMContract");

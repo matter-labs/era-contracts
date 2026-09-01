@@ -43,9 +43,9 @@ sol! {
     }
 }
 
-// Era bytecodeInfo       = abi.encode(bytes32 zkHash)             = 32 bytes
-// ZKsyncOS simple        = 96-byte triplet (blake|pad|keccak)     = 96 bytes  (unused here)
+// ZKsyncOS simple        = 96-byte triplet (blake|pad|keccak)     = 96 bytes
 // ZKsyncOS proxy upgrade = abi.encode(implInfo_96, proxyInfo_96)  = 320 bytes
+// (The 32-byte Era zk-hash shape is rejected — Era CTMs are unsupported.)
 //
 // For ZKsyncOS proxy (320 bytes), observables live at:
 // - implInfo[64..96]  => raw_bytes[160..192]
@@ -54,18 +54,19 @@ fn expect_bytecode_info(
     result: &mut VerificationResult,
     verifiers: &Verifiers,
     bytecode_info: &[u8],
-    era_expected: &str,
     zksync_os_expected: &str,
 ) {
     match bytecode_info.len() {
-        32 => {
-            let hash = FixedBytes::<32>::from_slice(bytecode_info);
-            result.expect_zk_bytecode(verifiers, &hash, era_expected);
-        }
         96 => {
             // Simple ZKsyncOS (non-proxy) bytecodeInfo.
             let observable = FixedBytes::<32>::from_slice(&bytecode_info[64..96]);
-            check_zksync_os_observable(result, verifiers, &observable, zksync_os_expected, "bytecode");
+            check_zksync_os_observable(
+                result,
+                verifiers,
+                &observable,
+                zksync_os_expected,
+                "bytecode",
+            );
         }
         320 => {
             // ZKsyncOS proxy: abi.encode(implInfo_96, proxyInfo_96).
@@ -79,7 +80,13 @@ fn expect_bytecode_info(
             //
             // Observables (keccak256 of deployed bytecode) live at raw[160..192] and raw[288..320].
             let impl_observable = FixedBytes::<32>::from_slice(&bytecode_info[160..192]);
-            check_zksync_os_observable(result, verifiers, &impl_observable, zksync_os_expected, "impl");
+            check_zksync_os_observable(
+                result,
+                verifiers,
+                &impl_observable,
+                zksync_os_expected,
+                "impl",
+            );
 
             let proxy_observable = FixedBytes::<32>::from_slice(&bytecode_info[288..320]);
             check_zksync_os_observable(
@@ -91,7 +98,7 @@ fn expect_bytecode_info(
             );
         }
         len => result.report_error(&format!(
-            "bytecodeInfo for {era_expected}: unexpected length {len} (expected 32/Era, 96/ZKsyncOS-simple, 320/ZKsyncOS-proxy)"
+            "bytecodeInfo for {zksync_os_expected}: unexpected length {len} (expected 96/ZKsyncOS-simple or 320/ZKsyncOS-proxy)"
         )),
     }
 }
@@ -157,37 +164,27 @@ impl FixedForceDeploymentsData {
 
         result.expect_address(verifiers, &self.l1AssetRouter, "l1_asset_router_proxy");
 
-        // l2TokenProxyBytecodeHash is a ZK hash on Era and an EVM deployed bytecode hash on ZKsyncOS.
-        // Try ZK lookup first; fall back to EVM deployed lookup.
+        // l2TokenProxyBytecodeHash is an EVM deployed bytecode hash on ZKsyncOS.
         let beacon_proxy_file = "l1-contracts/BeaconProxy";
-        let is_zk = verifiers
-            .bytecode_verifier
-            .zk_bytecode_hash_to_file(&self.l2TokenProxyBytecodeHash)
-            .is_some_and(|f| f == beacon_proxy_file);
-        let is_evm = verifiers
+        match verifiers
             .bytecode_verifier
             .evm_deployed_bytecode_hash_to_file(&self.l2TokenProxyBytecodeHash)
-            .is_some_and(|f| f == beacon_proxy_file);
-        if is_zk || is_evm {
-            // ok
-        } else if verifiers
-            .bytecode_verifier
-            .zk_bytecode_hash_to_file(&self.l2TokenProxyBytecodeHash)
-            .is_some()
-            || verifiers
-                .bytecode_verifier
-                .evm_deployed_bytecode_hash_to_file(&self.l2TokenProxyBytecodeHash)
-                .is_some()
         {
-            result.report_error(&format!(
-                "l2TokenProxyBytecodeHash maps to wrong contract (expected {})",
-                beacon_proxy_file
-            ));
-        } else {
-            result.report_error(&format!(
-                "l2TokenProxyBytecodeHash cannot be verified: {} not in AllContractsHashes",
-                self.l2TokenProxyBytecodeHash
-            ));
+            Some(file) if file == beacon_proxy_file => {
+                // ok
+            }
+            Some(_) => {
+                result.report_error(&format!(
+                    "l2TokenProxyBytecodeHash maps to wrong contract (expected {})",
+                    beacon_proxy_file
+                ));
+            }
+            None => {
+                result.report_error(&format!(
+                    "l2TokenProxyBytecodeHash cannot be verified: {} not in AllContractsHashes",
+                    self.l2TokenProxyBytecodeHash
+                ));
+            }
         }
 
         // aliasedL1Governance = applyL1ToL2Alias(Bridgehub.owner()), registered
@@ -214,20 +211,17 @@ impl FixedForceDeploymentsData {
             verifiers,
             &self.bridgehubBytecodeInfo,
             "l1-contracts/L2Bridgehub",
-            "l1-contracts/L2Bridgehub",
         );
         expect_bytecode_info(
             result,
             verifiers,
             &self.l2AssetRouterBytecodeInfo,
             "l1-contracts/L2AssetRouter",
-            "l1-contracts/L2AssetRouter",
         );
         expect_bytecode_info(
             result,
             verifiers,
             &self.l2NtvBytecodeInfo,
-            "l1-contracts/L2NativeTokenVault",
             "l1-contracts/L2NativeTokenVaultZKOS",
         );
         expect_bytecode_info(
@@ -235,13 +229,11 @@ impl FixedForceDeploymentsData {
             verifiers,
             &self.messageRootBytecodeInfo,
             "l1-contracts/L2MessageRoot",
-            "l1-contracts/L2MessageRoot",
         );
         expect_bytecode_info(
             result,
             verifiers,
             &self.chainAssetHandlerBytecodeInfo,
-            "l1-contracts/L2ChainAssetHandler",
             "l1-contracts/L2ChainAssetHandler",
         );
         expect_bytecode_info(
@@ -249,20 +241,18 @@ impl FixedForceDeploymentsData {
             verifiers,
             &self.interopCenterBytecodeInfo,
             "l1-contracts/InteropCenter",
-            "l1-contracts/InteropCenter",
         );
+        // `DeployCTM.s.sol` fills this with `CoreContract.L2InteropHandler`.
         expect_bytecode_info(
             result,
             verifiers,
             &self.interopHandlerBytecodeInfo,
-            "l1-contracts/InteropHandler",
-            "l1-contracts/InteropHandler",
+            "l1-contracts/L2InteropHandler",
         );
         expect_bytecode_info(
             result,
             verifiers,
             &self.assetTrackerBytecodeInfo,
-            "l1-contracts/L2AssetTracker",
             "l1-contracts/L2AssetTracker",
         );
         expect_bytecode_info(
@@ -270,13 +260,11 @@ impl FixedForceDeploymentsData {
             verifiers,
             &self.beaconDeployerInfo,
             "l1-contracts/UpgradeableBeaconDeployer",
-            "l1-contracts/UpgradeableBeaconDeployer",
         );
         expect_bytecode_info(
             result,
             verifiers,
             &self.baseTokenHolderBytecodeInfo,
-            "l1-contracts/BaseTokenHolder",
             "l1-contracts/BaseTokenHolder",
         );
 

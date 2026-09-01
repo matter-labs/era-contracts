@@ -8,20 +8,12 @@ pragma solidity 0.8.28;
 
 import "../SystemContractsProcessing.s.sol";
 
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-import {
-    L2_COMPLEX_UPGRADER_ADDR,
-    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
-import {EraForceDeploymentsLib} from "./EraForceDeploymentsLib.sol";
-import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
+import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 
-/// @notice Default runtime-selected L2 upgrade strategy.
-/// @dev CTMUpgradeBase remains VM-neutral; this layer owns the default
-///      Era/ZKsyncOS split for scripts that are instantiated before config is
-///      initialized.
+/// @notice Default L2 upgrade strategy for ZKsync OS chains.
 abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
     function getUniversalForceDeployments(
         uint256 _l1ChainId,
@@ -29,35 +21,13 @@ abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
     ) internal virtual override returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
         return
             SystemContractsProcessing.mergeUniversalForceDeployments(
-                getBaseUniversalForceDeployments(_l1ChainId, _ownerAddress),
+                SystemContractsProcessing.getBaseZKsyncOSForceDeployments(),
                 getAdditionalUniversalForceDeployments()
             );
     }
 
-    function getBaseUniversalForceDeployments(
-        uint256 _l1ChainId,
-        address _ownerAddress
-    ) internal virtual returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
-        if (config.isZKsyncOS) {
-            return SystemContractsProcessing.getBaseZKsyncOSForceDeployments();
-        }
-
-        return
-            EraForceDeploymentsLib.wrap(SystemContractsProcessing.getBaseForceDeployments(_l1ChainId, _ownerAddress));
-    }
-
-    function getL2UpgradeTargetAndData(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
-    ) internal virtual override returns (address, bytes memory) {
-        if (config.isZKsyncOS) {
-            return getZKsyncOSL2UpgradeTargetAndData(_deployments);
-        }
-
-        return getEraL2UpgradeTargetAndData(_deployments);
-    }
-
     function getUpgradeTxType() internal virtual override returns (uint256) {
-        return UpgradeHelperLib.getUpgradeTxType(config.isZKsyncOS);
+        return ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
     }
 
     /// @notice Composes the `ComplexUpgrader` target and calldata via the universal
@@ -77,24 +47,11 @@ abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
         );
     }
 
-    /// @notice Get Era L2 upgrade target and data.
-    /// @dev From V32 onwards, both Era and ZKsyncOS should use forceDeployAndUpgradeUniversal
-    /// (via L2_COMPLEX_UPGRADER_ADDR) since it supports both chain types via ContractUpgradeType.
-    /// This default uses forceDeployOnAddresses only because V31 Era chains do not yet
-    /// have forceDeployAndUpgradeUniversal deployed.
-    function getEraL2UpgradeTargetAndData(
+    /// @notice L2 upgrade target and data. Subclasses override this to route the upgrade through a
+    /// different delegate target.
+    function getL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
-    ) internal virtual returns (address, bytes memory) {
-        return (
-            address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR),
-            abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (EraForceDeploymentsLib.unwrap(_deployments)))
-        );
-    }
-
-    /// @notice Get ZKsyncOS L2 upgrade target and data.
-    function getZKsyncOSL2UpgradeTargetAndData(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
-    ) internal virtual returns (address, bytes memory) {
+    ) internal virtual override returns (address, bytes memory) {
         return (
             address(L2_COMPLEX_UPGRADER_ADDR),
             abi.encodeCall(IComplexUpgrader.forceDeployAndUpgradeUniversal, (_deployments, address(0), ""))

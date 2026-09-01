@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as zlib from "zlib";
-import { Contract, ContractFactory, Wallet, ethers, providers } from "ethers";
+import { Contract, ContractFactory, Wallet, ethers } from "ethers";
 import type { AnvilManager } from "./daemons/anvil-manager";
 import { ForgeDeployer } from "./deployers/deployer";
 import { ChainRegistry } from "./deployers/chain-registry";
@@ -17,7 +17,7 @@ import type {
   L2ChainInfo,
   PriorityRequestData,
 } from "./core/types";
-import { getChainIdsByRole, timeIt } from "./core/utils";
+import { getChainIdsByRole, timeIt, createProvider } from "./core/utils";
 import { getAbi, getCreationBytecode } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS, INTEROP_CENTER_ADDR } from "./core/const";
 import { getInteropSourcePrivateKey, isLiveInteropMode } from "./core/accounts";
@@ -114,7 +114,7 @@ export class DeploymentRunner {
   }
 
   private async resolveLiveChainId(label: string, rpcUrl: string): Promise<number> {
-    const provider = new providers.JsonRpcProvider(rpcUrl);
+    const provider = createProvider(rpcUrl);
     const network = await provider.getNetwork();
     console.log(`  ${label}: discovered chain ID ${network.chainId}`);
     return network.chainId;
@@ -147,7 +147,7 @@ export class DeploymentRunner {
     sourceRpcUrl: string,
     sourceAddress: string
   ): Promise<{ l1Address: string; assetId: string } | undefined> {
-    const provider = new providers.JsonRpcProvider(sourceRpcUrl);
+    const provider = createProvider(sourceRpcUrl);
     const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
     const assetId: string = await interopCenter.ZK_TOKEN_ASSET_ID();
 
@@ -188,7 +188,7 @@ export class DeploymentRunner {
     const l1RpcUrl = this.getRequiredEnv("LIVE_L1_RPC");
     const privateKey = getInteropSourcePrivateKey();
 
-    const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
+    const l1Provider = createProvider(l1RpcUrl);
     const l1ChainId = (await l1Provider.getNetwork()).chainId;
     const sourceL1Wallet = new Wallet(privateKey, l1Provider);
     const sourceAddress = sourceL1Wallet.address;
@@ -248,7 +248,7 @@ export class DeploymentRunner {
         throw new Error(`Live token deposit to chain ${chainId} did not produce an L2 receipt`);
       }
 
-      const l2Provider = new providers.JsonRpcProvider(chainRpcUrl);
+      const l2Provider = createProvider(chainRpcUrl);
       const l2TokenAddress = await targetLiveSdk.sdk.tokens.toL2Address(l1TokenAddress);
       const l2Token = new Contract(l2TokenAddress, getAbi("TestnetERC20Token"), new Wallet(privateKey, l2Provider));
       const l2Balance = await l2Token.balanceOf(sourceAddress);
@@ -378,7 +378,7 @@ export class DeploymentRunner {
 
     console.log(`\nDeploying custom base tokens for ${chainsNeedingCustomToken.length} chain(s)...`);
 
-    const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, new providers.JsonRpcProvider(l1RpcUrl));
+    const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, createProvider(l1RpcUrl));
     const abi = getAbi("TestnetERC20Token");
     const bytecode = getCreationBytecode("TestnetERC20Token");
 
@@ -399,7 +399,7 @@ export class DeploymentRunner {
   private async deployL1ZkToken(l1RpcUrl: string): Promise<{ l1Address: string; assetId: string }> {
     console.log("\nDeploying L1 ZK token for fixed-fee interop coverage...");
 
-    const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, new providers.JsonRpcProvider(l1RpcUrl));
+    const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, createProvider(l1RpcUrl));
     const factory = new ContractFactory(getAbi("TestnetERC20Token"), getCreationBytecode("TestnetERC20Token"), wallet);
     const token = await factory.deploy("ZK Token", "ZK", 18);
     await token.deployed();
@@ -632,7 +632,7 @@ export class DeploymentRunner {
 
     // Unpause deposits on all chains in parallel using explicit nonces
     console.log("\nUnpausing deposits on all chains...");
-    const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
+    const l1Provider = createProvider(l1RpcUrl);
     const wallet = new Wallet(privateKey, l1Provider);
     const migratorAbi = getAbi("MigratorFacet");
     const baseNonce = await wallet.getTransactionCount();

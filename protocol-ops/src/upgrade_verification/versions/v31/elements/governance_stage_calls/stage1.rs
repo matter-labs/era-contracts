@@ -20,7 +20,7 @@ use alloy::{
 use anyhow::Context;
 
 use crate::upgrade_verification::{
-    artifacts::{CtmArtifact, CtmFlavor, EcosystemUpgradeArtifact},
+    artifacts::{CtmArtifact, EcosystemUpgradeArtifact},
     verifiers::{VerificationResult, Verifiers},
 };
 
@@ -687,67 +687,26 @@ async fn verify_set_chain_creation_params_payload(
         errors += 1;
     }
 
-    match ctm.flavor {
-        CtmFlavor::Era => {
-            match genesis_config.genesis_rollup_leaf_index {
-                Some(genesis_rollup_leaf_index) => {
-                    if params.genesisIndexRepeatedStorageChanges != genesis_rollup_leaf_index {
-                        result.report_error(&format!(
-                            "Expected genesis index repeated storage changes to be {}, but got {}",
-                            genesis_rollup_leaf_index, params.genesisIndexRepeatedStorageChanges
-                        ));
-                        errors += 1;
-                    }
-                }
-                None => {
-                    result.report_error(
-                        "Era genesis config is missing required `genesis_rollup_leaf_index`",
-                    );
-                    errors += 1;
-                }
-            }
+    let expected_genesis_index_repeated_storage_changes = 0_u64;
+    if params.genesisIndexRepeatedStorageChanges != expected_genesis_index_repeated_storage_changes
+    {
+        result.report_error(&format!(
+            "Expected ZKsync OS genesis index repeated storage changes to be {}, but got {}",
+            expected_genesis_index_repeated_storage_changes,
+            params.genesisIndexRepeatedStorageChanges
+        ));
+        errors += 1;
+    }
 
-            match &genesis_config.genesis_batch_commitment {
-                Some(genesis_batch_commitment) => {
-                    if params.genesisBatchCommitment.to_string() != *genesis_batch_commitment {
-                        result.report_error(&format!(
-                            "Expected genesis batch commitment to be {}, but got {}",
-                            genesis_batch_commitment, params.genesisBatchCommitment
-                        ));
-                        errors += 1;
-                    }
-                }
-                None => {
-                    result.report_error(
-                        "Era genesis config is missing required `genesis_batch_commitment`",
-                    );
-                    errors += 1;
-                }
-            }
-        }
-        CtmFlavor::ZksyncOs => {
-            let expected_genesis_index_repeated_storage_changes = 0_u64;
-            if params.genesisIndexRepeatedStorageChanges
-                != expected_genesis_index_repeated_storage_changes
-            {
-                result.report_error(&format!(
-                    "Expected ZKsync OS genesis index repeated storage changes to be {}, but got {}",
-                    expected_genesis_index_repeated_storage_changes, params.genesisIndexRepeatedStorageChanges
-                ));
-                errors += 1;
-            }
-
-            let expected_genesis_batch_commitment = U256::from(1);
-            let actual_genesis_batch_commitment =
-                U256::from_be_slice(params.genesisBatchCommitment.as_slice());
-            if actual_genesis_batch_commitment != expected_genesis_batch_commitment {
-                result.report_error(&format!(
-                    "Expected ZKsync OS genesis batch commitment to be bytes32(1), but got {}",
-                    params.genesisBatchCommitment
-                ));
-                errors += 1;
-            }
-        }
+    let expected_genesis_batch_commitment = U256::from(1);
+    let actual_genesis_batch_commitment =
+        U256::from_be_slice(params.genesisBatchCommitment.as_slice());
+    if actual_genesis_batch_commitment != expected_genesis_batch_commitment {
+        result.report_error(&format!(
+            "Expected ZKsync OS genesis batch commitment to be bytes32(1), but got {}",
+            params.genesisBatchCommitment
+        ));
+        errors += 1;
     }
 
     errors += expect_hex_equal(
@@ -801,7 +760,7 @@ async fn verify_set_chain_creation_params_payload(
         ctm.flavor.label()
     ));
     match InitializeDataNewChain::abi_decode(&params.diamondCut.initCalldata) {
-        Ok(init_data) => init_data.verify(ctm.flavor, verifiers, result),
+        Ok(init_data) => init_data.verify(result),
         Err(err) => {
             result.report_error(&format!(
                 "Failed to decode InitializeDataNewChain from chain-creation initCalldata: {err}"

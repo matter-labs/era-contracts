@@ -32,11 +32,9 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
-import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {AcceptingVerifier} from "contracts/dev-contracts/test/AcceptingVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {MessageRootBase} from "contracts/core/message-root/MessageRootBase.sol";
@@ -285,7 +283,9 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encode(bool(true))
         );
         DiamondInit diamondInit = new DiamondInit(isZKsyncOS());
-        EraTestnetVerifier testnetVerifier = new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
+        // Registry model: the verifier `DiamondInit` installs is served from the pinned release
+        // (mocked below), not from a CTM version-keyed map.
+        AcceptingVerifier testnetVerifier = new AcceptingVerifier();
         validatorTimelock = ValidatorTimelock(deployValidatorTimelock(address(dummyBridgehub), owner, 0));
 
         genesisStoredBatchInfo = IExecutor.StoredBatchInfo({

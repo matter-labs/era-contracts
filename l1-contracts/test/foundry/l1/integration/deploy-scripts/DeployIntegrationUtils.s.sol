@@ -20,11 +20,8 @@ import {L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2Contrac
 abstract contract DeployIntegrationUtils is Script, DeployCTMUtils {
     function test() internal virtual override {}
 
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
-        return super.getInitializeCalldata(contractName, isZKBytecode);
+    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
+        return super.getInitializeCalldata(contractName);
     }
 
     function clearPriorityQueue(address _bridgehub, uint256 _chainId) public {

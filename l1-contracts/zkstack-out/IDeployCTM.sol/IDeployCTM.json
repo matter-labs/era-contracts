@@ -178,11 +178,6 @@
                 "name": "legacyValidatorTimelock",
                 "type": "address",
                 "internalType": "address"
-              },
-              {
-                "name": "eraDiamondProxy",
-                "type": "address",
-                "internalType": "address"
               }
             ]
           },
@@ -298,11 +293,6 @@
             "internalType": "address"
           },
           {
-            "name": "eraChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
             "name": "gatewayChainId",
             "type": "uint256",
             "internalType": "uint256"
@@ -319,16 +309,6 @@
           },
           {
             "name": "testnetVerifier",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "supportL2LegacySharedBridgeTest",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "isZKsyncOS",
             "type": "bool",
             "internalType": "bool"
           },
@@ -396,21 +376,6 @@
                     "name": "latestProtocolVersion",
                     "type": "uint256",
                     "internalType": "uint256"
-                  },
-                  {
-                    "name": "bootloaderHash",
-                    "type": "bytes32",
-                    "internalType": "bytes32"
-                  },
-                  {
-                    "name": "defaultAAHash",
-                    "type": "bytes32",
-                    "internalType": "bytes32"
-                  },
-                  {
-                    "name": "evmEmulatorHash",
-                    "type": "bytes32",
-                    "internalType": "bytes32"
                   }
                 ]
               }

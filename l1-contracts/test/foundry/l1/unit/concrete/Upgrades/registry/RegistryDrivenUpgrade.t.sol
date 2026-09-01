@@ -23,15 +23,12 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
-import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {AcceptingVerifier} from "contracts/dev-contracts/test/AcceptingVerifier.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
     PRIORITY_TX_MAX_GAS_LIMIT,
-    SYSTEM_UPGRADE_L2_TX_TYPE,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
@@ -136,8 +133,8 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         // and the plain DefaultUpgrade as the upgrade-init contract.
         newAdminFacet = address(new AdminFacet(block.chainid, RollupDAManager(address(0))));
         defaultUpgrade = address(new DefaultUpgrade());
-        verifierV32 = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
-        verifierV33 = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+        verifierV32 = address(new AcceptingVerifier());
+        verifierV33 = address(new AcceptingVerifier());
         // The pinned genesisUpgrade must carry real code — the registry's codehash pin rejects a
         // codeless target — so etch a stand-in and pin its actual codehash below.
         genesisUpgradeAddr = makeAddr("genesisUpgrade");
@@ -402,34 +399,10 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     }
 }
 
-/// @notice The registry-driven upgrade run against an Era CTM and chain: the chain commits a
-///         `SYSTEM_UPGRADE_L2_TX_TYPE` (254) transaction with an Era force-deployment.
-contract RegistryDrivenUpgradeEraTest is RegistryDrivenUpgradeTestBase {
-    function _deployFixture() internal override {
-        deploy();
-    }
-
-    function _isZKsyncOSVariant() internal pure override returns (bool) {
-        return false;
-    }
-
-    function _expectedL2UpgradeTxType() internal pure override returns (uint256) {
-        return SYSTEM_UPGRADE_L2_TX_TYPE;
-    }
-
-    function _l2DeploymentType() internal pure override returns (IComplexUpgrader.ContractUpgradeType) {
-        return IComplexUpgrader.ContractUpgradeType.EraForceDeployment;
-    }
-
-    function _l2DeployedBytecodeInfo() internal pure override returns (bytes memory) {
-        // For Era this is the abi-encoded bytecode hash of the force-deployed contract.
-        return abi.encode(bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001)));
-    }
-
-    function _registryGenesisBatchCommitment() internal pure override returns (bytes32) {
-        return bytes32(uint256(2));
-    }
-}
+// NOTE(v0.34 merge): the Era variant of this suite was removed together with
+// `EraChainTypeManager` — the repo is ZKsync-OS-only, and the shared CTM fixture now deploys a
+// ZKsyncOS CTM. The registry-driven upgrade flow itself is VM-agnostic and stays covered by the
+// ZKsyncOS variant below.
 
 /// @notice The registry-driven upgrade run against a ZKsyncOS CTM and chain: the chain commits
 ///         a `ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE` (126) transaction with a

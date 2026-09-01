@@ -16,8 +16,8 @@ jobs:
         with:
           submodules: true
 
-      - name: Install foundry-zksync
-        uses: ./.github/actions/install-zksync-foundry
+      - name: Install Foundry
+        uses: ./.github/actions/install-foundry
 
       - name: Use Node.js
         uses: actions/setup-node@v6
@@ -27,6 +27,9 @@ jobs:
 
       - name: Install dependencies
         run: yarn
+
+      - name: Warm solc build cache
+        uses: ./.github/actions/warm-solc-cache
 
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
@@ -41,12 +44,6 @@ jobs:
         working-directory: ./l1-contracts
         run: forge build deploy-scripts
 
-      - name: Build system-contract artifacts
-        run: yarn sc build:foundry
-
-      - name: Build l2 artifacts
-        run: yarn l2 build:foundry
-
       - name: Create cache
         uses: actions/cache/save@v4
         with:
@@ -56,10 +53,6 @@ jobs:
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
-            l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout
 
   contract-size:
     runs-on: ubuntu-latest
@@ -70,8 +63,8 @@ jobs:
         with:
           submodules: true
 
-      - name: Install foundry-zksync
-        uses: ./.github/actions/install-zksync-foundry
+      - name: Install Foundry
+        uses: ./.github/actions/install-foundry
 
       - name: Use Node.js
         uses: actions/setup-node@v6
@@ -140,17 +133,9 @@ jobs:
             da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
-            l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout
 
       - name: Use Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        # Using "stable" channel leads to issues with files not being opened for writing.
-        # Before removing specific version, ensure the issue is resolved.
-        with:
-          version: "v1.4.0"
+        uses: ./.github/actions/install-foundry
 
       - name: Copy configs from template
         working-directory: ./l1-contracts

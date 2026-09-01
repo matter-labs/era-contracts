@@ -7,14 +7,13 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 
 /// @notice Reusable fixture for tests that need a `ZKsyncOSChainTypeManager` together with the
 ///         full chain-creation plumbing (`createNewChain`, bridgehub mocks, real facet cuts) of
-///         the shared Era fixture.
+///         the shared fixture.
 /// @dev `deployZKsyncOS()` runs `ChainTypeManagerTest.deploy()` wholesale — the ecosystem
 ///      contracts and the chain facets are VM-agnostic L1 contracts — and then swaps in the two
 ///      ZKsyncOS specifics:
@@ -23,11 +22,10 @@ import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 ///         fee model);
 ///      2. a `ZKsyncOSChainTypeManager` behind its own proxy, initialized with
 ///         `genesisBatchCommitment == bytes32(uint256(1))` as that CTM enforces.
-///      The Era CTM the base fixture deploys is simply left unused.
+///      The base fixture's own CTM proxy is simply left unused.
 contract ZKsyncOSChainTypeManagerSharedTest is ChainTypeManagerTest {
-    /// @dev The ZKsyncOS CTM proxy, correctly typed. `chainContractAddress` is re-pointed to
-    ///      the same address: every inherited helper only uses the `ChainTypeManagerBase` ABI
-    ///      common to both VMs, so the Era-typed handle stays valid.
+    /// @dev The ZKsyncOS CTM proxy; `chainContractAddress` is re-pointed to the same address
+    ///      so every inherited helper drives this CTM.
     ZKsyncOSChainTypeManager internal zksyncOSChainTypeManager;
 
     function deployZKsyncOS() public {
@@ -35,7 +33,7 @@ contract ZKsyncOSChainTypeManagerSharedTest is ChainTypeManagerTest {
 
         // ZKsyncOS chains must be initialized with `DiamondInit(true)`: it stores
         // `s.zksyncOS = true` on the diamond. Re-pin this new init in the mocked genesis registry
-        // (the base fixture pinned the Era `DiamondInit`); tests building chain-creation cuts
+        // (a fresh instance, separate from the base fixture's); tests building chain-creation cuts
         // through `getDiamondCutData(diamondInit)` pick it up via `_mockGenesisRegistryFacets`.
         diamondInit = address(new DiamondInit(true));
         vm.mockCall(
@@ -68,6 +66,6 @@ contract ZKsyncOSChainTypeManagerSharedTest is ChainTypeManagerTest {
             abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
         );
         zksyncOSChainTypeManager = ZKsyncOSChainTypeManager(address(transparentUpgradeableProxy));
-        chainContractAddress = EraChainTypeManager(address(transparentUpgradeableProxy));
+        chainContractAddress = ZKsyncOSChainTypeManager(address(transparentUpgradeableProxy));
     }
 }

@@ -15,7 +15,7 @@ import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChain
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {
     ZeroAddress,
@@ -29,7 +29,6 @@ import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
@@ -75,7 +74,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         validator = makeAddr("validator");
         serverNotifier = makeAddr("serverNotifier");
         baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
-        testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+        testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
 
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
         chainAssetHandler = new L1ChainAssetHandler(governor, address(bridgehub));
@@ -113,7 +112,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             address(0),
             address(0)
         );
-        diamondInit = address(new DiamondInit(false));
+        diamondInit = address(new DiamondInit(true));
         genesisUpgradeContract = new L1GenesisUpgrade();
         vm.stopPrank();
     }

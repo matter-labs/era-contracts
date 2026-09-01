@@ -61,7 +61,6 @@ import {UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
 contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     using stdToml for string;
 
-    uint256 internal constant ERA_TEST_CREATE_CHAIN_ID = 555;
     uint256 internal constant ZKSYNC_OS_TEST_CREATE_CHAIN_ID = 556;
 
     // solhint-disable-next-line gas-struct-packing
@@ -107,7 +106,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         bytes32 create2FactorySalt;
         address ctmProxy;
         address bytecodesSupplier;
-        bool isZKsyncOS;
         /// @dev ZK token asset ID, used by `InteropCenter.initL2` for fixed-fee bundles.
         ///      MUST be non-zero — `InteropCenter.initL2` reverts otherwise, which would abort the
         ///      L2 upgrade transaction.
@@ -124,7 +122,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     GatewayConfig internal gatewayConfig;
 
     // Discovered addresses
-    ZkChainAddresses internal discoveredEraZkChain;
+    ZkChainAddresses internal discoveredRepresentativeZkChain;
     ZkChainAddresses internal upToDateZkChain;
     L1Bridgehub internal bridgehub;
 
@@ -137,7 +135,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         initializeWithArgs(
             _params.ctmProxy,
             _params.bytecodesSupplier,
-            _params.isZKsyncOS,
             _params.rollupDAManager,
             _params.create2FactorySalt,
             _params.upgradeInputPath,
@@ -160,7 +157,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     function initializeWithArgs(
         address ctmProxy,
         address bytecodesSupplier,
-        bool isZKsyncOS,
         address rollupDAManager,
         bytes32 create2FactorySalt,
         string memory newConfigPath,
@@ -173,7 +169,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         initializeConfigFromArgs(
             ctmProxy,
             bytecodesSupplier,
-            isZKsyncOS,
             rollupDAManager,
             create2FactorySalt,
             newConfigPath,
@@ -203,7 +198,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         // The supplier is read off the CTM's `L1_BYTECODES_SUPPLIER()` immutable during discovery, so the
         // permanent-values entry is informational for this path.
         setAddressesBasedOnCTM();
-        config.isZKsyncOS = permanentConfig.isZKsyncOS;
+        // Only ZKsync OS CTMs can be upgraded onto this release; the flag stays in the permanent
+        // config as a guard against pointing the script at a legacy EraVM CTM section.
         // Must be non-zero: `InteropCenter.initL2` reverts on a zero asset ID. It runs on the genesis path
         // of `performForceDeployedContractsInit` only, so this aborts the genesis of chains created from the
         // release rather than this upgrade — caught here so the misconfiguration surfaces during
@@ -239,7 +235,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     function initializeConfigFromArgs(
         address ctmProxy,
         address bytecodesSupplier,
-        bool isZKsyncOS,
         address rollupDAManager,
         bytes32 create2FactorySalt,
         string memory newConfigPath,
@@ -248,22 +243,16 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
-        if (toml.keyExists("$.era_chain_id")) {
-            config.eraChainId = toml.readUint("$.era_chain_id");
-        }
+        // No `era_chain_id` read: `setAddressesBasedOnCTM` resolves it from the live asset router,
+        // which is authoritative for the ecosystems this flow upgrades.
 
         PermanentCTMConfig memory permanentConfig = PermanentCTMConfig({
             ctmProxy: ctmProxy,
             bytecodesSupplier: bytecodesSupplier,
-            isZKsyncOS: isZKsyncOS,
             create2FactorySalt: create2FactorySalt,
             zkTokenAssetId: zkTokenAssetId
         });
-        // Set config.isZKsyncOS before getChainCreationParamsConfig.
-        config.isZKsyncOS = isZKsyncOS;
-        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
-            Utils.genesisConfigPath(isZKsyncOS)
-        );
+        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(Utils.genesisConfigPath());
 
         // Optional explicit target protocol version from the upgrade input. The genesis config
         // (`configs/genesis/*/latest.json`) may still declare the PREVIOUS version while an
@@ -304,11 +293,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function deployUsedUpgradeContract() internal virtual returns (address) {
-        return deploySimpleContract("DefaultUpgrade", false);
+        return deploySimpleContract("DefaultUpgrade");
     }
 
     function deployGovernanceUpgradeTimer() internal virtual {
-        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
+        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer");
     }
 
     /// @notice Deploy everything that should be deployed
@@ -428,7 +417,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         }
 
         if (preV32Ecosystem) {
-            ctmAddresses = AddressIntrospector.getCTMAddressesV31(ctm, config.isZKsyncOS);
+            ctmAddresses = AddressIntrospector.getCTMAddressesV31(ctm);
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubAddr);
         } else {
             ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
@@ -436,16 +425,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         }
 
         config.ownerAddress = ctmAddresses.admin.governance;
-        config.eraChainId = AddressIntrospector.getEraChainId(coreAddresses.bridges.proxies.l1AssetRouter);
 
-        address eraChainAddress = bridgehub.getZKChain(config.eraChainId);
-        if (eraChainAddress != address(0)) {
-            // ERA chain exists, discover its addresses
-            discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(IZKChain(eraChainAddress));
-            ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredEraZkChain.l1DAValidator;
+        address representativeChain = AddressIntrospector.getRepresentativeZkChain(bridgehubAddr);
+        if (representativeChain != address(0)) {
+            discoveredRepresentativeZkChain = AddressIntrospector.getZkChainAddresses(IZKChain(representativeChain));
+            ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredRepresentativeZkChain.l1DAValidator;
         } else {
-            // ERA chain doesn't exist yet (fresh deployment), use up-to-date addresses
-            console.log("ERA chain not found in bridgehub, using up-to-date addresses");
+            // Chainless ecosystem (fresh deployment), use up-to-date addresses
+            console.log("No registered chain in bridgehub, using up-to-date addresses");
         }
 
         upToDateZkChain = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManagerBase(ctm));
@@ -481,45 +468,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
     function publishBytecodes() public virtual {
         bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
-            config.isZKsyncOS,
             getAdditionalFactoryDependencyContracts()
         );
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
-        PublishFactoryDepsResult memory result = BytecodePublisher.publishAndProcessFactoryDeps(
-            config.isZKsyncOS,
-            supplier,
-            allDeps
-        );
-
-        // Era-only invariant: factoryDepsHashes[0..3] == (bootloader,
-        // defaultAA, evmEmulator). ZKsyncOS has none of these concepts —
-        // `chainCreationParams.{bootloader,defaultAA,evmEmulator}Hash` are
-        // zero and the factoryDepsHashes describe a different, smaller set
-        // of contracts, so indexing [1]/[2] would go out of bounds.
-        if (!config.isZKsyncOS && result.factoryDepsHashes.length > 0) {
-            console.logBytes32(config.contracts.chainCreationParams.bootloaderHash);
-            console.log(result.factoryDepsHashes[0]);
-            console.logBytes32(config.contracts.chainCreationParams.defaultAAHash);
-            console.log(result.factoryDepsHashes[1]);
-            console.logBytes32(config.contracts.chainCreationParams.evmEmulatorHash);
-            console.log(result.factoryDepsHashes[2]);
-
-            if (!skipFactoryDepsCheck) {
-                require(
-                    bytes32(result.factoryDepsHashes[0]) == config.contracts.chainCreationParams.bootloaderHash,
-                    "bootloader hash factory dep mismatch"
-                );
-                require(
-                    bytes32(result.factoryDepsHashes[1]) == config.contracts.chainCreationParams.defaultAAHash,
-                    "default aa hash factory dep mismatch"
-                );
-                require(
-                    bytes32(result.factoryDepsHashes[2]) == config.contracts.chainCreationParams.evmEmulatorHash,
-                    "EVM emulator hash factory dep mismatch"
-                );
-            }
-        }
+        PublishFactoryDepsResult memory result = BytecodePublisher.publishAndProcessFactoryDeps(supplier, allDeps);
 
         factoryDepsResult = result;
         upgradeConfig.factoryDepsPublished = true;
@@ -548,7 +501,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             abi.encode(stage2Calls)
         );
 
-        vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
+        // Upstream forge's keyed `vm.writeToml(json, path, key)` silently no-ops when the key
+        // does not exist in the file yet, so append sections by re-serializing into the same
+        // "root" object and rewriting the whole file instead.
+        string memory updatedToml = vm.serializeString("root", "governance_calls", governanceCallsSerialized);
+        vm.writeToml(updatedToml, upgradeConfig.outputPath);
     }
 
     function prepareDefaultCTMAdminCalls() public virtual returns (Call[] memory calls) {
@@ -567,7 +524,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             abi.encode(calls)
         );
 
-        vm.writeToml(ctmAdminCallsSerialized, upgradeConfig.outputPath, ".ctm_admin_calls");
+        // See the note in prepareDefaultGovernanceCalls on why keyed writeToml is not used here.
+        string memory updatedCtmAdminToml = vm.serializeString("root", "ctm_admin_calls", ctmAdminCallsSerialized);
+        vm.writeToml(updatedCtmAdminToml, upgradeConfig.outputPath);
     }
 
     function prepareDefaultTestUpgradeCalls() public {
@@ -583,7 +542,13 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             abi.encode(testCreateChainCall)
         );
 
-        vm.writeToml(testUpgradeCallsSerialized, upgradeConfig.outputPath, ".test_upgrade_calls");
+        // See the note in prepareDefaultGovernanceCalls on why keyed writeToml is not used here.
+        string memory updatedTestCallsToml = vm.serializeString(
+            "root",
+            "test_upgrade_calls",
+            testUpgradeCallsSerialized
+        );
+        vm.writeToml(updatedTestCallsToml, upgradeConfig.outputPath);
     }
 
     function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
@@ -873,7 +838,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
     /// @notice Tests that it is possible to create a new chain with the new version
     function getDefaultTestCreateChainId() public view virtual returns (uint256) {
-        return config.isZKsyncOS ? ZKSYNC_OS_TEST_CREATE_CHAIN_ID : ERA_TEST_CREATE_CHAIN_ID;
+        return ZKSYNC_OS_TEST_CREATE_CHAIN_ID;
     }
 
     function TESTONLY_prepareCreateChainCall() private returns (Call[] memory calls, address admin) {
@@ -883,14 +848,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function deployUpgradeStageValidator() internal {
-        upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator", false);
+        upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator");
     }
 
-    function getCreationCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        require(!isZKBytecode, "ZK bytecodes are not supported in CTM upgrade");
+    function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
         if (compareStrings(contractName, "UpgradeStageValidator")) {
             return abi.encode(ctmAddresses.stateTransition.proxies.chainTypeManager, getNewProtocolVersion());
         } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
@@ -898,7 +859,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             uint256 maxAdditionalDelay = 2 weeks;
             return abi.encode(initialDelay, maxAdditionalDelay, config.ownerAddress, newConfig.ecosystemAdminAddress);
         } else {
-            return super.getCreationCalldata(contractName, isZKBytecode);
+            return super.getCreationCalldata(contractName);
         }
     }
 
@@ -990,10 +951,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         );
 
         // Serialize newly deployed upgrade addresses
-        vm.serializeAddress("deployed_addresses", "chain_admin", discoveredEraZkChain.chainAdmin);
+        vm.serializeAddress("deployed_addresses", "chain_admin", discoveredRepresentativeZkChain.chainAdmin);
         vm.serializeAddress("deployed_addresses", "access_control_restriction_addr", address(0));
         vm.serializeAddress("deployed_addresses", "transparent_proxy_admin", ctmAddresses.admin.transparentProxyAdmin);
-        vm.serializeAddress("deployed_addresses", "rollup_l1_da_validator_addr", discoveredEraZkChain.l1DAValidator);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "rollup_l1_da_validator_addr",
+            discoveredRepresentativeZkChain.l1DAValidator
+        );
         vm.serializeAddress("deployed_addresses", "validium_l1_da_validator_addr", address(0));
         vm.serializeAddress(
             "deployed_addresses",

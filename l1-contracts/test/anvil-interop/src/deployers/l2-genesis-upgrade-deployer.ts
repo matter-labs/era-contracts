@@ -1,5 +1,6 @@
-import { Contract, providers } from "ethers";
-import { relayTx } from "../core/utils";
+import type { providers } from "ethers";
+import { Contract } from "ethers";
+import { relayTx, createProvider } from "../core/utils";
 import { getAbi, getBytecode } from "../core/contracts";
 import { PREDEPLOY_SYSTEM_CONTRACTS } from "../core/predeploys";
 import type { SystemContractPredeploy } from "../core/predeploys";
@@ -23,7 +24,7 @@ export class L2GenesisUpgradeDeployer {
   private l2Provider: providers.JsonRpcProvider;
 
   constructor(l2RpcUrl: string) {
-    this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
+    this.l2Provider = createProvider(l2RpcUrl);
   }
 
   private async bootstrapSystemContractPrestate(

@@ -123,9 +123,6 @@ mod ctm_signatures {
                 address _permissionlessValidator
             );
         }
-        contract V31DualVerifier {
-            constructor(address _fflonkVerifier, address _plonkVerifier);
-        }
         contract V31ZKsyncOSVerifier {
             constructor(address _plonkVerifier);
         }
@@ -1017,10 +1014,7 @@ async fn verify_ctm_provenance(
         ],
     )?;
 
-    let ctm_file = match ctm.flavor {
-        CtmFlavor::Era => "l1-contracts/EraChainTypeManager",
-        CtmFlavor::ZksyncOs => "l1-contracts/ZKsyncOSChainTypeManager",
-    };
+    let ctm_file = "l1-contracts/ZKsyncOSChainTypeManager";
 
     // Single dispatch table: (address, encoded ctor args, expected file).
     let checks: Vec<(Address, Vec<u8>, &str)> = vec![
@@ -1133,11 +1127,10 @@ async fn verify_ctm_provenance(
     Ok(())
 }
 
-/// Per-CTM, per-flavor provenance for the contracts that ship one copy per
-/// CTM (verifiers, DiamondInit, default_upgrade, genesis_upgrade, getters/
-/// executor/admin facets, ServerNotifier, EIP7702Checker). The v31 upgrade
-/// deploys these once for Era and once for ZKsyncOS, so verification
-/// iterates per CTM and uses each CTM's own `flavor`.
+/// Per-CTM provenance for the contracts that ship one copy per CTM
+/// (verifiers, DiamondInit, default_upgrade, genesis_upgrade, getters/
+/// executor/admin facets, ServerNotifier, EIP7702Checker). Verification
+/// iterates per `[ctms.<flavor>]` entry (ZKsync OS only on this build).
 ///
 /// All required addresses come from the CTM's own `[ctms.<flavor>]`
 /// section via `required_address`.
@@ -1149,27 +1142,14 @@ fn verify_ctm_base_provenance(
 ) -> Result<()> {
     use ctm_signatures::*;
 
-    let is_zksync_os = matches!(ctm.flavor, CtmFlavor::ZksyncOs);
     let scope = format!("ctms.{}", ctm.flavor.label());
 
-    // Per-flavor verifier file names. `AllContractsHashes.json` ships
-    // per-flavor verifiers since v30, so we match each CTM's deploys
-    // against the matching set.
-    let (verifier_plonk_file, verifier_fflonk_file, main_verifier_file, testnet_verifier_file) =
-        match ctm.flavor {
-            CtmFlavor::Era => (
-                "l1-contracts/EraVerifierPlonk",
-                Some("l1-contracts/EraVerifierFflonk"),
-                "l1-contracts/EraDualVerifier",
-                "l1-contracts/EraTestnetVerifier",
-            ),
-            CtmFlavor::ZksyncOs => (
-                "l1-contracts/ZKsyncOSVerifierPlonk",
-                None,
-                "l1-contracts/ZKsyncOSVerifier",
-                "l1-contracts/ZKsyncOSTestnetVerifier",
-            ),
-        };
+    // ZKsync OS verifier file names — `AllContractsHashes.json` ships
+    // per-flavor verifiers since v30; only the ZKsync OS set remains on
+    // this OS-only build.
+    let verifier_plonk_file = "l1-contracts/ZKsyncOSVerifierPlonk";
+    let main_verifier_file = "l1-contracts/ZKsyncOSVerifier";
+    let testnet_verifier_file = "l1-contracts/ZKsyncOSTestnetVerifier";
     // No-arg CTM contracts. `eip7702_checker_addr` lives in the da-contracts
     // tree; everything else is l1-contracts.
     let no_args: &[(&[&str], &str)] = &[
@@ -1183,7 +1163,7 @@ fn verify_ctm_base_provenance(
             &["state_transition", "getters_facet_addr"],
             "l1-contracts/GettersFacet",
         ),
-        // {Era,ZKsyncOS}VerifierPlonk() — no ctor args.
+        // ZKsyncOSVerifierPlonk() — no ctor args.
         (
             &["state_transition", "verifier_plonk_addr"],
             verifier_plonk_file,
@@ -1204,63 +1184,43 @@ fn verify_ctm_base_provenance(
         result.expect_create2_params(verifiers, &addr, Vec::<u8>::new(), expected_file);
     }
 
-    if let Some(verifier_fflonk_file) = verifier_fflonk_file {
-        let verifier_fflonk = required_address(
-            &ctm.value,
-            &scope,
-            &["state_transition", "verifier_fflonk_addr"],
-        )?;
-        result.expect_create2_params(
-            verifiers,
-            &verifier_fflonk,
-            Vec::<u8>::new(),
-            verifier_fflonk_file,
-        );
-    }
+    // PriorityOpLowerBound() — no ctor args; the registry the per-chain upgrade embeds.
+    let priority_op_lower_bound = required_address(
+        &ctm.value,
+        &scope,
+        &["state_transition", "priority_op_lower_bound_addr"],
+    )?;
+    result.expect_create2_params(
+        verifiers,
+        &priority_op_lower_bound,
+        Vec::<u8>::new(),
+        "l1-contracts/PriorityOpLowerBound",
+    );
 
-    // Only ZKsync OS chains can be upgraded onto this release, so the per-chain upgrade contract
-    // and its registry exist for ZKsync OS CTMs only.
-    if is_zksync_os {
-        // PriorityOpLowerBound() — no ctor args; the registry the per-chain upgrade embeds.
-        let priority_op_lower_bound = required_address(
-            &ctm.value,
-            &scope,
-            &["state_transition", "priority_op_lower_bound_addr"],
-        )?;
-        result.expect_create2_params(
-            verifiers,
-            &priority_op_lower_bound,
-            Vec::<u8>::new(),
-            "l1-contracts/PriorityOpLowerBound",
-        );
+    // V32UpgradeZKsyncOS(IPriorityOpLowerBound) — the per-chain upgrade contract embeds the
+    // registry address as its single constructor argument, encoded as a left-padded 32-byte word.
+    let default_upgrade = required_address(
+        &ctm.value,
+        &scope,
+        &["state_transition", "default_upgrade_addr"],
+    )?;
+    let mut default_upgrade_ctor = vec![0u8; 32];
+    default_upgrade_ctor[12..].copy_from_slice(priority_op_lower_bound.as_slice());
+    result.expect_create2_params(
+        verifiers,
+        &default_upgrade,
+        default_upgrade_ctor,
+        "l1-contracts/V32UpgradeZKsyncOS",
+    );
 
-        // V32UpgradeZKsyncOS(IPriorityOpLowerBound) — the per-chain upgrade contract embeds the
-        // registry address as its single constructor argument, encoded as a left-padded 32-byte word.
-        let default_upgrade = required_address(
-            &ctm.value,
-            &scope,
-            &["state_transition", "default_upgrade_addr"],
-        )?;
-        let mut default_upgrade_ctor = vec![0u8; 32];
-        default_upgrade_ctor[12..].copy_from_slice(priority_op_lower_bound.as_slice());
-        result.expect_create2_params(
-            verifiers,
-            &default_upgrade,
-            default_upgrade_ctor,
-            "l1-contracts/V32UpgradeZKsyncOS",
-        );
-    }
-
-    // DiamondInit(bool _isZKsyncOS) — encoded as a single 32-byte word.
+    // DiamondInit(bool _isZKsyncOS) — encoded as a single 32-byte word (true).
     let diamond_init = required_address(
         &ctm.value,
         &scope,
         &["state_transition", "diamond_init_addr"],
     )?;
     let mut encoded = vec![0u8; 32];
-    if is_zksync_os {
-        encoded[31] = 1;
-    }
+    encoded[31] = 1;
     result.expect_create2_params(
         verifiers,
         &diamond_init,
@@ -1301,9 +1261,7 @@ fn verify_ctm_base_provenance(
         "l1-contracts/AdminFacet",
     );
 
-    // Main verifier / *TestnetVerifier. Era receives both verifier implementations;
-    // ZKsync OS receives only PLONK.
-    //
+    // Main verifier / ZKsyncOSTestnetVerifier. ZKsync OS receives only PLONK.
     let verifier = required_address(&ctm.value, &scope, &["state_transition", "verifier_addr"])?;
     let plonk = required_address(
         &ctm.value,
@@ -1315,16 +1273,7 @@ fn verify_ctm_base_provenance(
     } else {
         main_verifier_file
     };
-    let encoded = if is_zksync_os {
-        V31ZKsyncOSVerifier::constructorCall::new((plonk,)).abi_encode()
-    } else {
-        let fflonk = required_address(
-            &ctm.value,
-            &scope,
-            &["state_transition", "verifier_fflonk_addr"],
-        )?;
-        V31DualVerifier::constructorCall::new((fflonk, plonk)).abi_encode()
-    };
+    let encoded = V31ZKsyncOSVerifier::constructorCall::new((plonk,)).abi_encode();
     result.expect_create2_params(verifiers, &verifier, encoded, verifier_file);
 
     Ok(())
@@ -1356,7 +1305,6 @@ async fn verify_v31_new_gateway_ctm_provenance(
     };
 
     let source_ctm = source_ctm_for_new_gateway(artifact, verifiers)?;
-    let is_zksync_os = matches!(source_ctm.flavor, CtmFlavor::ZksyncOs);
     let aliased_governance = apply_l2_to_l1_alias(verifiers.bridgehub_owner);
     let gateway_salt = verifiers.gateway_ctm_create2_salt;
 
@@ -1420,10 +1368,9 @@ async fn verify_v31_new_gateway_ctm_provenance(
 
     // Direct Gateway L1->L2 CREATE2 deployments. These are present as raw
     // priority tx calldata and therefore can be checked by address.
+    // DiamondInit(bool _isZKsyncOS = true).
     let mut diamond_init_args = vec![0u8; 32];
-    if is_zksync_os {
-        diamond_init_args[31] = 1;
-    }
+    diamond_init_args[31] = 1;
     let direct_checks: Vec<(Address, Vec<u8>, &str)> = vec![
         (
             admin,
@@ -1561,11 +1508,7 @@ async fn verify_v31_new_gateway_ctm_provenance(
         );
     }
 
-    let verifiers_file = if is_zksync_os {
-        "l1-contracts/GatewayCTMDeployerVerifiersZKsyncOS"
-    } else {
-        "l1-contracts/GatewayCTMDeployerVerifiers"
-    };
+    let verifiers_file = "l1-contracts/GatewayCTMDeployerVerifiersZKsyncOS";
     let verifiers_deployer = expect_create2_params_by_file(
         verifiers,
         result,
@@ -1575,7 +1518,7 @@ async fn verify_v31_new_gateway_ctm_provenance(
             salt: gateway_salt,
             aliasedGovernanceAddress: aliased_governance,
             testnetVerifier: source_ctm.contracts_config.is_testnet,
-            isZKsyncOS: is_zksync_os,
+            isZKsyncOS: true,
         }
         .abi_encode(),
     );
@@ -1594,11 +1537,7 @@ async fn verify_v31_new_gateway_ctm_provenance(
         );
     }
 
-    let ctm_deployer_file = if is_zksync_os {
-        "l1-contracts/GatewayCTMDeployerCTMZKsyncOS"
-    } else {
-        "l1-contracts/GatewayCTMDeployerCTM"
-    };
+    let ctm_deployer_file = "l1-contracts/GatewayCTMDeployerCTMZKsyncOS";
     let gateway_ctm_config = GatewayCTMFinalConfig {
         baseConfig: GatewayCTMDeployerConfig {
             aliasedGovernanceAddress: aliased_governance,
@@ -1606,7 +1545,7 @@ async fn verify_v31_new_gateway_ctm_provenance(
             eraChainId: U256::from(era_chain_id),
             l1ChainId: U256::from(l1_chain_id),
             testnetVerifier: source_ctm.contracts_config.is_testnet,
-            isZKsyncOS: is_zksync_os,
+            isZKsyncOS: true,
             adminSelectors: admin_cut.selectors.clone(),
             executorSelectors: executor_cut.selectors.clone(),
             mailboxSelectors: mailbox_cut.selectors.clone(),
@@ -1620,14 +1559,7 @@ async fn verify_v31_new_gateway_ctm_provenance(
             genesisRollupLeafIndex: U256::from(
                 genesis_config.genesis_rollup_leaf_index.unwrap_or_default(),
             ),
-            genesisBatchCommitment: if is_zksync_os {
-                zksync_os_genesis_batch_commitment()
-            } else {
-                parse_optional_bytes32_hex(
-                    "genesis_batch_commitment",
-                    genesis_config.genesis_batch_commitment.as_deref(),
-                )?
-            },
+            genesisBatchCommitment: zksync_os_genesis_batch_commitment(),
             forceDeploymentsData: Bytes::from(force_deployments_data),
             protocolVersion: U256::from(source_ctm.contracts_config.new_protocol_version),
         },
@@ -1868,13 +1800,6 @@ fn expect_create2_params_by_file(
 fn parse_bytes32_hex(label: &str, value: &str) -> Result<FixedBytes<32>> {
     FixedBytes::<32>::from_hex(value)
         .with_context(|| format!("{label} must be a 0x-prefixed 32-byte hex string"))
-}
-
-fn parse_optional_bytes32_hex(label: &str, value: Option<&str>) -> Result<FixedBytes<32>> {
-    match value {
-        Some(value) => parse_bytes32_hex(label, value),
-        None => Ok(FixedBytes::<32>::ZERO),
-    }
 }
 
 fn zksync_os_genesis_batch_commitment() -> FixedBytes<32> {

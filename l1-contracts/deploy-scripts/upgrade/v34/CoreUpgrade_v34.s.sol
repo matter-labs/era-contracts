@@ -48,20 +48,16 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
             ).chainRegistrationSender();
         }
 
-        coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
-        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
-        coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
-        coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter", false);
-        coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault", false);
+        coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub");
+        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot");
+        coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier");
+        coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter");
+        coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault");
         coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract(
-            "CTMDeploymentTracker",
-            false
-        );
-        coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler", false);
+            "CTMDeploymentTracker");
+        coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler");
         coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
-            "ChainRegistrationSender",
-            false
-        );
+            "ChainRegistrationSender");
     }
 
     function prepareEcosystemUpgrade() public virtual override {
@@ -86,8 +82,7 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
             deployViaCreate2AndNotify(
                 type(CoreRegistry).creationCode,
                 abi.encode(CoreRegistryManifest({proxyUpgrades: _coreProxyUpgradeRows()})),
-                "CoreRegistry",
-                false
+                "CoreRegistry"
             )
         );
 
@@ -102,8 +97,7 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
                         // The audited-object anchor for every registry this executor accepts.
                         keccak256(vm.getDeployedCode("CoreRegistry.sol:CoreRegistry"))
                     ),
-                    "EcosystemUpgradeExecutor",
-                    false
+                    "EcosystemUpgradeExecutor"
                 )
             )
         );

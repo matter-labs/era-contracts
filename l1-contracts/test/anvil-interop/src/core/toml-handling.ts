@@ -63,10 +63,8 @@ export function prepareGatewayVoteConfig(outputDir: string, gatewayChainId: numb
     force_deployments_data: readTomlString(contracts, "force_deployments_data"),
     gateway_chain_id: gatewayChainId,
     gateway_settlement_fee: 0,
-    is_zk_sync_os: readTomlBoolean(ctmConfig, "is_zk_sync_os"),
     owner_address: readTomlString(ctmConfig, "owner_address"),
     refund_recipient: ANVIL_DEFAULT_ACCOUNT_ADDR,
-    support_l2_legacy_shared_bridge_test: readTomlBoolean(ctmConfig, "support_l2_legacy_shared_bridge_test"),
     testnet_verifier: readTomlBoolean(ctmConfig, "testnet_verifier"),
     zk_token_asset_id: readTomlString(ctmConfig, "zk_token_asset_id"),
     contracts: {

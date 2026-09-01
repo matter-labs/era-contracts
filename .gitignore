@@ -3,14 +3,10 @@
 .vscode/*
 !.vscode/settings.json
 artifacts-forge/
-artifacts-zk/
 artifacts/
 build/
 cache-forge/
-cache-zk/
 cache/
-contracts-preprocessed/
-era_test_node.log*
 foundry.lock
 node_modules/
 # also match node_modules symlinks (worktrees link them to the main checkout; the
@@ -69,12 +65,7 @@ l1-contracts/test/foundry/l1/integration/deploy-scripts/script-out/*
 l1-contracts/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-*.toml
 l1-contracts/test/foundry/integration/deploy-scripts/script-out/*
 l1-contracts/test/foundry/l1/integration/upgrade-envs/script-out/*.toml
-l1-contracts/zkout/*
 .lycheecache
-
-# Foundry binary
-foundry-zksync/
-l1-contracts/foundry-zksync/
 
 # Local secrets (never commit)
 .env
