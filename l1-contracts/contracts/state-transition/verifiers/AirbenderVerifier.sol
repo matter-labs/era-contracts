@@ -20,16 +20,12 @@ import {PUBLIC_INPUT_SHIFT} from "../../common/Config.sol";
 /// the recursion circuit — the guest's final registers are bound to the audited binary there — so it is not
 /// carried in the SNARK public input and there is nothing for this contract to re-derive.
 ///
-/// @dev The prover also supports a mode that lifts the commitment into the SNARK public input. The lane runs
-/// in the existing mode for now, but the switch is deliberately a one-contract change and needs no new
-/// machinery anywhere else:
-///  - `_airbenderPublicInput` is the only place the derivation lives, and it is `virtual`. A guest-bound
-///    variant overrides it with `keccak(programOutput | guestBinaryCommitment) >> PUBLIC_INPUT_SHIFT`, adding
-///    the commitment as an immutable of its own — the two rotate together out of one guest build, exactly as
-///    a verification key does.
-///  - `EraMultiProofVerifier` holds this lane as an `IVerifier` immutable, so adopting the variant is a
-///    deployment change: deploy it, deploy a gate pointing at it, repoint `protocolVersionVerifier`. The
-///    Executor, the chain storage, the Admin facet and the kill switch are all untouched by it.
+/// @dev The prover also supports a mode that lifts the commitment into the SNARK public input. Adopting it
+/// means a new lane contract deriving `keccak(programOutput | guestBinaryCommitment) >> PUBLIC_INPUT_SHIFT`
+/// from its own pinned commitment, a new gate pointing at it, and a `protocolVersionVerifier` repoint —
+/// `EraMultiProofVerifier` holds this lane as an `IVerifier` immutable, so nothing in the Executor, the chain
+/// storage, the Admin facet or the kill switch changes. No extension point is kept here for it: the switch
+/// redeploys this contract either way.
 ///
 /// @dev The derivation currently coincides with the Boojum lane's. That is expected — both proof systems
 /// attest to the same state transition — and it is not what separates the lanes: they are separate because
@@ -51,9 +47,8 @@ contract AirbenderVerifier is IVerifier {
     /// @param _publicInputs The untruncated per-batch transition hash emitted by the Executor.
     /// @param _proof The Airbender PLONK proof, with the routing word already stripped by the caller.
     function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) external view returns (bool) {
-        // Era proves one batch per call. Validated here rather than inside the overridable derivation, so a
-        // future subclass cannot drop the check by forgetting to repeat it. Checked here rather than trusted
-        // from the caller because `verify` is permissionless.
+        // Era proves one batch per call, and `verify` is permissionless, so the length is checked here
+        // rather than trusted from the caller.
         if (_publicInputs.length != 1) {
             revert InvalidPublicInputsLength();
         }
@@ -69,14 +64,8 @@ contract AirbenderVerifier is IVerifier {
     }
 
     /// @notice Derives the Airbender SNARK public input from the batch's transition hash.
-    /// @dev This is the seam for the guest-bound prover mode described above, and the only thing a variant
-    /// needs to override. It takes the single transition hash rather than the array, so the caller keeps
-    /// ownership of input validation.
-    /// @dev Declared `view`, not `pure`, although the body reads nothing: Solidity only lets an override
-    /// tighten mutability, so a `pure` base could never be overridden by a variant that reads its pinned
-    /// commitment from an immutable. Do not "simplify" this to `pure` — it would close the seam.
     /// @param _transitionHash The untruncated `keccak(prevCommitment | currentCommitment)` for the batch.
-    function _airbenderPublicInput(uint256 _transitionHash) internal view virtual returns (uint256) {
+    function _airbenderPublicInput(uint256 _transitionHash) internal pure returns (uint256) {
         return _transitionHash >> PUBLIC_INPUT_SHIFT;
     }
 }

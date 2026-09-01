@@ -91,10 +91,11 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
         // required is read from the calling chain rather than held here. In settlement the caller is that
         // chain's diamond, because the Executor facet calls its verifier directly.
         uint8 disabled = IGetters(msg.sender).disabledProofSystems();
-        // `Admin.setDisabledProofSystems` already rejects this, but that guard lives in another contract.
-        // This is the gate that the two-prover guarantee actually rests on, so it refuses to accept a batch
-        // it verified nothing for rather than trusting a value written elsewhere.
-        if (disabled & ALL_PROOF_SYSTEMS_DISABLED == ALL_PROOF_SYSTEMS_DISABLED) {
+        // `Admin.setDisabledProofSystems` already rejects anything but 0, 1 and 2, but that guard lives in
+        // another contract. This is the gate the two-prover guarantee actually rests on, so it re-checks
+        // rather than trusting a value written elsewhere — with the same predicate as the setter, so an
+        // unknown bit is rejected here too instead of being tolerated.
+        if (disabled >= ALL_PROOF_SYSTEMS_DISABLED) {
             revert InvalidDisabledProofSystemsMask(disabled);
         }
 

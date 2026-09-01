@@ -12,6 +12,7 @@ import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerB
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
 import {AirbenderVerifier} from "contracts/state-transition/verifiers/AirbenderVerifier.sol";
 import {IEraDualVerifier} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
@@ -52,11 +53,30 @@ contract AirbenderDeploymentTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     /// is the gate itself, so it has to answer for the router it wraps — otherwise chain registration and
     /// upgrade-calldata generation revert.
     function test_gateAnswersSubVerifierIntrospection() public view {
-        IEraDualVerifier chainVerifier = IEraDualVerifier(
-            address(IZKChain(getZKChainAddress(eraZKChainId)).getVerifier())
+        IEraDualVerifier chainVerifier = IEraDualVerifier(address(_gate()));
+        IEraDualVerifier router = IEraDualVerifier(address(_gate().BOOJUM_VERIFIER()));
+
+        // Identity, not merely non-zero: the gate forwards to the router it wraps, so a swapped or wrong
+        // lane would still look populated to tooling that only checks for a set address.
+        assertEq(
+            address(chainVerifier.FFLONK_VERIFIER()),
+            address(router.FFLONK_VERIFIER()),
+            "gate reports the wrong FFLONK verifier"
         );
-        assertTrue(address(chainVerifier.FFLONK_VERIFIER()) != address(0), "FFLONK not introspectable");
-        assertTrue(address(chainVerifier.PLONK_VERIFIER()) != address(0), "PLONK not introspectable");
+        assertEq(
+            address(chainVerifier.PLONK_VERIFIER()),
+            address(router.PLONK_VERIFIER()),
+            "gate reports the wrong PLONK verifier"
+        );
+        assertTrue(
+            address(router.FFLONK_VERIFIER()) != address(router.PLONK_VERIFIER()),
+            "fflonk and plonk must be distinct, or the identity assertions above prove nothing"
+        );
+        assertEq(
+            _gate().verificationKeyHash(),
+            IVerifier(address(_gate().BOOJUM_VERIFIER())).verificationKeyHash(),
+            "gate must report the Boojum lane's verification key hash"
+        );
     }
 
     /// `AddressIntrospector` runs against the live chain verifier and is used by `RegisterZKChain` and by the
