@@ -14,7 +14,7 @@ args to `protocol_ops` unless the first post-flag word is `forge`/`cast`).
 | `generate-chain-add-validator-calldata`         | `protocol-ops chain add-validator`                                      |
 | `generate-chain-remove-validator-calldata`      | `protocol-ops chain remove-validator`                                   |
 | `generate-gateway-convert-calldata`             | `protocol-ops chain gateway convert`                                    |
-| `generate-upgrade-calldata-prepare`             | `protocol-ops ecosystem upgrade-prepare`                                |
+| `generate-upgrade-calldata-prepare`             | `protocol-ops ecosystem upgrade-prepare-all`                            |
 | `generate-upgrade-calldata-governance`          | `protocol-ops ecosystem upgrade-governance` (stages 0+1+2)              |
 | `generate-migrate-to-gw-phase0-pause`           | `protocol-ops chain gateway migrate-to phase-0-pause-deposits`          |
 | `generate-migrate-to-gw-phase1-submit`          | `protocol-ops chain gateway migrate-to phase-1-submit`                  |

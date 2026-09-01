@@ -10,9 +10,9 @@ pub(crate) struct EcosystemUpgradeArtifact {
     /// Raw `[core]` table from the merged ecosystem TOML.
     pub(crate) core: toml::Value,
     pub(crate) governance_calls: GovernanceCalls,
-    /// One entry per `[ctms.<flavor>]` section in the merged TOML, in the
-    /// order encountered. `era` always sorts before `zksync_os` for
-    /// deterministic ordering.
+    /// One entry per `[ctms.<flavor>]` section in the merged TOML, in
+    /// sorted-key order. Only the `zksync_os` flavor is supported on this
+    /// OS-only build; `[ctms.era]` input is rejected at parse time.
     pub(crate) ctms: Vec<CtmArtifact>,
     /// Optional `[new_gateway]` table from `write_merged_ecosystem_toml` —
     /// present when the env config carried a `[new_gateway]` block. Stage-2
@@ -61,23 +61,24 @@ pub(crate) struct ZkGovernanceArtifact {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CtmFlavor {
-    Era,
     ZksyncOs,
 }
 
 impl CtmFlavor {
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::Era => "era",
             Self::ZksyncOs => "zksync_os",
         }
     }
 
     fn parse(label: &str) -> anyhow::Result<Self> {
         match label {
-            "era" => Ok(Self::Era),
             "zksync_os" => Ok(Self::ZksyncOs),
-            other => anyhow::bail!("unknown CTM flavor `{other}`; expected `era` or `zksync_os`"),
+            "era" => anyhow::bail!(
+                "[ctms.era] is not supported: Era CTM verification was removed from this \
+                 ZKsync OS-only build; only `[ctms.zksync_os]` can be verified"
+            ),
+            other => anyhow::bail!("unknown CTM flavor `{other}`; expected `zksync_os`"),
         }
     }
 }
@@ -149,7 +150,7 @@ impl EcosystemUpgradeArtifact {
             anyhow::bail!("[ctms] must contain at least one CTM section");
         }
 
-        // Deterministic ordering: era first, then zksync_os.
+        // Deterministic ordering by sorted section key.
         let mut flavor_keys: Vec<String> = ctms_table.keys().cloned().collect();
         flavor_keys.sort();
 
@@ -315,10 +316,10 @@ mod tests {
             [core.upgrade_addresses]
             native_token_vault_implementation_addr = "0x0000000000000000000000000000000000000002"
 
-            [ctms.era]
+            [ctms.zksync_os]
             chain_upgrade_diamond_cut = "0xabcd"
 
-            [ctms.era.contracts_config]
+            [ctms.zksync_os.contracts_config]
             diamond_cut_data = "0x"
             force_deployments_data = "0x"
             new_protocol_version = 2
@@ -326,12 +327,12 @@ mod tests {
             governance_upgrade_timer_initial_delay = 1200
             is_testnet = true
 
-            [ctms.era.state_transition]
+            [ctms.zksync_os.state_transition]
             chain_type_manager_proxy = "0x0000000000000000000000000000000000000003"
         "#;
         let a = EcosystemUpgradeArtifact::from_toml_str(toml).unwrap();
         assert_eq!(a.ctms.len(), 1);
-        assert_eq!(a.ctms[0].flavor, CtmFlavor::Era);
+        assert_eq!(a.ctms[0].flavor, CtmFlavor::ZksyncOs);
         assert_eq!(a.ctms[0].chain_upgrade_diamond_cut, "0xabcd");
         assert!(a.core.get("state_transition").is_none());
         assert!(a.core.get("upgrade_addresses").is_some());
@@ -339,7 +340,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_multi_ctm_artifact_in_deterministic_order() {
+    fn rejects_era_ctm_section_with_clear_error() {
         let toml = r#"
             [governance_calls]
             stage0_calls = "0x"
@@ -347,16 +348,6 @@ mod tests {
             stage2_calls = "0x"
 
             [core]
-
-            [ctms.zksync_os]
-            chain_upgrade_diamond_cut = "0xbb"
-            [ctms.zksync_os.contracts_config]
-            diamond_cut_data = "0x"
-            force_deployments_data = "0x"
-            new_protocol_version = 2
-            old_protocol_version = 1
-            governance_upgrade_timer_initial_delay = 0
-            is_testnet = false
 
             [ctms.era]
             chain_upgrade_diamond_cut = "0xaa"
@@ -368,12 +359,11 @@ mod tests {
             governance_upgrade_timer_initial_delay = 0
             is_testnet = false
         "#;
-        let a = EcosystemUpgradeArtifact::from_toml_str(toml).unwrap();
-        assert_eq!(a.ctms.len(), 2);
-        assert_eq!(a.ctms[0].flavor, CtmFlavor::Era);
-        assert_eq!(a.ctms[1].flavor, CtmFlavor::ZksyncOs);
-        assert_eq!(a.ctms[0].chain_upgrade_diamond_cut, "0xaa");
-        assert_eq!(a.ctms[1].chain_upgrade_diamond_cut, "0xbb");
+        let err = EcosystemUpgradeArtifact::from_toml_str(toml).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("[ctms.era] is not supported"),
+            "unexpected error: {err:#}"
+        );
     }
 
     #[test]
@@ -386,9 +376,9 @@ mod tests {
 
             [core]
 
-            [ctms.era]
+            [ctms.zksync_os]
             chain_upgrade_diamond_cut = "0xaa"
-            [ctms.era.contracts_config]
+            [ctms.zksync_os.contracts_config]
             diamond_cut_data = "0x"
             force_deployments_data = "0x"
             new_protocol_version = 2

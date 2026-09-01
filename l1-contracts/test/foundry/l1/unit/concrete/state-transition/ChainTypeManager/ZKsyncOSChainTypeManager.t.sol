@@ -23,7 +23,7 @@ import {
     ChainCreationParams,
     ChainTypeManagerInitializeData
 } from "contracts/state-transition/IChainTypeManager.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {
     ZeroAddress,
@@ -40,7 +40,6 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
@@ -72,7 +71,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     address internal testnetVerifier;
     bytes internal forceDeploymentsData = hex"";
 
-    uint256 eraChainId = 9;
+    uint256 zkChainId = 9;
     uint256 internal constant MAX_NUMBER_OF_ZK_CHAINS = 10;
 
     Diamond.FacetCut[] internal facetCuts;
@@ -91,7 +90,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         serverNotifier = makeAddr("serverNotifier");
         newChainAdmin = makeAddr("chainadmin");
         baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
-        testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+        testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
 
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
         chainAssetHandler = new L1ChainAssetHandler(governor, address(bridgehub));
@@ -129,7 +128,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
             address(0),
             address(0)
         );
-        diamondInit = address(new DiamondInit(false));
+        diamondInit = address(new DiamondInit(true));
         genesisUpgradeContract = new L1GenesisUpgrade();
 
         facetCuts.push(
@@ -201,6 +200,9 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
         InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
+        initializeData.l2BootloaderBytecodeHash = bytes32(0);
+        initializeData.l2DefaultAccountBytecodeHash = bytes32(0);
+        initializeData.l2EvmEmulatorBytecodeHash = bytes32(0);
         bytes memory initCalldata = abi.encode(initializeData);
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
     }

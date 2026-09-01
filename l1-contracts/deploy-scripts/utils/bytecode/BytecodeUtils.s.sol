@@ -2,37 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 library BytecodeUtils {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     Vm internal constant vm = Vm(VM_ADDRESS);
 
-    /**
-     * @dev Returns the bytecode of a given system contract.
-     */
-    function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
-        return readZKFoundryBytecodeSystemContracts(string.concat(filename, ".sol"), filename);
-    }
-
-    /**
-     * @dev Returns the bytecode of a given system contract in yul.
-     */
-    function readSystemContractsYulBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
-
-        return readFoundryBytecode(path);
-    }
-
-    /**
-     * @dev Returns the bytecode of a given precompile system contract.
-     */
-    function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
-
-        return readFoundryBytecode(path);
-    }
     /**
      * @dev Returns the bytecode of a given DA contract.
      */
@@ -54,17 +29,9 @@ library BytecodeUtils {
         return bytecode;
     }
 
-    /// @notice Read L1 creation bytecode from the correct artifact directory.
-    ///         EVM bytecodes → out/, ZK bytecodes → zkout/.
-    function readBytecodeL1(
-        bool _isEVMBytecode,
-        string memory _fileName,
-        string memory _contractName
-    ) internal view returns (bytes memory) {
-        return
-            _isEVMBytecode
-                ? readFoundryBytecodeL1(_fileName, _contractName)
-                : readZKFoundryBytecodeL1(_fileName, _contractName);
+    /// @notice Read L1 creation bytecode from `out/`.
+    function readBytecodeL1(string memory _fileName, string memory _contractName) internal view returns (bytes memory) {
+        return readFoundryBytecodeL1(_fileName, _contractName);
     }
 
     function readFoundryBytecodeL1(
@@ -73,33 +40,6 @@ library BytecodeUtils {
     ) private view returns (bytes memory) {
         string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
         return readFoundryBytecode(path);
-    }
-
-    function readZKFoundryBytecodeL1(
-        string memory fileName,
-        string memory contractName
-    ) private view returns (bytes memory) {
-        string memory path = string.concat("/../l1-contracts/zkout/", fileName, "/", contractName, ".json");
-        bytes memory bytecode = readFoundryBytecode(path);
-        return bytecode;
-    }
-
-    function readZKFoundryBytecodeL2(
-        string memory fileName,
-        string memory contractName
-    ) internal view returns (bytes memory) {
-        string memory path = string.concat("/../l2-contracts/zkout/", fileName, "/", contractName, ".json");
-        bytes memory bytecode = readFoundryBytecode(path);
-        return bytecode;
-    }
-
-    function readZKFoundryBytecodeSystemContracts(
-        string memory fileName,
-        string memory contractName
-    ) internal view returns (bytes memory) {
-        string memory path = string.concat("/../system-contracts/zkout/", fileName, "/", contractName, ".json");
-        bytes memory bytecode = readFoundryBytecode(path);
-        return bytecode;
     }
 
     // ======================== Deployed bytecode reading ========================
@@ -111,41 +51,28 @@ library BytecodeUtils {
         return vm.parseJsonBytes(json, ".deployedBytecode.object");
     }
 
-    /// @notice Read L1 deployed bytecode from the correct artifact directory.
-    ///         EVM bytecodes → out/ (EVM deployed bytecode), ZK bytecodes → zkout/ (ZK creation bytecode).
+    /// @notice Read L1 deployed bytecode from `out/`.
     function readDeployedBytecodeL1(
-        bool _isEVMBytecode,
         string memory _fileName,
         string memory _contractName
     ) internal view returns (bytes memory) {
-        if (_isEVMBytecode) {
-            string memory path = string.concat("/../l1-contracts/out/", _fileName, "/", _contractName, ".json");
-            return readFoundryDeployedBytecode(path);
-        }
-        return readZKFoundryBytecodeL1(_fileName, _contractName);
+        string memory path = string.concat("/../l1-contracts/out/", _fileName, "/", _contractName, ".json");
+        return readFoundryDeployedBytecode(path);
     }
 
     // ======================== Bytecode hashing ========================
 
-    /// @notice Hash bytecode using the VM-appropriate algorithm.
-    ///         ZK bytecodes: L2ContractHelper.hashL2Bytecode (ZK bytecode hash).
-    ///         EVM bytecodes: keccak256 of the bytecode.
-    function hashBytecode(bool _isEVMBytecode, bytes memory _bytecode) internal pure returns (bytes32) {
-        if (_isEVMBytecode) {
-            return keccak256(_bytecode);
-        }
-        return L2ContractHelper.hashL2Bytecode(_bytecode);
+    /// @notice Hash bytecode (keccak256).
+    function hashBytecode(bytes memory _bytecode) internal pure returns (bytes32) {
+        return keccak256(_bytecode);
     }
 
-    /// @notice Read and hash deployed bytecode in one call.
-    ///         ZK bytecodes: L2ContractHelper.hashL2Bytecode of ZK creation bytecode.
-    ///         EVM bytecodes: keccak256 of EVM deployed bytecode.
+    /// @notice Read and hash deployed bytecode (keccak256) in one call.
     function getDeployedBytecodeHash(
-        bool _isEVMBytecode,
         string memory _fileName,
         string memory _contractName
     ) internal view returns (bytes32) {
-        return hashBytecode(_isEVMBytecode, readDeployedBytecodeL1(_isEVMBytecode, _fileName, _contractName));
+        return hashBytecode(readDeployedBytecodeL1(_fileName, _contractName));
     }
 
     function compareStrings(string memory a, string memory b) internal pure returns (bool) {

@@ -7,7 +7,6 @@ on:
   pull_request:
     paths:
       - ".github/workflows/anvil-interop-ci.yaml"
-      - ".github/actions/install-zksync-foundry/**"
       - "l1-contracts/contracts/**"
       - "l1-contracts/deploy-scripts/**"
       - "l1-contracts/lib/**"
@@ -16,21 +15,7 @@ on:
       - "l1-contracts/foundry.toml"
       - "l1-contracts/hardhat.config.ts"
       - "l1-contracts/package.json"
-      - "l2-contracts/contracts/**"
-      - "l2-contracts/lib/**"
-      - "l2-contracts/src/**"
-      - "l2-contracts/test/**"
-      - "l2-contracts/foundry.toml"
-      - "l2-contracts/hardhat.config.ts"
-      - "l2-contracts/package.json"
-      - "system-contracts/bootloader/**"
-      - "system-contracts/contracts/**"
-      - "system-contracts/lib/**"
-      - "system-contracts/scripts/**"
-      - "system-contracts/test/**"
-      - "system-contracts/foundry.toml"
-      - "system-contracts/hardhat.config.ts"
-      - "system-contracts/package.json"
+      - "l1-contracts/frozen-system-constants/Constants.sol"
       - "da-contracts/contracts/**"
       - "da-contracts/lib/**"
       - "da-contracts/test/**"
@@ -54,9 +39,7 @@ jobs:
           submodules: true
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: v1.5.1
+        uses: ./.github/actions/install-foundry
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -77,6 +60,11 @@ jobs:
       - name: TypeScript type check
         working-directory: l1-contracts/test/anvil-interop
         run: yarn tsc --noEmit
+
+      # Each suite covers something an ordinary run cannot fail on; see their headers.
+      - name: Unit-test the interop harness
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn test:unit
 
       - name: Run interop tests (preloaded state)
         working-directory: l1-contracts/test/anvil-interop
@@ -110,13 +98,16 @@ jobs:
         with:
           submodules: true
 
-      - name: Install Foundry (for Anvil)
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: v1.5.1
+      # The committed v31 state uses the newer Anvil trace schema, while the
+      # release bytecode is reproduced with the `build` Forge pin.
+      - name: Install Anvil toolchain (state-compatible with committed states)
+        uses: ./.github/actions/install-foundry
 
-      - name: Install foundry-zksync (for forge --zksync)
-        uses: ./.github/actions/install-zksync-foundry
+      - name: Preserve the pinned Anvil before switching to the build toolchain
+        run: cp "$(command -v anvil)" "$RUNNER_TEMP/anvil-pinned"
+
+      - name: Install foundry
+        uses: ./.github/actions/install-foundry
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -127,11 +118,14 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      # Reuses the artifacts l1-contracts-ci built for this commit rather than compiling them again.
+      # Via the action, not a bare cache restore: the prefix key can land a previous commit's `out`,
+      # and without the pruning a deleted contract's stale ABI would reach the upgrade harness.
+      - name: Warm solc build cache
+        uses: ./.github/actions/warm-solc-cache
+
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
-
-      - name: Build system-contracts artifacts
-        run: yarn sc build:foundry
 
       - name: Build l1-contracts artifacts
         run: yarn l1 build:foundry
@@ -142,6 +136,8 @@ jobs:
 
       - name: Run V31 to V32 upgrade test
         working-directory: l1-contracts/test/anvil-interop
+        env:
+          ANVIL_BIN: ${{ runner.temp }}/anvil-pinned
         run: |
           echo "Running V31 -> V32 upgrade test..."
           yarn ts-node run-v31-to-v32-upgrade-test.ts
@@ -175,10 +171,8 @@ jobs:
         with:
           submodules: true
 
-      - name: Install Foundry (no foundry-zksync — deterministic bytecode)
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: v1.5.1
+      - name: Install Anvil toolchain (deterministic bytecode)
+        uses: ./.github/actions/install-foundry
 
       - name: Use Node.js
         uses: actions/setup-node@v4

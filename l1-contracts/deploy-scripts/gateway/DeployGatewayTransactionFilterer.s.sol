@@ -33,8 +33,7 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeplo
             type(GatewayTransactionFilterer).creationCode,
             abi.encode(bridgehub, l1AssetRouter),
             "GatewayTransactionFilterer",
-            "GatewayTransactionFilterer",
-            false
+            "GatewayTransactionFilterer"
         );
 
         // Prepare the initialization calldata.
@@ -51,8 +50,7 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeplo
                 initData // initialization calldata to set chainAdmin as owner
             ),
             "TransparentUpgradeableProxy",
-            "GatewayTxFiltererProxy",
-            false
+            "GatewayTxFiltererProxy"
         );
 
         saveOutput(proxy);

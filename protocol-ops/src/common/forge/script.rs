@@ -72,14 +72,14 @@ impl ForgeScript {
         self
     }
 
-    /// Skip forge's post-run label collection. After every script run forge
-    /// queries Sourcify (+ Etherscan if a key is configured) to map every
-    /// traced address to its contract name. Those lookups frequently hang
-    /// for 5–30+ minutes per CTM today, even though the underlying script
-    /// work has finished. `--disable-labels` skips the lookups entirely;
-    /// `--silent` only suppresses the printout (the work still runs).
-    pub fn with_disable_labels(mut self) -> Self {
-        self.args.add_arg(ForgeScriptArg::DisableLabels);
+    /// Run forge without ancillary network access (`--offline`). This skips
+    /// the post-run Sourcify/Etherscan label lookups that frequently hang for
+    /// 5–30+ minutes per CTM even though the underlying script work has
+    /// finished (`--silent` only suppresses the printout — the work still
+    /// runs). RPC traffic to the target chain is unaffected; solc must
+    /// already be installed.
+    pub fn with_offline(mut self) -> Self {
+        self.args.add_arg(ForgeScriptArg::Offline);
         self
     }
 
@@ -230,10 +230,9 @@ pub enum ForgeScriptArg {
     GasLimit {
         gas_limit: u64,
     },
-    DisableLabels,
+    Offline,
     Silent,
     Unlocked,
-    Zksync,
     #[strum(to_string = "skip={skip_path}")]
     Skip {
         skip_path: String,
@@ -259,8 +258,6 @@ pub struct ForgeScriptArgs {
     /// Verifier API key
     #[clap(long)]
     pub verifier_api_key: Option<String>,
-    #[clap(long)]
-    pub zksync: bool,
     /// List of additional arguments that can be passed through the CLI.
     ///
     /// e.g.: `[COMMAND] -a --with-gas-price=4000000000`
@@ -274,10 +271,6 @@ impl ForgeScriptArgs {
     pub fn build(&mut self) -> Vec<String> {
         self.add_verify_args();
         self.cleanup_contract_args();
-        if self.zksync {
-            self.add_arg(ForgeScriptArg::Zksync);
-        }
-
         self.args
             .iter()
             .map(|arg| arg.to_string())

@@ -38,25 +38,14 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
         override
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
     {
-        if (config.isZKsyncOS) {
-            return new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
-        }
-
-        return buildEraUniversalForceDeployments(getV31AdditionalFactoryDependencyContracts());
+        return new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
     }
 
     function getV31L2UpgradeCalldata() internal view returns (bytes memory) {
-        return abi.encodeCall(IL2V32Upgrade.upgrade, (config.isZKsyncOS, address(0), "", ""));
+        return abi.encodeCall(IL2V32Upgrade.upgrade, (true, address(0), "", ""));
     }
 
-    function getEraL2UpgradeTargetAndData(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
-    ) internal view override returns (address, bytes memory) {
-        return
-            getComplexUpgraderTargetAndData(_deployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, getV31L2UpgradeCalldata());
-    }
-
-    function getZKsyncOSL2UpgradeTargetAndData(
+    function getL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal view override returns (address, bytes memory) {
         return

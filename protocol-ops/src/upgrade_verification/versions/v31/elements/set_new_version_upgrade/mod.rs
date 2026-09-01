@@ -6,17 +6,16 @@
 //! `forceDeployAndUpgrade(Universal)` inner call, factory deps, and the
 //! `IL2V32Upgrade.upgrade` arguments.
 //!
-//! The flavor split lives in submodules:
-//! - [`era`] — Era-VM expected force-deployments, `L2ChainAssetHandler` input
-//!   shape, Era factory-dep set, and the Era `forceDeployAndUpgrade` orchestrator.
-//! - [`zksync_os`] — ZKsync OS expected force-deployments, deployed-bytecode-info
-//!   decoding, ZKsync OS factory-dep set, and the ZKsync OS
-//!   `forceDeployAndUpgradeUniversal` orchestrator.
+//! The flavor-specific logic lives in the [`zksync_os`] submodule — expected
+//! force-deployments, deployed-bytecode-info decoding, the ZKsync OS
+//! factory-dep set, and the `forceDeployAndUpgradeUniversal` orchestrator.
+//! (The Era-VM arm was removed together with the rest of the Era CTM
+//! verification in the OS-only build.)
 //!
 //! This module owns the shared `sol!` types (re-exported under the module
 //! path for external consumers like `governance_stage_calls`), the
-//! `ProposedUpgrade` impl that dispatches by flavor, `verify_factory_deps`,
-//! and `verify_l2_v31_upgrade_inner_calldata` (used by both flavors).
+//! `ProposedUpgrade` impl, `verify_factory_deps`, and
+//! `verify_l2_v31_upgrade_inner_calldata`.
 
 use alloy::{
     hex,
@@ -29,17 +28,14 @@ use std::collections::HashSet;
 use crate::upgrade_verification::{
     artifacts::CtmFlavor,
     constants::{
-        BOOTLOADER_CONTRACT, DEFAULT_ACCOUNT_CONTRACT, ERA_SYSTEM_UPGRADE_TX_TYPE,
-        EVM_EMULATOR_CONTRACT, L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR,
-        L2_UPGRADE_GAS_LIMIT, L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT,
-        ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE,
+        L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_UPGRADE_GAS_LIMIT,
+        L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT, ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE,
     },
     verifiers::{VerificationResult, Verifiers},
 };
 
 use super::{fixed_force_deployment::FixedForceDeploymentsData, protocol_version::ProtocolVersion};
 
-mod era;
 mod zksync_os;
 
 sol! {
@@ -180,15 +176,6 @@ sol! {
     }
 }
 
-/// Selects which `BytecodesSupplier` mapping (and which bytecode-verifier
-/// lookup table) to consult for a factoryDep hash. Era L2 uses ZK bytecodes;
-/// ZKsync OS L2 uses EVM-shaped bytecodes.
-#[derive(Debug, Clone, Copy)]
-pub(super) enum FactoryDepHashKind {
-    EraZkBytecode,
-    ZksyncOsEvmBytecode,
-}
-
 impl ProposedUpgrade {
     /// Top-level entry: dispatches `verify_static_fields` (bytecode hashes
     /// per flavor + empty-field invariants) and `verify_l2_protocol_upgrade_tx`
@@ -206,7 +193,7 @@ impl ProposedUpgrade {
         let initial_error_count = result.errors;
         let expected_version = ProtocolVersion::from(expected_new_protocol_version);
 
-        self.verify_static_fields(result, verifiers, expected_new_protocol_version, ctm_flavor);
+        self.verify_static_fields(result, expected_new_protocol_version, ctm_flavor);
         self.verify_l2_protocol_upgrade_tx(
             verifiers,
             result,
@@ -227,20 +214,10 @@ impl ProposedUpgrade {
     fn verify_static_fields(
         &self,
         result: &mut VerificationResult,
-        verifiers: &Verifiers,
         expected_new_protocol_version: U256,
         ctm_flavor: CtmFlavor,
     ) {
         match ctm_flavor {
-            CtmFlavor::Era => {
-                result.expect_zk_bytecode(verifiers, &self.bootloaderHash, BOOTLOADER_CONTRACT);
-                result.expect_zk_bytecode(
-                    verifiers,
-                    &self.defaultAccountHash,
-                    DEFAULT_ACCOUNT_CONTRACT,
-                );
-                result.expect_zk_bytecode(verifiers, &self.evmEmulatorHash, EVM_EMULATOR_CONTRACT);
-            }
             CtmFlavor::ZksyncOs => {
                 expect_zero_bytecode_hash(result, &self.bootloaderHash, "ZKsync OS bootloaderHash");
                 expect_zero_bytecode_hash(
@@ -291,11 +268,10 @@ impl ProposedUpgrade {
         }
     }
 
-    /// Validates the canonical L2 tx shape, then dispatches strictly on the
-    /// CTM flavor: Era expects `(txType=254, data=forceDeployAndUpgrade)`,
-    /// ZKsync OS expects `(txType=126, data=forceDeployAndUpgradeUniversal)`.
-    /// Mismatched `(flavor, txType)` or `(flavor, inner-data selector)` pairs
-    /// are rejected explicitly rather than via decode failure.
+    /// Validates the canonical L2 tx shape, then the ZKsync OS payload:
+    /// `(txType=126, data=forceDeployAndUpgradeUniversal)`. A mismatched
+    /// txType or inner-data selector is rejected explicitly rather than via
+    /// decode failure.
     #[allow(clippy::too_many_arguments)]
     async fn verify_l2_protocol_upgrade_tx(
         &self,
@@ -364,42 +340,6 @@ impl ProposedUpgrade {
         }
 
         match ctm_flavor {
-            CtmFlavor::Era => {
-                if tx.txType != U256::from(ERA_SYSTEM_UPGRADE_TX_TYPE) {
-                    result.report_error(&format!(
-                        "Era L2 upgrade tx must use txType {ERA_SYSTEM_UPGRADE_TX_TYPE}, got {}",
-                        tx.txType
-                    ));
-                }
-                let decoded =
-                    match IComplexUpgrader::forceDeployAndUpgradeCall::abi_decode(&tx.data) {
-                        Ok(decoded) => decoded,
-                        Err(err) => {
-                            result.report_error(&format!(
-                            "Era L2 upgrade tx data must decode as forceDeployAndUpgrade: {err}"
-                        ));
-                            return Ok(());
-                        }
-                    };
-                verify_factory_deps(
-                    verifiers,
-                    result,
-                    &tx.factoryDeps,
-                    era::EXPECTED_V31_ERA_BYTECODES,
-                    "Era",
-                    bytecodes_supplier_addr,
-                    FactoryDepHashKind::EraZkBytecode,
-                )
-                .await;
-                era::verify_era_force_deploy_and_upgrade(
-                    verifiers,
-                    result,
-                    &decoded,
-                    expected_fixed_force_deployments_data,
-                )
-                .await?;
-                result.report_ok("Decoded Era forceDeployAndUpgrade L2 upgrade tx");
-            }
             CtmFlavor::ZksyncOs => {
                 if tx.txType != U256::from(ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE) {
                     result.report_error(&format!(
@@ -425,7 +365,6 @@ impl ProposedUpgrade {
                     zksync_os::EXPECTED_V31_ZKSYNC_OS_BYTECODES,
                     "ZKsync OS",
                     bytecodes_supplier_addr,
-                    FactoryDepHashKind::ZksyncOsEvmBytecode,
                 )
                 .await;
                 zksync_os::verify_zksync_os_force_deploy_and_upgrade(
@@ -454,7 +393,6 @@ async fn verify_factory_deps(
     expected_bytecodes: &[&str],
     label: &str,
     bytecodes_supplier_addr: Option<Address>,
-    hash_kind: FactoryDepHashKind,
 ) {
     let expected_bytecodes: HashSet<&str> = expected_bytecodes.iter().copied().collect();
     let mut actual_bytecodes = HashSet::new();
@@ -462,7 +400,7 @@ async fn verify_factory_deps(
 
     for dep in factory_deps {
         let dep = fixed_bytes_from_u256(dep);
-        match bytecode_hash_to_file(verifiers, &dep, hash_kind) {
+        match bytecode_hash_to_file(verifiers, &dep) {
             Some(file_name) => {
                 if !expected_bytecodes.contains(file_name.as_str()) {
                     errors += 1;
@@ -517,17 +455,11 @@ async fn verify_factory_deps(
         let mut publish_errors = 0usize;
         for dep in factory_deps {
             let dep = fixed_bytes_from_u256(dep);
-            let publishing_block = match hash_kind {
-                FactoryDepHashKind::EraZkBytecode => supplier.publishingBlock(dep).call().await,
-                FactoryDepHashKind::ZksyncOsEvmBytecode => {
-                    supplier.evmPublishingBlock(dep).call().await
-                }
-            };
-            match publishing_block {
+            match supplier.evmPublishingBlock(dep).call().await {
                 Ok(block) if block != U256::ZERO => {}
                 Ok(_) => {
                     publish_errors += 1;
-                    let dep_label = bytecode_hash_to_file(verifiers, &dep, hash_kind)
+                    let dep_label = bytecode_hash_to_file(verifiers, &dep)
                         .cloned()
                         .unwrap_or_else(|| format!("0x{dep:x}"));
                     result.report_error(&format!(
@@ -536,12 +468,8 @@ async fn verify_factory_deps(
                 }
                 Err(err) => {
                     publish_errors += 1;
-                    let mapping_name = match hash_kind {
-                        FactoryDepHashKind::EraZkBytecode => "publishingBlock",
-                        FactoryDepHashKind::ZksyncOsEvmBytecode => "evmPublishingBlock",
-                    };
                     result.report_error(&format!(
-                        "BytecodesSupplier.{mapping_name} call failed for {label} factoryDep 0x{dep:x}: {err}"
+                        "BytecodesSupplier.evmPublishingBlock call failed for {label} factoryDep 0x{dep:x}: {err}"
                     ));
                 }
             }
@@ -556,9 +484,8 @@ async fn verify_factory_deps(
 }
 
 /// Decodes the `IL2V32Upgrade.upgrade(...)` inner calldata from the
-/// `forceDeployAndUpgrade(Universal)` `_calldata` argument and validates each
-/// field. Shared by both Era and ZKsync OS paths — they only differ in the
-/// expected value of `_isZKsyncOS`.
+/// `forceDeployAndUpgradeUniversal` `_calldata` argument and validates each
+/// field.
 pub(super) async fn verify_l2_v31_upgrade_inner_calldata(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
@@ -625,16 +552,10 @@ fn fixed_bytes_from_u256(value: &U256) -> FixedBytes<32> {
 fn bytecode_hash_to_file<'a>(
     verifiers: &'a Verifiers,
     bytecode_hash: &FixedBytes<32>,
-    hash_kind: FactoryDepHashKind,
 ) -> Option<&'a String> {
-    match hash_kind {
-        FactoryDepHashKind::EraZkBytecode => verifiers
-            .bytecode_verifier
-            .zk_bytecode_hash_to_file(bytecode_hash),
-        FactoryDepHashKind::ZksyncOsEvmBytecode => verifiers
-            .bytecode_verifier
-            .evm_deployed_bytecode_hash_to_file(bytecode_hash),
-    }
+    verifiers
+        .bytecode_verifier
+        .evm_deployed_bytecode_hash_to_file(bytecode_hash)
 }
 
 fn expect_zero_bytecode_hash(

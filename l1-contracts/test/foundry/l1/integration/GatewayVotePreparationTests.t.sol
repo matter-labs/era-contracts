@@ -273,8 +273,6 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
 
         vm.serializeAddress("gw_vote_prep", "owner_address", addresses.bridgehub.owner());
         vm.serializeBool("gw_vote_prep", "testnet_verifier", true);
-        vm.serializeBool("gw_vote_prep", "support_l2_legacy_shared_bridge_test", false);
-        vm.serializeBool("gw_vote_prep", "is_zk_sync_os", true);
         vm.serializeAddress("gw_vote_prep", "refund_recipient", address(0xBEEF));
         vm.serializeUint("gw_vote_prep", "gateway_chain_id", GATEWAY_CHAIN_ID);
         vm.serializeBytes("gw_vote_prep", "force_deployments_data", hex"00");

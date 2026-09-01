@@ -19,7 +19,6 @@ use crate::{
             address_verifier::AddressVerifier,
             apply_l2_to_l1_alias,
             bytecode_verifier::BytecodeVerifier,
-            fee_param_verifier::FeeParamVerifier,
             get_contents_from_github,
             network_verifier::{Bridgehub as BridgehubContract, NetworkVerifier},
             repo_relative_path,
@@ -39,9 +38,7 @@ pub(crate) struct Verifiers {
     pub address_verifier: AddressVerifier,
     pub bytecode_verifier: BytecodeVerifier,
     pub network_verifier: NetworkVerifier,
-    pub era_genesis_config: GenesisConfig,
     pub zksync_os_genesis_config: GenesisConfig,
-    pub fee_param_verifier: FeeParamVerifier,
     pub era_chain_id: u64,
     pub legacy_gateway_chain_id: u64,
     pub legacy_gateway_chain_intervals: Vec<ChainInterval>,
@@ -58,14 +55,12 @@ pub(crate) struct Verifiers {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum GenesisConfigKind {
-    Era,
     ZksyncOs,
 }
 
 impl GenesisConfigKind {
     fn local_path(self) -> &'static str {
         match self {
-            Self::Era => "configs/genesis/era/latest.json",
             Self::ZksyncOs => "configs/genesis/zksync-os/latest.json",
         }
     }
@@ -118,9 +113,6 @@ impl Verifiers {
             network_verifier.get_gateway_chain_id(),
             new_gateway_chain_id,
         );
-        let fee_param_verifier =
-            FeeParamVerifier::safe_init(&bridgehub_address, &network_verifier, contracts_commit)
-                .await?;
         let new_gateway_representative_ctm = network_verifier
             .try_get_chain_type_manager_from_bridgehub(
                 bridgehub_address,
@@ -181,8 +173,6 @@ impl Verifiers {
             "aliased_protocol_upgrade_handler_proxy",
         );
 
-        let era_genesis_config =
-            GenesisConfig::init_v31(GenesisConfigKind::Era, contracts_commit).await?;
         let zksync_os_genesis_config =
             GenesisConfig::init_v31(GenesisConfigKind::ZksyncOs, contracts_commit).await?;
 
@@ -193,9 +183,7 @@ impl Verifiers {
             address_verifier,
             bytecode_verifier,
             network_verifier,
-            era_genesis_config,
             zksync_os_genesis_config,
-            fee_param_verifier,
             era_chain_id,
             legacy_gateway_chain_id,
             legacy_gateway_chain_intervals: legacy_gateway_chain_intervals.to_vec(),
@@ -210,7 +198,6 @@ impl Verifiers {
 
     pub(crate) fn genesis_config_for_ctm(&self, flavor: CtmFlavor) -> &GenesisConfig {
         match flavor {
-            CtmFlavor::Era => &self.era_genesis_config,
             CtmFlavor::ZksyncOs => &self.zksync_os_genesis_config,
         }
     }
@@ -219,10 +206,9 @@ impl Verifiers {
 #[derive(Debug, Clone, Deserialize)]
 pub struct GenesisConfig {
     pub genesis_root: String,
+    /// Absent from ZKsync OS genesis configs; consumers default it to 0.
     #[serde(default)]
     pub genesis_rollup_leaf_index: Option<u64>,
-    #[serde(default)]
-    pub genesis_batch_commitment: Option<String>,
 }
 
 impl GenesisConfig {
@@ -322,39 +308,6 @@ impl VerificationResult {
                     Location::caller()
                 ));
                 false
-            }
-        }
-    }
-
-    #[track_caller]
-    pub(crate) fn expect_zk_bytecode(
-        &mut self,
-        verifiers: &Verifiers,
-        bytecode_hash: &FixedBytes<32>,
-        expected: &str,
-    ) {
-        match verifiers
-            .bytecode_verifier
-            .zk_bytecode_hash_to_file(bytecode_hash)
-        {
-            Some(file_name) if file_name == expected => {
-                // All good.
-            }
-            Some(file_name) => {
-                self.report_error(&format!(
-                    "Expected bytecode {}, got {} at {}",
-                    expected,
-                    file_name,
-                    Location::caller()
-                ));
-            }
-            None => {
-                self.report_error(&format!(
-                    "Cannot verify bytecode hash: {} - expected {} at {}",
-                    bytecode_hash,
-                    expected,
-                    Location::caller()
-                ));
             }
         }
     }

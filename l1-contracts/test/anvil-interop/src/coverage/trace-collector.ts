@@ -10,7 +10,7 @@
  * to return non-empty structLogs.
  */
 
-import { providers } from "ethers";
+import { createProvider } from "../core/utils";
 
 /** Per-contract execution data: set of PCs that were executed */
 export type ContractPCs = Map<string, Set<number>>;
@@ -68,14 +68,68 @@ function extractCallTarget(log: StructLog): string | null {
  * @param label - Human-readable chain label for logging
  * @returns Map of lowercase address -> set of executed PCs
  */
-export async function collectChainTraces(rpcUrl: string, label: string): Promise<ContractPCs> {
-  const provider = new providers.JsonRpcProvider(rpcUrl);
+/** What a chain's trace collection actually managed to do, so callers can tell failure from silence. */
+export interface ChainTraceResult {
+  contractPCs: ContractPCs;
+  /** Transactions found on the chain. */
+  transactions: number;
+  /** Transactions whose debug_traceTransaction call failed. */
+  traceFailures: number;
+}
+
+/**
+ * Fails when a run executed transactions but produced nothing usable.
+ *
+ * Per-transaction trace errors are only warnings — one odd transaction should not sink a run — but
+ * that means a systemic regression (steps-tracing not enabled, an Anvil API change, a wrong RPC)
+ * looks exactly like "no coverage": an LCOV is still written, the mergers only check that the file
+ * exists, and coverage-report goes green with a zero-hit Anvil contribution.
+ */
+export function assertTracesUsable(stats: {
+  transactions: number;
+  traceFailures: number;
+  tracedContracts: number;
+  hitSourceFiles: number;
+}): void {
+  if (stats.transactions === 0) {
+    // Not a failure at this level: some specs only read. 04-gateway-setup and
+    // 01-deployment-verification assert over state the pre-generated snapshots already contain, so
+    // they transact nothing and a per-shard error here fails them on principle — as an earlier
+    // version of this guard did. Whether a *run* saw no transactions at all is the meaningful
+    // signal, and assertMergedCoverageUsable checks that once the shards are merged.
+    console.warn("  ⚠️  No transactions on these chains; this shard contributes no coverage.");
+    return;
+  }
+
+  if (stats.traceFailures === stats.transactions) {
+    throw new Error(
+      `Coverage collection failed: all ${stats.transactions} transaction trace(s) errored. ` +
+        "Is Anvil running with --steps-tracing (ANVIL_COVERAGE_MODE=1)?"
+    );
+  }
+  if (stats.tracedContracts === 0) {
+    throw new Error(
+      `Coverage collection produced no trace data from ${stats.transactions} transaction(s) ` +
+        `(${stats.traceFailures} trace call(s) failed). Refusing to write an empty report.`
+    );
+  }
+  if (stats.hitSourceFiles === 0) {
+    throw new Error(
+      `Coverage collection traced ${stats.tracedContracts} contract(s) from ${stats.transactions} ` +
+        "transaction(s) but mapped none of them to source lines. Refusing to write an empty report."
+    );
+  }
+}
+
+export async function collectChainTraces(rpcUrl: string, label: string): Promise<ChainTraceResult> {
+  const provider = createProvider(rpcUrl);
   const contractPCs: ContractPCs = new Map();
 
   const blockNumber = await provider.getBlockNumber();
   console.log(`  📊 ${label}: scanning ${blockNumber} blocks...`);
 
   let totalTxs = 0;
+  let traceFailures = 0;
   let totalOps = 0;
 
   for (let i = 0; i <= blockNumber; i++) {
@@ -137,6 +191,7 @@ export async function collectChainTraces(rpcUrl: string, label: string): Promise
           }
         }
       } catch (err: unknown) {
+        traceFailures++;
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(`  ⚠️  Failed to trace tx ${txHash}: ${msg}`);
       }
@@ -144,9 +199,10 @@ export async function collectChainTraces(rpcUrl: string, label: string): Promise
   }
 
   console.log(
-    `  📊 ${label}: traced ${totalTxs} transactions, ${totalOps} opcodes across ${contractPCs.size} contracts`
+    `  📊 ${label}: traced ${totalTxs} transactions, ${totalOps} opcodes across ${contractPCs.size} contracts` +
+      (traceFailures > 0 ? ` (${traceFailures} trace call(s) failed)` : "")
   );
-  return contractPCs;
+  return { contractPCs, transactions: totalTxs, traceFailures };
 }
 
 /**

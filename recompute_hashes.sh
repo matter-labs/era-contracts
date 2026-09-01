@@ -3,13 +3,22 @@
 
 set -e
 
-# Expected Foundry version and commit
-EXPECTED_VERSION="forge Version: 1.3.5-foundry-zksync-v0.1.5"
-EXPECTED_COMMIT="807f47ace"
+# Expected Foundry version and commit, read from the single source of truth
+# shared with CI and the Docker images.
+VERSIONS_FILE="$(dirname "${BASH_SOURCE[0]:-$0}")/.github/foundry-versions.env"
+if [ ! -f "$VERSIONS_FILE" ]; then
+  echo "error: cannot find $VERSIONS_FILE" >&2
+  exit 1
+fi
+# shellcheck source=.github/foundry-versions.env
+. "$VERSIONS_FILE"
+BARE_VERSION="${FOUNDRY_VERSION#v}"
+EXPECTED_VERSION="forge Version: ${BARE_VERSION}-${FOUNDRY_VERSION}"
+EXPECTED_COMMIT="${FOUNDRY_COMMIT}"
 
 # Check if Foundry is installed
 if ! command -V forge &> /dev/null; then
-  echo "Foundry is not installed. Please install it using \"foundryup-zksync -i 0.1.5\"."
+  echo "Foundry is not installed. Please install upstream Foundry ${FOUNDRY_VERSION}."
   exit 1
 fi
 
@@ -22,7 +31,7 @@ if [[ "$FORGE_VERSION" != "$EXPECTED_VERSION" ]]; then
   echo "Incorrect Foundry version."
   echo "Expected: ${EXPECTED_VERSION}"
   echo "Found:    ${FORGE_VERSION}"
-  echo "Run: foundryup-zksync -i 0.1.5"
+  echo "Install upstream Foundry ${FOUNDRY_VERSION}."
   exit 1
 fi
 
@@ -32,7 +41,7 @@ if [[ "$FORGE_COMMIT" != "$EXPECTED_COMMIT" && "$FORGE_COMMIT" != "VERGEN_ID" ]]
   echo "Incorrect Foundry commit."
   echo "Expected: ${EXPECTED_COMMIT}"
   echo "Found:    ${FORGE_COMMIT}"
-  echo "Run: foundryup-zksync --commit ${EXPECTED_COMMIT}"
+  echo "Install upstream Foundry ${FOUNDRY_VERSION}."
   exit 1
 fi
 
@@ -46,19 +55,11 @@ git submodule update --init --recursive
 
 yarn
 
-# Cleanup everything and recompile
-yarn --cwd da-contracts clean
+# Clean and rebuild the ordinary-EVM artifact roots.
 forge clean --root da-contracts
-yarn --cwd l1-contracts clean
 forge clean --root l1-contracts
-yarn --cwd l2-contracts clean
-forge clean --root l2-contracts
-yarn --cwd system-contracts clean
-forge clean --root system-contracts
 
 yarn --cwd da-contracts build:foundry
 yarn --cwd l1-contracts build:foundry
-yarn --cwd l2-contracts build:foundry
-yarn --cwd system-contracts build:foundry
 
 yarn calculate-hashes:fix

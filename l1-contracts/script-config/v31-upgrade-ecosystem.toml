@@ -2,7 +2,6 @@ era_chain_id = 271
 owner_address = "0x624c41d3a2f76bb06fd363ae050d39f08557cba7"
 testnet_verifier = true
 governance_upgrade_timer_initial_delay = 0
-support_l2_legacy_shared_bridge_test = false
 old_protocol_version = "0x1c00000000"
 priority_txs_l2_gas_limit = 800
 max_expected_l1_gas_price = 10000000000

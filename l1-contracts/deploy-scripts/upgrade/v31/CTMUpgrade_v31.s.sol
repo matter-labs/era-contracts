@@ -8,7 +8,6 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {Utils} from "../../utils/Utils.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
@@ -33,7 +32,6 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         initializeWithArgs(
             _params.ctmProxy,
             _params.bytecodesSupplier,
-            _params.isZKsyncOS,
             _params.rollupDAManager,
             _params.create2FactorySalt,
             _params.upgradeInputPath,
@@ -57,7 +55,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     /// @notice Deploy everything that should be deployed
     function deployNewCTMContracts() public virtual override {
         (ctmAddresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
-        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
+        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
 
         deployVerifiers();
 
@@ -78,38 +76,27 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             ctmAddresses.stateTransition.proxies.permissionlessValidator != address(0),
             "CTM has no PermissionlessValidator registered; it is expected from v31 on"
         );
-        ctmAddresses.stateTransition.implementations.bytecodesSupplier = deploySimpleContract(
-            "BytecodesSupplier",
-            false
-        );
+        ctmAddresses.stateTransition.implementations.bytecodesSupplier = deploySimpleContract("BytecodesSupplier");
         ctmAddresses.stateTransition.implementations.permissionlessValidator = deploySimpleContract(
-            "PermissionlessValidator",
-            false
+            "PermissionlessValidator"
         );
 
         // Deploy new ChainTypeManager implementation
         // The constructor will receive the new BytecodesSupplier and PermissionlessValidator proxy addresses.
-        // Select the correct ChainTypeManager based on chain type (Era vs ZKsyncOS)
         // FIXME we never actually use deploySimpleContract or deploy TUPP with anything else than false. We need to clean this code.
-        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(
-            config.isZKsyncOS,
-            CTMContract.ChainTypeManager
-        );
+        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
         console.log("Deploying ChainTypeManager:", ctmContractName);
-        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
+        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName);
 
         // Deploy new ServerNotifier implementation
-        ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier", false);
+        ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier");
 
         // v31 adds `UPGRADER_ROLE` + `upgradeChainFromVersion()` (IChainUpgrader) to ValidatorTimelock;
         // existing chains' proxy still points at the v30 impl, so swap it under the same CREATE2 flow.
         // Deploy `MultisigCommitter` (a superset of ValidatorTimelock) as the default validator impl so the
         // upgrade does NOT downgrade proxies that already run a MultisigCommitter — the v31 stage-1 upgrade
         // previously deployed plain `ValidatorTimelock` here, which silently dropped multisig-commit support.
-        ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract(
-            "MultisigCommitter",
-            false
-        );
+        ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract("MultisigCommitter");
 
         deployStateTransitionDiamondFacets();
     }
@@ -160,18 +147,14 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     }
 
     /// @notice Override to deploy the per-chain upgrade contract.
-    /// @dev Only ZKsync OS chains can be upgraded onto this release. There is no Era counterpart, and
-    ///      falling back to the v31 one would generate an upgrade that re-runs v31's one-time work, so this
-    ///      refuses to produce anything for Era instead.
+    /// @dev Only ZKsync OS chains can be upgraded onto this release (enforced in `initializeConfig`).
     function deployUsedUpgradeContract() internal virtual override returns (address) {
-        require(config.isZKsyncOS, "Upgrading Era chains onto this release is not supported");
-
         // The registry must exist first: the v32 upgrade contract embeds its address as an immutable.
-        priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound", false);
+        priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound");
         console.log("Deployed PriorityOpLowerBound at", priorityOpLowerBound);
 
         console.log("Deploying V32UpgradeZKsyncOS");
-        return deploySimpleContract("V32UpgradeZKsyncOS", false);
+        return deploySimpleContract("V32UpgradeZKsyncOS");
     }
 
     function getV31AdditionalFactoryDependencyContracts()
@@ -196,11 +179,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         override
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
     {
-        if (config.isZKsyncOS) {
-            return getV31AdditionalZKsyncOSUniversalForceDeployments();
-        }
-
-        return buildEraUniversalForceDeployments(getV31AdditionalFactoryDependencyContracts());
+        return getV31AdditionalZKsyncOSUniversalForceDeployments();
     }
 
     function getV31L2UpgradeCalldata() internal returns (bytes memory) {
@@ -210,20 +189,8 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         return
             abi.encodeCall(
                 IL2V32Upgrade.upgrade,
-                (
-                    config.isZKsyncOS,
-                    coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
-                    generatedData.forceDeploymentsData,
-                    ""
-                )
+                (true, coreAddresses.bridgehub.proxies.ctmDeploymentTracker, generatedData.forceDeploymentsData, "")
             );
-    }
-
-    function getEraL2UpgradeTargetAndData(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
-    ) internal virtual override returns (address, bytes memory) {
-        return
-            getComplexUpgraderTargetAndData(_deployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, getV31L2UpgradeCalldata());
     }
 
     /// @notice V31-specific: include L2V32Upgrade as an additional ZKsyncOS force deployment.
@@ -243,7 +210,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         });
     }
 
-    function getZKsyncOSL2UpgradeTargetAndData(
+    function getL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual override returns (address, bytes memory) {
         // For ZKsyncOS, the delegateTo address is a derived address (not the constant

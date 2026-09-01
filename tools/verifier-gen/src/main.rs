@@ -24,7 +24,6 @@ use structopt::StructOpt;
 
 #[derive(Debug, Clone)]
 enum Variant {
-    Era,
     ZKsyncOS,
     Custom,
 }
@@ -34,11 +33,10 @@ impl FromStr for Variant {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "era" => Ok(Variant::Era),
             "zksync-os" | "zksyncos" => Ok(Variant::ZKsyncOS),
             "custom" => Ok(Variant::Custom),
             _ => Err(format!(
-                "Invalid variant '{}'. Valid options: era, zksync-os, custom",
+                "Invalid variant '{}'. Valid options: zksync-os, custom",
                 s
             )),
         }
@@ -51,7 +49,7 @@ impl FromStr for Variant {
     about = "Tool for generating verifier contract using scheduler json key"
 )]
 struct Opt {
-    /// Variant to use: era, zksync-os, or custom
+    /// Variant to use: zksync-os or custom
     #[structopt(long = "variant", default_value = "custom")]
     variant: Variant,
 
@@ -86,14 +84,6 @@ struct ResolvedPaths {
 
 fn resolve_paths(opt: &Opt) -> ResolvedPaths {
     match opt.variant {
-        Variant::Era => ResolvedPaths {
-            plonk_input: "data/Era_plonk_scheduler_key.json".to_string(),
-            plonk_output: "data/EraVerifierPlonk.sol".to_string(),
-            fflonk: Some((
-                "data/Era_fflonk_scheduler_key.json".to_string(),
-                "data/EraVerifierFflonk.sol".to_string(),
-            )),
-        },
         Variant::ZKsyncOS => ResolvedPaths {
             plonk_input: "data/ZKsyncOS_plonk_scheduler_key.json".to_string(),
             plonk_output: "data/ZKsyncOSVerifierPlonk.sol".to_string(),
@@ -112,7 +102,6 @@ fn resolve_paths(opt: &Opt) -> ResolvedPaths {
 
 fn resolve_contract_name(variant: &Variant) -> String {
     match variant {
-        Variant::Era => "Era".to_string(),
         Variant::ZKsyncOS => "ZKsyncOS".to_string(),
         Variant::Custom => "".to_string(),
     }

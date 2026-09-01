@@ -11,21 +11,10 @@ owner_address = "0x0000000000000000000000000000000000000000"
 pre_v32_introspection = true
 
 # The sections below mirror the shape of a production upgrade input so the same scripts can read this file.
-# Of them, only `pre_v32_introspection` above and `contracts.new_protocol_version` below are consumed by
-# this scenario; the rest are placeholders.
+# Only `pre_v32_introspection` above and `contracts.new_protocol_version` below are consumed; the genesis
+# and recursion-vk placeholders that used to sit here were read by nothing and have been dropped.
 [chain]
 chain_id = 10
 
 [contracts]
-
-genesis_root = "0x0000000000000000000000000000000000000000000000000000000000000000"
-genesis_rollup_leaf_index = 0
-genesis_batch_commitment = "0x0000000000000000000000000000000000000000000000000000000000000000"
-recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-bootloader_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-default_aa_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-evm_emulator_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-latest_protocol_version = 0x2000000000
 new_protocol_version = 0x2000000000

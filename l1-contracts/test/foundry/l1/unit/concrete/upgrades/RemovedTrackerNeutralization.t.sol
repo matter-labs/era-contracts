@@ -98,7 +98,7 @@ contract RemovedTrackerNeutralizationTest is Test {
         vm.etch(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, address(new FaithfulZKOSDeployer()).code);
         vm.etch(
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
-            BytecodeUtils.readDeployedBytecodeL1(true, "SystemContractProxyAdmin.sol", "SystemContractProxyAdmin")
+            BytecodeUtils.readDeployedBytecodeL1("SystemContractProxyAdmin.sol", "SystemContractProxyAdmin")
         );
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).forceSetOwner(L2_COMPLEX_UPGRADER_ADDR);
@@ -111,10 +111,7 @@ contract RemovedTrackerNeutralizationTest is Test {
     }
 
     function _installV31Tracker(address _proxyAddr) internal {
-        vm.etch(
-            _proxyAddr,
-            BytecodeUtils.readDeployedBytecodeL1(true, "SystemContractProxy.sol", "SystemContractProxy")
-        );
+        vm.etch(_proxyAddr, BytecodeUtils.readDeployedBytecodeL1("SystemContractProxy.sol", "SystemContractProxy"));
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         ISystemContractProxy(_proxyAddr).forceInitAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
@@ -147,11 +144,7 @@ contract RemovedTrackerNeutralizationTest is Test {
             );
         }
 
-        bytes memory emptyContractBytecode = BytecodeUtils.readDeployedBytecodeL1(
-            true,
-            "EmptyContract.sol",
-            "EmptyContract"
-        );
+        bytes memory emptyContractBytecode = BytecodeUtils.readDeployedBytecodeL1("EmptyContract.sol", "EmptyContract");
 
         // The deployer materializes each entry's requested bytecode: the real proxy for fresh
         // proxies, EmptyContract wherever an entry's implementation info asks for it, and an inert
@@ -161,7 +154,6 @@ contract RemovedTrackerNeutralizationTest is Test {
             // The expected Blake hashes are derived independently from the raw artifacts (not from
             // the entries under test), so a list builder emitting a wrong Blake hash fails here.
             bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
-                true,
                 "SystemContractProxy.sol",
                 "SystemContractProxy"
             );

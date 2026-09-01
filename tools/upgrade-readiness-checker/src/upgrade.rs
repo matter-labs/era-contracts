@@ -57,7 +57,6 @@ pub async fn find_upgrade_tx_hash(
     ctm_address: Address,
     bridgehub_address: Address,
     chain_id: u64,
-    zksync_os: bool,
     protocol_version: U256,
     lookback_blocks: u64,
 ) -> anyhow::Result<B256> {
@@ -92,7 +91,6 @@ pub async fn find_upgrade_tx_hash(
                 diamond_cut.initAddress,
                 bridgehub_address,
                 chain_id,
-                zksync_os,
                 &diamond_cut.initCalldata,
             )
             .await;
@@ -118,11 +116,13 @@ async fn tx_hash_from_init_calldata(
     init_address: Address,
     bridgehub_address: Address,
     chain_id: u64,
-    zksync_os: bool,
     init_calldata: &[u8],
 ) -> anyhow::Result<B256> {
     if init_calldata.len() < 4 {
-        anyhow::bail!("DiamondCutData.initCalldata too short ({} bytes)", init_calldata.len());
+        anyhow::bail!(
+            "DiamondCutData.initCalldata too short ({} bytes)",
+            init_calldata.len()
+        );
     }
     // Skip the 4-byte selector and decode the ProposedUpgrade struct.
     let proposed = <crate::abi::IChainTypeManager::ProposedUpgrade as SolValue>::abi_decode(
@@ -136,7 +136,6 @@ async fn tx_hash_from_init_calldata(
         init_address,
         bridgehub_address,
         chain_id,
-        zksync_os,
         tx.data.clone(),
     )
     .await;
@@ -152,15 +151,17 @@ async fn rebuild_tx_data_if_v31plus(
     init_address: Address,
     bridgehub_address: Address,
     chain_id: u64,
-    zksync_os: bool,
     original_data: Bytes,
 ) -> Bytes {
     let upgrade = ISettlementLayerUpgradeInstance::new(init_address, provider.clone());
+    // The `zksyncOS` bool stays in the call to preserve the upgrade
+    // contract's ABI tuple shape; every chain this tooling serves is a
+    // ZKsync OS chain, so it is unconditionally `true`.
     match upgrade
         .getL2UpgradeTxData(
             bridgehub_address,
             U256::from(chain_id),
-            zksync_os,
+            true,
             original_data.clone(),
         )
         .call()

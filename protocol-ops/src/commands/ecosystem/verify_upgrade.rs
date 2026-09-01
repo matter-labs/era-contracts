@@ -41,7 +41,7 @@ pub struct VerifyUpgradeArgs {
 
     /// Optional era-contracts commit to load contract metadata from GitHub.
     /// If omitted, the local checkout is the authority for AllContractsHashes.json
-    /// and SystemConfig.json; verify that the checkout matches the reviewed commit.
+    /// and the genesis configs; verify that the checkout matches the reviewed commit.
     #[clap(long)]
     pub contracts_commit: Option<String>,
 

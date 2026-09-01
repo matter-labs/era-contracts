@@ -19,6 +19,7 @@ import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.s
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {InteropLibrary} from "../InteropLibrary.sol";
 import {L2_BRIDGEHUB_ADDRESS, Utils} from "../utils/Utils.sol";
+import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
@@ -36,7 +37,6 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
-import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
@@ -344,12 +344,13 @@ contract GatewayPreparation is Script {
         initializeConfig();
 
         // TODO(EVM-925): it is deployed without any restrictions.
-        address l2ChainAdminAddress = Utils.deployThroughL1({
-            bytecode: ContractsBytecodesLib.getCreationCodeEra("ChainAdmin"),
-            constructorargs: abi.encode(new address[](0)),
-            create2salt: bytes32(0),
+        // `ChainAdmin` is CREATE2-deployed like any ordinary contract, so its constructor runs
+        // normally — unlike the predeployed L2 built-ins, which are initialized via `initL2`.
+        address l2ChainAdminAddress = Utils.deployThroughL1ViaDeterministicCreate2({
+            bytecode: ContractsBytecodesLib.getCreationCodeEVM("ChainAdmin"),
+            constructorArgs: abi.encode(new address[](0)),
+            create2Salt: bytes32(0),
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
-            factoryDeps: new bytes[](0),
             chainId: config.gatewayChainId,
             bridgehubAddress: config.bridgehub,
             l1SharedBridgeProxy: config.sharedBridgeProxy

@@ -1,20 +1,15 @@
 use anyhow::Result;
 
 use crate::upgrade_verification::{
-    artifacts::{
-        required_address_in_value as required_address, CtmFlavor, EcosystemUpgradeArtifact,
-    },
+    artifacts::{required_address_in_value as required_address, EcosystemUpgradeArtifact},
     constants::EIP1967_PROXY_ADMIN_SLOT,
     verifiers::{VerificationResult, Verifiers},
     versions::v31::{
-        utils::{
-            fee_param_verifier::{FeeParamVerifier, FeeParams},
-            network_verifier::{
-                Bridgehub as BridgehubContract, ChainRegistrationSender, ChainTypeManager,
-                L1AssetRouter, Ownable, Ownable2Step, ValidatorTimelock, ZKChainFeeParams,
-            },
+        utils::network_verifier::{
+            Bridgehub as BridgehubContract, ChainRegistrationSender, ChainTypeManager,
+            L1AssetRouter, Ownable, Ownable2Step, ValidatorTimelock,
         },
-        MAX_PRIORITY_TX_GAS_LIMIT, STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID,
+        STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID,
     },
 };
 
@@ -26,9 +21,6 @@ use alloy::{
 
 const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
 
-// `DiamondInit` writes the default fee params from `Config.sol` into
-// `ZKChainStorage.s.feeParams`; this slot matches the v31 storage layout.
-const FEE_PARAMS_STORAGE_SLOT: u64 = 38;
 const MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 10_800;
 const TESTNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 0;
 
@@ -75,45 +67,6 @@ fn expect_debug_eq<T: std::fmt::Debug + PartialEq>(
     }
 }
 
-fn expect_fee_params_eq(result: &mut VerificationResult, actual: &FeeParams, expected: &FeeParams) {
-    expect_debug_eq(
-        result,
-        "Era feeParams.pubdataPricingMode",
-        &actual.pubdataPricingMode,
-        &expected.pubdataPricingMode,
-    );
-    expect_debug_eq(
-        result,
-        "Era feeParams.batchOverheadL1Gas",
-        &actual.batchOverheadL1Gas,
-        &expected.batchOverheadL1Gas,
-    );
-    expect_debug_eq(
-        result,
-        "Era feeParams.maxPubdataPerBatch",
-        &actual.maxPubdataPerBatch,
-        &expected.maxPubdataPerBatch,
-    );
-    expect_debug_eq(
-        result,
-        "Era feeParams.maxL2GasPerBatch",
-        &actual.maxL2GasPerBatch,
-        &expected.maxL2GasPerBatch,
-    );
-    expect_debug_eq(
-        result,
-        "Era feeParams.priorityTxMaxPubdata",
-        &actual.priorityTxMaxPubdata,
-        &expected.priorityTxMaxPubdata,
-    );
-    expect_debug_eq(
-        result,
-        "Era feeParams.minimalL2GasPrice",
-        &actual.minimalL2GasPrice,
-        &expected.minimalL2GasPrice,
-    );
-}
-
 /// RPC state checks
 ///
 /// This is intentionally the *non-overlapping* slice of legacy PUVT's
@@ -127,7 +80,6 @@ fn expect_fee_params_eq(result: &mut VerificationResult, actual: &FeeParams, exp
 /// - Pre-upgrade core wiring: AssetRouter owner / legacy bridge / NTV and
 ///   Bridgehub / ChainAssetHandler wiring.
 /// - ValidatorTimelock owner and execution delay.
-/// - Era fee params and priority-tx max gas limit.
 ///
 /// Per-implementation deployed-bytecode and constructor-arg checks live in
 /// deployment provenance: they use init bytecode + constructor args (via
@@ -155,7 +107,6 @@ pub(crate) async fn verify_v31_artifact_state(
     verify_v31_proxy_admins(artifact, verifiers, result).await?;
     verify_v31_core_wiring(artifact, verifiers, result).await?;
     verify_v31_validator_timelocks(artifact, verifiers, result).await?;
-    verify_v31_era_fee_params(verifiers, result).await;
     verify_v31_timer_admin_state(artifact, verifiers, result).await?;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
     verify_v31_ctm_flavor(artifact, verifiers, result).await?;
@@ -549,73 +500,6 @@ async fn verify_v31_validator_timelocks(
     Ok(())
 }
 
-async fn verify_v31_era_fee_params(verifiers: &Verifiers, result: &mut VerificationResult) {
-    let era_chain_id = verifiers.era_chain_id;
-    let diamond = match verifiers
-        .network_verifier
-        .try_get_chain_diamond_from_bridgehub(verifiers.bridgehub_address, U256::from(era_chain_id))
-        .await
-    {
-        Ok(addr) if addr != Address::ZERO => addr,
-        Ok(_) => {
-            result.report_error(&format!(
-                "Cannot verify Era fee params: Bridgehub.getZKChain({era_chain_id}) returned address(0)"
-            ));
-            return;
-        }
-        Err(err) => {
-            result.report_error(&format!(
-                "Cannot verify Era fee params: Bridgehub.getZKChain({era_chain_id}) failed: {err}"
-            ));
-            return;
-        }
-    };
-
-    let provider = verifiers.network_verifier.get_l1_provider();
-    let raw = match provider
-        .get_storage_at(diamond, U256::from(FEE_PARAMS_STORAGE_SLOT))
-        .await
-    {
-        Ok(value) => value.to_be_bytes::<32>(),
-        Err(err) => {
-            result.report_error(&format!(
-                "Cannot verify Era fee params: eth_getStorageAt({diamond}, slot {FEE_PARAMS_STORAGE_SLOT}) failed: {err}"
-            ));
-            return;
-        }
-    };
-
-    let actual_fee_params = match FeeParamVerifier::decode_storage_word(FixedBytes::from(raw)) {
-        Ok(value) => value,
-        Err(err) => {
-            result.report_error(&format!(
-                "Cannot verify Era fee params: failed to decode storage slot {FEE_PARAMS_STORAGE_SLOT}: {err}"
-            ));
-            return;
-        }
-    };
-    expect_fee_params_eq(
-        result,
-        &actual_fee_params,
-        &verifiers.fee_param_verifier.fee_params,
-    );
-
-    let chain_getters = ZKChainFeeParams::new(diamond, provider);
-    match chain_getters.getPriorityTxMaxGasLimit().call().await {
-        Ok(actual) if actual == U256::from(MAX_PRIORITY_TX_GAS_LIMIT) => result.report_ok(
-            &format!(
-                "Era getPriorityTxMaxGasLimit() matches expected value ({MAX_PRIORITY_TX_GAS_LIMIT})"
-            ),
-        ),
-        Ok(actual) => result.report_error(&format!(
-            "Era getPriorityTxMaxGasLimit() mismatch: expected {MAX_PRIORITY_TX_GAS_LIMIT}, got {actual}"
-        )),
-        Err(err) => result.report_error(&format!(
-            "Failed to call Era getPriorityTxMaxGasLimit(): {err}"
-        )),
-    }
-}
-
 /// Sanity-check the live ownership state that should match the timer
 /// constructor addresses recorded under `[ctms.<flavor>.admin]`.
 ///
@@ -719,9 +603,9 @@ async fn verify_v31_ctm_permissionless_validator(
 
 /// `isZKsyncOS()` is `external pure` on the v31 CTM impl so it's safe to call
 /// directly on the implementation contract (no proxy, no init required). This
-/// guards against the artifact mislabeling a ZKsync OS CTM as Era or vice
-/// versa — an artifact-side swap that all other per-CTM checks would happily
-/// pass through.
+/// guards against the artifact pointing at a non-ZKsync-OS (e.g. Era) CTM
+/// implementation — an artifact-side swap that all other per-CTM checks would
+/// happily pass through.
 async fn verify_v31_ctm_flavor(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
@@ -736,7 +620,8 @@ async fn verify_v31_ctm_flavor(
             &scope,
             &["state_transition", "chain_type_manager_implementation_addr"],
         )?;
-        let expected = matches!(ctm.flavor, CtmFlavor::ZksyncOs);
+        // Only the zksync_os flavor exists on this build.
+        let expected = true;
         match ChainTypeManager::new(ctm_impl, provider.clone())
             .isZKsyncOS()
             .call()

@@ -30,7 +30,6 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 
-import {ContractsBytecodesLib} from "../../utils/bytecode/ContractsBytecodesLib.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
@@ -96,7 +95,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
 
     AdditionalConfig internal newConfig;
     Gateway internal gatewayConfig;
-    ZkChainAddresses internal discoveredEraZkChain;
+    ZkChainAddresses internal discoveredRepresentativeZkChain;
     L1Bridgehub internal bridgehub;
     CTMDeployedAddresses internal ctmDeployedAddresses;
 
@@ -111,10 +110,13 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
+    /// @dev Any registered chain of the ecosystem being upgraded; used only to resolve the CTM and
+    /// read the ecosystem's rollup L1 DA validator off a live chain.
+    uint256 internal representativeChainId;
+
     function initializeWithArgs(
-        bool _isZKsyncOS,
         bytes32 _create2FactorySalt,
-        uint256 _eraChainId,
+        uint256 _representativeChainId,
         uint256 _priorityTxsL2GasLimit,
         uint256 _maxExpectedL1GasPrice,
         Gateway memory _gatewayConfig,
@@ -127,9 +129,8 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
 
         initializeConfig(
             _create2FactorySalt,
-            _isZKsyncOS,
-            getChainCreationParamsConfig(Utils.genesisConfigPath(_isZKsyncOS)),
-            _eraChainId,
+            getChainCreationParamsConfig(Utils.genesisConfigPath()),
+            _representativeChainId,
             _priorityTxsL2GasLimit,
             _maxExpectedL1GasPrice,
             _gatewayConfig,
@@ -143,9 +144,8 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
 
     function initializeConfig(
         bytes32 _create2FactorySalt,
-        bool _isZKsyncOS,
         ChainCreationParamsConfig memory _chainCreationParams,
-        uint256 _eraChainId,
+        uint256 _representativeChainId,
         uint256 _priorityTxsL2GasLimit,
         uint256 _maxExpectedL1GasPrice,
         Gateway memory _gatewayConfig,
@@ -156,9 +156,9 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             setCreate2Salt(_create2FactorySalt);
         }
         config.l1ChainId = block.chainid;
-        config.eraChainId = _eraChainId;
+        representativeChainId = _representativeChainId;
         setAddressesBasedOnBridgehub();
-        config.isZKsyncOS = _isZKsyncOS;
+        // Only ZKsync-OS-based Gateways are supported on this release.
         config.contracts.chainCreationParams = _chainCreationParams;
         if (_governance != address(0)) {
             config.ownerAddress = _governance;
@@ -193,18 +193,17 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function deployGWContract(string memory contractName) internal returns (address contractAddress) {
-        bytes memory creationCalldata = getCreationCalldata(contractName, true);
-        contractAddress = Utils.deployThroughL1Deterministic(
-            getCreationCode(contractName, true),
-            creationCalldata,
-            0,
-            newConfig.priorityTxsL2GasLimit,
-            new bytes[](0),
-            gatewayConfig.chainId,
-            coreAddresses.bridgehub.proxies.bridgehub,
-            coreAddresses.bridges.proxies.l1AssetRouter
-        );
-        notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName, true);
+        bytes memory creationCalldata = getCreationCalldata(contractName);
+        contractAddress = Utils.deployThroughL1ViaDeterministicCreate2({
+            bytecode: getCreationCode(contractName),
+            constructorArgs: creationCalldata,
+            create2Salt: bytes32(0),
+            l2GasLimit: newConfig.priorityTxsL2GasLimit,
+            chainId: gatewayConfig.chainId,
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
+            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter
+        });
+        notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName);
     }
 
     /// @notice Generate data required for the upgrade
@@ -219,7 +218,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             config.l1ChainId,
             config.ownerAddress,
             factoryDepsResult,
-            discoveredEraZkChain.zkChainProxy
+            discoveredRepresentativeZkChain.zkChainProxy
         );
         gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
         upgradeConfig.upgradeCutPrepared = true;
@@ -242,13 +241,14 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     function setAddressesBasedOnBridgehub() internal virtual {
         coreAddresses = AddressIntrospector.getCoreDeployedAddresses(address(bridgehub));
         config.ownerAddress = coreAddresses.shared.governance;
-        address ctm = bridgehub.chainTypeManager(config.eraChainId);
+        address ctm = bridgehub.chainTypeManager(representativeChainId);
         ctmDeployedAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
-        discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(
-            IZKChain(bridgehub.getZKChain(config.eraChainId))
+        discoveredRepresentativeZkChain = AddressIntrospector.getZkChainAddresses(
+            IZKChain(bridgehub.getZKChain(representativeChainId))
         );
 
-        ctmDeployedAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredEraZkChain.l1DAValidator;
+        ctmDeployedAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredRepresentativeZkChain
+            .l1DAValidator;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         newConfig.oldProtocolVersion = ctmProtocolVersion;
         require(
@@ -283,7 +283,11 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             abi.encode(stage2Calls)
         );
 
-        vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
+        // Upstream forge's keyed `vm.writeToml(json, path, key)` silently no-ops when the key
+        // does not exist in the file yet, so append sections by re-serializing into the same
+        // "root" object and rewriting the whole file instead.
+        string memory updatedToml = vm.serializeString("root", "governance_calls", governanceCallsSerialized);
+        vm.writeToml(updatedToml, upgradeConfig.outputPath);
     }
 
     /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
@@ -361,16 +365,20 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function deployUsedUpgradeContractGW() internal virtual returns (address) {
-        return deployGWContract("DefaultUpgrade");
+        (, string memory defaultUpgradeName) = DeployCTML1OrGateway.resolve(CTMContract.DefaultUpgrade);
+        return deployGWContract(defaultUpgradeName);
     }
 
     /// @notice Deploy everything that should be deployed for GW
     function deployNewEcosystemContractsGW() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
 
-        gatewayConfig.gatewayStateTransition.verifiers.verifierFflonk = deployGWContract("VerifierFflonk");
-        gatewayConfig.gatewayStateTransition.verifiers.verifierPlonk = deployGWContract("VerifierPlonk");
-        gatewayConfig.gatewayStateTransition.verifiers.verifier = deployGWContract("Verifier");
+        // Mirrors `DeployCTM.deployVerifiers`: ZKsync OS has no FFLONK verifier, and the surviving
+        // two are resolved rather than named, since their contracts carry a ZKsyncOS prefix.
+        (, string memory plonkName) = DeployCTML1OrGateway.resolve(CTMContract.VerifierPlonk);
+        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
+        gatewayConfig.gatewayStateTransition.verifiers.verifierPlonk = deployGWContract(plonkName);
+        gatewayConfig.gatewayStateTransition.verifiers.verifier = deployGWContract(verifierName);
 
         gatewayConfig.gatewayStateTransition.facets.executorFacet = deployGWContract("ExecutorFacet");
         gatewayConfig.gatewayStateTransition.facets.adminFacet = deployGWContract("AdminFacet");
@@ -382,10 +390,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
-        (, string memory gwCtmContractName) = DeployCTML1OrGateway.resolve(
-            config.isZKsyncOS,
-            CTMContract.ChainTypeManager
-        );
+        (, string memory gwCtmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
         gatewayConfig.gatewayStateTransition.implementations.chainTypeManager = deployGWContract(gwCtmContractName);
 
         deployUpgradeSpecificContractsGW();
@@ -604,23 +609,6 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
 
     function getAddresses() public view virtual override returns (CTMDeployedAddresses memory) {
         return ctmDeployedAddresses;
-    }
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        require(isZKBytecode, "Only ZK bytecodes are supported in Gateway upgrade");
-        if (compareStrings(contractName, "DefaultUpgrade")) {
-            return BytecodeUtils.readBytecodeL1(false, "DefaultUpgrade.sol", "DefaultUpgrade");
-        } else if (compareStrings(contractName, "BytecodesSupplier")) {
-            return BytecodeUtils.readBytecodeL1(false, "BytecodesSupplier.sol", "BytecodesSupplier");
-        } else if (compareStrings(contractName, "TransitionaryOwner")) {
-            return BytecodeUtils.readBytecodeL1(false, "TransitionaryOwner.sol", "TransitionaryOwner");
-        } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            return ContractsBytecodesLib.getCreationCodeEra("ValidatorTimelock");
-        }
-        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function saveOutputVersionSpecific() internal virtual {}

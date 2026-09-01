@@ -8,7 +8,6 @@ import {console2 as console} from "forge-std/Script.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
-import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {
@@ -28,8 +27,6 @@ import {
 
 import {Utils} from "../utils/Utils.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
 
 import {Facets, Verifiers} from "contracts/common/StateTransitionTypes.sol";
@@ -100,7 +97,7 @@ struct CalculateAddressesIntermediate {
     Verifiers verifiersResult;
 }
 
-/// @notice Result of preparing an L1->L2 deployment (CREATE2 via Era or ZKsyncOS factory).
+/// @notice Result of preparing an L1->L2 deployment (CREATE2 via the ZKsyncOS deterministic factory).
 struct L1L2DeployPrepareResult {
     address expectedAddress;
     bytes data;
@@ -108,13 +105,10 @@ struct L1L2DeployPrepareResult {
 }
 
 library GatewayCTMDeployerHelper {
-    // GW deploys are EVM-equivalent by default, but tests may force EraVM mode.
-    string internal constant GW_IS_EVM_EQUIVALENT_ENV = "GW_IS_EVM_EQUIVALENT";
-
     /// @notice Calculates all addresses for the deployment.
     /// @dev Uses 5 deployers + direct contract deployments.
     /// @param _create2Salt Salt used for CREATE2 when deploying the deployers.
-    /// @param config The full deployment configuration (`config.isZKsyncOS` selects Era vs ZKsyncOS).
+    /// @param config The full deployment configuration (ZKsyncOS only).
     /// @return contracts The complete set of deployed contracts.
     /// @return deployerCalldata The CREATE2 calldata for each deployer.
     /// @return deployers The addresses of each deployer.
@@ -134,8 +128,7 @@ library GatewayCTMDeployerHelper {
         )
     {
         // Use Arachnid deterministic CREATE2 by default (GW path),
-        // unless the env override switches to EraVM factory mode.
-        create2FactoryAddress = _getDeploymentTarget(_isGatewayEvmEquivalentInCurrentContext());
+        create2FactoryAddress = Utils.DETERMINISTIC_CREATE2_ADDRESS;
         (contracts, deployerCalldata, deployers, directCalldata) = _calculateAddressesInner(_create2Salt, config);
     }
 
@@ -204,23 +197,14 @@ library GatewayCTMDeployerHelper {
             aliasedGovernanceAddress: config.aliasedGovernanceAddress
         });
 
-        bytes memory bytecode = BytecodeUtils.readBytecodeL1(
-            config.isZKsyncOS,
-            "GatewayCTMDeployerDA.sol",
-            "GatewayCTMDeployerDA"
-        );
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1("GatewayCTMDeployerDA.sol", "GatewayCTMDeployerDA");
         bytes memory constructorArgs = abi.encode(daConfig);
 
-        L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(
-            true,
-            _create2Salt,
-            bytecode,
-            constructorArgs
-        );
+        L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(_create2Salt, bytecode, constructorArgs);
         deployer = deployResult.expectedAddress;
         data = deployResult.data;
         _logGatewayVerifyContract(deployer, "GatewayCTMDeployerDA", constructorArgs);
-        result = _calculateDADeployerAddresses(deployer, daConfig, config.isZKsyncOS);
+        result = _calculateDADeployerAddresses(deployer, daConfig);
     }
 
     // ============ ProxyAdmin Deployer ============
@@ -235,22 +219,16 @@ library GatewayCTMDeployerHelper {
         });
 
         bytes memory bytecode = BytecodeUtils.readBytecodeL1(
-            config.isZKsyncOS,
             "GatewayCTMDeployerProxyAdmin.sol",
             "GatewayCTMDeployerProxyAdmin"
         );
         bytes memory constructorArgs = abi.encode(proxyAdminConfig);
 
-        L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(
-            true,
-            _create2Salt,
-            bytecode,
-            constructorArgs
-        );
+        L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(_create2Salt, bytecode, constructorArgs);
         deployer = deployResult.expectedAddress;
         data = deployResult.data;
         _logGatewayVerifyContract(deployer, "GatewayCTMDeployerProxyAdmin", constructorArgs);
-        result = _calculateProxyAdminDeployerAddresses(deployer, proxyAdminConfig, config.isZKsyncOS);
+        result = _calculateProxyAdminDeployerAddresses(deployer, proxyAdminConfig);
     }
 
     // ============ ValidatorTimelock Deployer ============
@@ -267,22 +245,16 @@ library GatewayCTMDeployerHelper {
         });
 
         bytes memory bytecode = BytecodeUtils.readBytecodeL1(
-            config.isZKsyncOS,
             "GatewayCTMDeployerValidatorTimelock.sol",
             "GatewayCTMDeployerValidatorTimelock"
         );
         bytes memory constructorArgs = abi.encode(vtConfig);
 
-        L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(
-            true,
-            _create2Salt,
-            bytecode,
-            constructorArgs
-        );
+        L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(_create2Salt, bytecode, constructorArgs);
         deployer = deployResult.expectedAddress;
         data = deployResult.data;
         _logGatewayVerifyContract(deployer, "GatewayCTMDeployerValidatorTimelock", constructorArgs);
-        result = _calculateValidatorTimelockDeployerAddresses(deployer, vtConfig, config.isZKsyncOS);
+        result = _calculateValidatorTimelockDeployerAddresses(deployer, vtConfig);
     }
 
     // ============ Verifiers Deployer ============
@@ -299,22 +271,16 @@ library GatewayCTMDeployerHelper {
         });
 
         (string memory vdFile, string memory vdName) = DeployCTML1OrGateway.resolve(
-            config.isZKsyncOS,
             CTMContract.GatewayCTMDeployerVerifiers
         );
-        bytes memory bytecode = BytecodeUtils.readBytecodeL1(config.isZKsyncOS, vdFile, vdName);
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1(vdFile, vdName);
         bytes memory constructorArgs = abi.encode(verifiersConfig);
 
-        L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(
-            true,
-            _create2Salt,
-            bytecode,
-            constructorArgs
-        );
+        L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(_create2Salt, bytecode, constructorArgs);
         deployer = deployResult.expectedAddress;
         data = deployResult.data;
         _logGatewayVerifyContract(deployer, vdName, constructorArgs);
-        result = _calculateVerifiersDeployerAddresses(deployer, verifiersConfig, config.isZKsyncOS);
+        result = _calculateVerifiersDeployerAddresses(deployer, verifiersConfig);
     }
 
     // ============ Direct Deployments (no deployer) ============
@@ -330,9 +296,7 @@ library GatewayCTMDeployerHelper {
             _create2Salt,
             "Admin.sol",
             "AdminFacet",
-            adminFacetArgs,
-            config.isZKsyncOS,
-            true
+            adminFacetArgs
         );
 
         // MailboxFacet
@@ -346,9 +310,7 @@ library GatewayCTMDeployerHelper {
             _create2Salt,
             "Mailbox.sol",
             "MailboxFacet",
-            mailboxFacetArgs,
-            config.isZKsyncOS,
-            true
+            mailboxFacetArgs
         );
 
         // ExecutorFacet
@@ -356,9 +318,7 @@ library GatewayCTMDeployerHelper {
             _create2Salt,
             "Executor.sol",
             "ExecutorFacet",
-            hex"",
-            config.isZKsyncOS,
-            true
+            hex""
         );
 
         // GettersFacet
@@ -366,9 +326,7 @@ library GatewayCTMDeployerHelper {
             _create2Salt,
             "Getters.sol",
             "GettersFacet",
-            hex"",
-            config.isZKsyncOS,
-            true
+            hex""
         );
 
         // MigratorFacet
@@ -377,9 +335,7 @@ library GatewayCTMDeployerHelper {
             _create2Salt,
             "Migrator.sol",
             "MigratorFacet",
-            migratorFacetArgs,
-            config.isZKsyncOS,
-            true
+            migratorFacetArgs
         );
 
         // CommitterFacet
@@ -388,20 +344,16 @@ library GatewayCTMDeployerHelper {
             _create2Salt,
             "Committer.sol",
             "CommitterFacet",
-            committerFacetArgs,
-            config.isZKsyncOS,
-            true
+            committerFacetArgs
         );
 
-        // DiamondInit
-        bytes memory diamondInitArgs = abi.encode(config.isZKsyncOS);
+        // DiamondInit — `DiamondInit(bool _isZKOS)`, always ZKsync OS.
+        bytes memory diamondInitArgs = abi.encode(true);
         (addresses.facets.diamondInit, data.diamondInitCalldata) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
             "DiamondInit.sol",
             "DiamondInit",
-            diamondInitArgs,
-            config.isZKsyncOS,
-            true
+            diamondInitArgs
         );
 
         // L1GenesisUpgrade
@@ -409,9 +361,7 @@ library GatewayCTMDeployerHelper {
             _create2Salt,
             "L1GenesisUpgrade.sol",
             "L1GenesisUpgrade",
-            hex"",
-            config.isZKsyncOS,
-            true
+            hex""
         );
 
         // Multicall3
@@ -419,9 +369,7 @@ library GatewayCTMDeployerHelper {
             _create2Salt,
             "Multicall3.sol",
             "Multicall3",
-            hex"",
-            config.isZKsyncOS,
-            true
+            hex""
         );
     }
 
@@ -429,17 +377,10 @@ library GatewayCTMDeployerHelper {
         bytes32 _create2Salt,
         string memory fileName,
         string memory contractName,
-        bytes memory constructorArgs,
-        bool _isZKsyncOS,
-        bool _gwIsEvmEquivalent
+        bytes memory constructorArgs
     ) internal returns (address addr, bytes memory data) {
-        bytes memory bytecode = BytecodeUtils.readBytecodeL1(_isZKsyncOS, fileName, contractName);
-        L1L2DeployPrepareResult memory result = _prepareL1L2Deployment(
-            _gwIsEvmEquivalent,
-            _create2Salt,
-            bytecode,
-            constructorArgs
-        );
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1(fileName, contractName);
+        L1L2DeployPrepareResult memory result = _prepareL1L2Deployment(_create2Salt, bytecode, constructorArgs);
         addr = result.expectedAddress;
         data = result.data;
         _logGatewayVerifyContract(addr, contractName, constructorArgs);
@@ -448,20 +389,10 @@ library GatewayCTMDeployerHelper {
     function _calculateCreate2AddressAndCalldata(
         bytes32 _create2Salt,
         CTMContract vmContract,
-        bytes memory constructorArgs,
-        bool _isZKsyncOS,
-        bool _gwIsEvmEquivalent
+        bytes memory constructorArgs
     ) internal returns (address addr, bytes memory data) {
-        (string memory fileName, string memory contractName) = DeployCTML1OrGateway.resolve(_isZKsyncOS, vmContract);
-        return
-            _calculateCreate2AddressAndCalldata(
-                _create2Salt,
-                fileName,
-                contractName,
-                constructorArgs,
-                _isZKsyncOS,
-                _gwIsEvmEquivalent
-            );
+        (string memory fileName, string memory contractName) = DeployCTML1OrGateway.resolve(vmContract);
+        return _calculateCreate2AddressAndCalldata(_create2Salt, fileName, contractName, constructorArgs);
     }
 
     // ============ CTM Deployer ============
@@ -484,11 +415,9 @@ library GatewayCTMDeployerHelper {
         (deployer, data) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
             CTMContract.GatewayCTMDeployerCTM,
-            abi.encode(ctmConfig),
-            config.isZKsyncOS,
-            true
+            abi.encode(ctmConfig)
         );
-        result = _calculateCTMDeployerAddresses(deployer, ctmConfig, config.isZKsyncOS);
+        result = _calculateCTMDeployerAddresses(deployer, ctmConfig);
     }
 
     function _buildCTMFinalConfig(
@@ -513,49 +442,34 @@ library GatewayCTMDeployerHelper {
 
     function _calculateDADeployerAddresses(
         address deployerAddr,
-        GatewayDADeployerConfig memory config,
-        bool _isZKsyncOS
+        GatewayDADeployerConfig memory config
     ) internal returns (DAContracts memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
 
-        result.rollupDAManager = _deployInternalEmptyParams(
-            "RollupDAManager",
-            "RollupDAManager.sol",
-            innerConfig,
-            _isZKsyncOS
-        );
+        result.rollupDAManager = _deployInternalEmptyParams("RollupDAManager", "RollupDAManager.sol", innerConfig);
         result.validiumDAValidator = _deployInternalEmptyParams(
             "ValidiumL1DAValidator",
             "ValidiumL1DAValidator.sol",
-            innerConfig,
-            _isZKsyncOS
+            innerConfig
         );
         result.rollupSLDAValidator = _deployInternalEmptyParams(
             "RelayedSLDAValidator",
             "RelayedSLDAValidator.sol",
-            innerConfig,
-            _isZKsyncOS
+            innerConfig
         );
     }
 
     function _calculateProxyAdminDeployerAddresses(
         address deployerAddr,
-        GatewayProxyAdminDeployerConfig memory config,
-        bool _isZKsyncOS
+        GatewayProxyAdminDeployerConfig memory config
     ) internal returns (GatewayProxyAdminDeployerResult memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
-        result.chainTypeManagerProxyAdmin = _deployInternalEmptyParams(
-            "ProxyAdmin",
-            "ProxyAdmin.sol",
-            innerConfig,
-            _isZKsyncOS
-        );
+        result.chainTypeManagerProxyAdmin = _deployInternalEmptyParams("ProxyAdmin", "ProxyAdmin.sol", innerConfig);
     }
 
     function _calculateValidatorTimelockDeployerAddresses(
         address deployerAddr,
-        GatewayValidatorTimelockDeployerConfig memory config,
-        bool _isZKsyncOS
+        GatewayValidatorTimelockDeployerConfig memory config
     ) internal returns (GatewayValidatorTimelockDeployerResult memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
 
@@ -563,8 +477,7 @@ library GatewayCTMDeployerHelper {
             "ValidatorTimelock",
             "ValidatorTimelock.sol",
             abi.encode(L2_BRIDGEHUB_ADDR),
-            innerConfig,
-            _isZKsyncOS
+            innerConfig
         );
 
         result.validatorTimelockProxy = _deployInternalWithParams(
@@ -575,54 +488,34 @@ library GatewayCTMDeployerHelper {
                 config.chainTypeManagerProxyAdmin,
                 abi.encodeCall(ValidatorTimelock.initialize, (config.aliasedGovernanceAddress, 0))
             ),
-            innerConfig,
-            _isZKsyncOS
+            innerConfig
         );
     }
 
     function _calculateVerifiersDeployerAddresses(
         address deployerAddr,
-        GatewayVerifiersDeployerConfig memory config,
-        bool _isZKsyncOS
+        GatewayVerifiersDeployerConfig memory config
     ) internal returns (Verifiers memory result) {
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: config.salt});
 
-        if (!_isZKsyncOS) {
-            (string memory fflonkFile, string memory fflonkName) = DeployCTML1OrGateway.resolve(
-                false,
-                CTMContract.VerifierFflonk
-            );
-            result.verifierFflonk = _deployInternalEmptyParams(fflonkName, fflonkFile, innerConfig, false);
-        }
         {
             (string memory plonkFile, string memory plonkName) = DeployCTML1OrGateway.resolve(
-                _isZKsyncOS,
                 CTMContract.VerifierPlonk
             );
-            result.verifierPlonk = _deployInternalEmptyParams(plonkName, plonkFile, innerConfig, _isZKsyncOS);
+            result.verifierPlonk = _deployInternalEmptyParams(plonkName, plonkFile, innerConfig);
         }
         {
             (string memory mainVerifierFile, string memory mainVerifierName) = DeployCTML1OrGateway.resolveMainVerifier(
-                _isZKsyncOS,
                 config.testnetVerifier
             );
-            bytes memory creationArgs = _isZKsyncOS
-                ? abi.encode(result.verifierPlonk)
-                : abi.encode(result.verifierFflonk, result.verifierPlonk);
-            result.verifier = _deployInternalWithParams(
-                mainVerifierName,
-                mainVerifierFile,
-                creationArgs,
-                innerConfig,
-                _isZKsyncOS
-            );
+            bytes memory creationArgs = abi.encode(result.verifierPlonk);
+            result.verifier = _deployInternalWithParams(mainVerifierName, mainVerifierFile, creationArgs, innerConfig);
         }
     }
 
     function _calculateCTMDeployerAddresses(
         address deployerAddr,
-        GatewayCTMFinalConfig memory config,
-        bool isZKsyncOS
+        GatewayCTMFinalConfig memory config
     ) internal returns (GatewayCTMFinalResult memory result) {
         GatewayCTMDeployerConfig memory baseConfig = config.baseConfig;
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: deployerAddr, salt: baseConfig.salt});
@@ -631,8 +524,7 @@ library GatewayCTMDeployerHelper {
         result.serverNotifierImplementation = _deployInternalEmptyParams(
             "ServerNotifier",
             "ServerNotifier.sol",
-            innerConfig,
-            isZKsyncOS
+            innerConfig
         );
 
         result.serverNotifierProxy = _deployInternalWithParams(
@@ -643,21 +535,16 @@ library GatewayCTMDeployerHelper {
                 config.chainTypeManagerProxyAdmin,
                 abi.encodeCall(ServerNotifier.initialize, (deployerAddr)) // deployer is temporary owner
             ),
-            innerConfig,
-            isZKsyncOS
+            innerConfig
         );
 
         // CTM Implementation
-        (string memory ctmFile, string memory ctmName) = DeployCTML1OrGateway.resolve(
-            isZKsyncOS,
-            CTMContract.ChainTypeManager
-        );
+        (string memory ctmFile, string memory ctmName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
         result.chainTypeManagerImplementation = _deployInternalWithParams(
             ctmName,
             ctmFile,
             abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0)),
-            innerConfig,
-            isZKsyncOS
+            innerConfig
         );
 
         {
@@ -673,8 +560,7 @@ library GatewayCTMDeployerHelper {
                 "TransparentUpgradeableProxy",
                 "TransparentUpgradeableProxy.sol",
                 proxyConstructorArgs,
-                innerConfig,
-                isZKsyncOS
+                innerConfig
             );
         }
     }
@@ -808,7 +694,6 @@ library GatewayCTMDeployerHelper {
     ) internal pure returns (CTMCoreDeploymentConfig memory) {
         return
             CTMCoreDeploymentConfig({
-                isZKsyncOS: _config.isZKsyncOS,
                 testnetVerifier: _config.testnetVerifier,
                 l1ChainId: _config.l1ChainId,
                 bridgehubProxy: L2_BRIDGEHUB_ADDR,
@@ -828,156 +713,63 @@ library GatewayCTMDeployerHelper {
     function _deployInternalEmptyParams(
         string memory contractName,
         string memory fileName,
-        InnerDeployConfig memory config,
-        bool _isZKsyncOS
+        InnerDeployConfig memory config
     ) private returns (address) {
-        return _deployInternal(contractName, fileName, hex"", config, _isZKsyncOS);
+        return _deployInternal(contractName, fileName, hex"", config);
     }
 
     function _deployInternalWithParams(
         string memory contractName,
         string memory fileName,
         bytes memory params,
-        InnerDeployConfig memory config,
-        bool _isZKsyncOS
+        InnerDeployConfig memory config
     ) private returns (address) {
-        return _deployInternal(contractName, fileName, params, config, _isZKsyncOS);
+        return _deployInternal(contractName, fileName, params, config);
     }
 
     function _deployInternal(
         string memory contractName,
         string memory fileName,
         bytes memory params,
-        InnerDeployConfig memory config,
-        bool _isZKsyncOS
+        InnerDeployConfig memory config
     ) private returns (address addr) {
-        bytes memory bytecode = BytecodeUtils.readBytecodeL1(_isZKsyncOS, fileName, contractName);
-        // Address derivation must match the factory mode selected for this context.
-        addr = _computeCreate2Address(
-            _isGatewayEvmEquivalentInCurrentContext(),
-            config.deployerAddr,
-            config.salt,
-            bytecode,
-            params
-        );
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1(fileName, contractName);
+        addr = _computeCreate2Address(config.deployerAddr, config.salt, bytecode, params);
         _logGatewayVerifyContract(addr, contractName, params);
     }
 
     // ============ Factory Dependencies ============
 
     /// @notice Returns all factory dependencies for deployment.
-    /// @return dependencies Array of bytecodes needed for deployment.
+    /// @dev ZKsyncOS gateway deployments are EVM-equivalent and need no EraVM factory dependencies.
     function getListOfFactoryDeps(
-        GatewayCTMDeployerConfig memory config
+        GatewayCTMDeployerConfig memory // config
     ) external returns (bytes[] memory dependencies) {
-        if (config.isZKsyncOS) {
-            return dependencies;
-        }
-        return _gatewayCTMEraFactoryDependencies();
+        return dependencies;
     }
 
-    /// @notice Bytecodes required for Gateway CTM deployers on Era.
-    // solhint-disable-next-line code-complexity
-    function _gatewayCTMEraFactoryDependencies() private returns (bytes[] memory dependencies) {
-        uint256 totalDependencies = 27;
-        dependencies = new bytes[](totalDependencies);
-        uint256 idx = 0;
-
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "GatewayCTMDeployerDA.sol", "GatewayCTMDeployerDA");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            false,
-            "GatewayCTMDeployerProxyAdmin.sol",
-            "GatewayCTMDeployerProxyAdmin"
-        );
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            false,
-            "GatewayCTMDeployerValidatorTimelock.sol",
-            "GatewayCTMDeployerValidatorTimelock"
-        );
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            false,
-            "GatewayCTMDeployerVerifiers.sol",
-            "GatewayCTMDeployerVerifiers"
-        );
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "GatewayCTMDeployerCTM.sol", "GatewayCTMDeployerCTM");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "RollupDAManager.sol", "RollupDAManager");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "RelayedSLDAValidator.sol", "RelayedSLDAValidator");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "ProxyAdmin.sol", "ProxyAdmin");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "ValidatorTimelock.sol", "ValidatorTimelock");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            false,
-            "TransparentUpgradeableProxy.sol",
-            "TransparentUpgradeableProxy"
-        );
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraVerifierFflonk.sol", "EraVerifierFflonk");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraVerifierPlonk.sol", "EraVerifierPlonk");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraTestnetVerifier.sol", "EraTestnetVerifier");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraDualVerifier.sol", "EraDualVerifier");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "ServerNotifier.sol", "ServerNotifier");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraChainTypeManager.sol", "EraChainTypeManager");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Admin.sol", "AdminFacet");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Mailbox.sol", "MailboxFacet");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Executor.sol", "ExecutorFacet");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Getters.sol", "GettersFacet");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Migrator.sol", "MigratorFacet");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Committer.sol", "CommitterFacet");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondInit.sol", "DiamondInit");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "L1GenesisUpgrade.sol", "L1GenesisUpgrade");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Multicall3.sol", "Multicall3");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondProxy.sol", "DiamondProxy");
-    }
-
-    // ======================== VM-branching utilities ========================
-
-    function _isGatewayEvmEquivalentInCurrentContext() private view returns (bool) {
-        // Default: true (real GW deploy flow).
-        // Tests may set GW_IS_EVM_EQUIVALENT=false to force EraVM-native factory mode.
-        return Utils.vm.envOr(GW_IS_EVM_EQUIVALENT_ENV, true);
-    }
-
-    function _getDeploymentTarget(bool _gwIsEvmEquivalent) private view returns (address) {
-        return _gwIsEvmEquivalent ? Utils.DETERMINISTIC_CREATE2_ADDRESS : L2_CREATE2_FACTORY_ADDR;
-    }
+    // ======================== Deployment utilities ========================
 
     function _computeCreate2Address(
-        bool _gwIsEvmEquivalent,
         address _deployer,
         bytes32 _salt,
         bytes memory _bytecode,
         bytes memory _constructorArgs
-    ) private returns (address) {
-        if (_gwIsEvmEquivalent) {
-            bytes memory initCode = abi.encodePacked(_bytecode, _constructorArgs);
-            return Utils.vm.computeCreate2Address(_salt, keccak256(initCode), _deployer);
-        }
-        return
-            L2ContractHelper.computeCreate2Address(
-                _deployer,
-                _salt,
-                L2ContractHelper.hashL2Bytecode(_bytecode),
-                keccak256(_constructorArgs)
-            );
+    ) private pure returns (address) {
+        bytes memory initCode = abi.encodePacked(_bytecode, _constructorArgs);
+        return Utils.vm.computeCreate2Address(_salt, keccak256(initCode), _deployer);
     }
 
     function _prepareL1L2Deployment(
-        bool /* _gwIsEvmEquivalent */,
         bytes32 _salt,
         bytes memory _bytecode,
         bytes memory _constructorArgs
     ) private view returns (L1L2DeployPrepareResult memory result) {
-        // Keep target/call-data/address derivation in sync with the selected mode.
-        bool gwIsEvmEquivalent = _isGatewayEvmEquivalentInCurrentContext();
-        result.targetAddress = _getDeploymentTarget(gwIsEvmEquivalent);
-        if (gwIsEvmEquivalent) {
-            bytes memory initCode = abi.encodePacked(_bytecode, _constructorArgs);
-            result.expectedAddress = Utils.getL2AddressViaDeterministicCreate2(_salt, initCode);
-            result.data = Utils.getDeterministicCreate2FactoryCalldata(_salt, initCode);
-        } else {
-            bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(_bytecode);
-            result.expectedAddress = Utils.getL2AddressViaCreate2Factory(_salt, bytecodeHash, _constructorArgs);
-            (, result.data) = Utils.getDeploymentCalldata(_salt, _bytecode, _constructorArgs);
-        }
+        // ZKsyncOS gateway deploys are EVM-equivalent and go through the deterministic CREATE2 factory.
+        result.targetAddress = Utils.DETERMINISTIC_CREATE2_ADDRESS;
+        bytes memory initCode = abi.encodePacked(_bytecode, _constructorArgs);
+        result.expectedAddress = Utils.getL2AddressViaDeterministicCreate2(_salt, initCode);
+        result.data = Utils.getDeterministicCreate2FactoryCalldata(_salt, initCode);
     }
 
     /// Emit a `forge verify-contract` line for a GW-side deploy. GW contracts

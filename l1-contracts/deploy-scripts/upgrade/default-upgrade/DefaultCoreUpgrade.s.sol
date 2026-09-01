@@ -41,7 +41,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     struct AdditionalConfigParams {
         uint256 newProtocolVersion;
-        bool isZKsyncOS;
         bool hasPreV32IntrospectionOverride;
         bool usePreV32IntrospectionOverride;
     }
@@ -51,7 +50,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     function initializeWithArgs(
         address bridgehubProxyAddress,
-        bool isZKsyncOS,
         bytes32 create2FactorySalt,
         string memory upgradeInputPath,
         string memory _outputPath
@@ -59,7 +57,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         string memory root = vm.projectRoot();
         upgradeInputPath = string.concat(root, upgradeInputPath);
 
-        initializeConfigWithArgs(bridgehubProxyAddress, isZKsyncOS, create2FactorySalt, upgradeInputPath);
+        initializeConfigWithArgs(bridgehubProxyAddress, create2FactorySalt, upgradeInputPath);
 
         upgradeConfig.outputPath = string.concat(root, _outputPath);
         upgradeConfig.initialized = true;
@@ -109,7 +107,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     function initializeConfigWithArgs(
         address bridgehubProxyAddress,
-        bool isZKsyncOS,
         bytes32 create2FactorySalt,
         string memory upgradeInputPath
     ) public virtual {
@@ -121,7 +118,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             setCreate2Salt(create2FactorySalt);
         }
 
-        additionalConfig.isZKsyncOS = isZKsyncOS;
+        // Only ZKsync OS ecosystems can be upgraded onto this release.
 
         // Optional override for pre-v32 introspection selection. Autodetection reads the protocol version of
         // a registered chain, which lags the L1 contracts: an ecosystem whose core contracts are already v32
@@ -154,9 +151,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         Governance governance = Governance(payable(coreAddresses.shared.governance));
         config.l1ChainId = block.chainid;
         config.deployerAddress = getBroadcasterAddress();
-        config.eraChainId = assetRouter.ERA_CHAIN_ID();
-        config.eraDiamondProxyAddress = bridgehub.getZKChain(assetRouter.ERA_CHAIN_ID());
-
         config.ownerAddress = assetRouter.owner();
 
         config.contracts.governanceSecurityCouncilAddress = governance.securityCouncil();
@@ -332,7 +326,11 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             abi.encode(stage2Calls)
         );
 
-        vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
+        // Upstream forge's keyed `vm.writeToml(json, path, key)` silently no-ops when the key
+        // does not exist in the file yet, so append sections by re-serializing into the same
+        // "root" object and rewriting the whole file instead.
+        string memory updatedToml = vm.serializeString("root", "governance_calls", governanceCallsSerialized);
+        vm.writeToml(updatedToml, upgradeConfig.outputPath);
     }
 
     function prepareDefaultEcosystemAdminCalls() public virtual returns (Call[] memory calls) {
@@ -494,11 +492,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice Load protocol version from genesis config
     function loadProtocolVersionFromGenesis() internal virtual returns (uint256) {
-        string memory genesisPath = Utils.genesisConfigPath(additionalConfig.isZKsyncOS);
-        return
-            ChainCreationParamsLib
-                .getChainCreationParams(genesisPath, additionalConfig.isZKsyncOS)
-                .latestProtocolVersion;
+        string memory genesisPath = Utils.genesisConfigPath();
+        return ChainCreationParamsLib.getChainCreationParams(genesisPath).latestProtocolVersion;
     }
 
     function getBroadcasterAddress() internal view virtual returns (address) {

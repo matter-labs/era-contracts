@@ -20,8 +20,10 @@
 //! [`verify_puh_immutables`] reads every immutable getter on the *new* PUH
 //! implementation and compares against either the current PUH (for "must-be-
 //! unchanged" immutables) or an expected artifact-derived address (for newly
-//! introduced immutables like `CHAIN_ASSET_HANDLER` and the per-flavor
-//! `ERA_CHAIN_TYPE_MANAGER` / `ZKSYNC_OS_CHAIN_TYPE_MANAGER`).
+//! introduced immutables like `CHAIN_ASSET_HANDLER` and
+//! `ZKSYNC_OS_CHAIN_TYPE_MANAGER`). The `ERA_CHAIN_TYPE_MANAGER` immutable
+//! is not checked — this OS-only build carries no `[ctms.era]` artifact to
+//! derive the expected value from.
 
 use alloy::{
     hex,
@@ -578,31 +580,6 @@ async fn verify_puh_immutables(
             Err(err) => result.report_error(&format!(
                 "Failed to call new PUH.CHAIN_ASSET_HANDLER(): {err}"
             )),
-        }
-    }
-
-    if let Some(era_ctm) = artifact
-        .ctms
-        .iter()
-        .find(|ctm| ctm.flavor == CtmFlavor::Era)
-    {
-        let expected = required_ctm_address(
-            era_ctm,
-            &["state_transition", "chain_type_manager_proxy"],
-            result,
-        );
-        if let Some(expected) = expected {
-            match new_impl.ERA_CHAIN_TYPE_MANAGER().call().await {
-                Ok(actual) => compare_puh_expected_address(
-                    result,
-                    "PUH.ERA_CHAIN_TYPE_MANAGER()",
-                    actual,
-                    expected,
-                ),
-                Err(err) => result.report_error(&format!(
-                    "Failed to call new PUH.ERA_CHAIN_TYPE_MANAGER(): {err}"
-                )),
-            }
         }
     }
 

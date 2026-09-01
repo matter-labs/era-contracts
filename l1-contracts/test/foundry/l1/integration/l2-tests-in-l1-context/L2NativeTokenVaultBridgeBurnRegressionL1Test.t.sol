@@ -4,53 +4,249 @@ pragma solidity ^0.8.20;
 
 // solhint-disable gas-custom-errors
 
-import {Test} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
+import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
+import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
+import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
+    L2_BASE_TOKEN_HOLDER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
+import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
+import {SharedL2ContractL1Deployer} from "./_SharedL2ContractL1Deployer.sol";
 
-import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
+contract L2NativeTokenVaultBridgeBurnRegressionL1Test is Test, SharedL2ContractL1Deployer {
+    using stdStorage for StdStorage;
 
-import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
+    function test_regression_bridgeBurnBaseTokenAsBridgedTokenCallsBurnMsgValue() external virtual {
+        L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
-import {L2NativeTokenVaultBridgeBurnRegressionTestAbstract} from "../l2-tests-abstract/L2NativeTokenVaultBridgeBurnRegressionTestAbstract.t.sol";
+        // Get the base token asset ID
+        bytes32 baseTokenAssetIdLocal = l2NativeTokenVault.BASE_TOKEN_ASSET_ID();
 
-import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
+        // The test needs the base token to be considered "bridged" (originChainId != block.chainid)
+        // to trigger the _bridgeBurnBridgedToken path where the bug was.
+        // Due to the way the test infrastructure handles storage for system contract addresses,
+        // we mock the originChainId return value to simulate the bridged token scenario.
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeCall(INativeTokenVaultBase.originChainId, (baseTokenAssetIdLocal)),
+            abi.encode(L1_CHAIN_ID)
+        );
 
-contract L2NativeTokenVaultBridgeBurnRegressionL1Test is
-    Test,
-    SharedL2ContractL1Deployer,
-    L2NativeTokenVaultBridgeBurnRegressionTestAbstract
-{
-    function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
+        // Verify setup - originChainId should now be L1_CHAIN_ID (10), different from block.chainid (31337)
+        uint256 storedOriginChainId = l2NativeTokenVault.originChainId(baseTokenAssetIdLocal);
+        assertEq(storedOriginChainId, L1_CHAIN_ID, "Base token originChainId should be L1_CHAIN_ID");
+        assertNotEq(
+            storedOriginChainId,
+            block.chainid,
+            "Base token should be considered bridged (originChainId != block.chainid)"
+        );
 
-    function initSystemContracts(
-        SystemContractsArgs memory _args
-    ) internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {
-        super.initSystemContracts(_args);
+        // Prepare bridgeBurn parameters
+        uint256 destinationChainId = L1_CHAIN_ID;
+        uint256 depositAmount = 1 ether;
+        address receiver = makeAddr("receiver");
+        address originalCaller = makeAddr("originalCaller");
+        // Data format: (amount, receiver, tokenAddress) - tokenAddress=0 means use stored address
+        bytes memory data = abi.encode(depositAmount, receiver, address(0));
+
+        // Deal ETH to the asset router (needed because bridgeBurn is called with msg.value)
+        vm.deal(L2_ASSET_ROUTER_ADDR, depositAmount);
+
+        // The asset tracker is already initialized via L2UtilsBase.setUp, but with bytes32(0) as the base
+        // token asset id. Overwrite BASE_TOKEN_ASSET_ID to the actual local value and register it through the
+        // vault — the genesis-path entry point, which is the only one left — so the BaseTokenHolder
+        // accounting works. The storage write is the only way to reach this state: `initL2` already ran with
+        // the wrong id in `setUp` and is one-shot.
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(baseTokenAssetIdLocal);
+        if (!IL2AssetTracker(L2_ASSET_TRACKER_ADDR).isAssetRegistered(baseTokenAssetIdLocal)) {
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            l2NativeTokenVault.registerBaseTokenIfNeeded();
+        }
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
+            abi.encode(L1_CHAIN_ID)
+        );
+
+        // Replace the dummy holder with the real implementation so the regression test
+        // observes the full tracker-accounting path.
+        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
+
+        // Record the BaseTokenHolder balance before
+        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
+        uint256 chainBalanceBefore = IL2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(
+            block.chainid,
+            baseTokenAssetIdLocal
+        );
+        uint256 totalWithdrawalsBefore = _readTotalWithdrawalsToL1(baseTokenAssetIdLocal);
+
+        // Call bridgeBurn from the asset router (which is the only allowed caller)
+        // Before the fix: This would revert because bridgeBurn would try to call
+        // IBridgedStandardToken(L2_BASE_TOKEN_SYSTEM_CONTRACT).bridgeBurn() which doesn't exist
+        // After the fix: This should succeed and send ETH to BaseTokenHolder
+        vm.prank(L2_ASSET_ROUTER_ADDR);
+        IAssetHandler(address(l2NativeTokenVault)).bridgeBurn{value: depositAmount}(
+            destinationChainId,
+            0, // _msgValue (unused in this context)
+            baseTokenAssetIdLocal,
+            originalCaller,
+            data
+        );
+
+        // Verify that BaseTokenHolder received the ETH (effectively "burning" from circulation)
+        uint256 holderBalanceAfter = L2_BASE_TOKEN_HOLDER_ADDR.balance;
+        assertEq(
+            holderBalanceAfter - holderBalanceBefore,
+            depositAmount,
+            "BaseTokenHolder should receive the deposit amount"
+        );
+        assertEq(
+            IL2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, baseTokenAssetIdLocal),
+            chainBalanceBefore,
+            "chainBalance should not change for bridged base token burns on L2"
+        );
+        assertEq(
+            _readTotalWithdrawalsToL1(baseTokenAssetIdLocal) - totalWithdrawalsBefore,
+            depositAmount,
+            "totalWithdrawalsToL1 should only increase once for bridged base token burn"
+        );
     }
 
-    function deployL2Contracts(
-        uint256 _l1ChainId
-    ) public virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {
-        super.deployL2Contracts(_l1ChainId);
+    /// @notice Test that bridgeBurn still works correctly for regular bridged tokens (non-base token)
+    /// @dev This is a sanity check to ensure the fix doesn't break normal bridged token burning
+    function test_regression_bridgeBurnRegularBridgedTokenStillCallsBridgeBurn() external virtual {
+        L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+
+        // Create a regular bridged token (not the base token)
+        uint256 originChainIdLocal = L1_CHAIN_ID;
+        address originToken = makeAddr("l1Token");
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(originChainIdLocal, originToken);
+
+        // Calculate the expected L2 token address
+        address expectedL2TokenAddress = l2NativeTokenVault.calculateCreate2TokenAddress(
+            originChainIdLocal,
+            originToken
+        );
+
+        // Set up the token in NTV storage
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig(INativeTokenVaultBase.tokenAddress.selector)
+            .with_key(assetId)
+            .checked_write(expectedL2TokenAddress);
+
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig(INativeTokenVaultBase.assetId.selector)
+            .with_key(expectedL2TokenAddress)
+            .checked_write(assetId);
+
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig(INativeTokenVaultBase.originChainId.selector)
+            .with_key(assetId)
+            .checked_write(originChainIdLocal);
+
+        // Verify setup - originChainId should be different from block.chainid
+        assertNotEq(l2NativeTokenVault.originChainId(assetId), block.chainid);
+
+        // Prepare bridgeBurn parameters
+        uint256 destinationChainId = 12345;
+        uint256 depositAmount = 100;
+        address receiver = makeAddr("receiver");
+        address originalCaller = makeAddr("originalCaller");
+        // Data format: (amount, receiver, tokenAddress) - tokenAddress=0 means use stored address
+        bytes memory data = abi.encode(depositAmount, receiver, address(0));
+
+        // Mock the bridgeBurn call on the bridged token
+        vm.mockCall(
+            expectedL2TokenAddress,
+            abi.encodeCall(IBridgedStandardToken.bridgeBurn, (originalCaller, depositAmount)),
+            abi.encode()
+        );
+
+        // Mock the originToken call
+        vm.mockCall(
+            expectedL2TokenAddress,
+            abi.encodeCall(IBridgedStandardToken.originToken, ()),
+            abi.encode(originToken)
+        );
+
+        // Mock the ERC20 metadata calls (name, symbol, decimals)
+        // These are called by BridgeHelper.getERC20Getters when getting ERC20 metadata
+        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20Metadata.name, ()), abi.encode("TestToken"));
+        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20Metadata.symbol, ()), abi.encode("TT"));
+        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20Metadata.decimals, ()), abi.encode(uint8(18)));
+
+        // Mock totalSupply() - called by L2AssetTracker._registerLegacyToken for bridged tokens
+        // (originChainId != block.chainid) during _registerLegacyTokenIfNeeded
+        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(uint256(0)));
+
+        // Expect the bridgeBurn call on the bridged token
+        vm.expectCall(
+            expectedL2TokenAddress,
+            abi.encodeCall(IBridgedStandardToken.bridgeBurn, (originalCaller, depositAmount))
+        );
+
+        // Call bridgeBurn from the asset router
+        vm.prank(L2_ASSET_ROUTER_ADDR);
+        IAssetHandler(address(l2NativeTokenVault)).bridgeBurn(destinationChainId, 0, assetId, originalCaller, data);
+
+        // The regular bridgeBurn should have been called on the bridged token
     }
 
-    function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getChainCreationFacetCuts(stateTransition);
-    }
+    /// @notice Test the base token bridgeBurn with different origin chain scenarios
+    /// @dev Fuzz test to verify the fix works for various amounts
+    function testFuzz_regression_bridgeBurnBaseTokenVariousAmounts(uint256 depositAmount) external virtual {
+        vm.assume(depositAmount > 0 && depositAmount < type(uint128).max);
 
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getUpgradeAddedFacetCuts(stateTransition);
-    }
+        L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        bytes32 baseTokenAssetIdLocal = l2NativeTokenVault.BASE_TOKEN_ASSET_ID();
 
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName, isZKBytecode);
+        // The test setup already initializes originChainId[baseTokenAssetId] = L1_CHAIN_ID
+        // Since block.chainid != L1_CHAIN_ID, the bridged token path is taken
+
+        // Prepare parameters
+        uint256 destinationChainId = 12345;
+        address receiver = makeAddr("receiver");
+        address originalCaller = makeAddr("originalCaller");
+        // Data format: (amount, receiver, tokenAddress)
+        bytes memory data = abi.encode(depositAmount, receiver, address(0));
+
+        vm.deal(L2_ASSET_ROUTER_ADDR, depositAmount);
+
+        // The DummyL2BaseTokenHolder deployed in test setup already has burnAndStartBridging()
+
+        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
+
+        // Should succeed and send ETH to BaseTokenHolder
+        vm.prank(L2_ASSET_ROUTER_ADDR);
+        IAssetHandler(address(l2NativeTokenVault)).bridgeBurn{value: depositAmount}(
+            destinationChainId,
+            0,
+            baseTokenAssetIdLocal,
+            originalCaller,
+            data
+        );
+
+        // Verify BaseTokenHolder received the ETH
+        assertEq(
+            L2_BASE_TOKEN_HOLDER_ADDR.balance - holderBalanceBefore,
+            depositAmount,
+            "BaseTokenHolder should receive the deposit amount"
+        );
     }
 }

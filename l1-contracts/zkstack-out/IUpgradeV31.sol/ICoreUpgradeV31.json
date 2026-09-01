@@ -14,11 +14,6 @@
             "internalType": "address"
           },
           {
-            "name": "isZKsyncOS",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
             "name": "create2FactorySalt",
             "type": "bytes32",
             "internalType": "bytes32"

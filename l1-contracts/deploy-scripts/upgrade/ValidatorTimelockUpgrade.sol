@@ -38,12 +38,7 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
 
     function deployImplementation(address owner, address bridgehub) internal returns (address) {
         return
-            deployViaCreate2AndNotify(
-                type(MultisigCommitter).creationCode,
-                abi.encode(bridgehub),
-                "MultisigCommitter",
-                false
-            );
+            deployViaCreate2AndNotify(type(MultisigCommitter).creationCode, abi.encode(bridgehub), "MultisigCommitter");
     }
 
     function prepareUpgradeValidatorTimelockCall(

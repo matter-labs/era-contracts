@@ -25,13 +25,13 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {
     IChainTypeManager,
     ChainCreationParams,
     ChainTypeManagerInitializeData
 } from "contracts/state-transition/IChainTypeManager.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
@@ -43,7 +43,6 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
@@ -53,8 +52,8 @@ import {PermissionlessValidator} from "contracts/state-transition/validators/Per
 contract ChainTypeManagerTest is UtilsCallMockerTest {
     using stdStorage for StdStorage;
 
-    EraChainTypeManager internal chainTypeManager;
-    EraChainTypeManager internal chainContractAddress;
+    ZKsyncOSChainTypeManager internal chainTypeManager;
+    ZKsyncOSChainTypeManager internal chainContractAddress;
     L1GenesisUpgrade internal genesisUpgradeContract;
     L1Bridgehub internal bridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
@@ -74,10 +73,10 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     address internal newChainAdmin;
     uint256 l1ChainId = 5;
     uint256 chainId = 112;
-    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(this))));
     bytes internal forceDeploymentsData = hex"";
 
-    uint256 eraChainId = 9;
+    uint256 zkChainId = 9;
     uint256 internal constant MAX_NUMBER_OF_ZK_CHAINS = 10;
 
     Diamond.FacetCut[] internal facetCuts;
@@ -124,8 +123,13 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
 
         newChainAdmin = makeAddr("chainadmin");
 
-        chainTypeManager = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
-        diamondInit = address(new DiamondInit(false));
+        chainTypeManager = new ZKsyncOSChainTypeManager(
+            address(bridgehub),
+            interopCenterAddress,
+            address(0),
+            address(0)
+        );
+        diamondInit = address(new DiamondInit(true));
         genesisUpgradeContract = new L1GenesisUpgrade();
 
         facetCuts.push(
@@ -226,13 +230,16 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             admin,
             abi.encodeCall(IChainTypeManager.initialize, ctmInitializeData)
         );
-        chainContractAddress = EraChainTypeManager(address(transparentUpgradeableProxy));
+        chainContractAddress = ZKsyncOSChainTypeManager(address(transparentUpgradeableProxy));
 
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
         InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
+        initializeData.l2BootloaderBytecodeHash = bytes32(0);
+        initializeData.l2DefaultAccountBytecodeHash = bytes32(0);
+        initializeData.l2EvmEmulatorBytecodeHash = bytes32(0);
 
         bytes memory initCalldata = abi.encode(initializeData);
 

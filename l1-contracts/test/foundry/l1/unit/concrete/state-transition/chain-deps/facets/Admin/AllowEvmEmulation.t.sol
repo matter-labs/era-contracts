@@ -11,6 +11,11 @@ import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol
 contract AllowEvmEmulationTest is AdminTest {
     event EnableEvmEmulator();
 
+    function setUp() public override {
+        super.setUp();
+        utilsFacet.util_setZksyncOS(false);
+    }
+
     function test_revertWhen_calledByNonAdmin() public {
         address nonAdmin = makeAddr("nonAdmin");
 

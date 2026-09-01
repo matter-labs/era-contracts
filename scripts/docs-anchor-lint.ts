@@ -127,10 +127,15 @@ function listedSourceFiles(): string[] {
     encoding: "utf-8",
     maxBuffer: 64 * 1024 * 1024,
   });
-  return out
-    .split("\n")
-    .filter(Boolean)
-    .filter((f) => f !== SELF_PATH);
+  return (
+    out
+      .split("\n")
+      .filter(Boolean)
+      .filter((f) => f !== SELF_PATH)
+      // `git ls-files` reads the index, which still lists files deleted in the
+      // working tree but not yet staged — skip those.
+      .filter((f) => fs.existsSync(f))
+  );
 }
 
 // Keyed by path relative to DOCS_DIR (e.g. `atomicity/flow.md`), so nested docs are addressable
