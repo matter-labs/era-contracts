@@ -406,8 +406,6 @@ error RegistryHashChangeToZero();
 error RegistryInventoryLengthMismatch(uint256 expected, uint256 actual);
 // 0xb40929f4
 error RegistryMemberHasNoFixedAddress(uint256 member);
-// 0x30f6031b
-error RegistryMissingBaseSystemHash();
 // 0xa0c88a92
 error RegistryPinTargetHasNoCode(address target);
 // 0x0d122829
