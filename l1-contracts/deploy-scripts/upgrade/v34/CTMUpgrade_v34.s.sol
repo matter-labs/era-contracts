@@ -156,6 +156,15 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         // live EIP-1967 slot rather than any address book — the migration validates every row
         // against it, so a stale book entry would fail loudly at the wrong time.
         ProxyAdmin ctmProxyAdmin = ProxyAdmin(Utils.getProxyAdminAddress(ctmProxy));
+        // The two-executor model hands the CTM domain's admin to the CTM executor and the
+        // ecosystem's to the ecosystem executor — a SHARED admin cannot be handed to both, and
+        // the collision would only surface as a stage-1 revert. ZKsyncOS CTMs (the only ones
+        // this release upgrades) are deployed with their own admin; Era CTMs on old ecosystems
+        // share the ecosystem's and would need an admin split first.
+        require(
+            address(ctmProxyAdmin) != coreAddresses.shared.transparentProxyAdmin,
+            "CTM domain shares the ecosystem ProxyAdmin; split the admin before the bootstrap"
+        );
 
         // Both go through the CREATE2 factory like every other prepare deployment: the Safe
         // bundle replays only factory transactions, so a plain CREATE here would leave the

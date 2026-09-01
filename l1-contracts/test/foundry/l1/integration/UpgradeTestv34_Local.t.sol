@@ -28,6 +28,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {LegacyTestAdminFacet} from "contracts/dev-contracts/test/LegacyTestAdminFacet.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IAdminV31} from "../../../../deploy-scripts/utils/UpgradeChainCall.sol";
 import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils.sol";
@@ -193,6 +194,24 @@ contract UpgradeIntegrationTest_v34_Local is
         IChainTypeManager(ctm).executeUpgrade(chainId, addCut);
     }
 
+    /// @dev The local fixture is Era-shaped: the CTM proxy shares the ecosystem's
+    ///      transparentProxyAdmin. Production ZKsyncOS CTMs sit under their OWN ProxyAdmin
+    ///      (see upgrade-envs/v0.31.0-interopB), which the v34 bootstrap requires — the core
+    ///      leg hands the ecosystem admin to the ecosystem executor, the CTM leg hands the
+    ///      CTM-domain admin to the CTM executor. Model that shape by moving the CTM proxy
+    ///      onto a fresh admin (owned by the same identity as the shared one) before prepare.
+    function _splitCTMProxyAdmin() private {
+        address ctm = address(addresses.chainTypeManager);
+        ProxyAdmin sharedAdmin = ProxyAdmin(DeployScriptUtils.getProxyAdminAddress(ctm));
+        address sharedAdminOwner = sharedAdmin.owner();
+
+        ProxyAdmin ctmAdmin = new ProxyAdmin();
+        ctmAdmin.transferOwnership(sharedAdminOwner);
+
+        vm.prank(sharedAdminOwner);
+        sharedAdmin.changeProxyAdmin(ITransparentUpgradeableProxy(payable(ctm)), address(ctmAdmin));
+    }
+
     function setUp() public {
         console.log("setUp: Starting");
         _deployL1Contracts();
@@ -202,6 +221,9 @@ contract UpgradeIntegrationTest_v34_Local is
         _deployEra();
         chainId = eraZKChainId;
         acceptPendingAdmin();
+
+        _splitCTMProxyAdmin();
+        console.log("setUp: CTM proxy moved onto its own ProxyAdmin");
 
         ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/foundry-upgrade.toml";
         ECOSYSTEM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
