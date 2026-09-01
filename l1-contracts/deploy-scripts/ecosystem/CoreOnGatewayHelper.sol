@@ -16,6 +16,7 @@ import {
     ZKsyncOSUpgradeType
 } from "./CoreContract.sol";
 import {UnknownCoreContract, UnknownZkSyncOsSystemContract, UnknownEraVmSystemContract} from "./DeployScriptErrors.sol";
+import {L2InventoryLib} from "contracts/upgrades/registry/libraries/L2InventoryLib.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
@@ -272,28 +273,10 @@ library CoreOnGatewayHelper {
     }
 
     /// @notice Resolve a L2EcosystemContract enum to its canonical L2 address.
-    /// @dev Only covers contracts with well-known constant addresses.
+    /// @dev Thin delegate to the on-chain inventory ({L2InventoryLib}), so deploy tooling and the
+    ///      transition derivation can never place a member at different addresses.
     function _resolveAddress(L2EcosystemContract _c) internal pure returns (address) {
-        if (_c == L2EcosystemContract.L2V34Upgrade) {
-            return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
-        }
-        if (_c == L2EcosystemContract.L2Bridgehub) return L2_BRIDGEHUB_ADDR;
-        if (_c == L2EcosystemContract.L2AssetRouter) return L2_ASSET_ROUTER_ADDR;
-        if (_c == L2EcosystemContract.L2NativeTokenVault) return L2_NATIVE_TOKEN_VAULT_ADDR;
-        if (_c == L2EcosystemContract.L2MessageRoot) return L2_MESSAGE_ROOT_ADDR;
-        if (_c == L2EcosystemContract.L2WrappedBaseToken) return L2_WRAPPED_BASE_TOKEN_IMPL_ADDR;
-        if (_c == L2EcosystemContract.L2MessageVerification) return address(L2_MESSAGE_VERIFICATION);
-        if (_c == L2EcosystemContract.L2ChainAssetHandler) return L2_CHAIN_ASSET_HANDLER_ADDR;
-        if (_c == L2EcosystemContract.L2InteropRootStorage) return address(L2_INTEROP_ROOT_STORAGE);
-        if (_c == L2EcosystemContract.BaseTokenHolder) return L2_BASE_TOKEN_HOLDER_ADDR;
-        if (_c == L2EcosystemContract.L2AssetTracker) return L2_ASSET_TRACKER_ADDR;
-        if (_c == L2EcosystemContract.InteropCenter) return L2_INTEROP_CENTER_ADDR;
-        if (_c == L2EcosystemContract.InteropAttributeParser) return L2_INTEROP_ATTRIBUTE_PARSER_ADDR;
-        if (_c == L2EcosystemContract.L2InteropHandler) return L2_INTEROP_HANDLER_ADDR;
-        if (_c == L2EcosystemContract.UpgradeableBeaconDeployer) return L2_NTV_BEACON_DEPLOYER_ADDR;
-        if (_c == L2EcosystemContract.L2InteropCommitmentTree) return L2_INTEROP_COMMITMENT_TREE_ADDR;
-        if (_c == L2EcosystemContract.AtomicFlowManager) return L2_ATOMIC_FLOW_MANAGER_ADDR;
-        revert UnknownCoreContract();
+        return L2InventoryLib.fixedAddress(_c);
     }
 
     // ======================== ZkSyncOsSystemContract resolvers ========================

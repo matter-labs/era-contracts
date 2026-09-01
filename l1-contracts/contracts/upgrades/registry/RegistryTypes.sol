@@ -58,12 +58,11 @@ struct ReleaseGenesisData {
 ///        L1 inventories): per member, the VM-specific deployed-bytecode descriptor a force
 ///        deployment of this release's code at the member's fixed address carries
 ///        (`UniversalContractUpgradeInfo.deployedBytecodeInfo`); an empty row means the member
-///        is not part of this release's force-deployed set. Pinned so transitions can derive
-///        their L2 deployments from the release pair instead of a parallel script-side
-///        composition (TODO(EVM-1644): the derivation; until then the table is pinned data
-///        only). The kernel built-ins not yet in the enum join by appending members — a release
-///        built before an append keeps its shorter table, so consumers must index by member,
-///        not assume the current count.
+///        is not part of this release's force-deployed set. Transitions DERIVE their L2 force
+///        deployments from this table ({TransitionDerivationLib.deriveL2Deployments}) — there is
+///        no parallel script-side composition to drift from. A release built before an enum
+///        append keeps its shorter table, so consumers index by member, never assume the
+///        current count.
 // solhint-disable-next-line gas-struct-packing
 struct ReleaseManifest {
     PinnedContract diamondInit;
@@ -74,15 +73,32 @@ struct ReleaseManifest {
     bytes[] l2BytecodeInfos;
 }
 
-/// @notice The complete, typed L2 side of one transition: the force-deployments, the delegate
-///         call the `L2ComplexUpgrader` performs after them, and the factory dependencies the
-///         L1 -> L2 transaction carries. Shape-validated at transition initialization — a plan
-///         that commits data the composed transaction would not execute refuses to exist.
+/// @notice The complete, typed L2 side of one transition AS EXECUTED: the force-deployments,
+///         the delegate call the `L2ComplexUpgrader` performs after them, and the factory
+///         dependencies the L1 -> L2 transaction carries. This is the FINAL shape a transition
+///         serves (`l2Plan()`) and the composer executes — its `deployments` are the
+///         table-derived set ({TransitionDerivationLib.deriveL2Deployments}) followed by the
+///         authored extras; only {AuthoredL2Plan} is manifest data.
+struct L2UpgradePlan {
+    IComplexUpgrader.UniversalContractUpgradeInfo[] deployments;
+    address delegateTo;
+    bytes delegateCalldata;
+    uint256[] factoryDepHashes;
+}
+
+/// @notice The AUTHORED part of a transition's L2 side — what the manifest pins on top of the
+///         table-derived force deployments. Shape-validated (against the combined plan) at
+///         transition initialization — a plan that commits data the composed transaction would
+///         not execute refuses to exist.
 /// @dev This is REVIEWED-AND-PINNED data, not proven state: L1 cannot verify L2 execution
 ///      effects, so the L1-side convergence guarantee deliberately does not extend here (see
 ///      the transition contract docs).
-struct L2UpgradePlan {
-    IComplexUpgrader.UniversalContractUpgradeInfo[] deployments;
+/// @param extraDeployments Force deployments the release table cannot express — in practice the
+///        version-specific upgrade delegate, force-deployed Unsafe at a bytecode-derived
+///        address. Appended AFTER the derived set (order between deployments is free; the
+///        delegatecall always runs last).
+struct AuthoredL2Plan {
+    IComplexUpgrader.UniversalContractUpgradeInfo[] extraDeployments;
     address delegateTo;
     bytes delegateCalldata;
     uint256[] factoryDepHashes;
@@ -110,7 +126,7 @@ struct TransitionManifest {
     ProxyUpgradeRow[] proxyUpgrades;
     uint256 oldProtocolVersionDeadline;
     uint256 upgradeTimestamp;
-    L2UpgradePlan l2Plan;
+    AuthoredL2Plan l2Plan;
 }
 
 /// @notice One proxy's upgrade row: a SOURCE-CHECKED edge, not just a target.
@@ -159,17 +175,22 @@ struct CoreRegistryManifest {
 ///        every release this CTM ever pins must run exactly that code.
 /// @param newProtocolVersion The version the CTM moves to.
 /// @param oldProtocolVersionDeadline Until when the departing version stays usable.
-/// @param upgradeCut The diamond cut committed for chains upgrading across this edge. It cannot
-///        be DERIVED the way a transition's is: the departing version predates releases, so
-///        there is no `fromRelease` to diff against. It is therefore pinned data, committed by
-///        the manifest hash, with its init target pinned separately below. Its `facetCuts` carry
-///        no per-facet pins — the one unpinned payload here, and the reason this edge is
-///        reviewed as legacy calldata rather than as a derived delta.
+/// @param upgradeCut The diamond cut committed for chains upgrading across this edge. The facet
+///        delta cannot be derived at CONSTRUCTION the way a transition's is — the departing
+///        version predates releases, so there is no `fromRelease` to diff against — so the cut
+///        carries NO facet cuts at all: its init target (pinned below) is the bootstrap engine,
+///        which derives the removals from each chain's own live diamond storage and the installs
+///        from its immutable-pinned genesis release AT EXECUTION. What remains reviewed as
+///        pinned calldata is the engine init payload (the `ProposedUpgrade`).
 /// @param upgradeCutInitCodehash Inline pin of `upgradeCut.initAddress`.
 /// @param ctmExecutor The pinned `CTMUpgradeExecutor` that receives BOTH CTM ownership and the
 ///        CTM-domain `ProxyAdmin` — the whole CTM domain lands under one executor. It must be
 ///        BOUND to `ctm` AND to `ctmProxyAdmin`, otherwise its fixed entrypoints could never
 ///        drive what it is handed.
+/// @param upgradeTimer The pinned `GovernanceUpgradeTimer` whose `checkDeadline()` gates the
+///        edge: stage 0 starts the timer, and `migrate()` refuses to run until the operational
+///        window has passed — the stage sequencing is enforced by the object itself, not by the
+///        order of calls in a reviewed bundle.
 struct BootstrapManifest {
     address ctm;
     uint256 expectedProtocolVersion;
@@ -181,6 +202,7 @@ struct BootstrapManifest {
     Diamond.DiamondCutData upgradeCut;
     bytes32 upgradeCutInitCodehash;
     PinnedContract ctmExecutor;
+    PinnedContract upgradeTimer;
 }
 
 /// @notice Everything the deploy flow feeds into a release manifest at build time.

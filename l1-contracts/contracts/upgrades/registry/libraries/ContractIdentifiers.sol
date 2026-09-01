@@ -32,7 +32,17 @@ enum L2EcosystemContract {
     // Atomic-interop built-ins, part of `getZKsyncOSOnlyContracts`: the commitment tree's storage is read
     // by the ZKsync OS bootloader, and Era chains have no atomic interop.
     L2InteropCommitmentTree,
-    AtomicFlowManager
+    AtomicFlowManager,
+    // ---- Appended members (the enum is append-only) ----
+    // ZKsync OS kernel built-ins with l1-contracts EVM bytecodes (system space, 0x800x). Members
+    // here so the release's L2 bytecode table covers the FULL force-deployed set and transitions
+    // can derive their L2 deployments from it.
+    L2BaseToken,
+    L1Messenger,
+    SystemContext,
+    // The retired v31 GWAssetTracker's system proxy: its table row pins the neutralizing
+    // implementation (`EmptyContract`) every release re-asserts at the reserved address.
+    RemovedGWAssetTracker
 }
 
 /// @notice Canonical identifier for CTM / state-transition contracts.

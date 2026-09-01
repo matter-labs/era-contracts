@@ -11,6 +11,7 @@ import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {CTMUpgradeExecutor} from "../executors/CTMUpgradeExecutor.sol";
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
+import {GovernanceUpgradeTimer} from "../../GovernanceUpgradeTimer.sol";
 import {
     BootstrapAlreadyExecuted,
     BootstrapAuthorityNotHeld,
@@ -58,7 +59,8 @@ contract RegistryBootstrapMigration {
             _manifest.ctm == address(0) ||
             address(_manifest.ctmProxyAdmin) == address(0) ||
             _manifest.currentRelease.addr == address(0) ||
-            _manifest.ctmExecutor.addr == address(0)
+            _manifest.ctmExecutor.addr == address(0) ||
+            _manifest.upgradeTimer.addr == address(0)
         ) {
             revert ZeroAddress();
         }
@@ -85,14 +87,19 @@ contract RegistryBootstrapMigration {
         return abi.decode(encodedManifest, (BootstrapManifest));
     }
 
-    /// @notice Reverts unless the live ecosystem is exactly the starting state the manifest names.
-    /// @dev Runs on the execution path, so a drifted ecosystem cannot be migrated by accident.
+    /// @notice Reverts unless the live ecosystem is exactly the starting state the manifest names
+    ///         AND the edge is executable now: the pinned timer's operational window has passed
+    ///         (which also proves stage 0 started it — `checkDeadline` rejects an unstarted timer).
+    /// @dev Runs on the execution path, so a drifted ecosystem cannot be migrated by accident and
+    ///      the stage sequencing is enforced by the object itself, not by call order in a bundle.
     /// @dev NOT a complete precondition oracle: `setNewVersionUpgrade` additionally requires chain
-    ///      migrations to be paused, which is bundle SEQUENCING (stage 0 opens the window) rather
-    ///      than ecosystem state this object pins. A migration that passes here can still revert
-    ///      inside `migrate` if it is run outside that window.
+    ///      migrations to be paused — ecosystem-domain state governance pauses in stage 0, enforced
+    ///      on-chain by the CTM's own version-edge commit rather than pinned here.
     function validate() public view {
         BootstrapManifest memory m = getManifest();
+
+        CodehashPinLib.requirePin(m.upgradeTimer);
+        GovernanceUpgradeTimer(m.upgradeTimer.addr).checkDeadline();
 
         // Authority must already rest here, or `migrate` could not perform any of the work.
         address ctmOwner = Ownable2Step(m.ctm).owner();
@@ -189,13 +196,13 @@ contract RegistryBootstrapMigration {
         ctm.setCurrentRelease(m.currentRelease.addr);
 
         // Authority leaves in the same transaction it arrived. The ProxyAdmin is plain `Ownable`,
-        // so its transfer lands immediately. The CTM is `Ownable2Step`, so this NOMINATES the
-        // executor; the handover is completed by `CTMUpgradeExecutor.acceptCTMOwnership()`, which
-        // is owner-gated on the executor and therefore the governance bundle's final call. That
-        // gate is deliberately not loosened here: an unguarded accept would widen the executor's
-        // only ownership-acquiring entrypoint to save one reviewable call.
+        // so its transfer lands immediately. The CTM is `Ownable2Step`: nominate the executor and
+        // complete the handover through its `acceptCTMOwnership()` in the SAME transaction — the
+        // accept is permissionless-safe (see its docs), so the CTM never sits owned by this
+        // spent one-shot object waiting for a separate governance call.
         Ownable2Step(m.ctm).transferOwnership(m.ctmExecutor.addr);
         m.ctmProxyAdmin.transferOwnership(m.ctmExecutor.addr);
+        CTMUpgradeExecutor(payable(m.ctmExecutor.addr)).acceptCTMOwnership();
 
         emit EcosystemBootstrapped(m.ctm, m.currentRelease.addr, m.newProtocolVersion);
     }

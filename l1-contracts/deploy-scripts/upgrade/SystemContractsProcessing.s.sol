@@ -35,6 +35,7 @@ import {
     ZKsyncOSUpgradeType
 } from "../ecosystem/CoreContract.sol";
 import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {TransitionDerivationLib} from "contracts/upgrades/registry/libraries/TransitionDerivationLib.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 import {DeduplicateBytecodesCountMismatch} from "../ecosystem/DeployScriptErrors.sol";
 import {EraForceDeploymentsLib} from "./default-upgrade/EraForceDeploymentsLib.sol";
@@ -397,61 +398,28 @@ library SystemContractsProcessing {
 
     /// @notice Build the base ZKsyncOS force deployment array.
     /// Parallel to `getBaseForceDeployments()` for Era — this is the ZKsyncOS equivalent.
-    /// Loads bytecode info per contract instead of materializing one large shared cache for this path.
+    /// @dev DERIVED from the release's L2 bytecode table via the SAME function the on-chain
+    ///      transition derivation uses, so the script-composed bootstrap L2 leg and every
+    ///      registry-driven edge after it are one code path. Which contracts participate is
+    ///      encoded once, in which table rows `buildL2BytecodeInfoTable` fills.
     function getBaseZKsyncOSForceDeployments()
         internal
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
     {
-        L2EcosystemContract[] memory fixedAddressCoreContracts = getFixedAddressCoreContracts();
-        L2EcosystemContract[] memory zksyncOSOnlyContracts = getZKsyncOSOnlyContracts();
-        ZkSyncOsSystemContract[] memory sysContracts = getZKsyncOSExtraSystemContracts();
-
-        // SystemContractProxyAdmin is intentionally NOT force-deployed here: it's a direct-deployed
-        // ProxyAdmin already present from genesis (owned by the ComplexUpgrader), so re-deploying it
-        // would require an unsafe overwrite. _setupProxyAdmin only reads its owner(), which is already
-        // correct. (L2WrappedBaseToken is likewise excluded — it is no longer in
-        // getFixedAddressCoreContracts.) The L2V34Upgrade delegate target remains the only legitimate
-        // ZKsyncOS unsafe force deployment (added in CTMUpgrade_v31); the PUVT guards that no other
-        // unsafe force deployment is present.
-        // The removed v31 GWAssetTracker's proxy gets its implementation swapped for EmptyContract.
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory neutralizations = getRemovedTrackerNeutralizations();
-
-        uint256 totalBase = fixedAddressCoreContracts.length +
-            zksyncOSOnlyContracts.length +
-            sysContracts.length +
-            neutralizations.length;
-
-        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](totalBase);
-
-        uint256 index;
-        // Fixed-address core contracts (0x10000+)
-        for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
-            deployments[index++] = _buildZKsyncOSEntry(fixedAddressCoreContracts[i]);
-        }
-        // ZKsync-OS-only contracts (currently the atomic-interop built-ins at 0x10012 / 0x10014).
-        // Predeployed in the ZKsync OS genesis, so a from-scratch chain already has them; a chain that
-        // predates the release gets them here, which is what lets `_initializeV32Contracts` initialize
-        // them on the upgrade path too.
-        for (uint256 i = 0; i < zksyncOSOnlyContracts.length; i++) {
-            deployments[index++] = _buildZKsyncOSEntry(zksyncOSOnlyContracts[i]);
-        }
-        // System contracts with l1-contracts EVM bytecodes (0x800x)
-        for (uint256 i = 0; i < sysContracts.length; i++) {
-            deployments[index++] = _buildZKsyncOSEntryForSystemContract(sysContracts[i]);
-        }
-
-        for (uint256 i = 0; i < neutralizations.length; i++) {
-            deployments[index++] = neutralizations[i];
-        }
+        return TransitionDerivationLib.deriveL2DeploymentsFromTable(buildL2BytecodeInfoTable(true), true);
     }
 
     /// @notice Builds the release manifest's enum-indexed L2 bytecode table
-    ///         (`ReleaseManifest.l2BytecodeInfos`): per genesis-force-deployed member, the
+    ///         (`ReleaseManifest.l2BytecodeInfos`): per force-deployed member, the
     ///         deployed-bytecode descriptor its force deployment carries; every other slot stays
-    ///         an explicit empty. The kernel built-ins (`ZkSyncOsSystemContract`) and the
-    ///         removed-tracker neutralization are not `L2EcosystemContract` members yet; they
-    ///         join the table when the enum is appended for the transition-side derivation
-    ///         (EVM-1644).
+    ///         an explicit empty.
+    /// @dev Deliberately UNFILLED rows, and why:
+    ///      - SystemContractProxyAdmin: a direct-deployed ProxyAdmin already present from genesis
+    ///        (owned by the ComplexUpgrader); re-deploying it would require an unsafe overwrite.
+    ///      - L2WrappedBaseToken: upgrades must not touch the impl on either VM (since v31).
+    ///      - L2V34Upgrade: the version-specific delegate is an UNSAFE deployment at a
+    ///        bytecode-derived address — pinned transition data (`AuthoredL2Plan.extraDeployments`),
+    ///        never table-derived; the PUVT guards that no other unsafe deployment is present.
     function buildL2BytecodeInfoTable(bool _isZKsyncOS) internal returns (bytes[] memory rows) {
         rows = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
         L2EcosystemContract[] memory core = getFixedAddressCoreContracts();
@@ -461,11 +429,41 @@ library SystemContractsProcessing {
                 : CoreOnGatewayHelper.getEraForceDeployment(core[i]).deployedBytecodeInfo;
         }
         if (_isZKsyncOS) {
+            // ZKsync-OS-only contracts (currently the atomic-interop built-ins at 0x10012 / 0x10014).
+            // Predeployed in the ZKsync OS genesis, so a from-scratch chain already has them; a chain
+            // that predates the release gets them on the upgrade path, which is what lets
+            // `_initializeV32Contracts` initialize them there too.
             L2EcosystemContract[] memory zkosOnly = getZKsyncOSOnlyContracts();
             for (uint256 i = 0; i < zkosOnly.length; i++) {
                 rows[uint256(zkosOnly[i])] = _buildZKsyncOSEntry(zkosOnly[i]).deployedBytecodeInfo;
             }
+            // Kernel built-ins with l1-contracts EVM bytecodes (system space, 0x800x).
+            ZkSyncOsSystemContract[] memory sysContracts = getZKsyncOSExtraSystemContracts();
+            for (uint256 i = 0; i < sysContracts.length; i++) {
+                rows[uint256(_l2MemberForSystemContract(sysContracts[i]))] = _buildZKsyncOSEntryForSystemContract(
+                    sysContracts[i]
+                ).deployedBytecodeInfo;
+            }
+            // The removed v31 GWAssetTracker's proxy keeps its neutralizing EmptyContract
+            // implementation (see `getRemovedTrackerNeutralizations`).
+            rows[uint256(L2EcosystemContract.RemovedGWAssetTracker)] = getRemovedTrackerNeutralizations()[0]
+                .deployedBytecodeInfo;
         }
+    }
+
+    /// @dev The appended `L2EcosystemContract` member a ZKsyncOS kernel built-in occupies in the
+    ///      release's L2 bytecode table.
+    function _l2MemberForSystemContract(ZkSyncOsSystemContract _id) private pure returns (L2EcosystemContract) {
+        if (_id == ZkSyncOsSystemContract.L2BaseToken) {
+            return L2EcosystemContract.L2BaseToken;
+        }
+        if (_id == ZkSyncOsSystemContract.L1Messenger) {
+            return L2EcosystemContract.L1Messenger;
+        }
+        if (_id == ZkSyncOsSystemContract.SystemContext) {
+            return L2EcosystemContract.SystemContext;
+        }
+        revert("ZkSyncOsSystemContract has no L2EcosystemContract member");
     }
 
     /// @notice Proxy upgrades that neutralize the removed v31 GWAssetTracker.

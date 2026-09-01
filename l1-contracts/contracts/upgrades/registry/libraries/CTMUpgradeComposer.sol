@@ -62,13 +62,17 @@ library CTMUpgradeComposer {
     ///      supports an empty deployment list followed by a delegatecall, and transition
     ///      initialization already rejects plans whose data could never execute.
     function buildL2UpgradeTx(ICTMTransition _transition) internal view returns (L2CanonicalTransaction memory) {
-        return _buildL2UpgradeTx(_transition.getManifest());
+        return _buildL2UpgradeTx(_transition, _transition.getManifest());
     }
 
-    /// @dev Manifest-taking form so callers already holding the decoded manifest avoid re-decoding.
-    function _buildL2UpgradeTx(TransitionManifest memory _m) private view returns (L2CanonicalTransaction memory) {
+    /// @dev Manifest-taking form so callers already holding the decoded manifest avoid re-decoding
+    ///      it; the FINAL plan (derived deployments included) still comes from the transition.
+    function _buildL2UpgradeTx(
+        ICTMTransition _transition,
+        TransitionManifest memory _m
+    ) private view returns (L2CanonicalTransaction memory) {
         uint256 newVersion = _m.newProtocolVersion;
-        L2UpgradePlan memory plan = _m.l2Plan;
+        L2UpgradePlan memory plan = _transition.l2Plan();
         if (plan.deployments.length == 0 && plan.delegateTo == address(0)) {
             // The upgrade has no L2 side (patch upgrades, or L1-only minor upgrades): an all-zero
             // transaction (txType == 0) makes `BaseZkSyncUpgrade` skip the L2 protocol upgrade
@@ -102,7 +106,7 @@ library CTMUpgradeComposer {
         // the manifest and needs its own read.
         TransitionManifest memory m = _transition.getManifest();
         proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(m.newProtocolVersion);
-        proposedUpgrade.l2ProtocolUpgradeTx = _buildL2UpgradeTx(m);
+        proposedUpgrade.l2ProtocolUpgradeTx = _buildL2UpgradeTx(_transition, m);
         // Straight from the TARGET release, not from `CTM.currentRelease()`: a chain several
         // versions behind executes the transition that names its own next release, and the CTM may
         // already have moved past it.

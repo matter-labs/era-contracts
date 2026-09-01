@@ -34,8 +34,8 @@ All are storage-backed, built once from a manifest they take in the constructor,
 
 | Contract                     | Holds                                                                                                                                                                                                                                                                                    |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, pin — routing is read from each pinned facet's own self-description), three base-system hashes, `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin                                        |
-| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine` + pin, `proxyUpgrades` (the `CTMContract`-indexed CTM-domain inventory, incl. the CTM itself), deadline, `upgradeTimestamp`, `L2UpgradePlan`; **derived and stored:** final `Diamond.FacetCut[]` and base-system hash changes |
+| `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, pin — routing is read from each pinned facet's own self-description), three base-system hashes, `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed L2 bytecode table)                                        |
+| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine` + pin, `proxyUpgrades` (the `CTMContract`-indexed CTM-domain inventory, incl. the CTM itself), deadline, `upgradeTimestamp`, `AuthoredL2Plan` (delegate leg, extra deployments, factory deps); **derived and stored:** final `Diamond.FacetCut[]`, base-system hash changes, and the L2 force deployments (from the target release's L2 bytecode table) |
 | `CoreRegistry`               | the `L1EcosystemContract`-indexed ecosystem inventory of `(proxy, expectedOldImpl, implNew + pin)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot)                                                                                                                      |
 | `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                                           |
 
@@ -322,10 +322,15 @@ base-system hashes an existing chain ends up with are byte-for-byte what a fresh
 `newRelease` gets**. The upgrade path and the genesis path resolve to the same pinned release, so
 they cannot drift. There is no second mechanism for any part of installed chain state.
 
-The **L2 side is reviewed-and-pinned data, not proven**. L1 cannot verify L2 execution effects. The
-`L2UpgradePlan` is shape-validated in the constructor — a plan whose data the composed transaction
-would never execute is rejected — but what the delegate call _does_ on L2 is covered by review of the
-pinned payload, not by an on-chain proof.
+The **L2 force deployments are derived too**: every nonempty row of the target release's
+`l2BytecodeInfos` table becomes one force deployment of that descriptor at its member's fixed
+address (`L2InventoryLib`), by the SAME function the deploy tooling uses to compose the bootstrap
+L2 leg. Same philosophy as the facet delta — a full reinstall of the target release's set, empty
+for a same-release pair. What stays **reviewed-and-pinned, not proven**, is the authored remainder
+(`AuthoredL2Plan`): the delegate target + calldata, extra deployments the table cannot express
+(the version-specific delegate, force-deployed Unsafe at a bytecode-derived address), and the
+factory-dep hashes. L1 cannot verify L2 execution effects, so what the delegate call _does_ on L2
+is covered by review of that pinned payload, not by an on-chain proof.
 
 ## Rules enforced at construction
 
@@ -346,9 +351,11 @@ needs a new release — a schedule-only patch cannot rotate the verifier.
 **Schedule.** `oldProtocolVersionDeadline >= upgradeTimestamp`, so the old protocol is never disabled
 before chains may upgrade.
 
-**L2 plan.** `L2ComplexUpgrader` unconditionally ends with a delegatecall, so a nonempty plan
-requires a delegate target; delegate calldata without a target, or factory deps without any L2 side,
-are rejected as dead payload. The factory-dep count is capped at the same limit execution enforces.
+**L2 plan.** Checked against the COMBINED plan (table-derived deployments plus authored extras).
+`L2ComplexUpgrader` unconditionally ends with a delegatecall, so a nonempty combined plan requires
+a delegate target; delegate calldata without a target, or factory deps without any L2 side, are
+rejected as dead payload. The factory-dep count is capped at the same limit execution enforces. A
+table row for a member with no fixed address fails the derivation itself.
 
 **Base-system hashes.** Zero means "leave unchanged" in an upgrade, so a nonzero → zero change is not
 representable and is rejected at derivation rather than stored as a silent no-op. The Era CTM
@@ -389,19 +396,27 @@ Two properties that look like omissions but are not:
 
 - `migrate()` is **permissionless**. The gate is the state, not the caller: nothing runs until
   governance has handed over both ownerships, which is the approval, and every value written
-  afterwards is pinned.
-- `upgradeCut` is **pinned data, not derived**. The departing version predates releases, so there is
-  no `fromRelease` to diff against. Its `facetCuts` carry no per-facet pins — the one unpinned
-  payload in the object.
+  afterwards is pinned. The STAGE sequencing is enforced by the object too: the manifest pins the
+  `GovernanceUpgradeTimer`, and `validate()` calls its `checkDeadline()` — so `migrate()` cannot
+  run before stage 0 started the timer and the operational window passed, and the CTM's own
+  version-edge commit refuses to run while chain migrations are unpaused.
+- `upgradeCut` carries **no facet cuts**. The facet delta cannot be derived at construction (the
+  departing version predates releases, so there is no `fromRelease` to diff against), so it is
+  derived AT EXECUTION instead: the cut's init target is the bootstrap engine
+  (`BootstrapUpgradeZKsyncOS`), which removes each chain's live routing read from its own diamond
+  storage and installs the facet set of its immutable-pinned genesis release. The reviewed pinned
+  payload is the engine's `ProposedUpgrade` init calldata.
 
-CTM ownership is transferred, not forced: `migrate()` nominates the executor, and
-`CTMUpgradeExecutor.acceptCTMOwnership()` — owner-gated — completes the handover.
+CTM ownership is transferred, not forced: `migrate()` nominates the executor and completes the
+handover through `CTMUpgradeExecutor.acceptCTMOwnership()` in the same transaction. The accept is
+permissionless-safe — it can only ever accept ownership of the bound CTM, and only after that
+CTM's current owner nominated the executor.
 
 The prepare side of this edge is `deploy-scripts/upgrade/v34/` (`CTMUpgrade_v34` +
 `CoreUpgrade_v34`): it rides the default pipeline for implementation deploys and cut
 composition, then deploys the executor and the migration (manifest pinned from the run's own
-outputs) and collapses the stage-1 CTM leg to FOUR governance calls — nominate the CTM, hand
-over its ProxyAdmin, `migrate()`, and `acceptCTMOwnership()`. `UpgradeTestv34_Local.t.sol`
+outputs) and collapses the stage-1 CTM leg to THREE governance calls — nominate the CTM, hand
+over its ProxyAdmin, and `migrate()`. `UpgradeTestv34_Local.t.sol`
 drives the whole edge through this pipeline in-forge, including the chain crossing via the
 legacy cut-taking leg (`LegacyTestAdminFacet`, the same dance the anvil bootstrap stage does). The v31 upgrade surface (scripts, its anvil CI job, fork harness and
 fixtures) is deleted; the pre-registry history lives on the release branches. The remaining

@@ -238,6 +238,10 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             ctmExecutor: PinnedContract({
                 addr: address(ctmUpgradeExecutor),
                 codehash: address(ctmUpgradeExecutor).codehash
+            }),
+            upgradeTimer: PinnedContract({
+                addr: upgradeAddresses.upgradeTimer,
+                codehash: upgradeAddresses.upgradeTimer.codehash
             })
         });
     }
@@ -252,16 +256,16 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         return new Call[](0);
     }
 
-    /// @notice The whole stage-1 CTM leg: hand both authorities to the migration, run the edge,
-    ///         and complete the executor's two-step CTM ownership handover. `migrate()` is
-    ///         permissionless (the handover IS the approval) but rides the bundle so the edge is
-    ///         applied atomically with it.
+    /// @notice The whole stage-1 CTM leg: hand both authorities to the migration and run the
+    ///         edge. `migrate()` is permissionless (the handover IS the approval) but rides the
+    ///         bundle so the edge is applied atomically with it; it completes the executor's
+    ///         two-step CTM ownership handover itself.
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         require(address(bootstrapMigration) != address(0), "bootstrap migration not deployed");
         address ctmProxy = ctmAddresses.stateTransition.proxies.chainTypeManager;
         address ctmProxyAdmin = Utils.getProxyAdminAddress(ctmProxy);
 
-        calls = new Call[](4);
+        calls = new Call[](3);
         calls[0] = Call({
             target: ctmProxy,
             data: abi.encodeCall(Ownable2Step.transferOwnership, (address(bootstrapMigration))),
@@ -277,10 +281,18 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             data: abi.encodeCall(bootstrapMigration.migrate, ()),
             value: 0
         });
-        calls[3] = Call({
-            target: address(ctmUpgradeExecutor),
-            data: abi.encodeCall(ctmUpgradeExecutor.acceptCTMOwnership, ()),
-            value: 0
-        });
+    }
+
+    /// @notice Absorbed into the migration: `migrate()` checks the pinned timer's deadline
+    ///         itself, which also proves stage 0 started it.
+    function prepareGovernanceUpgradeTimerCheckCall() public virtual override returns (Call[] memory calls) {
+        return new Call[](0);
+    }
+
+    /// @notice Absorbed on-chain: the CTM's own version-edge commit (which `migrate()` drives)
+    ///         refuses to run while migrations are unpaused, so the separate validator early-fail
+    ///         carries no additional guarantee.
+    function prepareCheckMigrationsPausedCalls() public virtual override returns (Call[] memory calls) {
+        return new Call[](0);
     }
 }

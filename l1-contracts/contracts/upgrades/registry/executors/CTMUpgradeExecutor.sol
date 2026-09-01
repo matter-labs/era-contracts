@@ -84,7 +84,12 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
 
     /// @notice Completes the two-step ownership handover of the bound CTM to this executor.
     /// @dev A narrow, fixed entrypoint so the standard handover does not depend on break-glass.
-    function acceptCTMOwnership() external onlyOwner {
+    /// @dev Deliberately PERMISSIONLESS: it can only ever accept ownership of the BOUND CTM, and
+    ///      only after that CTM's current owner nominated this executor — the nomination is the
+    ///      approval, exactly the gate that makes `RegistryBootstrapMigration.migrate()`
+    ///      permissionless. That is also what lets the bootstrap migration complete the handover
+    ///      inside `migrate()` itself, so authority is never parked between bundle calls.
+    function acceptCTMOwnership() external {
         Ownable2Step(address(CHAIN_TYPE_MANAGER)).acceptOwnership();
     }
 

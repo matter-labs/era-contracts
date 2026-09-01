@@ -27,17 +27,20 @@ import {
 } from "../../../common/L1ContractErrors.sol";
 import {L2UpgradePlan, PinnedContract, ProxyUpgradeRow, TransitionManifest} from "../RegistryTypes.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
+import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
 
 /// @notice Storage-backed, write-once transition between two CTM releases.
 /// @dev The facet cuts and base-system hash changes are NOT part of the manifest: they are
 ///      DERIVED from the `(fromRelease, newRelease)` pair at initialization (see
 ///      {TransitionDerivationLib}) and stored. Transition and release state cannot diverge because
 ///      the delta is a pure function of the two pinned releases.
-/// @dev What IS authored: the version edge, upgrade engine, schedule and the L2 plan — each either
-///      derived-checked or codehash-pinned inline. The verifier is NOT authored here: it is part of
-///      the installed chain state and therefore lives on the release, so it converges by the same
-///      mechanism as facet routing. The L2 plan is reviewed-and-pinned data (L1 cannot verify L2
-///      execution effects); the on-chain convergence guarantee covers L1 state only.
+/// @dev What IS authored: the version edge, upgrade engine, schedule and the L2 plan's authored
+///      remainder (delegate leg, extras, factory deps) — each either derived-checked or
+///      codehash-pinned inline. The verifier is NOT authored here: it is part of the installed
+///      chain state and therefore lives on the release, so it converges by the same mechanism as
+///      facet routing. The L2 force deployments are DERIVED from the target release's bytecode
+///      table; the authored remainder is reviewed-and-pinned data (L1 cannot verify L2 execution
+///      effects), so the on-chain convergence guarantee covers L1 state only.
 contract CTMTransition is ICTMTransition {
     /// @dev THE manifest, stored as its own ABI encoding — see {CTMRelease} for why the struct is
     ///      not transcribed into structured storage.
@@ -49,6 +52,10 @@ contract CTMTransition is ICTMTransition {
     bytes32 internal derivedBootloaderChange;
     bytes32 internal derivedDefaultAccountChange;
     bytes32 internal derivedEvmEmulatorChange;
+    /// @dev The FINAL L2 force-deployment list — the table-derived set followed by the authored
+    ///      extras — stored as its ABI encoding (same reasoning as `encodedManifest`: the legacy
+    ///      codegen pipeline cannot copy a struct array with dynamic members into storage).
+    bytes internal encodedL2Deployments;
 
     /// @notice Pins the manifest and DERIVES the delta. No state-mutating function exists on this
     ///         contract: everything is written once, at construction.
@@ -116,14 +123,25 @@ contract CTMTransition is ICTMTransition {
                 revert ProtocolVersionMinorDeltaTooBig(MAX_ALLOWED_MINOR_VERSION_DELTA, minorDelta);
             }
         }
-        // L2 plan shape: committed data must be data the composed transaction actually EXECUTES.
+        // The FINAL deployment list: the target release's table-derived set (empty for a
+        // same-release pair by identity) followed by the authored extras.
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory l2Deployments = _combineL2Deployments(
+            TransitionDerivationLib.deriveL2Deployments(
+                ICTMRelease(_manifest.fromRelease),
+                ICTMRelease(_manifest.newRelease)
+            ),
+            _manifest.l2Plan.extraDeployments
+        );
+
+        // L2 plan shape: committed data must be data the composed transaction actually EXECUTES,
+        // checked against the COMBINED plan — derived deployments included.
         // `L2ComplexUpgrader.forceDeployAndUpgradeUniversal` unconditionally ends with the
         // delegatecall, so a nonempty plan REQUIRES a delegate target (a deployments-only plan
         // would initialize here but revert on L2 forever); a delegate calldata without a target,
         // or factory deps without any L2 side, would be silently dead payload — refuse all of it.
-        bool hasL2Side = _manifest.l2Plan.deployments.length != 0 || _manifest.l2Plan.delegateTo != address(0);
+        bool hasL2Side = l2Deployments.length != 0 || _manifest.l2Plan.delegateTo != address(0);
         if (
-            (_manifest.l2Plan.deployments.length != 0 && _manifest.l2Plan.delegateTo == address(0)) ||
+            (l2Deployments.length != 0 && _manifest.l2Plan.delegateTo == address(0)) ||
             (_manifest.l2Plan.delegateCalldata.length != 0 && _manifest.l2Plan.delegateTo == address(0)) ||
             (_manifest.l2Plan.factoryDepHashes.length != 0 && !hasL2Side)
         ) {
@@ -136,13 +154,14 @@ contract CTMTransition is ICTMTransition {
         if (_manifest.l2Plan.factoryDepHashes.length > MAX_NEW_FACTORY_DEPS) {
             revert MalformedL2UpgradePlan();
         }
-        // A same-release transition is schedule-only: the derived facet/hash delta is
-        // empty by construction, and it must not carry an L2 payload either.
+        // A same-release transition is schedule-only: the derived facet/hash/deployment delta is
+        // empty by construction, and it must not carry an authored L2 payload either.
         if (_manifest.fromRelease == _manifest.newRelease && hasL2Side) {
             revert SameReleaseTransitionHasPayload();
         }
 
         encodedManifest = abi.encode(_manifest);
+        encodedL2Deployments = abi.encode(l2Deployments);
 
         // Derive the L1 delta from the release pair and freeze it as final diamond cuts.
         Diamond.FacetCut[] memory facetCutsMemory = TransitionDerivationLib.deriveFacetCuts(
@@ -205,8 +224,17 @@ contract CTMTransition is ICTMTransition {
         return (derivedBootloaderChange, derivedDefaultAccountChange, derivedEvmEmulatorChange);
     }
 
+    /// @notice The FINAL, executable L2 plan: the stored derived-plus-extra deployments with the
+    ///         manifest's authored delegate leg and factory dependencies.
     function l2Plan() external view returns (L2UpgradePlan memory) {
-        return getManifest().l2Plan;
+        TransitionManifest memory m = getManifest();
+        return
+            L2UpgradePlan({
+                deployments: abi.decode(encodedL2Deployments, (IComplexUpgrader.UniversalContractUpgradeInfo[])),
+                delegateTo: m.l2Plan.delegateTo,
+                delegateCalldata: m.l2Plan.delegateCalldata,
+                factoryDepHashes: m.l2Plan.factoryDepHashes
+            });
     }
 
     function ctmProxyRows() external view returns (ProxyUpgradeRow[] memory) {
@@ -233,5 +261,22 @@ contract CTMTransition is ICTMTransition {
 
     function _requirePin(PinnedContract memory _pinned) private view {
         CodehashPinLib.requirePin(_pinned);
+    }
+
+    /// @dev Derived set first, authored extras after — order between deployments is free (the
+    ///      delegatecall always runs last on L2), this just keeps the stored list canonical.
+    function _combineL2Deployments(
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _derived,
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _extras
+    ) private pure returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory combined) {
+        combined = new IComplexUpgrader.UniversalContractUpgradeInfo[](_derived.length + _extras.length);
+        uint256 derivedLength = _derived.length;
+        for (uint256 i = 0; i < derivedLength; ++i) {
+            combined[i] = _derived[i];
+        }
+        uint256 extrasLength = _extras.length;
+        for (uint256 i = 0; i < extrasLength; ++i) {
+            combined[derivedLength + i] = _extras[i];
+        }
     }
 }

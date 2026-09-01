@@ -400,6 +400,7 @@ error RegistryEmptySelectors(address facet);
 error RegistryHashChangeToZero();
 // 0xd79000b2
 error RegistryInventoryLengthMismatch(uint256 expected, uint256 actual);
+error RegistryMemberHasNoFixedAddress(uint256 member);
 // 0x30f6031b
 error RegistryMissingBaseSystemHash();
 // 0xa0c88a92
