@@ -26,6 +26,8 @@ import "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
 import "contracts/l2-upgrades/ISystemContractProxy.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
+import {L2EcosystemRegistry} from "contracts/core/registry/L2EcosystemRegistry.sol";
+import {AddressHasNoCode} from "contracts/common/L1ContractErrors.sol";
 
 /**
  * @title L2GenesisForceDeploymentsHelperTest
@@ -37,6 +39,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     bytes32 internal constant CONTRACT_UPGRADED_SIG = keccak256("ContractUpgraded(uint8,address)");
     bytes32 internal constant FORCE_DEPLOYED_CONTRACTS_INITIALIZED_SIG =
         keccak256("ForceDeployedContractsInitialized(bool,bool)");
+    bytes32 internal constant ECOSYSTEM_DATA_UPDATED_SIG = keccak256("EcosystemDataUpdated(bytes32)");
 
     // Test constants
     uint256 constant L1_CHAIN_ID = 1;
@@ -75,6 +78,10 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // Deploy mock base token implementation
         MockContract mockBaseToken = new MockContract();
         vm.etch(L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, address(mockBaseToken).code);
+
+        // The REAL ecosystem registry at its ZKsync OS built-in address: the ZKOS init path pins
+        // the verbatim fixed-force-deployments bytes there FIRST, and asserts the code exists.
+        vm.etch(L2_ECOSYSTEM_REGISTRY_ADDR, address(new L2EcosystemRegistry()).code);
     }
 
     function testZKsyncOSSystemProxyUpgrade_Genesis() public {
@@ -106,6 +113,19 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(_countLogs(logs, CONTRACT_UPGRADED_SIG), 0);
         assertEq(_countLogs(logs, FORCE_DEPLOYED_CONTRACTS_INITIALIZED_SIG), 1);
+
+        // REGISTRY FIRST: the ecosystem data is pinned verbatim before anything else initializes.
+        assertEq(
+            L2EcosystemRegistry(L2_ECOSYSTEM_REGISTRY_ADDR).dataHash(),
+            keccak256(fixedEncoded),
+            "registry must pin the verbatim fixed-force-deployments bytes"
+        );
+        assertEq(_countLogs(logs, ECOSYSTEM_DATA_UPDATED_SIG), 1);
+        assertTrue(
+            _firstLogIndex(logs, ECOSYSTEM_DATA_UPDATED_SIG) <
+                _firstLogIndex(logs, FORCE_DEPLOYED_CONTRACTS_INITIALIZED_SIG),
+            "the registry write must precede the init-complete marker"
+        );
 
         _assertAtomicInteropInitialized();
 
@@ -186,6 +206,32 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // chain the current release can upgrade already ran them at genesis. The state stays
         // exactly what the pre-seeding above produced — a second init would have reverted.
         _assertAtomicInteropInitialized();
+
+        // The registry, by contrast, is RE-pinned on every upgrade path run.
+        assertEq(
+            L2EcosystemRegistry(L2_ECOSYSTEM_REGISTRY_ADDR).dataHash(),
+            keccak256(fixedEncoded),
+            "the upgrade path must re-pin the registry data"
+        );
+    }
+
+    /// @dev A call to a codeless address silently succeeds, so the helper asserts the registry's
+    ///      presence explicitly — a ZKsync OS image without the predeploy must fail loudly.
+    function test_revertWhen_ZKOSInitWithoutRegistryCode() public {
+        vm.etch(L2_ECOSYSTEM_REGISTRY_ADDR, hex"");
+        FixedForceDeploymentsData memory fixedData = _createFixedForceDeploymentsData(true);
+        ZKChainSpecificForceDeploymentsData memory additionalData = _createAdditionalForceDeploymentsData();
+
+        vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
+        vm.expectRevert(abi.encodeWithSelector(AddressHasNoCode.selector, L2_ECOSYSTEM_REGISTRY_ADDR));
+        L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
+            true, // _isZKsyncOS
+            ctmDeployerAddress,
+            abi.encode(fixedData),
+            abi.encode(additionalData),
+            true // _isGenesisUpgrade
+        );
+        vm.stopPrank();
     }
 
     function testEraForceDeployment() public {
@@ -231,6 +277,14 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // `_etchAllDeferredContracts` gave them real code here: on a real Era chain those addresses are
         // empty and initializing them would revert the whole upgrade transaction.
         _assertAtomicInteropUninitialized();
+
+        // The ecosystem registry is ZKsync-OS-only too: the Era path never touches it, so the
+        // etched registry still holds no data (the hash of empty bytes).
+        assertEq(
+            L2EcosystemRegistry(L2_ECOSYSTEM_REGISTRY_ADDR).dataHash(),
+            keccak256(bytes("")),
+            "the Era path must not write the ZKsync-OS-only registry"
+        );
     }
 
     /// @dev Neither built-in seeded: the tree has no leaves and the manager no L1 chain id.
@@ -247,6 +301,16 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
                 count++;
             }
         }
+    }
+
+    /// @dev Index of the first log with the given topic0; reverts when absent.
+    function _firstLogIndex(Vm.Log[] memory logs, bytes32 signature) internal pure returns (uint256) {
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics.length > 0 && logs[i].topics[0] == signature) {
+                return i;
+            }
+        }
+        revert("log not found");
     }
 
     function _createFixedForceDeploymentsData(bool isGenesis) internal returns (FixedForceDeploymentsData memory) {

@@ -243,3 +243,23 @@ system-proxied built-in on every ZKsync OS chain, so the upgrade swaps that prox
 `EmptyContract` — otherwise the retired tracker code would stay callable. Chains created on v32 receive
 the same EmptyContract-backed proxy from genesis, so fresh and upgraded chains match at the reserved
 address.
+
+## The L2 ecosystem registry
+
+`L2EcosystemRegistry` at `0x10016` (`L2_ECOSYSTEM_REGISTRY_ADDR`) is a ZKsync OS built-in holding
+the queryable, on-chain copy of the ecosystem's `FixedForceDeploymentsData`: L2 contracts can look
+ecosystem facts (L1 chain id, L1 asset router, aliased governance, the ZK token asset id, …) up at
+runtime instead of each storing its own initialized copy, and its `dataHash()` equals the hash of
+the exact bytes the L1 release pins (`ICTMRelease.fixedForceDeploymentsData()`), so a chain's
+ecosystem data is verifiable transitively from the release pin.
+
+Its lifecycle is the atomic-interop built-ins' (see above): predeployed by the ZKsync OS genesis,
+force-deployed to pre-existing chains by the upgrade (`getZKsyncOSOnlyContracts`), no constructor.
+Unlike their one-shot `initL2`s, its `updateL2` runs REGISTRY-FIRST in
+`L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit` on BOTH the genesis and the
+upgrade path: the data is release-scoped, so every protocol upgrade re-pins it (the same upgrade
+force-deploys the registry's fresh bytecode, so the stored encoding and the code that decodes it
+always ship together). Only the `L2ComplexUpgrader` may write it. Because a call to a codeless
+address silently succeeds, the helper asserts the registry's code presence before writing — a
+genesis image that does not yet predeploy the registry fails loudly instead of minting a chain
+with silently-missing ecosystem data.

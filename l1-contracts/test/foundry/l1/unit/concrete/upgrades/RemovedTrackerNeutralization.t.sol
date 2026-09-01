@@ -131,20 +131,30 @@ contract RemovedTrackerNeutralizationTest is Test {
     }
 
     function test_neutralizationSwitchesTheLiveTrackerProxyToEmptyContract() public {
-        // The COMPLETE production list, dispatched in production order: the neutralizations sit at
-        // the tail, so a dispatcher (or list builder) that stopped at the former entry count would
-        // fail the per-proxy assertions below.
+        // The COMPLETE production list, dispatched in production order. The list is table-DERIVED
+        // in enum order, so the neutralization is one row of it: assert it is present with exactly
+        // the neutralizing content — a list builder that dropped or mangled the row fails here,
+        // and the per-proxy assertions below then prove the row actually executes.
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = SystemContractsProcessing
             .getBaseZKsyncOSForceDeployments();
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory neutralizations = SystemContractsProcessing
             .getRemovedTrackerNeutralizations();
         assertEq(neutralizations.length, 1, "the removed GWAssetTracker must be neutralized");
         for (uint256 i = 0; i < neutralizations.length; ++i) {
-            assertEq(
-                deployments[deployments.length - neutralizations.length + i].newAddress,
-                neutralizations[i].newAddress,
-                "the neutralizations must sit at the tail of the production list"
-            );
+            bool found = false;
+            for (uint256 j = 0; j < deployments.length; ++j) {
+                if (deployments[j].newAddress != neutralizations[i].newAddress) {
+                    continue;
+                }
+                assertEq(
+                    abi.encode(deployments[j]),
+                    abi.encode(neutralizations[i]),
+                    "the production list's neutralization row must match the neutralization exactly"
+                );
+                found = true;
+                break;
+            }
+            assertTrue(found, "the neutralization must be part of the production list");
         }
 
         bytes memory emptyContractBytecode = BytecodeUtils.readDeployedBytecodeL1(

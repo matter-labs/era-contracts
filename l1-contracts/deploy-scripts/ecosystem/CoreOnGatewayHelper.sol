@@ -229,6 +229,7 @@ library CoreOnGatewayHelper {
         if (_c == L2EcosystemContract.InteropAttributeParser) return "InteropAttributeParser";
         if (_c == L2EcosystemContract.L2InteropCommitmentTree) return "L2InteropCommitmentTree";
         if (_c == L2EcosystemContract.AtomicFlowManager) return "AtomicFlowManager";
+        if (_c == L2EcosystemContract.L2EcosystemRegistry) return "L2EcosystemRegistry";
         if (_c == L2EcosystemContract.L2InteropHandler) return "L2InteropHandler";
         if (_c == L2EcosystemContract.L2AssetTracker) return "L2AssetTracker";
         if (_c == L2EcosystemContract.L2WrappedBaseToken) return "L2WrappedBaseToken";
@@ -267,6 +268,9 @@ library CoreOnGatewayHelper {
             return ZKsyncOSUpgradeType.SystemProxy;
         }
         if (_c == L2EcosystemContract.AtomicFlowManager) {
+            return ZKsyncOSUpgradeType.SystemProxy;
+        }
+        if (_c == L2EcosystemContract.L2EcosystemRegistry) {
             return ZKsyncOSUpgradeType.SystemProxy;
         }
         revert UnknownCoreContract();

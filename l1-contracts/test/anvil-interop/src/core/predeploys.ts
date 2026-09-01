@@ -11,6 +11,7 @@ import {
   L2_CHAIN_ASSET_HANDLER_ADDR,
   L2_COMPLEX_UPGRADER_ADDR,
   L2_CONTRACT_DEPLOYER_ADDR,
+  L2_ECOSYSTEM_REGISTRY_ADDR,
   L2_GENESIS_UPGRADE_ADDR,
   L2_INTEROP_COMMITMENT_TREE_ADDR,
   L2_INTEROP_HANDLER_ADDR,
@@ -59,4 +60,7 @@ export const PREDEPLOY_SYSTEM_CONTRACTS: readonly SystemContractPredeploy[] = [
   { address: L2_INTEROP_HANDLER_ADDR, contractName: "L2InteropHandler" },
   { address: L2_INTEROP_COMMITMENT_TREE_ADDR, contractName: "L2InteropCommitmentTree" },
   { address: L2_ATOMIC_FLOW_MANAGER_ADDR, contractName: "AtomicFlowManager" },
+  // The ZKsync OS genesis image predeploys the ecosystem registry; the genesis init writes it
+  // FIRST and asserts its presence, so states without it cannot genesis a ZKOS chain.
+  { address: L2_ECOSYSTEM_REGISTRY_ADDR, contractName: "L2EcosystemRegistry" },
 ] as const;

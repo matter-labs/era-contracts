@@ -7,6 +7,7 @@ import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_ATOMIC_FLOW_MANAGER_ADDR,
+    L2_ECOSYSTEM_REGISTRY_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -25,6 +26,7 @@ import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
 import {L2V34Upgrade} from "contracts/l2-upgrades/L2V34Upgrade.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
+import {L2EcosystemRegistry} from "contracts/core/registry/L2EcosystemRegistry.sol";
 import {IL2V34Upgrade} from "contracts/upgrades/IL2V34Upgrade.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
@@ -199,6 +201,10 @@ contract L2V34UpgradeUnitTest is Test {
         _etchCode(L2_ASSET_TRACKER_ADDR, address(new MockV34UpgradeAssetTracker()));
         _etchCode(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(new MockV34UpgradeBaseToken()));
 
+        // The REAL ecosystem registry: the ZKOS init path asserts its presence and pins the
+        // verbatim fixed-force-deployments bytes there first.
+        _etchCode(L2_ECOSYSTEM_REGISTRY_ADDR, address(new L2EcosystemRegistry()));
+
         testUpgrade = new L2V34Upgrade();
     }
 
@@ -229,6 +235,13 @@ contract L2V34UpgradeUnitTest is Test {
         // BaseToken: its `initL2` is a genesis-path call as well.
         MockV34UpgradeBaseToken baseToken = MockV34UpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         assertEq(baseToken.initCalls(), 0, "base token must not be re-initialized on an upgrade");
+
+        // The ecosystem registry is ZKsync-OS-only: the Era path leaves it untouched.
+        assertEq(
+            L2EcosystemRegistry(L2_ECOSYSTEM_REGISTRY_ADDR).dataHash(),
+            keccak256(bytes("")),
+            "the Era path must not write the ZKsync-OS-only registry"
+        );
     }
 
     /// @dev The atomic-interop built-ins arrived in v32 and their `initL2`s are one-shot, so every
@@ -262,6 +275,13 @@ contract L2V34UpgradeUnitTest is Test {
         // Pre-v32 contracts stay untouched on the ZKsync OS path too.
         MockV34UpgradeBaseToken baseToken = MockV34UpgradeBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         assertEq(baseToken.initCalls(), 0, "base token must not be re-initialized on an upgrade");
+
+        // The ZKOS path pins the verbatim fixed-force-deployments bytes on the registry.
+        assertEq(
+            L2EcosystemRegistry(L2_ECOSYSTEM_REGISTRY_ADDR).dataHash(),
+            keccak256(fixedData),
+            "the upgrade must pin the verbatim release bytes on the ecosystem registry"
+        );
     }
 
     function _buildFixedForceDeploymentsData() private pure returns (FixedForceDeploymentsData memory) {

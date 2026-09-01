@@ -108,6 +108,7 @@ const ARTIFACTS = {
   // Atomic interop (bundle model) — see {protocol-docs/atomicity/README.md#contracts}.
   L2InteropCommitmentTree: "L2InteropCommitmentTree.sol/L2InteropCommitmentTree.json",
   AtomicFlowManager: "AtomicFlowManager.sol/AtomicFlowManager.json",
+  L2EcosystemRegistry: "L2EcosystemRegistry.sol/L2EcosystemRegistry.json",
   IAtomicFlowManager: "IAtomicFlowManager.sol/IAtomicFlowManager.json",
   L2MessageVerification: "L2MessageVerification.sol/L2MessageVerification.json",
   L2InteropRootStorage: "L2InteropRootStorage.sol/L2InteropRootStorage.json",

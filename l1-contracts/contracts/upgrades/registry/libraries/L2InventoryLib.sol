@@ -12,6 +12,7 @@ import {
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_ECOSYSTEM_REGISTRY_ADDR,
     L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
@@ -103,6 +104,9 @@ library L2InventoryLib {
         }
         if (_member == L2EcosystemContract.RemovedGWAssetTracker) {
             return L2_REMOVED_GW_ASSET_TRACKER_ADDR;
+        }
+        if (_member == L2EcosystemContract.L2EcosystemRegistry) {
+            return L2_ECOSYSTEM_REGISTRY_ADDR;
         }
         revert RegistryMemberHasNoFixedAddress(uint256(_member));
     }

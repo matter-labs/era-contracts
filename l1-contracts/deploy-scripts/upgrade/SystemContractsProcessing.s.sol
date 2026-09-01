@@ -64,7 +64,7 @@ uint256 constant ERA_FACTORY_DEPENDENCY_CONTRACTS_COUNT = FIXED_ADDRESS_CORE_CON
 uint256 constant ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT = 3;
 
 /// @dev Core contracts that only exist on ZKsync OS chains.
-uint256 constant ZKOS_ONLY_CONTRACTS_COUNT = 2;
+uint256 constant ZKOS_ONLY_CONTRACTS_COUNT = 3;
 
 /// @notice A fixed-address core contract's identity plus its Era bytecode.
 struct FixedAddressCoreContractDeployInfo {
@@ -225,6 +225,7 @@ library SystemContractsProcessing {
         uint256 i;
         ids[i++] = L2EcosystemContract.L2InteropCommitmentTree;
         ids[i++] = L2EcosystemContract.AtomicFlowManager;
+        ids[i++] = L2EcosystemContract.L2EcosystemRegistry;
         // Same guard as `getFixedAddressCoreContracts`: under-filling would leave `L2EcosystemContract(0)` entries.
         require(i == ZKOS_ONLY_CONTRACTS_COUNT, "ZKsync-OS-only contract count mismatch");
     }

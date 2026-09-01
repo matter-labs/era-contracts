@@ -45,6 +45,7 @@ import {
   L2_CHAIN_ASSET_HANDLER_ADDR,
   L2_COMPLEX_UPGRADER_ADDR,
   L2_CONTRACT_DEPLOYER_ADDR,
+  L2_ECOSYSTEM_REGISTRY_ADDR,
   L2_FORCE_DEPLOYER_ADDR,
   L2_ATOMIC_FLOW_MANAGER_ADDR,
   L2_INTEROP_COMMITMENT_TREE_ADDR,
@@ -235,6 +236,7 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       l2TxParamType,
       settlementLayerUpgradeAddr,
       bridgehubAddr: l1Addresses.bridgehub,
+      ctmAddr: ctmAddresses.chainTypeManager,
       isZKsyncOS: scenario.isZKsyncOS,
       l2DelegateBytecodeName: scenario.l2DelegateBytecodeName,
     });
@@ -612,11 +614,22 @@ async function runLegacyChainLegAndRelayL2(params: {
   l2TxParamType: ethers.utils.ParamType;
   settlementLayerUpgradeAddr: string;
   bridgehubAddr: string;
+  ctmAddr: string;
   isZKsyncOS: boolean;
   l2DelegateBytecodeName: ContractName;
 }): Promise<void> {
   const l2Tx = params.proposedUpgrade.l2ProtocolUpgradeTx;
   const hasL2Leg = !ethers.BigNumber.from(l2Tx.txType).isZero();
+
+  // ZKsync OS relays write the registry FIRST: every chain's L2EcosystemRegistry must end up
+  // pinning exactly the fixedForceDeploymentsData bytes the run's deployed release pins on L1
+  // (the L1 legs already ran, so the CTM's currentRelease IS that release).
+  let expectedEcosystemDataHash: string | undefined;
+  if (params.isZKsyncOS && hasL2Leg) {
+    const ctm = new ethers.Contract(params.ctmAddr, getAbi("IChainTypeManager"), params.l1Provider);
+    const release = new ethers.Contract(await ctm.currentRelease(), getAbi("CTMRelease"), params.l1Provider);
+    expectedEcosystemDataHash = ethers.utils.keccak256(await release.fixedForceDeploymentsData());
+  }
   // The committed L2 tx carries per-chain placeholders (chainId, chain-specific force-deployment
   // data); the per-chain upgrade contract rewrites them at upgrade time, and this leg reproduces
   // the same rewrite through its public view.
@@ -688,6 +701,18 @@ async function runLegacyChainLegAndRelayL2(params: {
     console.log(`  ✅ L2 upgrade relay tx: ${l2TxHash}`);
 
     await verifyL2UpgradeResult(l2Provider, chain.chainId);
+
+    if (expectedEcosystemDataHash) {
+      const registry = new ethers.Contract(L2_ECOSYSTEM_REGISTRY_ADDR, getAbi("L2EcosystemRegistry"), l2Provider);
+      const liveHash: string = await registry.dataHash();
+      if (liveHash.toLowerCase() !== expectedEcosystemDataHash.toLowerCase()) {
+        throw new Error(
+          `Chain ${chain.chainId}: L2EcosystemRegistry.dataHash ${liveHash} does not match the keccak of the ` +
+            `release's pinned fixedForceDeploymentsData (${expectedEcosystemDataHash})`
+        );
+      }
+      console.log(`   L2EcosystemRegistry pins the release's fixedForceDeploymentsData (${liveHash})`);
+    }
   }
 }
 
@@ -901,9 +926,13 @@ function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, Contra
     [L2_INTEROP_ROOT_STORAGE_ADDR.toLowerCase(), "L2InteropRootStorage"],
   ];
   if (isZKsyncOS) {
+    // Keep this block in sync with SystemContractsProcessing's getZKsyncOSOnlyContracts /
+    // getZKsyncOSExtraSystemContracts: every appended L2EcosystemContract member with a
+    // fixed address rides the derived force-deployment list and needs a row here.
     entries.push(
       [L2_INTEROP_COMMITMENT_TREE_ADDR.toLowerCase(), "L2InteropCommitmentTree"],
       [L2_ATOMIC_FLOW_MANAGER_ADDR.toLowerCase(), "AtomicFlowManager"],
+      [L2_ECOSYSTEM_REGISTRY_ADDR.toLowerCase(), "L2EcosystemRegistry"],
       [L2_BASE_TOKEN_ADDR.toLowerCase(), "L2BaseTokenZKOS"],
       [L2_TO_L1_MESSENGER_ADDR.toLowerCase(), "L1MessengerZKOS"],
       [SYSTEM_CONTEXT_ADDR.toLowerCase(), "SystemContext"],

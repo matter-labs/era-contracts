@@ -339,6 +339,14 @@ base-system hashes an existing chain ends up with are byte-for-byte what a fresh
 `newRelease` gets**. The upgrade path and the genesis path resolve to the same pinned release, so
 they cannot drift. There is no second mechanism for any part of installed chain state.
 
+The registry model has an **L2-side leg**: `L2EcosystemRegistry`, a ZKsync OS built-in at
+`L2_ECOSYSTEM_REGISTRY_ADDR` holding the queryable on-chain copy of the ecosystem's
+`FixedForceDeploymentsData`. It is written REGISTRY-FIRST by the genesis / upgrade initialization
+with the verbatim bytes the release pins, so `dataHash()` on L2 equals
+`keccak256(ICTMRelease.fixedForceDeploymentsData())` on L1 — a chain's ecosystem data verifies
+transitively from the release pin. Lifecycle and write rules: `protocol-docs/chain-lifecycle.md`
+("The L2 ecosystem registry").
+
 The **L2 force deployments are derived too**: every nonempty row of the target release's
 `l2BytecodeInfos` table becomes one force deployment of that descriptor at its member's fixed
 address (`L2InventoryLib`), by the SAME function the deploy tooling uses to compose the bootstrap
