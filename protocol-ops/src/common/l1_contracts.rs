@@ -7,7 +7,7 @@
 
 use alloy::network::Ethereum;
 use alloy::primitives::{Address, U256};
-use alloy::providers::{ProviderBuilder, RootProvider};
+use alloy::providers::{Provider, ProviderBuilder, RootProvider};
 use anyhow::Context;
 
 use crate::common::abi::{BridgehubAbi, IChainTypeManagerAbi, ZkChainAbi};
@@ -368,10 +368,11 @@ pub async fn resolve_is_zksync_os(l1_rpc_url: &str, ctm_proxy: Address) -> anyho
 }
 
 /// Resolve whether the current verifier is a testnet verifier by querying
-/// `IS_TESTNET_VERIFIER()` on the verifier contract.
+/// `isTestnetVerifier()` (v34+) or the legacy `IS_TESTNET_VERIFIER()` constant
+/// (pre-v34 testnet verifiers) on the verifier contract.
 ///
-/// Returns `false` if the verifier doesn't expose this constant (production
-/// verifiers or older deployments).
+/// Returns `false` if the verifier exposes neither (a pre-v34 production
+/// verifier).
 pub async fn resolve_is_testnet_verifier(
     l1_rpc_url: &str,
     ctm_proxy: Address,
@@ -393,11 +394,22 @@ pub async fn resolve_is_testnet_verifier(
         .context("ctm.protocolVersionVerifier() call failed")?;
     ensure_nonzero(verifier, "ctm.protocolVersionVerifier()")?;
 
+    let code = p
+        .get_code_at(verifier)
+        .await
+        .context("get_code(verifier) failed")?;
+    anyhow::ensure!(!code.is_empty(), "verifier {verifier} has no code");
+
     let verifier_contract = ITestnetVerifier::new(verifier, p);
-    match verifier_contract.IS_TESTNET_VERIFIER().call().await {
+    match verifier_contract.isTestnetVerifier().call().await {
         Ok(is_testnet) => Ok(is_testnet),
-        // Older verifiers don't expose IS_TESTNET_VERIFIER — treat as production.
-        Err(_) => Ok(false),
+        // Pre-v34 verifiers don't have the camelCase getter; testnet ones exported the flag as
+        // the legacy IS_TESTNET_VERIFIER constant instead.
+        Err(_) => match verifier_contract.IS_TESTNET_VERIFIER().call().await {
+            Ok(is_testnet) => Ok(is_testnet),
+            // Neither name answers — a pre-v34 production verifier.
+            Err(_) => Ok(false),
+        },
     }
 }
 

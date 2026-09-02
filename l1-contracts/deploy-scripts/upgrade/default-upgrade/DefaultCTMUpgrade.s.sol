@@ -190,15 +190,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
             ctmAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
-        // FIXME: need to provide the params as the input for the function, since
-        // on mainnet testnetVerifier must be false. Right now the introspection is not available
-        // due to the previous version being v29.
-        // TODO: restore introspection when L1 state is regenerated with ZKsyncOSTestnetVerifier.IS_TESTNET_VERIFIER
-        // (bool ok, bytes memory data) = ctmAddresses.stateTransition.verifiers.verifier.staticcall(
-        //     abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
-        // );
-        // config.testnetVerifier = ok;
-        config.testnetVerifier = true;
+        config.testnetVerifier = UpgradeUtils.resolveTestnetVerifier(
+            IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager)
+        );
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
