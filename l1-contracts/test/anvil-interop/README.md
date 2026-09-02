@@ -36,9 +36,11 @@ yarn test:hardhat:interop --keep-chains
 
 ## Pregenerated Chain States
 
-Tests load pregenerated Anvil snapshots from `chain-states/v0.32.0/` by default (the current protocol version). This skips the full deployment and cuts test time from ~5 min to ~85s.
+Tests load pregenerated Anvil snapshots from `chain-states/v0.34.0/` by default (the current release/state version, configured as `stateVersion` in `config/anvil-config.json`). This skips the full deployment and cuts test time from ~5 min to ~85s.
 
-The runner auto-detects pregenerated state by checking for `chain-states/<protocol-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `FRESH_DEPLOY=1`), it runs the full 5-step deployment.
+The runner auto-detects pregenerated state by checking for `chain-states/<state-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `FRESH_DEPLOY=1`), it runs the full 5-step deployment.
+
+Older `chain-states/` directories (`v0.31.0/`, `v0.32.0/`) are **immutable upgrade-test sources**: they snapshot what a chain deployed from that release looks like, and the upgrade harnesses load them to exercise the real upgrade path onto current contracts. Never regenerate them from current contracts — only the directory named by `stateVersion` is regenerated. The directory name records the repository release the snapshot was generated from; the protocol version its contracts report is embedded in the fixture itself and may differ.
 
 The per-chain state dumps are committed **gzip-compressed** (`<chainId>.json.gz`). These snapshots are multi-MB; storing them as raw JSON floods every regeneration with an enormous, unreviewable diff. GitHub renders `.gz` as binary ("Binary file not shown"), keeping them out of PR diffs, and gzip shrinks them ~10x. `addresses.json` stays plain text so contract-address changes remain reviewable. Compression/decompression is handled automatically by `dumpAllStates()` / `loadChainStates()` in `deployment-runner.ts` — no manual step.
 
@@ -240,7 +242,9 @@ test/anvil-interop/
 │   ├── permanent-values.toml      # Immutable protocol values
 │   └── chain-{10,11,12,13}.toml   # Per-chain deployment params (generated)
 ├── chain-states/
-│   └── v0.32.0/                   # Pregenerated Anvil state snapshots
+│   ├── v0.31.0/                   # Frozen v0.31 snapshots (upgrade-test source; immutable)
+│   ├── v0.32.0/                   # Frozen v0.32 snapshots (upgrade-test source; immutable)
+│   └── v0.34.0/                   # Pregenerated Anvil state snapshots (current, regenerated)
 │       ├── 31337.json.gz          # L1 state dump (gzip; kept out of diffs)
 │       ├── {10,11,12,13}.json.gz  # L2 chain state dumps (gzip)
 │       └── addresses.json         # All contract addresses + test tokens

@@ -20,7 +20,7 @@ async function main(): Promise<void> {
   try {
     // Compute output paths before starting chains, so Anvil
     // can be started with --dump-state flags from the beginning.
-    const version = runner.getProtocolVersionString();
+    const version = runner.getStateVersionString();
     const stateDir = path.join(__dirname, "chain-states", version);
     const dumpStatePaths = runner.buildDumpStatePaths(stateDir);
 
