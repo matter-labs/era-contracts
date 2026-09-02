@@ -89,10 +89,9 @@ pub struct ChainUpgradeArgs {
     #[clap(long, default_value = ZERO_ADDRESS)]
     pub access_control_restriction: Address,
 
-    /// Where the chain's pubdata goes after the upgrade. Set it to move the chain's DA setup as
-    /// part of the upgrade; the L2 commitment scheme and the pubdata content then default from it
-    /// and the chain's VM, and either can be named explicitly with the two flags below — the two
-    /// axes are independent. Requires `--l1-da-validator`.
+    /// What kind of chain this should be after the upgrade, as far as its pubdata is concerned.
+    /// The delivery scheme and the pubdata content default from it and the chain's VM, and either
+    /// can be named explicitly with the two flags below. Requires `--l1-da-validator`.
     ///
     /// For chains that settle on a gateway use `chain gateway migrate-to`: the schemes differ.
     #[clap(long, value_enum, requires = "l1_da_validator", help_heading = "DA")]
@@ -103,15 +102,14 @@ pub struct ChainUpgradeArgs {
     #[clap(long, requires = "da_mode", help_heading = "DA")]
     pub l1_da_validator: Option<Address>,
 
-    /// The L2 DA commitment scheme, when it is not the one `--da-mode` defaults to — a chain on
-    /// the rollup validator that publishes through commit-tx calldata rather than blobs takes
-    /// `blobs-and-pubdata-keccak256`.
+    /// How the chain's committed pubdata reaches L1 after the upgrade, when it is not the blobs
+    /// `--da-mode` defaults to on ZKsync OS.
     #[clap(long, value_enum, help_heading = "DA")]
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
 
     /// How much pubdata the chain commits after the upgrade, when it is not what `--da-mode`
-    /// defaults to. Any combination of the two is allowed: a chain publishing through blobs may
-    /// commit `logs-only`, and one publishing nothing may still commit `full-pubdata`.
+    /// defaults to. On its own it is a complete move: a chain that delivers nothing needs exactly
+    /// this to keep proving past v33.
     #[clap(long, value_enum, help_heading = "DA")]
     pub pubdata_content: Option<PubdataContent>,
 
@@ -330,9 +328,9 @@ async fn resolve_da_move(
 /// neither DA axis is named. The version gives such a chain a pubdata content it does not publish
 /// — `FULL_PUBDATA` against the empty no-DA scheme — and that pair is folded into every batch's
 /// chain-config hash, so its batches stop proving (`InvalidProof`). Naming either axis is enough:
-/// `--pubdata-content logs-only` to keep publishing nothing but commit only what it publishes, or
-/// `--da-mode` to move it onto DA, which is also what puts its interop commitment tree leaves back
-/// within reach of L1.
+/// `--pubdata-content logs-only` to keep delivering nothing but commit only that, or `--da-mode`
+/// to move it onto blobs, which is also what puts its interop commitment tree leaves back within
+/// reach of L1.
 async fn guard_validium_without_da(
     l1_rpc_url: &str,
     ctm: Address,
@@ -356,10 +354,10 @@ async fn guard_validium_without_da(
     anyhow::ensure!(
         new_minor < MIN_MINOR_VERSION_WITH_VALIDIUM_DA,
         "chain {chain_id} is validium-priced and this upgrade takes it to v{new_minor}, which \
-         would leave it committing full pubdata it never publishes — batches in that state do not \
-         prove. Pass `--pubdata-content logs-only` to match what it publishes, or `--da-mode` \
-         (with `--l1-da-validator`) to move it onto DA, or `--keep-da-setup` to leave it alone \
-         deliberately"
+         would leave it committing full pubdata it never delivers — batches in that state do not \
+         prove. Pass `--pubdata-content logs-only` to match what it delivers, or `--da-mode \
+         logs-only-validium --l1-da-validator <address>` to move it onto blobs as well, or \
+         `--keep-da-setup` to leave it alone deliberately"
     );
     Ok(())
 }

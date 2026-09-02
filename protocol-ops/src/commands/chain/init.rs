@@ -84,13 +84,14 @@ pub struct ChainInitArgs {
     /// e.g. "4000/1" means: 1 ETH = 4000 base tokens
     #[clap(long, default_value = "1/1", help_heading = "Advanced input")]
     pub base_token_price_ratio: String,
-    /// Where the chain's pubdata goes: the L1 DA validator it registers with. Independent of
-    /// `--pubdata-content`, which says how much pubdata there is to publish.
+    /// What kind of chain this is, as far as its pubdata is concerned: it fixes the pricing mode
+    /// and the pubdata content, and defaults the delivery to blobs. Use
+    /// `--l2-da-commitment-scheme` to deliver it another way.
     #[clap(long, value_enum, default_value_t = DAValidatorType::Rollup, help_heading = "Advanced input")]
     pub da_mode: DAValidatorType,
-    /// The L2 DA commitment scheme, when it is not the one `--da-mode` defaults to (Rollup +
-    /// ZKsync OS defaults to BlobsZKSyncOS). A rollup-validator chain that publishes through
-    /// commit-tx calldata rather than blobs takes `blobs-and-pubdata-keccak256`.
+    /// How the chain's committed pubdata reaches L1, when it is not the blobs every `--da-mode`
+    /// defaults to on ZKsync OS: `blobs-and-pubdata-keccak256` for commit-tx calldata, or
+    /// `discouraged-empty-no-da` for a chain that delivers nothing.
     #[clap(long, value_enum, help_heading = "Advanced input")]
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
     /// How much pubdata the chain's batches commit to (ZKsync OS only; defaults to FullPubdata for
