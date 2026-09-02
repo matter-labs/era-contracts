@@ -10,6 +10,9 @@ import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrad
 import {Call} from "contracts/governance/Common.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../../../deploy-scripts/utils/Types.sol";
 import {PublishFactoryDepsResult} from "../../../../deploy-scripts/utils/bytecode/BytecodePublisher.s.sol";
@@ -200,6 +203,12 @@ contract UpgradeIntegrationTest_Local is
         assertNotEq(_expectedRewrittenUpgradeTxHash, placeholderHash, "OS rewrite was a no-op");
     }
 
+    /// @dev The genesis fixture deploys a testnet verifier; the production-verifier variant
+    /// overrides this together with the ecosystem mutation in `setupUpgrade`.
+    function _expectTestnetEcosystem() internal pure virtual returns (bool) {
+        return true;
+    }
+
     function setUp() public {
         console.log("setUp: Starting");
         _deployL1Contracts();
@@ -302,13 +311,14 @@ contract UpgradeIntegrationTest_Local is
             ctmUpgrade.getAddresses().stateTransition.verifiers.verifier,
             "Registered verifier differs from the one the script deployed"
         );
-        // This local ecosystem is a testnet environment: DefaultCTMUpgrade.initializeConfig must
-        // have resolved testnetVerifier=true from the deployed verifier and installed a testnet
-        // verifier for the new version.
-        assertTrue(ctmUpgrade.getTestnetVerifier(), "Script must have resolved a testnet environment");
-        assertTrue(
+        // DefaultCTMUpgrade.initializeConfig must resolve the verifier kind from the ecosystem's
+        // deployed verifier and install a matching one for the new version; the production-verifier
+        // variant below flips the expectation.
+        assertEq(ctmUpgrade.getTestnetVerifier(), _expectTestnetEcosystem(), "Script resolved the wrong verifier kind");
+        assertEq(
             IZKsyncOSVerifier(newVerifier).isTestnetVerifier(),
-            "New version must be registered with a testnet verifier"
+            _expectTestnetEcosystem(),
+            "New version registered with the wrong verifier kind"
         );
         assertGt(
             IChainTypeManager(ctm).protocolVersionDeadline(_expectedNewVersion),
@@ -357,5 +367,27 @@ contract UpgradeIntegrationTest_Local is
                 "ServerNotifier implementation not upgraded"
             );
         }
+    }
+}
+
+/// @notice The same end-to-end upgrade against an ecosystem whose current verifier is a production
+/// one: `DefaultCTMUpgrade.initializeConfig` must resolve testnetVerifier=false and the upgrade
+/// must install a production verifier for the new version. Guards against the resolution being
+/// hardcoded or ignored, which the testnet fixture alone cannot detect.
+contract UpgradeIntegrationTest_LocalProductionVerifier is UpgradeIntegrationTest_Local {
+    function _expectTestnetEcosystem() internal pure override returns (bool) {
+        return false;
+    }
+
+    function setupUpgrade(bool skipFactoryDepsCheck) public override {
+        // The genesis fixture registers a testnet verifier; swap in a production one via the CTM
+        // owner before the upgrade scripts read it.
+        ChainTypeManagerBase ctm_ = ChainTypeManagerBase(address(addresses.chainTypeManager));
+        address productionVerifier = address(new ZKsyncOSVerifier(IVerifier(address(0))));
+        uint256 currentVersion = ctm_.protocolVersion();
+        address ctmOwner = ctm_.owner();
+        vm.prank(ctmOwner);
+        ctm_.setProtocolVersionVerifier(currentVersion, productionVerifier);
+        super.setupUpgrade(skipFactoryDepsCheck);
     }
 }
