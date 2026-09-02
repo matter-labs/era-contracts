@@ -1,75 +1,124 @@
-import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
+import { ethers } from "ethers";
 import {
   CREATE2_SALT_BYTES,
   DEPLOY_BUNDLE_SCHEMA,
   FUNCTION_SELECTOR_BYTES,
-  HEX_CHARACTERS_PER_BYTE,
-  HEX_PREFIX_CHARACTERS,
   SUPPORTING_BUNDLE_FILES,
   V31_UPGRADE_NAME,
 } from "./constants";
+import { parseUpgradeEnvironment } from "./environment";
 import {
   L1_CONTRACTS_DIR,
   REPO_ROOT,
-  captureCommand,
   fileSha256,
   optionalTomlInteger,
   optionalTomlString,
-  parseInteger,
   readJson,
   readToml,
   requireFile,
-  verifyBundleIntegrity,
-} from "./common";
-import type { BundleManifest, DeployBundleMetadata, PackedBundle, SafeBundle, SafeTransaction } from "./types";
+  resolveContainedFile,
+} from "./file-system";
+import { verifyBundleIntegrity } from "./integrity";
+import { captureCommand, commandSucceeds } from "./process";
+import type {
+  BundleManifest,
+  DeployBundleMetadata,
+  PackedBundle,
+  SafeBundle,
+  SafeTransaction,
+  TomlRecord,
+} from "./types";
+
+export interface BundleProvenance {
+  deployerAddress?: string;
+  forkedAtBlock?: number;
+  zkGovernanceCommit?: string;
+  foundryZksyncVersion?: string;
+  github?: {
+    runId: string;
+    serverUrl: string;
+    repository: string;
+    runnerOs?: string;
+  };
+}
 
 export interface PackDeployBundleOptions {
   outputDirectory?: string;
   bundleDirectory?: string;
   permanentValuesPath?: string;
   repositoryRoot?: string;
+  provenance?: BundleProvenance;
 }
 
-function protocolVersions(toml: string, key: string): string[] {
+export function bundleProvenanceFromEnvironment(overrides: BundleProvenance = {}): BundleProvenance {
+  const runId = process.env.GITHUB_RUN_ID;
+  const serverUrl = process.env.GITHUB_SERVER_URL;
+  const repository = process.env.GITHUB_REPOSITORY;
+  return {
+    deployerAddress: process.env.DEPLOYER_ADDR,
+    zkGovernanceCommit: process.env.ZK_GOVERNANCE_COMMIT,
+    foundryZksyncVersion: process.env.ZKSYNC_FOUNDRY_VERSION,
+    github:
+      runId && serverUrl && repository ? { runId, serverUrl, repository, runnerOs: process.env.RUNNER_OS } : undefined,
+    ...overrides,
+  };
+}
+
+function protocolVersions(config: TomlRecord, key: string): string[] {
   const values = new Set<bigint>();
-  const expression = new RegExp(`^${key}\\s*=\\s*(\\d+)`, "gm");
-  for (const match of toml.matchAll(expression)) values.add(BigInt(match[1]));
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (typeof value !== "object" || value === null || value instanceof Date) return;
+    for (const [entryKey, entryValue] of Object.entries(value)) {
+      if (entryKey === key) {
+        if (typeof entryValue !== "number" || !Number.isSafeInteger(entryValue) || entryValue < 0) {
+          throw new Error(`${key} must be a non-negative safe integer`);
+        }
+        values.add(BigInt(entryValue));
+      }
+      visit(entryValue);
+    }
+  };
+  visit(config);
   return [...values]
     .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
     .map((value) => `0x${value.toString(16)}`);
 }
 
 function checkedGeneratedFile(directory: string, relativePath: string): string {
-  const resolvedDirectory = path.resolve(directory);
-  const resolvedFile = path.resolve(directory, relativePath);
-  const relative = path.relative(resolvedDirectory, resolvedFile);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    throw new Error(`generated bundle file escapes prepare directory: ${relativePath}`);
-  }
-  requireFile(resolvedFile, "generated bundle file");
-  return resolvedFile;
+  return resolveContainedFile(directory, relativePath, "generated bundle file escapes prepare directory");
 }
 
 function describeTransaction(
   transaction: SafeTransaction,
-  create2Factory: string
+  create2Factory?: string
 ): {
   kind: string;
   tag: string;
   dataBytes: number;
 } {
-  const data = transaction.data || "0x";
-  if (!/^0x[0-9a-fA-F]*$/.test(data))
-    throw new Error(`invalid transaction data for ${transaction.to ?? "unknown target"}`);
-  const isCreate2 = (transaction.to ?? "").toLowerCase() === create2Factory.toLowerCase();
+  const data = transaction.data ?? "0x";
+  if (!ethers.utils.isHexString(data)) throw new Error(`invalid transaction data for ${transaction.to}`);
+  if (!transaction.to || !ethers.utils.isAddress(transaction.to)) {
+    throw new Error(`invalid transaction target: ${String(transaction.to)}`);
+  }
+  const target = ethers.utils.getAddress(transaction.to);
+  const isCreate2 = create2Factory !== undefined && target === create2Factory;
+  const dataBytes = ethers.utils.hexDataLength(data);
+  if (isCreate2 && dataBytes < CREATE2_SALT_BYTES) {
+    throw new Error(`CREATE2 transaction to ${target} has no ${CREATE2_SALT_BYTES}-byte salt`);
+  }
   return {
     kind: isCreate2 ? "CREATE2 deploy" : "call",
     tag: isCreate2
-      ? `0x${data.slice(HEX_PREFIX_CHARACTERS, HEX_PREFIX_CHARACTERS + CREATE2_SALT_BYTES * HEX_CHARACTERS_PER_BYTE)}`
-      : data.slice(0, HEX_PREFIX_CHARACTERS + FUNCTION_SELECTOR_BYTES * HEX_CHARACTERS_PER_BYTE),
-    dataBytes: Math.max(data.length - HEX_PREFIX_CHARACTERS, 0) / HEX_CHARACTERS_PER_BYTE,
+      ? ethers.utils.hexDataSlice(data, 0, CREATE2_SALT_BYTES)
+      : ethers.utils.hexDataSlice(data, 0, Math.min(FUNCTION_SELECTOR_BYTES, dataBytes)),
+    dataBytes,
   };
 }
 
@@ -130,7 +179,7 @@ ${dependentList}
 \`\`\`bash
 git checkout ${metadata.contracts_commit}        # bytecode identity: must match
 cd protocol-ops && cargo build --release && cd ..
-yarn --cwd l1-contracts/test/anvil-interop install
+yarn --cwd l1-contracts/test/anvil-interop install --frozen-lockfile
 
 yarn --cwd l1-contracts/test/anvil-interop bundle replay \\
   --bundle <this-dir> --rpc <l1-rpc> --key "$DEPLOYER_KEY"
@@ -163,13 +212,15 @@ ${callsMarkdown.join("\n")}
 }
 
 export function packDeployBundle(environment: string, options: PackDeployBundleOptions = {}): string {
+  const environmentName = parseUpgradeEnvironment(environment);
   const outputDirectory =
-    options.outputDirectory ?? path.join(L1_CONTRACTS_DIR, "upgrade-envs", V31_UPGRADE_NAME, "output", environment);
+    options.outputDirectory ?? path.join(L1_CONTRACTS_DIR, "upgrade-envs", V31_UPGRADE_NAME, "output", environmentName);
   const bundleDirectory = path.resolve(
     options.bundleDirectory ?? process.env.BUNDLE_DIR ?? path.join(outputDirectory, "deploy-bundle")
   );
   const permanentValuesPath =
-    options.permanentValuesPath ?? path.join(L1_CONTRACTS_DIR, "upgrade-envs/permanent-values", `${environment}.toml`);
+    options.permanentValuesPath ??
+    path.join(L1_CONTRACTS_DIR, "upgrade-envs/permanent-values", `${environmentName}.toml`);
   const repositoryRoot = options.repositoryRoot ?? REPO_ROOT;
   const sourcePrepareDirectory = path.join(outputDirectory, "prepare");
   const sourceManifestPath = path.join(sourcePrepareDirectory, "manifest.json");
@@ -196,12 +247,16 @@ export function packDeployBundle(environment: string, options: PackDeployBundleO
   }
 
   const contractsCommit = captureCommand("git", ["rev-parse", "HEAD"], repositoryRoot, "unknown");
-  const dirtyResult = spawnSync("git", ["diff", "--quiet", "HEAD", "--ignore-submodules=all"], {
-    cwd: repositoryRoot,
-  });
+  const worktreeIsClean = commandSucceeds(
+    "git",
+    ["diff", "--quiet", "HEAD", "--ignore-submodules=all"],
+    repositoryRoot
+  );
   const permanentValues = readToml(permanentValuesPath);
-  const deployer = process.env.DEPLOYER_ADDR?.toLowerCase() ?? "";
-  const create2Factory = optionalTomlString(permanentValues, "create2_factory_addr") ?? "";
+  const provenance = options.provenance ?? {};
+  const deployer = provenance.deployerAddress ? ethers.utils.getAddress(provenance.deployerAddress) : undefined;
+  const configuredCreate2Factory = optionalTomlString(permanentValues, "permanent_contracts.create2_factory_addr");
+  const create2Factory = configuredCreate2Factory ? ethers.utils.getAddress(configuredCreate2Factory) : undefined;
   const callsMarkdown: string[] = [];
   const bundles: PackedBundle[] = [...sourceManifest.bundles]
     .sort((left, right) => left.index - right.index)
@@ -210,7 +265,8 @@ export function packDeployBundle(environment: string, options: PackDeployBundleO
       const safePath = path.join(bundleDirectory, relativePath);
       const safe = readJson<SafeBundle>(safePath);
       if (!Array.isArray(safe.transactions)) throw new Error(`${safePath} has no transactions array`);
-      const role = deployer && bundle.target.toLowerCase() === deployer ? "DEPLOYER" : "other signer";
+      const target = ethers.utils.getAddress(bundle.target);
+      const role = deployer === target ? "DEPLOYER" : "other signer";
       callsMarkdown.push(
         `\n### Bundle ${bundle.index} — signer \`${bundle.target}\` (${role})\n\n` +
           `\`${bundle.file}\` · ${safe.transactions.length} transaction(s)\n\n` +
@@ -226,9 +282,10 @@ export function packDeployBundle(environment: string, options: PackDeployBundleO
       return {
         ...bundle,
         file: path.basename(bundle.file),
+        target,
         steps: bundle.steps ?? [],
         transaction_count: safe.transactions.length,
-        is_deployer_bundle: deployer ? bundle.target.toLowerCase() === deployer : null,
+        is_deployer_bundle: deployer ? target === deployer : null,
         sha256: fileSha256(safePath),
       };
     });
@@ -240,9 +297,10 @@ export function packDeployBundle(environment: string, options: PackDeployBundleO
     const seen = new Set<string>();
     for (const match of fs.readFileSync(verificationLog, "utf8").matchAll(pattern)) {
       const address = match[1];
-      if (match[3].toLowerCase().includes(deployer.slice(2)) && !seen.has(address.toLowerCase())) {
-        seen.add(address.toLowerCase());
-        deployerDependent.push({ address, contract: match[2] });
+      const normalizedAddress = ethers.utils.getAddress(address);
+      if (match[3].toLowerCase().includes(deployer.slice(2).toLowerCase()) && !seen.has(normalizedAddress)) {
+        seen.add(normalizedAddress);
+        deployerDependent.push({ address: normalizedAddress, contract: match[2] });
       }
     }
   }
@@ -252,35 +310,34 @@ export function packDeployBundle(environment: string, options: PackDeployBundleO
     const filePath = path.join(bundleDirectory, relativePath);
     if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) supportingFiles[relativePath] = fileSha256(filePath);
   }
-  const ecosystemToml = fs.readFileSync(path.join(bundleDirectory, "ecosystem.toml"), "utf8");
-  const githubRunId = process.env.GITHUB_RUN_ID;
+  const ecosystem = readToml(path.join(bundleDirectory, "ecosystem.toml"));
   const metadata: DeployBundleMetadata = {
     schema: DEPLOY_BUNDLE_SCHEMA,
     upgrade: V31_UPGRADE_NAME,
-    env: environment,
+    env: environmentName,
     protocol_version: {
-      old: protocolVersions(ecosystemToml, "old_protocol_version"),
-      new: protocolVersions(ecosystemToml, "new_protocol_version"),
+      old: protocolVersions(ecosystem, "old_protocol_version"),
+      new: protocolVersions(ecosystem, "new_protocol_version"),
     },
     contracts_commit: contractsCommit,
-    contracts_worktree_dirty: dirtyResult.status !== 0,
+    contracts_worktree_dirty: !worktreeIsClean,
     all_contracts_hashes_sha256: fileSha256(path.join(repositoryRoot, "AllContractsHashes.json")),
     l1: {
       chain_id: optionalTomlInteger(permanentValues, "l1_chain_id") ?? null,
-      forked_at_block: parseInteger(process.env.FORKED_AT_BLOCK, "FORKED_AT_BLOCK") ?? null,
+      forked_at_block: provenance.forkedAtBlock ?? null,
     },
-    deployer_address: process.env.DEPLOYER_ADDR ?? null,
+    deployer_address: deployer ?? null,
     deployer_dependent_deployments: deployerDependent,
-    zk_governance_commit: process.env.ZK_GOVERNANCE_COMMIT ?? null,
+    zk_governance_commit: provenance.zkGovernanceCommit ?? null,
     toolchain: {
       forge: captureCommand("forge", ["--version"], undefined, "unknown").split("\n")[0],
       rustc: captureCommand("rustc", ["--version"], undefined, "unknown"),
-      foundry_zksync: process.env.ZKSYNC_FOUNDRY_VERSION ?? null,
+      foundry_zksync: provenance.foundryZksyncVersion ?? null,
     },
-    generated_by: githubRunId
+    generated_by: provenance.github
       ? {
-          workflow_run: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${githubRunId}`,
-          runner_os: process.env.RUNNER_OS ?? null,
+          workflow_run: `${provenance.github.serverUrl}/${provenance.github.repository}/actions/runs/${provenance.github.runId}`,
+          runner_os: provenance.github.runnerOs ?? null,
         }
       : null,
     files: supportingFiles,

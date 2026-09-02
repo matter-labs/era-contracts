@@ -1,34 +1,18 @@
-import type { ChildProcess } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { ethers } from "ethers";
 import {
-  ANVIL_GAS_PRICE_WEI,
   DEFAULT_GATEWAY_RPC_URL,
   DEFAULT_ZK_GOVERNANCE_COMMIT,
   REPLAY_PORT_OFFSET,
-  SIGINT_EXIT_CODE,
-  SIGTERM_EXIT_CODE,
   V31_UPGRADE_NAME,
 } from "./constants";
-import {
-  L1_CONTRACTS_DIR,
-  REPO_ROOT,
-  envAnvilPort,
-  envHasGateway,
-  fileSha256,
-  fundBundleTargets,
-  isRpcReady,
-  locateProtocolOps,
-  readToml,
-  requireFile,
-  requireTomlString,
-  startAnvilFork,
-  stopAnvil,
-  verifyBundleIntegrity,
-  writeCombinedLog,
-} from "./common";
-import { broadcastUpgrade, verifyUpgrade } from "./operations";
+import { AnvilFork } from "./anvil";
+import { anvilPort, loadUpgradeEnvironment, parseUpgradeEnvironment } from "./environment";
+import { L1_CONTRACTS_DIR, REPO_ROOT, fileSha256, requireFile, writeCombinedLog } from "./file-system";
+import { fundBundleTargets } from "./funding";
+import { verifyBundleIntegrity } from "./integrity";
+import { ProtocolOps } from "./operations";
 
 export interface ReplayOptions {
   bundleDirectory: string;
@@ -39,15 +23,26 @@ export interface ReplayOptions {
 }
 
 export async function replayBundleAndVerify(args: ReplayOptions): Promise<void> {
+  if (Boolean(args.forkUrl) === Boolean(args.rpcUrl)) {
+    throw new Error("replay requires exactly one of forkUrl or rpcUrl");
+  }
   requireFile(path.join(args.bundleDirectory, "bundle-metadata.json"), "deploy bundle metadata");
   const metadata = verifyBundleIntegrity(args.bundleDirectory);
-  const environment = metadata.env;
-  const deployer = metadata.deployer_address;
+  const environment = parseUpgradeEnvironment(metadata.env);
+  const deployer = metadata.deployer_address ? ethers.utils.getAddress(metadata.deployer_address) : undefined;
   if (!deployer) throw new Error("bundle metadata has no deployer_address");
-  const permanentValuesPath = path.join(L1_CONTRACTS_DIR, "upgrade-envs/permanent-values", `${environment}.toml`);
-  const v31InputPath = path.join(L1_CONTRACTS_DIR, "upgrade-envs", V31_UPGRADE_NAME, `${environment}.toml`);
-  requireFile(permanentValuesPath, `config for env '${environment}'`);
-  requireFile(v31InputPath, `config for env '${environment}'`);
+  if (args.deployerKey) {
+    let signerAddress: string;
+    try {
+      signerAddress = new ethers.Wallet(args.deployerKey).address;
+    } catch {
+      throw new Error("the supplied private key is invalid");
+    }
+    if (signerAddress !== deployer) {
+      throw new Error("the supplied private key does not match the bundle deployer");
+    }
+  }
+  const config = loadUpgradeEnvironment(environment);
 
   console.log(`Env:          ${environment}`);
   console.log(`Bundle:       ${args.bundleDirectory}`);
@@ -64,56 +59,21 @@ export async function replayBundleAndVerify(args: ReplayOptions): Promise<void> 
     );
   }
 
-  const protocolOps = locateProtocolOps();
-  console.log(`protocol_ops: ${protocolOps}`);
+  const protocolOps = new ProtocolOps();
+  console.log(`protocol_ops: ${protocolOps.executable}`);
   const workDirectory = path.join(args.bundleDirectory, "replay");
   fs.mkdirSync(workDirectory, { recursive: true });
-  let rpcUrl = args.rpcUrl;
-  let anvil: ChildProcess | undefined;
-  const keepAnvil = process.env.KEEP_ANVIL === "1";
-  const cleanup = async (): Promise<void> => {
-    if (!anvil) return;
-    if (keepAnvil) {
-      console.log(`Leaving anvil (pid ${anvil.pid}) running on ${rpcUrl} (KEEP_ANVIL=1)`);
-      anvil.unref();
-      return;
-    }
-    console.log(`Stopping anvil (pid ${anvil.pid})...`);
-    await stopAnvil(anvil);
-    anvil = undefined;
-  };
-  const interruptHandler = (): void => {
-    void cleanup().finally(() => process.exit(SIGINT_EXIT_CODE));
-  };
-  const terminateHandler = (): void => {
-    void cleanup().finally(() => process.exit(SIGTERM_EXIT_CODE));
-  };
-  process.once("SIGINT", interruptHandler);
-  process.once("SIGTERM", terminateHandler);
-
-  try {
-    if (args.forkUrl) {
-      const port = envAnvilPort(environment) + REPLAY_PORT_OFFSET;
-      rpcUrl = `http://localhost:${port}`;
-      if (await isRpcReady(rpcUrl)) {
-        console.log(`=== Step 0: reusing anvil on ${rpcUrl} ===`);
-      } else {
-        console.log(`=== Step 0: anvil fork on port ${port} ===`);
-        if (metadata.l1.forked_at_block === null) {
-          console.warn(
-            "WARNING: the bundle records no fork height — forking at chain tip. " +
-              "If the upgrade is live, re-pack with FORKED_AT_BLOCK or pass --rpc."
-          );
-        }
-        anvil = await startAnvilFork({
-          port,
-          forkUrl: args.forkUrl,
-          forkBlock: metadata.l1.forked_at_block ?? undefined,
-          logPath: path.join(workDirectory, "anvil.log"),
-        });
-      }
-    }
-    if (!rpcUrl) throw new Error("replay requires either forkUrl or rpcUrl");
+  if (args.forkUrl && metadata.l1.forked_at_block === null) {
+    console.warn(
+      "WARNING: the bundle records no fork height — forking at chain tip. " +
+        "If the upgrade is live, re-pack with FORKED_AT_BLOCK or pass --rpc."
+    );
+  }
+  const replay = async (
+    provider: ethers.providers.JsonRpcProvider,
+    rpcUrl: string,
+    setNextBlockBaseFee?: () => Promise<void>
+  ): Promise<void> => {
     console.log(`L1 RPC:       ${rpcUrl}`);
     const gatewayRpcUrl = process.env.GW_RPC_URL ?? DEFAULT_GATEWAY_RPC_URL;
     console.log(`GW RPC:       ${gatewayRpcUrl}`);
@@ -126,23 +86,19 @@ export async function replayBundleAndVerify(args: ReplayOptions): Promise<void> 
     } else {
       if (args.forkUrl) {
         console.log("=== Step 1: fund every bundle signer (fork only) ===");
-        const v31Input = readToml(v31InputPath);
-        const permanentValues = readToml(permanentValuesPath);
-        await fundBundleTargets({
-          rpcUrl,
-          bridgehub: requireTomlString(v31Input, "bridgehub_proxy_address", v31InputPath),
-          zkAssetId: requireTomlString(permanentValues, "zk_token_asset_id", permanentValuesPath),
-          hasGateway: envHasGateway(permanentValues),
+        await fundBundleTargets(provider, {
+          bridgehubAddress: config.bridgehubAddress,
+          zkAssetId: config.zkAssetId,
+          hasGateway: config.hasGateway,
           manifestPath,
           ecosystemTomlPath: path.join(args.bundleDirectory, "ecosystem.toml"),
-          deployer,
+          deployerAddress: deployer,
         });
-        const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
-        await provider.send("anvil_setNextBlockBaseFeePerGas", [`0x${ANVIL_GAS_PRICE_WEI.toString(16)}`]);
+        if (!setNextBlockBaseFee) throw new Error("fork replay requires Anvil RPC controls");
+        await setNextBlockBaseFee();
       }
       console.log("=== Step 2: upgrade-broadcast ===");
-      await broadcastUpgrade({
-        protocolOps,
+      await protocolOps.broadcast({
         manifestPath,
         rpcUrl,
         outputPath: executedPath,
@@ -162,8 +118,7 @@ export async function replayBundleAndVerify(args: ReplayOptions): Promise<void> 
       "transactions.txt"
     );
     writeCombinedLog(combinedTransactionsPath, [realTransactionsPath, transactionsPath]);
-    await verifyUpgrade({
-      protocolOps,
+    await protocolOps.verify({
       environment,
       ecosystemTomlPath: path.join(args.bundleDirectory, "ecosystem.toml"),
       rpcUrl,
@@ -173,9 +128,19 @@ export async function replayBundleAndVerify(args: ReplayOptions): Promise<void> 
         process.env.ZK_GOVERNANCE_COMMIT ?? metadata.zk_governance_commit ?? DEFAULT_ZK_GOVERNANCE_COMMIT,
     });
     console.log("=== Done ===");
-  } finally {
-    process.removeListener("SIGINT", interruptHandler);
-    process.removeListener("SIGTERM", terminateHandler);
-    await cleanup();
+  };
+
+  if (args.forkUrl) {
+    const anvil = await AnvilFork.connectOrStart({
+      port: anvilPort(environment) + REPLAY_PORT_OFFSET,
+      forkUrl: args.forkUrl,
+      forkBlock: metadata.l1.forked_at_block ?? undefined,
+      logPath: path.join(workDirectory, "anvil.log"),
+    });
+    await anvil.run(process.env.KEEP_ANVIL === "1", ({ provider, rpcUrl }) =>
+      replay(provider, rpcUrl, () => anvil.setNextBlockBaseFee())
+    );
+  } else if (args.rpcUrl) {
+    await replay(new ethers.providers.JsonRpcProvider(args.rpcUrl), args.rpcUrl);
   }
 }

@@ -1,16 +1,18 @@
+import { ethers } from "ethers";
+
 export const DEPLOY_BUNDLE_SCHEMA = "zksync-ecosystem-upgrade-deploy-bundle/1";
 export const V31_UPGRADE_NAME = "v0.31.0-interopB";
 
-export const ENV_ANVIL_PORTS: Readonly<Record<string, number>> = {
+export const ENV_ANVIL_PORTS = {
   stage: 29_545,
   testnet: 29_547,
   mainnet: 29_549,
-};
+} as const;
 export const REPLAY_PORT_OFFSET = 1;
 
-export const ANVIL_GAS_PRICE_WEI = 1_000_000_000;
-export const ANVIL_BALANCE_HEX = "0x21e19e0c9bab2400000";
-export const BUNDLE_TARGET_TOKEN_FUNDING_WEI = "1000000000000000000000000000000";
+export const ANVIL_GAS_PRICE = ethers.utils.parseUnits("1", "gwei");
+export const ANVIL_BALANCE = ethers.utils.parseEther("10000");
+export const BUNDLE_TARGET_TOKEN_FUNDING = ethers.utils.parseEther("1000000000000");
 export const ANVIL_READY_ATTEMPTS = 30;
 export const ANVIL_READY_DELAY_MS = 1_000;
 export const ANVIL_STOP_TIMEOUT_MS = 5_000;
@@ -32,8 +34,6 @@ export const ERAVM_HASH_RESERVED_OFFSET = 1;
 export const ERAVM_HASH_LENGTH_OFFSET = 2;
 export const MAX_ERAVM_BYTECODE_WORDS = 0xffff;
 
-export const HEX_PREFIX_CHARACTERS = 2;
-export const HEX_CHARACTERS_PER_BYTE = 2;
 export const CREATE2_SALT_BYTES = 32;
 export const FUNCTION_SELECTOR_BYTES = 4;
 export const SIGINT_EXIT_CODE = 130;

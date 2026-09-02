@@ -12,7 +12,7 @@ import {
   ERAVM_HASH_VERSION_OFFSET,
   MAX_ERAVM_BYTECODE_WORDS,
 } from "./constants";
-import { readJson, readToml, requireTomlString } from "./common";
+import { readJson, readToml, requireTomlString } from "./file-system";
 
 interface ContractHashEntry {
   contractName?: string;
@@ -48,7 +48,7 @@ export function restoreCanonicalDefaultAccountArtifact(
   hashesPath: string
 ): void {
   const environment = readToml(environmentPath);
-  const environmentHash = requireTomlString(environment, "default_aa_hash", environmentPath).toLowerCase();
+  const environmentHash = requireTomlString(environment, "contracts.default_aa_hash", environmentPath).toLowerCase();
   if (!/^0x[0-9a-f]{64}$/.test(environmentHash)) fail(`${environmentPath} has an invalid default_aa_hash`);
 
   const hashes = readJson<ContractHashEntry[]>(hashesPath);

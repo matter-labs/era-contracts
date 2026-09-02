@@ -1,8 +1,9 @@
 import * as path from "path";
 import { parseArgs } from "util";
-import { runCli, verifyBundleIntegrity } from "./common";
 import { restoreCanonicalDefaultAccountArtifact } from "./default-account";
-import { packDeployBundle } from "./pack";
+import { formatError, parseInteger } from "./file-system";
+import { verifyBundleIntegrity } from "./integrity";
+import { bundleProvenanceFromEnvironment, packDeployBundle } from "./pack";
 import { regenerateAndVerify } from "./regenerate";
 import { replayBundleAndVerify } from "./replay";
 
@@ -33,12 +34,20 @@ function expectPositionals(args: string[], count: number, command: Command): str
 
 async function main(): Promise<void> {
   const [commandName, ...commandArgs] = process.argv.slice(2);
+  if (commandName === "help" || commandName === "--help" || commandName === "-h") {
+    console.log(USAGE);
+    return;
+  }
   if (!isCommand(commandName)) usage(commandName ? `unknown bundle command: ${commandName}` : undefined);
 
   switch (commandName) {
     case "pack": {
       const [environment] = expectPositionals(commandArgs, 1, commandName);
-      packDeployBundle(environment);
+      packDeployBundle(environment, {
+        provenance: bundleProvenanceFromEnvironment({
+          forkedAtBlock: parseInteger(process.env.FORKED_AT_BLOCK, "FORKED_AT_BLOCK"),
+        }),
+      });
       return;
     }
     case "regen": {
@@ -57,6 +66,7 @@ async function main(): Promise<void> {
           "verify-only": { type: "boolean", default: false },
         },
         strict: true,
+        allowPositionals: false,
       });
       if (!values.bundle) usage("bundle replay requires --bundle");
       if (Boolean(values["fork-url"]) === Boolean(values.rpc)) {
@@ -83,4 +93,7 @@ async function main(): Promise<void> {
   }
 }
 
-runCli(main);
+void main().catch((error) => {
+  console.error(formatError(error));
+  process.exitCode = 1;
+});
