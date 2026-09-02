@@ -353,7 +353,7 @@ library Utils {
     }
 
     function getGettersSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](35);
+        bytes4[] memory selectors = new bytes4[](32);
         uint256 i = 0;
         selectors[i++] = GettersFacet.getVerifier.selector;
         selectors[i++] = GettersFacet.getAdmin.selector;
@@ -368,9 +368,6 @@ library Utils {
         selectors[i++] = GettersFacet.isValidator.selector;
         selectors[i++] = GettersFacet.l2LogsRootHash.selector;
         selectors[i++] = GettersFacet.storedBatchHash.selector;
-        selectors[i++] = GettersFacet.getL2BootloaderBytecodeHash.selector;
-        selectors[i++] = GettersFacet.getL2DefaultAccountBytecodeHash.selector;
-        selectors[i++] = GettersFacet.getL2EvmEmulatorBytecodeHash.selector;
         selectors[i++] = GettersFacet.getVerifierParams.selector;
         selectors[i++] = GettersFacet.isDiamondStorageFrozen.selector;
         selectors[i++] = GettersFacet.getPriorityTxMaxGasLimit.selector;

@@ -75,18 +75,6 @@ contract GettersFacetWrapper is GettersFacet, Test {
         s.storedBatchHashes[batchNumber] = _storedBatchHash;
     }
 
-    function util_setL2BootloaderBytecodeHash(bytes32 _l2BootloaderBytecodeHash) external {
-        s.__DEPRECATED_l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;
-    }
-
-    function util_setL2DefaultAccountBytecodeHash(bytes32 _l2DefaultAccountBytecodeHash) external {
-        s.__DEPRECATED_l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
-    }
-
-    function utils_setL2EvmEmulatorBytecodeHash(bytes32 _l2EvmEmulatorBytecodeHash) external {
-        s.__DEPRECATED_l2EvmEmulatorBytecodeHash = _l2EvmEmulatorBytecodeHash;
-    }
-
     function util_setVerifierParams(VerifierParams memory _verifierParams) external {
         s.__DEPRECATED_verifierParams = _verifierParams;
     }

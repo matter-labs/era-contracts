@@ -35,7 +35,8 @@ contract DefaultUpgradeTest is BaseUpgrade {
         assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
-        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
+        // The EraVM bytecode-hash fields of ProposedUpgrade are ignored: the deprecated slots stay untouched.
+        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), bytes32(0));
+        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), bytes32(0));
     }
 }

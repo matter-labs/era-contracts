@@ -46,6 +46,10 @@ contract BaseUpgradeUtils is Test, ZKChainBase {
         return s.__DEPRECATED_l2BootloaderBytecodeHash;
     }
 
+    function getL2EvmEmulatorBytecodeHash() public view returns (bytes32) {
+        return s.__DEPRECATED_l2EvmEmulatorBytecodeHash;
+    }
+
     function getProtocolVersion() public view returns (uint256) {
         return s.protocolVersion;
     }

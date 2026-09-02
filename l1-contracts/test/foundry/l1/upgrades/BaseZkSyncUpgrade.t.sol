@@ -16,8 +16,6 @@ import {
     L2UpgradeNonceNotEqualToNewProtocolVersion,
     NewProtocolMajorVersionNotZero,
     PatchCantSetUpgradeTxn,
-    PatchUpgradeCantSetBootloader,
-    PatchUpgradeCantSetDefaultAccount,
     PreviousProtocolMajorVersionNotZero,
     PreviousUpgradeNotCleaned,
     PreviousUpgradeNotFinalized,
@@ -144,29 +142,6 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    // Patch upgrade can't set bootloader
-    function test_revertWhen_PatchUpgradeCantSetBootloader() public {
-        uint256 newVersion = SemVer.packSemVer(0, 1, 1);
-        baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
-        baseZkSyncUpgrade.mockProtocolVersionVerifier(newVersion, mockVerifier);
-        proposedUpgrade.newProtocolVersion = newVersion;
-
-        vm.expectRevert(abi.encodeWithSelector(PatchUpgradeCantSetBootloader.selector));
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
-    }
-
-    // Patch upgrade can't set default account
-    function test_revertWhen_PatchUpgradeCantSetDefaultAccount() public {
-        uint256 newVersion = SemVer.packSemVer(0, 1, 1);
-        baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
-        baseZkSyncUpgrade.mockProtocolVersionVerifier(newVersion, mockVerifier);
-        proposedUpgrade.newProtocolVersion = newVersion;
-        proposedUpgrade.bootloaderHash = bytes32(0);
-
-        vm.expectRevert(abi.encodeWithSelector(PatchUpgradeCantSetDefaultAccount.selector));
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
-    }
-
     // L2 system upgrade tx type is wrong
     function test_revertWhen_InvalidTxType(uint256 newTxType) public {
         vm.assume(newTxType != SYSTEM_UPGRADE_L2_TX_TYPE && newTxType > 0);
@@ -178,11 +153,6 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
     // Patch upgrade can't set upgrade txn
     function test_revertWhen_PatchCantSetUpgradeTxn() public {
-        // Change basic hashes to 0, to skip previous path only checks
-        proposedUpgrade.bootloaderHash = bytes32(0);
-        proposedUpgrade.defaultAccountHash = bytes32(0);
-        proposedUpgrade.evmEmulatorHash = bytes32(0);
-
         uint256 newVersion = SemVer.packSemVer(0, 1, 1);
         baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
         baseZkSyncUpgrade.mockProtocolVersionVerifier(newVersion, mockVerifier);
@@ -236,22 +206,17 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    function test_SuccessWith_L2BootloaderBytecodeHashIsZero() public {
-        proposedUpgrade.bootloaderHash = bytes32(0);
+    // The EraVM bytecode-hash fields of ProposedUpgrade are dead on the ZKsync OS line: even a
+    // non-zero value must be ignored and the deprecated slots left untouched.
+    function test_upgrade_IgnoresLegacyBytecodeHashes() public {
+        assertTrue(proposedUpgrade.bootloaderHash != bytes32(0), "fixture must carry a non-zero hash");
 
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
-    }
-
-    function test_SuccessWith_L2DefaultAccountBytecodeHashIsZero() public {
-        proposedUpgrade.defaultAccountHash = bytes32(0);
-
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
-
-        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
+        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), bytes32(0));
+        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), bytes32(0));
+        assertEq(baseZkSyncUpgrade.getL2EvmEmulatorBytecodeHash(), bytes32(0));
     }
 
     function test_SuccessWith_TxTypeIsZero() public {
@@ -260,16 +225,12 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
-        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 
     function test_SuccessUpgrade() public {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
-        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 
     function test_revertWhen_VerifierIsZeroAddress() public {
