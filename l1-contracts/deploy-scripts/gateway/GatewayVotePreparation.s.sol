@@ -152,7 +152,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
     /// @notice Brings up a brand-new gateway: CREATE2-deploys the whole gateway CTM contract set
     ///         through L1->L2 transactions.
-    /// @dev DISABLED IN v32. No gateway is deployed in this release: chain migrations are switched off
+    /// @dev DISABLED IN v33. No gateway is deployed in this release: chain migrations are switched off
     ///      ecosystem-wide (`CHAIN_MIGRATIONS_ENABLED == false` in `Config.sol`, see
     ///      {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}), so no chain
     ///      can ever settle on a gateway created here, and the release's gateway-side pieces are
@@ -169,7 +169,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     /// @dev `virtual` for the anvil-interop harness alone, which brings a gateway up to keep exercising
     ///      the machinery this release keeps but does not deploy — see `_GatewayVotePreparationForTests`.
     function deployGatewayCTM() internal virtual {
-        revert("GatewayVotePreparation: v32 deploys no gateway; see the note on deployGatewayCTM");
+        revert("GatewayVotePreparation: v33 deploys no gateway; see the note on deployGatewayCTM");
     }
 
     /// @notice The gateway CTM deployment itself, kept intact for the harness and for the release that
