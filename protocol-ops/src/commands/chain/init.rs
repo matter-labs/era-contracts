@@ -248,6 +248,16 @@ pub async fn chain_init(
          pubdata content LogsOnly (chain {})",
         input.chain_params.chain_id.as_u64()
     );
+    // The override exists to name a content the derivation cannot know about, not to contradict
+    // the DA mode. A validium created with FullPubdata pays a rollup's DA costs while calling
+    // itself a validium, and the mistake is invisible until the first batch settles.
+    anyhow::ensure!(
+        !(input.chain_params.da_mode == DAValidatorType::LogsOnlyValidium
+            && input.pubdata_content == Some(PubdataContent::FullPubdata)),
+        "chain {} is a logs-only validium, so it cannot be created with pubdata content \
+         FullPubdata — drop `--pubdata-content` and let it follow `--da-mode`",
+        input.chain_params.chain_id.as_u64()
+    );
     // A fresh chain starts at `FullPubdata`, so only a differing value needs a transaction.
     let should_set_pubdata_content =
         pubdata_content.is_some_and(|content| content != PubdataContent::FullPubdata);
