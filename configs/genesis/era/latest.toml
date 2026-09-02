@@ -1,4 +1,4 @@
-protocol_semantic_version = 133143986177
+protocol_semantic_version = 137438953474
 genesis_root = "0x25a62a2f3b9c970e4c2d3fc17f20660e505c08608b0facf56a2d08491bfa27f5"
 genesis_rollup_leaf_index = 102
 genesis_batch_commitment = "0x02774b40a89092f54ecd5930d227689010d5d01e737c7b5903add3d5144e29aa"
@@ -7,6 +7,6 @@ default_aa_hash = "0x010005f9d84c1863bf21a9393f2fd1631af92aab68f12c35dba580c8d7a
 evm_emulator_hash = "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63"
 
 [prover]
-recursion_scheduler_level_vk_hash = "0x18bdc7272350532ca7c3d4d613f0f22aa4100bcddd06722b2f8c6896ca5f5ad3"
-fflonk_snark_wrapper_vk_hash = "0x34e7f769253b128e4ac6fbf71b3f8471d507c4f93bc50dcf26509ed1bae25122"
+recursion_scheduler_level_vk_hash = "0xbaaa46d644f7034d609eea327e818bd9a93a3c0fdd60e887d233da8a35c4f8ae"
+fflonk_snark_wrapper_vk_hash = "0xd89b62ac599b15d9dc47860c8ebca5964c99e7b177e9b8ea38a0c13714dc32bb"
 airbender_snark_wrapper_vk_hash = "0xd8176dea8eb7277c3c7ac5c40bfce0b59cd6edfcaa9fff3b06cda5e4aebfdf4c"
