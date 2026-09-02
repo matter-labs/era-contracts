@@ -23,7 +23,7 @@ uint256 constant ERA_CHAIN_ID_UNUSED = 0;
 address constant ERA_DIAMOND_PROXY_UNUSED = address(0);
 
 /// @dev First protocol version whose production verifier exports the testnet-verifier flag
-/// (`isTestnetVerifier()`). Earlier production verifiers export no flag; v32/v33 testnet
+/// (`isTestnetVerifier()`). Earlier production verifiers export no flag; v31/v32/v33 testnet
 /// verifiers exported it as the legacy `IS_TESTNET_VERIFIER` constant.
 uint32 constant FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG = 34;
 
