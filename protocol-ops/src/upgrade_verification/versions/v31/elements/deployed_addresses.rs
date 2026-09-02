@@ -1805,42 +1805,15 @@ fn hex_bytes(label: &str, value: &str) -> Result<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-    use alloy::{
-        primitives::{Address, Bytes, FixedBytes, U256},
-        sol,
-        sol_types::SolValue,
-    };
+    use alloy::sol_types::SolStruct;
 
     use super::gateway_signatures::GatewayCTMDeployerConfig;
 
-    // Keep this fixture in the exact order of the Solidity source of truth in
-    // l1-contracts/contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol.
-    sol! {
-        struct SolidityGatewayCTMDeployerConfig {
-            address aliasedGovernanceAddress;
-            bytes32 salt;
-            uint256 l1ChainId;
-            bool testnetVerifier;
-            bool isZKsyncOS;
-            bytes4[] adminSelectors;
-            bytes4[] executorSelectors;
-            bytes4[] mailboxSelectors;
-            bytes4[] gettersSelectors;
-            bytes4[] migratorSelectors;
-            bytes4[] committerSelectors;
-            bytes32 genesisRoot;
-            uint256 genesisRollupLeafIndex;
-            bytes32 genesisBatchCommitment;
-            bytes forceDeploymentsData;
-            uint256 protocolVersion;
-        }
-    }
-
     // This mirror already drifted from the Solidity struct once (a stray `eraChainId` field),
-    // silently breaking the gateway CTM CREATE2-address verification; pin the layout the same
-    // way fixed_force_deployment.rs pins FixedForceDeploymentsData.
+    // silently breaking the gateway CTM CREATE2-address verification; keep it pinned to the
+    // Solidity source of truth (same intent as the fixed_force_deployment.rs layout test).
     #[test]
-    fn matches_and_decodes_solidity_gateway_ctm_deployer_config_layout() {
+    fn gateway_ctm_deployer_config_matches_solidity_layout() {
         let solidity_source = include_str!(
             "../../../../../../l1-contracts/contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol"
         );
@@ -1851,83 +1824,20 @@ mod tests {
             .split_once('}')
             .expect("canonical Solidity struct must be closed")
             .0;
-        let solidity_fields: Vec<_> = struct_body
-            .lines()
-            .map(str::trim)
-            .filter(|line| line.ends_with(';'))
-            .collect();
-        assert_eq!(
-            solidity_fields,
-            [
-                "address aliasedGovernanceAddress;",
-                "bytes32 salt;",
-                "uint256 l1ChainId;",
-                "bool testnetVerifier;",
-                "bool isZKsyncOS;",
-                "bytes4[] adminSelectors;",
-                "bytes4[] executorSelectors;",
-                "bytes4[] mailboxSelectors;",
-                "bytes4[] gettersSelectors;",
-                "bytes4[] migratorSelectors;",
-                "bytes4[] committerSelectors;",
-                "bytes32 genesisRoot;",
-                "uint256 genesisRollupLeafIndex;",
-                "bytes32 genesisBatchCommitment;",
-                "bytes forceDeploymentsData;",
-                "uint256 protocolVersion;",
-            ],
-            "protocol-ops GatewayCTMDeployerConfig must follow the canonical Solidity fields"
+        let solidity_signature = format!(
+            "GatewayCTMDeployerConfig({})",
+            struct_body
+                .lines()
+                .map(str::trim)
+                .filter(|line| line.ends_with(';'))
+                .map(|line| line.trim_end_matches(';'))
+                .collect::<Vec<_>>()
+                .join(",")
         );
-
-        let expected = SolidityGatewayCTMDeployerConfig {
-            aliasedGovernanceAddress: Address::from([1; 20]),
-            salt: FixedBytes::from([2; 32]),
-            l1ChainId: U256::from(3),
-            testnetVerifier: true,
-            isZKsyncOS: true,
-            adminSelectors: vec![FixedBytes::from([4, 4, 4, 4])],
-            executorSelectors: vec![FixedBytes::from([5, 5, 5, 5])],
-            mailboxSelectors: vec![FixedBytes::from([6, 6, 6, 6])],
-            gettersSelectors: vec![FixedBytes::from([7, 7, 7, 7])],
-            migratorSelectors: vec![FixedBytes::from([8, 8, 8, 8])],
-            committerSelectors: vec![FixedBytes::from([9, 9, 9, 9])],
-            genesisRoot: FixedBytes::from([10; 32]),
-            genesisRollupLeafIndex: U256::from(11),
-            genesisBatchCommitment: FixedBytes::from([12; 32]),
-            forceDeploymentsData: Bytes::from(vec![13]),
-            protocolVersion: U256::from(14),
-        };
-
-        let encoded = expected.abi_encode();
-        let actual = GatewayCTMDeployerConfig::abi_decode(&encoded)
-            .expect("the protocol-ops mirror must decode the Solidity layout");
-
-        macro_rules! assert_fields {
-            ($actual:ident, $expected:ident; $($field:ident),+ $(,)?) => {
-                $(assert_eq!(
-                    $actual.$field,
-                    $expected.$field,
-                    concat!(stringify!($field), " ABI position drifted")
-                );)+
-            };
-        }
-        assert_fields!(actual, expected;
-            aliasedGovernanceAddress,
-            salt,
-            l1ChainId,
-            testnetVerifier,
-            isZKsyncOS,
-            adminSelectors,
-            executorSelectors,
-            mailboxSelectors,
-            gettersSelectors,
-            migratorSelectors,
-            committerSelectors,
-            genesisRoot,
-            genesisRollupLeafIndex,
-            genesisBatchCommitment,
-            forceDeploymentsData,
-            protocolVersion,
+        assert_eq!(
+            GatewayCTMDeployerConfig::eip712_root_type().as_ref(),
+            solidity_signature.as_str(),
+            "protocol-ops GatewayCTMDeployerConfig must follow the canonical Solidity fields"
         );
     }
 }
