@@ -1,0 +1,55 @@
+{
+  "l1Addresses": {
+    "bridgehub": "0x3BFDCfcc2Ac1d41071F3D8c52991f00C9Ac4D1B0",
+    "l1SharedBridge": "0x00e0376cC93dd1D773487c05bc78c7803a8f0760",
+    "l1NullifierProxy": "0xc25a77d2F5d783f61864bEaDD8162BDC1803277b",
+    "l1NativeTokenVault": "0x09a1D23dD96Ef87Dc19Aa127F772Bab13Add2F88",
+    "governance": "0xa60F07cAaFA0aE451296c0ca5C261578A390105e",
+    "transparentProxyAdmin": "0x0FA38b5c8cb180809E0C95E2EE923eC093123285",
+    "messageRoot": "0xDf98881AF7B64657Cffd1CB5Ff4cA4BF0996cE89",
+    "ctmDeploymentTracker": "0xE3eCC09C5E538169549552348CF34eDC6659D560",
+    "chainRegistrationSender": "0x031A653CFDA8d5e8f065d12c5b653Ab0F62f6e01"
+  },
+  "ctmAddresses": {
+    "chainTypeManager": "0xEcb4C00AA1DEB9334d59d625648718B2eE78861E",
+    "chainAdmin": "0x16b5d0b1A5c64195453315C58671A6f847CE1aC2",
+    "verifier": "0xffdBE47DbD4174114873fE39c2210F18053d4632",
+    "rollupL1DAValidator": "0xfB934Eb423BC274E2F47579bb87bC47c29CE5bDd"
+  },
+  "chainAddresses": [
+    {
+      "chainId": 10,
+      "diamondProxy": "0x50d1C26f9996BCFF5c2269AcD553939ffcD8bC03"
+    },
+    {
+      "chainId": 11,
+      "diamondProxy": "0x1f77d0a4130c323614276172C102c0a8c9b222C3"
+    },
+    {
+      "chainId": 12,
+      "diamondProxy": "0x8D79CB6801C71f00cCad61a9a034BA596C1938dc"
+    },
+    {
+      "chainId": 13,
+      "diamondProxy": "0xDD23D9794b4DE96aE441bf7FD170A441a973fE48"
+    },
+    {
+      "chainId": 14,
+      "diamondProxy": "0x81C0543970c9dD9E7a9ddA04d51126c921461a8F"
+    }
+  ],
+  "testTokens": {
+    "10": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "11": "0x9A676e781A523b5d0C0e43731313A708CB607508",
+    "12": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "13": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "14": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  },
+  "customBaseTokens": {
+    "14": "0x367761085BF3C12e5DA2Df99AC6E1a824612b8fb"
+  },
+  "zkToken": {
+    "l1Address": "0x70e0bA845a1A0F2DA3359C97E0285013525FFC49",
+    "assetId": "0x3abdd76e9c62392af697f095b46d1602d95dd4949ed0bb1e2c2f2f459c959f4b"
+  }
+}
