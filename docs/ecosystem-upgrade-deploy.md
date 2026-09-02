@@ -76,7 +76,7 @@ the normalization.
 export PATH="$PWD/foundry-zksync:$PATH"          # foundry-zksync v0.1.5
 DEPLOYER_ADDR=<deployer-eoa> \
 L1_FORK_URL=<l1-rpc> GW_RPC_URL=<l1-rpc> \
-ZK_GOVERNANCE_COMMIT=9b06a16 \
+ZK_GOVERNANCE_COMMIT=9b06a16159cd58add109f25598e79731450d1772 \
 ZK_GOVERNANCE_DIR=../../zk-governance \
   ./l1-contracts/test/anvil-interop/regen-and-verify.sh mainnet
 
@@ -212,7 +212,7 @@ OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
   --ecosystem-toml "$OUT/ecosystem.toml" \
   --transactions-log "$OUT/transactions.txt" \
   --l1-rpc-url <l1-rpc> --gw-rpc-url <l1-rpc> \
-  --zk-governance-commit 9b06a16
+  --zk-governance-commit 9b06a16159cd58add109f25598e79731450d1772
 ```
 
 Pre-governance (contracts deployed, governance not yet executed) this reports the

@@ -239,9 +239,9 @@ on:
         default: "v0.1.5"
         type: string
       zk_governance_commit:
-        description: "zk-governance commit for PUVT bytecode metadata (PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard). Mainnet v31 = 9b06a16."
+        description: "Full zk-governance commit SHA for checkout and PUVT bytecode metadata (PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard)."
         required: false
-        default: "9b06a16"
+        default: "9b06a16159cd58add109f25598e79731450d1772"
         type: string
       fork_block:
         description: "L1 block to fork at (BLANK = chain tip). Pin to a block BEFORE the upgrade was deployed if the ecosystem is already live: re-running the prepare against post-deploy tip reverts because ownership has already been handed off from the deployer. CREATE2 addresses are deterministic, so the generated calldata is identical to a tip run."
