@@ -103,11 +103,10 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         setAddressesBasedOnBridgehub(ctmRepresentativeChainId, bridgehubProxy);
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
-        // TODO: drop `eraChainId` and `isZKsyncOS` from `GatewayCTMDeployerConfig` in the next
-        // release. Neither is read by any audited contract — the `eraChainId` that reaches
-        // `MailboxFacet` on Gateway travels in script-computed creation code — but the struct is
-        // declared in the frozen `gateway-ctm-deployer/GatewayCTMDeployer.sol`, so removing the
-        // fields here would modify audited code.
+        // TODO: drop `isZKsyncOS` from `GatewayCTMDeployerConfig` in the next release — this
+        // OS-only line no longer needs the flag, but the deployed gateway deployers still assert
+        // it (`GatewayCTMDeployerVerifiersZKsyncOS` / `GatewayCTMDeployerCTMZKsyncOS`), so
+        // removing it means touching those contracts.
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: aliasedGovernor,
             salt: toml.readBytes32("$.contracts.create2_factory_salt"),

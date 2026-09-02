@@ -310,7 +310,7 @@ mod tests {
     sol! {
         struct SolidityFixedForceDeploymentsData {
             uint256 l1ChainId;
-                address l1AssetRouter;
+            address l1AssetRouter;
             bytes32 l2TokenProxyBytecodeHash;
             address aliasedL1Governance;
             uint256 maxNumberOfZKChains;
