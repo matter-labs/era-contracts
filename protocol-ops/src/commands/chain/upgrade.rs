@@ -74,9 +74,10 @@ pub struct ChainUpgradeArgs {
     #[clap(long, default_value = ZERO_ADDRESS)]
     pub access_control_restriction: Address,
 
-    /// What the chain does with its pubdata after the upgrade. Set it to move the chain's DA
-    /// setup as part of the upgrade; the L2 commitment scheme and the pubdata content follow
-    /// from it and the chain's VM. Requires `--l1-da-validator`.
+    /// Where the chain's pubdata goes after the upgrade. Set it to move the chain's DA setup as
+    /// part of the upgrade; the L2 commitment scheme and the pubdata content then default from it
+    /// and the chain's VM, and either can be named explicitly with the two flags below — the two
+    /// axes are independent. Requires `--l1-da-validator`.
     ///
     /// For chains that settle on a gateway use `chain gateway migrate-to`: the schemes differ.
     #[clap(long, value_enum, requires = "l1_da_validator", help_heading = "DA")]
@@ -87,17 +88,21 @@ pub struct ChainUpgradeArgs {
     #[clap(long, requires = "da_mode", help_heading = "DA")]
     pub l1_da_validator: Option<Address>,
 
-    /// Override the L2 DA commitment scheme derived from `--da-mode` and the chain's VM.
+    /// The L2 DA commitment scheme, when it is not the one `--da-mode` defaults to — a chain on
+    /// the rollup validator that publishes through commit-tx calldata rather than blobs takes
+    /// `blobs-and-pubdata-keccak256`.
     #[clap(long, value_enum, help_heading = "DA")]
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
 
-    /// Override the pubdata content derived from `--da-mode` and the chain's VM.
+    /// How much pubdata the chain commits after the upgrade, when it is not what `--da-mode`
+    /// defaults to. Any combination of the two is allowed: a chain publishing through blobs may
+    /// commit `logs-only`, and one publishing nothing may still commit `full-pubdata`.
     #[clap(long, value_enum, help_heading = "DA")]
     pub pubdata_content: Option<PubdataContent>,
 
     /// Upgrade a validium-priced chain past the version that requires it to publish its pubdata,
-    /// without moving its DA setup. The chain stops producing provable batches — pass this only
-    /// when the DA move is applied by other means.
+    /// leaving its DA setup alone. Such a chain stops producing provable batches — pass this only
+    /// when the move is applied by other means, or deliberately.
     #[clap(long, default_value_t = false, help_heading = "DA")]
     pub keep_da_setup: bool,
 

@@ -84,14 +84,18 @@ pub struct ChainInitArgs {
     /// e.g. "4000/1" means: 1 ETH = 4000 base tokens
     #[clap(long, default_value = "1/1", help_heading = "Advanced input")]
     pub base_token_price_ratio: String,
-    /// Data availability mode
+    /// Where the chain's pubdata goes: the L1 DA validator it registers with. Independent of
+    /// `--pubdata-content`, which says how much pubdata there is to publish.
     #[clap(long, value_enum, default_value_t = DAValidatorType::Rollup, help_heading = "Advanced input")]
     pub da_mode: DAValidatorType,
-    /// Override L2 DA commitment scheme (default: Rollup + ZKsync OS VM uses BlobsZKSyncOS, etc.)
+    /// The L2 DA commitment scheme, when it is not the one `--da-mode` defaults to (Rollup +
+    /// ZKsync OS defaults to BlobsZKSyncOS). A rollup-validator chain that publishes through
+    /// commit-tx calldata rather than blobs takes `blobs-and-pubdata-keccak256`.
     #[clap(long, value_enum, help_heading = "Advanced input")]
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
-    /// Override the pubdata content (ZKsync OS only; default: FullPubdata for a rollup or custom-DA
-    /// chain, LogsOnly for a validium). Must match the chain's server/prover chain config.
+    /// How much pubdata the chain's batches commit to (ZKsync OS only; defaults to FullPubdata for
+    /// a chain that publishes and LogsOnly for one that does not). Any combination with `--da-mode`
+    /// is allowed. Must match the chain's server/prover chain config.
     #[clap(long, value_enum, help_heading = "Advanced input")]
     pub pubdata_content: Option<PubdataContent>,
     /// Keep deposits paused after init
@@ -246,16 +250,6 @@ pub async fn chain_init(
         !(input.make_permanent_rollup && pubdata_content == Some(PubdataContent::LogsOnly)),
         "a permanent rollup must publish the full pubdata, so it cannot be created with \
          pubdata content LogsOnly (chain {})",
-        input.chain_params.chain_id.as_u64()
-    );
-    // The override exists to name a content the derivation cannot know about, not to contradict
-    // the DA mode. A validium created with FullPubdata pays a rollup's DA costs while calling
-    // itself a validium, and the mistake is invisible until the first batch settles.
-    anyhow::ensure!(
-        !(input.chain_params.da_mode == DAValidatorType::LogsOnlyValidium
-            && input.pubdata_content == Some(PubdataContent::FullPubdata)),
-        "chain {} is a logs-only validium, so it cannot be created with pubdata content \
-         FullPubdata — drop `--pubdata-content` and let it follow `--da-mode`",
         input.chain_params.chain_id.as_u64()
     );
     // A fresh chain starts at `FullPubdata`, so only a differing value needs a transaction.

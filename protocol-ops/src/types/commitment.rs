@@ -6,18 +6,25 @@ use strum::Display;
 
 use crate::types::VMOption;
 
-/// The kind of chain being created, named after what it does with its pubdata.
+/// Where a chain's committed pubdata goes — the L1 DA validator it registers with, and through it
+/// the on-chain `PubdataPricingMode` (`Rollup` for `Rollup`, `Validium` for everything else).
+///
+/// This is one of the two DA axes and says nothing about *how much* pubdata the chain commits;
+/// that is [`PubdataContent`], and the two are chosen independently. A logs-only chain publishing
+/// through blobs registers here as `Rollup`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, ValueEnum)]
 pub enum DAValidatorType {
-    /// Publishes the whole pubdata on L1.
+    /// Publishes to L1 itself, through the rollup DA validator: blobs, or commit-tx calldata with
+    /// the `BlobsAndPubdataKeccak256` scheme.
     #[default]
     Rollup,
-    /// Publishes only the mandatory L2->L1 log region on L1 — including the interop commitment tree
-    /// leaves, which is what keeps such a chain interop-capable — and drops the state diffs and the
-    /// message preimages. On ZKsync OS that region still goes into blobs, so the chain runs the same
-    /// DA validator a rollup does and differs from it only in `PubdataContent`; the Era VM has no
-    /// pubdata-content axis, so there this is the classic no-DA validium (`EmptyNoDA`).
-    LogsOnlyValidium,
+    /// Publishes nothing: the batch commits the empty no-DA scheme.
+    ///
+    /// Discouraged, hence the name. Whatever the chain committed is then unavailable from L1 — its
+    /// interop commitment tree leaves included, which takes the chain out of interop — and from
+    /// protocol v33 a chain in this mode produces batches that do not prove.
+    #[value(name = "discouraged-no-da")]
+    DiscouragedNoDa,
     /// Hands the full pubdata to an external DA layer.
     Avail,
     /// Hands the full pubdata to an external DA layer.
@@ -28,16 +35,16 @@ impl DAValidatorType {
     pub fn to_u8(self) -> u8 {
         match self {
             DAValidatorType::Rollup => 0,
-            DAValidatorType::LogsOnlyValidium => 1,
+            DAValidatorType::DiscouragedNoDa => 1,
             DAValidatorType::Avail => 2,
             DAValidatorType::Eigen => 3,
         }
     }
 }
 
-/// Which part of the pubdata a ZKsync OS chain's batches commit to. Orthogonal to
-/// [`L2DACommitmentScheme`] (the publishing *mechanism*) and part of the batch public input via the
-/// chain config hash, so the value set on L1 must match the one the chain's server/prover runs with
+/// How much pubdata a ZKsync OS chain's batches commit to — the second DA axis, free to combine
+/// with any [`DAValidatorType`]. Part of the batch public input via the chain config hash, so the
+/// value set on L1 must match the one the chain's server/prover runs with
 /// (`ChainConfig::with_pubdata_content` on ZKsync OS).
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, Display, ValueEnum,
@@ -54,11 +61,12 @@ pub enum PubdataContent {
 }
 
 impl PubdataContent {
-    /// The pubdata content implied by a chain's DA mode.
+    /// The default for a chain's DA mode, used when the caller names no content of its own.
     ///
-    /// A rollup commits and publishes everything; a [`DAValidatorType::LogsOnlyValidium`] commits
-    /// exactly the region its name says. A custom-DA chain (`Avail`/`Eigen`) commits
-    /// `keccak(pubdata)` over the *full* pubdata it hands to its DA layer, so it stays `FullPubdata`.
+    /// A chain that publishes (a rollup, or one handing the full pubdata to Avail/Eigen) defaults
+    /// to committing all of it; one that publishes nothing defaults to the smallest thing it can
+    /// commit, since the rest would be unavailable anyway. Both are only defaults — every
+    /// combination of the two axes is expressible.
     ///
     /// Era chains have no such setting (`Admin.setPubdataContent` is ZKsync OS only), hence the `Option`.
     pub fn from_da_and_vm_types(da_type: DAValidatorType, vm_type: VMOption) -> Option<Self> {
@@ -66,7 +74,7 @@ impl PubdataContent {
             return None;
         }
         Some(match da_type {
-            DAValidatorType::LogsOnlyValidium => PubdataContent::LogsOnly,
+            DAValidatorType::DiscouragedNoDa => PubdataContent::LogsOnly,
             DAValidatorType::Rollup | DAValidatorType::Avail | DAValidatorType::Eigen => {
                 PubdataContent::FullPubdata
             }
@@ -80,9 +88,10 @@ impl PubdataContent {
 
 /// The mechanism a chain's batches commit their pubdata with — the on-chain `L2DACommitmentScheme`.
 ///
-/// Callers normally never name a variant: [`Self::from_da_and_vm_types`] derives it from what the
-/// chain does with its pubdata plus the VM it runs. The CLI spellings below exist for the few places
-/// that still need to override the derived value (a gateway-settling chain).
+/// Callers normally never name a variant: [`Self::from_da_and_vm_types`] derives it from the DA
+/// validator type plus the VM. The CLI spellings below exist to override the derived value — for a
+/// gateway-settling chain, or for a rollup-validator chain that puts its pubdata in commit-tx
+/// calldata (`blobs-and-pubdata-keccak256`) rather than in blobs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, ValueEnum)]
 #[repr(u8)]
 pub enum L2DACommitmentScheme {
@@ -116,15 +125,7 @@ impl L2DACommitmentScheme {
             DAValidatorType::Avail | DAValidatorType::Eigen => {
                 L2DACommitmentScheme::PubdataKeccak256
             }
-            // A logs-only validium publishes less pubdata, not none: the L2->L1 log region — with the
-            // interop commitment tree leaves in it — still reaches L1 through the same blob mechanism
-            // a rollup uses. The DA *mechanism* is therefore identical to a rollup's and only
-            // `PubdataContent` differs, so the chain runs the ZKsync OS blobs L1 DA validator. The
-            // Era VM has no pubdata-content axis, so there this stays the classic no-DA validium.
-            DAValidatorType::LogsOnlyValidium => match vm_type {
-                VMOption::EraVM => L2DACommitmentScheme::EmptyNoDA,
-                VMOption::ZKSyncOsVM => L2DACommitmentScheme::BlobsZKSyncOS,
-            },
+            DAValidatorType::DiscouragedNoDa => L2DACommitmentScheme::EmptyNoDA,
         }
     }
 
@@ -142,7 +143,7 @@ impl L2DACommitmentScheme {
             DAValidatorType::Avail | DAValidatorType::Eigen => {
                 L2DACommitmentScheme::PubdataKeccak256
             }
-            DAValidatorType::LogsOnlyValidium => L2DACommitmentScheme::EmptyNoDA,
+            DAValidatorType::DiscouragedNoDa => L2DACommitmentScheme::EmptyNoDA,
         }
     }
 }
@@ -182,28 +183,10 @@ impl FromStr for L2DACommitmentScheme {
 mod tests {
     use super::*;
 
-    /// A logs-only validium keeps the rollup's DA *mechanism* (blobs) and only narrows the pubdata
-    /// *content*, so that its interop commitment leaves stay on L1.
+    /// The two axes are independent: the DA validator type picks where the pubdata goes, the
+    /// pubdata content how much of it there is, and the derivations below are only defaults.
     #[test]
-    fn zksync_os_validium_publishes_the_log_region_through_blobs() {
-        assert_eq!(
-            L2DACommitmentScheme::from_da_and_vm_types(
-                DAValidatorType::LogsOnlyValidium,
-                VMOption::ZKSyncOsVM
-            ),
-            L2DACommitmentScheme::BlobsZKSyncOS
-        );
-        assert_eq!(
-            PubdataContent::from_da_and_vm_types(
-                DAValidatorType::LogsOnlyValidium,
-                VMOption::ZKSyncOsVM
-            ),
-            Some(PubdataContent::LogsOnly)
-        );
-    }
-
-    #[test]
-    fn zksync_os_rollup_publishes_everything_through_blobs() {
+    fn zksync_os_defaults_follow_the_da_validator_type() {
         assert_eq!(
             L2DACommitmentScheme::from_da_and_vm_types(
                 DAValidatorType::Rollup,
@@ -215,24 +198,51 @@ mod tests {
             PubdataContent::from_da_and_vm_types(DAValidatorType::Rollup, VMOption::ZKSyncOsVM),
             Some(PubdataContent::FullPubdata)
         );
-    }
 
-    /// Era validiums are unchanged: no DA commitment at all, and no pubdata content setting.
-    #[test]
-    fn era_validium_keeps_the_empty_no_da_scheme() {
         assert_eq!(
             L2DACommitmentScheme::from_da_and_vm_types(
-                DAValidatorType::LogsOnlyValidium,
-                VMOption::EraVM
+                DAValidatorType::DiscouragedNoDa,
+                VMOption::ZKSyncOsVM
             ),
             L2DACommitmentScheme::EmptyNoDA
         );
         assert_eq!(
             PubdataContent::from_da_and_vm_types(
-                DAValidatorType::LogsOnlyValidium,
+                DAValidatorType::DiscouragedNoDa,
+                VMOption::ZKSyncOsVM
+            ),
+            Some(PubdataContent::LogsOnly)
+        );
+    }
+
+    /// Era has no pubdata-content axis at all, whatever the DA validator type.
+    #[test]
+    fn era_has_no_pubdata_content() {
+        for da in [
+            DAValidatorType::Rollup,
+            DAValidatorType::DiscouragedNoDa,
+            DAValidatorType::Avail,
+        ] {
+            assert_eq!(
+                PubdataContent::from_da_and_vm_types(da, VMOption::EraVM),
+                None
+            );
+        }
+        assert_eq!(
+            L2DACommitmentScheme::from_da_and_vm_types(
+                DAValidatorType::DiscouragedNoDa,
                 VMOption::EraVM
             ),
-            None
+            L2DACommitmentScheme::EmptyNoDA
+        );
+    }
+
+    /// The CLI spelling is the discouragement: an operator has to type the word.
+    #[test]
+    fn no_da_is_spelled_out_as_discouraged() {
+        assert_eq!(
+            <DAValidatorType as ValueEnum>::from_str("discouraged-no-da", false).unwrap(),
+            DAValidatorType::DiscouragedNoDa
         );
     }
 }
