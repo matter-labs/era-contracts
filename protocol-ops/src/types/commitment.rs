@@ -20,9 +20,8 @@ pub enum DAValidatorType {
     Rollup,
     /// Publishes nothing: the batch commits the empty no-DA scheme.
     ///
-    /// Discouraged, hence the name. Whatever the chain committed is then unavailable from L1 — its
-    /// interop commitment tree leaves included, which takes the chain out of interop — and from
-    /// protocol v33 a chain in this mode produces batches that do not prove.
+    /// Discouraged, hence the name: whatever the chain committed is then unavailable from L1, its
+    /// interop commitment tree leaves included, so the chain cannot take part in interop.
     #[value(name = "discouraged-no-da")]
     DiscouragedNoDa,
     /// Hands the full pubdata to an external DA layer.

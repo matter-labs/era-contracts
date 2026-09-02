@@ -16,8 +16,7 @@ use crate::types::{DAValidatorType, L2DACommitmentScheme, PubdataContent};
 const PRICING_MODE_VALIDIUM: u8 = 1;
 
 /// First minor protocol version at which a validium-priced chain may publish its pubdata through
-/// blobs or calldata. Below it, such a chain can only commit the empty no-DA scheme; from it, a
-/// chain that keeps no-DA no longer produces batches that prove.
+/// blobs or calldata. Below it, such a chain can only commit the empty no-DA scheme.
 const MIN_MINOR_VERSION_WITH_VALIDIUM_DA: u64 = 33;
 
 #[derive(Serialize)]
@@ -50,7 +49,7 @@ struct DaMove {
 /// `--da-mode` — the DA validator pair and pubdata content the chain runs after
 /// it. Keeping them in one transaction matters for a validium going to v33:
 /// between the cut and a separate DA transaction the chain would commit batches
-/// that no longer prove.
+/// under a DA setup its new version no longer settles.
 ///
 /// Pass `--chain-id` to target a single chain. Omit it to loop over every
 /// chain registered on the bridgehub — each chain's bundle lands under
@@ -295,9 +294,10 @@ async fn resolve_da_move(
     }))
 }
 
-/// Refuse to take a validium-priced chain past [`MIN_MINOR_VERSION_WITH_VALIDIUM_DA`] while it
-/// still publishes nothing: from that version its batches no longer prove, and its L2->L1 log
-/// region — the interop commitment tree leaves included — never reaches L1.
+/// Refuse to take a validium-priced chain past [`MIN_MINOR_VERSION_WITH_VALIDIUM_DA`] while its
+/// DA setup is left untouched. Such a chain lands on the version's default pubdata content while
+/// publishing nothing, which is the configuration whose batches were observed not to prove; and
+/// its L2->L1 log region — the interop commitment tree leaves included — never reaches L1.
 async fn guard_validium_without_da(
     l1_rpc_url: &str,
     ctm: Address,
@@ -320,10 +320,10 @@ async fn guard_validium_without_da(
         crate::common::l1_contracts::resolve_ctm_minor_protocol_version(l1_rpc_url, ctm).await?;
     anyhow::ensure!(
         new_minor < MIN_MINOR_VERSION_WITH_VALIDIUM_DA,
-        "chain {chain_id} is validium-priced and this upgrade takes it to v{new_minor}, from which \
-         a chain that publishes no pubdata produces batches that do not prove. Pass \
-         `--da-mode logs-only-validium --l1-da-validator <address>` to move it onto DA with the \
-         upgrade, or `--keep-da-setup` if the move is applied by other means"
+        "chain {chain_id} is validium-priced and this upgrade takes it to v{new_minor}, which \
+         gives it a pubdata content it does not publish — a configuration whose batches do not \
+         settle. Pass `--da-mode`/`--pubdata-content` (with `--l1-da-validator`) to name its DA \
+         setup as part of the upgrade, or `--keep-da-setup` to leave it alone deliberately"
     );
     Ok(())
 }
