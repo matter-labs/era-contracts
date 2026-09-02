@@ -13,6 +13,6 @@
   "prover": {
     "recursion_scheduler_level_vk_hash": "0xbaaa46d644f7034d609eea327e818bd9a93a3c0fdd60e887d233da8a35c4f8ae",
     "fflonk_snark_wrapper_vk_hash": "0xd89b62ac599b15d9dc47860c8ebca5964c99e7b177e9b8ea38a0c13714dc32bb",
-    "airbender_snark_wrapper_vk_hash": "0xd8176dea8eb7277c3c7ac5c40bfce0b59cd6edfcaa9fff3b06cda5e4aebfdf4c"
+    "airbender_snark_wrapper_vk_hash": "0x847c9e3ca44a799555b3b5827144b94423a9eb610146c1196c0a1666d8098e6f"
   }
 }

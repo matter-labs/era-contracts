@@ -13,15 +13,20 @@
 #
 # <tag> defaults to the version below; pass one to regenerate against a different
 # release (must match the tag pinned in `airbender_prover_server/Cargo.toml`).
+#
+# The verifier is released from the private `zksync-protocol-private` monorepo,
+# whose assets no anonymous request can read, so this needs `gh` authenticated
+# against that repository. Releases up to v31.1.1 are on the public
+# `eravm-airbender-verifier` repository instead.
 
 set -euo pipefail
 
 # Keep in sync with the `zksync_airbender_verifier` tag in
 # `airbender_prover_server/Cargo.toml`.
-DEFAULT_TAG="v31.1.1"
+DEFAULT_TAG="eravm-airbender-verifier-v31.2.0"
 TAG="${1:-$DEFAULT_TAG}"
 
-REPO_URL="https://github.com/matter-labs/eravm-airbender-verifier"
+REPO="matter-labs/zksync-protocol-private"
 ASSET="snark_vk.json"
 
 # Resolve paths relative to this script so it can be run from anywhere.
@@ -33,10 +38,10 @@ GENERATED_PATH="$DATA_DIR/AirbenderVerifierPlonk.sol"
 # Final home of the committed contract.
 CONTRACT_DEST="$SCRIPT_DIR/../../l1-contracts/contracts/state-transition/verifiers/AirbenderVerifierPlonk.sol"
 
-echo "Downloading $ASSET from $REPO_URL release $TAG"
-curl --fail --location --silent --show-error \
-    "$REPO_URL/releases/download/$TAG/$ASSET" \
-    --output "$VK_PATH"
+echo "Downloading $ASSET from $REPO release $TAG"
+# `gh` keeps the asset's own name, and codegen reads the airbender-prefixed one.
+gh release download "$TAG" --repo "$REPO" --pattern "$ASSET" --dir "$DATA_DIR" --clobber
+mv "$DATA_DIR/$ASSET" "$VK_PATH"
 
 echo "Generating Airbender PLONK verifier contract"
 (cd "$SCRIPT_DIR" && cargo run --release --bin zksync_verifier_contract_generator -- --variant airbender)

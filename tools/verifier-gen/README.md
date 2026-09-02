@@ -34,14 +34,15 @@ This will:
 
 Generates only the PLONK verifier for the Airbender (RISC-V) FRI proof wrapped into a PLONK SNARK. Airbender has no
 FFLONK wrapper today, so no FFLONK contract is produced. Its verification key (`data/airbender_snark_vk.json`) is the
-`snark_vk.json` published by [`eravm-airbender-verifier`](https://github.com/matter-labs/eravm-airbender-verifier) — the
-same key the prover server proves against — so the two must be regenerated together.
+`snark_vk.json` published with the verifier release — the same key the prover server proves against — so the two must be
+regenerated together. The verifier now releases from the private `zksync-protocol-private` monorepo, on its own
+`eravm-airbender-verifier-v*` tag line, so downloading the key needs `gh` authenticated against that repository.
 
 Use the wrapper script, which downloads the key from the pinned release and runs codegen:
 
 ```shell
-./regenerate-airbender-verifier.sh            # uses the default pinned tag
-./regenerate-airbender-verifier.sh v29.9.0    # or an explicit tag
+./regenerate-airbender-verifier.sh                                   # uses the default pinned tag
+./regenerate-airbender-verifier.sh eravm-airbender-verifier-v31.2.0  # or an explicit tag
 ```
 
 This will:

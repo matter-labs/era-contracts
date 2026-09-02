@@ -109,12 +109,13 @@ contract AirbenderPlonkProofIntegrationTest is Test {
     /// The VK hash baked into `AirbenderVerifierPlonk` by codegen — recorded in the
     /// header comment of the regenerated contract. Pinning it here catches
     /// accidental regenerations from the wrong key. This value is the codegen
-    /// output for the `snark_vk.json` of the `eravm-airbender-verifier` release
-    /// pinned in `airbender_prover_server/Cargo.toml` (v31.1.1); regenerate the
-    /// contract with `tools/verifier-gen/regenerate-airbender-verifier.sh` and
-    /// update this pin whenever that release moves.
+    /// output for the `snark_vk.json` of the verifier release pinned in
+    /// `airbender_prover_server/Cargo.toml` (`eravm-airbender-verifier-v31.2.0`);
+    /// regenerate the contract with
+    /// `tools/verifier-gen/regenerate-airbender-verifier.sh` and update this pin
+    /// whenever that release moves.
     function test_airbenderVerifierPlonk_vkHashIsPinned() public view {
-        bytes32 expected = 0xd8176dea8eb7277c3c7ac5c40bfce0b59cd6edfcaa9fff3b06cda5e4aebfdf4c;
+        bytes32 expected = 0x847c9e3ca44a799555b3b5827144b94423a9eb610146c1196c0a1666d8098e6f;
         assertEq(airbenderVerifier.verificationKeyHash(), expected, "VK hash drifted from codegen output");
     }
 
