@@ -27,6 +27,7 @@ import {Governance} from "contracts/governance/Governance.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
 
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
@@ -190,14 +191,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
             ctmAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
-        // FIXME: need to provide the params as the input for the function, since
-        // on mainnet testnetVerifier must be false. Right now the introspection is not available
-        // because the previous version's production verifier does not export the flag.
-        // TODO(EVM-1660): every ZKsync OS verifier exports the flag from v34 onwards, so once the
-        // previous version is v34+, restore the introspection:
-        // config.testnetVerifier =
-        //     IZKsyncOSVerifier(ctmAddresses.stateTransition.verifiers.verifier).IS_TESTNET_VERIFIER();
-        config.testnetVerifier = true;
+        // Deliberate low-level probe (not error-hiding): testnet verifiers already export
+        // IS_TESTNET_VERIFIER in every version these scripts can meet (v31+ states and live envs),
+        // and from v34 every verifier exports it — so a revert here has exactly one meaning:
+        // a pre-v34 production verifier.
+        (bool ok, bytes memory data) = ctmAddresses.stateTransition.verifiers.verifier.staticcall(
+            abi.encodeCall(IZKsyncOSVerifier.IS_TESTNET_VERIFIER, ())
+        );
+        config.testnetVerifier = ok && abi.decode(data, (bool));
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
