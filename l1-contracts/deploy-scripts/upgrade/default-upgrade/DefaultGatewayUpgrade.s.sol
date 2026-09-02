@@ -177,8 +177,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             ctmDeployedAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
         config.testnetVerifier = UpgradeUtils.resolveTestnetVerifier(
-            IChainTypeManager(ctmDeployedAddresses.stateTransition.proxies.chainTypeManager),
-            ctmDeployedAddresses.stateTransition.verifiers.verifier
+            IChainTypeManager(ctmDeployedAddresses.stateTransition.proxies.chainTypeManager)
         );
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }

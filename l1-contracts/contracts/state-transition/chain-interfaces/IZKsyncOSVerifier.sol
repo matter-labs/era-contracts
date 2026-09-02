@@ -9,5 +9,5 @@ interface IZKsyncOSVerifier {
     function PLONK_VERIFIER() external view returns (IVerifier);
 
     /// @notice Whether this is a testnet verifier that supports mock proof verification.
-    function IS_TESTNET_VERIFIER() external view returns (bool);
+    function isTestnetVerifier() external view returns (bool);
 }

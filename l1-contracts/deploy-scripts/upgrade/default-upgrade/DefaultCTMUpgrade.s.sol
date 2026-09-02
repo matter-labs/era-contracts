@@ -191,8 +191,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             ctmAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
         config.testnetVerifier = UpgradeUtils.resolveTestnetVerifier(
-            IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager),
-            ctmAddresses.stateTransition.verifiers.verifier
+            IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager)
         );
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }

@@ -9,6 +9,7 @@ import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_
 import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../../../deploy-scripts/utils/Types.sol";
 import {PublishFactoryDepsResult} from "../../../../deploy-scripts/utils/bytecode/BytecodePublisher.s.sol";
@@ -294,9 +295,14 @@ contract UpgradeIntegrationTest_Local is
             _expectedUpgradeCutHash,
             "Stored upgradeCutHash mismatch"
         );
+        address newVerifier = IChainTypeManager(ctm).protocolVersionVerifier(_expectedNewVersion);
+        assertEq(newVerifier, _expectedNewVerifier, "Stored verifier differs from the emitted one");
+        // This local ecosystem is a testnet environment: DefaultCTMUpgrade.initializeConfig must
+        // have resolved testnetVerifier=true from the deployed verifier and installed a testnet
+        // verifier for the new version.
         assertTrue(
-            IChainTypeManager(ctm).protocolVersionVerifier(_expectedNewVersion) != address(0),
-            "Missing verifier for new version"
+            IZKsyncOSVerifier(newVerifier).isTestnetVerifier(),
+            "New version must be registered with a testnet verifier"
         );
         assertGt(
             IChainTypeManager(ctm).protocolVersionDeadline(_expectedNewVersion),

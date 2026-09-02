@@ -18,8 +18,7 @@ contract ZKsyncOSTestnetVerifier is ZKsyncOSVerifier {
     }
 
     /// @inheritdoc IZKsyncOSVerifier
-    // solhint-disable-next-line func-name-mixedcase
-    function IS_TESTNET_VERIFIER() external pure override returns (bool) {
+    function isTestnetVerifier() external pure override returns (bool) {
         return true;
     }
 

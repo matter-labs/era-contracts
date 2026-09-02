@@ -51,6 +51,7 @@ contract UpgradeIntegrationTestBase is Test {
     address internal _eraDiamond;
     address internal _newChainDiamond;
     bytes32 internal _expectedUpgradeCutHash;
+    address internal _expectedNewVerifier;
     address internal _expectedNewChainAdmin;
     bytes32 internal _expectedBaseTokenAssetId;
     Call[] internal _ctmAdminCalls;
@@ -221,6 +222,7 @@ contract UpgradeIntegrationTestBase is Test {
             ctmUpgrade.getCTMAddress()
         );
         assertEq(uint256(npvv.topics[1]), ctmUpgrade.getNewProtocolVersion(), "Verifier protocol version mismatch");
+        _expectedNewVerifier = address(uint160(uint256(npvv.topics[2])));
 
         // Chain-op events
         chainOpsLogs.requireAtLeast("DiamondCut((address,uint8,bool,bytes4[])[],address,bytes)", 1);
