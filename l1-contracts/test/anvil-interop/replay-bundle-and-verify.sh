@@ -165,7 +165,9 @@ else
   fi
 
   echo "=== Step 2: upgrade-broadcast ==="
-  rm -f "$TXLOG"
+  # Keep the receipt journal across retries. `upgrade-broadcast` appends each
+  # confirmed transaction immediately, so a later failure in the same bundle
+  # cannot erase the hashes PUVT needs for already-mined CREATE2 deployments.
   broadcast_args=(
     ecosystem upgrade-broadcast
     --manifest "$MANIFEST"

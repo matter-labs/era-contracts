@@ -51,6 +51,13 @@ ecosystem contract _on the fork_ to compute deterministic CREATE2 addresses),
 replays the prepare bundles, runs PUVT, and emits the git-portable calldata set.
 Nothing touches real L1 — the deployer is impersonated.
 
+For Era environments, CI also normalizes the clean build's final
+`DefaultAccount` compiler-metadata word to the canonical v31 release artifact.
+This is fail-closed: the executable prefix must match the reviewed #2268 build,
+and the restored bytecode hash must match both the selected environment and
+`AllContractsHashes.json`. Contract-code changes therefore cannot be hidden by
+the normalization.
+
 **Outputs** (under `l1-contracts/upgrade-envs/v0.31.0-interopB/output/<env>/`):
 
 | Artifact                                        | Purpose                                                            |
@@ -129,8 +136,11 @@ The sender (`submit_and_confirm` in
 - **Idempotent** — CREATE2 deploys already on-chain and known already-done
   reverts are skipped, so a re-run after a partial deploy resumes cleanly.
 
-It appends each mined hash to `transactions.txt` (next to `--out`), which is what
-PUVT reads.
+It journals each confirmed receipt immediately: the mined hash is appended to
+`transactions.txt` (next to `--out`) and the matching calldata is atomically
+recorded in `deploy-executed.json`. Both files are loaded and extended on a
+retry, so a later failure cannot erase the provenance PUVT needs for earlier
+CREATE2 deployments.
 
 **Locally** (real signing — needs the deployer key):
 
@@ -163,21 +173,32 @@ grep 'forge verify-contract' \
 **In CI:** run the **`Ecosystem Upgrade: Deploy + Verify (v31)`** workflow
 (`deploy-ecosystem-upgrade.yaml`) with `generate_run_id` = the step-1 run to pull
 the deploy bundle from. It uploads `transactions.txt` as
-`ecosystem-upgrade-deploy-result-<env>`.
+`ecosystem-upgrade-deploy-result-<env>`. The selected generation run must be a
+successful manual run of `generate-ecosystem-upgrade-calldata.yaml`, and its
+`verify-bundle-handoff` job must have succeeded. The downloaded bundle's strict
+metadata must also identify that exact run, commit, and environment; diagnostic
+artifacts from failed generation runs and metadata-free legacy bundles are
+rejected before any secret is selected.
 
 Which L1 it signs against comes from the bundle's `bundle-metadata.json`
 (`l1.chain_id`), **not** from the `environment` name: chain ID `1` uses
 `L1_RPC_URL_MAINNET` + `DEPLOYER_PRIVATE_KEY_MAINNET`, while `11155111` uses the
-`_SEPOLIA` pair. The job also refuses to start if the key's address isn't the
-deployer the bundle was prepared for, since `--skip-unkeyed` would otherwise drop
-every bundle and report success having deployed nothing. `ETHERSCAN_API_KEY` is
-optional (verify only).
+`_SEPOLIA` pair. Before exporting either secret to later steps, the job requires
+`cast chain-id` against that RPC to equal the bundle's chain ID. It also refuses
+to start if the key's address isn't the deployer the bundle was prepared for,
+since `--skip-unkeyed` would otherwise drop every bundle and report success
+having deployed nothing. `ETHERSCAN_API_KEY` is optional (verify only).
 
 > A single deployer bundle can revert mid-way (e.g. RPC 429). The broadcast is
-> idempotent, so just re-run it — already-deployed / already-transferred txs are
-> skipped and it resumes. Ownership-transfer txs are **not** idempotent-skipped,
-> so if a bundle was interrupted after some ownership moved off the deployer, see
-> the notes in `execute_safe.rs` for building a resume bundle.
+> idempotent, so retry it with the same journal — already-deployed /
+> already-transferred txs are skipped and it resumes. Locally, reuse the same
+> `--out` path. In CI, dispatch a new deploy run with `resume_deploy_run_id` set
+> to the failed deploy run; the workflow validates and restores that run's
+> partial result artifact before broadcasting. Do not use GitHub's plain
+> “re-run failed jobs” button, which cannot add the resume input. Ownership-
+> transfer txs are **not** idempotent-skipped, so if a bundle was interrupted
+> after some ownership moved off the deployer, see the notes in
+> `execute_safe.rs` for building a resume bundle.
 
 ---
 

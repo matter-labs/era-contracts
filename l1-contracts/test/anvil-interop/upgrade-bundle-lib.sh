@@ -42,6 +42,98 @@ with open(sys.argv[1], "rb") as source:
 PY
 }
 
+# Restore the canonical v31 DefaultAccount compiler-metadata word after a clean
+# foundry-zksync build. The v0.31 release artifact and a clean GitHub runner have
+# identical executable bytes but can differ in the final 32-byte metadata word.
+# We only normalize the one reviewed executable prefix, then require the result
+# to match both the selected env config and AllContractsHashes.json.
+# $1 = generated DefaultAccount artifact, $2 = v31 env TOML,
+# $3 = AllContractsHashes.json.
+restore_v31_default_account_artifact() {
+  python3 - "$1" "$2" "$3" <<'PY'
+import hashlib
+import json
+import os
+import re
+import sys
+
+artifact_path, env_path, hashes_path = sys.argv[1:]
+
+# Canonical artifact from the #2268 merge build (workflow run 33096868698).
+CANONICAL_HASH = "0x010005f9d84c1863bf21a9393f2fd1631af92aab68f12c35dba580c8d7a06146"
+CANONICAL_EXECUTABLE_SHA256 = "28c736311a2f872a0b8ff289b0ae35266f1ccd402885435fd9ffd2a154a39a96"
+CANONICAL_METADATA_WORD = bytes.fromhex(
+    "3ad06056e66b778b11945dd3cf11269b479679b45850c25af96c8ca9f309acb0"
+)
+METADATA_WORD_BYTES = 32
+
+def fail(message):
+    raise SystemExit(f"canonical DefaultAccount restore failed: {message}")
+
+def zk_bytecode_hash(bytecode):
+    if len(bytecode) % 32 != 0:
+        fail(f"bytecode length {len(bytecode)} is not word-aligned")
+    words = len(bytecode) // 32
+    if words % 2 != 1 or words > 0xFFFF:
+        fail(f"invalid EraVM bytecode word length {words}")
+    digest = bytearray(hashlib.sha256(bytecode).digest())
+    digest[0:2] = b"\x01\x00"
+    digest[2:4] = words.to_bytes(2, "big")
+    return "0x" + digest.hex()
+
+with open(env_path) as source:
+    match = re.search(r'^default_aa_hash\s*=\s*"(0x[0-9a-fA-F]{64})"', source.read(), re.MULTILINE)
+if not match:
+    fail(f"{env_path} has no top-level default_aa_hash")
+env_hash = match.group(1).lower()
+
+with open(hashes_path) as source:
+    hashes = json.load(source)
+reviewed = [
+    entry.get("zkBytecodeHash", "").lower()
+    for entry in hashes
+    if entry.get("contractName") == "system-contracts/DefaultAccount"
+]
+if reviewed != [env_hash]:
+    fail(f"env hash {env_hash} does not uniquely match AllContractsHashes.json: {reviewed}")
+
+with open(artifact_path) as source:
+    artifact = json.load(source)
+raw = artifact.get("bytecode", {}).get("object")
+if not isinstance(raw, str) or not re.fullmatch(r"(?:0x)?[0-9a-fA-F]+", raw):
+    fail(f"{artifact_path} has no bytecode.object")
+hex_prefix = "0x" if raw.startswith("0x") else ""
+bytecode = bytes.fromhex(raw.removeprefix("0x"))
+built_hash = zk_bytecode_hash(bytecode)
+if built_hash == env_hash:
+    print(f"DefaultAccount artifact already canonical: {built_hash}")
+    raise SystemExit(0)
+if env_hash != CANONICAL_HASH:
+    fail(f"no canonical artifact registered for env hash {env_hash} (build produced {built_hash})")
+if len(bytecode) <= METADATA_WORD_BYTES:
+    fail("bytecode is too short to contain the metadata word")
+executable = bytecode[:-METADATA_WORD_BYTES]
+executable_sha256 = hashlib.sha256(executable).hexdigest()
+if executable_sha256 != CANONICAL_EXECUTABLE_SHA256:
+    fail(
+        f"executable prefix changed: expected {CANONICAL_EXECUTABLE_SHA256}, "
+        f"got {executable_sha256}"
+    )
+
+canonical = executable + CANONICAL_METADATA_WORD
+canonical_hash = zk_bytecode_hash(canonical)
+if canonical_hash != env_hash:
+    fail(f"restored hash {canonical_hash} does not match reviewed hash {env_hash}")
+artifact["bytecode"]["object"] = hex_prefix + canonical.hex()
+temporary_path = artifact_path + ".tmp"
+with open(temporary_path, "w") as destination:
+    json.dump(artifact, destination, separators=(",", ":"))
+    destination.write("\n")
+os.replace(temporary_path, artifact_path)
+print(f"Restored canonical DefaultAccount artifact: {built_hash} -> {canonical_hash}")
+PY
+}
+
 # Fail unless every executable/supporting file in a deploy bundle matches the
 # SHA-256 recorded by `pack-deploy-bundle.sh`, and the metadata's bundle list is
 # exactly the list the manifest will execute. This is called before fork replay

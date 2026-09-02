@@ -9,13 +9,10 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 # upgraded separately (step 5) — a chain cannot go to v31 before its ecosystem
 # has.
 #
-# ── 0. Once per branch: make the generated artifacts match a clean build ─────
+# ── 0. Once per branch: make the generated artifacts match reviewed hashes ───
 # The prepare asserts that the factory deps it builds equal the hashes pinned in
-# `configs/genesis/<flavor>/latest.json` and the env config. If the committed
-# `AllContractsHashes.json` / `zkstack-out` were regenerated on a warm working
-# tree they can disagree with a clean build, and the prepare then dies with
-# `default aa hash factory dep mismatch` (Era CTMs only — the check is skipped
-# for ZKsync-OS). Symptom to watch for: a red `check-zkstack-out`.
+# `configs/genesis/<flavor>/latest.json`, `AllContractsHashes.json`, and the env
+# config. If committed generated files are stale, refresh them with:
 #
 #   gh workflow run update-generated-artifacts.yaml --ref <branch> -f pr_number=<PR#>
 #
@@ -114,17 +111,11 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 # full workflow → `protocol_ops` subcommand map.
 #
 # ── TROUBLESHOOTING ───────────────────────────────────────────────────────
-# `default aa hash factory dep mismatch`      → Era CTMs only (the check is
-#                                               skipped for ZKsync-OS). Try step 0.
-#                                               KNOWN OPEN ISSUE on this branch: a
-#                                               fresh build can produce a
-#                                               DefaultAccount that differs from the
-#                                               pinned genesis value even though the
-#                                               canonical regen reports the hashes as
-#                                               matching, so step 0 may not clear it.
-#                                               Until the system-contracts build is
-#                                               bit-reproducible, only ZKsync-OS-only
-#                                               ecosystems can be prepared here.
+# canonical DefaultAccount restore failed    → the env's default-AA hash is not
+#                                               the reviewed AllContractsHashes
+#                                               entry, or executable bytes changed.
+#                                               Refresh/review generated artifacts;
+#                                               never bypass this check.
 # prepare reverts on owner-gated calls        → the ecosystem is already upgraded;
 #                                               pass `fork_block` = a block BEFORE
 #                                               that deployment (ownership has since
@@ -307,13 +298,9 @@ jobs:
       # calldata generation on the same sequence as the artifact generation is the
       # cheapest way to not have to wonder whether a difference came from here.
       #
-      # NOTE it does not by itself make the system-contracts build reproduce the
-      # committed hashes: at the time of writing a fresh build of this branch can
-      # produce a DefaultAccount that differs from the pinned
-      # `configs/genesis/era/latest.json` value, which trips `CTMUpgrade_v31`'s
-      # factory-deps check ("default aa hash factory dep mismatch") on every
-      # Era-CTM env — while the same canonical pipeline reports the hashes as
-      # matching. See the RUNBOOK's step 0 and TROUBLESHOOTING.
+      # The canonical DefaultAccount metadata normalization immediately below
+      # closes the only known clean-runner difference without accepting changed
+      # executable bytecode.
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
       - name: Build l1-contracts artifacts (EVM + zkout)
@@ -322,6 +309,21 @@ jobs:
         run: yarn l2 build:foundry
       - name: Build system-contracts artifacts
         run: yarn sc build:foundry
+
+      # A clean runner and the reviewed #2268 release artifact differ only in
+      # DefaultAccount's final compiler-metadata word. Normalize that word only
+      # after proving the executable prefix is the reviewed one, then require the
+      # resulting hash to match both the env config and AllContractsHashes.json.
+      - name: Restore canonical v31 DefaultAccount artifact
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          source l1-contracts/test/anvil-interop/upgrade-bundle-lib.sh
+          restore_v31_default_account_artifact \
+            system-contracts/zkout/DefaultAccount.sol/DefaultAccount.json \
+            "l1-contracts/upgrade-envs/v0.31.0-interopB/$ENVIRONMENT.toml" \
+            AllContractsHashes.json
 
       - name: Build protocol_ops
         working-directory: protocol-ops

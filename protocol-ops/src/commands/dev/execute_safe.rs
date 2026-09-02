@@ -21,7 +21,7 @@ use crate::common::{logger, PrivateKey};
 /// `UpgradeOutput.transactions` shape but with the raw input data alongside
 /// each hash, so verifier-side parsing doesn't need an extra
 /// `eth_getTransactionByHash` round trip.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutedTx {
     pub tx_hash: String,
     pub to: String,
@@ -33,7 +33,7 @@ pub struct ExecutedTx {
 /// Top-level shape written to `--out`. Multiple `dev execute-safe`
 /// invocations can append by passing the same path; they are concatenated
 /// in execution order so verifier-side replay matches the on-chain order.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutedBundle {
     pub transactions: Vec<ExecutedTx>,
 }
@@ -300,9 +300,9 @@ pub struct DevExecuteSafeArgs {
     pub private_key: PrivateKey,
 
     /// Optional path to append the replayed transactions to as JSON. Use the
-    /// same path across multiple bundles (the file is read on entry and
-    /// rewritten on exit, so successful replays of multiple bundles
-    /// accumulate in execution order). Consumed later by
+    /// same path across multiple bundles or retries. Each confirmed receipt is
+    /// journaled immediately, so a later failure cannot erase the provenance
+    /// of transactions that already mined. Consumed later by
     /// `ecosystem verify-upgrade --executed-bundles <path>` so the verifier
     /// can reconstruct CREATE2 / TUPP deployments from the prepare output.
     #[clap(long)]
@@ -383,27 +383,9 @@ pub async fn execute_one_bundle(
         format_gwei(max_gas_price_wei)
     ));
 
-    // Per-bundle tx log loaded from `--out`; we only flush additions after
-    // the entire bundle succeeds so failed bundles do not pollute outputs.
-    let mut executed: ExecutedBundle = match out_path {
-        Some(path) if path.exists() => {
-            let raw = fs::read_to_string(path).with_context(|| {
-                format!(
-                    "failed to read existing executed-bundle file {}",
-                    path.display()
-                )
-            })?;
-            serde_json::from_str(&raw).with_context(|| {
-                format!(
-                    "failed to parse existing executed-bundle file {}",
-                    path.display()
-                )
-            })?
-        }
-        _ => ExecutedBundle::default(),
-    };
-    let mut bundle_executed: Vec<ExecutedTx> = Vec::new();
-    let mut bundle_hashes: Vec<B256> = Vec::new();
+    // Load the prior receipt journal so a retry in the same working directory
+    // extends it instead of losing the provenance of an earlier partial run.
+    let mut executed = load_executed_bundle(out_path)?;
 
     // Parse + sign + submit each tx sequentially, awaiting its receipt
     // before the next. Some bundle txs depend on contracts deployed by
@@ -521,25 +503,19 @@ pub async fn execute_one_bundle(
             "Safe tx #{idx} (hash {tx_hash:#x}) reverted (status=0)",
         );
 
-        if out_path.is_some() {
-            bundle_executed.push(ExecutedTx {
-                tx_hash: format!("{tx_hash:#x}"),
-                to: format!("{to:#x}"),
-                data: format!("0x{}", alloy::hex::encode(receipt_input(tx)?)),
-                value: format!("{value}"),
-                status,
-            });
-            bundle_hashes.push(tx_hash);
-        }
-    }
-
-    if let Some(path) = out_path {
-        if !bundle_executed.is_empty() {
-            executed.transactions.extend(bundle_executed);
-            persist_executed_bundle(path, &executed)?;
-            for tx_hash in bundle_hashes {
-                append_transaction_hash(path, tx_hash)?;
-            }
+        if let Some(path) = out_path {
+            record_executed_tx(
+                path,
+                &mut executed,
+                tx_hash,
+                ExecutedTx {
+                    tx_hash: format!("{tx_hash:#x}"),
+                    to: format!("{to:#x}"),
+                    data: format!("0x{}", alloy::hex::encode(receipt_input(tx)?)),
+                    value: format!("{value}"),
+                    status,
+                },
+            )?;
         }
     }
 
@@ -582,6 +558,41 @@ fn receipt_input(tx: &Value) -> anyhow::Result<Vec<u8>> {
         .context("Safe tx `data` is not valid hex while building executed bundle")
 }
 
+fn load_executed_bundle(out_path: Option<&Path>) -> anyhow::Result<ExecutedBundle> {
+    match out_path {
+        Some(path) if path.exists() => {
+            let raw = fs::read_to_string(path).with_context(|| {
+                format!(
+                    "failed to read existing executed-bundle file {}",
+                    path.display()
+                )
+            })?;
+            serde_json::from_str(&raw).with_context(|| {
+                format!(
+                    "failed to parse existing executed-bundle file {}",
+                    path.display()
+                )
+            })
+        }
+        _ => Ok(ExecutedBundle::default()),
+    }
+}
+
+/// Journal one confirmed receipt immediately. `transactions.txt` is written
+/// first because it is the PUVT's source of deployment provenance; the JSON is
+/// then atomically replaced for the human/machine execution record. If a later
+/// transaction in the same Safe bundle fails, this receipt survives the retry.
+fn record_executed_tx(
+    out_path: &Path,
+    executed: &mut ExecutedBundle,
+    tx_hash: B256,
+    tx: ExecutedTx,
+) -> anyhow::Result<()> {
+    append_transaction_hash(out_path, tx_hash)?;
+    executed.transactions.push(tx);
+    persist_executed_bundle(out_path, executed)
+}
+
 fn persist_executed_bundle(path: &Path, bundle: &ExecutedBundle) -> anyhow::Result<()> {
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {
@@ -595,8 +606,20 @@ fn persist_executed_bundle(path: &Path, bundle: &ExecutedBundle) -> anyhow::Resu
     }
     let serialized =
         serde_json::to_string_pretty(bundle).context("failed to serialise executed bundle")?;
-    fs::write(path, serialized)
-        .with_context(|| format!("failed to write executed-bundle file {}", path.display()))?;
+    let temporary_path = path.with_extension("tmp");
+    fs::write(&temporary_path, serialized).with_context(|| {
+        format!(
+            "failed to write temporary executed-bundle file {}",
+            temporary_path.display()
+        )
+    })?;
+    fs::rename(&temporary_path, path).with_context(|| {
+        format!(
+            "failed to replace executed-bundle file {} with {}",
+            path.display(),
+            temporary_path.display()
+        )
+    })?;
     Ok(())
 }
 
@@ -677,28 +700,8 @@ pub async fn execute_one_bundle_unlocked(
     let gas_price = GAS_PRICE_FLOOR_WEI;
     logger::info(format!("Using gas price {} gwei", format_gwei(gas_price)));
 
-    // Same accumulating-write shape as `execute_one_bundle`: load any
-    // existing log so multiple bundles into the same `--out` path stack in
-    // execution order. Flush only after full-bundle success.
-    let mut executed: ExecutedBundle = match out_path {
-        Some(path) if path.exists() => {
-            let raw = fs::read_to_string(path).with_context(|| {
-                format!(
-                    "failed to read existing executed-bundle file {}",
-                    path.display()
-                )
-            })?;
-            serde_json::from_str(&raw).with_context(|| {
-                format!(
-                    "failed to parse existing executed-bundle file {}",
-                    path.display()
-                )
-            })?
-        }
-        _ => ExecutedBundle::default(),
-    };
-    let mut bundle_executed: Vec<ExecutedTx> = Vec::new();
-    let mut bundle_hashes: Vec<B256> = Vec::new();
+    // Same append-on-each-receipt journal as the signed path.
+    let mut executed = load_executed_bundle(out_path)?;
 
     let mut skipped: usize = 0;
     for (idx, tx) in safe_txs.iter().enumerate() {
@@ -798,25 +801,19 @@ pub async fn execute_one_bundle_unlocked(
             "Safe tx #{idx} (hash {tx_hash:#x}) reverted (status=0)",
         );
 
-        if out_path.is_some() {
-            bundle_executed.push(ExecutedTx {
-                tx_hash: format!("{tx_hash:#x}"),
-                to: format!("{to:#x}"),
-                data: format!("0x{}", alloy::hex::encode(receipt_input(tx)?)),
-                value: format!("{value}"),
-                status: u64::from(receipt.status()),
-            });
-            bundle_hashes.push(tx_hash);
-        }
-    }
-
-    if let Some(path) = out_path {
-        if !bundle_executed.is_empty() {
-            executed.transactions.extend(bundle_executed);
-            persist_executed_bundle(path, &executed)?;
-            for tx_hash in bundle_hashes {
-                append_transaction_hash(path, tx_hash)?;
-            }
+        if let Some(path) = out_path {
+            record_executed_tx(
+                path,
+                &mut executed,
+                tx_hash,
+                ExecutedTx {
+                    tx_hash: format!("{tx_hash:#x}"),
+                    to: format!("{to:#x}"),
+                    data: format!("0x{}", alloy::hex::encode(receipt_input(tx)?)),
+                    value: format!("{value}"),
+                    status: u64::from(receipt.status()),
+                },
+            )?;
         }
     }
 
@@ -842,7 +839,15 @@ fn parse_decimal_or_hex_u256(raw: &str) -> anyhow::Result<U256> {
 
 #[cfg(test)]
 mod tests {
-    use super::{bump_gas, gwei_to_wei, GAS_BUMP_BPS};
+    use std::fs;
+
+    use alloy::primitives::B256;
+    use tempfile::tempdir;
+
+    use super::{
+        bump_gas, gwei_to_wei, load_executed_bundle, record_executed_tx, ExecutedBundle,
+        ExecutedTx, GAS_BUMP_BPS,
+    };
 
     #[test]
     fn bump_gas_increases_by_at_least_the_replacement_threshold() {
@@ -868,5 +873,48 @@ mod tests {
         // ...and once at/above the ceiling, no further bump is offered.
         assert_eq!(bump_gas(max, max), None);
         assert_eq!(bump_gas(max + 1, max), None);
+    }
+
+    #[test]
+    fn confirmed_receipts_are_journaled_immediately_and_survive_retries() {
+        let dir = tempdir().unwrap();
+        let out = dir.path().join("executed.json");
+        let first_hash = B256::from([1_u8; 32]);
+        let second_hash = B256::from([2_u8; 32]);
+        let first = ExecutedTx {
+            tx_hash: format!("{first_hash:#x}"),
+            to: "0x1111111111111111111111111111111111111111".to_string(),
+            data: "0x01".to_string(),
+            value: "0".to_string(),
+            status: 1,
+        };
+        let second = ExecutedTx {
+            tx_hash: format!("{second_hash:#x}"),
+            to: "0x2222222222222222222222222222222222222222".to_string(),
+            data: "0x02".to_string(),
+            value: "0".to_string(),
+            status: 1,
+        };
+
+        let mut first_run = ExecutedBundle::default();
+        record_executed_tx(&out, &mut first_run, first_hash, first.clone()).unwrap();
+        assert_eq!(
+            load_executed_bundle(Some(&out)).unwrap().transactions,
+            vec![first.clone()]
+        );
+
+        // Simulate a new process after the first bundle attempt failed.
+        let mut retry = load_executed_bundle(Some(&out)).unwrap();
+        record_executed_tx(&out, &mut retry, second_hash, second.clone()).unwrap();
+        assert_eq!(
+            load_executed_bundle(Some(&out)).unwrap().transactions,
+            vec![first, second]
+        );
+
+        let hashes = fs::read_to_string(dir.path().join("transactions.txt")).unwrap();
+        assert_eq!(
+            hashes.lines().collect::<Vec<_>>(),
+            vec![format!("{first_hash:#x}"), format!("{second_hash:#x}")]
+        );
     }
 }

@@ -54,6 +54,11 @@ on:
         description: "Run ID of the 'Ecosystem Upgrade Calldata' (step 1) run to download the deployer bundles from"
         required: true
         type: string
+      resume_deploy_run_id:
+        description: "Optional earlier deploy-workflow run whose partial receipt journal should be restored before retrying"
+        required: false
+        default: ""
+        type: string
       max_gas_price_gwei:
         description: "Gas-price ceiling (gwei) for the stuck-tx bump loop"
         required: false
@@ -80,6 +85,92 @@ jobs:
     timeout-minutes: 90
 
     steps:
+      # The generation workflow uploads its bundle with `if: always()` so a failed
+      # run still leaves diagnostics. Never turn that diagnostic artifact into a
+      # real deployment: require the exact handoff-proof job to have succeeded.
+      - name: Require a successful bundle handoff proof
+        uses: actions/github-script@v7
+        env:
+          GENERATE_RUN_ID: ${{ inputs.generate_run_id }}
+          RESUME_DEPLOY_RUN_ID: ${{ inputs.resume_deploy_run_id }}
+        with:
+          script: |
+            const runAttempt = Number(process.env.GITHUB_RUN_ATTEMPT);
+            if (runAttempt > 1) {
+              core.setFailed(
+                "Do not re-run this job in place after a partial broadcast. " +
+                  "Dispatch a new deploy run and set resume_deploy_run_id to this run ID.",
+              );
+              return;
+            }
+
+            const runId = Number(process.env.GENERATE_RUN_ID);
+            if (!Number.isSafeInteger(runId) || runId <= 0) {
+              core.setFailed(`generate_run_id must be a positive integer, got ${process.env.GENERATE_RUN_ID}`);
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const { data: run } = await github.rest.actions.getWorkflowRun({
+              owner,
+              repo,
+              run_id: runId,
+            });
+            const expectedPath = ".github/workflows/generate-ecosystem-upgrade-calldata.yaml";
+            if (run.path !== expectedPath) {
+              core.setFailed(`run ${runId} used ${run.path}, expected ${expectedPath}`);
+              return;
+            }
+            if (run.event !== "workflow_dispatch" || run.conclusion !== "success") {
+              core.setFailed(
+                `generation run ${runId} must be a successful workflow_dispatch run; ` +
+                  `event=${run.event}, conclusion=${run.conclusion}`,
+              );
+              return;
+            }
+
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner,
+              repo,
+              run_id: runId,
+              filter: "latest",
+              per_page: 100,
+            });
+            const handoffJobs = jobs.filter((job) => job.name === "verify-bundle-handoff");
+            if (handoffJobs.length !== 1 || handoffJobs[0].conclusion !== "success") {
+              const found = handoffJobs.map((job) => `${job.id}:${job.conclusion}`).join(", ") || "none";
+              core.setFailed(`run ${runId} has no single successful verify-bundle-handoff job (found ${found})`);
+              return;
+            }
+
+            core.exportVariable("GENERATE_HEAD_SHA", run.head_sha);
+            core.exportVariable("GENERATE_RUN_URL", run.html_url);
+            core.info(`Handoff proof passed: ${handoffJobs[0].html_url}`);
+
+            if (process.env.RESUME_DEPLOY_RUN_ID) {
+              const resumeRunId = Number(process.env.RESUME_DEPLOY_RUN_ID);
+              if (!Number.isSafeInteger(resumeRunId) || resumeRunId <= 0) {
+                core.setFailed(
+                  `resume_deploy_run_id must be a positive integer, got ${process.env.RESUME_DEPLOY_RUN_ID}`,
+                );
+                return;
+              }
+              const { data: resumeRun } = await github.rest.actions.getWorkflowRun({
+                owner,
+                repo,
+                run_id: resumeRunId,
+              });
+              const expectedResumePath = ".github/workflows/deploy-ecosystem-upgrade.yaml";
+              if (resumeRun.path !== expectedResumePath || resumeRun.event !== "workflow_dispatch") {
+                core.setFailed(
+                  `resume run ${resumeRunId} must be a workflow_dispatch run of ${expectedResumePath}; ` +
+                    `path=${resumeRun.path}, event=${resumeRun.event}`,
+                );
+                return;
+              }
+              core.exportVariable("RESUME_RUN_URL", resumeRun.html_url);
+            }
+
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
@@ -133,6 +224,15 @@ jobs:
           run-id: ${{ inputs.generate_run_id }}
           github-token: ${{ github.token }}
 
+      - name: Download the prior deploy receipt journal
+        if: ${{ inputs.resume_deploy_run_id != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ecosystem-upgrade-deploy-result-${{ inputs.environment }}
+          path: ${{ github.workspace }}/previous-deploy-result
+          run-id: ${{ inputs.resume_deploy_run_id }}
+          github-token: ${{ github.token }}
+
       - name: Validate deploy bundle integrity
         run: |
           set -euo pipefail
@@ -147,19 +247,85 @@ jobs:
           verify_bundle_integrity "$DEPLOY_BUNDLE_DIR"
           echo "DEPLOY_BUNDLE_DIR=$DEPLOY_BUNDLE_DIR" >> "$GITHUB_ENV"
 
-      # The bundle's bytecode was compiled from a specific commit. Broadcasting is
-      # commit-agnostic (it just replays calldata), but the Etherscan verify step
-      # below RECOMPILES from this checkout — from a different commit it would
-      # submit sources that don't match the deployed code. Warn loudly.
-      - name: Check the bundle's provenance against this checkout
+      # Tie the downloaded bytes back to the exact successful generation run.
+      # Broadcasting is commit-agnostic, but Etherscan verification recompiles
+      # from this checkout, so a different checkout is still warned separately.
+      - name: Check bundle provenance against the proven run
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
         run: |
           set -euo pipefail
           META="$DEPLOY_BUNDLE_DIR/bundle-metadata.json"
           cat "$META"
           bundle_commit="$(jq -r '.contracts_commit // empty' "$META")"
-          if [ -n "$bundle_commit" ] && [ "$bundle_commit" != "$GITHUB_SHA" ]; then
+          bundle_run="$(jq -r '.generated_by.workflow_run // empty' "$META")"
+          bundle_env="$(jq -r '.env // empty' "$META")"
+          bundle_dirty="$(jq -r 'if has("contracts_worktree_dirty") then (.contracts_worktree_dirty | tostring) else empty end' "$META")"
+          if [ "$bundle_run" != "$GENERATE_RUN_URL" ]; then
+            echo "::error::bundle provenance run '$bundle_run' does not match proven run '$GENERATE_RUN_URL'"; exit 1
+          fi
+          if [ "$bundle_commit" != "$GENERATE_HEAD_SHA" ]; then
+            echo "::error::bundle commit '$bundle_commit' does not match generation head '$GENERATE_HEAD_SHA'"; exit 1
+          fi
+          if [ "$bundle_env" != "$ENVIRONMENT" ]; then
+            echo "::error::bundle env '$bundle_env' does not match requested env '$ENVIRONMENT'"; exit 1
+          fi
+          if [ "$bundle_dirty" != "false" ]; then
+            echo "::error::bundle was generated from a dirty or unknown worktree"; exit 1
+          fi
+          if [ "$bundle_commit" != "$GITHUB_SHA" ]; then
             echo "::warning::bundle was generated from $bundle_commit but this run checked out $GITHUB_SHA — re-dispatch on that commit for a source-matching Etherscan verify."
           fi
+
+      # A failed broadcast can already have mined some CREATE2 transactions.
+      # Restore its journal before retrying so idempotently skipped calls do not
+      # disappear from the PUVT's provenance input.
+      - name: Initialize or restore the deployment receipt journal
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          GENERATE_RUN_ID: ${{ inputs.generate_run_id }}
+          RESUME_DEPLOY_RUN_ID: ${{ inputs.resume_deploy_run_id }}
+        run: |
+          set -euo pipefail
+          OUTDIR="$GITHUB_WORKSPACE/deploy-result"
+          mkdir -p "$OUTDIR"
+          bundle_metadata_sha256="$(sha256sum "$DEPLOY_BUNDLE_DIR/bundle-metadata.json" | awk '{print $1}')"
+
+          if [ -n "$RESUME_DEPLOY_RUN_ID" ]; then
+            previous_meta="$(find "$GITHUB_WORKSPACE/previous-deploy-result" -name resume-metadata.json -print -quit)"
+            if [ -z "$previous_meta" ]; then
+              echo "::error::resume artifact has no resume-metadata.json"; exit 1
+            fi
+            jq -e \
+              --arg generation_run "$GENERATE_RUN_URL" \
+              --arg deployment_run "$RESUME_RUN_URL" \
+              --arg env "$ENVIRONMENT" \
+              --arg digest "$bundle_metadata_sha256" \
+              '.generation_run == $generation_run and
+               .deployment_run == $deployment_run and
+               .environment == $env and
+               .bundle_metadata_sha256 == $digest' \
+              "$previous_meta" >/dev/null || {
+                echo "::error::resume journal does not belong to this generation run, environment, and bundle"; exit 1;
+              }
+            previous_dir="$(dirname "$previous_meta")"
+            [ ! -f "$previous_dir/transactions.txt" ] || cp "$previous_dir/transactions.txt" "$OUTDIR/transactions.txt"
+            [ ! -f "$previous_dir/deploy-executed.json" ] || cp "$previous_dir/deploy-executed.json" "$OUTDIR/deploy-executed.json"
+            echo "Restored receipt journal from deploy run $RESUME_DEPLOY_RUN_ID"
+          fi
+
+          jq -n \
+            --arg generation_run "$GENERATE_RUN_URL" \
+            --arg deployment_run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --arg env "$ENVIRONMENT" \
+            --arg digest "$bundle_metadata_sha256" \
+            '{generation_run: $generation_run, deployment_run: $deployment_run,
+              environment: $env, bundle_metadata_sha256: $digest}' \
+            > "$OUTDIR/resume-metadata.json"
+          {
+            echo "DEPLOY_OUTDIR=$OUTDIR"
+            echo "TXLOG=$OUTDIR/transactions.txt"
+          } >> "$GITHUB_ENV"
 
       # Which L1 to broadcast to comes from the BUNDLE, not from the env's name:
       # `bundle-metadata.json` records the `l1.chain_id` the calldata was computed
@@ -174,16 +340,7 @@ jobs:
         run: |
           set -euo pipefail
           META="$DEPLOY_BUNDLE_DIR/bundle-metadata.json"
-          L1_CHAIN_ID=""
-          if [ -n "$META" ]; then
-            L1_CHAIN_ID="$(jq -r '.l1.chain_id // empty' "$META")"
-          fi
-          if [ -z "$L1_CHAIN_ID" ]; then
-            # Bundle predates the metadata: fall back to the env config in this checkout.
-            PV="l1-contracts/upgrade-envs/permanent-values/${ENVIRONMENT}.toml"
-            L1_CHAIN_ID="$(sed -nE 's/^[[:space:]]*l1_chain_id[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$PV" 2>/dev/null | head -1)"
-            echo "::warning::bundle has no l1.chain_id; falling back to $PV -> ${L1_CHAIN_ID:-<none>}"
-          fi
+          L1_CHAIN_ID="$(jq -r '.l1.chain_id // empty' "$META")"
           case "$L1_CHAIN_ID" in
             1)        rpc="$RPC_MAINNET"; pk="$PK_MAINNET"; net=mainnet ;;
             11155111) rpc="$RPC_SEPOLIA"; pk="$PK_SEPOLIA"; net=sepolia ;;
@@ -198,24 +355,31 @@ jobs:
           fi
           echo "::add-mask::$rpc"
           echo "::add-mask::$pk"
+          actual_chain_id="$(cast chain-id --rpc-url "$rpc")"
+          if [ "$actual_chain_id" != "$L1_CHAIN_ID" ]; then
+            echo "::error::RPC selected for $net reports chain id $actual_chain_id, bundle requires $L1_CHAIN_ID"
+            exit 1
+          fi
+          echo "RPC chain id verified: $actual_chain_id"
           deployer="$(cast wallet address --private-key "$pk")"
           echo "Deployer (real signer): $deployer"
+          # The bundle names the EOA whose bundles are the deployer's. If the key in
+          # CI is a different account, `--skip-unkeyed` would silently broadcast
+          # nothing, so say so now rather than "succeeding" with an empty deploy.
+          want="$(jq -r '.deployer_address // empty' "$META")"
+          if [ -z "$want" ]; then
+            echo "::error::bundle metadata has no deployer_address"; exit 1
+          fi
+          if [ "$(echo "$want" | tr 'A-Z' 'a-z')" != "$(echo "$deployer" | tr 'A-Z' 'a-z')" ]; then
+            echo "::error::bundle was prepared for deployer $want but this key is $deployer — its bundles would be skipped. Re-generate with -f deployer_address=$deployer, or use that account's key."
+            exit 1
+          fi
           {
             echo "L1_RPC_URL=$rpc"
             echo "DEPLOYER_PK=$pk"
             echo "DEPLOYER_ADDR=$deployer"
             echo "ETHERSCAN_CHAIN=$net"
           } >> "$GITHUB_ENV"
-          # The bundle names the EOA whose bundles are the deployer's. If the key in
-          # CI is a different account, `--skip-unkeyed` would silently broadcast
-          # nothing, so say so now rather than "succeeding" with an empty deploy.
-          if [ -n "$META" ]; then
-            want="$(jq -r '.deployer_address // empty' "$META")"
-            if [ -n "$want" ] && [ "$(echo "$want" | tr 'A-Z' 'a-z')" != "$(echo "$deployer" | tr 'A-Z' 'a-z')" ]; then
-              echo "::error::bundle was prepared for deployer $want but this key is $deployer — its bundles would be skipped. Re-generate with -f deployer_address=$deployer, or use that account's key."
-              exit 1
-            fi
-          fi
 
       # Broadcast ONLY the deployer bundles (target == deployer), robustly, one
       # at a time. Writes transactions.txt next to --out for the PUVT.
@@ -223,7 +387,6 @@ jobs:
         run: |
           set -euo pipefail
           MANIFEST="$DEPLOY_BUNDLE_DIR/prepare/manifest.json"
-          OUTDIR="$DEPLOY_BUNDLE_DIR"
           echo "Manifest: $MANIFEST"
           ./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \
             --manifest "$MANIFEST" \
@@ -231,19 +394,16 @@ jobs:
             --key "${DEPLOYER_ADDR}=${DEPLOYER_PK}" \
             --skip-unkeyed \
             --max-gas-price-gwei "${{ inputs.max_gas_price_gwei }}" \
-            --out "$OUTDIR/deploy-executed.json"
-          echo "TXLOG=$OUTDIR/transactions.txt" >> "$GITHUB_ENV"
+            --out "$DEPLOY_OUTDIR/deploy-executed.json"
           echo "=== transactions.txt ==="
-          cat "$OUTDIR/transactions.txt" || true
+          cat "$TXLOG" || true
 
       - name: Upload transactions.txt + executed log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-result-${{ inputs.environment }}
-          path: |
-            ${{ env.TXLOG }}
-            ${{ github.workspace }}/deploy-inputs/**/deploy-executed.json
+          path: ${{ github.workspace }}/deploy-result
           if-no-files-found: warn
           retention-days: 90
 
