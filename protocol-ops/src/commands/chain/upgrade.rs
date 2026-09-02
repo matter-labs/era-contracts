@@ -62,8 +62,7 @@ impl DaMove {
 /// it.
 ///
 /// The bundle is a single `ChainAdmin.multicall`: the diamond cut, and — with
-/// `--da-mode` — the DA validator pair and pubdata content the chain runs after
-/// it. Keeping them in one transaction matters for a validium going to v33:
+/// `--da-mode` — the DA validator pair and the pubdata content that mode implies. Keeping them in one transaction matters for a validium going to v33:
 /// between the cut and a separate DA transaction the chain would commit batches
 /// under a DA setup its new version no longer settles.
 ///
@@ -107,15 +106,10 @@ pub struct ChainUpgradeArgs {
     #[clap(long, value_enum, help_heading = "DA")]
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
 
-    /// How much pubdata the chain commits after the upgrade, when it is not what `--da-mode`
-    /// defaults to. On its own it is a complete move: a chain that delivers nothing needs exactly
-    /// this to keep proving past v33.
-    #[clap(long, value_enum, help_heading = "DA")]
-    pub pubdata_content: Option<PubdataContent>,
-
-    /// Upgrade a validium-priced chain past the version that requires it to publish its pubdata,
-    /// leaving its DA setup alone. Such a chain stops producing provable batches — pass this only
-    /// when the move is applied by other means, or deliberately.
+    /// Upgrade a validium-priced chain past the version that gives it a pubdata content, leaving
+    /// its DA setup alone. Such a chain then commits full pubdata it does not deliver and its
+    /// batches stop proving — pass this only when the move is applied by other means, or
+    /// deliberately.
     #[clap(long, default_value_t = false, help_heading = "DA")]
     pub keep_da_setup: bool,
 
@@ -307,12 +301,10 @@ async fn resolve_da_move(
         }),
         None => None,
     };
-    // Named explicitly, or derived from a DA mode that was. Naming only the content is a complete
-    // move on its own: it is what a chain publishing nothing needs to keep proving past v33.
-    let pubdata_content = args.pubdata_content.or_else(|| {
-        args.da_mode
-            .and_then(|da_mode| PubdataContent::from_da_and_vm_types(da_mode, vm_type))
-    });
+    // Follows from the kind of chain `--da-mode` says it now is; it has no knob of its own.
+    let pubdata_content = args
+        .da_mode
+        .and_then(|da_mode| PubdataContent::from_da_and_vm_types(da_mode, vm_type));
 
     let da_move = DaMove {
         pair,
@@ -328,9 +320,10 @@ async fn resolve_da_move(
 /// neither DA axis is named. The version gives such a chain a pubdata content it does not publish
 /// — `FULL_PUBDATA` against the empty no-DA scheme — and that pair is folded into every batch's
 /// chain-config hash, so its batches stop proving (`InvalidProof`). Naming either axis is enough:
-/// `--pubdata-content logs-only` to keep delivering nothing but commit only that, or `--da-mode`
-/// to move it onto blobs, which is also what puts its interop commitment tree leaves back within
-/// reach of L1.
+/// `--da-mode logs-only-validium` gives it a content it can back: add
+/// `--l2-da-commitment-scheme discouraged-empty-no-da` to keep delivering nothing, or leave the
+/// scheme derived to move it onto blobs — which is also what puts its interop commitment tree
+/// leaves back within reach of L1.
 async fn guard_validium_without_da(
     l1_rpc_url: &str,
     ctm: Address,
@@ -355,9 +348,9 @@ async fn guard_validium_without_da(
         new_minor < MIN_MINOR_VERSION_WITH_VALIDIUM_DA,
         "chain {chain_id} is validium-priced and this upgrade takes it to v{new_minor}, which \
          would leave it committing full pubdata it never delivers — batches in that state do not \
-         prove. Pass `--pubdata-content logs-only` to match what it delivers, or `--da-mode \
-         logs-only-validium --l1-da-validator <address>` to move it onto blobs as well, or \
-         `--keep-da-setup` to leave it alone deliberately"
+         prove. Pass `--da-mode logs-only-validium --l1-da-validator <address>` to give it a \
+         content it can back (adding `--l2-da-commitment-scheme discouraged-empty-no-da` keeps it \
+         delivering nothing), or `--keep-da-setup` to leave it alone deliberately"
     );
     Ok(())
 }
