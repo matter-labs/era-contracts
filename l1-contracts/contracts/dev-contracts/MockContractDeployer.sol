@@ -1,17 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/// @title MockContractDeployer
-/// @notice Mock for the ZK-VM ContractDeployer system contract (address 0x8006).
-/// @dev In production (zkVM), ContractDeployer.forceDeployOnAddresses deploys
-/// bytecode at arbitrary addresses.  On Anvil EVM this is impossible from
-/// within a contract, so the test infrastructure pre-deploys all needed
-/// bytecodes via anvil_setCode *before* relaying the upgrade tx and this
-/// mock simply no-ops so the call chain does not revert.
-contract MockContractDeployer {
-    fallback() external payable {
-        // No-op: force deployments are handled via anvil_setCode in the test harness
-    }
+import {IZKOSContractDeployer} from "../l2-system/zksync-os/interfaces/IZKOSContractDeployer.sol";
 
-    receive() external payable {}
+/// @title MockContractDeployer
+/// @notice Mock for the ZKsync OS contract-deployer system contract (address 0x8006).
+/// @dev In production, `ZKOSContractDeployer.setBytecodeDetailsEVM` registers bytecode
+/// at arbitrary addresses through a system hook. On Anvil EVM this is impossible from
+/// within a contract, so the test infrastructure pre-deploys all needed bytecodes via
+/// anvil_setCode *before* relaying the upgrade tx, and this mock no-ops the call so the
+/// chain does not revert.
+///
+/// The mock implements the production interface — so the compiler itself pins the mock
+/// to the real deployer's ABI — and has deliberately no fallback: a caller using a stale
+/// or unexpected selector reverts loudly instead of silently "succeeding", so ABI drift
+/// between the harness and the production deployer surfaces immediately.
+contract MockContractDeployer is IZKOSContractDeployer {
+    /// @inheritdoc IZKOSContractDeployer
+    /// @dev No-op: bytecode placement is handled via anvil_setCode in the test harness.
+    function setBytecodeDetailsEVM(address, bytes32, uint32, bytes32) external override {}
 }
