@@ -94,15 +94,15 @@ interface IGetters is IZKChainBase {
     function storedBatchHash(uint256 _batchNumber) external view returns (bytes32);
 
     /// @return Bytecode hash of bootloader program.
-    /// @dev Deprecated: EraVM-only; always zero for ZKsync OS chains. Kept for legacy tooling.
+    /// @dev This function is deprecated and will soon be removed; always zero for ZKsync OS chains.
     function getL2BootloaderBytecodeHash() external view returns (bytes32);
 
     /// @return Bytecode hash of default account (bytecode for EOA).
-    /// @dev Deprecated: EraVM-only; always zero for ZKsync OS chains. Kept for legacy tooling.
+    /// @dev This function is deprecated and will soon be removed; always zero for ZKsync OS chains.
     function getL2DefaultAccountBytecodeHash() external view returns (bytes32);
 
     /// @return Bytecode hash of EVM emulator.
-    /// @dev Deprecated: EraVM-only; always zero for ZKsync OS chains. Kept for legacy tooling.
+    /// @dev This function is deprecated and will soon be removed; always zero for ZKsync OS chains.
     function getL2EvmEmulatorBytecodeHash() external view returns (bytes32);
 
     /// @return Verifier parameters.

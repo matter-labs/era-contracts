@@ -114,12 +114,13 @@ struct ZKChainStorage {
     VerifierParams __DEPRECATED_verifierParams;
     /// @dev Deprecated slot, retained to preserve the storage layout. Formerly `l2BootloaderBytecodeHash`
     /// (EraVM bootloader bytecode hash, a zkp-circuit input); ZKsync OS chains have no bootloader.
-    /// No longer read; only the legacy `BaseZkSyncUpgrade` path could write it, and ZKsync OS
-    /// upgrades never carry a non-zero hash.
+    /// Read only by the deprecated getter and the EraVM-only commit path; written only by the legacy
+    /// `BaseZkSyncUpgrade` setters, which ZKsync OS upgrades never trigger (they carry zero hashes).
     /// @dev STORAGE SLOT: 23
     bytes32 __DEPRECATED_l2BootloaderBytecodeHash;
     /// @dev Deprecated slot, retained to preserve the storage layout. Formerly `l2DefaultAccountBytecodeHash`
     /// (EraVM default-account bytecode hash, a zkp-circuit input); ZKsync OS chains have no default account.
+    /// Same lifecycle as {__DEPRECATED_l2BootloaderBytecodeHash}.
     /// @dev STORAGE SLOT: 24
     bytes32 __DEPRECATED_l2DefaultAccountBytecodeHash;
     /// @dev Indicates that the porter may be touched on L2 transactions.
@@ -224,6 +225,7 @@ struct ZKChainStorage {
     bool isPermanentRollup;
     /// @dev Deprecated slot, retained to preserve the storage layout. Formerly `l2EvmEmulatorBytecodeHash`
     /// (EraVM EVM-emulator bytecode hash, a zkp-circuit input); ZKsync OS chains have no EVM emulator.
+    /// Same lifecycle as {__DEPRECATED_l2BootloaderBytecodeHash}.
     /// @dev STORAGE SLOT: 58
     bytes32 __DEPRECATED_l2EvmEmulatorBytecodeHash;
     /// @notice The precommitment for the latest uncommitted batch (i.e. totalBatchesCommitted + 1).
