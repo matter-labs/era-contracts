@@ -11,8 +11,10 @@ import {
   ERAVM_HASH_VERSION,
   ERAVM_HASH_VERSION_OFFSET,
   MAX_ERAVM_BYTECODE_WORDS,
-} from "./constants";
-import { readJson, readToml, requireTomlString } from "./file-system";
+  readJson,
+  readToml,
+  requireTomlString,
+} from "./common";
 
 interface ContractHashEntry {
   contractName?: string;

@@ -1,11 +1,9 @@
 import * as path from "path";
 import { parseArgs } from "util";
+import { bundleProvenanceFromEnvironment, packDeployBundle, verifyBundleIntegrity } from "./bundle";
+import { formatError, parseInteger } from "./common";
 import { restoreCanonicalDefaultAccountArtifact } from "./default-account";
-import { formatError, parseInteger } from "./file-system";
-import { verifyBundleIntegrity } from "./integrity";
-import { bundleProvenanceFromEnvironment, packDeployBundle } from "./pack";
-import { regenerateAndVerify } from "./regenerate";
-import { replayBundleAndVerify } from "./replay";
+import { regenerateAndVerify, replayBundleAndVerify } from "./flows";
 
 const COMMANDS = ["pack", "regen", "replay", "restore-default-account", "verify"] as const;
 type Command = (typeof COMMANDS)[number];

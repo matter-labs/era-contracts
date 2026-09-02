@@ -4,14 +4,11 @@ import * as os from "os";
 import * as path from "path";
 import { afterEach, describe, it } from "node:test";
 import { ethers } from "ethers";
-import { DEPLOY_BUNDLE_SCHEMA } from "./constants";
-import { loadUpgradeEnvironment } from "./environment";
-import { fileSha256, readJson } from "./file-system";
-import { verifyBundleIntegrity } from "./integrity";
+import { packDeployBundle, verifyBundleIntegrity } from "./bundle";
+import { DEPLOY_BUNDLE_SCHEMA, fileSha256, loadUpgradeEnvironment, readJson } from "./common";
+import type { DeployBundleMetadata } from "./common";
 import { restoreCanonicalDefaultAccountArtifact, zkBytecodeHash } from "./default-account";
-import { packDeployBundle } from "./pack";
-import { replayBundleAndVerify } from "./replay";
-import type { DeployBundleMetadata } from "./types";
+import { replayBundleAndVerify } from "./flows";
 
 const temporaryDirectories: string[] = [];
 const TEST_BUNDLE_TARGET = "0x0000000000000000000000000000000000000002";
