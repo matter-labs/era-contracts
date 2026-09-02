@@ -176,9 +176,10 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
             ctmDeployedAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
-        (bool ok, bytes memory data) = ctmDeployedAddresses.stateTransition.verifiers.verifier.staticcall(
-            abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
-        );
+        // TODO(EVM-1660): every ZKsync OS verifier exports the flag from v34 onwards, so once the
+        // previous version is v34+, restore the introspection:
+        // config.testnetVerifier =
+        //     IZKsyncOSVerifier(ctmDeployedAddresses.stateTransition.verifiers.verifier).IS_TESTNET_VERIFIER();
         config.testnetVerifier = true;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }

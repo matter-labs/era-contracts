@@ -192,12 +192,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         ).executionDelay();
         // FIXME: need to provide the params as the input for the function, since
         // on mainnet testnetVerifier must be false. Right now the introspection is not available
-        // due to the previous version being v29.
-        // TODO: restore introspection when L1 state is regenerated with ZKsyncOSTestnetVerifier.IS_TESTNET_VERIFIER
-        // (bool ok, bytes memory data) = ctmAddresses.stateTransition.verifiers.verifier.staticcall(
-        //     abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
-        // );
-        // config.testnetVerifier = ok;
+        // because the previous version's production verifier does not export the flag.
+        // TODO(EVM-1660): every ZKsync OS verifier exports the flag from v34 onwards, so once the
+        // previous version is v34+, restore the introspection:
+        // config.testnetVerifier =
+        //     IZKsyncOSVerifier(ctmAddresses.stateTransition.verifiers.verifier).IS_TESTNET_VERIFIER();
         config.testnetVerifier = true;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }

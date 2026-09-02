@@ -72,6 +72,16 @@ contract ZKsyncOSVerifierTest is Test {
         new ZKsyncOSTestnetVerifier(IVerifier(address(plonkVerifier)));
     }
 
+    // ============ IS_TESTNET_VERIFIER Tests ============
+
+    function test_IS_TESTNET_VERIFIER_falseOnProductionVerifier() public view {
+        assertFalse(verifier.IS_TESTNET_VERIFIER());
+    }
+
+    function test_IS_TESTNET_VERIFIER_trueOnTestnetVerifier() public view {
+        assertTrue(testnetVerifier.IS_TESTNET_VERIFIER());
+    }
+
     // ============ verify Tests ============
 
     function test_verify_routesToPlonkVerifier() public view {

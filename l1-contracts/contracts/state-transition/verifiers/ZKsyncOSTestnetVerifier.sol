@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {ZKsyncOSVerifier} from "./ZKsyncOSVerifier.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
+import {IZKsyncOSVerifier} from "../chain-interfaces/IZKsyncOSVerifier.sol";
 import {InvalidMockProofLength, InvalidProof} from "../../common/L1ContractErrors.sol";
 import {MAINNET_CHAIN_ID, ZKSYNC_OS_MOCK_PROOF_LENGTH, ZKSYNC_OS_MOCK_PROOF_MAGIC} from "../../common/Config.sol";
 
@@ -12,10 +13,14 @@ import {MAINNET_CHAIN_ID, ZKSYNC_OS_MOCK_PROOF_LENGTH, ZKSYNC_OS_MOCK_PROOF_MAGI
 /// @notice Modified version of the main verifier contract for the testnet environment
 /// @dev This contract is used to support mock verification.
 contract ZKsyncOSTestnetVerifier is ZKsyncOSVerifier {
-    bool public constant IS_TESTNET_VERIFIER = true;
-
     constructor(IVerifier _plonkVerifier) ZKsyncOSVerifier(_plonkVerifier) {
         assert(block.chainid != MAINNET_CHAIN_ID);
+    }
+
+    /// @inheritdoc IZKsyncOSVerifier
+    // solhint-disable-next-line func-name-mixedcase
+    function IS_TESTNET_VERIFIER() external pure override returns (bool) {
+        return true;
     }
 
     /// @dev Verifies the correctness of public input, doesn't check the validity of proof itself.
