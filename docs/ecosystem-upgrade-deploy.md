@@ -79,7 +79,7 @@ DEPLOYER_ADDR=<deployer-eoa> \
 L1_FORK_URL=<l1-rpc> GW_RPC_URL=<l1-rpc> \
 ZK_GOVERNANCE_COMMIT=9b06a16159cd58add109f25598e79731450d1772 \
 ZK_GOVERNANCE_DIR=../../zk-governance \
-  yarn --cwd l1-contracts/test/anvil-interop bundle:regen -- mainnet
+  yarn --cwd l1-contracts/test/anvil-interop bundle regen mainnet
 
 # 1b) emit the sim-inputs + transaction-simulator.json
 OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
@@ -255,14 +255,14 @@ transaction.
 **Check out the commit `bundle-metadata.json` names.** PUVT identifies deployed
 contracts by matching their code against the committed `AllContractsHashes.json`;
 from a different commit the deployments are not recognised and the verdict is
-meaningless. `bundle:replay` compares the hash and exits on a mismatch.
+meaningless. `bundle replay` compares the hash and exits on a mismatch.
 
 **Rehearse the deploy and run PUVT — no compiler, no regeneration:**
 
 ```bash
 cd protocol-ops && cargo build --release && cd ..     # the only build needed
 yarn --cwd l1-contracts/test/anvil-interop install --frozen-lockfile
-yarn --cwd l1-contracts/test/anvil-interop bundle:replay -- \
+yarn --cwd l1-contracts/test/anvil-interop bundle replay \
   --bundle <unpacked-bundle-dir> --fork-url <l1-rpc>
 ```
 
@@ -274,11 +274,11 @@ Variants:
 
 ```bash
 # verify a chain the bundle was already broadcast to (no replay)
-yarn --cwd l1-contracts/test/anvil-interop bundle:replay -- \
+yarn --cwd l1-contracts/test/anvil-interop bundle replay \
   --bundle <dir> --rpc <l1-rpc> --verify-only
 
 # broadcast the deployer bundles for real, then verify
-yarn --cwd l1-contracts/test/anvil-interop bundle:replay -- \
+yarn --cwd l1-contracts/test/anvil-interop bundle replay \
   --bundle <dir> --rpc <l1-rpc> --key "$DEPLOYER_KEY"
 ```
 
@@ -290,5 +290,5 @@ idempotency, as step 2 above.
 
 ```bash
 DEPLOYER_ADDR=<deployer> FORKED_AT_BLOCK=<block> \
-  yarn --cwd l1-contracts/test/anvil-interop bundle:pack -- <env>
+  yarn --cwd l1-contracts/test/anvil-interop bundle pack <env>
 ```

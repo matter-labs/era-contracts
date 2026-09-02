@@ -66,7 +66,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 #
 # Or locally from the downloaded bundle — same `protocol_ops` code path:
 #
-#   yarn --cwd l1-contracts/test/anvil-interop bundle:replay -- \
+#   yarn --cwd l1-contracts/test/anvil-interop bundle replay \
 #     --bundle <unpacked-bundle> --rpc <l1-rpc> --key "$DEPLOYER_KEY"
 #
 # Broadcast ONLY the deployer's bundles; the governance-signed ones are the
@@ -80,7 +80,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 # `AllContractsHashes.json`):
 #
 #   cd protocol-ops && cargo build --release && cd ..
-#   yarn --cwd l1-contracts/test/anvil-interop bundle:replay -- \
+#   yarn --cwd l1-contracts/test/anvil-interop bundle replay \
 #     --bundle <unpacked-bundle> --rpc <l1-rpc> --verify-only     # already deployed
 #   #  … or --fork-url <l1-rpc> to rehearse the whole thing on a throw-away fork
 #
@@ -147,10 +147,10 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 # source — including any contract changes merged in since the last image was
 # published.
 #
-# Flow (the canonical `bundle:regen` TypeScript command):
+# Flow (the canonical `bundle regen` TypeScript command):
 #   anvil fork of the L1 RPC
 #     -> protocol_ops ecosystem upgrade-prepare-all   (writes ecosystem.toml)
-#     -> bundle:pack                                  (the transferable handoff)
+#     -> bundle pack                                  (the transferable handoff)
 #     -> fund + fork-replay the prepare bundles
 #     -> protocol_ops ecosystem verify-upgrade (PUVT)
 #   then emit the git-portable `sim-inputs/` handoff set AND the ready-to-paste
@@ -332,7 +332,7 @@ jobs:
           ENVIRONMENT: ${{ inputs.environment }}
         run: |
           set -euo pipefail
-          yarn --cwd l1-contracts/test/anvil-interop bundle:restore-default-account -- \
+          yarn --cwd l1-contracts/test/anvil-interop bundle restore-default-account \
             "$GITHUB_WORKSPACE/system-contracts/zkout/DefaultAccount.sol/DefaultAccount.json" \
             "$GITHUB_WORKSPACE/l1-contracts/upgrade-envs/v0.31.0-interopB/$ENVIRONMENT.toml" \
             "$GITHUB_WORKSPACE/AllContractsHashes.json"
@@ -409,7 +409,7 @@ jobs:
           fi
           echo "Deployer (impersonated on the fork): $deployer"
           # Job-scoped. L1_FORK_URL stays masked; DEPLOYER_ADDR is public.
-          # Setting DEPLOYER_ADDR makes bundle:regen run in impersonation
+          # Setting DEPLOYER_ADDR makes `bundle regen` run in impersonation
           # mode (no signing key required).
           {
             echo "L1_FORK_URL=$rpc"
@@ -427,7 +427,7 @@ jobs:
           # redeployed PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard bytecodes.
           ZK_GOVERNANCE_COMMIT: ${{ inputs.zk_governance_commit }}
           ZK_GOVERNANCE_DIR: ${{ github.workspace }}/zk-governance
-          # Optional fork-block pin (blank = tip). bundle:regen reads this.
+          # Optional fork-block pin (blank = tip). `bundle regen` reads this.
           FORK_BLOCK: ${{ inputs.fork_block }}
           # Recorded in the deploy bundle's metadata (part of the bytecode identity).
           ZKSYNC_FOUNDRY_VERSION: ${{ inputs.zksync_foundry_version }}
@@ -436,7 +436,7 @@ jobs:
           # forks L1_FORK_URL into a local anvil and runs prepare/PUVT against
           # localhost, so only anvil sees the real RPC. DEPLOYER_ADDR puts it in
           # impersonation mode (no signing key needed).
-          yarn bundle:regen -- "${{ inputs.environment }}"
+          yarn bundle regen "${{ inputs.environment }}"
 
       # Produce the same calldata artifact set PR #2268 committed for mainnet:
       # the git-portable `sim-inputs/` handoff set AND the ready-to-paste
@@ -479,7 +479,7 @@ jobs:
           retention-days: 30
 
       # The DEPLOY BUNDLE: everything needed to broadcast this run's contracts and
-      # re-verify them, and nothing else. Packed by `bundle:pack` during
+      # re-verify them, and nothing else. Packed by `bundle pack` during
       # the regen (right after the prepare, so it exists even if PUVT fails):
       #
       #   prepare/manifest.json + prepare/*.safe.json  the deployer calls to send
@@ -632,6 +632,6 @@ jobs:
         run: |
           # The command stops only the fork anvil process it started, so this job
           # needs no separate cleanup step.
-          yarn bundle:replay -- \
+          yarn bundle replay \
             --bundle "$GITHUB_WORKSPACE/deploy-bundle" \
             --fork-url "$L1_FORK_URL"

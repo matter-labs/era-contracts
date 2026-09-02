@@ -22,7 +22,6 @@ import {
   readToml,
   requireFile,
   requireTomlString,
-  runCli,
   startAnvilFork,
   stopAnvil,
   writeCombinedLog,
@@ -43,7 +42,7 @@ function resolveDeployer(): string {
   return new ethers.Wallet(privateKey).address;
 }
 
-async function regenerateAndVerify(environment: string): Promise<void> {
+export async function regenerateAndVerify(environment: string): Promise<void> {
   const forkUrl = process.env.L1_FORK_URL;
   if (!forkUrl) throw new Error("L1_FORK_URL is required");
   const port = envAnvilPort(environment);
@@ -204,9 +203,3 @@ async function regenerateAndVerify(environment: string): Promise<void> {
     await cleanup();
   }
 }
-
-runCli(() => {
-  const [environment = "stage", extra] = process.argv.slice(2);
-  if (extra) throw new Error("usage: yarn bundle:regen [stage | testnet | mainnet]");
-  return regenerateAndVerify(environment);
-});

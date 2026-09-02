@@ -23,7 +23,6 @@ import {
   readToml,
   requireFile,
   requireTomlString,
-  runCli,
   startAnvilFork,
   stopAnvil,
   verifyBundleIntegrity,
@@ -31,7 +30,7 @@ import {
 } from "./common";
 import { broadcastUpgrade, verifyUpgrade } from "./operations";
 
-interface ReplayArguments {
+export interface ReplayOptions {
   bundleDirectory: string;
   forkUrl?: string;
   rpcUrl?: string;
@@ -39,38 +38,7 @@ interface ReplayArguments {
   verifyOnly: boolean;
 }
 
-function usage(): never {
-  throw new Error(
-    "usage: yarn bundle:replay --bundle <dir> (--fork-url <l1-rpc> | --rpc <rpc>) " + "[--key <0xhex>] [--verify-only]"
-  );
-}
-
-function parseArguments(args: string[]): ReplayArguments {
-  let bundleDirectory: string | undefined;
-  let forkUrl: string | undefined;
-  let rpcUrl: string | undefined;
-  let deployerKey: string | undefined;
-  let verifyOnly = false;
-  for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index];
-    const value = (): string => {
-      const next = args[index + 1];
-      if (!next) usage();
-      index += 1;
-      return next;
-    };
-    if (argument === "--bundle") bundleDirectory = value();
-    else if (argument === "--fork-url") forkUrl = value();
-    else if (argument === "--rpc") rpcUrl = value();
-    else if (argument === "--key") deployerKey = value();
-    else if (argument === "--verify-only") verifyOnly = true;
-    else usage();
-  }
-  if (!bundleDirectory || (!forkUrl && !rpcUrl) || (forkUrl && rpcUrl)) usage();
-  return { bundleDirectory: path.resolve(bundleDirectory), forkUrl, rpcUrl, deployerKey, verifyOnly };
-}
-
-async function replayBundleAndVerify(args: ReplayArguments): Promise<void> {
+export async function replayBundleAndVerify(args: ReplayOptions): Promise<void> {
   requireFile(path.join(args.bundleDirectory, "bundle-metadata.json"), "deploy bundle metadata");
   const metadata = verifyBundleIntegrity(args.bundleDirectory);
   const environment = metadata.env;
@@ -145,7 +113,7 @@ async function replayBundleAndVerify(args: ReplayArguments): Promise<void> {
         });
       }
     }
-    if (!rpcUrl) usage();
+    if (!rpcUrl) throw new Error("replay requires either forkUrl or rpcUrl");
     console.log(`L1 RPC:       ${rpcUrl}`);
     const gatewayRpcUrl = process.env.GW_RPC_URL ?? DEFAULT_GATEWAY_RPC_URL;
     console.log(`GW RPC:       ${gatewayRpcUrl}`);
@@ -211,5 +179,3 @@ async function replayBundleAndVerify(args: ReplayArguments): Promise<void> {
     await cleanup();
   }
 }
-
-runCli(() => replayBundleAndVerify(parseArguments(process.argv.slice(2))));

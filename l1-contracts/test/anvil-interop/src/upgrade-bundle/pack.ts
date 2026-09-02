@@ -132,7 +132,7 @@ git checkout ${metadata.contracts_commit}        # bytecode identity: must match
 cd protocol-ops && cargo build --release && cd ..
 yarn --cwd l1-contracts/test/anvil-interop install
 
-yarn --cwd l1-contracts/test/anvil-interop bundle:replay -- \\
+yarn --cwd l1-contracts/test/anvil-interop bundle replay \\
   --bundle <this-dir> --rpc <l1-rpc> --key "$DEPLOYER_KEY"
 \`\`\`
 
@@ -145,7 +145,7 @@ already on-chain are skipped, so a re-run after a partial deploy resumes.
 ## Rehearse + verify (PUVT) locally, no compiler needed
 
 \`\`\`bash
-yarn --cwd l1-contracts/test/anvil-interop bundle:replay -- \\
+yarn --cwd l1-contracts/test/anvil-interop bundle replay \\
   --bundle <this-dir> --fork-url <l1-rpc>
 \`\`\`
 

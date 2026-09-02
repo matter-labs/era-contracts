@@ -155,7 +155,7 @@ describe("packDeployBundle", () => {
     const metadata = verifyBundleIntegrity(bundleDirectory);
     assert.deepStrictEqual(metadata.protocol_version, { old: ["0x1"], new: ["0x2"] });
     const readme = fs.readFileSync(path.join(bundleDirectory, "README.md"), "utf8");
-    assert.match(readme, /yarn --cwd l1-contracts\/test\/anvil-interop bundle:replay/);
+    assert.match(readme, /yarn --cwd l1-contracts\/test\/anvil-interop bundle replay/);
     assert.match(readme, /CREATE2 deploy/);
   });
 });
