@@ -301,6 +301,10 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      - name: Install deploy-bundle tooling dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install --frozen-lockfile
+
       # Build ALL FOUR packages in the order `recompute_hashes.sh` and
       # `update-hashes-on-demand.yaml` use to produce the committed
       # `AllContractsHashes.json` — da → l1 → l2 → system-contracts. Keeping the
@@ -328,19 +332,14 @@ jobs:
           ENVIRONMENT: ${{ inputs.environment }}
         run: |
           set -euo pipefail
-          source l1-contracts/test/anvil-interop/upgrade-bundle-lib.sh
-          restore_v31_default_account_artifact \
-            system-contracts/zkout/DefaultAccount.sol/DefaultAccount.json \
-            "l1-contracts/upgrade-envs/v0.31.0-interopB/$ENVIRONMENT.toml" \
-            AllContractsHashes.json
+          yarn --cwd l1-contracts/test/anvil-interop bundle:restore-default-account -- \
+            "$GITHUB_WORKSPACE/system-contracts/zkout/DefaultAccount.sol/DefaultAccount.json" \
+            "$GITHUB_WORKSPACE/l1-contracts/upgrade-envs/v0.31.0-interopB/$ENVIRONMENT.toml" \
+            "$GITHUB_WORKSPACE/AllContractsHashes.json"
 
       - name: Build protocol_ops
         working-directory: protocol-ops
         run: cargo build --release
-
-      - name: Install anvil-interop dependencies
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn install
 
       # Pick the per-network L1 RPC (secret), mask it, and resolve the deployer
       # EOA address. stage + testnet fork Sepolia; mainnet forks mainnet.
@@ -437,7 +436,7 @@ jobs:
           # forks L1_FORK_URL into a local anvil and runs prepare/PUVT against
           # localhost, so only anvil sees the real RPC. DEPLOYER_ADDR puts it in
           # impersonation mode (no signing key needed).
-          ./regen-and-verify.sh "${{ inputs.environment }}"
+          yarn bundle:regen -- "${{ inputs.environment }}"
 
       # Produce the same calldata artifact set PR #2268 committed for mainnet:
       # the git-portable `sim-inputs/` handoff set AND the ready-to-paste
@@ -540,6 +539,17 @@ jobs:
         with:
           submodules: true
 
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: l1-contracts/test/anvil-interop/yarn.lock
+
+      - name: Install deploy-bundle tooling dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install --frozen-lockfile
+
       # anvil + cast only. No forge --zksync, no contract build: PUVT reads the
       # committed AllContractsHashes.json / SystemConfig.json / configs/genesis,
       # never `out/` or `zkout/`.
@@ -620,8 +630,8 @@ jobs:
       - name: Replay the bundle on a fresh fork + PUVT
         working-directory: l1-contracts/test/anvil-interop
         run: |
-          # The script stops its own fork anvil on exit (EXIT trap), so this job
+          # The command stops only the fork anvil process it started, so this job
           # needs no separate cleanup step.
-          ./replay-bundle-and-verify.sh \
+          yarn bundle:replay -- \
             --bundle "$GITHUB_WORKSPACE/deploy-bundle" \
             --fork-url "$L1_FORK_URL"
