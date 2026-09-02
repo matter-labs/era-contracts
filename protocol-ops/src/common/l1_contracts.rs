@@ -7,7 +7,7 @@
 
 use alloy::network::Ethereum;
 use alloy::primitives::{Address, U256};
-use alloy::providers::{ProviderBuilder, RootProvider};
+use alloy::providers::{Provider, ProviderBuilder, RootProvider};
 use anyhow::Context;
 
 use crate::common::abi::{BridgehubAbi, IChainTypeManagerAbi, ZkChainAbi};
@@ -393,6 +393,12 @@ pub async fn resolve_is_testnet_verifier(
         .await
         .context("ctm.protocolVersionVerifier() call failed")?;
     ensure_nonzero(verifier, "ctm.protocolVersionVerifier()")?;
+
+    let code = p
+        .get_code_at(verifier)
+        .await
+        .context("get_code(verifier) failed")?;
+    anyhow::ensure!(!code.is_empty(), "verifier {verifier} has no code");
 
     let verifier_contract = ITestnetVerifier::new(verifier, p);
     match verifier_contract.isTestnetVerifier().call().await {

@@ -23,8 +23,8 @@ uint256 constant ERA_CHAIN_ID_UNUSED = 0;
 address constant ERA_DIAMOND_PROXY_UNUSED = address(0);
 
 /// @dev First protocol version whose production verifier exports the testnet-verifier flag
-/// (`isTestnetVerifier()`). Pre-v34 only testnet verifiers export it (as the legacy
-/// `IS_TESTNET_VERIFIER` constant) and the production verifier reverts.
+/// (`isTestnetVerifier()`). Earlier production verifiers export no flag; v32/v33 testnet
+/// verifiers exported it as the legacy `IS_TESTNET_VERIFIER` constant.
 uint32 constant FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG = 34;
 
 struct BridgehubContracts {

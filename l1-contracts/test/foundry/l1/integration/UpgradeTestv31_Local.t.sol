@@ -297,9 +297,15 @@ contract UpgradeIntegrationTest_Local is
         );
         address newVerifier = IChainTypeManager(ctm).protocolVersionVerifier(_expectedNewVersion);
         assertEq(newVerifier, _expectedNewVerifier, "Stored verifier differs from the emitted one");
+        assertEq(
+            newVerifier,
+            ctmUpgrade.getAddresses().stateTransition.verifiers.verifier,
+            "Registered verifier differs from the one the script deployed"
+        );
         // This local ecosystem is a testnet environment: DefaultCTMUpgrade.initializeConfig must
         // have resolved testnetVerifier=true from the deployed verifier and installed a testnet
         // verifier for the new version.
+        assertTrue(ctmUpgrade.getTestnetVerifier(), "Script must have resolved a testnet environment");
         assertTrue(
             IZKsyncOSVerifier(newVerifier).isTestnetVerifier(),
             "New version must be registered with a testnet verifier"

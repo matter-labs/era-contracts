@@ -11,7 +11,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
 import {FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG} from "../../utils/Types.sol";
 
-/// @dev Getter that pre-v34 testnet verifiers exported as a public constant; pre-v34 production
+/// @dev Getter that v32/v33 testnet verifiers exported as a public constant; pre-v34 production
 /// verifiers don't have it.
 interface ILegacyTestnetVerifier {
     // solhint-disable-next-line func-name-mixedcase
@@ -26,7 +26,7 @@ library UpgradeUtils {
     /// script config cannot skew the answer. From v34 every ZKsync OS verifier exports the flag,
     /// so it is called directly and a wrong deployment fails loudly. Pre-v34 the deployed verifier
     /// may answer under the current name (a newer verifier serving an older version) or the legacy
-    /// constant name; only a verifier answering neither is a pre-v34 production verifier.
+    /// constant name; a verifier answering neither resolves to "production".
     /// Temporary shim: once every environment these scripts can meet is on v34+, the pre-v34
     /// branches can be deleted in favor of the direct call.
     function resolveTestnetVerifier(IChainTypeManager _ctm) internal view returns (bool) {
