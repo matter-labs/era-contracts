@@ -81,7 +81,32 @@ interface IAdminFunctions {
         uint256 timestamp
     ) external;
 
-    function upgradeChainFromCTM(address chainAddress, address adminAddr, address accessControlRestriction) external;
+    /// @dev Everything a chain's upgrade has to do on L1, executed as one `ChainAdmin.multicall`:
+    /// the diamond cut, plus — for a chain whose DA setup the new version changes — the DA
+    /// validator pair and the pubdata content that have to take effect with it. Splitting those
+    /// across transactions leaves a window in which the chain commits batches under a
+    /// configuration the new version cannot prove.
+    ///
+    /// The two DA fields are `uint8` rather than their enums ({L2DACommitmentScheme},
+    /// {PubdataContent}) so this struct stays encodable from the generated ABI: a Solidity enum
+    /// inside a struct reaches the artifact JSON as a named type that ABI-driven bindings cannot
+    /// resolve. Both are cast on use, and encode identically either way.
+    // solhint-disable-next-line gas-struct-packing
+    struct ChainUpgradeParams {
+        address chainAddress;
+        address adminAddr;
+        address accessControlRestriction;
+        /// @dev The L1 DA validator to run after the cut; read only when `shouldSetDaValidatorPair`.
+        address l1DaValidator;
+        uint8 l2DaCommitmentScheme;
+        /// @dev Which part of the pubdata the chain's batches commit to afterwards; ZKsync OS
+        /// chains only, and read only when `shouldSetPubdataContent`.
+        uint8 pubdataContent;
+        bool shouldSetDaValidatorPair;
+        bool shouldSetPubdataContent;
+    }
+
+    function upgradeChainFromCTM(ChainUpgradeParams calldata params) external;
 
     function makePermanentRollup(ChainAdmin chainAdmin, address target) external;
 

@@ -566,10 +566,17 @@ contract AdminFunctions is Script, IAdminFunctions {
         );
     }
 
-    /// @notice Upgrade a chain by reading the diamond cut directly from the CTM.
+    /// @notice Upgrade a chain by reading the diamond cut directly from the CTM, together with the
+    ///         DA configuration the new version requires of it.
     /// @dev Reads the diamond cut from the CTM's storage to avoid TOML parsing
     ///      issues with large hex strings.
-    function upgradeChainFromCTM(address _chainAddress, address _adminAddr, address _accessControlRestriction) public {
+    ///
+    ///      The cut and the DA calls go out as ONE `ChainAdmin.multicall`. They cannot be split:
+    ///      `setPubdataContent` only exists on the facets the cut installs, and between the cut and
+    ///      a later DA transaction the chain would commit v33 batches under the old pair — which
+    ///      for a no-DA validium do not prove.
+    function upgradeChainFromCTM(IAdminFunctions.ChainUpgradeParams calldata _params) public {
+        address _chainAddress = _params.chainAddress;
         console.log("AdminFunctions: upgrading chain", _chainAddress);
 
         IZKChain chain = IZKChain(_chainAddress);
@@ -601,7 +608,39 @@ contract AdminFunctions is Script, IAdminFunctions {
             ? abi.encodeCall(IAdminLegacy.upgradeChainFromVersion, (currentProtocolVersion, diamondCut))
             : abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainAddress, currentProtocolVersion, diamondCut));
 
-        Utils.adminExecute(_adminAddr, _accessControlRestriction, _chainAddress, upgradeCall, 0);
+        uint256 callCount = 1;
+        if (_params.shouldSetDaValidatorPair) {
+            ++callCount;
+        }
+        if (_params.shouldSetPubdataContent) {
+            ++callCount;
+        }
+        Call[] memory calls = new Call[](callCount);
+        uint256 next;
+        calls[next++] = Call({target: _chainAddress, value: 0, data: upgradeCall});
+        // After the cut, so the pair the first batch of the new version commits with is already
+        // the new one.
+        if (_params.shouldSetDaValidatorPair) {
+            console.log("AdminFunctions: setting DA validator pair", _params.l1DaValidator);
+            calls[next++] = Call({
+                target: _chainAddress,
+                value: 0,
+                data: abi.encodeCall(
+                    IAdmin.setDAValidatorPair,
+                    (_params.l1DaValidator, L2DACommitmentScheme(_params.l2DaCommitmentScheme))
+                )
+            });
+        }
+        if (_params.shouldSetPubdataContent) {
+            console.log("AdminFunctions: setting pubdata content", _params.pubdataContent);
+            calls[next++] = Call({
+                target: _chainAddress,
+                value: 0,
+                data: abi.encodeCall(IAdmin.setPubdataContent, (PubdataContent(_params.pubdataContent)))
+            });
+        }
+
+        Utils.adminExecuteCalls(_params.adminAddr, _params.accessControlRestriction, calls);
 
         console.log("AdminFunctions: upgrade completed successfully");
     }

@@ -3,27 +3,54 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
+use crate::common::abi::admin_functions::IAdminFunctions::ChainUpgradeParams;
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::addresses::ZERO_ADDRESS;
 use crate::common::env_config::default_protocol_ops_out_dir;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
+use crate::types::{DAValidatorType, L2DACommitmentScheme, PubdataContent};
+
+/// `PubdataPricingMode.Validium` — `getPubdataPricingMode()` on the chain's diamond.
+const PRICING_MODE_VALIDIUM: u8 = 1;
+
+/// First minor protocol version at which a validium-priced chain may publish its pubdata through
+/// blobs or calldata. Below it, such a chain can only commit the empty no-DA scheme; from it, a
+/// chain that keeps no-DA no longer produces batches that prove.
+const MIN_MINOR_VERSION_WITH_VALIDIUM_DA: u64 = 33;
 
 #[derive(Serialize)]
 struct ChainUpgradeOutput {
     chain_address: Address,
     admin_address: Address,
     access_control_restriction: Address,
+    /// The DA setup the upgrade puts the chain on, when it moves it at all.
+    da_move: Option<DaMove>,
+}
+
+/// The DA half of a chain upgrade: what the same `ChainAdmin.multicall` sets after the cut.
+#[derive(Clone, Copy, Debug, Serialize)]
+struct DaMove {
+    l1_da_validator: Address,
+    l2_da_commitment_scheme: L2DACommitmentScheme,
+    /// `None` on Era, which has no pubdata-content axis.
+    pubdata_content: Option<PubdataContent>,
 }
 
 /// Chain-level CTM upgrade, prepare-only.
 ///
-/// Drives `AdminFunctions.s.sol::upgradeChainFromCTM(chain, admin, acr)`
-/// against a forked anvil (auto-impersonation), emits a Gnosis Safe
-/// Transaction Builder JSON bundle via `--out`, and never broadcasts.
-/// Replay the bundle via `protocol-ops dev execute-safe` (or any
-/// Safe-bundle-aware executor) to apply it.
+/// Drives `AdminFunctions.s.sol::upgradeChainFromCTM(params)` against a forked
+/// anvil (auto-impersonation), emits a Gnosis Safe Transaction Builder JSON
+/// bundle via `--out`, and never broadcasts. Replay the bundle via
+/// `protocol-ops dev execute-safe` (or any Safe-bundle-aware executor) to apply
+/// it.
+///
+/// The bundle is a single `ChainAdmin.multicall`: the diamond cut, and — with
+/// `--da-mode` — the DA validator pair and pubdata content the chain runs after
+/// it. Keeping them in one transaction matters for a validium going to v33:
+/// between the cut and a separate DA transaction the chain would commit batches
+/// that no longer prove.
 ///
 /// Pass `--chain-id` to target a single chain. Omit it to loop over every
 /// chain registered on the bridgehub — each chain's bundle lands under
@@ -46,6 +73,33 @@ pub struct ChainUpgradeArgs {
     /// an ACR.
     #[clap(long, default_value = ZERO_ADDRESS)]
     pub access_control_restriction: Address,
+
+    /// What the chain does with its pubdata after the upgrade. Set it to move the chain's DA
+    /// setup as part of the upgrade; the L2 commitment scheme and the pubdata content follow
+    /// from it and the chain's VM. Requires `--l1-da-validator`.
+    ///
+    /// For chains that settle on a gateway use `chain gateway migrate-to`: the schemes differ.
+    #[clap(long, value_enum, requires = "l1_da_validator", help_heading = "DA")]
+    pub da_mode: Option<DAValidatorType>,
+
+    /// L1 DA validator to run after the upgrade — the one the ecosystem upgrade deployed for
+    /// `--da-mode`. Only meaningful together with it.
+    #[clap(long, requires = "da_mode", help_heading = "DA")]
+    pub l1_da_validator: Option<Address>,
+
+    /// Override the L2 DA commitment scheme derived from `--da-mode` and the chain's VM.
+    #[clap(long, value_enum, help_heading = "DA")]
+    pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
+
+    /// Override the pubdata content derived from `--da-mode` and the chain's VM.
+    #[clap(long, value_enum, help_heading = "DA")]
+    pub pubdata_content: Option<PubdataContent>,
+
+    /// Upgrade a validium-priced chain past the version that requires it to publish its pubdata,
+    /// without moving its DA setup. The chain stops producing provable batches — pass this only
+    /// when the DA move is applied by other means.
+    #[clap(long, default_value_t = false, help_heading = "DA")]
+    pub keep_da_setup: bool,
 
     #[clap(flatten)]
     #[serde(flatten)]
@@ -95,7 +149,7 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
             shared.out = Some(base.join(cid.to_string()));
         }
 
-        run_one(bridgehub, cid, args.access_control_restriction, &shared)
+        run_one(bridgehub, cid, &args, &shared)
             .await
             .with_context(|| format!("chain {cid} upgrade"))?;
     }
@@ -106,9 +160,10 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
 async fn run_one(
     bridgehub: Address,
     chain_id: u64,
-    access_control_restriction: Address,
+    args: &ChainUpgradeArgs,
     shared: &SharedRunArgs,
 ) -> anyhow::Result<()> {
+    let access_control_restriction = args.access_control_restriction;
     let mut runner = ForgeRunner::new(shared)?;
 
     let chain_address =
@@ -119,6 +174,10 @@ async fn run_one(
         crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
             .await
             .context("resolving chain admin from L1")?;
+    let da_move = resolve_da_move(&runner.rpc_url, bridgehub, chain_id, chain_address, args)
+        .await
+        .context("resolving the DA setup for the upgrade")?;
+
     // The Solidity helper executes through ChainAdmin, but broadcasts from
     // ChainAdmin.owner() or the AccessControlRestriction default admin inside adminExecuteCalls.
     let sender = runner
@@ -135,6 +194,17 @@ async fn run_one(
         access_control_restriction
     ));
     logger::info(format!("RPC URL: {}", shared.l1_rpc_url));
+    match da_move {
+        Some(m) => logger::info(format!(
+            "DA after the upgrade: validator {:#x}, scheme {}, pubdata content {}",
+            m.l1_da_validator,
+            m.l2_da_commitment_scheme,
+            m.pubdata_content
+                .map(|c| c.to_string())
+                .unwrap_or_else(|| "unchanged".to_string())
+        )),
+        None => logger::info("DA setup: unchanged".to_string()),
+    }
 
     // `--broadcast` against the anvil fork (applied inside the helper). In this
     // mode the target RPC is the anvil fork, so "broadcast" produces no
@@ -143,9 +213,19 @@ async fn run_one(
     // output would be empty.
     let script = runner
         .script_call(AdminFunctionsAbi::upgradeChainFromCTMCall {
-            _chainAddress: chain_address,
-            _adminAddr: admin_address,
-            _accessControlRestriction: access_control_restriction,
+            _params: ChainUpgradeParams {
+                chainAddress: chain_address,
+                adminAddr: admin_address,
+                accessControlRestriction: access_control_restriction,
+                l1DaValidator: da_move.map(|m| m.l1_da_validator).unwrap_or(Address::ZERO),
+                l2DaCommitmentScheme: da_move
+                    .map(|m| m.l2_da_commitment_scheme)
+                    .unwrap_or(L2DACommitmentScheme::None)
+                    as u8,
+                pubdataContent: da_move.and_then(|m| m.pubdata_content).unwrap_or_default() as u8,
+                shouldSetDaValidatorPair: da_move.is_some(),
+                shouldSetPubdataContent: da_move.is_some_and(|m| m.pubdata_content.is_some()),
+            },
         })
         .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
         .with_wallet(&sender);
@@ -162,10 +242,83 @@ async fn run_one(
             chain_address,
             admin_address,
             access_control_restriction,
+            da_move,
         },
     )
     .await?;
 
     logger::success(format!("Chain {chain_id} upgrade prepared"));
+    Ok(())
+}
+
+/// Work out what the upgrade should do to the chain's DA setup.
+///
+/// `--da-mode` names the target and everything else follows from it and the chain's VM, so the
+/// pair and the content cannot end up disagreeing. Without it the upgrade leaves the DA setup
+/// alone — except for a validium-priced chain crossing into a version that requires it to publish,
+/// which is refused rather than upgraded into a state where its batches stop proving.
+async fn resolve_da_move(
+    l1_rpc_url: &str,
+    bridgehub: Address,
+    chain_id: u64,
+    chain_address: Address,
+    args: &ChainUpgradeArgs,
+) -> anyhow::Result<Option<DaMove>> {
+    let ctm = crate::common::l1_contracts::resolve_ctm_proxy(l1_rpc_url, bridgehub, chain_id)
+        .await
+        .context("resolving CTM from L1")?;
+    let vm_type = crate::common::l1_contracts::resolve_vm_type(l1_rpc_url, ctm)
+        .await
+        .context("resolving the chain's VM from the CTM")?;
+
+    let Some(da_mode) = args.da_mode else {
+        guard_validium_without_da(l1_rpc_url, ctm, chain_id, chain_address, args).await?;
+        return Ok(None);
+    };
+
+    let l1_da_validator = args
+        .l1_da_validator
+        .context("--da-mode requires --l1-da-validator")?;
+    Ok(Some(DaMove {
+        l1_da_validator,
+        l2_da_commitment_scheme: args
+            .l2_da_commitment_scheme
+            .unwrap_or_else(|| L2DACommitmentScheme::from_da_and_vm_types(da_mode, vm_type)),
+        pubdata_content: args
+            .pubdata_content
+            .or_else(|| PubdataContent::from_da_and_vm_types(da_mode, vm_type)),
+    }))
+}
+
+/// Refuse to take a validium-priced chain past [`MIN_MINOR_VERSION_WITH_VALIDIUM_DA`] while it
+/// still publishes nothing: from that version its batches no longer prove, and its L2->L1 log
+/// region — the interop commitment tree leaves included — never reaches L1.
+async fn guard_validium_without_da(
+    l1_rpc_url: &str,
+    ctm: Address,
+    chain_id: u64,
+    chain_address: Address,
+    args: &ChainUpgradeArgs,
+) -> anyhow::Result<()> {
+    if args.keep_da_setup {
+        return Ok(());
+    }
+
+    let pricing_mode =
+        crate::common::l1_contracts::resolve_pubdata_pricing_mode(l1_rpc_url, chain_address)
+            .await?;
+    if pricing_mode != PRICING_MODE_VALIDIUM {
+        return Ok(());
+    }
+
+    let new_minor =
+        crate::common::l1_contracts::resolve_ctm_minor_protocol_version(l1_rpc_url, ctm).await?;
+    anyhow::ensure!(
+        new_minor < MIN_MINOR_VERSION_WITH_VALIDIUM_DA,
+        "chain {chain_id} is validium-priced and this upgrade takes it to v{new_minor}, from which \
+         a chain that publishes no pubdata produces batches that do not prove. Pass \
+         `--da-mode logs-only-validium --l1-da-validator <address>` to move it onto DA with the \
+         upgrade, or `--keep-da-setup` if the move is applied by other means"
+    );
     Ok(())
 }

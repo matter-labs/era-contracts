@@ -387,6 +387,36 @@ pub async fn resolve_is_zksync_os(l1_rpc_url: &str, ctm_proxy: Address) -> anyho
 ///
 /// Returns `false` if the verifier doesn't expose this constant (production
 /// verifiers or older deployments).
+/// Resolve `chain.getPubdataPricingMode()` — `Rollup` (0) or `Validium` (1). Available on every
+/// version of the diamond, unlike the pubdata-content getter.
+pub async fn resolve_pubdata_pricing_mode(
+    l1_rpc_url: &str,
+    chain_address: Address,
+) -> anyhow::Result<u8> {
+    use crate::common::abi::ZkChainAbi;
+
+    ZkChainAbi::new(chain_address, provider(l1_rpc_url)?)
+        .getPubdataPricingMode()
+        .call()
+        .await
+        .context("chain.getPubdataPricingMode() call failed")
+}
+
+/// Resolve the minor component of `ctm.protocolVersion()` — the version chains upgrading from this
+/// CTM land on. The version is packed as `major << 64 | minor << 32 | patch`.
+pub async fn resolve_ctm_minor_protocol_version(
+    l1_rpc_url: &str,
+    ctm_proxy: Address,
+) -> anyhow::Result<u64> {
+    let version = IChainTypeManagerAbi::new(ctm_proxy, provider(l1_rpc_url)?)
+        .protocolVersion()
+        .call()
+        .await
+        .context("ctm.protocolVersion() call failed")?;
+    let minor: alloy::primitives::U256 = (version >> 32) & alloy::primitives::U256::from(u32::MAX);
+    Ok(minor.to::<u64>())
+}
+
 pub async fn resolve_is_testnet_verifier(
     l1_rpc_url: &str,
     ctm_proxy: Address,
