@@ -97,20 +97,8 @@ plus `v0.31.0-interopB/<env>.toml` — and the L1 to fork is read from that env'
 needs no workflow edit: commit the config pair, add its anvil port to
 `env_anvil_port` in `upgrade-bundle-lib.sh` if it needs its own fork, and (if PUVT
 should accept it) a variant in `VerifyUpgradeEnv`. Committed today: `stage`,
-`testnet`, `mainnet`, `battlechain`.
-
-`verify_mode` decides whether PUVT gates the job:
-
-- **`strict`** — PUVT must pass. Correct for the PUH-governed envs (`stage`,
-  `testnet`, `mainnet`).
-- **`report-only`** — PUVT still runs and prints everything, but its exit doesn't
-  fail the job. This is for ecosystems whose topology PUVT wasn't written for:
-  `battlechain` is legacy-`Governance.sol`-owned (no ProtocolUpgradeHandler, so the
-  PUH / zk-governance provenance checks don't apply) and single-chain (PUVT's
-  Era-diamond fee-param check compares against a chain that isn't registered
-  there). Those are exemptions of topology, not calldata defects — read the printed
-  PUVT output rather than trusting the green tick. Never use it to silence a
-  PUH-governed env.
+`testnet`, `mainnet`. PUVT must pass for both the generate job and the independent
+bundle-handoff verification job.
 
 > **Already-deployed ecosystems.** Re-running the prepare against the chain tip
 > of an ecosystem whose v31 upgrade is already live reverts (the deployer no
@@ -178,13 +166,12 @@ the deploy bundle from. It uploads `transactions.txt` as
 `ecosystem-upgrade-deploy-result-<env>`.
 
 Which L1 it signs against comes from the bundle's `bundle-metadata.json`
-(`l1.chain_id`), **not** from the `environment` name — an ecosystem can be on
-mainnet without being called "mainnet". So `environment=battlechain`
-(`l1_chain_id = 1`) uses `L1_RPC_URL_MAINNET` + `DEPLOYER_PRIVATE_KEY_MAINNET` and
-verifies with `--chain mainnet`; a Sepolia env uses the `_SEPOLIA` pair. The job
-also refuses to start if the key's address isn't the deployer the bundle was
-prepared for, since `--skip-unkeyed` would otherwise drop every bundle and report
-success having deployed nothing. `ETHERSCAN_API_KEY` is optional (verify only).
+(`l1.chain_id`), **not** from the `environment` name: chain ID `1` uses
+`L1_RPC_URL_MAINNET` + `DEPLOYER_PRIVATE_KEY_MAINNET`, while `11155111` uses the
+`_SEPOLIA` pair. The job also refuses to start if the key's address isn't the
+deployer the bundle was prepared for, since `--skip-unkeyed` would otherwise drop
+every bundle and report success having deployed nothing. `ETHERSCAN_API_KEY` is
+optional (verify only).
 
 > A single deployer bundle can revert mid-way (e.g. RPC 429). The broadcast is
 > idempotent, so just re-run it — already-deployed / already-transferred txs are

@@ -29,7 +29,6 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 #
 #   gh workflow run generate-ecosystem-upgrade-calldata.yaml --ref <branch> \
 #     -f environment=<env> \
-#     -f verify_mode=strict \                 # report-only for battlechain
 #     -f deployer_address=0x…                 # MUST be the EOA that will broadcast
 #     [-f fork_block=<n>]                     # see TROUBLESHOOTING
 #
@@ -64,11 +63,9 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 #   gh workflow run deploy-ecosystem-upgrade.yaml --ref <branch> \
 #     -f environment=<env> -f generate_run_id=<step-1 run id>
 #
-# The L1 it signs against is read from the bundle's `l1.chain_id`, NOT from the env
-# name: `environment=battlechain` goes to L1 MAINNET and needs
-# L1_RPC_URL_MAINNET + DEPLOYER_PRIVATE_KEY_MAINNET (Etherscan `--chain mainnet`),
-# even though the env isn't called "mainnet". The key's address must be the
-# deployer the bundle was prepared for, or the job stops.
+# The L1 it signs against is read from the bundle's `l1.chain_id`, NOT inferred
+# from the env name. The key's address must be the deployer the bundle was
+# prepared for, or the job stops.
 #
 # Or locally from the downloaded bundle — same `protocol_ops` code path:
 #
@@ -134,11 +131,6 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 #                                               moved off the deployer). CREATE2
 #                                               addresses are deterministic, so the
 #                                               output matches a tip run.
-# PUVT fails on PUH / Era-diamond checks      → expected for a legacy-Governance or
-#                                               single-chain ecosystem; use
-#                                               `verify_mode=report-only` and READ
-#                                               the printed output. Never for a
-#                                               PUH-governed env.
 # `No deploy bundle was published`            → the prepare died before the pack
 #                                               step; fix the generate job first.
 # deploy job: "bundle was prepared for X but    → the key in CI is not the EOA the
@@ -242,17 +234,9 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment = basename of the config pair upgrade-envs/permanent-values/<env>.toml + upgrade-envs/v0.31.0-interopB/<env>.toml. Today: stage, testnet, mainnet, battlechain. The L1 to fork is chosen from that env's l1_chain_id (1 → mainnet, 11155111 → Sepolia)."
+        description: "Environment = basename of the config pair upgrade-envs/permanent-values/<env>.toml + upgrade-envs/v0.31.0-interopB/<env>.toml. Today: stage, testnet, mainnet. The L1 to fork is chosen from that env's l1_chain_id (1 → mainnet, 11155111 → Sepolia)."
         required: true
         type: string
-      verify_mode:
-        description: "strict = PUVT must pass (PUH-governed envs: stage/testnet/mainnet). report-only = run PUVT and print everything, but don't fail the job on its exit — for ecosystems whose topology PUVT doesn't model (legacy-Governance-owned and/or single-chain, e.g. battlechain)."
-        required: true
-        default: "strict"
-        type: choice
-        options:
-          - strict
-          - report-only
       l1_rpc_url:
         description: "L1 RPC URL (optional override; BLANK = use repo secret. NOTE: a typed value is visible in the run summary — not secret-grade)"
         required: false
@@ -436,8 +420,6 @@ jobs:
           FORK_BLOCK: ${{ inputs.fork_block }}
           # Recorded in the deploy bundle's metadata (part of the bytecode identity).
           ZKSYNC_FOUNDRY_VERSION: ${{ inputs.zksync_foundry_version }}
-          # report-only → PUVT runs and prints, but its exit doesn't fail the job.
-          VERIFY_NONFATAL: ${{ inputs.verify_mode == 'report-only' && '1' || '0' }}
         run: |
           # L1_FORK_URL (masked) + DEPLOYER_ADDR come from $GITHUB_ENV. The script
           # forks L1_FORK_URL into a local anvil and runs prepare/PUVT against
@@ -625,10 +607,6 @@ jobs:
       # The same command an operator runs locally against a downloaded bundle.
       - name: Replay the bundle on a fresh fork + PUVT
         working-directory: l1-contracts/test/anvil-interop
-        env:
-          # Same PUVT policy as the generate job: on a report-only env the replay
-          # must not be judged by checks that env's topology doesn't satisfy.
-          VERIFY_NONFATAL: ${{ inputs.verify_mode == 'report-only' && '1' || '0' }}
         run: |
           # The script stops its own fork anvil on exit (EXIT trap), so this job
           # needs no separate cleanup step.

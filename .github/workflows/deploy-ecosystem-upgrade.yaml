@@ -24,17 +24,13 @@ name: "Ecosystem Upgrade: Deploy + Verify (v31)"
 #
 # ─── WHICH L1, WHICH SECRETS ───
 # The target L1 is taken from the downloaded bundle's `bundle-metadata.json`
-# (`l1.chain_id`), NOT from the `environment` name — an ecosystem can sit on
-# mainnet without being named "mainnet" (battlechain does: `l1_chain_id = 1`), and
-# choosing by name would sign against the wrong chain with the wrong key. So:
+# (`l1.chain_id`), NOT inferred from the `environment` name. This prevents a
+# mismatched name from selecting the wrong chain and key. So:
 #
 #   l1.chain_id = 1         → L1_RPC_URL_MAINNET + DEPLOYER_PRIVATE_KEY_MAINNET,
 #                             Etherscan `--chain mainnet`
 #   l1.chain_id = 11155111  → L1_RPC_URL_SEPOLIA + DEPLOYER_PRIVATE_KEY_SEPOLIA,
 #                             Etherscan `--chain sepolia`
-#
-# e.g. `environment=battlechain` deploys to L1 MAINNET and needs the _MAINNET
-# secrets, even though the env is not called mainnet.
 #
 # Unlike step 1 (a fork rehearsal that impersonates the deployer and signs
 # nothing), this step signs REAL transactions, so it needs the deployer key. The
@@ -51,7 +47,7 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment = the same config-pair basename you generated with (stage, testnet, mainnet, battlechain, …). Which L1 gets broadcast to is NOT derived from this name — it comes from the bundle's own `bundle-metadata.json` `l1.chain_id`, so an ecosystem on mainnet uses the mainnet RPC/key even if its name isn't 'mainnet'."
+        description: "Environment = the same config-pair basename you generated with (stage, testnet, mainnet). Which L1 gets broadcast to is NOT derived from this name — it comes from the bundle's own `bundle-metadata.json` `l1.chain_id`."
         required: true
         type: string
       generate_run_id:
@@ -156,9 +152,7 @@ jobs:
 
       # Which L1 to broadcast to comes from the BUNDLE, not from the env's name:
       # `bundle-metadata.json` records the `l1.chain_id` the calldata was computed
-      # against. An ecosystem can live on mainnet without being called "mainnet"
-      # (battlechain does), and picking the network by name would then sign against
-      # the wrong chain with the wrong key.
+      # against, avoiding a name-based selection of the wrong chain and key.
       - name: Select + mask RPC and deployer key (L1 from the bundle)
         env:
           ENVIRONMENT: ${{ inputs.environment }}

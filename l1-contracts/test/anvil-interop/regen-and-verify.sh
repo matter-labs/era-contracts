@@ -15,7 +15,6 @@
 #   ./regen-and-verify.sh            # stage   (port 29545)
 #   ./regen-and-verify.sh testnet    # testnet (port 29547)
 #   ./regen-and-verify.sh mainnet    # mainnet (port 29549)
-#   ./regen-and-verify.sh battlechain # battlechain (port 29551)
 #
 # All env-specific inputs are derived from the canonical config TOMLs so this
 # script never drifts from the source of truth:
@@ -220,7 +219,7 @@ if [[ "$SKIP_BROADCAST" == "1" && -f "$OUT/fork-rehearsal/executed.json" ]]; the
   : > "$COMBINED_TXLOG"
   [[ -f "$OUT/transactions.txt" ]] && cat "$OUT/transactions.txt" >> "$COMBINED_TXLOG"
   [[ -f "$OUT/fork-rehearsal/transactions.txt" ]] && cat "$OUT/fork-rehearsal/transactions.txt" >> "$COMBINED_TXLOG"
-  run_verify_upgrade "$PROTOCOL_OPS" \
+  "$PROTOCOL_OPS" ecosystem verify-upgrade \
     --env "$ENV" \
     --ecosystem-toml "$OUT/ecosystem.toml" \
     --l1-rpc-url "$RPC" \
@@ -264,7 +263,7 @@ COMBINED_TXLOG="$FORK_DIR/transactions.combined.txt"
 : > "$COMBINED_TXLOG"
 [[ -f "$REAL_TXLOG" ]] && cat "$REAL_TXLOG" >> "$COMBINED_TXLOG"
 [[ -f "$FORK_TXLOG" ]] && cat "$FORK_TXLOG" >> "$COMBINED_TXLOG"
-run_verify_upgrade "$PROTOCOL_OPS" \
+"$PROTOCOL_OPS" ecosystem verify-upgrade \
   --env "$ENV" \
   --ecosystem-toml "$OUT/ecosystem.toml" \
   --l1-rpc-url "$RPC" \
