@@ -47,12 +47,6 @@ struct DaPair {
     l2_da_commitment_scheme: L2DACommitmentScheme,
 }
 
-impl DaMove {
-    fn is_empty(&self) -> bool {
-        self.pair.is_none() && self.pubdata_content.is_none()
-    }
-}
-
 /// Chain-level CTM upgrade, prepare-only.
 ///
 /// Drives `AdminFunctions.s.sol::upgradeChainFromCTM(params)` against a forked
@@ -106,12 +100,11 @@ pub struct ChainUpgradeArgs {
     #[clap(long, value_enum, help_heading = "DA")]
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
 
-    /// Upgrade a validium-priced chain past the version that gives it a pubdata content, leaving
-    /// its DA setup alone. Such a chain then commits full pubdata it does not deliver and its
-    /// batches stop proving — pass this only when the move is applied by other means, or
-    /// deliberately.
+    /// Take a validium-priced chain to v33 or beyond in a state that is not the recommended one:
+    /// logs-only pubdata that the chain actually delivers. Without this, such an upgrade is
+    /// refused rather than prepared.
     #[clap(long, default_value_t = false, help_heading = "DA")]
-    pub keep_da_setup: bool,
+    pub acknowledge_unrecommended_noda: bool,
 
     #[clap(flatten)]
     #[serde(flatten)]
@@ -310,47 +303,80 @@ async fn resolve_da_move(
         pair,
         pubdata_content,
     };
-    if da_move.is_empty() {
-        guard_validium_without_da(l1_rpc_url, ctm, chain_id, chain_address, args).await?;
-    }
+    guard_unrecommended_validium_state(l1_rpc_url, ctm, chain_id, chain_address, &da_move, args)
+        .await?;
     Ok(da_move)
 }
 
-/// Refuse to take a validium-priced chain past [`MIN_MINOR_VERSION_WITH_VALIDIUM_DA`] while
-/// neither DA axis is named. The version gives such a chain a pubdata content it does not publish
-/// — `FULL_PUBDATA` against the empty no-DA scheme — and that pair is folded into every batch's
-/// chain-config hash, so its batches stop proving (`InvalidProof`). Naming either axis is enough:
-/// `--da-mode logs-only-validium` gives it a content it can back: add
-/// `--l2-da-commitment-scheme discouraged-empty-no-da` to keep delivering nothing, or leave the
-/// scheme derived to move it onto blobs — which is also what puts its interop commitment tree
-/// leaves back within reach of L1.
-async fn guard_validium_without_da(
+/// Refuse to prepare an upgrade that leaves a validium-priced chain in an unrecommended state
+/// from [`MIN_MINOR_VERSION_WITH_VALIDIUM_DA`] on.
+///
+/// The recommended state is the one such a chain can operate in: it commits only the log region
+/// ([`PubdataContent::LogsOnly`]) and actually delivers it, through blobs or a keccak256 scheme.
+/// The two ways to miss it differ in how badly:
+///
+/// - committing full pubdata while delivering nothing is not merely unrecommended, it does not
+///   prove — the content and the scheme are both in the batch's chain-config hash;
+/// - committing the log region while delivering nothing does prove, but nothing the chain
+///   committed can be read back from L1, its interop commitment tree leaves included.
+///
+/// Both are refused unless the caller acknowledges the second one with
+/// `--acknowledge-unrecommended-noda`.
+async fn guard_unrecommended_validium_state(
     l1_rpc_url: &str,
     ctm: Address,
     chain_id: u64,
     chain_address: Address,
+    da_move: &DaMove,
     args: &ChainUpgradeArgs,
 ) -> anyhow::Result<()> {
-    if args.keep_da_setup {
-        return Ok(());
-    }
-
     let pricing_mode =
         crate::common::l1_contracts::resolve_pubdata_pricing_mode(l1_rpc_url, chain_address)
             .await?;
     if pricing_mode != PRICING_MODE_VALIDIUM {
         return Ok(());
     }
-
     let new_minor =
         crate::common::l1_contracts::resolve_ctm_minor_protocol_version(l1_rpc_url, ctm).await?;
+    if new_minor < MIN_MINOR_VERSION_WITH_VALIDIUM_DA {
+        return Ok(());
+    }
+
+    // What the chain runs once this upgrade lands: what the bundle sets, or what it already has
+    // where the bundle sets nothing. A chain arriving at the version that introduces the pubdata
+    // content gets that version's default, `FULL_PUBDATA`.
+    let scheme = match da_move.pair {
+        Some(pair) => pair.l2_da_commitment_scheme,
+        None => {
+            crate::common::l1_contracts::resolve_l2_da_commitment_scheme(l1_rpc_url, chain_address)
+                .await?
+        }
+    };
+    let content = da_move
+        .pubdata_content
+        .unwrap_or(PubdataContent::FullPubdata);
+    let delivers = !matches!(
+        scheme,
+        L2DACommitmentScheme::EmptyNoDA | L2DACommitmentScheme::None
+    );
+
+    if content == PubdataContent::LogsOnly && delivers {
+        return Ok(());
+    }
     anyhow::ensure!(
-        new_minor < MIN_MINOR_VERSION_WITH_VALIDIUM_DA,
-        "chain {chain_id} is validium-priced and this upgrade takes it to v{new_minor}, which \
-         would leave it committing full pubdata it never delivers — batches in that state do not \
-         prove. Pass `--da-mode logs-only-validium --l1-da-validator <address>` to give it a \
-         content it can back (adding `--l2-da-commitment-scheme discouraged-empty-no-da` keeps it \
-         delivering nothing), or `--keep-da-setup` to leave it alone deliberately"
+        content == PubdataContent::LogsOnly,
+        "this upgrade would take chain {chain_id} to v{new_minor} committing {content} while its \
+         DA scheme is {scheme} — batches in that state do not prove. Pass \
+         `--da-mode logs-only-validium --l1-da-validator <address>` so it commits the log region \
+         and delivers it"
+    );
+    anyhow::ensure!(
+        args.acknowledge_unrecommended_noda,
+        "this upgrade would take chain {chain_id} to v{new_minor} committing {content} but \
+         delivering nothing ({scheme}), so nothing it commits can be read back from L1 — its \
+         interop commitment tree leaves included. Give it a delivering scheme (blobs is what \
+         `--da-mode logs-only-validium` derives), or pass \
+         `--acknowledge-unrecommended-noda` to prepare it anyway"
     );
     Ok(())
 }
