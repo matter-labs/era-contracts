@@ -124,10 +124,10 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         L2ContractHelper.validateBytecodeHash(_l2DefaultAccountBytecodeHash);
 
         // Save previous value into the stack to put it into the event later
-        bytes32 previousDefaultAccountBytecodeHash = s.l2DefaultAccountBytecodeHash;
+        bytes32 previousDefaultAccountBytecodeHash = s.__DEPRECATED_l2DefaultAccountBytecodeHash;
 
         // Change the default account bytecode hash
-        s.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
+        s.__DEPRECATED_l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
         emit NewL2DefaultAccountBytecodeHash(previousDefaultAccountBytecodeHash, _l2DefaultAccountBytecodeHash);
     }
 
@@ -146,10 +146,10 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         L2ContractHelper.validateBytecodeHash(_l2EvmEmulatorBytecodeHash);
 
         // Save previous value into the stack to put it into the event later
-        bytes32 previousL2EvmEmulatorBytecodeHash = s.l2EvmEmulatorBytecodeHash;
+        bytes32 previousL2EvmEmulatorBytecodeHash = s.__DEPRECATED_l2EvmEmulatorBytecodeHash;
 
         // Change the EVM emulator bytecode hash
-        s.l2EvmEmulatorBytecodeHash = _l2EvmEmulatorBytecodeHash;
+        s.__DEPRECATED_l2EvmEmulatorBytecodeHash = _l2EvmEmulatorBytecodeHash;
         emit NewL2EvmEmulatorBytecodeHash(previousL2EvmEmulatorBytecodeHash, _l2EvmEmulatorBytecodeHash);
     }
 
@@ -168,10 +168,10 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         L2ContractHelper.validateBytecodeHash(_l2BootloaderBytecodeHash);
 
         // Save previous value into the stack to put it into the event later
-        bytes32 previousBootloaderBytecodeHash = s.l2BootloaderBytecodeHash;
+        bytes32 previousBootloaderBytecodeHash = s.__DEPRECATED_l2BootloaderBytecodeHash;
 
         // Change the bootloader bytecode hash
-        s.l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;
+        s.__DEPRECATED_l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;
         emit NewL2BootloaderBytecodeHash(previousBootloaderBytecodeHash, _l2BootloaderBytecodeHash);
     }
 

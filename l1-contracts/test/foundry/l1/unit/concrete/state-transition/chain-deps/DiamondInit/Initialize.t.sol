@@ -125,8 +125,9 @@ contract InitializeTest is DiamondInitTest {
         assertEq(utilsFacet.util_getValidator(initializeData.validatorTimelock), true);
 
         assertEq(utilsFacet.util_getStoredBatchHashes(0), initializeData.storedBatchZero);
-        assertEq(utilsFacet.util_getL2BootloaderBytecodeHash(), initializeData.l2BootloaderBytecodeHash);
-        assertEq(utilsFacet.util_getL2DefaultAccountBytecodeHash(), initializeData.l2DefaultAccountBytecodeHash);
-        assertEq(utilsFacet.util_getL2EvmEmulatorBytecodeHash(), initializeData.l2EvmEmulatorBytecodeHash);
+        // The EraVM bytecode-hash slots are deprecated: initialization must leave them untouched.
+        assertEq(utilsFacet.util_getL2BootloaderBytecodeHash(), bytes32(0));
+        assertEq(utilsFacet.util_getL2DefaultAccountBytecodeHash(), bytes32(0));
+        assertEq(utilsFacet.util_getL2EvmEmulatorBytecodeHash(), bytes32(0));
     }
 }

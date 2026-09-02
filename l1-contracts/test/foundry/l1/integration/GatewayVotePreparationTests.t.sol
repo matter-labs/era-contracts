@@ -221,7 +221,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             bytes32(uint256(uint160(address(0x1337)))), // validatorTimelock
             keccak256("baseTokenAssetId"), // baseTokenAssetId (non-zero)
             bytes32(uint256(1)), // storedBatchZero
-            diamondCut.initCalldata // abi.encode(InitializeDataNewChain)
+            diamondCut.initCalldata // empty since v34: the chain-creation init tail was removed
         );
         diamondCut.initCalldata = bytes.concat(initData1, initData2);
 

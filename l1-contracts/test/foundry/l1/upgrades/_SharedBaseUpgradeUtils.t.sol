@@ -39,11 +39,11 @@ contract BaseUpgradeUtils is Test, ZKChainBase {
     }
 
     function getL2DefaultAccountBytecodeHash() public view returns (bytes32) {
-        return s.l2DefaultAccountBytecodeHash;
+        return s.__DEPRECATED_l2DefaultAccountBytecodeHash;
     }
 
     function getL2BootloaderBytecodeHash() public view returns (bytes32) {
-        return s.l2BootloaderBytecodeHash;
+        return s.__DEPRECATED_l2BootloaderBytecodeHash;
     }
 
     function getProtocolVersion() public view returns (uint256) {

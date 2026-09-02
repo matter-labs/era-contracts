@@ -292,8 +292,6 @@ contract ExecutorTest is UtilsCallMockerTest {
         );
         validatorTimelock = ValidatorTimelock(deployValidatorTimelock(address(dummyBridgehub), owner, 0));
 
-        bytes8 dummyHash = 0x1234567890123456;
-
         genesisStoredBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: 0,
             batchHash: bytes32(""),
@@ -316,11 +314,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             admin: owner,
             validatorTimelock: address(validatorTimelock),
             baseTokenAssetId: baseTokenAssetId,
-            storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
-            // verifier is fetched from CTM
-            l2BootloaderBytecodeHash: dummyHash,
-            l2DefaultAccountBytecodeHash: dummyHash,
-            l2EvmEmulatorBytecodeHash: dummyHash
+            storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo))
         });
         mockDiamondInitInteropCenterCallsWithAddress(
             address(dummyBridgehub),

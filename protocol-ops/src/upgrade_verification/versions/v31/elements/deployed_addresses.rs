@@ -176,13 +176,6 @@ mod gateway_signatures {
         }
 
         #[derive(Debug)]
-        struct InitializeDataNewChain {
-            bytes32 l2BootloaderBytecodeHash;
-            bytes32 l2DefaultAccountBytecodeHash;
-            bytes32 l2EvmEmulatorBytecodeHash;
-        }
-
-        #[derive(Debug)]
         struct GatewayDADeployerConfig {
             bytes32 salt;
             address aliasedGovernanceAddress;
@@ -213,7 +206,6 @@ mod gateway_signatures {
         struct GatewayCTMDeployerConfig {
             address aliasedGovernanceAddress;
             bytes32 salt;
-            uint256 eraChainId;
             uint256 l1ChainId;
             bool testnetVerifier;
             bool isZKsyncOS;
@@ -223,9 +215,6 @@ mod gateway_signatures {
             bytes4[] gettersSelectors;
             bytes4[] migratorSelectors;
             bytes4[] committerSelectors;
-            bytes32 bootloaderHash;
-            bytes32 defaultAccountHash;
-            bytes32 evmEmulatorHash;
             bytes32 genesisRoot;
             uint256 genesisRollupLeafIndex;
             bytes32 genesisBatchCommitment;
@@ -1361,8 +1350,15 @@ async fn verify_v31_new_gateway_ctm_provenance(
     expect_gateway_facet_cut(result, "migrator", migrator_cut, migrator, false);
     expect_gateway_facet_cut(result, "committer", committer_cut, committer, true);
 
-    let initialize_data = InitializeDataNewChain::abi_decode(&diamond_cut.initCalldata)
-        .context("decode new_gateway.diamond_cut_data.initCalldata as InitializeDataNewChain")?;
+    // The chain-creation init tail is empty from v34 onwards (InitializeDataNewChain removed).
+    if diamond_cut.initCalldata.is_empty() {
+        result.report_ok("new_gateway.diamond_cut_data.initCalldata is empty (expected from v34)");
+    } else {
+        result.report_error(&format!(
+            "new_gateway.diamond_cut_data.initCalldata must be empty from v34 onwards, got {} bytes",
+            diamond_cut.initCalldata.len()
+        ));
+    }
     let genesis_config = verifiers.genesis_config_for_ctm(source_ctm.flavor);
     let gw_provider = verifiers.network_verifier.get_gw_provider();
 
@@ -1542,7 +1538,6 @@ async fn verify_v31_new_gateway_ctm_provenance(
         baseConfig: GatewayCTMDeployerConfig {
             aliasedGovernanceAddress: aliased_governance,
             salt: gateway_salt,
-            eraChainId: U256::from(era_chain_id),
             l1ChainId: U256::from(l1_chain_id),
             testnetVerifier: source_ctm.contracts_config.is_testnet,
             isZKsyncOS: true,
@@ -1552,9 +1547,6 @@ async fn verify_v31_new_gateway_ctm_provenance(
             gettersSelectors: getters_cut.selectors.clone(),
             migratorSelectors: migrator_cut.selectors.clone(),
             committerSelectors: committer_cut.selectors.clone(),
-            bootloaderHash: initialize_data.l2BootloaderBytecodeHash,
-            defaultAccountHash: initialize_data.l2DefaultAccountBytecodeHash,
-            evmEmulatorHash: initialize_data.l2EvmEmulatorBytecodeHash,
             genesisRoot: parse_bytes32_hex("genesis_root", &genesis_config.genesis_root)?,
             genesisRollupLeafIndex: U256::from(
                 genesis_config.genesis_rollup_leaf_index.unwrap_or_default(),

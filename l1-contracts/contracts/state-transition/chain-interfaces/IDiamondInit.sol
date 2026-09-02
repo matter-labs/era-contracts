@@ -10,9 +10,6 @@ pragma solidity ^0.8.21;
 /// @param admin address who can manage the contract
 /// @param baseTokenAssetId asset id of the base token of the chain
 /// @param storedBatchZero hash of the initial genesis batch
-/// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
-/// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
-/// @param l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
 // solhint-disable-next-line gas-struct-packing
 struct InitializeData {
     uint256 chainId;
@@ -24,18 +21,6 @@ struct InitializeData {
     address validatorTimelock;
     bytes32 baseTokenAssetId;
     bytes32 storedBatchZero;
-    bytes32 l2BootloaderBytecodeHash;
-    bytes32 l2DefaultAccountBytecodeHash;
-    bytes32 l2EvmEmulatorBytecodeHash;
-}
-
-/// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
-/// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
-/// @param l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
-struct InitializeDataNewChain {
-    bytes32 l2BootloaderBytecodeHash;
-    bytes32 l2DefaultAccountBytecodeHash;
-    bytes32 l2EvmEmulatorBytecodeHash;
 }
 
 interface IDiamondInit {

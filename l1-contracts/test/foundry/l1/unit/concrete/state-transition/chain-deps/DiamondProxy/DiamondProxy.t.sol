@@ -56,9 +56,6 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         );
         dummyBridgehub = new DummyBridgehub();
         initializeData = Utils.makeInitializeData(address(dummyBridgehub));
-        initializeData.l2BootloaderBytecodeHash = bytes32(0);
-        initializeData.l2DefaultAccountBytecodeHash = bytes32(0);
-        initializeData.l2EvmEmulatorBytecodeHash = bytes32(0);
 
         mockDiamondInitInteropCenterCallsWithAddress(initializeData.bridgehub, address(0), bytes32(0));
         mockChainTypeManagerVerifier(testnetVerifier);

@@ -21,7 +21,7 @@ import {IChainTypeManager} from "../IChainTypeManager.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
-import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {EmptyAssetId, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
@@ -63,20 +63,6 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
             revert EmptyAssetId();
         }
 
-        if (!IS_ZKSYNC_OS) {
-            if (_initializeData.l2BootloaderBytecodeHash == bytes32(0)) {
-                revert EmptyBytes32();
-            }
-
-            if (_initializeData.l2DefaultAccountBytecodeHash == bytes32(0)) {
-                revert EmptyBytes32();
-            }
-
-            if (_initializeData.l2EvmEmulatorBytecodeHash == bytes32(0)) {
-                revert EmptyBytes32();
-            }
-        }
-
         s.chainId = _initializeData.chainId;
         s.bridgehub = _initializeData.bridgehub;
         s.chainTypeManager = _initializeData.chainTypeManager;
@@ -103,9 +89,6 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.validators[_initializeData.validatorTimelock] = true;
 
         s.storedBatchHashes[0] = _initializeData.storedBatchZero;
-        s.l2BootloaderBytecodeHash = _initializeData.l2BootloaderBytecodeHash;
-        s.l2DefaultAccountBytecodeHash = _initializeData.l2DefaultAccountBytecodeHash;
-        s.l2EvmEmulatorBytecodeHash = _initializeData.l2EvmEmulatorBytecodeHash;
         s.priorityTxMaxGasLimit = DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT;
         s.priorityModeInfo.permissionlessValidator = IChainTypeManager(_initializeData.chainTypeManager)
             .PERMISSIONLESS_VALIDATOR();
