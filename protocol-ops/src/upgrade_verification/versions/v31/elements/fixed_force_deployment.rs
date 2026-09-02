@@ -19,7 +19,6 @@ sol! {
     #[derive(Debug)]
     struct FixedForceDeploymentsData {
         uint256 l1ChainId;
-        uint256 eraChainId;
         address l1AssetRouter;
         bytes32 l2TokenProxyBytecodeHash;
         address aliasedL1Governance;
@@ -148,18 +147,6 @@ impl FixedForceDeploymentsData {
             Err(err) => result.report_error(&format!(
                 "Could not verify FixedForceDeploymentsData l1ChainId: {err}"
             )),
-        }
-
-        let era_chain_id = verifiers.era_chain_id;
-        if U256::from(era_chain_id) != self.eraChainId {
-            result.report_error(&format!(
-                "FixedForceDeploymentsData eraChainId mismatch: expected {}, got {}",
-                era_chain_id, self.eraChainId
-            ));
-        } else {
-            result.report_ok(&format!(
-                "FixedForceDeploymentsData eraChainId matches env era_chain_id ({era_chain_id})"
-            ));
         }
 
         result.expect_address(verifiers, &self.l1AssetRouter, "l1_asset_router_proxy");
@@ -323,8 +310,7 @@ mod tests {
     sol! {
         struct SolidityFixedForceDeploymentsData {
             uint256 l1ChainId;
-            uint256 eraChainId;
-            address l1AssetRouter;
+                address l1AssetRouter;
             bytes32 l2TokenProxyBytecodeHash;
             address aliasedL1Governance;
             uint256 maxNumberOfZKChains;
@@ -367,7 +353,6 @@ mod tests {
             solidity_fields,
             [
                 "uint256 l1ChainId;",
-                "uint256 eraChainId;",
                 "address l1AssetRouter;",
                 "bytes32 l2TokenProxyBytecodeHash;",
                 "address aliasedL1Governance;",
@@ -393,7 +378,6 @@ mod tests {
 
         let expected = SolidityFixedForceDeploymentsData {
             l1ChainId: U256::from(1),
-            eraChainId: U256::from(2),
             l1AssetRouter: Address::from([3; 20]),
             l2TokenProxyBytecodeHash: FixedBytes::from([4; 32]),
             aliasedL1Governance: Address::from([5; 20]),
@@ -430,7 +414,6 @@ mod tests {
         }
         assert_fields!(actual, expected;
             l1ChainId,
-            eraChainId,
             l1AssetRouter,
             l2TokenProxyBytecodeHash,
             aliasedL1Governance,

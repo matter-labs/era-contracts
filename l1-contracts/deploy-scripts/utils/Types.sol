@@ -12,7 +12,7 @@ import {
 
 /// @dev Value passed for the `eraChainId` parameter that several audited constructors and structs
 /// still carry (`MailboxFacet`, `L1Nullifier`, `L1AssetRouter`,
-/// `FixedForceDeploymentsData`, `GatewayCTMDeployerConfig`). Nothing this release deploys has an
+/// `GatewayCTMDeployerConfig`). Nothing this release deploys has an
 /// Era chain, and `Bridgehub` rejects chain id 0 (`ZeroChainId`), so every Era-legacy branch keyed
 /// off it is unreachable — whereas a made-up non-zero id would unlock those branches for whichever
 /// chain happened to hold it.

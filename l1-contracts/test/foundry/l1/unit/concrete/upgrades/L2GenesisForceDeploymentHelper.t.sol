@@ -252,7 +252,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     function _createFixedForceDeploymentsData(bool isGenesis) internal returns (FixedForceDeploymentsData memory) {
         FixedForceDeploymentsData memory data;
         data.l1ChainId = L1_CHAIN_ID;
-        data.eraChainId = ERA_CHAIN_ID;
         data.aliasedL1Governance = aliasedL1GovernanceAddress;
         data.maxNumberOfZKChains = MAX_ZK_CHAINS;
         data.l1AssetRouter = l1AssetRouterAddress;
@@ -313,7 +312,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     function _createEraFixedForceDeploymentsData() internal returns (FixedForceDeploymentsData memory) {
         FixedForceDeploymentsData memory data;
         data.l1ChainId = L1_CHAIN_ID;
-        data.eraChainId = ERA_CHAIN_ID;
         data.aliasedL1Governance = aliasedL1GovernanceAddress;
         data.maxNumberOfZKChains = MAX_ZK_CHAINS;
         data.l1AssetRouter = l1AssetRouterAddress;
