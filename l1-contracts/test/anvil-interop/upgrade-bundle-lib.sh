@@ -29,6 +29,115 @@ read_toml_int() {
   sed -nE "s/^[[:space:]]*${2}[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p" "$1" | head -1
 }
 
+# Print the SHA-256 digest of one file. Python keeps this portable across Linux
+# CI and developer machines where `sha256sum` may not be installed.
+# $1 = file.
+file_sha256() {
+  python3 - "$1" <<'PY'
+import hashlib
+import sys
+
+with open(sys.argv[1], "rb") as source:
+    print(hashlib.sha256(source.read()).hexdigest())
+PY
+}
+
+# Fail unless every executable/supporting file in a deploy bundle matches the
+# SHA-256 recorded by `pack-deploy-bundle.sh`, and the metadata's bundle list is
+# exactly the list the manifest will execute. This is called before fork replay
+# and before real-L1 broadcast.
+# $1 = deploy-bundle directory.
+verify_bundle_integrity() {
+  python3 - "$1" <<'PY'
+import hashlib
+import json
+import os
+import re
+import sys
+
+bundle = os.path.realpath(sys.argv[1])
+metadata_path = os.path.join(bundle, "bundle-metadata.json")
+manifest_path = os.path.join(bundle, "prepare", "manifest.json")
+
+def fail(message):
+    raise SystemExit(f"deploy bundle integrity check failed: {message}")
+
+def load_json(path, label):
+    try:
+        with open(path) as source:
+            return json.load(source)
+    except (OSError, json.JSONDecodeError) as error:
+        fail(f"cannot read {label}: {error}")
+
+def checked_path(relative_path):
+    if not isinstance(relative_path, str) or not relative_path:
+        fail("metadata contains an empty/non-string file path")
+    path = os.path.realpath(os.path.join(bundle, relative_path))
+    if os.path.commonpath([bundle, path]) != bundle:
+        fail(f"file escapes bundle directory: {relative_path}")
+    if not os.path.isfile(path):
+        fail(f"missing file: {relative_path}")
+    return path
+
+def verify_digest(relative_path, expected):
+    if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+        fail(f"invalid SHA-256 for {relative_path}")
+    with open(checked_path(relative_path), "rb") as source:
+        actual = hashlib.sha256(source.read()).hexdigest()
+    if actual != expected:
+        fail(f"SHA-256 mismatch for {relative_path}: expected {expected}, got {actual}")
+
+metadata = load_json(metadata_path, "bundle-metadata.json")
+manifest = load_json(manifest_path, "prepare/manifest.json")
+if metadata.get("schema") != "zksync-ecosystem-upgrade-deploy-bundle/1":
+    fail(f"unsupported schema: {metadata.get('schema')!r}")
+
+metadata_bundles = metadata.get("bundles")
+manifest_bundles = manifest.get("bundles")
+if not isinstance(metadata_bundles, list) or not metadata_bundles:
+    fail("metadata.bundles is empty or not an array")
+if not isinstance(manifest_bundles, list) or not manifest_bundles:
+    fail("manifest.bundles is empty or not an array")
+
+def identity(entry):
+    try:
+        return (int(entry["index"]), entry["file"], entry["target"].lower())
+    except (KeyError, TypeError, ValueError, AttributeError) as error:
+        fail(f"invalid bundle identity: {error}")
+
+metadata_identities = [identity(entry) for entry in metadata_bundles]
+manifest_identities = [identity(entry) for entry in manifest_bundles]
+if len(set(metadata_identities)) != len(metadata_identities):
+    fail("metadata contains duplicate bundle identities")
+if sorted(metadata_identities) != sorted(manifest_identities):
+    fail("metadata bundle list does not match prepare/manifest.json")
+
+for entry in metadata_bundles:
+    relative_path = os.path.join("prepare", entry["file"])
+    verify_digest(relative_path, entry.get("sha256"))
+    safe = load_json(checked_path(relative_path), relative_path)
+    transactions = safe.get("transactions")
+    if not isinstance(transactions, list):
+        fail(f"{relative_path} has no transactions array")
+    if len(transactions) != entry.get("transaction_count"):
+        fail(f"transaction count mismatch for {relative_path}")
+
+supporting_files = metadata.get("files")
+if not isinstance(supporting_files, dict) or not supporting_files:
+    fail("metadata.files is empty or not an object")
+for required in ("prepare/manifest.json", "ecosystem.toml"):
+    if required not in supporting_files:
+        fail(f"metadata.files does not include {required}")
+for relative_path, expected in supporting_files.items():
+    verify_digest(relative_path, expected)
+
+print(
+    f"Deploy bundle integrity: OK "
+    f"({len(metadata_bundles)} bundle(s), {len(supporting_files)} supporting file(s))"
+)
+PY
+}
+
 # Base anvil port for an env's GENERATE fork. Each env gets a distinct port so
 # stage/testnet/mainnet rehearsals can run in parallel without colliding (and a
 # KEEP_ANVIL fork of one env is never reused by another).

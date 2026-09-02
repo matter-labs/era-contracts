@@ -205,14 +205,14 @@ A generation run packs `output/<env>/deploy-bundle/` (uploaded by CI as
 `ecosystem-upgrade-deploy-inputs-<env>`). It is the unit of handoff between the
 machine that compiled the upgrade and whoever deploys or audits it:
 
-| File                          | Why it is in there                                                                                                                     |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `prepare/manifest.json`       | the bundles, in execution order, each with its signer (`target`)                                                                       |
-| `prepare/*.safe.json`         | the calls themselves — `to`/`value`/`data`, CREATE2 init code included                                                                 |
-| `ecosystem.toml`              | the resulting addresses + governance stage 0/1/2 calldata                                                                              |
-| `bundle-metadata.json`        | provenance: contracts commit, `AllContractsHashes.json` hash, fork height, deployer, toolchain versions, per-bundle tx counts + sha256 |
-| `extra-verification-logs.txt` | `forge verify-contract` commands, constructor args included                                                                            |
-| `README.md`                   | the two commands below, pre-filled for that bundle                                                                                     |
+| File                          | Why it is in there                                                     |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| `prepare/manifest.json`       | the bundles, in execution order, each with its signer (`target`)       |
+| `prepare/*.safe.json`         | the calls themselves — `to`/`value`/`data`, CREATE2 init code included |
+| `ecosystem.toml`              | the resulting addresses + governance stage 0/1/2 calldata              |
+| `bundle-metadata.json`        | provenance plus SHA-256 for every executable/supporting bundle file    |
+| `extra-verification-logs.txt` | `forge verify-contract` commands, constructor args included            |
+| `README.md`                   | the two commands below, pre-filled for that bundle                     |
 
 **The broadcasting EOA must be the bundle's `deployer_address`.** The deployer is
 not just the fork-rehearsal signer: the prepare passes it as the initial owner of
@@ -225,10 +225,14 @@ silently broken upgrade. The bundle lists them under
 `deploy-ecosystem-upgrade.yaml` refuses to start on a mismatch. Generate with the
 EOA that will deploy; never with a placeholder.
 
+Both the replay script and deploy workflow verify the metadata's file digests and
+require its bundle list to exactly match `prepare/manifest.json` before sending any
+transaction.
+
 **Check out the commit `bundle-metadata.json` names.** PUVT identifies deployed
 contracts by matching their code against the committed `AllContractsHashes.json`;
 from a different commit the deployments are not recognised and the verdict is
-meaningless. `replay-bundle-and-verify.sh` compares the hash and warns.
+meaningless. `replay-bundle-and-verify.sh` compares the hash and exits on a mismatch.
 
 **Rehearse the deploy and run PUVT — no compiler, no regeneration:**
 

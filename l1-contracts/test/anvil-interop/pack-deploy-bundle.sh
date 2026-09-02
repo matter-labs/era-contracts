@@ -83,7 +83,7 @@ CONTRACTS_DIRTY=false
 # modified (worktrees, different lib/ checkouts) and say nothing about the
 # contract sources that were compiled.
 if ! git -C "$REPO_ROOT" diff --quiet HEAD --ignore-submodules=all 2>/dev/null; then CONTRACTS_DIRTY=true; fi
-HASHES_SHA="$(sha256sum "$REPO_ROOT/AllContractsHashes.json" | cut -d' ' -f1)"
+HASHES_SHA="$(file_sha256 "$REPO_ROOT/AllContractsHashes.json")"
 L1_CHAIN_ID="$(read_toml_int "$PERMANENT_VALUES" l1_chain_id)"
 FORGE_VERSION="$(forge --version 2>/dev/null | head -1 || echo unknown)"
 RUSTC_VERSION="$(rustc --version 2>/dev/null || echo unknown)"
@@ -107,6 +107,10 @@ manifest = json.load(open(f"{bundle}/prepare/manifest.json"))
 deployer = (os.environ.get("DEPLOYER_ADDR") or "").lower()
 
 create2_factory = (os.environ.get("CREATE2_FACTORY") or "").lower()
+
+def sha256(path):
+    with open(path, "rb") as source:
+        return hashlib.sha256(source.read()).hexdigest()
 
 bundles = []
 calls_md = []
@@ -142,7 +146,7 @@ for b in sorted(manifest["bundles"], key=lambda b: b["index"]):
         "steps": b.get("steps", []),
         "transaction_count": len(txs),
         "is_deployer_bundle": b["target"].lower() == deployer if deployer else None,
-        "sha256": hashlib.sha256(open(path, "rb").read()).hexdigest(),
+        "sha256": sha256(path),
     })
 
 # Which deployments have the deployer baked INTO their init code — i.e. whose
@@ -173,6 +177,19 @@ def ints(key):
     return sorted({int(v) for v in re.findall(rf"^{key}\s*=\s*(\d+)", toml, re.M)})
 def hexes(key):
     return [hex(v) for v in ints(key)]
+
+# Digests for every non-bundle file consumed by replay, deployment, PUVT or
+# Etherscan verification. The Safe JSON digests live beside their bundle entries.
+supporting_files = {}
+for relative_path in (
+    "prepare/manifest.json",
+    "ecosystem.toml",
+    "extra-verification-logs.txt",
+    "gw-verification-logs.txt",
+):
+    path = os.path.join(bundle, relative_path)
+    if os.path.isfile(path):
+        supporting_files[relative_path] = sha256(path)
 
 meta = {
     "schema": "zksync-ecosystem-upgrade-deploy-bundle/1",
@@ -210,6 +227,7 @@ meta = {
         "workflow_run": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
         "runner_os": os.environ.get("RUNNER_OS"),
     } if os.environ.get("GITHUB_RUN_ID") else None),
+    "files": supporting_files,
     "bundles": bundles,
 }
 json.dump(meta, open(f"{bundle}/bundle-metadata.json", "w"), indent=2, sort_keys=True)
@@ -237,7 +255,7 @@ build environment yields different metadata, hence different addresses.
 | `prepare/manifest.json` | bundle list, in execution order, with each bundle's signer (`target`) |
 | `prepare/*.safe.json` | the calls themselves (Safe Transaction Builder shape) |
 | `ecosystem.toml` | resulting addresses + governance stage 0/1/2 calldata |
-| `bundle-metadata.json` | provenance: commit, hashes, fork block, toolchain |
+| `bundle-metadata.json` | provenance + SHA-256 for every executable/supporting file |
 | `extra-verification-logs.txt` | `forge verify-contract` commands (constructor args included) |
 
 ## Who signs what
@@ -261,18 +279,15 @@ so a different signer puts them at different CREATE2 addresses while
 git checkout {meta['contracts_commit']}        # bytecode identity: must match
 cd protocol-ops && cargo build --release && cd ..
 
-./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \\
-  --manifest <this-dir>/prepare/manifest.json \\
-  --l1-rpc-url <l1-rpc> \\
-  --key "{meta['deployer_address']}=$DEPLOYER_KEY" \\
-  --skip-unkeyed \\
-  --out <this-dir>/deploy-executed.json
+./l1-contracts/test/anvil-interop/replay-bundle-and-verify.sh \\
+  --bundle <this-dir> --rpc <l1-rpc> --key "$DEPLOYER_KEY"
 ```
 
-`--skip-unkeyed` drops the bundles you hold no key for (the governance ceremony).
-The run appends every mined hash to `transactions.txt` next to `--out` — that is
-the log PUVT reads. The broadcast is idempotent: CREATE2 deploys already on-chain
-are skipped, so a re-run after a partial deploy resumes.
+The wrapper verifies every bundle digest and the checkout's bytecode identity,
+then passes `--skip-unkeyed` so only the deployer bundles are sent (the governance
+bundles remain for their ceremony). It appends every mined hash to
+`replay/transactions.txt` for PUVT. The broadcast is idempotent: CREATE2 deploys
+already on-chain are skipped, so a re-run after a partial deploy resumes.
 
 ## Rehearse + verify (PUVT) locally, no compiler needed
 
@@ -294,6 +309,10 @@ Bundles are sent in `index` order and each bundle's transactions in listed order
 """
 open(f"{bundle}/README.md", "w").write(readme)
 PY
+
+# Catch an incomplete or internally inconsistent handoff before it can be
+# uploaded, replayed or broadcast.
+verify_bundle_integrity "$BUNDLE"
 
 echo "=== Deploy bundle packed: $BUNDLE"
 ls -1 "$BUNDLE" "$BUNDLE/prepare" | sed 's/^/  /'

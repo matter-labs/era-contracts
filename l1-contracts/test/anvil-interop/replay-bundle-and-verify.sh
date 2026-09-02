@@ -53,6 +53,7 @@ if [[ -n "$FORK_URL" && -n "$RPC" ]]; then
   exit 1
 fi
 [[ -f "$BUNDLE/bundle-metadata.json" ]] || { echo "not a deploy bundle (no bundle-metadata.json): $BUNDLE" >&2; exit 1; }
+verify_bundle_integrity "$BUNDLE"
 
 meta() { jq -r "$1 // empty" "$BUNDLE/bundle-metadata.json"; }
 ENV="$(meta .env)"
@@ -78,14 +79,19 @@ echo "Deployer:     $DEPLOYER"
 # PUVT identifies each deployed contract by matching its code against the
 # `AllContractsHashes.json` of the CHECKOUT. If that file differs from the one
 # the bundle was built against, deployments stop being recognised (they are
-# skipped as "stale") and the run's verdict is meaningless — so say so loudly.
-LOCAL_HASHES_SHA="$(sha256sum "$REPO_ROOT/AllContractsHashes.json" | cut -d' ' -f1)"
-if [[ -n "$BUNDLE_HASHES_SHA" && "$LOCAL_HASHES_SHA" != "$BUNDLE_HASHES_SHA" ]]; then
-  echo "WARNING: AllContractsHashes.json differs from the bundle's." >&2
+# skipped as "stale") and the run's verdict is meaningless, so fail closed.
+LOCAL_HASHES_SHA="$(file_sha256 "$REPO_ROOT/AllContractsHashes.json")"
+if [[ -z "$BUNDLE_HASHES_SHA" ]]; then
+  echo "ERROR: bundle metadata has no all_contracts_hashes_sha256." >&2
+  exit 1
+fi
+if [[ "$LOCAL_HASHES_SHA" != "$BUNDLE_HASHES_SHA" ]]; then
+  echo "ERROR: AllContractsHashes.json differs from the bundle's." >&2
   echo "         bundle: $BUNDLE_HASHES_SHA (commit $BUNDLE_COMMIT)" >&2
   echo "         local:  $LOCAL_HASHES_SHA" >&2
   echo "         PUVT will not recognise the deployed bytecode. Check out $BUNDLE_COMMIT" >&2
-  echo "         (or pass --contracts-commit to verify-upgrade) before trusting the result." >&2
+  echo "         before replaying or trusting the verification result." >&2
+  exit 1
 fi
 
 _PO_DIR="$REPO_ROOT/protocol-ops"

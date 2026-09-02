@@ -72,6 +72,7 @@ on:
 
 permissions:
   contents: read
+  actions: read # Download the deploy bundle from the generation workflow run.
 
 jobs:
   deploy:
@@ -132,6 +133,20 @@ jobs:
           run-id: ${{ inputs.generate_run_id }}
           github-token: ${{ github.token }}
 
+      - name: Validate deploy bundle integrity
+        run: |
+          set -euo pipefail
+          META="$(find "$GITHUB_WORKSPACE/deploy-inputs" -name bundle-metadata.json -print -quit)"
+          if [ -z "$META" ]; then
+            echo "::error::bundle-metadata.json not found in the downloaded deploy inputs"
+            exit 1
+          fi
+          DEPLOY_BUNDLE_DIR="$(dirname "$META")"
+          # shellcheck source=l1-contracts/test/anvil-interop/upgrade-bundle-lib.sh
+          source l1-contracts/test/anvil-interop/upgrade-bundle-lib.sh
+          verify_bundle_integrity "$DEPLOY_BUNDLE_DIR"
+          echo "DEPLOY_BUNDLE_DIR=$DEPLOY_BUNDLE_DIR" >> "$GITHUB_ENV"
+
       # The bundle's bytecode was compiled from a specific commit. Broadcasting is
       # commit-agnostic (it just replays calldata), but the Etherscan verify step
       # below RECOMPILES from this checkout — from a different commit it would
@@ -139,11 +154,7 @@ jobs:
       - name: Check the bundle's provenance against this checkout
         run: |
           set -euo pipefail
-          META="$(find "$GITHUB_WORKSPACE/deploy-inputs" -name bundle-metadata.json | head -1)"
-          if [ -z "$META" ]; then
-            echo "::warning::bundle-metadata.json not found — bundle predates provenance metadata; cannot check the commit."
-            exit 0
-          fi
+          META="$DEPLOY_BUNDLE_DIR/bundle-metadata.json"
           cat "$META"
           bundle_commit="$(jq -r '.contracts_commit // empty' "$META")"
           if [ -n "$bundle_commit" ] && [ "$bundle_commit" != "$GITHUB_SHA" ]; then
@@ -162,7 +173,7 @@ jobs:
           PK_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
         run: |
           set -euo pipefail
-          META="$(find "$GITHUB_WORKSPACE/deploy-inputs" -name bundle-metadata.json | head -1)"
+          META="$DEPLOY_BUNDLE_DIR/bundle-metadata.json"
           L1_CHAIN_ID=""
           if [ -n "$META" ]; then
             L1_CHAIN_ID="$(jq -r '.l1.chain_id // empty' "$META")"
@@ -211,11 +222,8 @@ jobs:
       - name: Broadcast deployer bundles to L1
         run: |
           set -euo pipefail
-          MANIFEST="$(find "$GITHUB_WORKSPACE/deploy-inputs" -name manifest.json | head -1)"
-          if [ -z "$MANIFEST" ]; then
-            echo "::error::manifest.json not found in the downloaded deploy inputs"; exit 1
-          fi
-          OUTDIR="$(dirname "$MANIFEST")/.."
+          MANIFEST="$DEPLOY_BUNDLE_DIR/prepare/manifest.json"
+          OUTDIR="$DEPLOY_BUNDLE_DIR"
           echo "Manifest: $MANIFEST"
           ./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \
             --manifest "$MANIFEST" \
@@ -256,8 +264,8 @@ jobs:
           if [ -z "${ETHERSCAN_API_KEY:-}" ]; then
             echo "::warning::ETHERSCAN_API_KEY not set; skipping verification"; exit 0
           fi
-          LOG="$(find "$GITHUB_WORKSPACE/deploy-inputs" -name extra-verification-logs.txt | head -1)"
-          if [ -z "$LOG" ]; then
+          LOG="$DEPLOY_BUNDLE_DIR/extra-verification-logs.txt"
+          if [ ! -f "$LOG" ]; then
             echo "::warning::extra-verification-logs.txt not found; skipping"; exit 0
           fi
           # $ETHERSCAN_CHAIN was resolved from the bundle's l1.chain_id, not from
