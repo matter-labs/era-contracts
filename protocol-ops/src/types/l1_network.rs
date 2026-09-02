@@ -1,11 +1,13 @@
 use std::str::FromStr;
 
-use alloy::primitives::B256;
+use alloy::primitives::{Address, B256};
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
 
-use crate::common::addresses::{LOCAL_ZK_TOKEN_ADDRESS, LOCAL_ZK_TOKEN_ASSET_ID};
+use crate::common::addresses::{
+    LOCAL_ZK_TOKEN_ADDRESS, LOCAL_ZK_TOKEN_ASSET_ID, MAINNET_WETH_ADDRESS, SEPOLIA_WETH_ADDRESS,
+};
 
 #[derive(
     Copy,
@@ -40,6 +42,25 @@ impl L1Network {
             11155111 => Ok(Self::Sepolia),
             other => anyhow::bail!("Unrecognized L1 chain ID: {}", other),
         }
+    }
+
+    /// Canonical WETH for this L1. Unlike the ZK token below, WETH has a
+    /// single well-known deployment per network, so it is resolved here
+    /// rather than carried per env. It is baked as an immutable into
+    /// `L1AssetRouter` and `L1NativeTokenVault`, so a wrong value can only be
+    /// corrected by an implementation upgrade. There is deliberately no
+    /// cross-network fallback: a network without a canonical address must
+    /// pass `--token-weth-address` rather than silently inherit another
+    /// network's WETH.
+    pub fn weth_address(&self) -> anyhow::Result<Address> {
+        let raw = match self {
+            L1Network::Mainnet => MAINNET_WETH_ADDRESS,
+            L1Network::Sepolia => SEPOLIA_WETH_ADDRESS,
+            L1Network::Holesky | L1Network::Localhost => {
+                anyhow::bail!("no canonical WETH address for {self}; pass --token-weth-address")
+            }
+        };
+        Ok(Address::from_str(raw).expect("hardcoded WETH address must parse"))
     }
 
     /// `zk_token_asset_id` for live networks is intentionally read from

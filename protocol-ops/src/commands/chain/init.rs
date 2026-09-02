@@ -51,6 +51,13 @@ pub struct ChainInitArgs {
     #[clap(long, help_heading = "Input")]
     pub bridgehub: Address,
 
+    /// CTM proxy address. Optional: discovered from L1 when omitted. Pass it for
+    /// the first chain on a fresh ecosystem, where discovery has to fall back to
+    /// scanning `ChainTypeManagerAdded` from block 0 and hosted RPCs cap the
+    /// `eth_getLogs` range.
+    #[clap(long, help_heading = "Input")]
+    pub ctm_proxy: Option<Address>,
+
     /// Owner address for the chain (default: sender)
     #[clap(long, help_heading = "Signers")]
     pub owner: Option<Address>,
@@ -128,12 +135,20 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
             .context("resolving bridgehub.admin() from L1")?;
     let bridgehub_admin = runner.prepare_sender(bridgehub_admin_addr).await?;
 
-    // Discover CTM proxy from L1.
-    let ctm_proxy =
-        crate::common::l1_contracts::discover_ctm_proxy(&runner.rpc_url, args.bridgehub)
-            .await
-            .context("Failed to discover CTM proxy from L1")?;
-    logger::info(format!("CTM proxy (from L1): {:#x}", ctm_proxy));
+    let ctm_proxy = match args.ctm_proxy {
+        Some(ctm) => {
+            logger::info(format!("CTM proxy (from --ctm-proxy): {:#x}", ctm));
+            ctm
+        }
+        None => {
+            let ctm =
+                crate::common::l1_contracts::discover_ctm_proxy(&runner.rpc_url, args.bridgehub)
+                    .await
+                    .context("Failed to discover CTM proxy from L1")?;
+            logger::info(format!("CTM proxy (from L1): {:#x}", ctm));
+            ctm
+        }
+    };
 
     // Resolve VM type from CTM.
     let vm_type = {
