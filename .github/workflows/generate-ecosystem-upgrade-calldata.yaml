@@ -550,9 +550,9 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn install --frozen-lockfile
 
-      # anvil + cast only. No forge --zksync, no contract build: PUVT reads the
-      # committed AllContractsHashes.json / SystemConfig.json / configs/genesis,
-      # never `out/` or `zkout/`.
+      # Foundry supplies anvil + cast, and the lightweight TypeScript package
+      # supplies the bundle command. There is still no forge --zksync or contract
+      # build: PUVT reads committed configuration, never `out/` or `zkout/`.
       - name: Install Foundry (anvil + cast)
         uses: foundry-rs/foundry-toolchain@v1
         with:

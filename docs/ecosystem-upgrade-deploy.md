@@ -73,6 +73,7 @@ the normalization.
 
 ```bash
 # 1a) fork + prepare + PUVT (writes ecosystem.toml + prepare/ + extra-verification-logs.txt)
+yarn --cwd l1-contracts/test/anvil-interop install --frozen-lockfile
 export PATH="$PWD/foundry-zksync:$PATH"          # foundry-zksync v0.1.5
 DEPLOYER_ADDR=<deployer-eoa> \
 L1_FORK_URL=<l1-rpc> GW_RPC_URL=<l1-rpc> \

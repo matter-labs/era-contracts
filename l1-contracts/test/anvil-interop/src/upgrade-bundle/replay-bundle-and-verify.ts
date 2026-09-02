@@ -107,6 +107,7 @@ async function replayBundleAndVerify(args: ReplayArguments): Promise<void> {
     if (!anvil) return;
     if (keepAnvil) {
       console.log(`Leaving anvil (pid ${anvil.pid}) running on ${rpcUrl} (KEEP_ANVIL=1)`);
+      anvil.unref();
       return;
     }
     console.log(`Stopping anvil (pid ${anvil.pid})...`);
