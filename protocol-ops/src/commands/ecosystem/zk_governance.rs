@@ -66,6 +66,8 @@ const DEFAULT_SCRIPT_PATH: &str = "scripts/DeployPUHAndGuardians.s.sol:DeployPUH
 pub(crate) const GOV_SALT_SEED: &[u8] = b"v31:gov";
 /// Default sibling checkout path for zk-governance.
 pub const DEFAULT_ZK_GOV_DIR: &str = "../../zk-governance";
+/// Optional path override used by CI and other non-sibling checkouts.
+pub const ZK_GOVERNANCE_DIR_ENV: &str = "ZK_GOVERNANCE_DIR";
 
 /// Inputs for the PUH/Guardians redeploy step. Most fields default — callers
 /// (`ecosystem upgrade-prepare-all`) should pass `env` for the auto-fills and
@@ -101,7 +103,9 @@ impl<'a> ZkGovernanceInputs<'a> {
             chain_asset_handler_override: None,
             create2_factory_override: None,
             gov_salt_override: None,
-            zk_governance_dir: PathBuf::from(DEFAULT_ZK_GOV_DIR),
+            zk_governance_dir: std::env::var_os(ZK_GOVERNANCE_DIR_ENV)
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from(DEFAULT_ZK_GOV_DIR)),
             zksync_os_ctm: None,
             use_testnet_puh,
         }

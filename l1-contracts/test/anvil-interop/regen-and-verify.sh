@@ -31,6 +31,10 @@
 #   DEPLOYER_PK=<0xhex>                  — broadcast signer's private key, OR
 #   DEPLOYER_PK_FILE=<path>              — file holding the same (trimmed)
 #
+# Optional path override:
+#   ZK_GOVERNANCE_DIR=<path>             — zk-governance checkout; defaults to
+#                                          the repository's usual sibling path
+#
 # The deployer EOA is derived from the PK at call time; we don't read it
 # from the env config (the env's `owner_address` is governance / PUH, not
 # a signable EOA).

@@ -268,6 +268,15 @@ jobs:
         with:
           submodules: true
 
+      - name: Checkout zk-governance at the reviewed commit
+        uses: actions/checkout@v4
+        with:
+          repository: zksync-association/zk-governance
+          ref: ${{ inputs.zk_governance_commit }}
+          path: zk-governance
+          submodules: recursive
+          persist-credentials: false
+
       - name: Install Foundry (for Anvil)
         uses: foundry-rs/foundry-toolchain@v1
         with:
@@ -418,6 +427,7 @@ jobs:
           # zk-governance commit whose AllContractsHashes PUVT uses to verify the
           # redeployed PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard bytecodes.
           ZK_GOVERNANCE_COMMIT: ${{ inputs.zk_governance_commit }}
+          ZK_GOVERNANCE_DIR: ${{ github.workspace }}/zk-governance
           # Optional fork-block pin (blank = tip). regen-and-verify.sh reads this.
           FORK_BLOCK: ${{ inputs.fork_block }}
           # Recorded in the deploy bundle's metadata (part of the bytecode identity).

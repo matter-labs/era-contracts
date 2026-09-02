@@ -77,6 +77,7 @@ export PATH="$PWD/foundry-zksync:$PATH"          # foundry-zksync v0.1.5
 DEPLOYER_ADDR=<deployer-eoa> \
 L1_FORK_URL=<l1-rpc> GW_RPC_URL=<l1-rpc> \
 ZK_GOVERNANCE_COMMIT=9b06a16 \
+ZK_GOVERNANCE_DIR=../../zk-governance \
   ./l1-contracts/test/anvil-interop/regen-and-verify.sh mainnet
 
 # 1b) emit the sim-inputs + transaction-simulator.json
