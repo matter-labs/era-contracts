@@ -24,17 +24,33 @@ struct ChainUpgradeOutput {
     chain_address: Address,
     admin_address: Address,
     access_control_restriction: Address,
-    /// The DA setup the upgrade puts the chain on, when it moves it at all.
-    da_move: Option<DaMove>,
+    /// What the upgrade changes about the chain's DA setup, if anything.
+    da_move: DaMove,
 }
 
-/// The DA half of a chain upgrade: what the same `ChainAdmin.multicall` sets after the cut.
-#[derive(Clone, Copy, Debug, Serialize)]
+/// The DA half of a chain upgrade: what the same `ChainAdmin.multicall` sets after the cut. The
+/// two axes are independent here too — an upgrade may move where the pubdata goes, how much of it
+/// there is, or both.
+#[derive(Clone, Copy, Debug, Default, Serialize)]
 struct DaMove {
+    /// `None` leaves the chain's DA validator pair as it is.
+    pair: Option<DaPair>,
+    /// `None` leaves the chain's pubdata content as the upgrade leaves it. Always `None` on Era,
+    /// which has no such axis.
+    pubdata_content: Option<PubdataContent>,
+}
+
+/// The DA validator pair a chain commits through.
+#[derive(Clone, Copy, Debug, Serialize)]
+struct DaPair {
     l1_da_validator: Address,
     l2_da_commitment_scheme: L2DACommitmentScheme,
-    /// `None` on Era, which has no pubdata-content axis.
-    pubdata_content: Option<PubdataContent>,
+}
+
+impl DaMove {
+    fn is_empty(&self) -> bool {
+        self.pair.is_none() && self.pubdata_content.is_none()
+    }
 }
 
 /// Chain-level CTM upgrade, prepare-only.
@@ -198,17 +214,20 @@ async fn run_one(
         access_control_restriction
     ));
     logger::info(format!("RPC URL: {}", shared.l1_rpc_url));
-    match da_move {
-        Some(m) => logger::info(format!(
-            "DA after the upgrade: validator {:#x}, scheme {}, pubdata content {}",
-            m.l1_da_validator,
-            m.l2_da_commitment_scheme,
-            m.pubdata_content
-                .map(|c| c.to_string())
-                .unwrap_or_else(|| "unchanged".to_string())
-        )),
-        None => logger::info("DA setup: unchanged".to_string()),
-    }
+    logger::info(format!(
+        "DA after the upgrade: pair {}, pubdata content {}",
+        da_move
+            .pair
+            .map(|p| format!(
+                "validator {:#x} + scheme {}",
+                p.l1_da_validator, p.l2_da_commitment_scheme
+            ))
+            .unwrap_or_else(|| "unchanged".to_string()),
+        da_move
+            .pubdata_content
+            .map(|c| c.to_string())
+            .unwrap_or_else(|| "unchanged".to_string())
+    ));
 
     // `--broadcast` against the anvil fork (applied inside the helper). In this
     // mode the target RPC is the anvil fork, so "broadcast" produces no
@@ -221,14 +240,18 @@ async fn run_one(
                 chainAddress: chain_address,
                 adminAddr: admin_address,
                 accessControlRestriction: access_control_restriction,
-                l1DaValidator: da_move.map(|m| m.l1_da_validator).unwrap_or(Address::ZERO),
+                l1DaValidator: da_move
+                    .pair
+                    .map(|p| p.l1_da_validator)
+                    .unwrap_or(Address::ZERO),
                 l2DaCommitmentScheme: da_move
-                    .map(|m| m.l2_da_commitment_scheme)
+                    .pair
+                    .map(|p| p.l2_da_commitment_scheme)
                     .unwrap_or(L2DACommitmentScheme::None)
                     as u8,
-                pubdataContent: da_move.and_then(|m| m.pubdata_content).unwrap_or_default() as u8,
-                shouldSetDaValidatorPair: da_move.is_some(),
-                shouldSetPubdataContent: da_move.is_some_and(|m| m.pubdata_content.is_some()),
+                pubdataContent: da_move.pubdata_content.unwrap_or_default() as u8,
+                shouldSetDaValidatorPair: da_move.pair.is_some(),
+                shouldSetPubdataContent: da_move.pubdata_content.is_some(),
             },
         })
         .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
@@ -267,7 +290,7 @@ async fn resolve_da_move(
     chain_id: u64,
     chain_address: Address,
     args: &ChainUpgradeArgs,
-) -> anyhow::Result<Option<DaMove>> {
+) -> anyhow::Result<DaMove> {
     let ctm = crate::common::l1_contracts::resolve_ctm_proxy(l1_rpc_url, bridgehub, chain_id)
         .await
         .context("resolving CTM from L1")?;
@@ -275,29 +298,41 @@ async fn resolve_da_move(
         .await
         .context("resolving the chain's VM from the CTM")?;
 
-    let Some(da_mode) = args.da_mode else {
-        guard_validium_without_da(l1_rpc_url, ctm, chain_id, chain_address, args).await?;
-        return Ok(None);
+    let pair = match args.da_mode {
+        Some(da_mode) => Some(DaPair {
+            l1_da_validator: args
+                .l1_da_validator
+                .context("--da-mode requires --l1-da-validator")?,
+            l2_da_commitment_scheme: args
+                .l2_da_commitment_scheme
+                .unwrap_or_else(|| L2DACommitmentScheme::from_da_and_vm_types(da_mode, vm_type)),
+        }),
+        None => None,
     };
+    // Named explicitly, or derived from a DA mode that was. Naming only the content is a complete
+    // move on its own: it is what a chain publishing nothing needs to keep proving past v33.
+    let pubdata_content = args.pubdata_content.or_else(|| {
+        args.da_mode
+            .and_then(|da_mode| PubdataContent::from_da_and_vm_types(da_mode, vm_type))
+    });
 
-    let l1_da_validator = args
-        .l1_da_validator
-        .context("--da-mode requires --l1-da-validator")?;
-    Ok(Some(DaMove {
-        l1_da_validator,
-        l2_da_commitment_scheme: args
-            .l2_da_commitment_scheme
-            .unwrap_or_else(|| L2DACommitmentScheme::from_da_and_vm_types(da_mode, vm_type)),
-        pubdata_content: args
-            .pubdata_content
-            .or_else(|| PubdataContent::from_da_and_vm_types(da_mode, vm_type)),
-    }))
+    let da_move = DaMove {
+        pair,
+        pubdata_content,
+    };
+    if da_move.is_empty() {
+        guard_validium_without_da(l1_rpc_url, ctm, chain_id, chain_address, args).await?;
+    }
+    Ok(da_move)
 }
 
-/// Refuse to take a validium-priced chain past [`MIN_MINOR_VERSION_WITH_VALIDIUM_DA`] while its
-/// DA setup is left untouched. Such a chain lands on the version's default pubdata content while
-/// publishing nothing, which is the configuration whose batches were observed not to prove; and
-/// its L2->L1 log region — the interop commitment tree leaves included — never reaches L1.
+/// Refuse to take a validium-priced chain past [`MIN_MINOR_VERSION_WITH_VALIDIUM_DA`] while
+/// neither DA axis is named. The version gives such a chain a pubdata content it does not publish
+/// — `FULL_PUBDATA` against the empty no-DA scheme — and that pair is folded into every batch's
+/// chain-config hash, so its batches stop proving (`InvalidProof`). Naming either axis is enough:
+/// `--pubdata-content logs-only` to keep publishing nothing but commit only what it publishes, or
+/// `--da-mode` to move it onto DA, which is also what puts its interop commitment tree leaves back
+/// within reach of L1.
 async fn guard_validium_without_da(
     l1_rpc_url: &str,
     ctm: Address,
@@ -321,9 +356,10 @@ async fn guard_validium_without_da(
     anyhow::ensure!(
         new_minor < MIN_MINOR_VERSION_WITH_VALIDIUM_DA,
         "chain {chain_id} is validium-priced and this upgrade takes it to v{new_minor}, which \
-         gives it a pubdata content it does not publish — a configuration whose batches do not \
-         settle. Pass `--da-mode`/`--pubdata-content` (with `--l1-da-validator`) to name its DA \
-         setup as part of the upgrade, or `--keep-da-setup` to leave it alone deliberately"
+         would leave it committing full pubdata it never publishes — batches in that state do not \
+         prove. Pass `--pubdata-content logs-only` to match what it publishes, or `--da-mode` \
+         (with `--l1-da-validator`) to move it onto DA, or `--keep-da-setup` to leave it alone \
+         deliberately"
     );
     Ok(())
 }
