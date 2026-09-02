@@ -1,7 +1,15 @@
 import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
-import { DEPLOY_BUNDLE_SCHEMA, SUPPORTING_BUNDLE_FILES, V31_UPGRADE_NAME } from "./constants";
+import {
+  CREATE2_SALT_BYTES,
+  DEPLOY_BUNDLE_SCHEMA,
+  FUNCTION_SELECTOR_BYTES,
+  HEX_CHARACTERS_PER_BYTE,
+  HEX_PREFIX_CHARACTERS,
+  SUPPORTING_BUNDLE_FILES,
+  V31_UPGRADE_NAME,
+} from "./constants";
 import {
   L1_CONTRACTS_DIR,
   REPO_ROOT,
@@ -9,6 +17,7 @@ import {
   fileSha256,
   optionalTomlInteger,
   optionalTomlString,
+  parseInteger,
   readJson,
   readToml,
   requireFile,
@@ -16,11 +25,20 @@ import {
 } from "./common";
 import type { BundleManifest, DeployBundleMetadata, PackedBundle, SafeBundle, SafeTransaction } from "./types";
 
+export interface PackDeployBundleOptions {
+  outputDirectory?: string;
+  bundleDirectory?: string;
+  permanentValuesPath?: string;
+  repositoryRoot?: string;
+}
+
 function protocolVersions(toml: string, key: string): string[] {
-  const values = new Set<number>();
+  const values = new Set<bigint>();
   const expression = new RegExp(`^${key}\\s*=\\s*(\\d+)`, "gm");
-  for (const match of toml.matchAll(expression)) values.add(Number(match[1]));
-  return [...values].sort((left, right) => left - right).map((value) => `0x${value.toString(16)}`);
+  for (const match of toml.matchAll(expression)) values.add(BigInt(match[1]));
+  return [...values]
+    .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
+    .map((value) => `0x${value.toString(16)}`);
 }
 
 function checkedGeneratedFile(directory: string, relativePath: string): string {
@@ -48,8 +66,10 @@ function describeTransaction(
   const isCreate2 = (transaction.to ?? "").toLowerCase() === create2Factory.toLowerCase();
   return {
     kind: isCreate2 ? "CREATE2 deploy" : "call",
-    tag: isCreate2 ? `0x${data.slice(2, 66)}` : data.slice(0, 10),
-    dataBytes: Math.max(data.length - 2, 0) / 2,
+    tag: isCreate2
+      ? `0x${data.slice(HEX_PREFIX_CHARACTERS, HEX_PREFIX_CHARACTERS + CREATE2_SALT_BYTES * HEX_CHARACTERS_PER_BYTE)}`
+      : data.slice(0, HEX_PREFIX_CHARACTERS + FUNCTION_SELECTOR_BYTES * HEX_CHARACTERS_PER_BYTE),
+    dataBytes: Math.max(data.length - HEX_PREFIX_CHARACTERS, 0) / HEX_CHARACTERS_PER_BYTE,
   };
 }
 
@@ -142,10 +162,15 @@ ${callsMarkdown.join("\n")}
 `;
 }
 
-export function packDeployBundle(environment: string): string {
-  const outputDirectory = path.join(L1_CONTRACTS_DIR, "upgrade-envs", V31_UPGRADE_NAME, "output", environment);
-  const bundleDirectory = path.resolve(process.env.BUNDLE_DIR ?? path.join(outputDirectory, "deploy-bundle"));
-  const permanentValuesPath = path.join(L1_CONTRACTS_DIR, "upgrade-envs/permanent-values", `${environment}.toml`);
+export function packDeployBundle(environment: string, options: PackDeployBundleOptions = {}): string {
+  const outputDirectory =
+    options.outputDirectory ?? path.join(L1_CONTRACTS_DIR, "upgrade-envs", V31_UPGRADE_NAME, "output", environment);
+  const bundleDirectory = path.resolve(
+    options.bundleDirectory ?? process.env.BUNDLE_DIR ?? path.join(outputDirectory, "deploy-bundle")
+  );
+  const permanentValuesPath =
+    options.permanentValuesPath ?? path.join(L1_CONTRACTS_DIR, "upgrade-envs/permanent-values", `${environment}.toml`);
+  const repositoryRoot = options.repositoryRoot ?? REPO_ROOT;
   const sourcePrepareDirectory = path.join(outputDirectory, "prepare");
   const sourceManifestPath = path.join(sourcePrepareDirectory, "manifest.json");
   requireFile(path.join(outputDirectory, "ecosystem.toml"), "generation output");
@@ -170,8 +195,10 @@ export function packDeployBundle(environment: string): string {
     if (fs.existsSync(source) && fs.statSync(source).size > 0) fs.copyFileSync(source, path.join(bundleDirectory, log));
   }
 
-  const contractsCommit = captureCommand("git", ["rev-parse", "HEAD"], REPO_ROOT, "unknown");
-  const dirtyResult = spawnSync("git", ["diff", "--quiet", "HEAD", "--ignore-submodules=all"], { cwd: REPO_ROOT });
+  const contractsCommit = captureCommand("git", ["rev-parse", "HEAD"], repositoryRoot, "unknown");
+  const dirtyResult = spawnSync("git", ["diff", "--quiet", "HEAD", "--ignore-submodules=all"], {
+    cwd: repositoryRoot,
+  });
   const permanentValues = readToml(permanentValuesPath);
   const deployer = process.env.DEPLOYER_ADDR?.toLowerCase() ?? "";
   const create2Factory = optionalTomlString(permanentValues, "create2_factory_addr") ?? "";
@@ -237,10 +264,10 @@ export function packDeployBundle(environment: string): string {
     },
     contracts_commit: contractsCommit,
     contracts_worktree_dirty: dirtyResult.status !== 0,
-    all_contracts_hashes_sha256: fileSha256(path.join(REPO_ROOT, "AllContractsHashes.json")),
+    all_contracts_hashes_sha256: fileSha256(path.join(repositoryRoot, "AllContractsHashes.json")),
     l1: {
       chain_id: optionalTomlInteger(permanentValues, "l1_chain_id") ?? null,
-      forked_at_block: process.env.FORKED_AT_BLOCK ? Number(process.env.FORKED_AT_BLOCK) : null,
+      forked_at_block: parseInteger(process.env.FORKED_AT_BLOCK, "FORKED_AT_BLOCK") ?? null,
     },
     deployer_address: process.env.DEPLOYER_ADDR ?? null,
     deployer_dependent_deployments: deployerDependent,

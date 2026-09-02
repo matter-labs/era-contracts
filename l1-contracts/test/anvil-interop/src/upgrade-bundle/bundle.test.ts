@@ -6,6 +6,7 @@ import { afterEach, describe, it } from "node:test";
 import { DEPLOY_BUNDLE_SCHEMA } from "./constants";
 import { fileSha256, verifyBundleIntegrity } from "./common";
 import { restoreCanonicalDefaultAccountArtifact, zkBytecodeHash } from "./default-account";
+import { packDeployBundle } from "./pack";
 import type { DeployBundleMetadata } from "./types";
 
 const temporaryDirectories: string[] = [];
@@ -110,5 +111,51 @@ describe("restoreCanonicalDefaultAccountArtifact", () => {
 
   it("rejects an invalid even-word EraVM bytecode length", () => {
     assert.throws(() => zkBytecodeHash(Buffer.alloc(64)), /invalid EraVM bytecode word length 2/);
+  });
+});
+
+describe("packDeployBundle", () => {
+  it("creates a self-consistent bundle and a runnable TypeScript handoff", () => {
+    const directory = temporaryDirectory();
+    const outputDirectory = path.join(directory, "output");
+    const prepareDirectory = path.join(outputDirectory, "prepare");
+    const repositoryRoot = path.join(directory, "repository");
+    const permanentValuesPath = path.join(directory, "permanent-values.toml");
+    const bundleDirectory = path.join(directory, "packed");
+    fs.mkdirSync(prepareDirectory, { recursive: true });
+    fs.mkdirSync(repositoryRoot, { recursive: true });
+    writeJson(path.join(repositoryRoot, "AllContractsHashes.json"), []);
+    fs.writeFileSync(
+      permanentValuesPath,
+      [
+        "l1_chain_id = 11155111",
+        "create2_factory_addr = " + JSON.stringify("0x0000000000000000000000000000000000000001"),
+        "",
+      ].join("\n")
+    );
+    fs.writeFileSync(
+      path.join(outputDirectory, "ecosystem.toml"),
+      "old_protocol_version = 1\nnew_protocol_version = 2\n"
+    );
+    writeJson(path.join(prepareDirectory, "manifest.json"), {
+      bundles: [{ index: 1, file: "01.safe.json", target: "0xabc", steps: ["deploy"] }],
+    });
+    writeJson(path.join(prepareDirectory, "01.safe.json"), {
+      transactions: [
+        {
+          to: "0x0000000000000000000000000000000000000001",
+          value: "0",
+          data: `0x${"11".repeat(32)}`,
+        },
+      ],
+    });
+
+    packDeployBundle("stage", { outputDirectory, permanentValuesPath, repositoryRoot, bundleDirectory });
+
+    const metadata = verifyBundleIntegrity(bundleDirectory);
+    assert.deepStrictEqual(metadata.protocol_version, { old: ["0x1"], new: ["0x2"] });
+    const readme = fs.readFileSync(path.join(bundleDirectory, "README.md"), "utf8");
+    assert.match(readme, /yarn --cwd l1-contracts\/test\/anvil-interop bundle:replay/);
+    assert.match(readme, /CREATE2 deploy/);
   });
 });

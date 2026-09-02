@@ -6,6 +6,8 @@ import {
   ANVIL_GAS_PRICE_WEI,
   DEFAULT_GATEWAY_RPC_URL,
   DEFAULT_ZK_GOVERNANCE_COMMIT,
+  SIGINT_EXIT_CODE,
+  SIGTERM_EXIT_CODE,
   V31_UPGRADE_NAME,
 } from "./constants";
 import {
@@ -82,11 +84,14 @@ async function regenerateAndVerify(environment: string): Promise<void> {
     await stopAnvil(anvil);
     anvil = undefined;
   };
-  const signalHandler = (): void => {
-    void cleanup().finally(() => process.exit(130));
+  const interruptHandler = (): void => {
+    void cleanup().finally(() => process.exit(SIGINT_EXIT_CODE));
   };
-  process.once("SIGINT", signalHandler);
-  process.once("SIGTERM", signalHandler);
+  const terminateHandler = (): void => {
+    void cleanup().finally(() => process.exit(SIGTERM_EXIT_CODE));
+  };
+  process.once("SIGINT", interruptHandler);
+  process.once("SIGTERM", terminateHandler);
 
   try {
     const skipPrepare = envFlag("SKIP_PREPARE");
@@ -193,8 +198,8 @@ async function regenerateAndVerify(environment: string): Promise<void> {
     });
     console.log("=== Done ===");
   } finally {
-    process.removeListener("SIGINT", signalHandler);
-    process.removeListener("SIGTERM", signalHandler);
+    process.removeListener("SIGINT", interruptHandler);
+    process.removeListener("SIGTERM", terminateHandler);
     await cleanup();
   }
 }

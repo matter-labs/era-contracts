@@ -78,7 +78,7 @@ DEPLOYER_ADDR=<deployer-eoa> \
 L1_FORK_URL=<l1-rpc> GW_RPC_URL=<l1-rpc> \
 ZK_GOVERNANCE_COMMIT=9b06a16159cd58add109f25598e79731450d1772 \
 ZK_GOVERNANCE_DIR=../../zk-governance \
-  ./l1-contracts/test/anvil-interop/regen-and-verify.sh mainnet
+  yarn --cwd l1-contracts/test/anvil-interop bundle:regen -- mainnet
 
 # 1b) emit the sim-inputs + transaction-simulator.json
 OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
@@ -103,7 +103,7 @@ standing proof that the artifact is self-sufficient.
 plus `v0.31.0-interopB/<env>.toml` — and the L1 to fork is read from that env's
 `l1_chain_id` (`1` → mainnet, `11155111` → Sepolia). Adding an ecosystem therefore
 needs no workflow edit: commit the config pair, add its anvil port to
-`env_anvil_port` in `upgrade-bundle-lib.sh` if it needs its own fork, and (if PUVT
+`ENV_ANVIL_PORTS` in `src/upgrade-bundle/constants.ts` if it needs its own fork, and (if PUVT
 should accept it) a variant in `VerifyUpgradeEnv`. Committed today: `stage`,
 `testnet`, `mainnet`. PUVT must pass for both the generate job and the independent
 bundle-handoff verification job.
@@ -247,20 +247,21 @@ silently broken upgrade. The bundle lists them under
 `deploy-ecosystem-upgrade.yaml` refuses to start on a mismatch. Generate with the
 EOA that will deploy; never with a placeholder.
 
-Both the replay script and deploy workflow verify the metadata's file digests and
+Both the replay command and deploy workflow verify the metadata's file digests and
 require its bundle list to exactly match `prepare/manifest.json` before sending any
 transaction.
 
 **Check out the commit `bundle-metadata.json` names.** PUVT identifies deployed
 contracts by matching their code against the committed `AllContractsHashes.json`;
 from a different commit the deployments are not recognised and the verdict is
-meaningless. `replay-bundle-and-verify.sh` compares the hash and exits on a mismatch.
+meaningless. `bundle:replay` compares the hash and exits on a mismatch.
 
 **Rehearse the deploy and run PUVT — no compiler, no regeneration:**
 
 ```bash
 cd protocol-ops && cargo build --release && cd ..     # the only build needed
-./l1-contracts/test/anvil-interop/replay-bundle-and-verify.sh \
+yarn --cwd l1-contracts/test/anvil-interop install --frozen-lockfile
+yarn --cwd l1-contracts/test/anvil-interop bundle:replay -- \
   --bundle <unpacked-bundle-dir> --fork-url <l1-rpc>
 ```
 
@@ -272,10 +273,12 @@ Variants:
 
 ```bash
 # verify a chain the bundle was already broadcast to (no replay)
-./…/replay-bundle-and-verify.sh --bundle <dir> --rpc <l1-rpc> --verify-only
+yarn --cwd l1-contracts/test/anvil-interop bundle:replay -- \
+  --bundle <dir> --rpc <l1-rpc> --verify-only
 
 # broadcast the deployer bundles for real, then verify
-./…/replay-bundle-and-verify.sh --bundle <dir> --rpc <l1-rpc> --key "$DEPLOYER_KEY"
+yarn --cwd l1-contracts/test/anvil-interop bundle:replay -- \
+  --bundle <dir> --rpc <l1-rpc> --key "$DEPLOYER_KEY"
 ```
 
 `--key` signs only the deployer's bundles (`--skip-unkeyed`); the governance
@@ -286,5 +289,5 @@ idempotency, as step 2 above.
 
 ```bash
 DEPLOYER_ADDR=<deployer> FORKED_AT_BLOCK=<block> \
-  ./l1-contracts/test/anvil-interop/pack-deploy-bundle.sh <env>
+  yarn --cwd l1-contracts/test/anvil-interop bundle:pack -- <env>
 ```

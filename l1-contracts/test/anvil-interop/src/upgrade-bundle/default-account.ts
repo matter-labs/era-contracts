@@ -5,6 +5,11 @@ import {
   CANONICAL_DEFAULT_ACCOUNT_HASH,
   CANONICAL_DEFAULT_ACCOUNT_METADATA_WORD,
   DEFAULT_ACCOUNT_METADATA_WORD_BYTES,
+  ERAVM_BYTECODE_WORD_BYTES,
+  ERAVM_HASH_LENGTH_OFFSET,
+  ERAVM_HASH_RESERVED_OFFSET,
+  ERAVM_HASH_VERSION,
+  ERAVM_HASH_VERSION_OFFSET,
   MAX_ERAVM_BYTECODE_WORDS,
 } from "./constants";
 import { readJson, readToml, requireTomlString } from "./common";
@@ -23,17 +28,17 @@ function fail(message: string): never {
 }
 
 export function zkBytecodeHash(bytecode: Buffer): string {
-  if (bytecode.length % DEFAULT_ACCOUNT_METADATA_WORD_BYTES !== 0) {
+  if (bytecode.length % ERAVM_BYTECODE_WORD_BYTES !== 0) {
     fail(`bytecode length ${bytecode.length} is not word-aligned`);
   }
-  const words = bytecode.length / DEFAULT_ACCOUNT_METADATA_WORD_BYTES;
+  const words = bytecode.length / ERAVM_BYTECODE_WORD_BYTES;
   if (words % 2 !== 1 || words > MAX_ERAVM_BYTECODE_WORDS) {
     fail(`invalid EraVM bytecode word length ${words}`);
   }
   const digest = createHash("sha256").update(bytecode).digest();
-  digest[0] = 0x01;
-  digest[1] = 0x00;
-  digest.writeUInt16BE(words, 2);
+  digest[ERAVM_HASH_VERSION_OFFSET] = ERAVM_HASH_VERSION;
+  digest[ERAVM_HASH_RESERVED_OFFSET] = 0;
+  digest.writeUInt16BE(words, ERAVM_HASH_LENGTH_OFFSET);
   return `0x${digest.toString("hex")}`;
 }
 

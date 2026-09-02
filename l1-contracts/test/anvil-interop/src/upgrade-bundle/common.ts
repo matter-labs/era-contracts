@@ -1,4 +1,5 @@
-import { spawn, spawnSync, type ChildProcess } from "child_process";
+import { spawn, spawnSync } from "child_process";
+import type { ChildProcess } from "child_process";
 import { createHash } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
@@ -20,16 +21,17 @@ import type { BundleManifest, DeployBundleMetadata, SafeBundle, TomlRecord } fro
 
 function findPackageDirectory(start: string): string {
   let current = path.resolve(start);
-  while (true) {
+  let previous = "";
+  while (current !== previous) {
     const packagePath = path.join(current, "package.json");
     if (fs.existsSync(packagePath)) {
       const packageJson = readJson<{ name?: string }>(packagePath);
       if (packageJson.name === "anvil-interop") return current;
     }
-    const parent = path.dirname(current);
-    if (parent === current) throw new Error("Cannot locate the anvil-interop package directory");
-    current = parent;
+    previous = current;
+    current = path.dirname(current);
   }
+  throw new Error("Cannot locate the anvil-interop package directory");
 }
 
 export const ANVIL_INTEROP_DIR = findPackageDirectory(__dirname);
@@ -187,16 +189,15 @@ export async function startAnvilFork(params: {
     }
     await delay(ANVIL_READY_DELAY_MS);
   }
+  await stopAnvil(child);
   throw new Error(`anvil failed to start (see ${params.logPath})`);
 }
 
 export async function stopAnvil(child: ChildProcess | undefined): Promise<void> {
   if (!child?.pid || child.exitCode !== null) return;
+  const exitPromise = new Promise<boolean>((resolve) => child.once("exit", () => resolve(true)));
   child.kill("SIGTERM");
-  const exited = await Promise.race([
-    new Promise<boolean>((resolve) => child.once("exit", () => resolve(true))),
-    delay(ANVIL_STOP_TIMEOUT_MS).then(() => false),
-  ]);
+  const exited = await Promise.race([exitPromise, delay(ANVIL_STOP_TIMEOUT_MS).then(() => false)]);
   if (!exited && child.exitCode === null) child.kill("SIGKILL");
 }
 
