@@ -40,7 +40,7 @@ import {
 import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
 import { forceBatchExecutedEqualsCommitted, modelV31BackfillPrerequisite, transferOwnable2Step } from "./harness-shims";
-import { customError, expectRevert } from "./balance-helpers";
+import { expectRevert } from "./balance-helpers";
 import { impersonateAndRun, createProvider } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
@@ -660,44 +660,62 @@ export async function runEcosystemGovernanceUpgrade(params: {
  * Assert the scheduling-time enforcement of the v32 upgrade prerequisite: the CTM-admin call set
  * (replayed with the prepare bundles) registered the release's precondition checker on the
  * ServerNotifier, so `setUpgradeTimestamp` must revert while the chain's backfill prerequisite is
- * missing. Returns the handles for the post-shim positive assertion.
- * See {protocol-docs/upgrade-scheduling.md}.
+ * missing. The expected failure is read from the on-chain preview rather than re-derived, so this
+ * cannot drift from the checker's own ordering. Returns the handles for the post-shim positive
+ * scheduling, or `null` when the chain is outside the registration's version (no assertion to
+ * make). See {protocol-docs/upgrade-scheduling.md}.
  */
 async function assertSchedulingBlockedOnMissingPrerequisite(params: {
   l1Provider: ethers.providers.JsonRpcProvider;
   ctmAddr: string;
   chainId: number;
-  diamondProxyAddr: string;
   scheduleTimestamp: number;
-}): Promise<{ serverNotifier: ethers.Contract; chainAdmin: string; oldProtocolVersion: ethers.BigNumber }> {
-  const { l1Provider, ctmAddr, chainId, diamondProxyAddr, scheduleTimestamp } = params;
+}): Promise<{ serverNotifier: ethers.Contract; chainAdmin: string; oldProtocolVersion: ethers.BigNumber } | null> {
+  const { l1Provider, ctmAddr, chainId, scheduleTimestamp } = params;
 
   const ctm = new ethers.Contract(ctmAddr, getAbi("IChainTypeManager"), l1Provider);
   const serverNotifier = new ethers.Contract(await ctm.serverNotifierAddress(), getAbi("IServerNotifier"), l1Provider);
   const oldProtocolVersion: ethers.BigNumber = await ctm.getProtocolVersion(chainId);
   const checkerAddr: string = await serverNotifier.upgradePreconditionChecker(oldProtocolVersion);
   if (checkerAddr === ethers.constants.AddressZero) {
-    throw new Error(
-      "No upgrade-precondition checker registered on ServerNotifier for protocol version " +
-        `${oldProtocolVersion.toString()} — the CTM-admin call set should have registered it`
+    // The release registers the checker for exactly one version (the CTM's prepare-time version);
+    // a chain at any other version legitimately has no checker — nothing to assert here.
+    console.log(
+      `  ⚠️ chain ${chainId}: no precondition checker registered for its version ` +
+        `${oldProtocolVersion.toString()}; skipping the scheduling assertions`
     );
+    return null;
   }
   const chainAdmin: string = await ctm.getChainAdmin(chainId);
 
-  // The exact failure depends on how far the fixture's history got: a chain whose backfill flag is
-  // not set fails on it, a chain that has the flag (e.g. created on v31) fails on the missing
-  // lower bound — the same order the checker (and the upgrade itself) checks in.
-  const getters = new ethers.Contract(diamondProxyAddr, getAbi("GettersFacet"), l1Provider);
-  const flagSet: boolean = await getters.baseTokenSupportsTotalSupply();
-  const expectedError = flagSet ? "LowerBoundNotRecorded()" : "BaseTokenPreV31TotalSupplyNotSet()";
+  // Ask the on-chain preview what scheduling would say right now. On a fork whose facets predate
+  // the checker's getters the preview itself reverts — scheduling is blocked either way, just
+  // without a specific selector to pin (same guard as `modelV31BackfillPrerequisite`).
+  let failed: string[] | null = null;
+  try {
+    failed = await serverNotifier.previewUpgradePreconditions(chainId);
+  } catch {
+    failed = null;
+  }
 
+  if (failed !== null && failed.length === 0) {
+    // Fork rehearsals can target a chain whose prerequisite is already satisfied (the bound was
+    // recorded in an earlier run against the same CREATE2 registry) — nothing to block on.
+    console.log(`  chain ${chainId}: prerequisite already satisfied; skipping the blocked-scheduling assertion`);
+    return { serverNotifier, chainAdmin, oldProtocolVersion };
+  }
+
+  const expectedSelector = failed === null ? undefined : failed[0];
   await expectRevert(
     () => serverNotifier.callStatic.setUpgradeTimestamp(chainId, scheduleTimestamp, { from: chainAdmin }),
     `chain ${chainId}: scheduling before the backfill prerequisite`,
-    customError("V33UpgradePreconditionChecker", expectedError),
+    expectedSelector,
     l1Provider
   );
-  console.log(`  ✅ chain ${chainId}: scheduling blocked with ${expectedError} before the prerequisite`);
+  console.log(
+    `  ✅ chain ${chainId}: scheduling blocked${expectedSelector ? ` with ${expectedSelector}` : ""} ` +
+      "before the prerequisite"
+  );
 
   return { serverNotifier, chainAdmin, oldProtocolVersion };
 }
@@ -741,11 +759,10 @@ export async function runChainUpgradesAndRelayL2(params: {
     // Scheduling-time enforcement of the same prerequisite the upgrade checks at execution time:
     // before the backfill history is modeled, the chain admin cannot even schedule the upgrade.
     const scheduleTimestamp = (await l1Provider.getBlock("latest")).timestamp + 3600;
-    const { serverNotifier, chainAdmin, oldProtocolVersion } = await assertSchedulingBlockedOnMissingPrerequisite({
+    const scheduling = await assertSchedulingBlockedOnMissingPrerequisite({
       l1Provider,
       ctmAddr: params.ctmAddr,
       chainId: chain.chainId,
-      diamondProxyAddr: chain.diamondProxy,
       scheduleTimestamp,
     });
 
@@ -757,25 +774,34 @@ export async function runChainUpgradesAndRelayL2(params: {
       settlementLayerUpgradeAddr,
     });
 
-    // With the prerequisite in place, scheduling passes and records the timestamp — the real
-    // pre-upgrade operator step (production: protocol-ops `chain set-upgrade-timestamp`).
-    await impersonateAndRun(l1Provider, chainAdmin, async (signer) => {
-      const tx = await serverNotifier
-        .connect(signer)
-        .setUpgradeTimestamp(chain.chainId, scheduleTimestamp, { gasLimit: 500_000 });
-      await tx.wait();
-    });
-    const storedTimestamp: ethers.BigNumber = await serverNotifier.protocolVersionToUpgradeTimestamp(
-      chain.chainId,
-      oldProtocolVersion
-    );
-    if (!storedTimestamp.eq(scheduleTimestamp)) {
-      throw new Error(
-        `chain ${chain.chainId}: scheduling after the prerequisite stored ${storedTimestamp.toString()}, ` +
-          `expected ${scheduleTimestamp}`
+    if (scheduling) {
+      // With the prerequisite in place, the preview clears and scheduling records the timestamp —
+      // the real pre-upgrade operator step (production: protocol-ops `chain set-upgrade-timestamp`).
+      const { serverNotifier, chainAdmin, oldProtocolVersion } = scheduling;
+      const stillFailing: string[] = await serverNotifier.previewUpgradePreconditions(chain.chainId);
+      if (stillFailing.length !== 0) {
+        throw new Error(
+          `chain ${chain.chainId}: preview still reports failed preconditions after the shim: ${stillFailing.join(", ")}`
+        );
+      }
+      await impersonateAndRun(l1Provider, chainAdmin, async (signer) => {
+        const tx = await serverNotifier
+          .connect(signer)
+          .setUpgradeTimestamp(chain.chainId, scheduleTimestamp, { gasLimit: 500_000 });
+        await tx.wait();
+      });
+      const storedTimestamp: ethers.BigNumber = await serverNotifier.protocolVersionToUpgradeTimestamp(
+        chain.chainId,
+        oldProtocolVersion
       );
+      if (!storedTimestamp.eq(scheduleTimestamp)) {
+        throw new Error(
+          `chain ${chain.chainId}: scheduling after the prerequisite stored ${storedTimestamp.toString()}, ` +
+            `expected ${scheduleTimestamp}`
+        );
+      }
+      console.log(`  ✅ chain ${chain.chainId}: upgrade scheduled once the prerequisite holds`);
     }
-    console.log(`  ✅ chain ${chain.chainId}: upgrade scheduled once the prerequisite holds`);
 
     runProtocolOps([
       "chain",

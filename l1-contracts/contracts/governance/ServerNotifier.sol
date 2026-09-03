@@ -136,8 +136,11 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
         IUpgradePreconditionChecker _checker
     ) external onlyOwner {
         if (address(_checker) != address(0)) {
-            // A plain call, not a probe: registering a contract that does not implement the
-            // interface must revert loudly here rather than brick scheduling later.
+            // A plain call, not a probe: a contract that does not expose the magic value reverts
+            // loudly here. This only proves interface intent — a checker whose checks themselves
+            // are broken still bricks scheduling for this version until the owner deregisters it,
+            // so releases must exercise the checker before registering; see
+            // {protocol-docs/upgrade-scheduling.md}.
             if (_checker.getSupportsUpgradePreconditionCheckerMagic() != UPGRADE_PRECONDITION_CHECKER_MAGIC) {
                 revert UpgradePreconditionCheckerMagicMismatch(address(_checker));
             }

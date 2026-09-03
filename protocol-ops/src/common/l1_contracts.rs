@@ -363,8 +363,10 @@ pub async fn resolve_server_notifier(
 /// Dry-run `ServerNotifier.previewUpgradePreconditions(chainId)`.
 ///
 /// Returns the failed checks' error selectors (empty when scheduling would pass), or `None` when
-/// the deployed ServerNotifier predates the preview (pre-v34 implementation) — the caller then
-/// falls back to the scheduling call's own revert as the source of truth.
+/// the call reverts with empty data — a pre-v34 implementation without the preview selector (an
+/// old chain whose facets predate the checker's getters bubbles the same empty revert) — and the
+/// caller then falls back to the scheduling call's own revert as the source of truth. Transport
+/// failures and reverts that carry data are real errors and are propagated.
 pub async fn preview_upgrade_preconditions(
     l1_rpc_url: &str,
     server_notifier: Address,
@@ -379,9 +381,18 @@ pub async fn preview_upgrade_preconditions(
         .await
     {
         Ok(failed) => Ok(Some(failed.iter().map(|s| s.0).collect())),
-        // A pre-v34 implementation has no such selector: the call reverts (or returns nothing to
-        // decode). That is not an error for the caller — only "no preview available".
-        Err(_) => Ok(None),
+        Err(err) => {
+            if let Some(data) = err.as_revert_data() {
+                if data.is_empty() {
+                    return Ok(None);
+                }
+                anyhow::bail!(
+                    "ServerNotifier.previewUpgradePreconditions({chain_id}) reverted with 0x{}",
+                    hex::encode(&data)
+                );
+            }
+            Err(err).context("ServerNotifier.previewUpgradePreconditions() call failed")
+        }
     }
 }
 

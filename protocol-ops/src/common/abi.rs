@@ -204,7 +204,7 @@ pub mod upgrade_precondition_errors {
     // CLI can print which precondition failed instead of a bare 4-byte selector.
     alloy::sol!(
         interface IUpgradePreconditionErrors {
-            error CutDataForProtocolVersionNotAvailable(uint256 protocolVersionId);
+            error CutDataForProtocolVersionNotAvailable(uint256 oldProtocolVersion);
             error BaseTokenPreV31TotalSupplyNotSet();
             error LowerBoundNotRecorded();
             error PriorityQueueNotReady();

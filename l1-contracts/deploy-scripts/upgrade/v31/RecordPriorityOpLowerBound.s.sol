@@ -13,7 +13,8 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 /// `V32UpgradeZKsyncOS`), so this must run in a transaction well before the chain's
 /// upgrade executes — never in the same bundle. The bound is also enforced when the chain admin
 /// *schedules* the upgrade (`ServerNotifier.setUpgradeTimestamp` consults the registered
-/// `V33UpgradePreconditionChecker`), so record it before scheduling; see
+/// `V33UpgradePreconditionChecker`), and the pinned bound includes priority ops pending at record
+/// time — so record it well before scheduling and let the chain process past the bound first; see
 /// {protocol-docs/upgrade-scheduling.md}. The registry address is the CTM upgrade output's
 /// `priority_op_lower_bound_addr`. The call is permissionless and this script is idempotent.
 contract RecordPriorityOpLowerBound is Script {

@@ -74,9 +74,8 @@ contract V33UpgradePreconditionChecker is IUpgradePreconditionChecker {
         if (!_lowerBoundRecorded(_zkChain)) {
             collected[count] = LowerBoundNotRecorded.selector;
             ++count;
-        } else if (!_priorityQueueReady(_zkChain)) {
-            // The queue check is only meaningful against a recorded bound (an unrecorded bound
-            // reads as zero and passes trivially), so it is reported only once one exists.
+        }
+        if (!_priorityQueueReady(_zkChain)) {
             collected[count] = PriorityQueueNotReady.selector;
             ++count;
         }

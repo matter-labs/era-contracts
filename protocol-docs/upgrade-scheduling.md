@@ -20,8 +20,9 @@ governance (`GatewayCTMDeployerCTMBase`).
 
 It emits three events the server watches:
 
-- `MigrateToGateway(chainId, migrationNumber)` / `MigrateFromGateway(chainId, migrationNumber)` —
-  migration signals (see {protocol-docs/chain-lifecycle.md}).
+- `MigrateToGateway(chainId, migrationNumber)` — migration signal (see
+  {protocol-docs/chain-lifecycle.md}).
+- `MigrateFromGateway(chainId, migrationNumber)` — the reverse migration signal.
 - `UpgradeTimestampUpdated(chainId, oldProtocolVersion, upgradeTimestamp)` — emitted by
   `setUpgradeTimestamp`, the upgrade _scheduling_ call. The `zksync-os-server` L1 watcher reacts to
   this event by injecting the upgrade transaction into the chain at the scheduled time.
@@ -60,9 +61,12 @@ upgrade transaction reverts at the scheduled moment.
   aliased governance on Gateway). Registering a non-zero checker validates the checker's magic
   value (`UPGRADE_PRECONDITION_CHECKER_MAGIC`) with a plain call, so registering a contract that
   does not implement the interface reverts loudly. Registering the zero address deregisters.
-- `previewUpgradePreconditions(chainId)` — a view mirroring `setUpgradeTimestamp`'s validation
-  without reverting: it returns the error selectors of the checks that would fail (missing upgrade
-  cut included), or an empty array when scheduling would pass. Operators and CI use it to dry-run.
+- `previewUpgradePreconditions(chainId)` — a view mirroring `setUpgradeTimestamp`'s upgrade-cut
+  and precondition checks without reverting: it returns the error selectors of the failed checks
+  (missing upgrade cut included), or an empty array when those checks pass. It deliberately does
+  not cover the caller (`onlyChainAdmin`) or zero-timestamp validation, and — like
+  `setUpgradeTimestamp` itself — it still reverts for a chain id the CTM does not know (the
+  protocol-version resolution dereferences the chain). Operators and CI use it to dry-run.
 
 When a checker is registered for the chain's current protocol version, `setUpgradeTimestamp` calls
 `checker.checkUpgradePreconditions(chainId, zkChain)` after the upgrade-cut check and before
@@ -73,6 +77,20 @@ passes the checker behaves exactly as before.
 Checkers are stateless `view` contracts. They must not mutate state, must not depend on
 `msg.sender`, and are keyed by the _old_ protocol version because that is what
 `setUpgradeTimestamp` resolves and what `upgradeCutHash` is keyed by.
+
+Two asymmetries of the registry are deliberate:
+
+- **Registration key vs lookup key.** The release flow registers under the CTM's own
+  `protocolVersion()` at prepare time, while `setUpgradeTimestamp` looks up the _chain's_ current
+  version. A chain lagging behind the CTM's prepare-time version therefore finds no checker —
+  which is fail-open but safe: such a chain also has no `upgradeCutHash` for its version from this
+  release, so the cut-availability check rejects the scheduling first.
+- **The magic check proves intent, not health.** Registration only validates the magic value; a
+  checker whose checks are themselves broken (reverting getters, wrong addresses) registers
+  cleanly and then blocks scheduling for every chain on that version until the CTM admin
+  deregisters it — an ecosystem-multisig round-trip. Releases must therefore exercise the checker
+  (its preview, against a real chain) before putting the registration into the call set; the
+  repo's integration tests do this for the shipped checker.
 
 ### The v32 checker
 
@@ -96,6 +114,14 @@ time. The checker deliberately does **not** include that check: batch state is t
 would flap at scheduling time (a chain drains its batches close to the upgrade, not days before,
 and new batches keep committing), producing spurious scheduling failures with no operational value.
 
+The queue check (3) is also time-dependent, but unlike batch drain it is monotone in the right
+direction: the bound is pinned once (first `lowerBoundPriorityOp` call wins, so nobody can raise it
+later) and `getFirstUnprocessedPriorityTx` only grows, so a chain that fails it merely has to keep
+processing its queue and retry — it can never regress from passing to failing. The cost is that a
+third party recording the bound during a deposit burst pins a higher bound and delays the chain's
+ability to _schedule_ (previously only its ability to execute); the runbook therefore records the
+bound well in advance, and the chain processes those ops on its normal cadence either way.
+
 ## How a release adds a checker
 
 A release with scheduling-time prerequisites ships the checker in its CTM upgrade script (see
@@ -117,14 +143,20 @@ soft-deprecated.
 
 ## Operator flow (v31 → v32 example)
 
-1. Ecosystem prepare: governance/CTM-admin bundles deploy the new contracts, register the upgrade
-   cut (`setNewVersionUpgrade`), upgrade the `ServerNotifier` implementation, and register the
-   checker for the chains' current version.
-2. Per chain, record the priority-op lower bound (`RecordPriorityOpLowerBound.s.sol`) — in a
-   transaction well before the chain's upgrade executes.
+1. Ecosystem prepare: the CTM-admin bundle deploys the new contracts, upgrades the `ServerNotifier`
+   implementation, and registers the checker for the chains' current version. This bundle must
+   execute **before** the governance stage that registers the upgrade cut
+   (`setNewVersionUpgrade`, a separate signer): scheduling becomes possible the moment
+   `upgradeCutHash(oldVersion)` is set, so a cut registered first would open an unguarded
+   scheduling window. The standard flows preserve this order — protocol-ops executes the CTM-admin
+   calls during prepare, ahead of the governance stages.
+2. Per chain, record the priority-op lower bound (`RecordPriorityOpLowerBound.s.sol`) — well before
+   the chain schedules, and note the pinned bound includes any priority ops pending at record time,
+   so the chain must have processed past it (its normal operation) before scheduling passes.
 3. Schedule: the chain admin calls `setUpgradeTimestamp(chainId, ts)` (protocol-ops
-   `chain set-upgrade-timestamp`). If step 2 was skipped, this now reverts with the same error the
-   upgrade would have reverted with — instead of the failure surfacing at execution time.
+   `chain set-upgrade-timestamp`). If step 2 was skipped or the queue has not drained past the
+   bound yet, this reverts with the same error the upgrade would have reverted with — instead of
+   the failure surfacing at execution time. Retry once the queue catches up.
 4. Execute: at `ts`, the server injects the upgrade transaction and the validator (or the admin)
    calls `upgradeChainFromVersion`.
 

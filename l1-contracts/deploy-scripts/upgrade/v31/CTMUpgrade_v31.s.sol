@@ -15,6 +15,7 @@ import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisFo
 import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
 import {IUpgradePreconditionChecker} from "contracts/upgrades/IUpgradePreconditionChecker.sol";
 import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 
@@ -166,12 +167,25 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
     /// @notice Register the precondition checker for the version this release upgrades chains from.
     /// @dev Appended after the ServerNotifier implementation upgrade in the same call array — the
-    ///      setter only exists on the new implementation and the calls execute in order.
+    ///      setter only exists on the new implementation and the calls execute in order. This call
+    ///      needs the proxy's own `onlyOwner`, which may legitimately differ from its ProxyAdmin's
+    ///      owner (fresh ecosystems leave the notifier's Ownable2Step transfer to the chain admin
+    ///      pending, so `owner()` is still the deployer); both executors of this call set resolve
+    ///      the signer per target, so a diverged owner routes to a different signer, not a revert.
+    ///      Log both owners so a rollout operator can see who has to sign.
     function prepareVersionSpecificCTMAdminCalls() public virtual override returns (Call[] memory calls) {
         require(upgradePreconditionChecker != address(0), "v31: precondition checker not deployed");
+
+        address serverNotifierProxy = ctmAddresses.stateTransition.proxies.serverNotifier;
+        console.log("ServerNotifier owner (signs the checker registration):", IOwnable(serverNotifierProxy).owner());
+        console.log(
+            "ServerNotifier ProxyAdmin owner (signs the implementation upgrade):",
+            IOwnable(Utils.getProxyAdminAddress(serverNotifierProxy)).owner()
+        );
+
         calls = new Call[](1);
         calls[0] = Call({
-            target: ctmAddresses.stateTransition.proxies.serverNotifier,
+            target: serverNotifierProxy,
             data: abi.encodeCall(
                 IServerNotifier.setUpgradePreconditionChecker,
                 (getOldProtocolVersion(), IUpgradePreconditionChecker(upgradePreconditionChecker))

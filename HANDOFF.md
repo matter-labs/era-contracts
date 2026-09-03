@@ -31,8 +31,11 @@ after. Design note with rejected alternatives: `protocol-docs/upgrade-scheduling
 3. **Checker name `V33UpgradePreconditionChecker`** while the sibling upgrade contract is
    `V32UpgradeZKsyncOS`. The plan mandated naming after the release the upgrade-env fixtures
    exercise (genesis v32.0.0, fixture upgrade v32→v33); the mismatch is explained in the NatSpec
-   and the design note. Renaming to `V32UpgradePreconditionChecker` for sibling consistency is a
-   one-commit change if reviewers prefer it.
+   and the design note. An adversarial review pass flagged that every sibling artifact of this
+   release (`V32UpgradeZKsyncOS`, `L2V32Upgrade`) is named after the production target version and
+   that the v31 provenance tooling now pins a `V33…` artifact inside a v31→v32 rollout — renaming
+   to `V32UpgradePreconditionChecker` is a one-commit change if you agree; the plan's naming was
+   kept deliberately pending your call.
 4. **Preview returns `bytes4[]` error selectors** (collecting every failed check) instead of a
    bool/bytes32 pair. Since `try`/`catch` is forbidden repo-wide, the checker interface carries
    both a reverting check and a non-reverting preview built on shared internal predicates.
@@ -42,18 +45,38 @@ after. Design note with rejected alternatives: `protocol-docs/upgrade-scheduling
    governance) but no Gateway release flow registers a checker; Gateway is soft-deprecated.
 7. **No batch-drain check in the checker** — `totalBatchesCommitted == totalBatchesExecuted` is
    time-sensitive and would flap at scheduling time (documented in the design note).
-8. **protocol-ops preview degrades gracefully**: a pre-v34 ServerNotifier without the preview
-   selector logs a note and falls back to the forge simulation's own revert (Rust-side error
-   handling, not contract-side probing).
+8. **protocol-ops preview degrades gracefully but narrowly**: only an empty-data revert (the
+   deployed implementation has no preview selector; an old chain whose facets predate the
+   checker's getters bubbles the same empty revert) is treated as "no preview available".
+   Transport failures and reverts carrying data are propagated as real errors. The preview also
+   queries `runner.rpc_url` (the anvil fork the simulation runs against), like every other
+   resolver in the command, so fork-mutating prepare flows see the upgraded notifier.
 
 ## 3. Not verified locally / left to CI
 
-- **anvil-interop chain states** (`chain-states/v0.32.2` etc.): the ServerNotifier bytecode changed,
-  so the committed fresh-deploy states embed the old implementation. Tests pass against them (the
-  interop suite does not exercise the new functions), but the "Regenerate Anvil Interop Chain
-  States" workflow should be run on the PR to keep states in sync.
+- **`AllContractsHashes.json` is deliberately left at the base version** and `check-hashes` will
+  fail until the "Update Hashes in PR" workflow is dispatched on the PR (it commits the delta
+  computed in CI's own environment). Investigation: a local regeneration moved every l1-contracts
+  row (155/155) while all 17 da-contracts rows reproduced byte-exactly; a control rebuild of the
+  **pristine base tree** on the same machine (pinned forge v1.5.1/b0a9dd9ce, recursive submodules,
+  frozen lockfile) diverged from the committed manifest on the same 155 rows — so this macOS
+  environment cannot reproduce CI's l1 metadata, and committing a locally computed manifest would
+  have rewritten the recorded hashes of the audited surface on unverifiable grounds. Lengths match
+  on unaffected rows (e.g. OZ `Address`, 85 bytes both sides); only the metadata blob differs.
+  The rows the workflow should actually move: one new (`l1-contracts/V33UpgradePreconditionChecker`)
+  plus the importers of the changed sources (ServerNotifier and its metadata closure — e.g.
+  AdminFacet, GatewayCTMDeployer\* — and every importer of `L1ContractErrors.sol`).
+- **anvil-interop chain states**: regenerated on this branch with the CI recipe
+  (`FOUNDRY_PROFILE=anvil-interop` builds + `setup-and-dump-state.ts`) because the
+  `state-generation-check` gate compares deployed code exactly and the ServerNotifier bytecode
+  changed (its CREATE2 proxy address, and the CTM/diamond addresses that embed it, cascade). The
+  macOS-vs-linux caveat from the hash manifest does **not** apply here: this profile strips the
+  CBOR metadata (`cbor_metadata=false`, `bytecode_hash="none"`), and the CI-generated v0.31.0
+  fixture reproduced byte-identically in the same local run — direct evidence the profile is
+  cross-platform deterministic. If CI still disagrees, the "Regenerate Anvil Interop Chain States"
+  workflow is the fallback.
 - **`zkstack-out`**: `IServerNotifier.json` was regenerated locally via `yarn copy-to-zkstack-out`;
-  the strict CI check should agree (only that file changed).
+  ABI-only, so it is platform-independent and the strict CI check should agree.
 - The first local v31→v32 interop run failed with an unrelated L2-relay revert
   (`forceDeployAndUpgradeUniversal`) on one chain; a clean rerun of the identical code passed
   end-to-end, and the same job was green on other PRs the same day — treated as a local
@@ -61,15 +84,17 @@ after. Design note with rejected alternatives: `protocol-docs/upgrade-scheduling
 
 ## 4. Validation (clean tree at final commit)
 
-- `yarn da build:foundry && yarn l1 build:foundry` — clean rebuild, success (see
-  `AllContractsHashes.json` commit).
-- `yarn l1 test:foundry` — full suite: 297 suites, **2504 passed, 0 failed, 0 skipped** (70.7s).
+- `yarn da build:foundry && yarn l1 build:foundry` — clean rebuild, success (run three times over
+  the branch's life: initial, frozen-lockfile control, final).
+- `yarn l1 test:foundry` — full suite: 297 suites, **2504 passed, 0 failed, 0 skipped** — run twice
+  (before and after the adversarial-review fix round; 70.7s / 63.1s).
 - Targeted: `V33UpgradePreconditionChecker.t.sol` 9/9, `ServerNotifierPreconditions.t.sol` 14/14
   (incl. 5 `vm.load` storage-layout locks), pre-existing `ServerNotifier.t.sol` 14/14 unmodified,
   `UpgradeChainFromVersion.t.sol` 9/9 untouched, `UpgradeIntegrationTest_Local` +
   `UpgradeIntegrationTest_LocalProductionVerifier` both pass (`--ffi --gas-limit 20000000000`).
-- anvil-interop: `yarn test:v31-to-v32` — full pass in 167s; per chain (10 and 11):
-  "scheduling blocked with LowerBoundNotRecorded() before the prerequisite" and
+- anvil-interop: `yarn test:v31-to-v32` — full pass, run twice (167s first round; rerun after the
+  harness rework). Per chain (10 and 11): "scheduling blocked with 0x5c25a57b
+  (LowerBoundNotRecorded, read from the on-chain preview) before the prerequisite" and
   "upgrade scheduled once the prerequisite holds". `yarn test:hardhat:interop` — 9/10 parallel
   workers passed; worker 1 (`01-deployment-verification`) was signal-killed under the 10-way
   parallel anvil load ("exit code unknown" = killed by signal, no mocha output), and the same spec
@@ -78,7 +103,9 @@ after. Design note with rejected alternatives: `protocol-docs/upgrade-scheduling
   `cargo test` 28/28.
 - `yarn lint:sol` (0 warnings), `yarn lint:ts`, `yarn prettier:check`, `markdownlint` on touched
   docs — all clean. `yarn errors-lint --fix` and `yarn selectors --fix` outputs committed.
-- `yarn calculate-hashes:check` — "Calculated hashes match" after the clean-rebuild regeneration.
+- `yarn calculate-hashes:check` — fails by design against the base-pinned manifest (see §3); the
+  local recomputation itself is self-consistent across clean rebuilds (two independent
+  regenerations agreed on every row).
 - Storage layout: `forge inspect ServerNotifier storage-layout` diffed against a worktree at the
   base commit — slots 0–3 identical, one appended mapping at slot 4.
 
@@ -93,19 +120,39 @@ after. Design note with rejected alternatives: `protocol-docs/upgrade-scheduling
 - **"anvil-interop: assert the scheduling path in the fresh-deploy interop suite too"** — the
   hardhat interop suite never touches ServerNotifier; a cheap smoke call would catch ABI drift
   against `chain-states`.
+- **"Fresh ecosystems leave ServerNotifier ownership pending with the deployer"** — `DeployCTM`
+  initializes the notifier with `config.deployerAddress` as owner (`DeployCTMUtils.s.sol`
+  `getInitializeCalldata`) and then calls `transferOwnership(chainAdmin)`
+  (`DeployCTM.s.sol` `updateOwners`), but ServerNotifier is `Ownable2Step` and nothing accepts —
+  so `owner()` stays the deployer EOA with the chain admin stuck as pending. Surfaced by a
+  prepare-time owner assertion this PR briefly carried (removed again: both call-set executors
+  resolve the signer per target, so the divergence routes rather than reverts, and the assertion
+  broke the legitimate fixture state). Either an acceptance step is missing from the fresh flow
+  or the pending transfer is intentional and undocumented; worth its own issue.
+- **"l1-contracts hash manifest is not reproducible on macOS"** — a pristine base-tree rebuild on
+  macOS (pinned forge, recursive submodules, frozen lockfile) moves every l1-contracts row of
+  `AllContractsHashes.json` while da-contracts reproduces byte-exactly; only the CBOR metadata blob
+  differs (lengths match). Contributors on macOS silently regenerate a manifest CI then disagrees
+  with; worth pinning down the metadata delta (remappings serialization? solc build?) or making
+  `recompute_hashes.sh` refuse on non-linux.
 
 ## 6. Instructions for the human
 
 - **Commits are unsigned** (GPG signing was disabled locally to keep the run non-interactive).
   Before pushing, re-sign them, e.g.:
   `git rebase --exec 'git commit --amend --no-edit -n -S' ae2941eaf`.
+- Commit-hygiene note: `AllContractsHashes.json` was regenerated in one commit and reverted to the
+  base version inside the chain-states commit (it was staged when that commit was made), so it
+  bounces across history; the final tree deliberately matches base (see §3). Squash if you care.
 - Review first: `l1-contracts/contracts/governance/ServerNotifier.sol` (the one production-contract
   behaviour change), then `V33UpgradePreconditionChecker.sol`, then the CTM-admin call ordering in
   `DefaultCTMUpgrade.s.sol` / `CTMUpgrade_v31.s.sol` (the setter call must stay after the
   implementation upgrade in the same `Call[]`).
-- On PR: open as **draft** against `draft/v0.34.0` with the body below; trigger the
-  "Update All Generated Artifacts" workflow (chain-state regeneration; hashes/selectors/zkstack-out
-  are already committed and should come back unchanged).
+- On PR: open as **draft** against `draft/v0.34.0` with the body below, then dispatch the
+  "Update Hashes in PR" workflow — `AllContractsHashes.json` is intentionally at the base version
+  (see §3) and `check-hashes` stays red until the bot commits CI's delta. Chain-states are
+  regenerated on the branch; selectors/zkstack-out are committed and ABI-derived, so they should
+  come back unchanged.
 - Natural reviewers: Protocol team — Kalman Lajko and Stanislav Bezkorovainyi (Stas filed
   EVM-1656 and the always-on-vs-flag decision in §2.1 deliberately deviates from his sketch).
 - Linear: EVM-1656 can move to "In Review" once the PR is up; no comment needed beyond the PR link.
@@ -174,9 +221,14 @@ Exactly one:
 The `UpgradeTimestampUpdated` event, the `protocolVersionToUpgradeTimestamp` mapping, and the
 `setUpgradeTimestamp(uint256,uint256)` ABI consumed by the server watcher, protocol-ops, and
 partner runbooks are unchanged. New externals (`setUpgradePreconditionChecker` — `onlyOwner`,
-`previewUpgradePreconditions` — `view`) are additive. The `L1ContractErrors.sol` addition
-(`UpgradePreconditionCheckerMagicMismatch`) moves solc metadata for every importer, hence the wide
-`AllContractsHashes.json` regeneration.
+`previewUpgradePreconditions` — `view`) are additive. `AllContractsHashes.json` is deliberately
+left at the base version: local (macOS) regeneration proved non-reproducible against CI for every
+l1-contracts row — including on a pristine base tree — so the manifest delta must come from the
+"Update Hashes in PR" workflow rather than an environment nobody can verify. Expect it to add the
+`V33UpgradePreconditionChecker` row and move the importers of the changed sources (ServerNotifier's
+metadata closure and every importer of `L1ContractErrors.sol`, whose error addition shifts their
+metadata). Note `AdminFacet` now transitively pulls `IUpgradePreconditionChecker` into its metadata
+closure (bytecode-metadata only, no behaviour) and will need re-verification on explorers.
 
 ### Storage layout (`ServerNotifier`, base `ae2941eaf` vs this branch)
 
@@ -198,14 +250,15 @@ Also locked at runtime by `ServerNotifierStorageLayoutTest` (`vm.load`-based slo
 See HANDOFF.md §4 (full commands and counts): full foundry suite 2504/2504; new unit suites 9/9 +
 14/14 (+5 layout locks); pre-existing ServerNotifier suite unmodified and green; v31 local
 integration tests green (`--ffi`); anvil-interop v31→v32 upgrade test green end to end with the
-new scheduling assertions; protocol-ops fmt/clippy(-D warnings)/tests green;
-`calculate-hashes:check` green after a clean rebuild; all linters green.
+new scheduling assertions; protocol-ops fmt/clippy(-D warnings)/tests green; all linters green.
+Chain-states regenerated on the branch with the CI recipe.
 
 ### Checklist
 
 - [x] Happy/unhappy/edge-path tests for every new external
 - [x] `errors-lint --fix`, `selectors --fix`, `copy-to-zkstack-out` outputs committed
-- [x] `AllContractsHashes.json` regenerated from a clean rebuild, check passes
+- [x] Chain-states regenerated (CI `state-generation-check` recipe)
 - [x] Storage layout append-only, diffed against the base commit
 - [x] No changes to audited diamond/CTM surfaces; server-facing event/ABI frozen
-- [ ] "Regenerate Anvil Interop Chain States" workflow (ServerNotifier bytecode changed)
+- [ ] Dispatch "Update Hashes in PR" — `AllContractsHashes.json` is at base by design (see PR
+      description); `check-hashes` is red until the bot commits CI's delta

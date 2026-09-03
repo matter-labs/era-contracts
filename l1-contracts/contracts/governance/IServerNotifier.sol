@@ -58,8 +58,10 @@ interface IServerNotifier {
     /// @param _checker The checker to consult in `setUpgradeTimestamp`; zero to deregister.
     function setUpgradePreconditionChecker(uint256 _oldProtocolVersion, IUpgradePreconditionChecker _checker) external;
 
-    /// @notice Non-reverting mirror of `setUpgradeTimestamp`'s validation, for operators and CI.
+    /// @notice Non-reverting mirror of `setUpgradeTimestamp`'s upgrade-cut and precondition
+    /// checks, for operators and CI. It does not cover the caller/timestamp validation, so an
+    /// empty result means the preconditions hold — not that any call will succeed.
     /// @param _chainId The ID of the chain to dry-run scheduling for.
-    /// @return failed The error selectors of every failed check; empty when scheduling would pass.
+    /// @return failed The error selectors of the failed checks; empty when the checks pass.
     function previewUpgradePreconditions(uint256 _chainId) external view returns (bytes4[] memory failed);
 }

@@ -94,15 +94,15 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     // Dry-run the on-chain scheduling preconditions and fail fast with a readable message. The
     // forge simulation below would surface the same failure, but only as a bare revert selector;
     // the on-chain check in `ServerNotifier.setUpgradeTimestamp` stays the source of truth.
-    let server_notifier = crate::common::l1_contracts::resolve_server_notifier(
-        &args.shared.l1_rpc_url,
-        bridgehub,
-        chain_id,
-    )
-    .await
-    .context("resolving ServerNotifier from L1")?;
+    // Queried on `runner.rpc_url` (the anvil fork the simulation runs against, like every other
+    // resolver here), so a prepare flow that upgraded the ServerNotifier only on the fork still
+    // gets a real preview.
+    let server_notifier =
+        crate::common::l1_contracts::resolve_server_notifier(&runner.rpc_url, bridgehub, chain_id)
+            .await
+            .context("resolving ServerNotifier from L1")?;
     match crate::common::l1_contracts::preview_upgrade_preconditions(
-        &args.shared.l1_rpc_url,
+        &runner.rpc_url,
         server_notifier,
         chain_id,
     )
@@ -121,7 +121,8 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         }
         Some(_) => logger::info("On-chain upgrade-scheduling preconditions: OK"),
         None => logger::info(
-            "ServerNotifier predates the precondition preview; relying on the scheduling call's own checks",
+            "No precondition preview available (the deployed ServerNotifier predates it); relying \
+             on the scheduling call's own checks",
         ),
     }
     // The Solidity helper executes through ChainAdmin, but broadcasts from
