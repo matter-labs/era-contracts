@@ -274,7 +274,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
 
     /// @notice Tries to get the new admin from the migration.
     /// @param _call The call data.
-    /// @return Returns a tuple of of the new admin and whether the transaction is indeed the migration.
+    /// @return Returns a tuple of the new admin and whether the transaction is indeed the migration.
     /// If the second item is `false`, the caller should ignore the first value.
     /// @dev If any other error is returned, it is assumed to be out of gas or some other unexpected
     /// error that should be bubbled up by the caller.
