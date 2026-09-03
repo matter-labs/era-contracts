@@ -38,9 +38,9 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 # passes it as the initial owner of two proxies (`initialize(deployer)`) and to the
 # verifier's constructor, so those three CREATE2 addresses are a function of it.
 # Generate with the EOA that will actually broadcast — a placeholder produces a
-# bundle whose `ecosystem.toml` addresses nobody can reproduce. The bundle lists the
-# affected deployments under `deployer_dependent_deployments`, and the deploy
-# workflow refuses to broadcast with a key for a different address.
+# bundle whose `ecosystem.toml` addresses nobody can reproduce. The bundle records it
+# as `deployer_address`, and the deploy workflow refuses to broadcast with a key for a
+# different account.
 #
 # Two artifacts come out:
 #
@@ -48,7 +48,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 #                                         + governance stage 0/1/2 calldata),
 #                                         sim-inputs/, transaction-simulator.json
 #   ecosystem-upgrade-deploy-inputs-<env> the DEPLOY BUNDLE (see below): the
-#                                         deployer calls + provenance + a README
+#                                         deployer calls + provenance
 #
 # The `verify-bundle-handoff` job then re-deploys and re-verifies that bundle from
 # scratch with no contract build. If it is green, the bundle is provably enough to
@@ -408,9 +408,9 @@ jobs:
             exit 1
           fi
           echo "Deployer (impersonated on the fork): $deployer"
-          # Job-scoped. L1_FORK_URL stays masked; DEPLOYER_ADDR is public.
-          # Setting DEPLOYER_ADDR makes `bundle regen` run in impersonation
-          # mode (no signing key required).
+          # Job-scoped. L1_FORK_URL stays masked; DEPLOYER_ADDR is public. Both are
+          # passed to `bundle regen` as flags below; the deployer is impersonated on
+          # the fork (no signing key required).
           {
             echo "L1_FORK_URL=$rpc"
             echo "DEPLOYER_ADDR=$deployer"
@@ -423,29 +423,39 @@ jobs:
       - name: Regenerate + verify calldata
         working-directory: l1-contracts/test/anvil-interop
         env:
+          ENVIRONMENT: ${{ inputs.environment }}
           # zk-governance commit whose AllContractsHashes PUVT uses to verify the
           # redeployed PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard bytecodes.
           ZK_GOVERNANCE_COMMIT: ${{ inputs.zk_governance_commit }}
+          # Read by protocol_ops to find the zk-governance checkout above.
           ZK_GOVERNANCE_DIR: ${{ github.workspace }}/zk-governance
-          # Optional fork-block pin (blank = tip). `bundle regen` reads this.
+          # Optional fork-block pin (blank = tip).
           FORK_BLOCK: ${{ inputs.fork_block }}
           # Recorded in the deploy bundle's metadata (part of the bytecode identity).
           ZKSYNC_FOUNDRY_VERSION: ${{ inputs.zksync_foundry_version }}
         run: |
-          # L1_FORK_URL (masked) + DEPLOYER_ADDR come from $GITHUB_ENV. The script
-          # forks L1_FORK_URL into a local anvil and runs prepare/PUVT against
-          # localhost, so only anvil sees the real RPC. DEPLOYER_ADDR puts it in
-          # impersonation mode (no signing key needed).
-          yarn bundle regen "${{ inputs.environment }}"
+          # L1_FORK_URL (masked), DEPLOYER_ADDR and GW_RPC_URL come from $GITHUB_ENV.
+          # The command forks L1_FORK_URL into a local anvil and runs prepare/PUVT
+          # against localhost, so only anvil sees the real RPC; the deployer is
+          # impersonated (no signing key needed). Blank optional flags are ignored.
+          yarn bundle regen "$ENVIRONMENT" \
+            --fork-url "$L1_FORK_URL" \
+            --deployer "$DEPLOYER_ADDR" \
+            --gw-rpc-url "${GW_RPC_URL:-}" \
+            --zk-governance-commit "$ZK_GOVERNANCE_COMMIT" \
+            --fork-block "$FORK_BLOCK" \
+            --foundry-zksync-version "$ZKSYNC_FOUNDRY_VERSION"
 
       # Produce the same calldata artifact set PR #2268 committed for mainnet:
       # the git-portable `sim-inputs/` handoff set AND the ready-to-paste
       # `transaction-simulator.json`. Two `governance-toml-to-simulator` calls,
       # matching the documented mainnet flow.
       - name: Emit sim-inputs + transaction-simulator.json
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
         run: |
           set -euo pipefail
-          OUT="l1-contracts/upgrade-envs/v0.31.0-interopB/output/${{ inputs.environment }}"
+          OUT="l1-contracts/upgrade-envs/v0.31.0-interopB/output/$ENVIRONMENT"
           BIN=./protocol-ops/target/release/protocol_ops
           # $DEPLOYER_ADDR (resolved earlier) is the Camp-A signer. Its bundles
           # are dropped from the sim-inputs: they're broadcast to the real chain,
@@ -453,7 +463,7 @@ jobs:
           # replaying them would revert.
           # 1) Normalized manifest + Camp-B `*.safe.json` sim-input bundles.
           "$BIN" ecosystem governance-toml-to-simulator \
-            --env "${{ inputs.environment }}" \
+            --env "$ENVIRONMENT" \
             --include-manifest "$OUT/prepare/manifest.json" \
             --camp-a-signers "$DEPLOYER_ADDR" \
             --emit-sim-inputs "$OUT/sim-inputs"
@@ -461,7 +471,7 @@ jobs:
           #    PUH stage 0/1/2 governance ceremony + post-upgrade smoke tests).
           #    --include-manifest defaults to sim-inputs/manifest.json (step 1).
           "$BIN" ecosystem governance-toml-to-simulator \
-            --env "${{ inputs.environment }}" \
+            --env "$ENVIRONMENT" \
             --out "$OUT/transaction-simulator.json"
 
       # Upload only the calldata deliverables. Deliberately NOT anvil.log /
@@ -487,7 +497,6 @@ jobs:
       #   extra-verification-logs.txt                  Etherscan verify commands
       #   bundle-metadata.json                         provenance (commit, hashes,
       #                                                fork block, toolchain)
-      #   README.md                                    the commands to run
       #
       # Consumed by `deploy-ecosystem-upgrade.yaml` (real broadcast) and by the
       # `verify-bundle-handoff` job below (fork rehearsal + PUVT). Safe to publish:
@@ -539,6 +548,26 @@ jobs:
         with:
           submodules: true
 
+      # Tolerated so the next step can explain WHY there is no bundle: the pack
+      # runs right after the prepare, so a prepare that never finished leaves
+      # nothing to hand off (and the upload step, being `always()` +
+      # `if-no-files-found: warn`, still "succeeds" having uploaded nothing).
+      - name: Download the deploy bundle
+        id: download-bundle
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
+          path: ${{ github.workspace }}/deploy-bundle
+
+      - name: Require a bundle to hand off
+        run: |
+          set -euo pipefail
+          if [ ! -f "$GITHUB_WORKSPACE/deploy-bundle/bundle-metadata.json" ]; then
+            echo '::error::No deploy bundle was published, so there is nothing to verify. The bundle is packed straight after `upgrade-prepare-all`, so the generate job failed at or before the prepare — fix that first.'
+            exit 1
+          fi
+
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
@@ -566,26 +595,6 @@ jobs:
       - name: Build protocol_ops
         working-directory: protocol-ops
         run: cargo build --release
-
-      # Tolerated so the next step can explain WHY there is no bundle: the pack
-      # runs right after the prepare, so a prepare that never finished leaves
-      # nothing to hand off (and the upload step, being `always()` +
-      # `if-no-files-found: warn`, still "succeeds" having uploaded nothing).
-      - name: Download the deploy bundle
-        id: download-bundle
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
-          path: ${{ github.workspace }}/deploy-bundle
-
-      - name: Require a bundle to hand off
-        run: |
-          set -euo pipefail
-          if [ ! -f "$GITHUB_WORKSPACE/deploy-bundle/bundle-metadata.json" ]; then
-            echo "::error::No deploy bundle was published, so there is nothing to verify. The bundle is packed straight after `upgrade-prepare-all`, so the generate job failed at or before the prepare — fix that first."
-            exit 1
-          fi
 
       - name: Show the bundle's provenance
         run: |
@@ -634,4 +643,5 @@ jobs:
           # needs no separate cleanup step.
           yarn bundle replay \
             --bundle "$GITHUB_WORKSPACE/deploy-bundle" \
-            --fork-url "$L1_FORK_URL"
+            --fork-url "$L1_FORK_URL" \
+            --gw-rpc-url "${GW_RPC_URL:-}"

@@ -75,11 +75,10 @@ the normalization.
 # 1a) fork + prepare + PUVT (writes ecosystem.toml + prepare/ + extra-verification-logs.txt)
 yarn --cwd l1-contracts/test/anvil-interop install --frozen-lockfile
 export PATH="$PWD/foundry-zksync:$PATH"          # foundry-zksync v0.1.5
-DEPLOYER_ADDR=<deployer-eoa> \
-L1_FORK_URL=<l1-rpc> GW_RPC_URL=<l1-rpc> \
-ZK_GOVERNANCE_COMMIT=9b06a16159cd58add109f25598e79731450d1772 \
 ZK_GOVERNANCE_DIR=../../zk-governance \
-  yarn --cwd l1-contracts/test/anvil-interop bundle regen mainnet
+  yarn --cwd l1-contracts/test/anvil-interop bundle regen mainnet \
+    --fork-url <l1-rpc> --deployer <deployer-eoa> \
+    --zk-governance-commit 9b06a16159cd58add109f25598e79731450d1772
 
 # 1b) emit the sim-inputs + transaction-simulator.json
 OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
@@ -228,14 +227,13 @@ A generation run packs `output/<env>/deploy-bundle/` (uploaded by CI as
 `ecosystem-upgrade-deploy-inputs-<env>`). It is the unit of handoff between the
 machine that compiled the upgrade and whoever deploys or audits it:
 
-| File                          | Why it is in there                                                     |
-| ----------------------------- | ---------------------------------------------------------------------- |
-| `prepare/manifest.json`       | the bundles, in execution order, each with its signer (`target`)       |
-| `prepare/*.safe.json`         | the calls themselves — `to`/`value`/`data`, CREATE2 init code included |
-| `ecosystem.toml`              | the resulting addresses + governance stage 0/1/2 calldata              |
-| `bundle-metadata.json`        | provenance plus SHA-256 for every executable/supporting bundle file    |
-| `extra-verification-logs.txt` | `forge verify-contract` commands, constructor args included            |
-| `README.md`                   | the two commands below, pre-filled for that bundle                     |
+| File                          | Why it is in there                                                                                                     |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `prepare/manifest.json`       | the bundles, in execution order, each with its signer (`target`)                                                       |
+| `prepare/*.safe.json`         | the calls themselves — `to`/`value`/`data`, CREATE2 init code included                                                 |
+| `ecosystem.toml`              | the resulting addresses + governance stage 0/1/2 calldata                                                              |
+| `bundle-metadata.json`        | provenance (commit, hashes digest, fork block, deployer, toolchain) plus the SHA-256 of every other file in the bundle |
+| `extra-verification-logs.txt` | `forge verify-contract` commands, constructor args included                                                            |
 
 **The broadcasting EOA must be the bundle's `deployer_address`.** The deployer is
 not just the fork-rehearsal signer: the prepare passes it as the initial owner of
@@ -243,10 +241,10 @@ two proxies (`initialize(deployer)`) and to `ZKsyncOSDualVerifier`'s constructor
 it sits in their init code and their CREATE2 addresses are a function of it.
 Broadcasting with a different EOA puts those contracts at different addresses while
 `ecosystem.toml` and the governance calldata still name the original ones — a
-silently broken upgrade. The bundle lists them under
-`deployer_dependent_deployments`, its README repeats the required signer, and
-`deploy-ecosystem-upgrade.yaml` refuses to start on a mismatch. Generate with the
-EOA that will deploy; never with a placeholder.
+silently broken upgrade. The bundle records the deployer as `deployer_address` in
+`bundle-metadata.json`; `bundle replay --key` and `deploy-ecosystem-upgrade.yaml` both
+refuse a key for any other account. Generate with the EOA that will deploy; never with
+a placeholder.
 
 Both the replay command and deploy workflow verify the metadata's file digests and
 require its bundle list to exactly match `prepare/manifest.json` before sending any
@@ -284,11 +282,15 @@ yarn --cwd l1-contracts/test/anvil-interop bundle replay \
 
 `--key` signs only the deployer's bundles (`--skip-unkeyed`); the governance
 ceremony bundles stay for their multisig. Same broadcast path, and same
-idempotency, as step 2 above.
+idempotency, as step 2 above. `bundle replay` writes its own state (the fork's
+`anvil.log`, `executed.json`, the receipts in `transactions.txt`) to
+`l1-contracts/upgrade-envs/v0.31.0-interopB/output/<env>/replay/`, never into the
+bundle directory, so a real broadcast's receipts are picked up by a later
+`--verify-only` run on the same machine.
 
 **Pack a bundle by hand** (e.g. from an older generation output):
 
 ```bash
-DEPLOYER_ADDR=<deployer> FORKED_AT_BLOCK=<block> \
-  yarn --cwd l1-contracts/test/anvil-interop bundle pack <env>
+yarn --cwd l1-contracts/test/anvil-interop bundle pack <env> \
+  --deployer <deployer> --forked-at-block <block>
 ```

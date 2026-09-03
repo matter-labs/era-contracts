@@ -42,30 +42,47 @@ export const ERAVM_HASH_RESERVED_OFFSET = 1;
 export const ERAVM_HASH_LENGTH_OFFSET = 2;
 export const MAX_ERAVM_BYTECODE_WORDS = 0xffff;
 
-export const CREATE2_SALT_BYTES = 32;
-export const FUNCTION_SELECTOR_BYTES = 4;
-export const SIGINT_EXIT_CODE = 130;
-export const SIGTERM_EXIT_CODE = 143;
+export const BUNDLE_METADATA_FILE = "bundle-metadata.json";
+/** Generation outputs a bundle must carry, besides the `prepare/*.safe.json` files the manifest names. */
+export const REQUIRED_BUNDLE_FILES = ["prepare/manifest.json", "ecosystem.toml"] as const;
+/** Etherscan verification command logs; `gw-verification-logs.txt` only exists on gateway-enabled envs. */
+export const OPTIONAL_BUNDLE_FILES = ["extra-verification-logs.txt", "gw-verification-logs.txt"] as const;
+/** The per-env real-network broadcast log, committed under `output/<env>/` and read by PUVT. */
+export const TRANSACTIONS_LOG = "transactions.txt";
 
-export const SUPPORTING_BUNDLE_FILES = [
-  "prepare/manifest.json",
-  "ecosystem.toml",
-  "extra-verification-logs.txt",
-  "gw-verification-logs.txt",
+/**
+ * Tracked paths whose modification changes the bytecode or calldata a generation run
+ * produces. `contracts_worktree_dirty` in the bundle metadata is scoped to these, so the
+ * generated files the run itself rewrites (`output/<env>/`, `zkstack-out/`) do not count.
+ */
+export const CONTRACT_SOURCE_PATHSPECS = [
+  "*/foundry.toml",
+  "AllContractsHashes.json",
+  "SystemConfig.json",
+  "configs/genesis",
+  "da-contracts/contracts",
+  "l1-contracts/contracts",
+  "l1-contracts/deploy-scripts",
+  "l1-contracts/upgrade-envs/permanent-values",
+  "l1-contracts/upgrade-envs/v0.31.0-interopB/*.toml",
+  "l2-contracts/contracts",
+  "protocol-ops/src",
+  "system-contracts/contracts",
 ] as const;
-
-export const REQUIRED_SUPPORTING_BUNDLE_FILES = ["prepare/manifest.json", "ecosystem.toml"] as const;
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────────
 
 export const addressSchema = z.string().refine((value) => ethers.utils.isAddress(value), "invalid address");
-export const hexDataSchema = z.string().refine((value) => ethers.utils.isHexString(value), "invalid hex data");
 export const bytes32Schema = z.string().refine((value) => ethers.utils.isHexString(value, 32), "must be 32 bytes");
 export const sha256Schema = z.string().regex(/^[0-9a-f]{64}$/, "invalid SHA-256");
 const bareFileNameSchema = z
   .string()
   .min(1)
   .refine((file) => path.basename(file) === file, "must be a bare file name");
+const bundleRelativePathSchema = z
+  .string()
+  .min(1)
+  .refine((file) => !path.isAbsolute(file) && !file.split("/").includes(".."), "path must stay inside the bundle");
 
 export const packageJsonSchema = z.object({ name: z.string().optional() });
 
@@ -74,48 +91,29 @@ export const manifestBundleSchema = z.object({
   index: z.number().int().nonnegative(),
   file: bareFileNameSchema,
   target: addressSchema,
-  steps: z.array(z.unknown()).optional(),
 });
 export const bundleManifestSchema = z.object({ bundles: z.array(manifestBundleSchema).min(1) });
 
-/** Safe Transaction Builder shape of `prepare/*.safe.json`. */
-export const safeTransactionSchema = z.object({
-  to: addressSchema,
-  value: z.string().default("0"),
-  data: hexDataSchema.default("0x"),
-});
-export const safeBundleSchema = z.object({ transactions: z.array(safeTransactionSchema) });
-
-export const packedBundleSchema = manifestBundleSchema.extend({
-  transaction_count: z.number().int().nonnegative(),
-  is_deployer_bundle: z.boolean().nullable(),
-  sha256: sha256Schema,
-});
-
-/** `bundle-metadata.json`. */
+/** `bundle-metadata.json`: provenance plus the digest of every other file in the bundle. */
 export const deployBundleMetadataSchema = z.object({
   schema: z.literal(DEPLOY_BUNDLE_SCHEMA),
   upgrade: z.string(),
   env: z.string(),
-  protocol_version: z.object({ old: z.array(z.string()), new: z.array(z.string()) }),
   contracts_commit: z.string(),
   contracts_worktree_dirty: z.boolean(),
   all_contracts_hashes_sha256: sha256Schema,
   l1: z.object({ chain_id: z.number().int().nullable(), forked_at_block: z.number().int().nullable() }),
   deployer_address: addressSchema.nullable(),
-  deployer_dependent_deployments: z.array(z.object({ address: addressSchema, contract: z.string() })),
   zk_governance_commit: z.string().nullable(),
   toolchain: z.object({ forge: z.string(), rustc: z.string(), foundry_zksync: z.string().nullable() }),
   generated_by: z.object({ workflow_run: z.string(), runner_os: z.string().nullable() }).nullable(),
-  files: z.record(sha256Schema),
-  bundles: z.array(packedBundleSchema).min(1),
+  files: z.record(bundleRelativePathSchema, sha256Schema),
 });
 
 /** `permanent-values/<env>.toml`, as far as the bundle tooling reads it. */
 export const permanentValuesSchema = z.object({
   l1_chain_id: z.number().int().optional(),
   zk_token_asset_id: bytes32Schema.optional(),
-  permanent_contracts: z.object({ create2_factory_addr: addressSchema.optional() }).optional(),
   new_gateway: z.unknown().optional(),
 });
 /** `v0.31.0-interopB/<env>.toml`, as far as the bundle tooling reads it. */
@@ -125,9 +123,6 @@ export const ecosystemTomlSchema = z.object({ asset_tracker_proxy_addr: addressS
 
 export type ManifestBundle = z.infer<typeof manifestBundleSchema>;
 export type BundleManifest = z.infer<typeof bundleManifestSchema>;
-export type SafeTransaction = z.infer<typeof safeTransactionSchema>;
-export type SafeBundle = z.infer<typeof safeBundleSchema>;
-export type PackedBundle = z.infer<typeof packedBundleSchema>;
 export type DeployBundleMetadata = z.infer<typeof deployBundleMetadataSchema>;
 export type TomlRecord = Record<string, unknown>;
 
@@ -198,25 +193,6 @@ export function requireFile(filePath: string, context = "file"): void {
   }
 }
 
-function escapesDirectory(relativePath: string): boolean {
-  return relativePath === ".." || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath);
-}
-
-export function resolveContainedFile(directory: string, relativePath: string, context: string): string {
-  if (!relativePath) throw new Error(`${context}: empty file path`);
-  const root = fs.realpathSync(directory);
-  const candidatePath = path.resolve(root, relativePath);
-  const unresolvedRelative = path.relative(root, candidatePath);
-  if (escapesDirectory(unresolvedRelative)) {
-    throw new Error(`${context}: ${relativePath}`);
-  }
-  requireFile(candidatePath, context);
-  const candidate = fs.realpathSync(candidatePath);
-  const relative = path.relative(root, candidate);
-  if (escapesDirectory(relative)) throw new Error(`${context}: ${relativePath}`);
-  return candidate;
-}
-
 export function writeCombinedLog(destination: string, sources: string[]): void {
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   const contents = sources.filter((source) => fs.existsSync(source)).map((source) => fs.readFileSync(source));
@@ -258,17 +234,10 @@ export function locateProtocolOps(protocolOpsDirectory = path.join(REPO_ROOT, "p
   throw new Error("protocol_ops binary not found — build it with 'cd protocol-ops && cargo build --release'");
 }
 
-export async function runCommand(
-  command: string,
-  args: string[],
-  options: { cwd?: string; env?: NodeJS.ProcessEnv; quiet?: boolean } = {}
-): Promise<void> {
+/** Run a command with inherited stdio; rejects when it exits non-zero. */
+export async function runCommand(command: string, args: string[]): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: options.env ?? process.env,
-      stdio: options.quiet ? "ignore" : "inherit",
-    });
+    const child = spawn(command, args, { stdio: "inherit" });
     child.once("error", reject);
     child.once("exit", (code, signal) => {
       if (code === 0) resolve();
@@ -277,15 +246,14 @@ export async function runCommand(
   });
 }
 
-export function captureCommand(command: string, args: string[], cwd?: string, fallback?: string): string {
+/** Trimmed stdout of a command, or `undefined` when it cannot run or exits non-zero. */
+export function tryCaptureCommand(command: string, args: string[], cwd?: string): string | undefined {
   const result = spawnSync(command, args, { cwd, encoding: "utf8" });
-  if (result.status === 0) return result.stdout.trim();
-  if (fallback !== undefined) return fallback;
-  throw new Error(`${command} failed: ${(result.stderr || result.stdout).trim()}`);
+  return result.status === 0 ? result.stdout.trim() : undefined;
 }
 
-export function commandSucceeds(command: string, args: string[], cwd?: string): boolean {
-  return spawnSync(command, args, { cwd, stdio: "ignore" }).status === 0;
+export function captureCommand(command: string, args: string[], cwd: string | undefined, fallback: string): string {
+  return tryCaptureCommand(command, args, cwd) ?? fallback;
 }
 
 // ─── Upgrade environments ────────────────────────────────────────────────────────

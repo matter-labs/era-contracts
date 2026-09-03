@@ -6,6 +6,7 @@ import { afterEach, describe, it } from "node:test";
 import { ethers } from "ethers";
 import { packDeployBundle, verifyBundleIntegrity } from "./bundle";
 import {
+  BUNDLE_METADATA_FILE,
   DEPLOY_BUNDLE_SCHEMA,
   deployBundleMetadataSchema,
   fileSha256,
@@ -17,8 +18,9 @@ import { restoreCanonicalDefaultAccountArtifact, zkBytecodeHash } from "./defaul
 import { replayBundleAndVerify } from "./flows";
 
 const temporaryDirectories: string[] = [];
-const TEST_BUNDLE_TARGET = "0x0000000000000000000000000000000000000002";
+const TEST_DEPLOYER = "0x0000000000000000000000000000000000000002";
 const TEST_TRANSACTION_TARGET = "0x0000000000000000000000000000000000000003";
+const TEST_BUNDLE_FILES = ["ecosystem.toml", "prepare/01.safe.json", "prepare/manifest.json"];
 
 function temporaryDirectory(): string {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "upgrade-bundle-test-"));
@@ -31,43 +33,38 @@ function writeJson(filePath: string, value: unknown): void {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function createValidBundle(): string {
-  const directory = temporaryDirectory();
-  const safePath = path.join(directory, "prepare/01.safe.json");
-  const manifestPath = path.join(directory, "prepare/manifest.json");
-  const ecosystemPath = path.join(directory, "ecosystem.toml");
-  const manifest = { bundles: [{ index: 1, file: "01.safe.json", target: TEST_BUNDLE_TARGET, steps: [] }] };
-  writeJson(safePath, { transactions: [{ to: TEST_TRANSACTION_TARGET, value: "0", data: "0x" }] });
-  writeJson(manifestPath, manifest);
-  fs.writeFileSync(ecosystemPath, "old_protocol_version = 1\nnew_protocol_version = 2\n");
+function writeManifest(directory: string, bundles: unknown[]): void {
+  writeJson(path.join(directory, "prepare/manifest.json"), { bundles });
+}
+
+/** Metadata whose `files` digests match what is currently on disk. */
+function writeMetadata(directory: string, patch: Partial<DeployBundleMetadata> = {}): void {
   const metadata: DeployBundleMetadata = {
     schema: DEPLOY_BUNDLE_SCHEMA,
     upgrade: "v0.31.0-interopB",
     env: "stage",
-    protocol_version: { old: ["0x1"], new: ["0x2"] },
     contracts_commit: "test",
     contracts_worktree_dirty: false,
     all_contracts_hashes_sha256: "0".repeat(64),
     l1: { chain_id: 1, forked_at_block: 1 },
-    deployer_address: TEST_BUNDLE_TARGET,
-    deployer_dependent_deployments: [],
+    deployer_address: TEST_DEPLOYER,
     zk_governance_commit: null,
     toolchain: { forge: "test", rustc: "test", foundry_zksync: null },
     generated_by: null,
-    files: {
-      "prepare/manifest.json": fileSha256(manifestPath),
-      "ecosystem.toml": fileSha256(ecosystemPath),
-    },
-    bundles: [
-      {
-        ...manifest.bundles[0],
-        transaction_count: 1,
-        is_deployer_bundle: true,
-        sha256: fileSha256(safePath),
-      },
-    ],
+    files: Object.fromEntries(TEST_BUNDLE_FILES.map((file) => [file, fileSha256(path.join(directory, file))])),
+    ...patch,
   };
-  writeJson(path.join(directory, "bundle-metadata.json"), metadata);
+  writeJson(path.join(directory, BUNDLE_METADATA_FILE), metadata);
+}
+
+function createValidBundle(): string {
+  const directory = temporaryDirectory();
+  writeJson(path.join(directory, "prepare/01.safe.json"), {
+    transactions: [{ to: TEST_TRANSACTION_TARGET, value: "0", data: "0x" }],
+  });
+  writeManifest(directory, [{ index: 1, file: "01.safe.json", target: TEST_DEPLOYER }]);
+  fs.writeFileSync(path.join(directory, "ecosystem.toml"), "old_protocol_version = 1\nnew_protocol_version = 2\n");
+  writeMetadata(directory);
   return directory;
 }
 
@@ -88,10 +85,9 @@ describe("loadUpgradeEnvironment", () => {
 });
 
 describe("verifyBundleIntegrity", () => {
-  it("accepts a complete bundle whose manifest and digests match", () => {
-    const directory = createValidBundle();
-    const metadata = verifyBundleIntegrity(directory);
-    assert.strictEqual(metadata.bundles.length, 1);
+  it("accepts a bundle whose files match their recorded digests", () => {
+    const metadata = verifyBundleIntegrity(createValidBundle());
+    assert.deepStrictEqual(Object.keys(metadata.files).sort(), TEST_BUNDLE_FILES);
   });
 
   it("rejects modified transaction bytes", () => {
@@ -100,33 +96,36 @@ describe("verifyBundleIntegrity", () => {
     assert.throws(() => verifyBundleIntegrity(directory), /SHA-256 mismatch for prepare\/01\.safe\.json/);
   });
 
-  it("rejects a manifest that executes a different bundle", () => {
+  it("rejects a manifest edited after packing", () => {
     const directory = createValidBundle();
-    const manifestPath = path.join(directory, "prepare/manifest.json");
-    writeJson(manifestPath, { bundles: [{ index: 2, file: "01.safe.json", target: TEST_BUNDLE_TARGET }] });
-    const metadataPath = path.join(directory, "bundle-metadata.json");
-    const metadata = readJsonAs(metadataPath, deployBundleMetadataSchema);
-    metadata.files["prepare/manifest.json"] = fileSha256(manifestPath);
-    writeJson(metadataPath, metadata);
-    assert.throws(() => verifyBundleIntegrity(directory), /bundle list does not match/);
+    writeManifest(directory, [{ index: 2, file: "01.safe.json", target: TEST_DEPLOYER }]);
+    assert.throws(() => verifyBundleIntegrity(directory), /SHA-256 mismatch for prepare\/manifest\.json/);
+  });
+
+  it("rejects a manifest naming a bundle file the metadata does not cover", () => {
+    const directory = createValidBundle();
+    writeManifest(directory, [{ index: 1, file: "02.safe.json", target: TEST_DEPLOYER }]);
+    writeMetadata(directory);
+    assert.throws(
+      () => verifyBundleIntegrity(directory),
+      /prepare\/02\.safe\.json is in the manifest but not in the metadata/
+    );
   });
 
   it("rejects invalid signer addresses", () => {
     const directory = createValidBundle();
-    const metadataPath = path.join(directory, "bundle-metadata.json");
-    const metadata = readJsonAs(metadataPath, deployBundleMetadataSchema);
-    metadata.bundles[0].target = "0xabc";
-    writeJson(metadataPath, metadata);
+    writeManifest(directory, [{ index: 1, file: "01.safe.json", target: "0xabc" }]);
+    writeMetadata(directory);
     assert.throws(() => verifyBundleIntegrity(directory), /bundles\.0\.target: invalid address/);
   });
 
-  it("rejects supporting files outside the bundle", () => {
+  it("rejects files outside the bundle", () => {
     const directory = createValidBundle();
-    const metadataPath = path.join(directory, "bundle-metadata.json");
+    const metadataPath = path.join(directory, BUNDLE_METADATA_FILE);
     const metadata = readJsonAs(metadataPath, deployBundleMetadataSchema);
     metadata.files["../outside.txt"] = "0".repeat(64);
     writeJson(metadataPath, metadata);
-    assert.throws(() => verifyBundleIntegrity(directory), /file escapes bundle directory: \.\.\/outside\.txt/);
+    assert.throws(() => verifyBundleIntegrity(directory), /path must stay inside the bundle/);
   });
 });
 
@@ -156,9 +155,11 @@ describe("replayBundleAndVerify", () => {
     await assert.rejects(
       replayBundleAndVerify({
         bundleDirectory: createValidBundle(),
-        rpcUrl: "http://localhost:8545",
-        deployerKey: ethers.Wallet.createRandom().privateKey,
-        verifyOnly: false,
+        mode: {
+          kind: "broadcast",
+          rpcUrl: "http://localhost:8545",
+          deployerKey: ethers.Wallet.createRandom().privateKey,
+        },
       }),
       /private key does not match the bundle deployer/
     );
@@ -166,48 +167,34 @@ describe("replayBundleAndVerify", () => {
 });
 
 describe("packDeployBundle", () => {
-  it("creates a self-consistent bundle and a runnable TypeScript handoff", () => {
+  it("copies the generation output and records a digest for every file", () => {
     const directory = temporaryDirectory();
     const outputDirectory = path.join(directory, "output");
-    const prepareDirectory = path.join(outputDirectory, "prepare");
     const repositoryRoot = path.join(directory, "repository");
     const permanentValuesPath = path.join(directory, "permanent-values.toml");
     const bundleDirectory = path.join(directory, "packed");
-    fs.mkdirSync(prepareDirectory, { recursive: true });
     fs.mkdirSync(repositoryRoot, { recursive: true });
     writeJson(path.join(repositoryRoot, "AllContractsHashes.json"), []);
-    fs.writeFileSync(
-      permanentValuesPath,
-      [
-        "l1_chain_id = 11155111",
-        "[permanent_contracts]",
-        "create2_factory_addr = " + JSON.stringify("0x0000000000000000000000000000000000000001"),
-        "",
-      ].join("\n")
-    );
-    fs.writeFileSync(
-      path.join(outputDirectory, "ecosystem.toml"),
-      "old_protocol_version = 1\nnew_protocol_version = 2\n"
-    );
-    writeJson(path.join(prepareDirectory, "manifest.json"), {
-      bundles: [{ index: 1, file: "01.safe.json", target: TEST_BUNDLE_TARGET, steps: ["deploy"] }],
-    });
-    writeJson(path.join(prepareDirectory, "01.safe.json"), {
-      transactions: [
-        {
-          to: "0x0000000000000000000000000000000000000001",
-          value: "0",
-          data: `0x${"11".repeat(32)}`,
-        },
-      ],
+    fs.writeFileSync(permanentValuesPath, "l1_chain_id = 11155111\n");
+    fs.mkdirSync(outputDirectory, { recursive: true });
+    fs.writeFileSync(path.join(outputDirectory, "ecosystem.toml"), "old_protocol_version = 1\n");
+    writeManifest(outputDirectory, [{ index: 1, file: "01.safe.json", target: TEST_DEPLOYER }]);
+    writeJson(path.join(outputDirectory, "prepare/01.safe.json"), {
+      transactions: [{ to: TEST_TRANSACTION_TARGET, value: "0", data: `0x${"11".repeat(32)}` }],
     });
 
-    packDeployBundle("stage", { outputDirectory, permanentValuesPath, repositoryRoot, bundleDirectory });
+    packDeployBundle("stage", {
+      outputDirectory,
+      permanentValuesPath,
+      repositoryRoot,
+      bundleDirectory,
+      provenance: { deployerAddress: TEST_DEPLOYER, forkedAtBlock: 42 },
+    });
 
     const metadata = verifyBundleIntegrity(bundleDirectory);
-    assert.deepStrictEqual(metadata.protocol_version, { old: ["0x1"], new: ["0x2"] });
-    const readme = fs.readFileSync(path.join(bundleDirectory, "README.md"), "utf8");
-    assert.match(readme, /yarn --cwd l1-contracts\/test\/anvil-interop bundle replay/);
-    assert.match(readme, /CREATE2 deploy/);
+    assert.deepStrictEqual(Object.keys(metadata.files).sort(), TEST_BUNDLE_FILES);
+    assert.deepStrictEqual(metadata.l1, { chain_id: 11155111, forked_at_block: 42 });
+    assert.strictEqual(metadata.deployer_address, TEST_DEPLOYER);
+    assert.deepStrictEqual(fs.readdirSync(bundleDirectory).sort(), [BUNDLE_METADATA_FILE, "ecosystem.toml", "prepare"]);
   });
 });

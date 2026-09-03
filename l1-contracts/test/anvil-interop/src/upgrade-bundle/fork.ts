@@ -12,8 +12,6 @@ import {
   ANVIL_STOP_TIMEOUT_MS,
   BUNDLE_TARGET_TOKEN_FUNDING,
   PROTOCOL_OPS_MEMORY_LIMIT,
-  SIGINT_EXIT_CODE,
-  SIGTERM_EXIT_CODE,
   bundleManifestSchema,
   ecosystemTomlSchema,
   locateProtocolOps,
@@ -21,6 +19,7 @@ import {
   readTomlAs,
   runCommand,
 } from "./common";
+import type { UpgradeEnvironment } from "./common";
 
 // ─── Anvil fork ──────────────────────────────────────────────────────────────────
 
@@ -28,7 +27,7 @@ function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-async function isReady(provider: ethers.providers.JsonRpcProvider): Promise<boolean> {
+async function isServing(provider: ethers.providers.JsonRpcProvider): Promise<boolean> {
   try {
     await provider.send("eth_chainId", []);
     return true;
@@ -37,42 +36,36 @@ async function isReady(provider: ethers.providers.JsonRpcProvider): Promise<bool
   }
 }
 
-async function stopProcess(child: ChildProcess): Promise<void> {
-  if (!child.pid || child.exitCode !== null) return;
-  const exitPromise = new Promise<boolean>((resolve) => child.once("exit", () => resolve(true)));
-  child.kill("SIGTERM");
-  const exited = await Promise.race([exitPromise, delay(ANVIL_STOP_TIMEOUT_MS).then(() => false)]);
-  if (!exited && child.exitCode === null) child.kill("SIGKILL");
-}
-
 export interface AnvilForkOptions {
   port: number;
   forkUrl: string;
+  /** Pin the fork to this L1 height; defaults to the chain tip. */
   forkBlock?: number;
   logPath: string;
 }
 
+/** A local anvil fork of L1 with every account impersonatable. */
 export class AnvilFork {
   public readonly rpcUrl: string;
   public readonly provider: ethers.providers.JsonRpcProvider;
-  private child?: ChildProcess;
-  private disposed = false;
+  /** The L1 height the fork was taken at. */
+  public readonly forkedAtBlock: number;
+  private readonly child: ChildProcess;
 
-  private constructor(rpcUrl: string, child?: ChildProcess) {
+  private constructor(rpcUrl: string, forkedAtBlock: number, child: ChildProcess) {
     this.rpcUrl = rpcUrl;
     this.provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+    this.forkedAtBlock = forkedAtBlock;
     this.child = child;
   }
 
-  public static async connectOrStart(options: AnvilForkOptions): Promise<AnvilFork> {
+  public static async start(options: AnvilForkOptions): Promise<AnvilFork> {
     const rpcUrl = `http://localhost:${options.port}`;
-    const existing = new ethers.providers.JsonRpcProvider(rpcUrl);
-    if (await isReady(existing)) {
-      console.log(`=== Step 0: reusing anvil on ${rpcUrl} ===`);
-      return new AnvilFork(rpcUrl);
+    const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+    if (await isServing(provider)) {
+      throw new Error(`something is already listening on ${rpcUrl}; stop it before starting a fork on that port`);
     }
 
-    console.log(`=== Step 0: anvil fork on port ${options.port} ===`);
     const args = [
       "--port",
       String(options.port),
@@ -83,10 +76,7 @@ export class AnvilFork {
       "--fork-url",
       options.forkUrl,
     ];
-    if (options.forkBlock !== undefined) {
-      console.log(`    pinning fork to block ${options.forkBlock}`);
-      args.push("--fork-block-number", String(options.forkBlock));
-    }
+    if (options.forkBlock !== undefined) args.push("--fork-block-number", String(options.forkBlock));
 
     fs.mkdirSync(path.dirname(options.logPath), { recursive: true });
     const log = fs.openSync(options.logPath, "w");
@@ -97,60 +87,44 @@ export class AnvilFork {
       child.once("error", reject);
     });
 
-    const fork = new AnvilFork(rpcUrl, child);
     for (let attempt = 0; attempt < ANVIL_READY_ATTEMPTS; attempt += 1) {
-      if (await isReady(fork.provider)) return fork;
+      if (await isServing(provider)) return new AnvilFork(rpcUrl, await provider.getBlockNumber(), child);
       if (child.exitCode !== null) {
         throw new Error(`anvil exited with code ${child.exitCode} before becoming ready (see ${options.logPath})`);
       }
       await delay(ANVIL_READY_DELAY_MS);
     }
-    await fork.dispose(false);
+    child.kill("SIGKILL");
     throw new Error(`anvil failed to start (see ${options.logPath})`);
   }
 
-  public async run<T>(keepAlive: boolean, action: (fork: AnvilFork) => Promise<T>): Promise<T> {
-    const exitAfterCleanup = (exitCode: number): void => {
-      void this.dispose(keepAlive).finally(() => process.exit(exitCode));
-    };
-    const interruptHandler = (): void => exitAfterCleanup(SIGINT_EXIT_CODE);
-    const terminateHandler = (): void => exitAfterCleanup(SIGTERM_EXIT_CODE);
-    process.once("SIGINT", interruptHandler);
-    process.once("SIGTERM", terminateHandler);
-    try {
-      return await action(this);
-    } finally {
-      process.removeListener("SIGINT", interruptHandler);
-      process.removeListener("SIGTERM", terminateHandler);
-      await this.dispose(keepAlive);
-    }
-  }
-
+  /** Pin the next block's base fee to the gas price the bundles were priced at. */
   public async setNextBlockBaseFee(): Promise<void> {
     await this.provider.send("anvil_setNextBlockBaseFeePerGas", [ANVIL_GAS_PRICE.toHexString()]);
   }
 
-  private async dispose(keepAlive: boolean): Promise<void> {
-    if (this.disposed || !this.child) return;
-    this.disposed = true;
-    const child = this.child;
-    this.child = undefined;
-    if (keepAlive) {
-      console.log(`Leaving anvil (pid ${child.pid}) running on ${this.rpcUrl} (KEEP_ANVIL=1)`);
-      child.unref();
-      return;
-    }
-    console.log(`Stopping anvil (pid ${child.pid})...`);
-    await stopProcess(child);
+  public async stop(): Promise<void> {
+    if (this.child.exitCode !== null) return;
+    const exited = new Promise<boolean>((resolve) => this.child.once("exit", () => resolve(true)));
+    this.child.kill("SIGTERM");
+    if (!(await Promise.race([exited, delay(ANVIL_STOP_TIMEOUT_MS).then(() => false)]))) this.child.kill("SIGKILL");
+  }
+}
+
+/** Start a fork, run `action` against it and always stop the fork afterwards. */
+export async function withAnvilFork<T>(options: AnvilForkOptions, action: (fork: AnvilFork) => Promise<T>): Promise<T> {
+  const fork = await AnvilFork.start(options);
+  try {
+    return await action(fork);
+  } finally {
+    await fork.stop();
   }
 }
 
 // ─── Funding ─────────────────────────────────────────────────────────────────────
 
 export interface FundBundleTargetsOptions {
-  bridgehubAddress: string;
-  zkAssetId: string;
-  hasGateway: boolean;
+  environment: UpgradeEnvironment;
   manifestPath: string;
   ecosystemTomlPath: string;
   deployerAddress: string;
@@ -160,12 +134,13 @@ export async function fundBundleTargets(
   provider: ethers.providers.JsonRpcProvider,
   options: FundBundleTargetsOptions
 ): Promise<void> {
-  const bridgehub = new ethers.Contract(options.bridgehubAddress, getAbi("L1Bridgehub"), provider);
+  const { bridgehubAddress, zkAssetId, hasGateway } = options.environment;
+  const bridgehub = new ethers.Contract(bridgehubAddress, getAbi("L1Bridgehub"), provider);
   const assetRouterAddress = ethers.utils.getAddress(await bridgehub.assetRouter());
   const assetRouter = new ethers.Contract(assetRouterAddress, getAbi("L1AssetRouter"), provider);
   const nativeTokenVaultAddress = ethers.utils.getAddress(await assetRouter.nativeTokenVault());
   const nativeTokenVault = new ethers.Contract(nativeTokenVaultAddress, getAbi("L1NativeTokenVault"), provider);
-  const zkTokenAddress = ethers.utils.getAddress(await nativeTokenVault.tokenAddress(options.zkAssetId));
+  const zkTokenAddress = ethers.utils.getAddress(await nativeTokenVault.tokenAddress(zkAssetId));
 
   console.log(`Asset router:      ${assetRouterAddress}`);
   console.log(`Native token vault: ${nativeTokenVaultAddress}`);
@@ -185,12 +160,12 @@ export async function fundBundleTargets(
   for (const target of targets) {
     await provider.send("anvil_setBalance", [target, ANVIL_BALANCE.toHexString()]);
     console.log(
-      `  bridgeMint(${target}, ${BUNDLE_TARGET_TOKEN_FUNDING.toString()})${options.hasGateway ? "" : " [best-effort]"}`
+      `  bridgeMint(${target}, ${BUNDLE_TARGET_TOKEN_FUNDING.toString()})${hasGateway ? "" : " [best-effort]"}`
     );
     try {
       await (await zkToken.bridgeMint(target, BUNDLE_TARGET_TOKEN_FUNDING)).wait();
     } catch (error) {
-      if (options.hasGateway) throw error;
+      if (hasGateway) throw error;
     }
   }
 
@@ -206,9 +181,9 @@ export async function fundBundleTargets(
     getAbi("L1AssetTracker"),
     provider.getSigner(ethers.utils.getAddress(options.deployerAddress))
   );
-  console.log(`  registerLegacyToken(${options.zkAssetId}) on ${assetTracker.address}`);
+  console.log(`  registerLegacyToken(${zkAssetId}) on ${assetTracker.address}`);
   try {
-    await (await assetTracker.registerLegacyToken(options.zkAssetId)).wait();
+    await (await assetTracker.registerLegacyToken(zkAssetId)).wait();
   } catch {
     // The setup is intentionally idempotent: registration may already exist.
   }

@@ -571,7 +571,7 @@ async function main(): Promise<void> {
         "",
         "  # phases 1 + 1.5 — prepare + fork-replay + PUVT",
         "  cd l1-contracts/test/anvil-interop && \\",
-        "    DEPLOYER_PK_FILE=~/.test_pk L1_FORK_URL=<sepolia-rpc> yarn bundle regen",
+        "    yarn bundle regen stage --fork-url <sepolia-rpc> --deployer <deployer-eoa>",
         "",
         "  # phase 2 — real-Sepolia broadcast",
         "  protocol_ops ecosystem upgrade-broadcast --manifest <prepare>/manifest.json \\",

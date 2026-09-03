@@ -64,6 +64,9 @@ l1-contracts/upgrade-envs/**/output/**/fork-rehearsal/
 # and re-verifies the upgrade. Machine-specific by construction (it pins the
 # generating build's bytecode), so it is never committed.
 l1-contracts/upgrade-envs/**/output/**/deploy-bundle/
+# Replay state (`bundle replay`): the fork's anvil.log and a real broadcast's receipts.
+# Kept out of the bundle directory, which is the handoff artifact.
+l1-contracts/upgrade-envs/**/output/**/replay/
 l1-contracts/test/foundry/l1/integration/deploy-scripts/script-out/*.toml
 !l1-contracts/script-out/.gitkeep
 *.timestamp
