@@ -298,7 +298,7 @@ npx ts-node setup-and-dump-state.ts
 
 3. **L1-context vs L2-context tests**: Tests in `l2-tests-in-l1-context` run L2 logic in an L1 environment. Some L2 system contract features may not work as expected in these tests, so assertions should account for this limitation.
 
-4. **zkstack-out artifacts out of date**: If CI fails with "l1-contracts/zkstack-out is out of date", you need to regenerate the compiled artifacts. This happens when you modify interface files (e.g., adding events, functions). Run:
+4. **zkstack-out artifacts out of date**: If CI fails with "l1-contracts/zkstack-out is out of date", the compiled artifacts need regenerating. This happens when you modify interface files (e.g., adding events, functions). On a draft PR, ignore this failure — see "Generated Artifacts and Draft-PR CI Policy" below. When preparing for merge, prefer the **Update All Generated Artifacts** dispatch (fixes this together with hashes and selectors); the manual alternative is:
 
    ```bash
    cd l1-contracts
@@ -310,7 +310,7 @@ npx ts-node setup-and-dump-state.ts
 
    Then commit the updated JSON files in `zkstack-out/`.
 
-5. **Selectors out of date**: If CI fails with selectors check, regenerate them:
+5. **Selectors out of date**: If CI fails with selectors check, the same policy applies: ignore on a draft PR, and when preparing for merge prefer the **Update All Generated Artifacts** dispatch. Manual alternative:
 
    ```bash
    cd l1-contracts
@@ -318,6 +318,23 @@ npx ts-node setup-and-dump-state.ts
    ```
 
    Then commit the updated `selectors` file.
+
+## Generated Artifacts and Draft-PR CI Policy
+
+The repo commits several build-derived artifacts: `AllContractsHashes.json`, `l1-contracts/selectors`, `l1-contracts/zkstack-out/`, and the anvil-interop chain-state snapshots (`l1-contracts/test/anvil-interop/chain-states/`). Any contract bytecode change invalidates all of them, and the only fix is a regeneration + commit.
+
+**Regenerate once per PR, right before merge — never per commit.**
+
+Open PRs as **drafts** while iterating. While a PR is in draft / under active development:
+
+- Do NOT regenerate these artifacts after every change, locally or via CI dispatch.
+- Red CI on `check-hashes`, `check-selectors`, `check-zkstack-out`, or `state-generation-check` is EXPECTED and ACCEPTABLE on a draft PR. Do not spend time investigating these failures, do not treat them as blockers, and do not try to fix them — they will all be cleared by the single pre-merge regeneration.
+- Stale chain-state snapshots also break the tests that consume them: the anvil-interop integration tests load contract bytecode from the snapshots, so after a bytecode change they may fail — or silently exercise the old code — until the snapshots are regenerated. When interop tests fail right after a contract change, suspect snapshot staleness before debugging the contracts; to run the suite against your actual code locally, use `ANVIL_INTEROP_FRESH_DEPLOY=1`.
+
+When the PR is done and ready to merge:
+
+1. Dispatch the **Update All Generated Artifacts** workflow (Actions tab) with the PR number. One dispatch regenerates and commits everything to the PR branch: hashes + selectors + zkstack-out, then the chain-state snapshots. Never regenerate `AllContractsHashes.json` or the chain states locally — local toolchains (macOS zksolc in particular) diverge from CI, and CI is the only oracle.
+2. Mark the PR **ready for review** and get all checks green before merging.
 
 ## Before Pushing Changes
 
