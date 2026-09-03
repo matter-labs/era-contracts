@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
+import {IUpgradePreconditionChecker} from "../upgrades/IUpgradePreconditionChecker.sol";
 
 /// @title IServerNotifier
 /// @notice Events and external API for ServerNotifier.
@@ -22,6 +23,11 @@ interface IServerNotifier {
     /// @param upgradeTimestamp UNIX timestamp when the upgrade is expected.
     event UpgradeTimestampUpdated(uint256 indexed chainId, uint256 indexed protocolVersion, uint256 upgradeTimestamp);
 
+    /// @notice Emitted whenever the precondition checker registered for a protocol version changes.
+    /// @param protocolVersion The old protocol version the checker guards scheduling from.
+    /// @param checker The registered checker; zero when deregistered.
+    event UpgradePreconditionCheckerSet(uint256 indexed protocolVersion, address checker);
+
     /// @notice Returns the upgrade timestamp for a specific chain ID and protocol version.
     /// @param _chainId The ID of the chain to query.
     /// @param _oldProtocolVersion The protocol version to query.
@@ -38,4 +44,25 @@ interface IServerNotifier {
     function migrateFromGateway(uint256 _chainId) external;
 
     function setUpgradeTimestamp(uint256 _chainId, uint256 _upgradeTimestamp) external;
+
+    /// @notice Returns the precondition checker consulted when scheduling an upgrade away from a
+    /// protocol version; zero when that version has no extra scheduling checks.
+    /// @param _oldProtocolVersion The protocol version chains upgrade *from*.
+    function upgradePreconditionChecker(
+        uint256 _oldProtocolVersion
+    ) external view returns (IUpgradePreconditionChecker);
+
+    /// @notice Registers (or, with the zero address, deregisters) the precondition checker for a
+    /// protocol version; see {protocol-docs/upgrade-scheduling.md}.
+    /// @param _oldProtocolVersion The protocol version chains upgrade *from*.
+    /// @param _checker The checker to consult in `setUpgradeTimestamp`; zero to deregister.
+    function setUpgradePreconditionChecker(
+        uint256 _oldProtocolVersion,
+        IUpgradePreconditionChecker _checker
+    ) external;
+
+    /// @notice Non-reverting mirror of `setUpgradeTimestamp`'s validation, for operators and CI.
+    /// @param _chainId The ID of the chain to dry-run scheduling for.
+    /// @return failed The error selectors of every failed check; empty when scheduling would pass.
+    function previewUpgradePreconditions(uint256 _chainId) external view returns (bytes4[] memory failed);
 }

@@ -6,11 +6,16 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 import {
     CutDataForProtocolVersionNotAvailable,
     Unauthorized,
+    UpgradePreconditionCheckerMagicMismatch,
     ZeroAddress,
     ZeroUpgradeTimestamp
 } from "../common/L1ContractErrors.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IServerNotifier} from "./IServerNotifier.sol";
+import {
+    IUpgradePreconditionChecker,
+    UPGRADE_PRECONDITION_CHECKER_MAGIC
+} from "../upgrades/IUpgradePreconditionChecker.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
@@ -29,6 +34,11 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
     /// @notice Maps each chainId => protocolVersion => expected upgrade timestamp.
     mapping(uint256 chainId => mapping(uint256 oldProtocolVersion => uint256 upgradeTimestamp))
         public protocolVersionToUpgradeTimestamp;
+
+    /// @inheritdoc IServerNotifier
+    mapping(uint256 oldProtocolVersion => IUpgradePreconditionChecker checker)
+        public
+        override upgradePreconditionChecker;
 
     /// @notice Modifier to ensure the caller is the administrator of the specified chain.
     /// @param _chainId The ID of the chain that requires the caller to be an admin.
@@ -110,7 +120,44 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
         if (chainTypeManager.upgradeCutHash(_oldProtocolVersion) == bytes32(0)) {
             revert CutDataForProtocolVersionNotAvailable(_oldProtocolVersion);
         }
+        // Footgun check, mirrored from the upgrade's own execution-time requirements; see
+        // {protocol-docs/upgrade-scheduling.md}.
+        IUpgradePreconditionChecker checker = upgradePreconditionChecker[_oldProtocolVersion];
+        if (address(checker) != address(0)) {
+            checker.checkUpgradePreconditions(_chainId, chainTypeManager.getZKChain(_chainId));
+        }
         protocolVersionToUpgradeTimestamp[_chainId][_oldProtocolVersion] = _upgradeTimestamp;
         emit UpgradeTimestampUpdated(_chainId, _oldProtocolVersion, _upgradeTimestamp);
+    }
+
+    /// @inheritdoc IServerNotifier
+    function setUpgradePreconditionChecker(
+        uint256 _oldProtocolVersion,
+        IUpgradePreconditionChecker _checker
+    ) external onlyOwner {
+        if (address(_checker) != address(0)) {
+            // A plain call, not a probe: registering a contract that does not implement the
+            // interface must revert loudly here rather than brick scheduling later.
+            if (_checker.getSupportsUpgradePreconditionCheckerMagic() != UPGRADE_PRECONDITION_CHECKER_MAGIC) {
+                revert UpgradePreconditionCheckerMagicMismatch(address(_checker));
+            }
+        }
+        upgradePreconditionChecker[_oldProtocolVersion] = _checker;
+        emit UpgradePreconditionCheckerSet(_oldProtocolVersion, address(_checker));
+    }
+
+    /// @inheritdoc IServerNotifier
+    function previewUpgradePreconditions(uint256 _chainId) external view returns (bytes4[] memory failed) {
+        uint256 oldProtocolVersion = chainTypeManager.getProtocolVersion(_chainId);
+        if (chainTypeManager.upgradeCutHash(oldProtocolVersion) == bytes32(0)) {
+            failed = new bytes4[](1);
+            failed[0] = CutDataForProtocolVersionNotAvailable.selector;
+            return failed;
+        }
+        IUpgradePreconditionChecker checker = upgradePreconditionChecker[oldProtocolVersion];
+        if (address(checker) == address(0)) {
+            return failed;
+        }
+        failed = checker.previewUpgradePreconditions(_chainId, chainTypeManager.getZKChain(_chainId));
     }
 }
