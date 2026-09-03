@@ -382,6 +382,22 @@ pub struct GovernanceTomlToSimulatorArgs {
     #[clap(long, value_delimiter = ',', num_args = 1..)]
     pub camp_a_signers: Vec<Address>,
 
+    /// Drop the `test_*` smoke transactions the prepare appends
+    /// (`test_create_chain_*`, `test_upgrade_chain_*`), emitting only the
+    /// governance ceremony and the Camp-B bundles.
+    ///
+    /// Those smoke tests exercise a *live* chain, so some of their
+    /// preconditions are races rather than properties of the calldata. The
+    /// v33 per-chain upgrade is the clearest case: it requires
+    /// `getFirstUnprocessedPriorityTx() >= lowerBound`, but the bound is
+    /// pinned at `getTotalPriorityTxs()` during the same run — so any deposit
+    /// that arrives between the fork and the pin makes the cut revert with
+    /// `PriorityQueueNotReady()`. On a real rollout the operator waits for the
+    /// queue to drain; a static fork never does. Use this when committing a
+    /// scenario that CI must pass deterministically.
+    #[clap(long, default_value_t = false)]
+    pub skip_test_upgrade_calls: bool,
+
     /// Optional path to a `sim-descriptions.toml` that overrides each
     /// emitted tx's `description` field with a human-readable string keyed by
     /// `(target, selector)` (+ optional discriminators). Auto-discovered at
@@ -656,14 +672,19 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
         .with_context(|| format!("failed to expand manifest bundles {}", manifest.display()))?;
         transactions.extend(extra);
     }
-    let governance =
-        governance_toml_to_simulator_transactions(&governance_toml, &network, from, &descriptions)
-            .with_context(|| {
-                format!(
-                    "failed to convert governance TOML {}",
-                    governance_toml.display()
-                )
-            })?;
+    let governance = governance_toml_to_simulator_transactions(
+        &governance_toml,
+        &network,
+        from,
+        &descriptions,
+        args.skip_test_upgrade_calls,
+    )
+    .with_context(|| {
+        format!(
+            "failed to convert governance TOML {}",
+            governance_toml.display()
+        )
+    })?;
     transactions.extend(governance);
     let body = serde_json::to_string_pretty(&transactions)?;
 
@@ -921,6 +942,7 @@ fn governance_toml_to_simulator_transactions(
     network: &str,
     from: Address,
     descriptions: &SimDescriptionRegistry,
+    skip_test_upgrade_calls: bool,
 ) -> anyhow::Result<Vec<SimulatorTransaction>> {
     let content =
         fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
@@ -990,7 +1012,13 @@ fn governance_toml_to_simulator_transactions(
         }
     }
 
-    append_test_upgrade_calls(&mut out, &parsed.test_upgrade_calls, network, descriptions)?;
+    if skip_test_upgrade_calls {
+        logger::info(
+            "Skipping the prepare's test_* smoke transactions (--skip-test-upgrade-calls)",
+        );
+    } else {
+        append_test_upgrade_calls(&mut out, &parsed.test_upgrade_calls, network, descriptions)?;
+    }
 
     Ok(out)
 }

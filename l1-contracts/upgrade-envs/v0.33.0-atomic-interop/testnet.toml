@@ -1,0 +1,71 @@
+# Upgrade input for the testnet environment (public ZKsync OS testnet on Sepolia) on the
+# v33 release.
+#
+# Ecosystem: bridgehub `0xc4FD2580…`, governed by the ProtocolUpgradeHandler `0x803e5E7a…`.
+# Two CTMs are registered:
+#
+#   * ZKsync OS (Atlas) `0x54D55e74…` — 25 chains, protocol version 0x1f00000001
+#   * EraVM          `0x3Cc81628…` — chain 301 only,   protocol version 0x1f00000000
+#
+# **Only the ZKsync OS CTM is upgraded.** v33 is a ZKsync OS-only release:
+# `CTMUpgrade_v33.noGovernancePrepare` refuses an EraVM CTM outright, and there is no Era
+# counterpart to `V32UpgradeZKsyncOS`. Chain 301 therefore stays on v31 until an Era path
+# exists. This is why `[create2_factory_salts]` below has a single entry.
+#
+# No gateway in this upgrade: `permanent-values/testnet.toml` declares no `[new_gateway]`
+# block, so no GW CTM is deployed or whitelisted.
+
+# Inert on the upgrade path — `DefaultCoreUpgrade` overwrites it with
+# `L1AssetRouter.ERA_CHAIN_ID()` before use. Recorded here as the value that router
+# actually reports (270), which is NOT the registered EraVM chain (301): this ecosystem was
+# brought up from a stage-shaped config. Neither value changes what the upgrade emits.
+era_chain_id = 270
+
+# Testnet runs `ZKsyncOSTestnetVerifier`, which accepts unproven batches. Duplicated from
+# `permanent-values/testnet.toml` on purpose: `DeployCTMUtils.s.sol:133` reads
+# `$.testnet_verifier` unguarded on the *deploy* path, so dropping it here breaks
+# `ctm deploy`. The upgrade path takes the permanent-values copy.
+testnet_verifier = true
+
+# 20 minutes. Bounds the window between the governance ceremony arming the
+# `GovernanceUpgradeTimer` and the per-chain diamond cuts becoming executable.
+governance_upgrade_timer_initial_delay = 1200
+
+# ProtocolUpgradeHandler proxy — `bridgehub.owner()` / `L1AssetRouter.owner()`.
+owner_address = "0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D"
+
+# This should always be false for non-loadtest environments.
+support_l2_legacy_shared_bridge_test = false
+
+# v31 -> v33. Documentation only: no consumer reads this key on the upgrade path — each
+# CTM's real transition is introspected from `ctm.protocolVersion()`.
+old_protocol_version = 0x1f00000000
+
+# NOTE: no `[legacy_gateway]` section, deliberately. `DefaultCoreUpgrade` reads
+# `$.legacy_gateway.chain_id` into `config.legacyGatewayChainId`, which is baked into the
+# redeployed `L1MessageRoot` as its immutable `ERA_GATEWAY_CHAIN_ID`. The key is optional,
+# and the currently deployed testnet `L1MessageRoot` (`0xe7047cD9…`) reports
+# `ERA_GATEWAY_CHAIN_ID() == 0` — testnet never had a Gateway to retire. Omitting the
+# section reproduces that 0 exactly. Do *not* copy the `531050204` placeholder from
+# `permanent-values/testnet.toml`: that is a real registered chain on this bridgehub, and
+# baking it in would make the new message root treat a live chain as the legacy Gateway.
+#
+# NOTE: no `[state_transition]` section either — stage.toml carries one, but nothing under
+# `deploy-scripts/` reads `$.state_transition`, so it is dead weight.
+#
+# NOTE: no `[tokens]` section — `DefaultCoreUpgrade` introspects
+# `L1AssetRouter.L1_WETH_TOKEN()` instead, which preserves this ecosystem's existing (and
+# admittedly wrong — see #2447) mainnet-WETH immutable rather than silently changing it.
+
+[contracts]
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+# Rotated for this regen. Every prepare must mint a fresh salt: CREATE2 returns the
+# previously deployed contract otherwise, and the run would silently reuse v31 bytecode.
+create2_factory_salt = "0x70352a74b4cd08600adf1881af0c4e7b647950d56639286b38029557201519ca"
+
+# Per-CTM CREATE2 salts. Each CTM prepare deploys its own `GovernanceUpgradeTimer`, whose
+# constructor args are env-wide constants — without a CTM-distinct salt two CTMs would land
+# the timer at the same address. Keyed by CTM proxy address.
+[create2_factory_salts]
+# ZKsync OS (Atlas) CTM — the only CTM this release can upgrade.
+"0x54D55e74De9c6003E7a68a1fE70E633f05761eb5" = "0x52cb2ea478a2e8e197240fe8587cf1f9e2461dd8d29c7f7de1fe8c7416b3f2f6"
