@@ -23,12 +23,21 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.MATTERLABS_BOTS_APP_ID }}
+          private-key: ${{ secrets.MATTERLABS_BOTS_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: era-contracts
+
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: true
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Get PR branch info
         id: pr
