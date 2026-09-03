@@ -157,7 +157,6 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 #   `transaction-simulator.json` (the full mainnet calldata artifact set, i.e.
 #   the same deliverables PR #2268 committed).
 # Artifacts uploaded: `ecosystem.toml` + `sim-inputs/` + `transaction-simulator.json`.
-# NOT `anvil.log` — it can contain the forked RPC URL.
 #
 # ─── WHY THE DEPLOY BUNDLE IS THE POINT ───
 # Solidity output is not byte-stable across build environments (the default
@@ -469,8 +468,8 @@ jobs:
             --env "$ENVIRONMENT" \
             --out "$OUT/transaction-simulator.json"
 
-      # Upload only the calldata deliverables. Deliberately NOT anvil.log /
-      # *-verification-logs.txt — anvil.log can echo the forked RPC URL.
+      # Upload only the calldata deliverables; the verification logs travel in the
+      # deploy bundle below.
       - name: Upload calldata artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -495,7 +494,7 @@ jobs:
       #
       # Consumed by `deploy-ecosystem-upgrade.yaml` (real broadcast) and by the
       # `verify-bundle-handoff` job below (fork rehearsal + PUVT). Safe to publish:
-      # tx calldata + addresses only, never keys or the RPC URL. NOT anvil.log.
+      # tx calldata + addresses only, never keys or the RPC URL.
       - name: Upload the deploy bundle (for the Deploy workflow + local replay)
         if: always()
         uses: actions/upload-artifact@v4

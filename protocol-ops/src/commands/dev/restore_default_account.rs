@@ -1,10 +1,14 @@
 //! Restore the reviewed v31 `DefaultAccount` artifact after a `system-contracts` build.
 //!
 //! The EraVM build is not bit-reproducible: a fresh build can differ from the reviewed
-//! bytecode in its trailing 32-byte metadata word only, which still changes the bytecode
-//! hash and trips the CTM upgrade's `default aa hash factory dep mismatch` check. When the
-//! executable prefix is byte-identical to the reviewed one, this swaps the metadata word
-//! back so the artifact hashes to the pinned `default_aa_hash`. Anything else is an error.
+//! bytecode in its trailing 32-byte compiler-metadata word only, which still changes the
+//! bytecode hash and trips the CTM upgrade's `default aa hash factory dep mismatch` check.
+//!
+//! Everything this needs is committed data: the env's v31 input pins the reviewed hash
+//! (`[contracts] default_aa_hash`, which must agree with `AllContractsHashes.json`) and the
+//! reviewed build's metadata word (`default_aa_metadata_word`). Swapping that word into the
+//! built bytecode must reproduce the pinned hash exactly; since the hash is a SHA-256, that
+//! single check proves the executable part of the build is byte-identical to the review.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -13,17 +17,9 @@ use anyhow::Context;
 use clap::Parser;
 use sha2::{Digest, Sha256};
 
-use crate::common::files::read_json_file;
+use crate::common::files::{read_json_file, read_toml_file};
 use crate::common::logger;
 
-/// The reviewed v31 DefaultAccount: its hash, and the executable prefix + metadata word a
-/// canonical build emits.
-const CANONICAL_DEFAULT_ACCOUNT_HASH: &str =
-    "0x010005f9d84c1863bf21a9393f2fd1631af92aab68f12c35dba580c8d7a06146";
-const CANONICAL_DEFAULT_ACCOUNT_EXECUTABLE_SHA256: &str =
-    "28c736311a2f872a0b8ff289b0ae35266f1ccd402885435fd9ffd2a154a39a96";
-const CANONICAL_DEFAULT_ACCOUNT_METADATA_WORD: &str =
-    "3ad06056e66b778b11945dd3cf11269b479679b45850c25af96c8ca9f309acb0";
 const METADATA_WORD_BYTES: usize = 32;
 // EraVM bytecode hash: sha256 with byte 0 = version, byte 1 = 0, bytes 2-3 = length in 32-byte words.
 const ERAVM_WORD_BYTES: usize = 32;
@@ -35,7 +31,8 @@ const DEFAULT_ACCOUNT_CONTRACT_NAME: &str = "system-contracts/DefaultAccount";
 pub struct RestoreDefaultAccountArgs {
     /// The built foundry artifact, e.g. `system-contracts/zkout/DefaultAccount.sol/DefaultAccount.json`.
     pub artifact: PathBuf,
-    /// The env's v31 input TOML, whose `[contracts] default_aa_hash` pins the reviewed hash.
+    /// The env's v31 input TOML: `[contracts] default_aa_hash` pins the reviewed hash and
+    /// `default_aa_metadata_word` the reviewed build's trailing metadata word.
     pub environment: PathBuf,
     /// `AllContractsHashes.json`, which must agree with the pinned hash.
     pub hashes: PathBuf,
@@ -60,16 +57,20 @@ pub fn zk_bytecode_hash(bytecode: &[u8]) -> anyhow::Result<String> {
     Ok(format!("0x{}", hex::encode(digest)))
 }
 
+fn hex_field<'a>(table: &'a toml::Value, key: &str) -> Option<&'a str> {
+    table.get(key).and_then(toml::Value::as_str)
+}
+
 pub fn restore_canonical_default_account(
     artifact_path: &Path,
     environment_path: &Path,
     hashes_path: &Path,
 ) -> anyhow::Result<()> {
-    let environment: toml::Value = crate::common::files::read_toml_file(environment_path)?;
-    let pinned = environment
-        .get("contracts")
-        .and_then(|contracts| contracts.get("default_aa_hash"))
-        .and_then(toml::Value::as_str)
+    let environment: toml::Value = read_toml_file(environment_path)?;
+    let contracts = environment.get("contracts").ok_or_else(|| {
+        anyhow::anyhow!("{} has no [contracts] table", environment_path.display())
+    })?;
+    let pinned = hex_field(contracts, "default_aa_hash")
         .ok_or_else(|| {
             anyhow::anyhow!(
                 "{} has no [contracts] default_aa_hash",
@@ -114,29 +115,31 @@ pub fn restore_canonical_default_account(
         ));
         return Ok(());
     }
+
+    let metadata_word = hex_field(contracts, "default_aa_metadata_word").ok_or_else(|| {
+        anyhow::anyhow!(
+            "built DefaultAccount hashes to {built} but {} pins {pinned}, and the env has no \
+             [contracts] default_aa_metadata_word to restore the reviewed build from",
+            environment_path.display()
+        )
+    })?;
+    let metadata_word = hex::decode(metadata_word.trim_start_matches("0x"))
+        .context("default_aa_metadata_word is not hex")?;
     anyhow::ensure!(
-        pinned == CANONICAL_DEFAULT_ACCOUNT_HASH,
-        "no canonical artifact registered for pinned hash {pinned} (build produced {built})"
+        metadata_word.len() == METADATA_WORD_BYTES,
+        "default_aa_metadata_word must be 32 bytes"
     );
     anyhow::ensure!(
         bytecode.len() > METADATA_WORD_BYTES,
         "bytecode is too short to contain the metadata word"
     );
-    let (executable, _metadata_word) = bytecode.split_at(bytecode.len() - METADATA_WORD_BYTES);
-    let executable_sha256 = hex::encode(Sha256::digest(executable));
-    anyhow::ensure!(
-        executable_sha256 == CANONICAL_DEFAULT_ACCOUNT_EXECUTABLE_SHA256,
-        "executable prefix changed: expected {CANONICAL_DEFAULT_ACCOUNT_EXECUTABLE_SHA256}, got {executable_sha256}"
-    );
-    let canonical = [
-        executable,
-        &hex::decode(CANONICAL_DEFAULT_ACCOUNT_METADATA_WORD)?,
-    ]
-    .concat();
+    let executable = &bytecode[..bytecode.len() - METADATA_WORD_BYTES];
+    let canonical = [executable, &metadata_word].concat();
     let restored = zk_bytecode_hash(&canonical)?;
     anyhow::ensure!(
         restored == pinned,
-        "restored hash {restored} does not match pinned hash {pinned}"
+        "the build differs from the reviewed DefaultAccount beyond the metadata word: \
+         restoring the pinned word gives {restored}, not {pinned}"
     );
 
     let object = format!(
@@ -164,31 +167,106 @@ pub fn run(args: RestoreDefaultAccountArgs) -> anyhow::Result<()> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn leaves_an_artifact_unchanged_when_it_already_has_the_pinned_hash() {
+    struct Fixture {
+        _dir: tempfile::TempDir,
+        artifact: PathBuf,
+        environment: PathBuf,
+        hashes: PathBuf,
+    }
+
+    /// An artifact holding `built`, and an env/hashes pair pinning `reviewed` (+ its metadata word).
+    fn fixture(built: &[u8], reviewed: &[u8], pin_word: bool) -> Fixture {
         let dir = tempfile::tempdir().unwrap();
-        let bytecode = vec![7u8; 32];
-        let hash = zk_bytecode_hash(&bytecode).unwrap();
+        let hash = zk_bytecode_hash(reviewed).unwrap();
         let artifact = dir.path().join("DefaultAccount.json");
         let environment = dir.path().join("environment.toml");
         let hashes = dir.path().join("AllContractsHashes.json");
-        let artifact_json = format!(
-            r#"{{"bytecode":{{"object":"0x{}"}}}}"#,
-            hex::encode(&bytecode)
-        );
-        fs::write(&artifact, &artifact_json).unwrap();
         fs::write(
-            &environment,
-            format!("[contracts]\ndefault_aa_hash = \"{hash}\"\n"),
+            &artifact,
+            format!(r#"{{"bytecode":{{"object":"0x{}"}}}}"#, hex::encode(built)),
         )
         .unwrap();
+        let mut toml = format!("[contracts]\ndefault_aa_hash = \"{hash}\"\n");
+        if pin_word {
+            let word = &reviewed[reviewed.len() - METADATA_WORD_BYTES..];
+            toml += &format!("default_aa_metadata_word = \"0x{}\"\n", hex::encode(word));
+        }
+        fs::write(&environment, toml).unwrap();
         fs::write(
             &hashes,
             format!(r#"[{{"contractName":"{DEFAULT_ACCOUNT_CONTRACT_NAME}","zkBytecodeHash":"{hash}"}}]"#),
         )
         .unwrap();
-        restore_canonical_default_account(&artifact, &environment, &hashes).unwrap();
-        assert_eq!(fs::read_to_string(&artifact).unwrap(), artifact_json);
+        Fixture {
+            _dir: dir,
+            artifact,
+            environment,
+            hashes,
+        }
+    }
+
+    fn artifact_bytecode(f: &Fixture) -> Vec<u8> {
+        let artifact: serde_json::Value = read_json_file(&f.artifact).unwrap();
+        hex::decode(
+            artifact
+                .pointer("/bytecode/object")
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .trim_start_matches("0x"),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn leaves_an_artifact_unchanged_when_it_already_has_the_pinned_hash() {
+        let bytecode = vec![7u8; 96];
+        let f = fixture(&bytecode, &bytecode, false);
+        let before = fs::read_to_string(&f.artifact).unwrap();
+        restore_canonical_default_account(&f.artifact, &f.environment, &f.hashes).unwrap();
+        assert_eq!(fs::read_to_string(&f.artifact).unwrap(), before);
+    }
+
+    #[test]
+    fn restores_the_pinned_metadata_word_when_only_that_differs() {
+        let reviewed = [vec![7u8; 64], vec![1u8; 32]].concat();
+        let built = [vec![7u8; 64], vec![2u8; 32]].concat();
+        let f = fixture(&built, &reviewed, true);
+        restore_canonical_default_account(&f.artifact, &f.environment, &f.hashes).unwrap();
+        assert_eq!(artifact_bytecode(&f), reviewed);
+    }
+
+    #[test]
+    fn rejects_a_build_whose_executable_changed() {
+        let reviewed = [vec![7u8; 64], vec![1u8; 32]].concat();
+        let built = [vec![8u8; 64], vec![2u8; 32]].concat();
+        let f = fixture(&built, &reviewed, true);
+        let error =
+            restore_canonical_default_account(&f.artifact, &f.environment, &f.hashes).unwrap_err();
+        assert!(
+            error.to_string().contains("beyond the metadata word"),
+            "{error}"
+        );
+        assert_eq!(
+            artifact_bytecode(&f),
+            built,
+            "the artifact must be left untouched"
+        );
+    }
+
+    #[test]
+    fn rejects_a_mismatch_when_no_metadata_word_is_pinned() {
+        let reviewed = [vec![7u8; 64], vec![1u8; 32]].concat();
+        let built = [vec![7u8; 64], vec![2u8; 32]].concat();
+        let f = fixture(&built, &reviewed, false);
+        let error =
+            restore_canonical_default_account(&f.artifact, &f.environment, &f.hashes).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("no [contracts] default_aa_metadata_word"),
+            "{error}"
+        );
     }
 
     #[test]
