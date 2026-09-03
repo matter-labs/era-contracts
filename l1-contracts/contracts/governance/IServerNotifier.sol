@@ -56,10 +56,7 @@ interface IServerNotifier {
     /// protocol version; see {protocol-docs/upgrade-scheduling.md}.
     /// @param _oldProtocolVersion The protocol version chains upgrade *from*.
     /// @param _checker The checker to consult in `setUpgradeTimestamp`; zero to deregister.
-    function setUpgradePreconditionChecker(
-        uint256 _oldProtocolVersion,
-        IUpgradePreconditionChecker _checker
-    ) external;
+    function setUpgradePreconditionChecker(uint256 _oldProtocolVersion, IUpgradePreconditionChecker _checker) external;
 
     /// @notice Non-reverting mirror of `setUpgradeTimestamp`'s validation, for operators and CI.
     /// @param _chainId The ID of the chain to dry-run scheduling for.

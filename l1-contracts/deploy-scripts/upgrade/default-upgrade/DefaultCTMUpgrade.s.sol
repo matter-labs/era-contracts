@@ -935,11 +935,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             vm.serializeAddress("state_transition", "priority_op_lower_bound_addr", priorityOpLowerBound);
         }
         if (upgradePreconditionChecker != address(0)) {
-            vm.serializeAddress(
-                "state_transition",
-                "upgrade_precondition_checker_addr",
-                upgradePreconditionChecker
-            );
+            vm.serializeAddress("state_transition", "upgrade_precondition_checker_addr", upgradePreconditionChecker);
         }
         string memory stateTransition = vm.serializeAddress(
             "state_transition",

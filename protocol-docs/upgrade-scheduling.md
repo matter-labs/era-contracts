@@ -1,6 +1,6 @@
 # Upgrade scheduling: `ServerNotifier` and on-chain preconditions
 
-This document is the source of truth for how a chain upgrade is *scheduled* on L1: what the
+This document is the source of truth for how a chain upgrade is _scheduled_ on L1: what the
 `ServerNotifier` contract is, the events the server watches, how the scheduled timestamp gates
 upgrade execution, and how release-specific upgrade preconditions are enforced at scheduling time.
 Contract doc comments reference this file instead of restating the narrative.
@@ -13,7 +13,7 @@ Related documents:
 
 `ServerNotifier` (`contracts/governance/ServerNotifier.sol`) is a small operational contract that
 chain admins use to signal the ZKsync OS server. It is a `TransparentUpgradeableProxy` with a
-dedicated `ProxyAdmin` owned by the CTM's ecosystem admin (`chainAdmin`), deliberately *outside*
+dedicated `ProxyAdmin` owned by the CTM's ecosystem admin (`chainAdmin`), deliberately _outside_
 governance: it can be upgraded operationally without touching the diamond, the CTM, or the
 governance timelock. Its `owner()` is the CTM admin on L1; on Gateway it is the aliased L1
 governance (`GatewayCTMDeployerCTMBase`).
@@ -23,20 +23,20 @@ It emits three events the server watches:
 - `MigrateToGateway(chainId, migrationNumber)` / `MigrateFromGateway(chainId, migrationNumber)` —
   migration signals (see {protocol-docs/chain-lifecycle.md}).
 - `UpgradeTimestampUpdated(chainId, oldProtocolVersion, upgradeTimestamp)` — emitted by
-  `setUpgradeTimestamp`, the upgrade *scheduling* call. The `zksync-os-server` L1 watcher reacts to
+  `setUpgradeTimestamp`, the upgrade _scheduling_ call. The `zksync-os-server` L1 watcher reacts to
   this event by injecting the upgrade transaction into the chain at the scheduled time.
 
 ## The scheduling call and the execution gate
 
 `setUpgradeTimestamp(chainId, upgradeTimestamp)` is callable only by the chain's admin (resolved
-through `chainTypeManager.getChainAdmin`). It resolves the chain's *current* ("old") protocol
+through `chainTypeManager.getChainAdmin`). It resolves the chain's _current_ ("old") protocol
 version, requires that the CTM already has an upgrade cut registered for it
 (`upgradeCutHash(oldProtocolVersion) != 0`), runs the registered precondition checker for that
 version if there is one (see below), and records the timestamp in
 `protocolVersionToUpgradeTimestamp[chainId][oldProtocolVersion]`.
 
 The stored timestamp is not merely informational. `AdminFacet.upgradeChainFromVersion` lets a
-*validator* (not only the chain admin or the CTM) execute the diamond cut once
+_validator_ (not only the chain admin or the CTM) execute the diamond cut once
 `block.timestamp >= timestamp` and the timestamp is non-zero. Scheduling is therefore the moment a
 chain commits to the upgrade being executable by its validator — which is exactly why
 release-specific prerequisites should be verified then, not only at execution.
@@ -45,16 +45,16 @@ release-specific prerequisites should be verified then, not only at execution.
 
 Some releases have per-chain prerequisites beyond "the upgrade cut exists". The v32 upgrade of a
 ZKsync OS chain is the canonical example: the chain's pre-v31 base-token total supply must have been
-backfilled, and a priority-op lower bound proving the backfill *executed* must have been recorded in
+backfilled, and a priority-op lower bound proving the backfill _executed_ must have been recorded in
 the `PriorityOpLowerBound` registry (`RecordPriorityOpLowerBound.s.sol`, run well before the
-upgrade executes). `V32UpgradeZKsyncOS.upgrade` enforces all of that at *execution* time — but a
+upgrade executes). `V32UpgradeZKsyncOS.upgrade` enforces all of that at _execution_ time — but a
 chain that scheduled a timestamp without the prerequisites would only discover the problem when its
 upgrade transaction reverts at the scheduled moment.
 
 `ServerNotifier` therefore keeps a per-protocol-version registry of precondition checkers:
 
 - `upgradePreconditionChecker(oldProtocolVersion)` — the registered
-  `IUpgradePreconditionChecker`, or zero when the release upgrading *from* that version has no
+  `IUpgradePreconditionChecker`, or zero when the release upgrading _from_ that version has no
   extra prerequisites (the default).
 - `setUpgradePreconditionChecker(oldProtocolVersion, checker)` — `onlyOwner` (the CTM admin;
   aliased governance on Gateway). Registering a non-zero checker validates the checker's magic
@@ -71,7 +71,7 @@ revert with at execution time. The event and mapping semantics are unchanged —
 passes the checker behaves exactly as before.
 
 Checkers are stateless `view` contracts. They must not mutate state, must not depend on
-`msg.sender`, and are keyed by the *old* protocol version because that is what
+`msg.sender`, and are keyed by the _old_ protocol version because that is what
 `setUpgradeTimestamp` resolves and what `upgradeCutHash` is keyed by.
 
 ### The v32 checker
@@ -86,7 +86,7 @@ read identically:
 3. `IGetters(zkChain).getFirstUnprocessedPriorityTx() >= lowerBound(zkChain)` — else
    `PriorityQueueNotReady`.
 
-On naming: the in-tree upgrade contracts for this release are `V32Upgrade*` (they take chains *to*
+On naming: the in-tree upgrade contracts for this release are `V32Upgrade*` (they take chains _to_
 protocol v32 from v31 in production), while the repo's upgrade-env fixtures deploy a genesis at
 v32.0.0 and exercise the same contracts as a v32 → v33 upgrade. The checker is named after the
 release the fixtures use; its NatSpec points here.
@@ -104,7 +104,7 @@ A release with scheduling-time prerequisites ships the checker in its CTM upgrad
 1. Deploy the checker alongside the release's per-chain upgrade contract (both typically embed the
    same auxiliary registries as immutables, e.g. `PriorityOpLowerBound`).
 2. Append a `setUpgradePreconditionChecker(oldProtocolVersion, checker)` call to the CTM-admin call
-   set (`[ctm_admin_calls] server_notifier_upgrade` in the output TOML), *after* the
+   set (`[ctm_admin_calls] server_notifier_upgrade` in the output TOML), _after_ the
    `ServerNotifier` implementation upgrade in the same call array — the setter only exists on the
    new implementation, and the calls execute in order.
 
@@ -140,7 +140,7 @@ putting the checks in `AdminFacet`/CTM — the point of the issue is to stay off
 diamond/CTM surface.
 
 **Always-on, no bypass flag.** `setUpgradeTimestamp` keeps its exact signature and semantics (its
-ABI is consumed by protocol-ops, partner runbooks, and the calldata-review docs) and *always* runs
+ABI is consumed by protocol-ops, partner runbooks, and the calldata-review docs) and _always_ runs
 the registered checker. Rejected: a `notify(chainId, bool checkPreconditions)` opt-in flag or a
 `setUpgradeTimestampUnchecked` variant — a per-call, chain-admin-controlled bypass defeats the
 footgun protection for exactly the operator who needs it. The escape hatch is that the CTM admin

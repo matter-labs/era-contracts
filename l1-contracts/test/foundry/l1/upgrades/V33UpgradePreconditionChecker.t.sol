@@ -51,11 +51,7 @@ contract V33UpgradePreconditionCheckerTest is Test {
     }
 
     function _mockFirstUnprocessedPriorityTx(uint256 _value) internal {
-        vm.mockCall(
-            chain,
-            abi.encodeWithSelector(IGetters.getFirstUnprocessedPriorityTx.selector),
-            abi.encode(_value)
-        );
+        vm.mockCall(chain, abi.encodeWithSelector(IGetters.getFirstUnprocessedPriorityTx.selector), abi.encode(_value));
     }
 
     function test_constructorRejectsZeroRegistry() public {

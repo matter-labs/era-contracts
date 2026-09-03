@@ -763,12 +763,18 @@ At minimum, v31 provenance must cover:
   NativeTokenVault, AssetTracker, CTMDeploymentTracker, MessageRoot,
   ChainAssetHandler, GovernanceUpgradeTimer, and EIP7702Checker;
 - the `PriorityOpLowerBound` registry (no-arg deploy) and, bound to it, the
-  per-chain upgrade contract `V32UpgradeZKsyncOS`, which takes the registry
-  address as its only constructor argument (immutable), so its constructor
+  per-chain upgrade contract `V32UpgradeZKsyncOS` and the scheduling-time
+  checker `V33UpgradePreconditionChecker`, each of which takes the registry
+  address as its only constructor argument (immutable), so their constructor
   bytes must be the ABI-encoded registry address — not empty. A ZKsync OS
   chain's upgrade additionally requires a bound recorded through
   `lowerBoundPriorityOp` (see `RecordPriorityOpLowerBound.s.sol`) in a separate,
-  earlier transaction, with the chain processed past it;
+  earlier transaction, with the chain processed past it. The CTM-admin call set
+  (`ctm_admin_calls.server_notifier_upgrade`) must contain, after the
+  ServerNotifier `ProxyAdmin.upgrade` call, one
+  `setUpgradePreconditionChecker(uint256,address)` (`0x0a294855`) call on the
+  ServerNotifier proxy registering that checker for the reviewed old protocol
+  version;
 - for Sepolia stage, MessageRoot may intentionally resolve to the
   `l1-contracts/L1MessageRootStageSepolia` implementation variant; this must
   come from the reviewed rollout source, not from a post-hoc label;
@@ -911,18 +917,23 @@ For `chain.set-upgrade-timestamp`:
 - if wrapped through `ChainAdmin.multicall((address,uint256,bytes)[],bool)`,
   decode every inner call and require `_requireSuccess = true`;
 - wrapper inner calls may be `setUpgradeTimestamp(uint256,uint256)` on the
-  chain admin, or `ServerNotifier.setUpgradeTimestamp(uint256,uint256,uint256)`
-  (`0x26079da9`);
+  chain admin (arguments: protocol version, timestamp), or
+  `ServerNotifier.setUpgradeTimestamp(uint256,uint256)` (same selector
+  `0xe2a9d554`; arguments: chain ID, timestamp) — the pre-v31 three-argument
+  ServerNotifier variant (`0x26079da9`) no longer exists after the prepare
+  bundle upgrades the ServerNotifier implementation;
 - protocol version is the reviewed v31 packed version;
 - timestamp matches phase metadata or rollout command evidence and is not zero;
 - for `ServerNotifier.setUpgradeTimestamp`, the chain ID argument equals the
-  reviewed chain ID;
+  reviewed chain ID, and the call succeeds only when the precondition checker
+  registered for the chain's current protocol version (Step 12) passes — a
+  simulated revert here means the chain's prerequisite (e.g. the recorded
+  priority-op lower bound) is missing, not that the calldata is malformed;
 - value is zero.
 
 ```bash
 cast calldata-decode "multicall((address,uint256,bytes)[],bool)" <call_data>
 cast calldata-decode "setUpgradeTimestamp(uint256,uint256)" <inner_data>
-cast calldata-decode "setUpgradeTimestamp(uint256,uint256,uint256)" <inner_data>
 ```
 
 For `chain.upgrade`:

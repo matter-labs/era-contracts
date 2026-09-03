@@ -89,11 +89,7 @@ contract ServerNotifierPreconditionsTest is Test {
     }
 
     function _mockFirstUnprocessedPriorityTx(uint256 _value) internal {
-        vm.mockCall(
-            chain,
-            abi.encodeWithSelector(IGetters.getFirstUnprocessedPriorityTx.selector),
-            abi.encode(_value)
-        );
+        vm.mockCall(chain, abi.encodeWithSelector(IGetters.getFirstUnprocessedPriorityTx.selector), abi.encode(_value));
     }
 
     function _registerChecker() internal {
@@ -142,13 +138,8 @@ contract ServerNotifierPreconditionsTest is Test {
         WrongMagicChecker wrongMagic = new WrongMagicChecker();
 
         vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSelector(UpgradePreconditionCheckerMagicMismatch.selector, address(wrongMagic))
-        );
-        serverNotifier.setUpgradePreconditionChecker(
-            protocolVersion,
-            IUpgradePreconditionChecker(address(wrongMagic))
-        );
+        vm.expectRevert(abi.encodeWithSelector(UpgradePreconditionCheckerMagicMismatch.selector, address(wrongMagic)));
+        serverNotifier.setUpgradePreconditionChecker(protocolVersion, IUpgradePreconditionChecker(address(wrongMagic)));
     }
 
     function test_setCheckerRevertsOnContractWithoutMagicGetter() public {

@@ -40,6 +40,7 @@ import {
 import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
 import { forceBatchExecutedEqualsCommitted, modelV31BackfillPrerequisite, transferOwnable2Step } from "./harness-shims";
+import { customError, expectRevert } from "./balance-helpers";
 import { impersonateAndRun, createProvider } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
@@ -655,6 +656,52 @@ export async function runEcosystemGovernanceUpgrade(params: {
 
 // ── Per-chain upgrade + L2 relay ─────────────────────────────────────
 
+/**
+ * Assert the scheduling-time enforcement of the v32 upgrade prerequisite: the CTM-admin call set
+ * (replayed with the prepare bundles) registered the release's precondition checker on the
+ * ServerNotifier, so `setUpgradeTimestamp` must revert while the chain's backfill prerequisite is
+ * missing. Returns the handles for the post-shim positive assertion.
+ * See {protocol-docs/upgrade-scheduling.md}.
+ */
+async function assertSchedulingBlockedOnMissingPrerequisite(params: {
+  l1Provider: ethers.providers.JsonRpcProvider;
+  ctmAddr: string;
+  chainId: number;
+  diamondProxyAddr: string;
+  scheduleTimestamp: number;
+}): Promise<{ serverNotifier: ethers.Contract; chainAdmin: string; oldProtocolVersion: ethers.BigNumber }> {
+  const { l1Provider, ctmAddr, chainId, diamondProxyAddr, scheduleTimestamp } = params;
+
+  const ctm = new ethers.Contract(ctmAddr, getAbi("IChainTypeManager"), l1Provider);
+  const serverNotifier = new ethers.Contract(await ctm.serverNotifierAddress(), getAbi("IServerNotifier"), l1Provider);
+  const oldProtocolVersion: ethers.BigNumber = await ctm.getProtocolVersion(chainId);
+  const checkerAddr: string = await serverNotifier.upgradePreconditionChecker(oldProtocolVersion);
+  if (checkerAddr === ethers.constants.AddressZero) {
+    throw new Error(
+      "No upgrade-precondition checker registered on ServerNotifier for protocol version " +
+        `${oldProtocolVersion.toString()} — the CTM-admin call set should have registered it`
+    );
+  }
+  const chainAdmin: string = await ctm.getChainAdmin(chainId);
+
+  // The exact failure depends on how far the fixture's history got: a chain whose backfill flag is
+  // not set fails on it, a chain that has the flag (e.g. created on v31) fails on the missing
+  // lower bound — the same order the checker (and the upgrade itself) checks in.
+  const getters = new ethers.Contract(diamondProxyAddr, getAbi("GettersFacet"), l1Provider);
+  const flagSet: boolean = await getters.baseTokenSupportsTotalSupply();
+  const expectedError = flagSet ? "LowerBoundNotRecorded()" : "BaseTokenPreV31TotalSupplyNotSet()";
+
+  await expectRevert(
+    () => serverNotifier.callStatic.setUpgradeTimestamp(chainId, scheduleTimestamp, { from: chainAdmin }),
+    `chain ${chainId}: scheduling before the backfill prerequisite`,
+    customError("V33UpgradePreconditionChecker", expectedError),
+    l1Provider
+  );
+  console.log(`  ✅ chain ${chainId}: scheduling blocked with ${expectedError} before the prerequisite`);
+
+  return { serverNotifier, chainAdmin, oldProtocolVersion };
+}
+
 export async function runChainUpgradesAndRelayL2(params: {
   l1Provider: ethers.providers.JsonRpcProvider;
   anvilManager: AnvilManager;
@@ -691,6 +738,17 @@ export async function runChainUpgradesAndRelayL2(params: {
     // "all batches executed" prerequisite without running the executor.
     await forceBatchExecutedEqualsCommitted(l1Provider, chain.diamondProxy);
 
+    // Scheduling-time enforcement of the same prerequisite the upgrade checks at execution time:
+    // before the backfill history is modeled, the chain admin cannot even schedule the upgrade.
+    const scheduleTimestamp = (await l1Provider.getBlock("latest")).timestamp + 3600;
+    const { serverNotifier, chainAdmin, oldProtocolVersion } = await assertSchedulingBlockedOnMissingPrerequisite({
+      l1Provider,
+      ctmAddr: params.ctmAddr,
+      chainId: chain.chainId,
+      diamondProxyAddr: chain.diamondProxy,
+      scheduleTimestamp,
+    });
+
     // ZKsync OS chains must additionally have the v31 base-token backfill behind them
     // (flag + executed-priority-op lower bound); model the missing history on the fork.
     await modelV31BackfillPrerequisite({
@@ -698,6 +756,26 @@ export async function runChainUpgradesAndRelayL2(params: {
       diamondProxyAddr: chain.diamondProxy,
       settlementLayerUpgradeAddr,
     });
+
+    // With the prerequisite in place, scheduling passes and records the timestamp — the real
+    // pre-upgrade operator step (production: protocol-ops `chain set-upgrade-timestamp`).
+    await impersonateAndRun(l1Provider, chainAdmin, async (signer) => {
+      const tx = await serverNotifier
+        .connect(signer)
+        .setUpgradeTimestamp(chain.chainId, scheduleTimestamp, { gasLimit: 500_000 });
+      await tx.wait();
+    });
+    const storedTimestamp: ethers.BigNumber = await serverNotifier.protocolVersionToUpgradeTimestamp(
+      chain.chainId,
+      oldProtocolVersion
+    );
+    if (!storedTimestamp.eq(scheduleTimestamp)) {
+      throw new Error(
+        `chain ${chain.chainId}: scheduling after the prerequisite stored ${storedTimestamp.toString()}, ` +
+          `expected ${scheduleTimestamp}`
+      );
+    }
+    console.log(`  ✅ chain ${chain.chainId}: upgrade scheduled once the prerequisite holds`);
 
     runProtocolOps([
       "chain",

@@ -58,10 +58,7 @@ contract V33UpgradePreconditionChecker is IUpgradePreconditionChecker {
     }
 
     /// @inheritdoc IUpgradePreconditionChecker
-    function previewUpgradePreconditions(
-        uint256,
-        address _zkChain
-    ) external view returns (bytes4[] memory failed) {
+    function previewUpgradePreconditions(uint256, address _zkChain) external view returns (bytes4[] memory failed) {
         if (_zkChain == address(0)) {
             failed = new bytes4[](1);
             failed[0] = ZKChainNotRegistered.selector;
