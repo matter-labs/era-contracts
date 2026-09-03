@@ -1,0 +1,127 @@
+# Shared foundry build of all contract projects + artifacts cache save.
+# Called as the `build` job by l1-contracts-ci.yaml and pre-merge-checks.yaml.
+name: Build contract artifacts
+
+on:
+  workflow_call:
+    inputs:
+      upload-artifacts:
+        description: "Also upload the artifacts for manual download"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Both callers build the same commit into the same key, so whichever runs second reuses the
+      # first's artifacts instead of compiling again. Concurrent callers both miss here and both
+      # build; the losing save is silently dropped, which is safe because consumers retry their
+      # restore until the winning upload finalizes (see restore-ci-artifacts).
+      - name: Reuse this commit's artifacts if already built
+        id: reuse
+        uses: actions/cache/restore@v4
+        with:
+          key: artifacts-l1-ci-${{ github.sha }}
+          path: |
+            da-contracts/cache-forge
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
+
+      - name: Install foundry-zksync
+        if: steps.reuse.outputs.cache-hit != 'true'
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Use Node.js
+        if: steps.reuse.outputs.cache-hit != 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - name: Install dependencies
+        if: steps.reuse.outputs.cache-hit != 'true'
+        run: yarn
+
+      # Fixture tests for the pruning that decides which restored artifacts are trusted. Every bug
+      # found in it needed a deleted or modified source to show up, so an ordinary run never
+      # exercises it — hence pinning it here, next to the job that relies on it.
+      - name: Unit-test the cache pruning
+        if: steps.reuse.outputs.cache-hit != 'true'
+        run: node .github/actions/warm-solc-cache/prune-stale-artifacts.test.js
+
+      - name: Warm solc build cache
+        if: steps.reuse.outputs.cache-hit != 'true'
+        uses: ./.github/actions/warm-solc-cache
+
+      - name: Build da contracts
+        if: steps.reuse.outputs.cache-hit != 'true'
+        working-directory: da-contracts
+        run: |
+          yarn build:foundry
+
+      - name: Build l1 contracts
+        if: steps.reuse.outputs.cache-hit != 'true'
+        working-directory: l1-contracts
+        run: |
+          yarn build:foundry
+
+      - name: Build l2 contracts
+        if: steps.reuse.outputs.cache-hit != 'true'
+        working-directory: l2-contracts
+        run: |
+          yarn build:foundry
+
+      - name: Build system contracts
+        if: steps.reuse.outputs.cache-hit != 'true'
+        working-directory: system-contracts
+        run: |
+          yarn install
+          yarn build:foundry
+
+      # Reads the cross-commit solc cache, never writes it. A PR's later runs can restore what its
+      # earlier runs saved, so a PR could plant a forged artifact plus a manifest vouching for it and
+      # have check-hashes attest to bytecode that never came from its sources. Constraining the writer
+      # is the only fix: verify-merged-commit.yaml builds clean and saves only after those checks pass.
+      # A PR pays only its own incremental recompile, since it still warms from the base's cache.
+      - name: Create cache
+        if: steps.reuse.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          key: artifacts-l1-ci-${{ github.sha }}
+          path: |
+            da-contracts/cache-forge
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
+
+      - name: Upload artifacts for download
+        if: inputs.upload-artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            da-contracts/cache-forge
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout

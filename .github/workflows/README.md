@@ -39,3 +39,24 @@ args to `protocol_ops` unless the first post-flag word is `forge`/`cast`).
 - **Artifact names**:
   - per-chain workflows: `safe-bundles-{operation}-{chain_name}-{environment}`
   - ecosystem-wide workflows (`upgrade-prepare`, `upgrade-governance`): `safe-bundles-{operation}-{environment}` (no `chain_name`)
+
+## CI tiers: per-commit vs pre-merge
+
+- **Per-commit** (`l1-contracts-ci`, `anvil-interop-ci`, `lint`, `slither`, ...):
+  builds, tests, and static checks. The anvil-interop suite runs from the
+  committed chain-state snapshots; if a change alters genesis state it may run
+  against stale bytecode (or fail) until the snapshots are regenerated — the
+  pre-merge determinism gate catches that before merge.
+- **Pre-merge** (`pre-merge-checks`): checks of committed _generated_ artifacts —
+  `AllContractsHashes.json`, `l1-contracts/selectors`, `l1-contracts/zkstack-out`,
+  and the anvil-interop chain-state snapshots (`state-generation-check`). Any
+  bytecode change invalidates these; the fix is a regen + commit, so they skip
+  on **draft** PRs and run once the PR is ready for review (and on every later
+  push while it stays non-draft; also unconditionally on merge queue / manual
+  dispatch).
+
+Merge flow: iterate on a draft PR until per-commit CI is green → dispatch
+**Update All Generated Artifacts** with the PR number (a single regen that
+commits hashes + selectors + zkstack-out, then chain states) → mark the PR
+ready for review → merge once `pre-merge-checks` is green. If review forces
+bytecode changes, regen again (or convert back to draft until done).
