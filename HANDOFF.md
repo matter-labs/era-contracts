@@ -114,9 +114,9 @@ after. Design note with rejected alternatives: `protocol-docs/upgrade-scheduling
 
 ## PR body (ready to paste)
 
-# EVM-1656: on-chain upgrade preconditions in `ServerNotifier`
+## EVM-1656: on-chain upgrade preconditions in `ServerNotifier` (PR title: drop the leading "EVM-1656: " if preferred)
 
-## What
+### What
 
 `ServerNotifier.setUpgradeTimestamp` — the call that schedules a chain upgrade and arms the
 validator execution path — now consults a pluggable, per-protocol-version precondition checker, so
@@ -148,7 +148,7 @@ execution time.
   `docs/ai-review/docs/v31-calldata-review.md` Step 16 and documented the registration call in
   Step 12; scheduling-time enforcement noted in `genesis-and-upgrades.md` and `ci-green.md`.
 
-## Why
+### Why
 
 Scheduling is the moment a chain commits to its upgrade being executable by its validator, but the
 only precondition verified was "the CTM has an upgrade cut". Release-specific prerequisites (the
@@ -158,7 +158,7 @@ time and by runbook discipline, so an operator could schedule an upgrade guarant
 diamond/CTM surface, with an existing footgun-check precedent (`migrateToGateway`'s
 `isReadyForMigration`). Linear: EVM-1656.
 
-## Behavioural changes in production contracts
+### Behavioural changes in production contracts
 
 Exactly one:
 
@@ -178,7 +178,7 @@ partner runbooks are unchanged. New externals (`setUpgradePreconditionChecker` �
 (`UpgradePreconditionCheckerMagicMismatch`) moves solc metadata for every importer, hence the wide
 `AllContractsHashes.json` regeneration.
 
-## Storage layout (`ServerNotifier`, base `ae2941eaf` vs this branch)
+### Storage layout (`ServerNotifier`, base `ae2941eaf` vs this branch)
 
 ```
 slot 0: _owner (address)                                              unchanged
@@ -193,7 +193,7 @@ slot 4: upgradePreconditionChecker
 
 Also locked at runtime by `ServerNotifierStorageLayoutTest` (`vm.load`-based slot pins).
 
-## Validation
+### Validation
 
 See HANDOFF.md §4 (full commands and counts): full foundry suite 2504/2504; new unit suites 9/9 +
 14/14 (+5 layout locks); pre-existing ServerNotifier suite unmodified and green; v31 local
@@ -201,7 +201,7 @@ integration tests green (`--ffi`); anvil-interop v31→v32 upgrade test green en
 new scheduling assertions; protocol-ops fmt/clippy(-D warnings)/tests green;
 `calculate-hashes:check` green after a clean rebuild; all linters green.
 
-## Checklist
+### Checklist
 
 - [x] Happy/unhappy/edge-path tests for every new external
 - [x] `errors-lint --fix`, `selectors --fix`, `copy-to-zkstack-out` outputs committed
