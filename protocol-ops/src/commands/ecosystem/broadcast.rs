@@ -23,7 +23,9 @@ use anyhow::Context;
 use clap::Parser;
 use serde::Deserialize;
 
-use crate::commands::dev::execute_safe::{execute_one_bundle, execute_one_bundle_unlocked};
+use crate::commands::dev::execute_safe::{
+    execute_one_bundle, execute_one_bundle_unlocked, GAS_PRICE_FLOOR_WEI,
+};
 use crate::common::logger;
 
 #[derive(Debug, Clone, Parser)]
@@ -159,9 +161,15 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
                 .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
         } else {
             let key = &key_map[&bundle.target];
-            execute_one_bundle(&bundle_path, &args.l1_rpc_url, key, out_path)
-                .await
-                .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
+            execute_one_bundle(
+                &bundle_path,
+                &args.l1_rpc_url,
+                key,
+                out_path,
+                GAS_PRICE_FLOOR_WEI,
+            )
+            .await
+            .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
         }
     }
 
