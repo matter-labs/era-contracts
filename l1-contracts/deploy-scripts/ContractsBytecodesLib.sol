@@ -131,7 +131,22 @@ library ContractsBytecodesLib {
 
         // --- General Cases ---
         // Checks if contractIdentifier is in CONTRACT_IDENTIFIERS.
-        // If so, loads ContractIdentifier.sol and expects contract class ContractIdentifier.
+        // If so, loads the corresponding L2-formatted artifact from zkout/.
+        //
+        // The L2 bytecode hash must be computed from the padded L2 artifact, not
+        // from the raw EVM creation bytecode emitted in out/.
+        if (Utils.compareStrings(contractIdentifier, "Bridgehub")) {
+            return Utils.readZKFoundryBytecodeL1("L2Bridgehub.sol", "L2Bridgehub");
+        } else if (Utils.compareStrings(contractIdentifier, "MessageRoot")) {
+            return Utils.readZKFoundryBytecodeL1("L2MessageRoot.sol", "L2MessageRoot");
+        } else if (Utils.compareStrings(contractIdentifier, "ChainAssetHandler")) {
+            return Utils.readZKFoundryBytecodeL1("L2ChainAssetHandler.sol", "L2ChainAssetHandler");
+        } else if (Utils.compareStrings(contractIdentifier, "L2AssetRouter")) {
+            return Utils.readZKFoundryBytecodeL1("L2AssetRouter.sol", "L2AssetRouter");
+        } else if (Utils.compareStrings(contractIdentifier, "L2NativeTokenVault")) {
+            return Utils.readZKFoundryBytecodeL1("L2NativeTokenVault.sol", "L2NativeTokenVault");
+        }
+
         uint256 SYSTEM_CONTRACT_IDENTIFIERS_LENGTH = SYSTEM_CONTRACT_IDENTIFIERS.length;
         for (uint i = 0; i < SYSTEM_CONTRACT_IDENTIFIERS_LENGTH; i++) {
             if (Utils.compareStrings(SYSTEM_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {

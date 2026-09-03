@@ -1,0 +1,39 @@
+{
+  "l1Addresses": {
+    "bridgehub": "0x2b9C8EC9F723EA869174496012102Baf31Fd8d14",
+    "l1SharedBridge": "0x71caab84d0fc4F703A485e3Bd9F73146c4ec7a1b",
+    "l1NullifierProxy": "0xc8e73DcA0A7Dc9600fCb294538b37914A7db0176",
+    "l1NativeTokenVault": "0xAfbCe7C2F79Bba094132fE4d768a1a755C4a3E55",
+    "l1AssetTracker": "0xDa1dD48A2e4fe414B57FF2fc9F84cCC3368C7086",
+    "l1ERC20Bridge": "0x2c099131DA70ea95D1FA6ab0B05A65A88Bf71fFE",
+    "governance": "0x6550c0A3cDD4510Fa639BEa72Dc8228359E3a74B",
+    "transparentProxyAdmin": "0x15Ff7042E2Aa7cF8ca316c7FCbB8E3b2e625a549",
+    "messageRoot": "0x106aCA4979B6F8bd1700CBF6cB75707527A7047B",
+    "ctmDeploymentTracker": "0xcE709f9Ea84b4C560E9900aeabEa41cF2285f45e",
+    "chainRegistrationSender": "0x018d3912B031Fd8413a0f1562Fd0bA11787c6085"
+  },
+  "ctmAddresses": {
+    "chainTypeManager": "0x1a4cCAFc06743d55c8eaA7B63BcC5d0AAC69c182",
+    "chainAdmin": "0x4c2977aD029071690f5d59B342A7B6f95fc839de",
+    "verifier": "0x9A0467235Ec5d1682Ac1B47DC0A45712fb7DF086",
+    "rollupL1DAValidator": "0x5Be9468566A91E9979Cc432a07998424B2f8c264"
+  },
+  "chainAddresses": [
+    {
+      "chainId": 10,
+      "diamondProxy": "0xf6A1a1EB41d7A2B0456f3117778c7e94aD7D9011"
+    },
+    {
+      "chainId": 11,
+      "diamondProxy": "0x8bC37d7EEE0ae68153793Fc0b7b2D726D1100021"
+    },
+    {
+      "chainId": 12,
+      "diamondProxy": "0x8A206f4119D967188d771804c31f23a4687CadD6"
+    },
+    {
+      "chainId": 13,
+      "diamondProxy": "0x3E6Ebf18A82D3D2276070E33345c9a8D8E86868C"
+    }
+  ]
+}
