@@ -272,4 +272,13 @@ struct ZKChainStorage {
     /// calling chain, since one verifier instance serves every chain of a protocol version.
     /// @dev STORAGE SLOT: 68 (offset 9). Packed with the two fields above: 1 + 8 + 1 of 32 bytes.
     uint8 disabledProofSystems;
+    /// @dev The Airbender-shape commitment of each verified batch, written when that batch's proof
+    /// is accepted and read back as the `prev` end of the next transition's Airbender public input.
+    /// @dev Era only. Recording it is what makes the Airbender lane a chain of values that lane
+    /// itself established, so it still binds a batch's predecessor when the Boojum lane is disabled
+    /// and the stored Boojum commitment is proven by nothing.
+    /// @dev Unset (`0`) for the last batch verified before the lane was enabled. The first proof
+    /// after that seeds the chain instead, via `AirbenderCommitment.deriveBootstrapCommitment`.
+    /// @dev STORAGE SLOT: 69
+    mapping(uint256 batchNumber => bytes32 airbenderCommitment) airbenderCommitments;
 }
