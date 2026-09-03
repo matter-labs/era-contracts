@@ -177,39 +177,30 @@ function dockerRun(args: string[], opts: SpawnSyncOptions = {}): number {
 }
 
 function cmdRegen(pk: string, rpc: string, binMount: string[]): number {
-  // Forward any iteration-skip flags the wrapper script understands. Useful
-  // for re-running just PUVT (`SKIP_PREPARE=1 SKIP_BROADCAST=1`) after
-  // refreshing only the protocol_ops binary, or skipping PUVT for fast
-  // iteration on the sim layer.
-  const passthrough: string[] = [];
-  for (const k of ["SKIP_PREPARE", "SKIP_BROADCAST", "SKIP_PUVT", "KEEP_ANVIL"]) {
-    if (process.env[k]) {
-      passthrough.push("-e", `${k}=${process.env[k]}`);
-    }
-  }
+  // `rehearse-upgrade` forks the RPC inside the container and impersonates the
+  // deployer, so it only needs the deployer's address; the key never enters
+  // the container.
+  const deployer = new ethers.Wallet(pk).address;
   const args = [
     "run",
     "--rm",
     "--platform",
     "linux/amd64",
     ...sourcifyBlock(),
-    "-e",
-    `DEPLOYER_PK=${pk}`,
-    "-e",
-    `L1_RPC_URL=${rpc}`,
-    "-e",
-    `L1_FORK_URL=${rpc}`,
-    ...passthrough,
     ...binMount,
     ...commonMounts(),
     "-w",
-    "/contracts/l1-contracts",
+    "/contracts",
     IMAGE,
-    "yarn",
-    "--cwd",
-    "test/anvil-interop",
-    "bundle",
-    "regen",
+    "protocol_ops",
+    "ecosystem",
+    "rehearse-upgrade",
+    "--env",
+    "stage",
+    "--fork-url",
+    rpc,
+    "--deployer-address",
+    deployer,
   ];
   return dockerRun(args);
 }
