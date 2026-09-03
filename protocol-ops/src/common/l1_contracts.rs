@@ -344,6 +344,47 @@ pub async fn resolve_chain_admin(
     ensure_nonzero(admin, &format!("zkChain({:#x}).getAdmin()", diamond))
 }
 
+/// Resolve `ctm.serverNotifierAddress()` for the chain's CTM → ServerNotifier proxy address.
+pub async fn resolve_server_notifier(
+    l1_rpc_url: &str,
+    bridgehub: Address,
+    chain_id: u64,
+) -> anyhow::Result<Address> {
+    let ctm_proxy = resolve_ctm_proxy(l1_rpc_url, bridgehub, chain_id).await?;
+    let ctm = IChainTypeManagerAbi::new(ctm_proxy, provider(l1_rpc_url)?);
+    let notifier = ctm
+        .serverNotifierAddress()
+        .call()
+        .await
+        .context("ctm.serverNotifierAddress() call failed")?;
+    ensure_nonzero(notifier, "ctm.serverNotifierAddress()")
+}
+
+/// Dry-run `ServerNotifier.previewUpgradePreconditions(chainId)`.
+///
+/// Returns the failed checks' error selectors (empty when scheduling would pass), or `None` when
+/// the deployed ServerNotifier predates the preview (pre-v34 implementation) — the caller then
+/// falls back to the scheduling call's own revert as the source of truth.
+pub async fn preview_upgrade_preconditions(
+    l1_rpc_url: &str,
+    server_notifier: Address,
+    chain_id: u64,
+) -> anyhow::Result<Option<Vec<[u8; 4]>>> {
+    use crate::common::abi::IServerNotifierAbi;
+
+    let notifier = IServerNotifierAbi::new(server_notifier, provider(l1_rpc_url)?);
+    match notifier
+        .previewUpgradePreconditions(U256::from(chain_id))
+        .call()
+        .await
+    {
+        Ok(failed) => Ok(Some(failed.iter().map(|s| s.0).collect())),
+        // A pre-v34 implementation has no such selector: the call reverts (or returns nothing to
+        // decode). That is not an error for the caller — only "no preview available".
+        Err(_) => Ok(None),
+    }
+}
+
 /// Resolve `zkChain.getRollupDAManager()` → RollupDAManager address.
 pub async fn resolve_rollup_da_manager(
     l1_rpc_url: &str,

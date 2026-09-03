@@ -44,6 +44,40 @@ pub struct ChainSetUpgradeTimestampArgs {
     pub shared: SharedRunArgs,
 }
 
+/// Human-readable rendering of the error selectors
+/// `ServerNotifier.previewUpgradePreconditions` reports.
+fn describe_precondition_failure(selector: &[u8; 4]) -> String {
+    use crate::common::abi::IUpgradePreconditionErrors as E;
+    use alloy::sol_types::SolError;
+
+    match *selector {
+        s if s == E::CutDataForProtocolVersionNotAvailable::SELECTOR => {
+            "CutDataForProtocolVersionNotAvailable: the CTM has no upgrade cut registered for the \
+             chain's current protocol version (run the ecosystem upgrade prepare first)"
+                .to_string()
+        }
+        s if s == E::BaseTokenPreV31TotalSupplyNotSet::SELECTOR => {
+            "BaseTokenPreV31TotalSupplyNotSet: the chain's pre-v31 base-token total supply was \
+             never backfilled"
+                .to_string()
+        }
+        s if s == E::LowerBoundNotRecorded::SELECTOR => {
+            "LowerBoundNotRecorded: the chain's priority-op lower bound is not recorded yet (run \
+             RecordPriorityOpLowerBound.s.sol)"
+                .to_string()
+        }
+        s if s == E::PriorityQueueNotReady::SELECTOR => {
+            "PriorityQueueNotReady: priority ops below the recorded lower bound are not fully \
+             processed yet"
+                .to_string()
+        }
+        s if s == E::ZKChainNotRegistered::SELECTOR => {
+            "ZKChainNotRegistered: the CTM has no chain registered under this chain id".to_string()
+        }
+        s => format!("unknown precondition error selector 0x{}", hex::encode(s)),
+    }
+}
+
 pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
@@ -56,6 +90,40 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
             .await
             .context("resolving chain admin from L1")?;
+
+    // Dry-run the on-chain scheduling preconditions and fail fast with a readable message. The
+    // forge simulation below would surface the same failure, but only as a bare revert selector;
+    // the on-chain check in `ServerNotifier.setUpgradeTimestamp` stays the source of truth.
+    let server_notifier = crate::common::l1_contracts::resolve_server_notifier(
+        &args.shared.l1_rpc_url,
+        bridgehub,
+        chain_id,
+    )
+    .await
+    .context("resolving ServerNotifier from L1")?;
+    match crate::common::l1_contracts::preview_upgrade_preconditions(
+        &args.shared.l1_rpc_url,
+        server_notifier,
+        chain_id,
+    )
+    .await?
+    {
+        Some(failed) if !failed.is_empty() => {
+            let lines: Vec<String> = failed
+                .iter()
+                .map(|s| format!("  - {}", describe_precondition_failure(s)))
+                .collect();
+            anyhow::bail!(
+                "chain {chain_id} is not ready to have its upgrade scheduled \
+                 (ServerNotifier.previewUpgradePreconditions):\n{}",
+                lines.join("\n")
+            );
+        }
+        Some(_) => logger::info("On-chain upgrade-scheduling preconditions: OK"),
+        None => logger::info(
+            "ServerNotifier predates the precondition preview; relying on the scheduling call's own checks",
+        ),
+    }
     // The Solidity helper executes through ChainAdmin, but broadcasts from
     // ChainAdmin.owner() or the AccessControlRestriction default admin inside adminExecuteCalls.
     let sender = runner

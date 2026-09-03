@@ -1213,6 +1213,23 @@ fn verify_ctm_base_provenance(
         "l1-contracts/V32UpgradeZKsyncOS",
     );
 
+    // V33UpgradePreconditionChecker(IPriorityOpLowerBound) — the scheduling-time counterpart of
+    // the per-chain upgrade's prerequisites, registered on the ServerNotifier by the CTM admin
+    // calls; embeds the same registry as its single constructor argument.
+    let upgrade_precondition_checker = required_address(
+        &ctm.value,
+        &scope,
+        &["state_transition", "upgrade_precondition_checker_addr"],
+    )?;
+    let mut checker_ctor = vec![0u8; 32];
+    checker_ctor[12..].copy_from_slice(priority_op_lower_bound.as_slice());
+    result.expect_create2_params(
+        verifiers,
+        &upgrade_precondition_checker,
+        checker_ctor,
+        "l1-contracts/V33UpgradePreconditionChecker",
+    );
+
     // DiamondInit(bool _isZKsyncOS) — encoded as a single 32-byte word (true).
     let diamond_init = required_address(
         &ctm.value,
