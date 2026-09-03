@@ -15,6 +15,25 @@
   },
   {
     "type": "function",
+    "name": "airbenderCommitment",
+    "inputs": [
+      {
+        "name": "_batchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "allowEvmEmulation",
     "inputs": [],
     "outputs": [

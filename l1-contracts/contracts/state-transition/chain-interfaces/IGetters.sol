@@ -137,6 +137,15 @@ interface IGetters is IZKChainBase {
     /// chain, since one verifier instance serves every chain of a protocol version.
     function disabledProofSystems() external view returns (uint8);
 
+    /// @return The Airbender-shape commitment recorded when the given batch was verified, or `0` if
+    /// the Airbender lane never verified it.
+    /// @dev The operator reads this to decide whether a prove call must carry a bootstrap witness
+    /// for its previous batch: `0` means the chain has to be seeded from that batch's committed
+    /// data, which is the case before the lane is first enabled and again after any period with the
+    /// lane switched off.
+    /// @param _batchNumber The batch to look up.
+    function airbenderCommitment(uint256 _batchNumber) external view returns (bytes32);
+
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
     /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.
