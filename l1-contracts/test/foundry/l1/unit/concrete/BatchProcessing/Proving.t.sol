@@ -19,7 +19,14 @@ import {
     TOTAL_BLOBS_IN_COMMITMENT
 } from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {BatchHashMismatch, VerifiedBatchesExceedsCommittedBatches} from "contracts/common/L1ContractErrors.sol";
+import {
+    AirbenderBootstrapWitnessNotExpected,
+    AirbenderBootstrapWitnessRequired,
+    AirbenderWitnessNotSupportedOnZKsyncOS,
+    BatchHashMismatch,
+    InvalidPublicInputsLength,
+    VerifiedBatchesExceedsCommittedBatches
+} from "contracts/common/L1ContractErrors.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
@@ -385,6 +392,142 @@ contract ProvingTest is ExecutorTest {
             bytes32(0),
             "a batch the Airbender lane never verified must not enter its chain"
         );
+    }
+
+    /// An unseeded chain refuses the transition unless it carries a witness for its predecessor.
+    ///
+    /// @dev The matching success case cannot be written against batch 1: the Executor forces `prev`
+    /// to be the genesis batch, whose commitment is a config value (`genesisBatchCommitment`) with
+    /// no preimage anyone can supply, so no witness can open it. Seeding therefore works when the
+    /// lane is enabled on a live chain — where `prev` is a batch the chain itself committed — and
+    /// not for a chain whose first ever proved batch is batch 1. That is a real constraint on
+    /// enabling the lane, not a gap in the test.
+    function test_bootstrapWitnessIsRequiredWhenTheChainIsUnseeded() public {
+        _installAcceptingGate();
+
+        AirbenderProofWitnesses memory airbender;
+        airbender.proved = new AirbenderCommitmentWitness[](1);
+        airbender.proved[0] = provedWitness;
+
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
+        batches[0] = newStoredBatchInfo;
+
+        vm.expectRevert(AirbenderBootstrapWitnessRequired.selector);
+        _proveWithWitnesses(batches, proof_(), airbender);
+    }
+
+    /// A bootstrap witness for a predecessor whose commitment is already recorded would be ignored,
+    /// so it is refused rather than silently dropped.
+    function test_bootstrapWitnessRefusedOnceTheChainIsSeeded() public {
+        _installAcceptingGate();
+        vm.store(address(executor), _airbenderCommitmentSlot(0), Utils.randomBytes32("seededGenesisAirbender"));
+
+        AirbenderProofWitnesses memory airbender;
+        airbender.proved = new AirbenderCommitmentWitness[](1);
+        airbender.proved[0] = provedWitness;
+        airbender.bootstrap = new AirbenderCommitmentWitness[](1);
+        airbender.bootstrap[0] = provedWitness;
+
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
+        batches[0] = newStoredBatchInfo;
+
+        vm.expectRevert(AirbenderBootstrapWitnessNotExpected.selector);
+        _proveWithWitnesses(batches, proof_(), airbender);
+    }
+
+    /// The witness must be opened against a batch the chain has stored, not one the caller invented.
+    /// `_checkBatchHashMismatch` runs first, so a fabricated `StoredBatchInfo` never reaches the
+    /// authentication check.
+    function test_unstoredBatchIsRejectedBeforeTheWitnessIsOpened() public {
+        _installAcceptingGate();
+        vm.store(address(executor), _airbenderCommitmentSlot(0), Utils.randomBytes32("seededGenesisAirbender"));
+
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
+        batches[0] = newStoredBatchInfo;
+        batches[0].commitment = Utils.randomBytes32("fabricatedCommitment");
+
+        AirbenderProofWitnesses memory airbender;
+        airbender.proved = new AirbenderCommitmentWitness[](1);
+        airbender.proved[0] = provedWitness;
+
+        vm.expectPartialRevert(BatchHashMismatch.selector);
+        _proveWithWitnesses(batches, proof_(), airbender);
+    }
+
+    /// ZKsync OS chains have no Airbender lane, and their stored `commitment` is a batch output hash
+    /// with no such preimage, so the encoding is refused outright rather than failing obscurely
+    /// inside the witness authentication.
+    ///
+    /// @dev `zksyncOS` is the low byte of the packed slot its declaration names; the rest of the
+    /// word is preserved. If that slot were wrong the flag would not take and this would revert
+    /// with something else, so the test self-checks.
+    function test_airbenderWitnessRefusedOnZKsyncOSChain() public {
+        _installAcceptingGate();
+
+        uint256 zksyncOSSlot = 60;
+        bytes32 packed = vm.load(address(executor), bytes32(zksyncOSSlot));
+        vm.store(address(executor), bytes32(zksyncOSSlot), packed | bytes32(uint256(1)));
+
+        AirbenderProofWitnesses memory airbender;
+        airbender.proved = new AirbenderCommitmentWitness[](1);
+        airbender.proved[0] = provedWitness;
+
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
+        batches[0] = newStoredBatchInfo;
+
+        vm.expectRevert(AirbenderWitnessNotSupportedOnZKsyncOS.selector);
+        _proveWithWitnesses(batches, proof_(), airbender);
+    }
+
+    /// The legacy encoding carries no witnesses, so it produces a one-word public input array that
+    /// the gate refuses — the choice of encoding cannot be used to leave the lane unchecked.
+    function test_legacyEncodingIsRefusedByTheGate() public {
+        _installAcceptingGate();
+
+        vm.expectRevert(InvalidPublicInputsLength.selector);
+        _proveWithLegacyEncoding(proof_());
+    }
+
+    function _installAcceptingGate() internal {
+        EraMultiProofVerifier gate = new EraMultiProofVerifier(
+            IVerifier(address(new AcceptingLane())),
+            IVerifier(address(new AcceptingLane()))
+        );
+        vm.etch(getters.getVerifier(), address(gate).code);
+    }
+
+    function _gateProof() internal pure returns (uint256[] memory proof) {
+        proof = new uint256[](2 + 1 + AIRBENDER_SNARK_PROOF_LENGTH);
+        proof[0] = ERA_MULTI_PROOF_TYPE;
+        proof[1] = 1;
+        proof[2] = 1;
+    }
+
+    function proof_() internal pure returns (uint256[] memory) {
+        return _gateProof();
+    }
+
+    function _proveWithWitnesses(
+        IExecutor.StoredBatchInfo[] memory _batches,
+        uint256[] memory _proof,
+        AirbenderProofWitnesses memory _airbender
+    ) internal {
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils
+            .encodeProveBatchesDataWithAirbender(genesisStoredBatchInfo, _batches, _proof, _airbender);
+        vm.prank(validator);
+        executor.proveBatchesSharedBridge(address(0), proveBatchFrom, proveBatchTo, proveData);
+    }
+
+    function _proveWithLegacyEncoding(uint256[] memory _proof) internal {
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
+        batches[0] = newStoredBatchInfo;
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
+            genesisStoredBatchInfo,
+            batches,
+            _proof
+        );
+        vm.prank(validator);
+        executor.proveBatchesSharedBridge(address(0), proveBatchFrom, proveBatchTo, proveData);
     }
 
     /// @dev `ZKChainStorage.airbenderCommitments` — asserted rather than assumed by
