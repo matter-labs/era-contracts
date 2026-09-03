@@ -150,7 +150,31 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         addresses.chainAdmin = L1Bridgehub(bridgehubProxy).admin();
     }
 
-    function deployGatewayCTM() internal {
+    /// @notice Brings up a brand-new gateway: CREATE2-deploys the whole gateway CTM contract set
+    ///         through L1->L2 transactions.
+    /// @dev DISABLED IN v32. No gateway is deployed in this release: chain migrations are switched off
+    ///      ecosystem-wide (`CHAIN_MIGRATIONS_ENABLED == false` in `Config.sol`, see
+    ///      {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}), so no chain
+    ///      can ever settle on a gateway created here, and the release's gateway-side pieces are
+    ///      consequently untested. Rather than emit a governance bundle that deploys an unusable — and
+    ///      unverified — CTM onto an L2, this reverts.
+    /// @dev The address-calculation half of this script (`GatewayCTMDeployerHelper.calculateAddresses`)
+    ///      stays reachable and is still covered by `GatewayVotePreparationTests`.
+    /// @dev When gateway support returns, re-enabling this is not enough: the deployed gateway CTM never
+    ///      receives a `setDefaultUpgrade` call, so `createNewVerifierOnlyUpgrade` on it would revert with
+    ///      `ZeroAddress`. The upgrade path solves this in `DefaultGatewayUpgrade`
+    ///      (`deployUsedUpgradeContractGW` + `prepareSetDefaultUpgradeCallForGateway`); the fresh path needs
+    ///      the equivalent — a per-VM default upgrade among the direct CREATE2 deployments plus an L1->L2
+    ///      `IChainTypeManager.setDefaultUpgrade` in `GatewayGovernanceUtils`.
+    /// @dev `virtual` for the anvil-interop harness alone, which brings a gateway up to keep exercising
+    ///      the machinery this release keeps but does not deploy — see `_GatewayVotePreparationForTests`.
+    function deployGatewayCTM() internal virtual {
+        revert("GatewayVotePreparation: v32 deploys no gateway; see the note on deployGatewayCTM");
+    }
+
+    /// @notice The gateway CTM deployment itself, kept intact for the harness and for the release that
+    ///         brings gateways back; unreachable in production through `deployGatewayCTM` above.
+    function _deployGatewayCTM() internal {
         (
             DeployedContracts memory expectedGatewayContracts,
             DeployerCreate2Calldata memory deployerCalldata,

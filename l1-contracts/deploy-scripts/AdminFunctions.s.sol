@@ -41,7 +41,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {InteropLibrary} from "./InteropLibrary.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {L2DACommitmentScheme, PubdataContent} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
@@ -902,6 +902,52 @@ contract AdminFunctions is Script, IAdminFunctions {
             target: chainInfo.diamondProxy,
             value: 0,
             data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaCommitmentScheme))
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, _accessControlRestriction, calls, _shouldSend);
+    }
+
+    /// @notice Sets the chain's pubdata content (ZKsync OS only): whether its batches commit the full
+    ///         pubdata or only the mandatory L2->L1 log region. A new chain starts at `FULL_PUBDATA`, and a
+    ///         permanent rollup is locked to it.
+    /// @dev Rejected by the chain while committed-but-unverified batches exist, since the value is part of
+    ///      the batch public input.
+    function setPubdataContent(
+        address _bridgehub,
+        address _accessControlRestriction,
+        uint256 _chainId,
+        PubdataContent _pubdataContent,
+        bool _shouldSend
+    ) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.setPubdataContent, (_pubdataContent))
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, _accessControlRestriction, calls, _shouldSend);
+    }
+
+    /// @notice Raises the chain's ZKsync OS single-transaction gas limit (EIP-7825) above the Ethereum
+    ///         default. A new chain runs on that default until this is called.
+    /// @dev Same batch-public-input constraint as `setPubdataContent`.
+    function setZKsyncOSMaxTxGasLimit(
+        address _bridgehub,
+        address _accessControlRestriction,
+        uint256 _chainId,
+        uint64 _newMaxTxGasLimit,
+        bool _shouldSend
+    ) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.setZKsyncOSMaxTxGasLimit, (_newMaxTxGasLimit))
         });
 
         saveAndSendAdminTx(chainInfo.admin, _accessControlRestriction, calls, _shouldSend);

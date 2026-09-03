@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {L2DACommitmentScheme, PubdataPricingMode} from "contracts/common/Config.sol";
+import {L2DACommitmentScheme, PubdataContent, PubdataPricingMode} from "contracts/common/Config.sol";
 
 /// Per-env list of contracts that can appear as the current owner of a CTM /
 /// ProxyAdmin and need their calls wrapped (since they have no private key)
@@ -146,6 +146,22 @@ interface IAdminFunctions {
         uint256 chainId,
         address l1DaValidator,
         L2DACommitmentScheme l2DaCommitmentScheme,
+        bool shouldSend
+    ) external;
+
+    function setPubdataContent(
+        address bridgehub,
+        address accessControlRestriction,
+        uint256 chainId,
+        PubdataContent pubdataContent,
+        bool shouldSend
+    ) external;
+
+    function setZKsyncOSMaxTxGasLimit(
+        address bridgehub,
+        address accessControlRestriction,
+        uint256 chainId,
+        uint64 newMaxTxGasLimit,
         bool shouldSend
     ) external;
 

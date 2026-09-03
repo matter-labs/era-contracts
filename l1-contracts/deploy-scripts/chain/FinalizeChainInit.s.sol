@@ -35,6 +35,18 @@ contract FinalizeChainInit is AdminFunctions, IFinalizeChainInit {
             );
         }
 
+        // Before the permanent-rollup step below: that one requires `FULL_PUBDATA` and, once taken, locks
+        // the pubdata content for good.
+        if (_params.shouldSetPubdataContent) {
+            setPubdataContent(
+                _params.bridgehub,
+                _params.accessControlRestriction,
+                _params.chainId,
+                _params.pubdataContent,
+                true
+            );
+        }
+
         if (_params.shouldMakePermanentRollup) {
             makePermanentRollup(chainAdmin, _params.diamondProxy);
         }
