@@ -1780,7 +1780,7 @@ fn hex_bytes(label: &str, value: &str) -> Result<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-    use alloy::sol_types::SolStruct;
+    use alloy::sol_types::{SolConstructor, SolStruct};
 
     use super::gateway_signatures::GatewayCTMDeployerConfig;
 
@@ -1834,6 +1834,21 @@ mod tests {
             params.trim(),
             "IL1Bridgehub _bridgehub, IMessageRootBase _messageRoot",
             "protocol-ops V31L1Nullifier must follow L1Nullifier's constructor"
+        );
+        // Tie the Rust mirror itself to the source: both constructor parameters are single
+        // words, so the encoding the verifier compares against must be exactly one word per
+        // Solidity parameter. Reverting the mirror to the four-argument shape fails here (and
+        // the two-tuple `constructorCall::new` above stops compiling).
+        let solidity_arity = params.split(',').count();
+        let encoded = super::core_signatures::V31L1Nullifier::constructorCall::new((
+            alloy::primitives::Address::ZERO,
+            alloy::primitives::Address::ZERO,
+        ))
+        .abi_encode();
+        assert_eq!(
+            encoded.len(),
+            solidity_arity * 32,
+            "V31L1Nullifier must encode one word per Solidity constructor parameter"
         );
     }
 }
