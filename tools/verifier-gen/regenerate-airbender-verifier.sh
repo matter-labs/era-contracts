@@ -23,7 +23,7 @@ set -euo pipefail
 
 # Keep in sync with the `zksync_airbender_verifier` tag in
 # `airbender_prover_server/Cargo.toml`.
-DEFAULT_TAG="eravm-airbender-verifier-v31.3.0"
+DEFAULT_TAG="eravm-airbender-verifier-v31.3.1"
 TAG="${1:-$DEFAULT_TAG}"
 
 REPO="matter-labs/zksync-protocol-private"

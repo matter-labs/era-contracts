@@ -42,7 +42,7 @@ Use the wrapper script, which downloads the key from the pinned release and runs
 
 ```shell
 ./regenerate-airbender-verifier.sh                                   # uses the default pinned tag
-./regenerate-airbender-verifier.sh eravm-airbender-verifier-v31.3.0  # or an explicit tag
+./regenerate-airbender-verifier.sh eravm-airbender-verifier-v31.3.1  # or an explicit tag
 ```
 
 This will:
