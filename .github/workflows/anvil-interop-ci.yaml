@@ -78,10 +78,6 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: yarn tsc --noEmit
 
-      - name: Test deploy-bundle tooling
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn test:bundle
-
       - name: Run interop tests (preloaded state)
         working-directory: l1-contracts/test/anvil-interop
         run: |

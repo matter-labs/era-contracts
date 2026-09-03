@@ -5,7 +5,7 @@
 - `protocol-ops/src/commands/ecosystem/verify_upgrade.rs` - PUVT entry point.
 - `protocol-ops/src/upgrade_verification/` - PUVT calldata and state verifiers.
 - `protocol-ops/README.md` - current PUVT build and run commands.
-- `bundle regen` in `l1-contracts/test/anvil-interop` - stage calldata regeneration, replay, and PUVT flow.
+- `protocol_ops ecosystem rehearse-upgrade` - stage calldata regeneration, replay, and PUVT flow.
 - `l1-contracts/deploy-scripts/upgrade/v31/` - v31 upgrade script entry points.
 - `l1-contracts/deploy-scripts/upgrade/default-upgrade/` - shared v31 upgrade payload construction.
 - `l1-contracts/contracts/upgrades/` - governance and L2 upgrade structs used for decoding.
@@ -984,7 +984,7 @@ Use these only for Sepolia stage review. They are repo-local anchors in the
 reviewed commit.
 
 - stage generation and PUVT replay script:
-  `bundle regen` in `l1-contracts/test/anvil-interop`
+  `protocol_ops ecosystem rehearse-upgrade`
 - stage v31 input:
   `l1-contracts/upgrade-envs/v0.31.0-interopB/stage.toml`
 - stage permanent values:

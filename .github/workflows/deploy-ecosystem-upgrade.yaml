@@ -201,10 +201,6 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Install deploy-bundle tooling dependencies
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn install --frozen-lockfile
-
       - name: Build protocol_ops
         working-directory: protocol-ops
         run: cargo build --release
@@ -246,7 +242,7 @@ jobs:
             exit 1
           fi
           DEPLOY_BUNDLE_DIR="$(dirname "$META")"
-          yarn --cwd l1-contracts/test/anvil-interop bundle verify "$DEPLOY_BUNDLE_DIR"
+          ./protocol-ops/target/release/protocol_ops ecosystem verify-bundle "$DEPLOY_BUNDLE_DIR"
           echo "DEPLOY_BUNDLE_DIR=$DEPLOY_BUNDLE_DIR" >> "$GITHUB_ENV"
 
       # Tie the downloaded bytes back to the exact successful generation run.

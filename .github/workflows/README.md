@@ -39,8 +39,8 @@ args to `protocol_ops` unless the first post-flag word is `forge`/`cast`).
 | `deploy-ecosystem-upgrade`            | Step 2: broadcast the bundle's deployer calls to a real L1, then verify on Etherscan. Takes the step-1 run id.                                                                                                                                                   |
 
 See [`docs/ecosystem-upgrade-deploy.md`](../../docs/ecosystem-upgrade-deploy.md)
-for the local TypeScript equivalents (`bundle regen`, `bundle pack`, and
-`bundle replay`) and why the bundle — not a re-run — is what
+for the local equivalents (`protocol_ops ecosystem rehearse-upgrade` and
+`replay-bundle`) and why the bundle — not a re-run — is what
 transfers between machines.
 
 ## Conventions

@@ -73,11 +73,11 @@ the normalization.
 
 ```bash
 # 1a) fork + prepare + PUVT (writes ecosystem.toml + prepare/ + extra-verification-logs.txt)
-yarn --cwd l1-contracts/test/anvil-interop install --frozen-lockfile
 export PATH="$PWD/foundry-zksync:$PATH"          # foundry-zksync v0.1.5
-ZK_GOVERNANCE_DIR=../../zk-governance \
-  yarn --cwd l1-contracts/test/anvil-interop bundle regen mainnet \
-    --fork-url <l1-rpc> --deployer <deployer-eoa> \
+cd protocol-ops && cargo build --release && cd ..
+ZK_GOVERNANCE_DIR=<zk-governance checkout> \
+  ./protocol-ops/target/release/protocol_ops ecosystem rehearse-upgrade --env mainnet \
+    --fork-url <l1-rpc> --deployer-address <deployer-eoa> \
     --zk-governance-commit 9b06a16159cd58add109f25598e79731450d1772
 
 # 1b) emit the sim-inputs + transaction-simulator.json
@@ -103,7 +103,7 @@ standing proof that the artifact is self-sufficient.
 plus `v0.31.0-interopB/<env>.toml` — and the L1 to fork is read from that env's
 `l1_chain_id` (`1` → mainnet, `11155111` → Sepolia). Adding an ecosystem therefore
 needs no workflow edit: commit the config pair, add its anvil port to
-`ENV_ANVIL_PORTS` in `src/upgrade-bundle/constants.ts` if it needs its own fork, and (if PUVT
+`ENV_ANVIL_PORTS` in `protocol-ops/src/commands/ecosystem/bundle.rs` if it needs its own fork, and (if PUVT
 should accept it) a variant in `VerifyUpgradeEnv`. Committed today: `stage`,
 `testnet`, `mainnet`. PUVT must pass for both the generate job and the independent
 bundle-handoff verification job.
@@ -242,25 +242,24 @@ it sits in their init code and their CREATE2 addresses are a function of it.
 Broadcasting with a different EOA puts those contracts at different addresses while
 `ecosystem.toml` and the governance calldata still name the original ones — a
 silently broken upgrade. The bundle records the deployer as `deployer_address` in
-`bundle-metadata.json`; `bundle replay --key` and `deploy-ecosystem-upgrade.yaml` both
+`bundle-metadata.json`; `replay-bundle --key` and `deploy-ecosystem-upgrade.yaml` both
 refuse a key for any other account. Generate with the EOA that will deploy; never with
 a placeholder.
 
-Both the replay command and deploy workflow verify the metadata's file digests and
-require its bundle list to exactly match `prepare/manifest.json` before sending any
-transaction.
+Both the replay command and the deploy workflow verify every file digest in the
+metadata, and that every bundle file the manifest names is covered, before sending
+any transaction.
 
 **Check out the commit `bundle-metadata.json` names.** PUVT identifies deployed
 contracts by matching their code against the committed `AllContractsHashes.json`;
 from a different commit the deployments are not recognised and the verdict is
-meaningless. `bundle replay` compares the hash and exits on a mismatch.
+meaningless. `replay-bundle` compares the hash and exits on a mismatch.
 
 **Rehearse the deploy and run PUVT — no compiler, no regeneration:**
 
 ```bash
 cd protocol-ops && cargo build --release && cd ..     # the only build needed
-yarn --cwd l1-contracts/test/anvil-interop install --frozen-lockfile
-yarn --cwd l1-contracts/test/anvil-interop bundle replay \
+./protocol-ops/target/release/protocol_ops ecosystem replay-bundle \
   --bundle <unpacked-bundle-dir> --fork-url <l1-rpc>
 ```
 
@@ -272,25 +271,18 @@ Variants:
 
 ```bash
 # verify a chain the bundle was already broadcast to (no replay)
-yarn --cwd l1-contracts/test/anvil-interop bundle replay \
+./protocol-ops/target/release/protocol_ops ecosystem replay-bundle \
   --bundle <dir> --rpc <l1-rpc> --verify-only
 
 # broadcast the deployer bundles for real, then verify
-yarn --cwd l1-contracts/test/anvil-interop bundle replay \
+./protocol-ops/target/release/protocol_ops ecosystem replay-bundle \
   --bundle <dir> --rpc <l1-rpc> --key "$DEPLOYER_KEY"
 ```
 
 `--key` signs only the deployer's bundles (`--skip-unkeyed`); the governance
 ceremony bundles stay for their multisig. Same broadcast path, and same
-idempotency, as step 2 above. `bundle replay` writes its own state (the fork's
-`anvil.log`, `executed.json`, the receipts in `transactions.txt`) to
+idempotency, as step 2 above. `replay-bundle` writes its own state (`executed.json`
+and the receipts in `transactions.txt`) to
 `l1-contracts/upgrade-envs/v0.31.0-interopB/output/<env>/replay/`, never into the
 bundle directory, so a real broadcast's receipts are picked up by a later
 `--verify-only` run on the same machine.
-
-**Pack a bundle by hand** (e.g. from an older generation output):
-
-```bash
-yarn --cwd l1-contracts/test/anvil-interop bundle pack <env> \
-  --deployer <deployer> --forked-at-block <block>
-```

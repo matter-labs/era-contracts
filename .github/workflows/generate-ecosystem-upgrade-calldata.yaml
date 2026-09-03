@@ -66,7 +66,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 #
 # Or locally from the downloaded bundle — same `protocol_ops` code path:
 #
-#   yarn --cwd l1-contracts/test/anvil-interop bundle replay \
+#   protocol_ops ecosystem replay-bundle \
 #     --bundle <unpacked-bundle> --rpc <l1-rpc> --key "$DEPLOYER_KEY"
 #
 # Broadcast ONLY the deployer's bundles; the governance-signed ones are the
@@ -80,7 +80,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 # `AllContractsHashes.json`):
 #
 #   cd protocol-ops && cargo build --release && cd ..
-#   yarn --cwd l1-contracts/test/anvil-interop bundle replay \
+#   protocol_ops ecosystem replay-bundle \
 #     --bundle <unpacked-bundle> --rpc <l1-rpc> --verify-only     # already deployed
 #   #  … or --fork-url <l1-rpc> to rehearse the whole thing on a throw-away fork
 #
@@ -147,10 +147,10 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 # source — including any contract changes merged in since the last image was
 # published.
 #
-# Flow (the canonical `bundle regen` TypeScript command):
+# Flow (the canonical `protocol_ops ecosystem rehearse-upgrade` command):
 #   anvil fork of the L1 RPC
 #     -> protocol_ops ecosystem upgrade-prepare-all   (writes ecosystem.toml)
-#     -> bundle pack                                  (the transferable handoff)
+#     -> pack the deploy bundle                       (the transferable handoff)
 #     -> fund + fork-replay the prepare bundles
 #     -> protocol_ops ecosystem verify-upgrade (PUVT)
 #   then emit the git-portable `sim-inputs/` handoff set AND the ready-to-paste
@@ -301,10 +301,6 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Install deploy-bundle tooling dependencies
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn install --frozen-lockfile
-
       # Build ALL FOUR packages in the order `recompute_hashes.sh` and
       # `update-hashes-on-demand.yaml` use to produce the committed
       # `AllContractsHashes.json` — da → l1 → l2 → system-contracts. Keeping the
@@ -323,6 +319,10 @@ jobs:
       - name: Build system-contracts artifacts
         run: yarn sc build:foundry
 
+      - name: Build protocol_ops
+        working-directory: protocol-ops
+        run: cargo build --release
+
       # A clean runner and the reviewed #2268 release artifact differ only in
       # DefaultAccount's final compiler-metadata word. Normalize that word only
       # after proving the executable prefix is the reviewed one, then require the
@@ -332,14 +332,10 @@ jobs:
           ENVIRONMENT: ${{ inputs.environment }}
         run: |
           set -euo pipefail
-          yarn --cwd l1-contracts/test/anvil-interop bundle restore-default-account \
+          ./protocol-ops/target/release/protocol_ops dev restore-default-account \
             "$GITHUB_WORKSPACE/system-contracts/zkout/DefaultAccount.sol/DefaultAccount.json" \
             "$GITHUB_WORKSPACE/l1-contracts/upgrade-envs/v0.31.0-interopB/$ENVIRONMENT.toml" \
             "$GITHUB_WORKSPACE/AllContractsHashes.json"
-
-      - name: Build protocol_ops
-        working-directory: protocol-ops
-        run: cargo build --release
 
       # Pick the per-network L1 RPC (secret), mask it, and resolve the deployer
       # EOA address. stage + testnet fork Sepolia; mainnet forks mainnet.
@@ -409,7 +405,7 @@ jobs:
           fi
           echo "Deployer (impersonated on the fork): $deployer"
           # Job-scoped. L1_FORK_URL stays masked; DEPLOYER_ADDR is public. Both are
-          # passed to `bundle regen` as flags below; the deployer is impersonated on
+          # passed to `rehearse-upgrade` as flags below; the deployer is impersonated on
           # the fork (no signing key required).
           {
             echo "L1_FORK_URL=$rpc"
@@ -421,7 +417,6 @@ jobs:
           fi
 
       - name: Regenerate + verify calldata
-        working-directory: l1-contracts/test/anvil-interop
         env:
           ENVIRONMENT: ${{ inputs.environment }}
           # zk-governance commit whose AllContractsHashes PUVT uses to verify the
@@ -434,17 +429,17 @@ jobs:
           # Recorded in the deploy bundle's metadata (part of the bytecode identity).
           ZKSYNC_FOUNDRY_VERSION: ${{ inputs.zksync_foundry_version }}
         run: |
+          set -euo pipefail
           # L1_FORK_URL (masked), DEPLOYER_ADDR and GW_RPC_URL come from $GITHUB_ENV.
           # The command forks L1_FORK_URL into a local anvil and runs prepare/PUVT
           # against localhost, so only anvil sees the real RPC; the deployer is
-          # impersonated (no signing key needed). Blank optional flags are ignored.
-          yarn bundle regen "$ENVIRONMENT" \
-            --fork-url "$L1_FORK_URL" \
-            --deployer "$DEPLOYER_ADDR" \
-            --gw-rpc-url "${GW_RPC_URL:-}" \
-            --zk-governance-commit "$ZK_GOVERNANCE_COMMIT" \
-            --fork-block "$FORK_BLOCK" \
-            --foundry-zksync-version "$ZKSYNC_FOUNDRY_VERSION"
+          # impersonated (no signing key needed).
+          args=(--env "$ENVIRONMENT" --fork-url "$L1_FORK_URL" --deployer-address "$DEPLOYER_ADDR")
+          args+=(--zk-governance-commit "$ZK_GOVERNANCE_COMMIT")
+          [ -z "${GW_RPC_URL:-}" ] || args+=(--gw-rpc-url "$GW_RPC_URL")
+          [ -z "$FORK_BLOCK" ] || args+=(--fork-block "$FORK_BLOCK")
+          [ -z "$ZKSYNC_FOUNDRY_VERSION" ] || args+=(--foundry-zksync-version "$ZKSYNC_FOUNDRY_VERSION")
+          ./protocol-ops/target/release/protocol_ops ecosystem rehearse-upgrade "${args[@]}"
 
       # Produce the same calldata artifact set PR #2268 committed for mainnet:
       # the git-portable `sim-inputs/` handoff set AND the ready-to-paste
@@ -489,7 +484,7 @@ jobs:
           retention-days: 30
 
       # The DEPLOY BUNDLE: everything needed to broadcast this run's contracts and
-      # re-verify them, and nothing else. Packed by `bundle pack` during
+      # re-verify them, and nothing else. Packed by `rehearse-upgrade` during
       # the regen (right after the prepare, so it exists even if PUVT fails):
       #
       #   prepare/manifest.json + prepare/*.safe.json  the deployer calls to send
@@ -568,20 +563,9 @@ jobs:
             exit 1
           fi
 
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-          cache-dependency-path: l1-contracts/test/anvil-interop/yarn.lock
-
-      - name: Install deploy-bundle tooling dependencies
-        working-directory: l1-contracts/test/anvil-interop
-        run: yarn install --frozen-lockfile
-
-      # Foundry supplies anvil + cast, and the lightweight TypeScript package
-      # supplies the bundle command. There is still no forge --zksync or contract
-      # build: PUVT reads committed configuration, never `out/` or `zkout/`.
+      # Foundry supplies anvil + cast and `protocol_ops` supplies the replay. There is
+      # no forge --zksync or contract build: PUVT reads committed configuration,
+      # never `out/` or `zkout/`.
       - name: Install Foundry (anvil + cast)
         uses: foundry-rs/foundry-toolchain@v1
         with:
@@ -637,11 +621,10 @@ jobs:
 
       # The same command an operator runs locally against a downloaded bundle.
       - name: Replay the bundle on a fresh fork + PUVT
-        working-directory: l1-contracts/test/anvil-interop
         run: |
-          # The command stops only the fork anvil process it started, so this job
-          # needs no separate cleanup step.
-          yarn bundle replay \
-            --bundle "$GITHUB_WORKSPACE/deploy-bundle" \
-            --fork-url "$L1_FORK_URL" \
-            --gw-rpc-url "${GW_RPC_URL:-}"
+          set -euo pipefail
+          # The command stops the fork anvil it started, so this job needs no
+          # separate cleanup step.
+          args=(--bundle "$GITHUB_WORKSPACE/deploy-bundle" --fork-url "$L1_FORK_URL")
+          [ -z "${GW_RPC_URL:-}" ] || args+=(--gw-rpc-url "$GW_RPC_URL")
+          ./protocol-ops/target/release/protocol_ops ecosystem replay-bundle "${args[@]}"
