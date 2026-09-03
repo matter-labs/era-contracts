@@ -135,6 +135,40 @@ jobs:
             exit 1
           fi
 
+  check-zksync-os-genesis:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Restore this commit's artifacts
+        uses: ./.github/actions/restore-ci-artifacts
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-08-09
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: tools/zksync-os-genesis-gen
+
+      - name: Regenerate ZKsync OS genesis
+        working-directory: tools/zksync-os-genesis-gen
+        run: cargo run --locked --release -- --output-file "$RUNNER_TEMP/zksync-os-genesis.json"
+
+      - name: Check ZKsync OS genesis
+        run: |
+          if [ -n "$(git status --porcelain -- configs/genesis/zksync-os/latest.json)" ]; then
+            echo "::error::configs/genesis/zksync-os/latest.json is out of date. Run 'cd tools/zksync-os-genesis-gen && cargo run --release' and commit the changes."
+            git --no-pager status --porcelain -- configs/genesis/zksync-os/latest.json
+            git --no-pager diff -- configs/genesis/zksync-os/latest.json || true
+            exit 1
+          fi
+
   check-hashes:
     needs: [build]
     runs-on: ubuntu-latest
