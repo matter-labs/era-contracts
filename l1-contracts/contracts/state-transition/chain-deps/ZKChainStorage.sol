@@ -279,6 +279,9 @@ struct ZKChainStorage {
     /// and the stored Boojum commitment is proven by nothing.
     /// @dev Unset (`0`) for the last batch verified before the lane was enabled. The first proof
     /// after that seeds the chain instead, via `AirbenderCommitment.deriveBootstrapCommitment`.
+    /// @dev Keyed by the batch's entry in `storedBatchHashes`, not its number: numbers are reused
+    /// after a revert, and an entry left over from a reverted batch would otherwise be read back as
+    /// the predecessor of its replacement, which no proof can satisfy.
     /// @dev STORAGE SLOT: 69
-    mapping(uint256 batchNumber => bytes32 airbenderCommitment) airbenderCommitments;
+    mapping(bytes32 storedBatchHash => bytes32 airbenderCommitment) airbenderCommitments;
 }
