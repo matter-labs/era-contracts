@@ -30,6 +30,8 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 import {IPriorityOpLowerBound} from "contracts/upgrades/IPriorityOpLowerBound.sol";
+import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
+import {LowerBoundNotRecorded} from "contracts/common/L1ContractErrors.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
 import {Bytes} from "contracts/vendor/Bytes.sol";
@@ -39,6 +41,11 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
     /// @notice Exposes the deployed PriorityOpLowerBound registry for the test's chain-upgrade precondition.
     function exposedPriorityOpLowerBound() external view returns (address) {
         return priorityOpLowerBound;
+    }
+
+    /// @notice Exposes the deployed precondition checker for the test's scheduling assertions.
+    function exposedUpgradePreconditionChecker() external view returns (address) {
+        return upgradePreconditionChecker;
     }
 
     /// @notice Override to skip bytecode publishing which reads large JSON files.
@@ -177,10 +184,43 @@ contract UpgradeIntegrationTest_Local is
         bytes32 v31MappingSlot = keccak256(abi.encode(eraZKChainId, L1_MESSAGE_ROOT_V31_UPGRADE_BATCH_NUMBER_SLOT));
         vm.store(messageRoot, v31MappingSlot, bytes32(V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE));
 
+        // Scheduling-time enforcement of the same precondition: the CTM-admin call set registered
+        // the release's checker on the ServerNotifier, so before the lower bound is recorded the
+        // chain admin cannot even schedule the upgrade — and the preview reports the same error.
+        IServerNotifier serverNotifier = IServerNotifier(
+            ctmUpgrade.getAddresses().stateTransition.proxies.serverNotifier
+        );
+        uint256 oldProtocolVersion = ctmUpgrade.getOldProtocolVersion();
+        assertEq(
+            address(serverNotifier.upgradePreconditionChecker(oldProtocolVersion)),
+            CTMUpgrade_v31_Test(address(ctmUpgrade)).exposedUpgradePreconditionChecker(),
+            "CTM-admin calls did not register the precondition checker"
+        );
+        address chainAdmin = IChainTypeManager(ctmUpgrade.getCTMAddress()).getChainAdmin(eraZKChainId);
+        uint256 scheduleTimestamp = block.timestamp + 1 days;
+
+        bytes4[] memory failed = serverNotifier.previewUpgradePreconditions(eraZKChainId);
+        assertEq(failed.length, 1, "Preview must report exactly the missing lower bound");
+        assertEq(failed[0], LowerBoundNotRecorded.selector);
+
+        vm.prank(chainAdmin);
+        vm.expectRevert(LowerBoundNotRecorded.selector);
+        serverNotifier.setUpgradeTimestamp(eraZKChainId, scheduleTimestamp);
+
         // v32 upgrade precondition: the chain's priority-op lower bound must be recorded before the
         // upgrade executes (permissionless; production runs RecordPriorityOpLowerBound.s.sol).
         IPriorityOpLowerBound(CTMUpgrade_v31_Test(address(ctmUpgrade)).exposedPriorityOpLowerBound())
             .lowerBoundPriorityOp(sourceChainDiamond);
+
+        // With the bound recorded, scheduling passes and records the timestamp.
+        assertEq(serverNotifier.previewUpgradePreconditions(eraZKChainId).length, 0);
+        vm.prank(chainAdmin);
+        serverNotifier.setUpgradeTimestamp(eraZKChainId, scheduleTimestamp);
+        assertEq(
+            serverNotifier.protocolVersionToUpgradeTimestamp(eraZKChainId, oldProtocolVersion),
+            scheduleTimestamp,
+            "Scheduling after the bound was recorded must store the timestamp"
+        );
     }
 
     function _snapshotExpectedZKsyncOSUpgradeTxHash() private {

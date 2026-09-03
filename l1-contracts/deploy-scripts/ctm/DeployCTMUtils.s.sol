@@ -95,6 +95,11 @@ abstract contract DeployCTMUtils is DeployUtils {
     /// it as an immutable.
     address internal priorityOpLowerBound;
 
+    /// @dev The scheduling-time counterpart of the v32 upgrade's prerequisites, deployed and
+    /// registered on ServerNotifier by `CTMUpgrade_v31`; zero for fresh ecosystems, which start at
+    /// the target version and have no from-version to guard.
+    address internal upgradePreconditionChecker;
+
     using stdToml for string;
 
     Config public config;
@@ -290,6 +295,10 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode(priorityOpLowerBound);
         } else if (compareStrings(contractName, "PriorityOpLowerBound")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "V33UpgradePreconditionChecker")) {
+            // The checker pins the same lower-bound registry the v32 upgrade contract embeds.
+            require(priorityOpLowerBound != address(0), "PriorityOpLowerBound not deployed");
+            return abi.encode(priorityOpLowerBound);
         } else if (compareStrings(contractName, "Governance")) {
             return
                 abi.encode(

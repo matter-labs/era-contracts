@@ -616,8 +616,10 @@ contract AdminFunctions is Script, IAdminFunctions {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
         Call[] memory calls = new Call[](1);
-        // ServerNotifier.setUpgradeTimestamp validates upgrade cut data exists, eliminating
-        // the race between timestamp and diamond-cut availability that exists on ChainAdmin alone.
+        // ServerNotifier.setUpgradeTimestamp validates upgrade cut data exists (eliminating the
+        // race between timestamp and diamond-cut availability that exists on ChainAdmin alone) and
+        // runs the release's registered upgrade-precondition checker, so a chain that would fail
+        // its upgrade fails here, at scheduling time; see {protocol-docs/upgrade-scheduling.md}.
         calls[0] = Call({
             target: chainInfo.serverNotifier,
             value: 0,

@@ -480,8 +480,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function prepareDefaultCTMAdminCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](1);
+        Call[][] memory allCalls = new Call[][](2);
         allCalls[0] = prepareUpgradeServerNotifierCall();
+        // Merged after the implementation upgrade: version-specific calls may target functions
+        // that only exist on the new implementation, and the merged array executes in order.
+        allCalls[1] = prepareVersionSpecificCTMAdminCalls();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
 
         address chainAdmin = IOwnable(calls[0].target).owner();
@@ -520,6 +523,13 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             testUpgradeCallsSerialized
         );
         vm.writeToml(updatedTestCallsToml, upgradeConfig.outputPath);
+    }
+
+    /// @notice Release-specific additions to the CTM-admin call set (targets owned by the CTM
+    ///         admin rather than governance), executed after `prepareUpgradeServerNotifierCall`'s
+    ///         implementation upgrade. Empty by default.
+    function prepareVersionSpecificCTMAdminCalls() public virtual returns (Call[] memory calls) {
+        calls = new Call[](0);
     }
 
     function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
@@ -923,6 +933,13 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         }
         if (priorityOpLowerBound != address(0)) {
             vm.serializeAddress("state_transition", "priority_op_lower_bound_addr", priorityOpLowerBound);
+        }
+        if (upgradePreconditionChecker != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "upgrade_precondition_checker_addr",
+                upgradePreconditionChecker
+            );
         }
         string memory stateTransition = vm.serializeAddress(
             "state_transition",

@@ -13,6 +13,8 @@ import {Utils} from "../../utils/Utils.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 
 import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
+import {IUpgradePreconditionChecker} from "contracts/upgrades/IUpgradePreconditionChecker.sol";
+import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 
@@ -153,8 +155,29 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound");
         console.log("Deployed PriorityOpLowerBound at", priorityOpLowerBound);
 
+        // The scheduling-time counterpart of the upgrade's prerequisites, registered on the
+        // ServerNotifier via the CTM-admin call set; see {protocol-docs/upgrade-scheduling.md}.
+        upgradePreconditionChecker = deploySimpleContract("V33UpgradePreconditionChecker");
+        console.log("Deployed V33UpgradePreconditionChecker at", upgradePreconditionChecker);
+
         console.log("Deploying V32UpgradeZKsyncOS");
         return deploySimpleContract("V32UpgradeZKsyncOS");
+    }
+
+    /// @notice Register the precondition checker for the version this release upgrades chains from.
+    /// @dev Appended after the ServerNotifier implementation upgrade in the same call array — the
+    ///      setter only exists on the new implementation and the calls execute in order.
+    function prepareVersionSpecificCTMAdminCalls() public virtual override returns (Call[] memory calls) {
+        require(upgradePreconditionChecker != address(0), "v31: precondition checker not deployed");
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: ctmAddresses.stateTransition.proxies.serverNotifier,
+            data: abi.encodeCall(
+                IServerNotifier.setUpgradePreconditionChecker,
+                (getOldProtocolVersion(), IUpgradePreconditionChecker(upgradePreconditionChecker))
+            ),
+            value: 0
+        });
     }
 
     function getV31AdditionalFactoryDependencyContracts()
