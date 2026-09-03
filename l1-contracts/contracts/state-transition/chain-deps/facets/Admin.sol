@@ -195,15 +195,11 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setDisabledProofSystems(uint8 _disabledProofSystems) external onlyAdmin onlySettlementLayer onlyEra {
-        // A mask above the known set would read as a configured policy while enabling nothing, and the
-        // all-disabled mask would let the chain settle with no proof system at all.
         if (_disabledProofSystems >= ALL_PROOF_SYSTEMS_DISABLED) {
             revert InvalidDisabledProofSystemsMask(_disabledProofSystems);
         }
-        // Deliberately NOT gated on a drained batch queue: the switch exists for the case where committed
-        // batches cannot be proved, so it has to take effect while those batches are still waiting. Unlike
-        // the ZKsync OS chain config, this value never enters a batch proof public input, so changing it
-        // cannot invalidate an already committed batch.
+        // No `_enforceNoUnverifiedBatchesForChainConfigUpdate()` here: this value never enters a batch
+        // proof public input, and it has to take effect while unproven batches are waiting.
         uint8 oldDisabledProofSystems = s.disabledProofSystems;
         s.disabledProofSystems = _disabledProofSystems;
         emit NewDisabledProofSystems(oldDisabledProofSystems, _disabledProofSystems);

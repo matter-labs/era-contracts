@@ -388,17 +388,17 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.proxies.chainTypeManager
         );
         vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
-        // `airbender_verifier_addr` keeps naming the generated PLONK verifier, as it always has; the wrapper
-        // and the Boojum router are new addresses and are reported under their own keys.
+        // `airbender_verifier_addr` is the lane the gate points at; the generated PLONK verifier it wraps is
+        // reported separately.
         vm.serializeAddress(
             "state_transition",
             "airbender_verifier_addr",
-            ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk
+            ctmAddresses.stateTransition.verifiers.airbenderVerifier
         );
         vm.serializeAddress(
             "state_transition",
-            "airbender_verifier_wrapper_addr",
-            ctmAddresses.stateTransition.verifiers.airbenderVerifier
+            "airbender_verifier_plonk_addr",
+            ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk
         );
         vm.serializeAddress(
             "state_transition",

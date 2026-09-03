@@ -18,10 +18,9 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 /// @notice Deploys the ecosystem with the Airbender lane enabled and exercises the paths that only exist in
 /// that configuration.
-/// @dev The shared integration config enables the lane, so every integration suite now deploys through it
-/// and this one asserts the properties that only hold in that configuration. Before it existed, the whole
-/// `airbender_verifier = true` branch — lane deployment order, the gate becoming the chain's verifier, and
-/// every downstream consumer of a chain's verifier — was unexecuted by the entire test suite.
+/// @dev The shared integration config enables the lane, so every integration suite deploys through it, and
+/// this suite asserts the properties that only hold in that configuration: lane deployment order, the gate
+/// becoming the chain's verifier, and the downstream consumers of a chain's verifier.
 contract AirbenderDeploymentTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     function _gate() internal view returns (EraMultiProofVerifier) {
         return EraMultiProofVerifier(address(IZKChain(getZKChainAddress(eraZKChainId)).getVerifier()));

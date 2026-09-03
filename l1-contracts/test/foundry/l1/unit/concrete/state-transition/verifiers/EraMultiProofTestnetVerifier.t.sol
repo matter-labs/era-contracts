@@ -49,10 +49,10 @@ contract ChainStub {
 }
 
 /// @notice Unit tests for the testnet variant of the Era dual-prover gate.
-/// @dev It INHERITS the production verifier rather than wrapping it. A wrapper would become the `msg.sender`
-/// the production contract reads the kill switch from, which is how the ZKsync OS lane's testnet wrapper
-/// ended up unable to answer for the chain at all. Inheriting keeps the chain's diamond as the caller, so the
-/// switch behaves identically on testnet and mainnet and is therefore testable before it is needed.
+/// @dev It inherits the production verifier rather than wrapping it. A wrapper would become the `msg.sender`
+/// the production contract reads `disabledProofSystems` from, which is why the ZKsync OS lane's testnet
+/// wrapper cannot answer for the chain. Inheriting keeps the chain's diamond as the caller, so the setting
+/// behaves identically on testnet and mainnet and can be tested before it is needed.
 contract EraMultiProofTestnetVerifierTest is Test {
     EraMultiProofTestnetVerifier internal verifier;
     ChainStub internal chain;
@@ -92,9 +92,9 @@ contract EraMultiProofTestnetVerifierTest is Test {
         chain.callVerify(verifier, _publicInputs(), _proof());
     }
 
-    /// The point of inheriting: the kill switch is read from the chain, not shadowed by a wrapper, so it
-    /// works on testnets too.
-    function test_killSwitchIsHonouredOnTestnet() public {
+    /// Inheriting means `disabledProofSystems` is read from the chain rather than from a wrapper, so it
+    /// takes effect on testnets too.
+    function test_disabledSystemsAreHonouredOnTestnet() public {
         chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
         assertTrue(chain.callVerify(verifier, _publicInputs(), _proof()));
     }

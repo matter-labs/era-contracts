@@ -6,10 +6,10 @@ import {AdminTest} from "./_Admin_Shared.t.sol";
 import {InvalidDisabledProofSystemsMask, MustBeEraChain, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {AIRBENDER_PROOF_SYSTEM_DISABLED, BOOJUM_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
 
-/// @notice Unit tests for the per-chain proof-system kill switch.
+/// @notice Unit tests for the per-chain `disabledProofSystems` setting.
 /// @dev Era chains settle behind two independent proof systems. Either may be switched off by the chain
-/// admin to keep the chain live through a prover incident, but never both — that would leave the chain able
-/// to "prove" batches with no proof system at all.
+/// admin to keep the chain live through a prover incident, but never both: with both off a batch would
+/// settle without being proved at all.
 contract SetDisabledProofSystemsTest is AdminTest {
     event NewDisabledProofSystems(uint8 oldDisabledProofSystems, uint8 newDisabledProofSystems);
 
@@ -76,8 +76,8 @@ contract SetDisabledProofSystemsTest is AdminTest {
         adminFacet.setDisabledProofSystems(_mask);
     }
 
-    /// The switch exists precisely for the case where committed batches cannot be proved, so it has to
-    /// take effect while they are still waiting. Mirrors the ZiSK kill switch's rationale.
+    /// The setting exists for the case where committed batches cannot be proved, so it has to take effect
+    /// while those batches are still waiting.
     function test_appliesWithCommittedButUnverifiedBatches() public {
         utilsFacet.util_setTotalBatchesCommitted(5);
         utilsFacet.util_setTotalBatchesVerified(1);

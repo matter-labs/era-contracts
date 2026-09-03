@@ -44,7 +44,7 @@ contract LaneVerifier is IVerifier {
     }
 }
 
-/// @notice Chain stand-in answering the kill-switch getter the verifier reads from its caller.
+/// @notice Chain stand-in answering the `disabledProofSystems` getter the verifier reads from its caller.
 contract ChainStub {
     uint8 public disabledProofSystems;
 
@@ -112,7 +112,7 @@ contract EraMultiProofVerifierTest is Test {
         assertTrue(chain.callVerify(verifier, _publicInputs(), _default()));
     }
 
-    /// The whole point: one lane rejecting must fail the batch even though the other accepted.
+    /// One lane rejecting must fail the batch even though the other accepted.
     function test_revertsWhenBoojumRejects() public {
         EraMultiProofVerifier v = new EraMultiProofVerifier(
             IVerifier(address(new LaneVerifier(false, false))),
@@ -159,7 +159,7 @@ contract EraMultiProofVerifierTest is Test {
         chain.callVerify(v, _publicInputs(), _default());
     }
 
-    // ============ Kill switch ============
+    // ============ Disabled proof systems ============
 
     function test_skipsAirbenderWhenChainDisabledIt() public {
         EraMultiProofVerifier v = new EraMultiProofVerifier(
@@ -203,7 +203,7 @@ contract EraMultiProofVerifierTest is Test {
         chain.callVerify(verifier, _publicInputs(), proof);
     }
 
-    /// Bits above the type byte are reserved, so a payload smuggled into them is refused.
+    /// Bits above the type byte are reserved, so a header carrying data in them is refused.
     function test_revertsOnReservedHeaderBits() public {
         uint256[] memory proof = _default();
         proof[0] = ERA_MULTI_PROOF_TYPE | (uint256(1) << 8);
@@ -222,9 +222,9 @@ contract EraMultiProofVerifierTest is Test {
         chain.callVerify(verifier, _publicInputs(), tooLong);
     }
 
-    /// The Boojum segment must not smuggle an Airbender-typed proof. Asserted against the REAL
-    /// `EraDualVerifier`, not a stand-in: a stub that reimplements the type check would pass even if the
-    /// production router had started accepting type 2.
+    /// The Boojum segment must not accept an Airbender-typed proof. Asserted against the real
+    /// `EraDualVerifier` rather than a stand-in: a stub that reimplements the type check would pass even if
+    /// the production router had started accepting type 2.
     function test_boojumSegmentCannotCarryAirbenderType() public {
         EraDualVerifier router = new EraDualVerifier(
             IVerifierV2(address(new LaneVerifier(false, true))),
@@ -238,7 +238,7 @@ contract EraMultiProofVerifierTest is Test {
 
     /// A declared Boojum length that would overflow a naive `2 + N + 44` must surface as the envelope
     /// error, not a checked-arithmetic panic.
-    function test_revertsOnAbsurdBoojumLength() public {
+    function test_revertsOnOutOfRangeBoojumLength() public {
         uint256[] memory proof = _default();
         proof[1] = type(uint256).max;
         vm.expectRevert(InvalidProofFormat.selector);
