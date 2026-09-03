@@ -155,7 +155,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         IL1Bridgehub bridgehub = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
         L1ChainAssetHandler chainAssetHandler = L1ChainAssetHandler(coreAddresses.bridgehub.proxies.chainAssetHandler);
         vm.startBroadcast(getDeployerAddress());
-        bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         BridgehubBase(address(bridgehub)).setAddresses(
             coreAddresses.bridges.proxies.l1AssetRouter,
             ICTMDeploymentTracker(coreAddresses.bridgehub.proxies.ctmDeploymentTracker),
@@ -201,7 +200,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         L1NativeTokenVault l1NativeTokenVault = L1NativeTokenVault(
             payable(coreAddresses.bridges.proxies.l1NativeTokenVault)
         );
-        l1NativeTokenVault.transferOwnership(config.ownerAddress);
+        l1NativeTokenVault.transferOwnership(coreAddresses.shared.governance);
 
         IL1Nullifier l1Nullifier = IL1Nullifier(coreAddresses.bridges.proxies.l1Nullifier);
         IOwnable(address(l1Nullifier)).transferOwnership(coreAddresses.shared.governance);
