@@ -72,11 +72,11 @@ export class DeploymentRunner {
 
   /**
    * Repository release/state version string naming the chain-states folder (e.g. "v0.34.0"). Read
-   * from the harness's OWN config (`stateVersion`), NOT the shared `configs/genesis/era/latest.json`:
-   * the shared genesis pins the L1 foundry suite's base version (v31) while the anvil harness runs
-   * the current release, and keeping the harness version local decouples the two. This names the
-   * release the snapshot was generated from; the protocol version the deployed contracts report is
-   * a separate concept recorded inside the fixture itself.
+   * from the harness's OWN config (`stateVersion`), NOT the shared `configs/genesis/zksync-os/latest.json`:
+   * the shared genesis pins its own protocol semantic version while the anvil harness runs the current
+   * release, and keeping the harness version local decouples the two. This names the release the
+   * snapshot was generated from; the protocol version the deployed contracts report is a separate
+   * concept recorded inside the fixture itself.
    */
   getStateVersionString(): string {
     const cfg = JSON.parse(fs.readFileSync(this.configPath, "utf-8")) as { stateVersion?: string };

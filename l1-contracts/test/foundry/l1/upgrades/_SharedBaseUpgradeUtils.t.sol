@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-contract BaseUpgradeUtils is Test, ZKChainBase {
+contract BaseUpgradeUtils is ZKChainBase {
+    address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+    Vm internal constant vm = Vm(VM_ADDRESS);
+
     function setChainTypeManager(address _chainTypeManager) public virtual {
         s.chainTypeManager = _chainTypeManager;
     }
@@ -36,18 +39,6 @@ contract BaseUpgradeUtils is Test, ZKChainBase {
 
     function setProtocolVersion(uint256 _protocolVersion) public {
         s.protocolVersion = _protocolVersion;
-    }
-
-    function getL2DefaultAccountBytecodeHash() public view returns (bytes32) {
-        return s.__DEPRECATED_l2DefaultAccountBytecodeHash;
-    }
-
-    function getL2BootloaderBytecodeHash() public view returns (bytes32) {
-        return s.__DEPRECATED_l2BootloaderBytecodeHash;
-    }
-
-    function getL2EvmEmulatorBytecodeHash() public view returns (bytes32) {
-        return s.__DEPRECATED_l2EvmEmulatorBytecodeHash;
     }
 
     function getProtocolVersion() public view returns (uint256) {

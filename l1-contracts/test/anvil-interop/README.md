@@ -51,7 +51,7 @@ cd contracts/l1-contracts/test/anvil-interop
 yarn setup-and-dump
 ```
 
-This runs the full deployment with deterministic settings (`blockTime=0`, `timestamp=1`) and dumps each chain's state to the `chain-states/` directory.
+This runs the full deployment with deterministic settings (`blockTime=1`, `timestamp=1`) and dumps each chain's state to the `chain-states/` directory.
 
 ## Running Tests Without Redeployment
 

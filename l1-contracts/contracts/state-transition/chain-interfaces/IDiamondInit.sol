@@ -4,10 +4,11 @@ pragma solidity ^0.8.21;
 
 /// @param chainId the id of the chain
 /// @param bridgehub the address of the bridgehub contract
+/// @param interopCenter the address of the interop center contract
 /// @param chainTypeManager contract's address
 /// @param protocolVersion initial protocol version
-/// @param validatorTimelock address of the validator timelock that delays execution
 /// @param admin address who can manage the contract
+/// @param validatorTimelock address of the validator timelock that delays execution
 /// @param baseTokenAssetId asset id of the base token of the chain
 /// @param storedBatchZero hash of the initial genesis batch
 // solhint-disable-next-line gas-struct-packing

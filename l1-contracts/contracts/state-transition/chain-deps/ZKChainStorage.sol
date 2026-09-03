@@ -114,7 +114,7 @@ struct ZKChainStorage {
     VerifierParams __DEPRECATED_verifierParams;
     /// @dev Deprecated slot, retained to preserve the storage layout. Formerly `l2BootloaderBytecodeHash`
     /// (EraVM bootloader bytecode hash, a zkp-circuit input); ZKsync OS chains have no bootloader.
-    /// Read only by the EraVM-only commit path (unreachable for ZKsync OS chains); never written.
+    /// Read only by the EraVM-only commit path (unreachable for ZKsync OS chains); no longer written.
     /// @dev STORAGE SLOT: 23
     bytes32 __DEPRECATED_l2BootloaderBytecodeHash;
     /// @dev Deprecated slot, retained to preserve the storage layout. Formerly `l2DefaultAccountBytecodeHash`

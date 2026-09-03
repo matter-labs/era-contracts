@@ -215,6 +215,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR))), // interopCenter
             bytes32(uint256(uint160(mockCTM))) // chainTypeManager
         );
+        assertEq(diamondCut.initCalldata.length, 0, "chain-creation init tail must be empty");
         bytes memory initData2 = bytes.concat(
             bytes32(config.protocolVersion), // protocolVersion
             bytes32(uint256(uint160(address(0xAD01)))), // admin
