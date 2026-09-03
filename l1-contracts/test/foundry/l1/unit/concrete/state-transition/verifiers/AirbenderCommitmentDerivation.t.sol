@@ -4,11 +4,8 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {
-    AirbenderCommitment,
-    AirbenderCommitmentWitness
-} from "contracts/state-transition/libraries/AirbenderCommitment.sol";
+import {AirbenderCommitmentWitness, IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {AirbenderCommitment} from "contracts/state-transition/libraries/AirbenderCommitment.sol";
 
 /// @notice Pins the Solidity Airbender commitment derivation against values produced by the Rust
 /// implementation the guest uses.

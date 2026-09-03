@@ -15,6 +15,17 @@ error AddressHasNoCode(address);
 error AddressMismatch(address expected, address supplied);
 // 0x42573d7a
 error AddressNotZero();
+// 0xb1fa9058
+/// @notice A bootstrap witness was supplied for a previous batch whose Airbender commitment is
+/// already recorded, where it would be silently ignored.
+error AirbenderBootstrapWitnessNotExpected();
+// 0xa7009944
+/// @notice The previous batch has no recorded Airbender commitment, so the transition that seeds
+/// the chain must carry a witness for it.
+error AirbenderBootstrapWitnessRequired();
+// 0x8a9f4aa0
+/// @notice The Airbender-lane prove encoding was used on a ZKsync OS chain, which has no such lane.
+error AirbenderWitnessNotSupportedOnZKsyncOS();
 // 0xb577eb6c
 error AlreadyDangerousContract(address);
 // 0x2a5989a0

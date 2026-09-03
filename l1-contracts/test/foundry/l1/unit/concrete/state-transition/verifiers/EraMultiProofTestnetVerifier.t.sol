@@ -66,8 +66,9 @@ contract EraMultiProofTestnetVerifierTest is Test {
     }
 
     function _publicInputs() internal pure returns (uint256[] memory pi) {
-        pi = new uint256[](1);
+        pi = new uint256[](2);
         pi[0] = uint256(keccak256("raw"));
+        pi[1] = uint256(keccak256("raw-airbender"));
     }
 
     function _proof() internal pure returns (uint256[] memory proof) {
