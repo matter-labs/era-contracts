@@ -94,6 +94,11 @@
                     "internalType": "address"
                   },
                   {
+                    "name": "airbenderVerifierPlonk",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
                     "name": "verifier",
                     "type": "address",
                     "internalType": "address"
@@ -309,6 +314,11 @@
           },
           {
             "name": "testnetVerifier",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "airbenderVerifier",
             "type": "bool",
             "internalType": "bool"
           },

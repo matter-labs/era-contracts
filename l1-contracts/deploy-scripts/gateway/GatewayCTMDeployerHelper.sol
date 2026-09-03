@@ -612,7 +612,9 @@ library GatewayCTMDeployerHelper {
                 _isZKsyncOS,
                 result.verifierFflonk,
                 result.verifierPlonk,
-                config.aliasedGovernanceAddress
+                config.aliasedGovernanceAddress,
+                // Gateway CTM deployment does not wire in the Airbender verifier.
+                address(0)
             );
             result.verifier = _deployInternalWithParams(
                 mainVerifierName,
@@ -825,6 +827,8 @@ library GatewayCTMDeployerHelper {
                 eip7702Checker: address(0),
                 verifierFflonk: _deployedContracts.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
+                // Gateway CTM deployment does not wire in the Airbender verifier.
+                airbenderVerifierPlonk: address(0),
                 verifierOwner: _config.aliasedGovernanceAddress,
                 permissionlessValidator: address(0)
             });

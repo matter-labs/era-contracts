@@ -9,4 +9,5 @@ import {IVerifier} from "./IVerifier.sol";
 interface IEraDualVerifier {
     function FFLONK_VERIFIER() external view returns (IVerifierV2);
     function PLONK_VERIFIER() external view returns (IVerifier);
+    function AIRBENDER_PLONK_VERIFIER() external view returns (IVerifier);
 }
