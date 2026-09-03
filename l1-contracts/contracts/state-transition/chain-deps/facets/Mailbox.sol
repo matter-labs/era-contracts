@@ -537,6 +537,9 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
         });
 
         L2CanonicalTransaction memory transaction;
+        // Both callers hardcode `SERVICE_TX_MAX_GAS_LIMIT`, so the gas limit here is authored by
+        // the protocol rather than supplied by whoever triggered the call, and stays on the chain
+        // limit. Using `_userPriorityTxMaxGasLimit()` would reject those transactions outright.
         (transaction, canonicalTxHash) = _validateTx(params, s.priorityTxMaxGasLimit);
         _writePriorityOp(transaction, params.request.factoryDeps, canonicalTxHash);
     }
@@ -589,13 +592,16 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
     /// @notice The transaction body gas ceiling for L1->L2 transactions whose gas limit comes from
     /// the caller.
     /// @dev Such transactions must eventually be included by the operator and cannot be split
-    /// across batches, so anyone could otherwise force an arbitrarily expensive transaction onto
-    /// the chain. `USER_PRIORITY_TX_MAX_GAS_LIMIT` bounds that without needing to be configured per
+    /// across batches, so the work a single one can impose has to be bounded at admission.
+    /// `USER_PRIORITY_TX_MAX_GAS_LIMIT` provides that bound without needing to be configured per
     /// chain, while a chain that has been set stricter than the constant keeps its own value.
-    /// @dev ZKsync OS chains are excluded: `Executor` commits `zksyncOSMaxTxGasLimit` to the batch
-    /// public input, so their per-transaction bound is enforced in-circuit for every transaction
-    /// rather than only at L1 admission, and a chain admin may deliberately raise it above the
-    /// EraVM constant. Applying the constant here would cap it back down unreachably.
+    /// @dev ZKsync OS chains are excluded, because there the gas limit is not what bounds the work:
+    /// the bootloader clamps an L1 transaction's native computational resources to a fixed ceiling
+    /// (`MAX_NATIVE_COMPUTATIONAL`), and at the constant native price used for L1 transactions that
+    /// clamp binds far below any gas limit worth requesting. `zksyncOSMaxTxGasLimit`, which `Executor` commits to the batch
+    /// public input, is applied when validating ordinary L2 transactions; ABI-encoded L1 priority
+    /// transactions take a separate bootloader path that deliberately does not reject them on gas
+    /// grounds. A chain admin may also raise that value above the EraVM constant on purpose.
     function _userPriorityTxMaxGasLimit() internal view returns (uint256) {
         uint256 chainLimit = s.priorityTxMaxGasLimit;
         if (s.zksyncOS) {
