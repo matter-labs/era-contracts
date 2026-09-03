@@ -19,8 +19,8 @@ import {
 /// - `zksync_types::commitment::airbender_l1_equivalence_tests`, which first asserts the vendored
 ///   Rust implementation still reproduces the recorded hashes, then emits the Airbender-shape
 ///   commitment for the same batch and for an all-16-blob variant of it;
-/// - `zksync_airbender_verifier`'s `tests/l1_derivation_fixture.rs`, which emits the synthetic
-///   previous commitment using the guest's own `compute_commitment` and `compute_pass_through_data_hash`.
+/// - `zksync_airbender_verifier`'s `tests/l1_derivation_fixture.rs`, which checks the pass-through
+///   hash against the guest's own `compute_pass_through_data_hash`.
 ///
 /// So every expected value here is produced by the code the guest actually runs, not re-derived.
 ///
@@ -33,8 +33,6 @@ contract AirbenderCommitmentDerivationTest is Test {
     bytes32 internal constant STATE_ROOT = 0x0332d2acc43785a44b2b84fc010372c8f3e4ff4d0ca5f312de142ffe74189500;
     bytes32 internal constant EXPECTED_PASS_THROUGH_DATA_HASH =
         0x756c1660f611302295f6a56a8f4b9d68f2ebf51f8278f225d6b7e64bb9364be0;
-    bytes32 internal constant EXPECTED_PREVIOUS_COMMITMENT =
-        0xfdf39a9031b6b4acd7002bf74bbf9029d0151197f35f4742b94390803f7015ef;
 
     // --- Meta parameters ---------------------------------------------------------------------
     bytes32 internal constant BOOTLOADER_CODE_HASH = 0x010008c753336bc8d1ddca235602b9f31d346412b2d463cd342899f7bfb73baf;
@@ -58,6 +56,9 @@ contract AirbenderCommitmentDerivationTest is Test {
     bytes32 internal constant AIRBENDER_HEAP_HASH = 0x35d519e586d0b30fb291b1ce24ce8ce0605af7f52c4bad1394febb63e387ed98;
     bytes32 internal constant EXPECTED_AIRBENDER_COMMITMENT =
         0xeb414bd21d1e5e39d8e169b9142b7e7eac72a3ebc5f2c6c43b85ca2f0f7272c7;
+    /// Airbender shape (events queue zeroed) but keeping the committed Poseidon heap hash.
+    bytes32 internal constant EXPECTED_BOOTSTRAP_COMMITMENT =
+        0xf8df01f01da6cc9a7efb8a7210b4b8385e5b41ca806120b5b7860b4525288ce1;
 
     // --- The same batch with all 16 blob slots populated --------------------------------------
     // The recorded batch fills only slot 0, so on its own it cannot pin the
@@ -118,24 +119,13 @@ contract AirbenderCommitmentDerivationTest is Test {
 
     // --- Equivalence with the Rust implementation ----------------------------------------------
 
-    /// The pass-through data hash is derivable from `StoredBatchInfo` alone. This is what lets the
-    /// previous batch need no witness at all, so it is pinned directly against the guest.
+    /// The pass-through data hash is derivable from `StoredBatchInfo` alone, so it is never taken
+    /// from the witness and cannot be chosen by the operator. Pinned directly against the guest.
     function test_passThroughDataHashMatchesRust() public pure {
         assertEq(
             AirbenderCommitment.passThroughDataHash(_storedBatch()),
             EXPECTED_PASS_THROUGH_DATA_HASH,
             "pass-through data encoding diverges from the Rust implementation"
-        );
-    }
-
-    /// The synthetic previous commitment, pinned against the guest's own `compute_commitment` with
-    /// both free inputs zeroed. If the guest ever begins constraining `prev_meta_hash` or
-    /// `prev_aux_hash`, this fixture moves and this test fails.
-    function test_previousCommitmentMatchesRust() public pure {
-        assertEq(
-            AirbenderCommitment.previousCommitment(_storedBatch()),
-            EXPECTED_PREVIOUS_COMMITMENT,
-            "synthetic previous commitment diverges from the guest's compute_commitment"
         );
     }
 
@@ -160,6 +150,36 @@ contract AirbenderCommitmentDerivationTest is Test {
             ALL_BLOBS_AIRBENDER_COMMITMENT,
             "blob word interleaving diverges from the Rust implementation"
         );
+    }
+
+    /// The seed for the first transition after the lane is enabled: Airbender shape, but with the
+    /// heap hash the batch was actually committed with, because no Airbender proof ever ran on it.
+    function test_bootstrapCommitmentMatchesRust() public pure {
+        assertEq(
+            AirbenderCommitment.deriveBootstrapCommitment(_witness(), _storedBatch()),
+            EXPECTED_BOOTSTRAP_COMMITMENT,
+            "bootstrap seed diverges from the Rust implementation"
+        );
+    }
+
+    /// The seed is a pure function of the authenticated commitment: the one witness word the
+    /// authentication leaves free is not read on this path, so an operator cannot steer it.
+    function test_bootstrapIgnoresTheAirbenderHeapHash() public pure {
+        AirbenderCommitmentWitness memory w = _witness();
+        w.airbenderBootloaderHeapHash = bytes32(uint256(w.airbenderBootloaderHeapHash) ^ 1);
+
+        assertEq(
+            AirbenderCommitment.deriveBootstrapCommitment(w, _storedBatch()),
+            EXPECTED_BOOTSTRAP_COMMITMENT,
+            "the bootstrap seed must not depend on a word the authentication does not pin"
+        );
+    }
+
+    /// The seed is not the batch's real Airbender commitment, and not its stored one either.
+    function test_bootstrapIsDistinctFromBothCommitments() public pure {
+        bytes32 seed = AirbenderCommitment.deriveBootstrapCommitment(_witness(), _storedBatch());
+        assertTrue(seed != EXPECTED_AIRBENDER_COMMITMENT, "seed must differ from the Airbender commitment");
+        assertTrue(seed != EXPECTED_STORED_COMMITMENT, "seed must differ from the stored commitment");
     }
 
     // --- Witness authentication ------------------------------------------------------------------

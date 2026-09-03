@@ -4,7 +4,8 @@ pragma solidity 0.8.28;
 
 import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "../chain-interfaces/IExecutor.sol";
 
-/// @notice Enough of a batch's commitment preimage to re-derive its Airbender commitment.
+/// @notice Enough of a batch's commitment preimage to re-derive its Airbender commitment. One is
+/// supplied per batch a transition names — for the previous batch as well as the proven one.
 /// @dev Calldata only; never stored. Authenticated by recomputing the batch's stored commitment
 /// from it, which pins every member except `airbenderBootloaderHeapHash`.
 /// @dev `passThroughDataHash` is deliberately absent: it is derivable from the authenticated
@@ -34,8 +35,17 @@ struct AirbenderCommitmentWitness {
 /// events queue hash, which Airbender pins to zero.
 ///
 /// @dev So the Airbender commitment is a pure function of data the stored commitment already
-/// authenticates, plus one extra word. It does not need to be committed to or stored: the operator
-/// re-supplies the shared preimage at prove time and this library pins it.
+/// authenticates, plus one extra word. It never has to be *committed to*: the operator re-supplies
+/// the shared preimage at prove time and this library pins it against the commitment the chain
+/// already holds. The Executor does record the result once a proof has verified it, so that the
+/// next transition's `prev` is a value Airbender itself established (see
+/// `deriveAirbenderCommitment`).
+///
+/// @dev What a derived commitment binds: the pass-through data (state root and enumeration index),
+/// the metaparameters, the system-logs hash, the state-diff hash, and every blob word. The two words
+/// left free are exactly the two Airbender does not reproduce — the Poseidon2-Goldilocks bootloader
+/// heap hash, which it recomputes with Blake2s and which the guest constrains to its own execution,
+/// and the events queue hash, which it pins to zero.
 library AirbenderCommitment {
     /// @notice The witness does not open the batch's stored commitment.
     error CommitmentWitnessMismatch(bytes32 storedCommitment, bytes32 derivedCommitment);
@@ -59,29 +69,54 @@ library AirbenderCommitment {
             );
     }
 
-    /// @notice The synthetic Airbender commitment standing in for the previous batch.
-    /// @dev The guest binds only `prev_passthrough` to its execution; `prev_meta_hash` and
-    /// `prev_aux_hash` are free inputs it uses nowhere else. Fixing both to zero therefore loses
-    /// nothing and removes the need for a previous-batch witness entirely. The sequencer feeds the
-    /// guest the same two zeros.
-    function previousCommitment(IExecutor.StoredBatchInfo memory _prevBatch) internal pure returns (bytes32) {
-        return keccak256(abi.encode(passThroughDataHash(_prevBatch), bytes32(0), bytes32(0)));
-    }
-
-    /// @notice Authenticates the witness against the batch's stored commitment, then derives the
-    /// Airbender commitment for the same batch.
+    /// @notice Authenticates the witness against the batch's stored commitment, then derives that
+    /// batch's Airbender commitment.
+    /// @dev This is the value the Executor records for a batch it has just verified, and reads back
+    /// as the `prev` end of the next transition. Recording it is what makes the lane a chain of
+    /// Airbender-proven values rather than a sequence of independently derived ones — which is what
+    /// the lane needs in order to stand alone when the Boojum lane is disabled.
     /// @dev MUST be called only after `_checkBatchHashMismatch` has authenticated `_batch`;
     /// beforehand, `_batch.commitment` is a value the caller chose.
     function deriveAirbenderCommitment(
         AirbenderCommitmentWitness memory _witness,
         IExecutor.StoredBatchInfo memory _batch
     ) internal pure returns (bytes32) {
+        bytes32 ptHash = _authenticate(_witness, _batch);
+        // Airbender pins the events queue slot to zero and hashes the heap with Blake2s.
+        bytes32 airbenderAux = _auxiliaryOutputHash(_witness, _witness.airbenderBootloaderHeapHash, bytes32(0));
+        return keccak256(abi.encode(ptHash, _witness.metadataHash, airbenderAux));
+    }
+
+    /// @notice The `prev` end of the first transition proved after the lane is enabled.
+    /// @dev No Airbender commitment was ever recorded for that batch, because no Airbender proof
+    /// verified it. The chain has to start somewhere, so it starts from the batch's committed data
+    /// with the heap hash it was actually committed with — Poseidon2-Goldilocks rather than Blake2s.
+    /// Airbender never inspects the previous batch's heap hash, so substituting it costs nothing,
+    /// and taking the committed value rather than a constant keeps the seed a pure function of an
+    /// authenticated commitment that anyone can recompute.
+    /// @dev `airbenderBootloaderHeapHash` is ignored on this path; every other member is pinned by
+    /// the same authentication check as the normal one.
+    function deriveBootstrapCommitment(
+        AirbenderCommitmentWitness memory _witness,
+        IExecutor.StoredBatchInfo memory _batch
+    ) internal pure returns (bytes32) {
+        bytes32 ptHash = _authenticate(_witness, _batch);
+        bytes32 seedAux = _auxiliaryOutputHash(_witness, _witness.storedBootloaderHeapHash, bytes32(0));
+        return keccak256(abi.encode(ptHash, _witness.metadataHash, seedAux));
+    }
+
+    /// @dev Pins every witness member except `airbenderBootloaderHeapHash` by rebuilding the batch's
+    /// stored commitment from it. Returns the pass-through hash, which both derivations reuse.
+    function _authenticate(
+        AirbenderCommitmentWitness memory _witness,
+        IExecutor.StoredBatchInfo memory _batch
+    ) private pure returns (bytes32 ptHash) {
         uint256 expectedWords = 2 * TOTAL_BLOBS_IN_COMMITMENT;
         if (_witness.blobAuxOutputWords.length != expectedWords) {
             revert InvalidBlobAuxOutputLength(_witness.blobAuxOutputWords.length, expectedWords);
         }
 
-        bytes32 ptHash = passThroughDataHash(_batch);
+        ptHash = passThroughDataHash(_batch);
 
         bytes32 storedAux = _auxiliaryOutputHash(
             _witness,
@@ -92,10 +127,6 @@ library AirbenderCommitment {
         if (derived != _batch.commitment) {
             revert CommitmentWitnessMismatch(_batch.commitment, derived);
         }
-
-        // Airbender pins the events queue slot to zero and hashes the heap with Blake2s.
-        bytes32 airbenderAux = _auxiliaryOutputHash(_witness, _witness.airbenderBootloaderHeapHash, bytes32(0));
-        return keccak256(abi.encode(ptHash, _witness.metadataHash, airbenderAux));
     }
 
     /// @dev Mirrors `Committer._batchAuxiliaryOutput`, with the two divergent words parameterised.
