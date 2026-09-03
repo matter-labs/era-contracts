@@ -25,9 +25,11 @@ import {
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Requires BOTH a Boojum proof and an Airbender proof for each Era state transition, and accepts
 /// only the combined proof type. Two independently built proof systems must agree before a batch settles, so
-/// a soundness failure in either one alone cannot finalize an invalid batch.
+/// the validity of a settled batch does not rest on either one alone.
 ///
-/// @dev Proof encoding received from the Executor:
+/// @dev Proof encoding received from the Executor. With a FFLONK Boojum proof the envelope is 71 words
+///      (2 + 25 + 44); with PLONK, 91. Both are a small fraction of the cost of verifying the two proofs.
+/// @dev Layout:
 ///      `_proof[0]` = proof type. The type occupies the low 8 bits; bits 8-255 are reserved and must be zero.
 ///      `_proof[1]` = N, the number of words in the Boojum sub-proof.
 ///      `_proof[2 .. 2+N]`   = the Boojum sub-proof, in the envelope `EraDualVerifier` parses; its leading
@@ -42,8 +44,8 @@ import {
 /// `PUBLIC_INPUT_SHIFT` itself. Shifting here would double-shift them.
 contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
     /// @notice The Boojum router (`EraDualVerifier`), which dispatches the FFLONK and PLONK wrappers.
-    /// @dev Immutable: a settable lane would let one key point it at a contract that accepts everything,
-    /// which is the one thing requiring two proof systems exists to prevent.
+    /// @dev Immutable: the two lanes are fixed at deployment, so the pair of proof systems a batch is
+    /// checked against is a property of the deployed gate rather than of mutable state.
     IVerifier public immutable BOOJUM_VERIFIER;
 
     /// @notice The Airbender verifier, which owns that lane's public-input derivation.
@@ -64,7 +66,7 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
             revert EmptyProofLength();
         }
 
-        // The header word carries the proof type and nothing else, so a payload smuggled into the reserved
+        // The header word carries the proof type and nothing else, so a value with data in the reserved
         // bits is rejected rather than read as a bare type.
         if (_proof[0] >> 8 != 0) {
             revert InvalidProofFormat();
@@ -74,7 +76,7 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
         }
         // Exact, not minimum: the Airbender SNARK is fixed-size, so the length is fully determined. Derived
         // by subtracting from `_proof.length` rather than adding to the caller-supplied `_proof[1]`, so an
-        // absurd declared length reverts here instead of panicking on overflow.
+        // out-of-range declared length reverts here instead of overflowing.
         if (_proof.length < 2 + AIRBENDER_SNARK_PROOF_LENGTH) {
             revert InvalidProofFormat();
         }
@@ -86,15 +88,15 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
         // One verifier instance serves every chain of a protocol version, so the policy is read from the
         // calling chain, which in settlement is that chain's diamond.
         uint8 disabled = IGetters(msg.sender).disabledProofSystems();
-        // Re-checked with the setter's own predicate: the guarantee rests on this contract, so it does not
-        // trust a value written elsewhere.
+        // Re-checked with the setter's own predicate, so the both-required property holds here on its own
+        // rather than depending on a value written elsewhere.
         if (disabled >= ALL_PROOF_SYSTEMS_DISABLED) {
             revert InvalidDisabledProofSystemsMask(disabled);
         }
 
         if (disabled & BOOJUM_PROOF_SYSTEM_DISABLED == 0) {
             // An enabled lane must carry a proof: a zero-length slice reaches a router that treats an empty
-            // proof as "skip", silently leaving the lane unverified.
+            // proof as "skip", which would leave the lane unverified.
             if (boojumLength == 0) {
                 revert BoojumVerificationFailed();
             }

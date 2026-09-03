@@ -34,13 +34,13 @@ contract AirbenderVerifier is IVerifier {
     /// @param _proof The Airbender PLONK proof, with the routing word already stripped by the caller.
     function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) external view returns (bool) {
         // Era proves one batch per call, and `verify` is permissionless, so the length is checked here
-        // rather than trusted from the caller.
+        // rather than assumed from the caller.
         if (_publicInputs.length != 1) {
             revert InvalidPublicInputsLength();
         }
 
         uint256[] memory args = new uint256[](1);
-        args[0] = _airbenderPublicInput(_publicInputs[0]);
+        args[0] = _shiftPublicInput(_publicInputs[0]);
         return AIRBENDER_PLONK_VERIFIER.verify(args, _proof);
     }
 
@@ -49,9 +49,9 @@ contract AirbenderVerifier is IVerifier {
         return AIRBENDER_PLONK_VERIFIER.verificationKeyHash();
     }
 
-    /// @notice Derives the Airbender SNARK public input from the batch's transition hash.
+    /// @notice Applies `PUBLIC_INPUT_SHIFT` to the batch's transition hash to get the SNARK public input.
     /// @param _transitionHash The untruncated `keccak(prevCommitment | currentCommitment)` for the batch.
-    function _airbenderPublicInput(uint256 _transitionHash) internal pure returns (uint256) {
+    function _shiftPublicInput(uint256 _transitionHash) internal pure returns (uint256) {
         return _transitionHash >> PUBLIC_INPUT_SHIFT;
     }
 }

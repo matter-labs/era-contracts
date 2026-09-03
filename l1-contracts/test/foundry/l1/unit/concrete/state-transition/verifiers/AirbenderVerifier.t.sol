@@ -169,7 +169,7 @@ contract AcceptingBoojumLane is IVerifier {
     }
 }
 
-/// @notice Answers the kill-switch getter the gate reads from its caller.
+/// @notice Answers the `disabledProofSystems` getter the gate reads from its caller.
 contract GateCaller {
     function disabledProofSystems() external pure returns (uint8) {
         return 0;

@@ -326,8 +326,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @dev Untruncated: `PUBLIC_INPUT_SHIFT` is applied once by the chain's verifier, after it has selected
     /// the proof system, so that each lane can define its own derivation over the full 256-bit hash rather
     /// than over a value this facet has already narrowed.
-    /// The ZKsync OS lane keeps its shift here for now; the multi-proof work on that lane moves it into
-    /// `ZKsyncOSVerifier` the same way, and whichever branch lands second reconciles the two.
     function _getBatchProofPublicInput(
         bytes32 _prevBatchCommitment,
         bytes32 _currentBatchCommitment

@@ -265,7 +265,7 @@ contract ProvingTest is ExecutorTest {
     /// End-to-end through a real diamond: the Executor calls the multi-proof gate, which reads the kill
     /// switch back off the chain's own Getters facet. The stubs in the verifier's own suite cannot catch a
     /// missing `disabledProofSystems` selector in the production facet cut; this can.
-    function test_multiProofGateReadsKillSwitchFromTheChain() public {
+    function test_multiProofGateReadsDisabledSystemsFromTheChain() public {
         AcceptingLane boojumLane = new AcceptingLane();
         RejectingLane airbenderLane = new RejectingLane();
         EraMultiProofVerifier gate = new EraMultiProofVerifier(
