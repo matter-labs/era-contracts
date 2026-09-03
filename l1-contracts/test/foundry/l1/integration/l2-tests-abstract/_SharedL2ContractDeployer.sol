@@ -303,7 +303,8 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
                 mintValue: 1 ether,
                 l2Value: 10,
                 l2Calldata: hex"",
-                // The most a caller-supplied L1->L2 tx may request.
+                // Comfortably within what a caller-supplied L1->L2 tx may request: the cap is on
+                // the transaction body, i.e. on this value less the batch overhead.
                 l2GasLimit: USER_PRIORITY_TX_MAX_GAS_LIMIT,
                 l2GasPerPubdataByteLimit: 800,
                 factoryDeps: deps,

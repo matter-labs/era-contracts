@@ -540,6 +540,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
         // Both callers hardcode `SERVICE_TX_MAX_GAS_LIMIT`, so the gas limit here is authored by
         // the protocol rather than supplied by whoever triggered the call, and stays on the chain
         // limit. Using `_userPriorityTxMaxGasLimit()` would reject those transactions outright.
+        // Protocol-authored constrains the gas limit, not who may reach this path:
+        // `ChainRegistrationSender.registerChain` is callable by anyone, bounded only by being
+        // one-shot per (chainToBeRegistered, chainRegisteredOn) pair. Bounding that belongs in
+        // access control there, not in a cap on a constant the protocol picked.
         (transaction, canonicalTxHash) = _validateTx(params, s.priorityTxMaxGasLimit);
         _writePriorityOp(transaction, params.request.factoryDeps, canonicalTxHash);
     }

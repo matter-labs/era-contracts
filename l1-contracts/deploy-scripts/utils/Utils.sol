@@ -138,8 +138,11 @@ library Utils {
 
     /// @dev The gas limit these helpers request for their L1->L2 transactions. They go through
     /// `Bridgehub.requestL2TransactionDirect`/`requestL2TransactionTwoBridges`, i.e. the
-    /// caller-supplied path, so this must not exceed `USER_PRIORITY_TX_MAX_GAS_LIMIT` or every
-    /// script-issued transaction reverts with `TooMuchGas`.
+    /// caller-supplied path, which bounds the transaction *body* gas — this value less the batch
+    /// overhead `TransactionValidator.getTransactionBodyGasLimit` subtracts — by
+    /// `USER_PRIORITY_TX_MAX_GAS_LIMIT`. Requesting exactly the constant therefore leaves the body
+    /// strictly under the bound; requesting more than the constant plus that overhead reverts with
+    /// `TooMuchGas`.
     uint256 internal constant MAX_PRIORITY_TX_GAS = USER_PRIORITY_TX_MAX_GAS_LIMIT;
 
     /**
