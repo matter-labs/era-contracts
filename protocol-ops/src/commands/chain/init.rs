@@ -24,7 +24,7 @@ use crate::common::{
     traits::{FileConfigTrait, ReadConfig, SaveConfig},
     wallets::Wallet,
 };
-use crate::types::{DAValidatorType, L2ChainId, L2DACommitmentScheme, VMOption};
+use crate::types::{DAValidatorType, L2ChainId, L2DACommitmentScheme, PubdataContent, VMOption};
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -91,10 +91,14 @@ pub struct ChainInitArgs {
     /// e.g. "4000/1" means: 1 ETH = 4000 base tokens
     #[clap(long, default_value = "1/1", help_heading = "Advanced input")]
     pub base_token_price_ratio: String,
-    /// Data availability mode
+    /// What kind of chain this is, as far as its pubdata is concerned: it fixes the pricing mode
+    /// and the pubdata content, and defaults the delivery to blobs. Use
+    /// `--l2-da-commitment-scheme` to deliver it another way.
     #[clap(long, value_enum, default_value_t = DAValidatorType::Rollup, help_heading = "Advanced input")]
     pub da_mode: DAValidatorType,
-    /// Override L2 DA commitment scheme (default: Rollup + ZKsync OS VM uses BlobsZKSyncOS, etc.)
+    /// How the chain's committed pubdata reaches L1, when it is not the blobs every `--da-mode`
+    /// defaults to on ZKsync OS: `blobs-and-pubdata-keccak256` for commit-tx calldata, or
+    /// `discouraged-empty-no-da` for a chain that delivers nothing.
     #[clap(long, value_enum, help_heading = "Advanced input")]
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
     /// Keep deposits paused after init
@@ -151,17 +155,7 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
     };
 
     // Resolve VM type from CTM.
-    let vm_type = {
-        let is_zksync_os =
-            crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
-                .await
-                .context("Failed to resolve isZKsyncOS from CTM")?;
-        if is_zksync_os {
-            VMOption::ZKSyncOsVM
-        } else {
-            VMOption::EraVM
-        }
-    };
+    let vm_type = crate::common::l1_contracts::resolve_vm_type(&runner.rpc_url, ctm_proxy).await?;
     logger::info(format!("VM type (from L1): {:?}", vm_type));
 
     let chain_params = NewChainParams {
@@ -256,6 +250,23 @@ pub async fn chain_init(
         L2DACommitmentScheme::from_da_and_vm_types(input.chain_params.da_mode, input.vm_type)
     });
 
+    // The pubdata content is part of every batch's public input (via the ZKsync OS chain config hash),
+    // so it is set here, at creation, before the chain commits its first batch. `None` means the chain
+    // has no such setting (Era) and the call must not be made at all.
+    // Follows from the kind of chain this is: there is no separate knob for it, so the value on
+    // L1 cannot drift from what `--da-mode` says the chain is.
+    let pubdata_content =
+        PubdataContent::from_da_and_vm_types(input.chain_params.da_mode, input.vm_type);
+    anyhow::ensure!(
+        !(input.make_permanent_rollup && pubdata_content == Some(PubdataContent::LogsOnly)),
+        "a permanent rollup must publish the full pubdata, so it cannot be created with \
+         pubdata content LogsOnly (chain {})",
+        input.chain_params.chain_id.as_u64()
+    );
+    // A fresh chain starts at `FullPubdata`, so only a differing value needs a transaction.
+    let should_set_pubdata_content =
+        pubdata_content.is_some_and(|content| content != PubdataContent::FullPubdata);
+
     logger::step("Finalizing chain admin operations...");
     runner.run(
         runner
@@ -269,8 +280,10 @@ pub async fn chain_init(
                     l1DaValidator: input.l1_da_validator,
                     tokenMultiplierSetter: token_multiplier_setter,
                     l2DaCommitmentScheme: commitment_scheme as u8,
+                    pubdataContent: pubdata_content.unwrap_or_default().to_u8(),
                     shouldUnpauseDeposits: should_unpause_deposits,
                     shouldSetDaValidatorPair: should_set_da_validator_pair,
+                    shouldSetPubdataContent: should_set_pubdata_content,
                     shouldMakePermanentRollup: input.make_permanent_rollup,
                 },
             })

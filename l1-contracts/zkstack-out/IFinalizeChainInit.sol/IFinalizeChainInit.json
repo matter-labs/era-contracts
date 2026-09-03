@@ -49,12 +49,22 @@
             "internalType": "enum L2DACommitmentScheme"
           },
           {
+            "name": "pubdataContent",
+            "type": "uint8",
+            "internalType": "enum PubdataContent"
+          },
+          {
             "name": "shouldUnpauseDeposits",
             "type": "bool",
             "internalType": "bool"
           },
           {
             "name": "shouldSetDaValidatorPair",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "shouldSetPubdataContent",
             "type": "bool",
             "internalType": "bool"
           },
