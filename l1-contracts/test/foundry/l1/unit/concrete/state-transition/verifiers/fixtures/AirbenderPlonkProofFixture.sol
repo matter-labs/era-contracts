@@ -7,55 +7,55 @@ pragma solidity 0.8.28;
 library AirbenderPlonkProofFixture {
     function publicInputs() internal pure returns (uint256[] memory inputs) {
         inputs = new uint256[](1);
-        inputs[0] = 0x00000000ce399ea5fde76145cc278f4e7d9aac74c96545ad6e523a242a7eda2c;
+        inputs[0] = 0x000000006c843a9bd9b0622c7e191f18ee5b128a4fc1cd0c021b244c5c27bdde;
     }
 
     function serializedProof() internal pure returns (uint256[] memory proof) {
         proof = new uint256[](44);
-        proof[0] = 0x06edeee1a3764d9b51f84f59c1520d42dda2b9f98ed8cf2de2f07b7c8d6ad9ef;
-        proof[1] = 0x2a169ab1e4d68288e1decc41b55c7ce153c0dfbadb8f1ea470a31a9f24cff1d0;
-        proof[2] = 0x20010c5ebc2b10acd7983be0535bb86685a18fc704340e73bb050f0dff280bf0;
-        proof[3] = 0x0adb7c37f3f72564438a0b6b90c9d610d00e352097daf72593b119b7fd1b4217;
-        proof[4] = 0x0caf3c3f3077434796731af3867bd9297e690cb5e5cc7fe68d0de21f86236257;
-        proof[5] = 0x0096f61a90a09fab06889df73c953c845615ddfcf06fafef96e5f981753652b4;
-        proof[6] = 0x0172ff49b23b358652577bd244d1f675f1df31807f767254a4a81c1e65a4e025;
-        proof[7] = 0x0063f2d7b200bab01543b07267419612341fc25f15e214545a252e0b7b3fbcaf;
-        proof[8] = 0x2ad1e59a3647aecebc66ebf6ca3d3801b91f7917bc1d00827cb8cb07387d9edb;
-        proof[9] = 0x24ce5dced6795c4ea31363b6a0d975653cf428c2fa0a4d263ca068c49b4a9ed9;
-        proof[10] = 0x2e7b2b1169ccf63179a82470720d57604cbd8ecef6f2963a1d03a0124fd01972;
-        proof[11] = 0x2d8f77a36fb42343b1a492d299b415d22bc962a3d98d890edb530d2e0f17e231;
-        proof[12] = 0x0a6edad35445aa59ba4ed38ae995303e0cb3de38465419fb79ab65138cb9d7a8;
-        proof[13] = 0x1eaaede7e3c40655202ed2877d34e1575e2b07535b2495bd26d205e6f2492dc0;
-        proof[14] = 0x29fd3ef851cdc2698c424cb1568193b9aa7f9a1a92c411ac0b43500a1548b08f;
-        proof[15] = 0x2ea6d8b25686de6aaed8dfb6dc9fdea7ef3c78d2d0a20c442434f6681d4db580;
-        proof[16] = 0x1d901da35d7ddeea3f599ab854e5ffd2279a46a065cea49e354fa3491f5b982b;
-        proof[17] = 0x1ed178d6f8b9863f568a371008bd0feac7494578bd3b7613afd65286cc348ec1;
-        proof[18] = 0x2122b42069f913bd5b273b9ddc8240d17974ed3c9e2b78e58e3b673c5e6bbae5;
-        proof[19] = 0x1a2a12812fc0aa493ac38913271790b58dd288a6f3e6cf9f1e3043d12d754034;
-        proof[20] = 0x11e32c9783a59ca792e802a90d94c097ede25fbbda89a158ec8a461d87e3996a;
-        proof[21] = 0x240e2142b86ad9d2233aef2f9b0dc05d84d290e49194ff355b731d345436464e;
-        proof[22] = 0x2230ecdc13c6b44381f8362abd1f05872ed3d3456d8773feaad5cbacf37da76b;
-        proof[23] = 0x2fc9b3d69727f398862fa2ae65edf8a6be9d90143284910d762e1721b5fafb0d;
-        proof[24] = 0x0e35ac55f329b24a0d1ea1335b2ff645bcf174a29ae993fe44b234447f6889b8;
-        proof[25] = 0x2829ea39d6a9074c6977cf11a9fc1c657e3b8c08d65d006db057fd4d55ce70e4;
-        proof[26] = 0x1fcaf9af3c76f09a8e755606b6caf8b94db806041961fb6399159768ed3abfe3;
-        proof[27] = 0x164bda962c24034e7f29141485b6bbde820d86fa3d9a827ecff56bac36b6e52c;
-        proof[28] = 0x1b67a2a78fe0f11128bec5ee691ecb5c6d3810affa855064ce93940bad8b9827;
-        proof[29] = 0x070f9365a919c6e046100f81d39156dd21642711b236e797209bf8193aee774b;
-        proof[30] = 0x2a72589cff07dd144c696f7f03b2aa6a3e87686d36bae25d98e242e6cae1920e;
-        proof[31] = 0x1d27d558b92a463327b0f560e896493fba34c9ebcd91835f46c907959823ed0b;
-        proof[32] = 0x0931d138224e1a90872a3aba2f6e790e7c3bb2cf91b8b3238b6c61a55a5df359;
-        proof[33] = 0x0bb081482adcc725f5c4d3719492bcafcc531cddffb3f7074dfc4db96a8ac142;
-        proof[34] = 0x0134b194734dc2d21e660410bde7e44c5f74897b60a7f3b1144a8e300e28ecf0;
-        proof[35] = 0x09acb58fc6a938e1378d6b5b0e0d864d79bb3512e7fc3f2e8251990bab3e645c;
-        proof[36] = 0x1ddd80a1d2c9c9f5df29e803b17db67335a78bd2b968ba347b1ac58ede89d64e;
-        proof[37] = 0x0dba904d060ed2c852a0f5e3b0fbd37ee319c838808aa79419039b7e958cb39d;
-        proof[38] = 0x212a944c641041c74c4d076cf858ab7d59a6e420e79d36fe713394e221618f68;
-        proof[39] = 0x1480897200c888b0bb9950f81d8e79a2c44825e4ce17a83e8e704b4b33e33337;
-        proof[40] = 0x069e55ebd9f0b4df483680ad36b648f05a654d455d0b4f9ac5b2278e3beff137;
-        proof[41] = 0x1f5c3d2478161c9fb4ece3a7b94e1d65e3227e2f7cc344f01fbf6b1df9a3138e;
-        proof[42] = 0x07b08d3d8c0babf781a9ef15084d720293e6b608bce07e13b44a8dfea04d5e4d;
-        proof[43] = 0x0d4765f49f1ec89be68b5c40b8991fcc0fda875e4413e398366c040638049551;
+        proof[0] = 0x27189e925cd964f883ff74089a551f2027e882208af1bf1e313a1d414f8cf905;
+        proof[1] = 0x158dd07d2ce705e8ddae001c5ec06c1cf73242597c3c0d50561680ae7aa02a8d;
+        proof[2] = 0x29d6daa22f4636b05cace8dff639706724c603b545be4f8d1ce7b3c3d46e3b52;
+        proof[3] = 0x0cb5dc298bb43a804ff4e428fb95f2fac0e43989b9d5ce43d41318f068c34f81;
+        proof[4] = 0x13305ccffa655c63417ed9511c211eb3dfc05e564c636faa9e4ba7ddc67fe3c3;
+        proof[5] = 0x295d1ee4e45bc4efcbbae807385ea62a3e576e13583e9dd4b663af46364fbfec;
+        proof[6] = 0x0130d66a7ed70a92414a579614a1f87a1ec89036c6a27be99f3f5b00af284f58;
+        proof[7] = 0x2f2561df80fe11f15fa80fdd0d2e79994dd2b3b8114011c3e5db20f1753e776b;
+        proof[8] = 0x1c8c55544b593c22e5eccfb9919b1d95db77f434cc04d38b9a1e72fb05fc998b;
+        proof[9] = 0x1586777a0b2b5d5bde58a86a28899433459b60db09f35d83e475f29836536c7e;
+        proof[10] = 0x2949c05f98e6a3550e927c99ff8f6959f8cd2c7fd27f5460b75ba38ada5ed283;
+        proof[11] = 0x1a4c9aa9f2de68a57d5ea17ca9bdaf52035d8e6d90914300dad358d282822dd5;
+        proof[12] = 0x2b121ac692528224d15ebc896c3187ab2ff84025ef9d51db4fbafcd38fd6361f;
+        proof[13] = 0x198255a773491ee8043bde78ddc425bd2c7eec60d4996023efb2d002be0a02d9;
+        proof[14] = 0x03f73df4745983d191e5ad1b5da15a13270bf6f12f21f8796c9e2aa5bb1e7ef3;
+        proof[15] = 0x000f52fbc5d9bdcfc18aa405980be02f4fd90b5613a5ef258ca3f7ac97753348;
+        proof[16] = 0x152d6831b8acf01c08b3966086fcd3db2a97061a339fd134cba7c134e235571a;
+        proof[17] = 0x0e0cc63ade19941c7b6edda8385feb884ffc3aa018a4f3a1b802a68c3a6a894d;
+        proof[18] = 0x1eef64e8fcc726f8619e087552133c8db9d199569a738eaff1b1bca12cb83921;
+        proof[19] = 0x0dc5271fb3fb3edabc24d054bb9757b703fe1da291eb5f73ee87a33c30a11966;
+        proof[20] = 0x02464a9896b290b2eaf4cb61abc75ea86fb190ff36fb9e5699a6b1f7926255c3;
+        proof[21] = 0x2444ff977c0c29dbd7692ad201818c5d690fdf6a7dca6cc7ed8b8f2298556408;
+        proof[22] = 0x10b3f2d9fb1a522ee669fa3100c67c972363a4233f47241b875566842b49420b;
+        proof[23] = 0x04be04caa15a06032a72480a537e4e795016be6019c3425e62d9765a2243ba76;
+        proof[24] = 0x1cd6f9663c7515a702eba6f52d42ae96935a81a022f4ab7074a661decca86636;
+        proof[25] = 0x286b9d88182009c816cdb3a2e4b0e8bf6e754fe7fe96128e144fe76d30d64657;
+        proof[26] = 0x28610df76d0d97daeb7cce7196e2e52b64f2ae4bb734b97ced409e5367942206;
+        proof[27] = 0x1f968661041089d041cfb226838dbe70d034c34468da815e877ad72d6c75b668;
+        proof[28] = 0x3036959d0e55ff04fc606709da43a5b8eb980e8d14f3425b0628e1fd6ab20709;
+        proof[29] = 0x18c0faf6e878504c3c95acf0632e7803f700de277a332bc2e0e2157b107558dc;
+        proof[30] = 0x06f84b2ed7ac5e1ff2c66c308e8aa5acda3e21f75ee8b98c71daa7dbf4682bba;
+        proof[31] = 0x1d50f64e0af77a3d206fb677905ee796cc7972d56ee0e2438caa55d72c4b6ea3;
+        proof[32] = 0x238d7949d083b22f4c9349f083d7829d3fc8c6cfbc558887eef8e5ada2ce97d8;
+        proof[33] = 0x011efd0b85701e98bc932bf64b1ea91d0608093139d317799b6686d520bbe83e;
+        proof[34] = 0x028768cba197b65eb130602335c66983b883d3afba3482f0a8e84f2cfcd4d805;
+        proof[35] = 0x089091a2bf2d88230660ca019d5349b5e6486127e4596230430234bc8bb937dd;
+        proof[36] = 0x1ae89401326f0cb5e319e6f6e6fe01867b874d4c64045814d71d903d602085cb;
+        proof[37] = 0x0b3cadf3826c0845855ffe4f4fcd9d0c53274b083b30865d855c74bd738c0343;
+        proof[38] = 0x100b62782aa9e456e6385988993cd7d5d088c8f37f2a922f8a842100cd147ba7;
+        proof[39] = 0x09c300c50bb61acff8fa29c7cb6235ee4a07c2849976d03ddfb1b7048b939120;
+        proof[40] = 0x1b6432cc47440421c06ea58ee47e8b157ac32d16d4f55edb5aa20cdf41a40cd6;
+        proof[41] = 0x0b6e04ef41e1bec0e67f7022afdde2bd20e058a886b7ef0a58b929071d79ae65;
+        proof[42] = 0x07972122345b5f835874d1f2ebba71cf114f95c4789b5eccde14b058ba7d05d1;
+        proof[43] = 0x0a1047645d8fe7220ace5fe9da0a4337c49b7b309591714b252c80e8e707ec7f;
     }
 
     /// The guest program output: registers 10..=17 (`Receipt::output`) the guest
@@ -63,6 +63,15 @@ library AirbenderPlonkProofFixture {
     /// little-endian `u32` words. The wrapper packs these, reads them big-endian and
     /// drops the low 32 bits (`PUBLIC_INPUT_SHIFT`) to obtain `publicInputs()[0]`.
     function programOutput() internal pure returns (uint32[8] memory words) {
-        words = [uint32(2778610126), 1164044285, 1318004684, 1957468797, 2907006409, 607801966, 752516650, 2556250368];
+        words = [
+            uint32(2604303468),
+            744665305,
+            404691326,
+            2316458990,
+            214810959,
+            1277434626,
+            3736938332,
+            764613735
+        ];
     }
 }
