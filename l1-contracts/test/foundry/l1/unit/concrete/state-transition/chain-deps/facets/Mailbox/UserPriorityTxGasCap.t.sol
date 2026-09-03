@@ -15,11 +15,12 @@ import {
 } from "contracts/common/Config.sol";
 import {TooMuchGas} from "contracts/common/L1ContractErrors.sol";
 
-/// @notice The DoS bound on *user-supplied* L1->L2 gas limits.
+/// @notice The bound on *user-supplied* L1->L2 gas limits.
 ///
-/// Only `_requestL2Transaction` carries a user-controlled `l2GasLimit`, and only that path can be
-/// forced on the operator by anyone. It is therefore capped by `USER_PRIORITY_TX_MAX_GAS_LIMIT` in
-/// addition to the per-chain `s.priorityTxMaxGasLimit`, whichever is lower.
+/// Only `_requestL2Transaction` carries a user-controlled `l2GasLimit`, so only that path needs a
+/// bound that does not depend on per-chain configuration. It is capped by
+/// `USER_PRIORITY_TX_MAX_GAS_LIMIT` in addition to the per-chain `s.priorityTxMaxGasLimit`,
+/// whichever is lower.
 ///
 /// The authored paths (`_requestL2TransactionFree` for service txs and the Gateway relay wrap, plus
 /// upgrade/genesis txs) build their own gas limit and stay on `s.priorityTxMaxGasLimit` alone.
@@ -38,7 +39,7 @@ contract MailboxUserPriorityTxGasCapTest is MailboxTest {
 
     /// Pinned so that moving the constant is a deliberate act with a failing test attached.
     function test_userCapIsFifteenMillion() public pure {
-        assertEq(USER_PRIORITY_TX_MAX_GAS_LIMIT, 15_000_000, "the DoS bound must not drift silently");
+        assertEq(USER_PRIORITY_TX_MAX_GAS_LIMIT, 15_000_000, "the user gas cap must not drift silently");
     }
 
     /// The chain limit stays at the 72M a chain is seeded with, so a pass here would mean the user
@@ -68,11 +69,11 @@ contract MailboxUserPriorityTxGasCapTest is MailboxTest {
         mailboxFacet.bridgehubRequestL2Transaction(_userRequest(BELOW_USER_CAP));
     }
 
-    /// ZKsync OS bounds every transaction via `zksyncOSMaxTxGasLimit`, which `Executor` commits to
-    /// the batch public input, so the bound is enforced in-circuit rather than at L1 admission. Its
-    /// default (2^24) is above the EraVM constant and a chain admin may raise it further, so
-    /// applying the EraVM constant here would silently undercut a knob ZKsync OS added on purpose.
-    function test_zksyncOSChainKeepsItsOwnPerTxBound() public {
+    /// On ZKsync OS the gas limit is not what bounds an L1 transaction's work: the bootloader
+    /// clamps its native computational resources to a fixed ceiling. The chain's own
+    /// `zksyncOSMaxTxGasLimit` default (2^24) already sits above the EraVM constant and an admin
+    /// may raise it further, so applying the EraVM constant here would undercut it for no gain.
+    function test_zksyncOSChainIsNotSubjectToTheEraVMUserCap() public {
         utilsFacet.util_setPriorityTxMaxGasLimit(DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT);
         utilsFacet.util_setZksyncOS(true);
 
