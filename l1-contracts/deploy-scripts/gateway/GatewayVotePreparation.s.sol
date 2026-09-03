@@ -230,7 +230,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     ) internal {
         Utils.runL1L2Transaction({
             l2Calldata: data,
-            l2GasLimit: 72_000_000,
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             l2Value: 0,
             factoryDeps: factoryDeps,
             dstAddress: to,
