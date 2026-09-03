@@ -2,25 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "../chain-interfaces/IExecutor.sol";
-
-/// @notice Enough of a batch's commitment preimage to re-derive its Airbender commitment. One is
-/// supplied per batch a transition names — for the previous batch as well as the proven one.
-/// @dev Calldata only; never stored. Authenticated by recomputing the batch's stored commitment
-/// from it, which pins every member except `airbenderBootloaderHeapHash`.
-/// @dev `passThroughDataHash` is deliberately absent: it is derivable from the authenticated
-/// `StoredBatchInfo`, so supplying it would add a word and a degree of operator freedom for nothing.
-struct AirbenderCommitmentWitness {
-    bytes32 metadataHash;
-    bytes32 l2ToL1LogsHash;
-    bytes32 stateDiffHash;
-    /// @dev The bootloader heap hash as committed, whatever shape that is. The contract cannot tell
-    /// which proof system produced it; the authentication check is what fixes it.
-    bytes32 storedBootloaderHeapHash;
-    bytes32 eventsQueueStateHash;
-    bytes32 airbenderBootloaderHeapHash;
-    bytes32[] blobAuxOutputWords;
-}
+import {AirbenderCommitmentWitness, IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "../chain-interfaces/IExecutor.sol";
 
 /// @title Airbender commitment derivation
 /// @author Matter Labs

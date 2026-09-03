@@ -72,6 +72,9 @@ contract EraMultiProofVerifierTest is Test {
     ChainStub internal chain;
 
     uint256 internal constant RAW_PUBLIC_INPUT = uint256(keccak256("untruncated-transition-hash"));
+    /// Distinct from the Boojum word, so routing the wrong one to a lane is caught rather than
+    /// passing by coincidence.
+    uint256 internal constant RAW_AIRBENDER_PUBLIC_INPUT = uint256(keccak256("airbender-transition-hash"));
     uint256 internal constant BOOJUM_SEGMENT_LENGTH = 3;
 
     function setUp() public {
@@ -81,9 +84,12 @@ contract EraMultiProofVerifierTest is Test {
         chain = new ChainStub();
     }
 
+    /// `[boojum, airbender]` — the two systems commit to different `auxiliaryOutputHash` values, so
+    /// a batch has a different transition hash under each.
     function _publicInputs() internal pure returns (uint256[] memory pi) {
-        pi = new uint256[](1);
+        pi = new uint256[](2);
         pi[0] = RAW_PUBLIC_INPUT;
+        pi[1] = RAW_AIRBENDER_PUBLIC_INPUT;
     }
 
     /// `[type, nBoojum, boojum..., airbender(44 words)]`
@@ -153,7 +159,7 @@ contract EraMultiProofVerifierTest is Test {
                 LaneVerifier.Reached.selector,
                 uint256(0xa0),
                 AIRBENDER_SNARK_PROOF_LENGTH,
-                RAW_PUBLIC_INPUT
+                RAW_AIRBENDER_PUBLIC_INPUT
             )
         );
         chain.callVerify(v, _publicInputs(), _default());

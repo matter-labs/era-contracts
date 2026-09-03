@@ -11,12 +11,19 @@ import {
 } from "./_Executor_Shared.t.sol";
 
 import {POINT_EVALUATION_PRECOMPILE_ADDR, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
-import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {
+    AirbenderCommitmentWitness,
+    AirbenderProofWitnesses,
+    IExecutor,
+    SystemLogKey,
+    TOTAL_BLOBS_IN_COMMITMENT
+} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {BatchHashMismatch, VerifiedBatchesExceedsCommittedBatches} from "contracts/common/L1ContractErrors.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
+import {AirbenderCommitment} from "contracts/state-transition/libraries/AirbenderCommitment.sol";
 import {
     AIRBENDER_PROOF_SYSTEM_DISABLED,
     AIRBENDER_SNARK_PROOF_LENGTH,
@@ -45,6 +52,13 @@ contract ProvingTest is ExecutorTest {
     bytes32 l2DAValidatorOutputHash;
     bytes32[] blobVersionedHashes;
     bytes operatorDAInput;
+    /// Kept from the commit so the Airbender witness can reopen the commitment it produced.
+    bytes32 committedStateDiffHash;
+    bytes32 committedBlobLinearHash;
+    bytes committedSystemLogs;
+    /// Built once in `setUp`: `Utils` is a deployed library, so constructing this inside a test
+    /// would put a delegatecall between `vm.expectRevert` and the call actually under test.
+    AirbenderCommitmentWitness internal provedWitness;
 
     function setUp() public {
         setUpCommitBatch();
@@ -62,6 +76,7 @@ contract ProvingTest is ExecutorTest {
 
         bytes memory l2Logs = Utils.encodePacked(correctL2Logs);
 
+        committedSystemLogs = l2Logs;
         newCommitBatchInfo.timestamp = uint64(currentTimestamp);
         newCommitBatchInfo.systemLogs = l2Logs;
         newCommitBatchInfo.operatorDAInput = operatorDAInput;
@@ -90,6 +105,24 @@ contract ProvingTest is ExecutorTest {
             timestamp: currentTimestamp,
             commitment: entries[EVENT_INDEX].topics[3]
         });
+
+        _buildProvedWitness();
+    }
+
+    /// The witness that reopens the commitment `commitBatchesSharedBridge` just produced.
+    function _buildProvedWitness() internal {
+        bytes32[] memory blobHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        blobHashes[0] = committedBlobLinearHash;
+        bytes32[] memory blobCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        blobCommitments[0] = Utils.defaultBlobOpeningCommitment(blobVersionedHashes[0]);
+
+        provedWitness.metadataHash = Utils.batchMetadataHash();
+        provedWitness.l2ToL1LogsHash = keccak256(committedSystemLogs);
+        provedWitness.stateDiffHash = committedStateDiffHash;
+        provedWitness.storedBootloaderHeapHash = newCommitBatchInfo.bootloaderHeapInitialContentsHash;
+        provedWitness.eventsQueueStateHash = newCommitBatchInfo.eventsQueueStateHash;
+        provedWitness.airbenderBootloaderHeapHash = Utils.randomBytes32("airbenderHeapHash");
+        provedWitness.blobAuxOutputWords = Utils.blobAuxOutputWords(blobCommitments, blobHashes);
     }
 
     function setUpCommitBatch() public {
@@ -101,6 +134,8 @@ contract ProvingTest is ExecutorTest {
         uint8 numberOfBlobs = 1;
         bytes32[] memory blobsLinearHashes = new bytes32[](1);
         blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes");
+        committedStateDiffHash = uncompressedStateDiffHash;
+        committedBlobLinearHash = blobsLinearHashes[0];
 
         operatorDAInput = abi.encodePacked(
             uncompressedStateDiffHash,
@@ -275,6 +310,10 @@ contract ProvingTest is ExecutorTest {
         // Immutables live in runtime code, so etching carries the two lane addresses with it.
         vm.etch(getters.getVerifier(), address(gate).code);
 
+        // The genesis batch predates the lane, so seed its entry to take the recorded path. The
+        // bootstrap path has its own coverage in the library suite.
+        vm.store(address(executor), _airbenderCommitmentSlot(0), Utils.randomBytes32("seededGenesisAirbender"));
+
         uint256[] memory proof = new uint256[](2 + 1 + AIRBENDER_SNARK_PROOF_LENGTH);
         proof[0] = ERA_MULTI_PROOF_TYPE;
         proof[1] = 1;
@@ -291,14 +330,81 @@ contract ProvingTest is ExecutorTest {
         assertEq(getters.getTotalBlocksVerified(), 1);
     }
 
+    /// A verified batch's Airbender commitment is recorded, and recorded at the slot
+    /// `ZKChainStorage.airbenderCommitments` declares: the write goes through the contract and the
+    /// assertion reads it back with `vm.load` at the computed slot, against the value the library
+    /// derives. A wrong slot, or a wrong value, fails here.
+    function test_airbenderCommitmentIsRecordedAtTheDeclaredSlot() public {
+        EraMultiProofVerifier gate = new EraMultiProofVerifier(
+            IVerifier(address(new AcceptingLane())),
+            IVerifier(address(new AcceptingLane()))
+        );
+        vm.etch(getters.getVerifier(), address(gate).code);
+        vm.store(address(executor), _airbenderCommitmentSlot(0), Utils.randomBytes32("seededGenesisAirbender"));
+
+        uint256[] memory proof = new uint256[](2 + 1 + AIRBENDER_SNARK_PROOF_LENGTH);
+        proof[0] = ERA_MULTI_PROOF_TYPE;
+        proof[1] = 1;
+        proof[2] = 1;
+        _proveWith(proof);
+
+        assertEq(
+            vm.load(address(executor), _airbenderCommitmentSlot(1)),
+            AirbenderCommitment.deriveAirbenderCommitment(provedWitness, newStoredBatchInfo),
+            "the verified batch's Airbender commitment must be recorded at the declared slot"
+        );
+    }
+
+    /// The lane's chain only holds values the lane itself established. With Airbender switched off
+    /// the gate verifies nothing against the derived commitment, so it must not be recorded — the
+    /// next transition after the lane comes back seeds afresh instead.
+    ///
+    /// @dev The companion positive case is `test_airbenderCommitmentIsRecordedAtTheDeclaredSlot`;
+    /// on its own this assertion would also hold if the slot were wrong, since a wrong slot reads
+    /// zero too.
+    function test_airbenderCommitmentNotRecordedWhenTheLaneIsDisabled() public {
+        EraMultiProofVerifier gate = new EraMultiProofVerifier(
+            IVerifier(address(new AcceptingLane())),
+            IVerifier(address(new AcceptingLane()))
+        );
+        vm.etch(getters.getVerifier(), address(gate).code);
+        vm.store(address(executor), _airbenderCommitmentSlot(0), Utils.randomBytes32("seededGenesisAirbender"));
+
+        uint256[] memory proof = new uint256[](2 + 1 + AIRBENDER_SNARK_PROOF_LENGTH);
+        proof[0] = ERA_MULTI_PROOF_TYPE;
+        proof[1] = 1;
+        proof[2] = 1;
+
+        vm.prank(owner);
+        IAdmin(address(executor)).setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+        _proveWith(proof);
+
+        assertEq(getters.getTotalBlocksVerified(), 1, "the batch settles on Boojum alone");
+        assertEq(
+            vm.load(address(executor), _airbenderCommitmentSlot(1)),
+            bytes32(0),
+            "a batch the Airbender lane never verified must not enter its chain"
+        );
+    }
+
+    /// @dev `ZKChainStorage.airbenderCommitments` — asserted rather than assumed by
+    /// `test_airbenderCommitmentIsRecordedAtTheDeclaredSlot`.
+    uint256 internal constant AIRBENDER_COMMITMENTS_SLOT = 69;
+
+    function _airbenderCommitmentSlot(uint256 _batchNumber) internal pure returns (bytes32) {
+        return keccak256(abi.encode(_batchNumber, AIRBENDER_COMMITMENTS_SLOT));
+    }
+
     function _proveWith(uint256[] memory _proof) internal {
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         storedBatchInfoArray[0] = newStoredBatchInfo;
-        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
-            genesisStoredBatchInfo,
-            storedBatchInfoArray,
-            _proof
-        );
+
+        AirbenderProofWitnesses memory airbender;
+        airbender.proved = new AirbenderCommitmentWitness[](1);
+        airbender.proved[0] = provedWitness;
+
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils
+            .encodeProveBatchesDataWithAirbender(genesisStoredBatchInfo, storedBatchInfoArray, _proof, airbender);
         vm.prank(validator);
         executor.proveBatchesSharedBridge(address(0), proveBatchFrom, proveBatchTo, proveData);
     }

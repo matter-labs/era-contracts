@@ -10,6 +10,7 @@ import {
     EmptyProofLength,
     InvalidDisabledProofSystemsMask,
     InvalidProofFormat,
+    InvalidPublicInputsLength,
     UnknownVerifierType
 } from "../../common/L1ContractErrors.sol";
 import {
@@ -40,8 +41,10 @@ import {
 /// @dev There is no carried-hash slot, unlike the ZKsync OS envelope: Era has no continuation proofs, so a
 /// permanently-zero reserved word would be audited surface with no meaning.
 ///
-/// @dev The batch public inputs reach both lanes whole and untruncated, because each lane applies
-/// `PUBLIC_INPUT_SHIFT` itself. Shifting here would double-shift them.
+/// @dev `_publicInputs` is the pair `[boojum, airbender]` for a single batch, not one entry per
+/// batch: the two systems commit to different `auxiliaryOutputHash` values, so a batch has a
+/// different transition hash under each. Each word reaches its lane untruncated, because the lanes
+/// apply `PUBLIC_INPUT_SHIFT` themselves; shifting here would double-shift.
 contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
     /// @notice The Boojum router (`EraDualVerifier`), which dispatches the FFLONK and PLONK wrappers.
     /// @dev Immutable: the two lanes are fixed at deployment, so the pair of proof systems a batch is
@@ -64,6 +67,12 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
     function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) public view virtual returns (bool) {
         if (_proof.length == 0) {
             revert EmptyProofLength();
+        }
+
+        // One word per lane. A caller using the legacy prove encoding arrives with a single word and
+        // is refused here, so that encoding cannot be used to leave the Airbender lane unchecked.
+        if (_publicInputs.length != 2) {
+            revert InvalidPublicInputsLength();
         }
 
         // The header word carries the proof type and nothing else, so a value with data in the reserved
@@ -100,13 +109,13 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
             if (boojumLength == 0) {
                 revert BoojumVerificationFailed();
             }
-            if (!BOOJUM_VERIFIER.verify(_publicInputs, _proof[2:2 + boojumLength])) {
+            if (!BOOJUM_VERIFIER.verify(_publicInputs[0:1], _proof[2:2 + boojumLength])) {
                 revert BoojumVerificationFailed();
             }
         }
 
         if (disabled & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
-            if (!AIRBENDER_VERIFIER.verify(_publicInputs, _proof[2 + boojumLength:])) {
+            if (!AIRBENDER_VERIFIER.verify(_publicInputs[1:2], _proof[2 + boojumLength:])) {
                 revert AirbenderVerificationFailed();
             }
         }

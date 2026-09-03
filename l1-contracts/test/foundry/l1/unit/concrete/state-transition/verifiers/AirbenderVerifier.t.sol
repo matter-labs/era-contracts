@@ -51,6 +51,14 @@ contract AirbenderVerifierTest is Test {
         inputs[0] = _raw;
     }
 
+    /// The gate takes the pair `[boojum, airbender]`. The Boojum word is arbitrary here because the
+    /// stub lane accepts anything; only the second word reaches the Airbender lane.
+    function _gateInputs(uint256 _rawAirbender) internal pure returns (uint256[] memory inputs) {
+        inputs = new uint256[](2);
+        inputs[0] = uint256(keccak256("unused-boojum-transition-hash"));
+        inputs[1] = _rawAirbender;
+    }
+
     function test_constructor_setsPlonkVerifier() public view {
         assertEq(address(verifier.AIRBENDER_PLONK_VERIFIER()), address(plonk));
     }
@@ -140,7 +148,7 @@ contract AirbenderVerifierTest is Test {
         }
 
         assertTrue(
-            chain.callVerify(gate, _inputs(AirbenderPlonkProofFixture.packedProgramOutput()), envelope),
+            chain.callVerify(gate, _gateInputs(AirbenderPlonkProofFixture.packedProgramOutput()), envelope),
             "real Airbender proof must verify through the gate"
         );
     }

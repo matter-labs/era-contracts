@@ -24,6 +24,7 @@ import {
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {
+    AirbenderProofWitnesses,
     IExecutor,
     SystemLogKey,
     MAX_NUMBER_OF_BLOBS,
@@ -275,6 +276,23 @@ library Utils {
             bytes.concat(
                 bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
                 abi.encode(_prevBatch, _committedBatches, _proof)
+            )
+        );
+    }
+
+    /// @dev Prove data carrying the Airbender-lane witnesses, i.e. `BatchDecoder` encoding 2.
+    function encodeProveBatchesDataWithAirbender(
+        IExecutor.StoredBatchInfo memory _prevBatch,
+        IExecutor.StoredBatchInfo[] memory _committedBatches,
+        uint256[] memory _proof,
+        AirbenderProofWitnesses memory _airbender
+    ) internal pure returns (uint256, uint256, bytes memory) {
+        return (
+            _committedBatches[0].batchNumber,
+            _committedBatches[_committedBatches.length - 1].batchNumber,
+            bytes.concat(
+                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_PROOF_AIRBENDER),
+                abi.encode(_prevBatch, _committedBatches, _proof, _airbender)
             )
         );
     }
@@ -695,6 +713,27 @@ library Utils {
         bytes32[] memory _blobHashes
     ) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(_stateDiffHash, _totalPubdataHash, _blobsAmount, _blobHashes));
+    }
+
+    /// @dev The batch metadata hash, i.e. the second layer of a batch commitment.
+    function batchMetadataHash() public pure returns (bytes32) {
+        return keccak256(_batchMetaParameters());
+    }
+
+    /// @dev The 32-word blob region of the auxiliary output preimage.
+    function blobAuxOutputWords(
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes
+    ) public pure returns (bytes32[] memory) {
+        return _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes);
+    }
+
+    /// @dev The opening commitment the rollup DA validator derives for `getDefaultBlobCommitment()`,
+    /// which is what lands in the batch's auxiliary output.
+    function defaultBlobOpeningCommitment(bytes32 _versionedHash) public pure returns (bytes32) {
+        bytes16 blobOpeningPoint = 0x7142c5851421a2dc03dde0aabdb0ffdb;
+        bytes32 blobClaimedValue = 0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0;
+        return keccak256(abi.encodePacked(_versionedHash, abi.encodePacked(blobOpeningPoint, blobClaimedValue)));
     }
 
     function getDefaultBlobCommitment() public pure returns (bytes memory) {

@@ -306,7 +306,13 @@ contract BatchDecoderTest is Test {
         uint256 _processBatchFrom,
         uint256 _processBatchTo
     ) external pure returns (IExecutor.StoredBatchInfo memory, IExecutor.StoredBatchInfo[] memory, uint256[] memory) {
-        return BatchDecoder.decodeAndCheckProofData(_proofData, _processBatchFrom, _processBatchTo);
+        (
+            IExecutor.StoredBatchInfo memory prevBatch,
+            IExecutor.StoredBatchInfo[] memory provedBatches,
+            uint256[] memory proof,
+
+        ) = BatchDecoder.decodeAndCheckProofData(_proofData, _processBatchFrom, _processBatchTo);
+        return (prevBatch, provedBatches, proof);
     }
 
     function externalDecodeAndCheckExecuteData(
