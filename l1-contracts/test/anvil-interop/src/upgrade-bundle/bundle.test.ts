@@ -5,7 +5,13 @@ import * as path from "path";
 import { afterEach, describe, it } from "node:test";
 import { ethers } from "ethers";
 import { packDeployBundle, verifyBundleIntegrity } from "./bundle";
-import { DEPLOY_BUNDLE_SCHEMA, fileSha256, loadUpgradeEnvironment, readJson } from "./common";
+import {
+  DEPLOY_BUNDLE_SCHEMA,
+  deployBundleMetadataSchema,
+  fileSha256,
+  loadUpgradeEnvironment,
+  readJsonAs,
+} from "./common";
 import type { DeployBundleMetadata } from "./common";
 import { restoreCanonicalDefaultAccountArtifact, zkBytecodeHash } from "./default-account";
 import { replayBundleAndVerify } from "./flows";
@@ -99,7 +105,7 @@ describe("verifyBundleIntegrity", () => {
     const manifestPath = path.join(directory, "prepare/manifest.json");
     writeJson(manifestPath, { bundles: [{ index: 2, file: "01.safe.json", target: TEST_BUNDLE_TARGET }] });
     const metadataPath = path.join(directory, "bundle-metadata.json");
-    const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8")) as DeployBundleMetadata;
+    const metadata = readJsonAs(metadataPath, deployBundleMetadataSchema);
     metadata.files["prepare/manifest.json"] = fileSha256(manifestPath);
     writeJson(metadataPath, metadata);
     assert.throws(() => verifyBundleIntegrity(directory), /bundle list does not match/);
@@ -108,16 +114,16 @@ describe("verifyBundleIntegrity", () => {
   it("rejects invalid signer addresses", () => {
     const directory = createValidBundle();
     const metadataPath = path.join(directory, "bundle-metadata.json");
-    const metadata = readJson<DeployBundleMetadata>(metadataPath);
+    const metadata = readJsonAs(metadataPath, deployBundleMetadataSchema);
     metadata.bundles[0].target = "0xabc";
     writeJson(metadataPath, metadata);
-    assert.throws(() => verifyBundleIntegrity(directory), /invalid bundle target address/);
+    assert.throws(() => verifyBundleIntegrity(directory), /bundles\.0\.target: invalid address/);
   });
 
   it("rejects supporting files outside the bundle", () => {
     const directory = createValidBundle();
     const metadataPath = path.join(directory, "bundle-metadata.json");
-    const metadata = readJson<DeployBundleMetadata>(metadataPath);
+    const metadata = readJsonAs(metadataPath, deployBundleMetadataSchema);
     metadata.files["../outside.txt"] = "0".repeat(64);
     writeJson(metadataPath, metadata);
     assert.throws(() => verifyBundleIntegrity(directory), /file escapes bundle directory: \.\.\/outside\.txt/);

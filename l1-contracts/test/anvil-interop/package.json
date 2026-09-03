@@ -31,7 +31,8 @@
     "@iarna/toml": "2.2.5",
     "@matterlabs/zksync-js": "0.0.17",
     "ethers": "5.7.2",
-    "viem": "2.48.4"
+    "viem": "2.48.4",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.19",

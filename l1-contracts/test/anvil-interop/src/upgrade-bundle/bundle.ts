@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { ethers } from "ethers";
+import type { z } from "zod";
 import {
   CREATE2_SALT_BYTES,
   DEPLOY_BUNDLE_SCHEMA,
@@ -10,95 +11,87 @@ import {
   REQUIRED_SUPPORTING_BUNDLE_FILES,
   SUPPORTING_BUNDLE_FILES,
   V31_UPGRADE_NAME,
+  bundleManifestSchema,
   captureCommand,
   commandSucceeds,
+  deployBundleMetadataSchema,
   fileSha256,
-  optionalTomlInteger,
-  optionalTomlString,
+  formatError,
   parseUpgradeEnvironment,
-  readJson,
+  permanentValuesSchema,
+  readJsonAs,
   readToml,
+  readTomlAs,
   requireFile,
   resolveContainedFile,
+  safeBundleSchema,
 } from "./common";
-import type {
-  BundleManifest,
-  DeployBundleMetadata,
-  PackedBundle,
-  SafeBundle,
-  SafeTransaction,
-  TomlRecord,
-} from "./common";
+import type { DeployBundleMetadata, ManifestBundle, PackedBundle, SafeTransaction, TomlRecord } from "./common";
 
 // ─── Integrity ───────────────────────────────────────────────────────────────────
 
 const INTEGRITY_ERROR = "deploy bundle integrity check failed";
 
-function fail(message: string): never {
-  throw new Error(`${INTEGRITY_ERROR}: ${message}`);
+export class BundleIntegrityError extends Error {
+  public constructor(message: string) {
+    super(`${INTEGRITY_ERROR}: ${message}`);
+    this.name = "BundleIntegrityError";
+  }
 }
 
-function bundleIdentity(entry: { index: number; file: string; target: string }): string {
-  if (
-    !Number.isInteger(entry.index) ||
-    typeof entry.file !== "string" ||
-    path.basename(entry.file) !== entry.file ||
-    typeof entry.target !== "string"
-  ) {
-    fail("invalid bundle identity");
+/** A bundle's identity as the manifest states it: position, file and signer. */
+function bundleKey(bundle: ManifestBundle): string {
+  return `${bundle.index}:${bundle.file}:${ethers.utils.getAddress(bundle.target)}`;
+}
+
+function indexBundles<Bundle extends ManifestBundle>(bundles: Bundle[], source: string): Map<string, Bundle> {
+  const byKey = new Map<string, Bundle>();
+  for (const bundle of bundles) {
+    const key = bundleKey(bundle);
+    if (byKey.has(key)) throw new BundleIntegrityError(`${source} lists bundle ${bundle.file} twice`);
+    byKey.set(key, bundle);
   }
-  let target: string;
-  try {
-    target = ethers.utils.getAddress(entry.target).toLowerCase();
-  } catch {
-    fail("invalid bundle target address");
-  }
-  return `${entry.index}\0${entry.file}\0${target}`;
+  return byKey;
 }
 
 export function verifyBundleIntegrity(bundleDirectory: string): DeployBundleMetadata {
-  const checkedPath = (relativePath: string): string =>
+  const containedFile = (relativePath: string): string =>
     resolveContainedFile(bundleDirectory, relativePath, `${INTEGRITY_ERROR}: file escapes bundle directory`);
-  const verifyDigest = (relativePath: string, expected: unknown): void => {
-    if (typeof expected !== "string" || !/^[0-9a-f]{64}$/.test(expected)) {
-      fail(`invalid SHA-256 for ${relativePath}`);
+  const readBundleFile = <Schema extends z.ZodTypeAny>(relativePath: string, schema: Schema): z.output<Schema> => {
+    const filePath = containedFile(relativePath);
+    try {
+      return readJsonAs(filePath, schema);
+    } catch (error) {
+      throw new BundleIntegrityError(formatError(error));
     }
-    const actual = fileSha256(checkedPath(relativePath));
-    if (actual !== expected) fail(`SHA-256 mismatch for ${relativePath}: expected ${expected}, got ${actual}`);
+  };
+  const verifyDigest = (relativePath: string, expected: string): void => {
+    const actual = fileSha256(containedFile(relativePath));
+    if (actual !== expected) {
+      throw new BundleIntegrityError(`SHA-256 mismatch for ${relativePath}: expected ${expected}, got ${actual}`);
+    }
   };
 
-  const metadata = readJson<DeployBundleMetadata>(checkedPath("bundle-metadata.json"));
-  const manifest = readJson<BundleManifest>(checkedPath("prepare/manifest.json"));
-  if (metadata.schema !== DEPLOY_BUNDLE_SCHEMA) fail(`unsupported schema: ${String(metadata.schema)}`);
-  if (!Array.isArray(metadata.bundles) || metadata.bundles.length === 0) {
-    fail("metadata.bundles is empty or not an array");
-  }
-  if (!Array.isArray(manifest.bundles) || manifest.bundles.length === 0) {
-    fail("manifest.bundles is empty or not an array");
+  const metadata = readBundleFile("bundle-metadata.json", deployBundleMetadataSchema);
+  const manifest = readBundleFile("prepare/manifest.json", bundleManifestSchema);
+
+  const packed = indexBundles(metadata.bundles, "bundle-metadata.json");
+  const listed = indexBundles(manifest.bundles, "prepare/manifest.json");
+  if (packed.size !== listed.size || ![...listed.keys()].every((key) => packed.has(key))) {
+    throw new BundleIntegrityError("metadata bundle list does not match prepare/manifest.json");
   }
 
-  const metadataIdentities = metadata.bundles.map(bundleIdentity);
-  const manifestIdentities = manifest.bundles.map(bundleIdentity);
-  if (new Set(metadataIdentities).size !== metadataIdentities.length) {
-    fail("metadata contains duplicate bundle identities");
-  }
-  if ([...metadataIdentities].sort().join("\n") !== [...manifestIdentities].sort().join("\n")) {
-    fail("metadata bundle list does not match prepare/manifest.json");
-  }
-
-  for (const entry of metadata.bundles) {
-    const relativePath = path.join("prepare", entry.file);
-    verifyDigest(relativePath, entry.sha256);
-    const safe = readJson<SafeBundle>(checkedPath(relativePath));
-    if (!Array.isArray(safe.transactions)) fail(`${relativePath} has no transactions array`);
-    if (safe.transactions.length !== entry.transaction_count) {
-      fail(`transaction count mismatch for ${relativePath}`);
+  for (const bundle of metadata.bundles) {
+    const relativePath = path.join("prepare", bundle.file);
+    verifyDigest(relativePath, bundle.sha256);
+    const safe = readBundleFile(relativePath, safeBundleSchema);
+    if (safe.transactions.length !== bundle.transaction_count) {
+      throw new BundleIntegrityError(`transaction count mismatch for ${relativePath}`);
     }
   }
 
-  if (!metadata.files || typeof metadata.files !== "object") fail("metadata.files is empty or not an object");
   for (const required of REQUIRED_SUPPORTING_BUNDLE_FILES) {
-    if (!(required in metadata.files)) fail(`metadata.files does not include ${required}`);
+    if (!(required in metadata.files)) throw new BundleIntegrityError(`metadata.files does not include ${required}`);
   }
   for (const [relativePath, digest] of Object.entries(metadata.files)) verifyDigest(relativePath, digest);
 
@@ -181,22 +174,17 @@ function describeTransaction(
   tag: string;
   dataBytes: number;
 } {
-  const data = transaction.data ?? "0x";
-  if (!ethers.utils.isHexString(data)) throw new Error(`invalid transaction data for ${transaction.to}`);
-  if (!transaction.to || !ethers.utils.isAddress(transaction.to)) {
-    throw new Error(`invalid transaction target: ${String(transaction.to)}`);
-  }
   const target = ethers.utils.getAddress(transaction.to);
   const isCreate2 = create2Factory !== undefined && target === create2Factory;
-  const dataBytes = ethers.utils.hexDataLength(data);
+  const dataBytes = ethers.utils.hexDataLength(transaction.data);
   if (isCreate2 && dataBytes < CREATE2_SALT_BYTES) {
     throw new Error(`CREATE2 transaction to ${target} has no ${CREATE2_SALT_BYTES}-byte salt`);
   }
   return {
     kind: isCreate2 ? "CREATE2 deploy" : "call",
     tag: isCreate2
-      ? ethers.utils.hexDataSlice(data, 0, CREATE2_SALT_BYTES)
-      : ethers.utils.hexDataSlice(data, 0, Math.min(FUNCTION_SELECTOR_BYTES, dataBytes)),
+      ? ethers.utils.hexDataSlice(transaction.data, 0, CREATE2_SALT_BYTES)
+      : ethers.utils.hexDataSlice(transaction.data, 0, Math.min(FUNCTION_SELECTOR_BYTES, dataBytes)),
     dataBytes,
   };
 }
@@ -307,10 +295,7 @@ export function packDeployBundle(environment: string, options: PackDeployBundleO
   requireFile(sourceManifestPath, "generation output");
   requireFile(permanentValuesPath, "environment config");
 
-  const sourceManifest = readJson<BundleManifest>(sourceManifestPath);
-  if (!Array.isArray(sourceManifest.bundles) || sourceManifest.bundles.length === 0) {
-    throw new Error(`${sourceManifestPath} has no bundles`);
-  }
+  const sourceManifest = readJsonAs(sourceManifestPath, bundleManifestSchema);
 
   fs.rmSync(bundleDirectory, { recursive: true, force: true });
   fs.mkdirSync(path.join(bundleDirectory, "prepare"), { recursive: true });
@@ -318,7 +303,7 @@ export function packDeployBundle(environment: string, options: PackDeployBundleO
   fs.copyFileSync(sourceManifestPath, path.join(bundleDirectory, "prepare/manifest.json"));
   for (const bundle of sourceManifest.bundles) {
     const source = checkedGeneratedFile(sourcePrepareDirectory, bundle.file);
-    fs.copyFileSync(source, path.join(bundleDirectory, "prepare", path.basename(bundle.file)));
+    fs.copyFileSync(source, path.join(bundleDirectory, "prepare", bundle.file));
   }
   for (const log of ["extra-verification-logs.txt", "gw-verification-logs.txt"]) {
     const source = path.join(outputDirectory, log);
@@ -331,19 +316,18 @@ export function packDeployBundle(environment: string, options: PackDeployBundleO
     ["diff", "--quiet", "HEAD", "--ignore-submodules=all"],
     repositoryRoot
   );
-  const permanentValues = readToml(permanentValuesPath);
+  const permanentValues = readTomlAs(permanentValuesPath, permanentValuesSchema);
   const provenance = options.provenance ?? {};
   const deployer = provenance.deployerAddress ? ethers.utils.getAddress(provenance.deployerAddress) : undefined;
-  const configuredCreate2Factory = optionalTomlString(permanentValues, "permanent_contracts.create2_factory_addr");
+  const configuredCreate2Factory = permanentValues.permanent_contracts?.create2_factory_addr;
   const create2Factory = configuredCreate2Factory ? ethers.utils.getAddress(configuredCreate2Factory) : undefined;
   const callsMarkdown: string[] = [];
   const bundles: PackedBundle[] = [...sourceManifest.bundles]
     .sort((left, right) => left.index - right.index)
     .map((bundle) => {
-      const relativePath = path.join("prepare", path.basename(bundle.file));
+      const relativePath = path.join("prepare", bundle.file);
       const safePath = path.join(bundleDirectory, relativePath);
-      const safe = readJson<SafeBundle>(safePath);
-      if (!Array.isArray(safe.transactions)) throw new Error(`${safePath} has no transactions array`);
+      const safe = readJsonAs(safePath, safeBundleSchema);
       const target = ethers.utils.getAddress(bundle.target);
       const role = deployer === target ? "DEPLOYER" : "other signer";
       callsMarkdown.push(
@@ -354,13 +338,12 @@ export function packDeployBundle(environment: string, options: PackDeployBundleO
       safe.transactions.forEach((transaction, index) => {
         const description = describeTransaction(transaction, create2Factory);
         callsMarkdown.push(
-          `| ${index + 1} | \`${transaction.to}\` | ${transaction.value ?? "0"} | ${description.kind} | ` +
+          `| ${index + 1} | \`${transaction.to}\` | ${transaction.value} | ${description.kind} | ` +
             `\`${description.tag}\` | ${description.dataBytes} |`
         );
       });
       return {
         ...bundle,
-        file: path.basename(bundle.file),
         target,
         steps: bundle.steps ?? [],
         transaction_count: safe.transactions.length,
@@ -402,7 +385,7 @@ export function packDeployBundle(environment: string, options: PackDeployBundleO
     contracts_worktree_dirty: !worktreeIsClean,
     all_contracts_hashes_sha256: fileSha256(path.join(repositoryRoot, "AllContractsHashes.json")),
     l1: {
-      chain_id: optionalTomlInteger(permanentValues, "l1_chain_id") ?? null,
+      chain_id: permanentValues.l1_chain_id ?? null,
       forked_at_block: provenance.forkedAtBlock ?? null,
     },
     deployer_address: deployer ?? null,

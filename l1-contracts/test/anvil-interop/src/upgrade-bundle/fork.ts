@@ -14,13 +14,13 @@ import {
   PROTOCOL_OPS_MEMORY_LIMIT,
   SIGINT_EXIT_CODE,
   SIGTERM_EXIT_CODE,
+  bundleManifestSchema,
+  ecosystemTomlSchema,
   locateProtocolOps,
-  optionalTomlString,
-  readJson,
-  readToml,
+  readJsonAs,
+  readTomlAs,
   runCommand,
 } from "./common";
-import type { BundleManifest } from "./common";
 
 // ─── Anvil fork ──────────────────────────────────────────────────────────────────
 
@@ -172,7 +172,7 @@ export async function fundBundleTargets(
   console.log(`ZK token:           ${zkTokenAddress}`);
   await provider.send("anvil_setBalance", [nativeTokenVaultAddress, ANVIL_BALANCE.toHexString()]);
 
-  const manifest = readJson<BundleManifest>(options.manifestPath);
+  const manifest = readJsonAs(options.manifestPath, bundleManifestSchema);
   const targets = [...new Set(manifest.bundles.map((bundle) => ethers.utils.getAddress(bundle.target).toLowerCase()))]
     .sort()
     .map((address) => ethers.utils.getAddress(address));
@@ -194,8 +194,7 @@ export async function fundBundleTargets(
     }
   }
 
-  const ecosystem = readToml(options.ecosystemTomlPath);
-  const assetTrackerAddress = optionalTomlString(ecosystem, "asset_tracker_proxy_addr");
+  const { asset_tracker_proxy_addr: assetTrackerAddress } = readTomlAs(options.ecosystemTomlPath, ecosystemTomlSchema);
   if (!assetTrackerAddress) {
     console.warn(
       `  WARNING: asset_tracker_proxy_addr not found in ${options.ecosystemTomlPath} — skipping registerLegacyToken`

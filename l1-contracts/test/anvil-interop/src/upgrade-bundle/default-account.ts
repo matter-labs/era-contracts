@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import * as fs from "fs";
+import { z } from "zod";
 import {
   CANONICAL_DEFAULT_ACCOUNT_EXECUTABLE_SHA256,
   CANONICAL_DEFAULT_ACCOUNT_HASH,
@@ -11,19 +12,20 @@ import {
   ERAVM_HASH_VERSION,
   ERAVM_HASH_VERSION_OFFSET,
   MAX_ERAVM_BYTECODE_WORDS,
-  readJson,
-  readToml,
-  requireTomlString,
+  readJsonAs,
+  readTomlAs,
 } from "./common";
 
-interface ContractHashEntry {
-  contractName?: string;
-  zkBytecodeHash?: string;
-}
-
-interface FoundryArtifact {
-  bytecode?: { object?: string };
-}
+const contractHashesSchema = z.array(
+  z.object({ contractName: z.string().optional(), zkBytecodeHash: z.string().optional() })
+);
+/** Only `bytecode.object` is read and rewritten; every other artifact field passes through untouched. */
+const foundryArtifactSchema = z
+  .object({ bytecode: z.object({ object: z.string().regex(/^(?:0x)?[0-9a-fA-F]+$/) }).passthrough() })
+  .passthrough();
+const upgradeInputDefaultAccountSchema = z.object({
+  contracts: z.object({ default_aa_hash: z.string().regex(/^0x[0-9a-fA-F]{64}$/) }),
+});
 
 function fail(message: string): never {
   throw new Error(`canonical DefaultAccount restore failed: ${message}`);
@@ -49,11 +51,12 @@ export function restoreCanonicalDefaultAccountArtifact(
   environmentPath: string,
   hashesPath: string
 ): void {
-  const environment = readToml(environmentPath);
-  const environmentHash = requireTomlString(environment, "contracts.default_aa_hash", environmentPath).toLowerCase();
-  if (!/^0x[0-9a-f]{64}$/.test(environmentHash)) fail(`${environmentPath} has an invalid default_aa_hash`);
+  const environmentHash = readTomlAs(
+    environmentPath,
+    upgradeInputDefaultAccountSchema
+  ).contracts.default_aa_hash.toLowerCase();
 
-  const hashes = readJson<ContractHashEntry[]>(hashesPath);
+  const hashes = readJsonAs(hashesPath, contractHashesSchema);
   const reviewed = hashes
     .filter((entry) => entry.contractName === "system-contracts/DefaultAccount")
     .map((entry) => (entry.zkBytecodeHash ?? "").toLowerCase());
@@ -61,11 +64,8 @@ export function restoreCanonicalDefaultAccountArtifact(
     fail(`env hash ${environmentHash} does not uniquely match AllContractsHashes.json: ${JSON.stringify(reviewed)}`);
   }
 
-  const artifact = readJson<FoundryArtifact>(artifactPath);
-  const raw = artifact.bytecode?.object;
-  if (typeof raw !== "string" || !/^(?:0x)?[0-9a-fA-F]+$/.test(raw)) {
-    fail(`${artifactPath} has no bytecode.object`);
-  }
+  const artifact = readJsonAs(artifactPath, foundryArtifactSchema);
+  const raw = artifact.bytecode.object;
   const hasHexPrefix = raw.startsWith("0x");
   const bytecode = Buffer.from(hasHexPrefix ? raw.slice(2) : raw, "hex");
   const builtHash = zkBytecodeHash(bytecode);

@@ -4,6 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { parse as parseToml } from "@iarna/toml";
 import { ethers } from "ethers";
+import { z } from "zod";
 
 // ─── Constants ───────────────────────────────────────────────────────────────────
 
@@ -55,63 +56,79 @@ export const SUPPORTING_BUNDLE_FILES = [
 
 export const REQUIRED_SUPPORTING_BUNDLE_FILES = ["prepare/manifest.json", "ecosystem.toml"] as const;
 
-// ─── Types ───────────────────────────────────────────────────────────────────────
+// ─── Schemas ─────────────────────────────────────────────────────────────────────
 
-export interface ManifestBundle {
-  index: number;
-  file: string;
-  target: string;
-  steps?: unknown[];
-}
+export const addressSchema = z.string().refine((value) => ethers.utils.isAddress(value), "invalid address");
+export const hexDataSchema = z.string().refine((value) => ethers.utils.isHexString(value), "invalid hex data");
+export const bytes32Schema = z.string().refine((value) => ethers.utils.isHexString(value, 32), "must be 32 bytes");
+export const sha256Schema = z.string().regex(/^[0-9a-f]{64}$/, "invalid SHA-256");
+const bareFileNameSchema = z
+  .string()
+  .min(1)
+  .refine((file) => path.basename(file) === file, "must be a bare file name");
 
-export interface BundleManifest {
-  bundles: ManifestBundle[];
-}
+export const packageJsonSchema = z.object({ name: z.string().optional() });
 
-export interface SafeTransaction {
-  to?: string;
-  value?: string;
-  data?: string;
-}
+/** One entry of `prepare/manifest.json` as `upgrade-prepare-all` writes it. */
+export const manifestBundleSchema = z.object({
+  index: z.number().int().nonnegative(),
+  file: bareFileNameSchema,
+  target: addressSchema,
+  steps: z.array(z.unknown()).optional(),
+});
+export const bundleManifestSchema = z.object({ bundles: z.array(manifestBundleSchema).min(1) });
 
-export interface SafeBundle {
-  transactions: SafeTransaction[];
-}
+/** Safe Transaction Builder shape of `prepare/*.safe.json`. */
+export const safeTransactionSchema = z.object({
+  to: addressSchema,
+  value: z.string().default("0"),
+  data: hexDataSchema.default("0x"),
+});
+export const safeBundleSchema = z.object({ transactions: z.array(safeTransactionSchema) });
 
-export interface PackedBundle extends ManifestBundle {
-  transaction_count: number;
-  is_deployer_bundle: boolean | null;
-  sha256: string;
-}
+export const packedBundleSchema = manifestBundleSchema.extend({
+  transaction_count: z.number().int().nonnegative(),
+  is_deployer_bundle: z.boolean().nullable(),
+  sha256: sha256Schema,
+});
 
-export interface DeployBundleMetadata {
-  schema: string;
-  upgrade: string;
-  env: string;
-  protocol_version: {
-    old: string[];
-    new: string[];
-  };
-  contracts_commit: string;
-  contracts_worktree_dirty: boolean;
-  all_contracts_hashes_sha256: string;
-  l1: {
-    chain_id: number | null;
-    forked_at_block: number | null;
-  };
-  deployer_address: string | null;
-  deployer_dependent_deployments: Array<{ address: string; contract: string }>;
-  zk_governance_commit: string | null;
-  toolchain: {
-    forge: string;
-    rustc: string;
-    foundry_zksync: string | null;
-  };
-  generated_by: { workflow_run: string; runner_os: string | null } | null;
-  files: Record<string, string>;
-  bundles: PackedBundle[];
-}
+/** `bundle-metadata.json`. */
+export const deployBundleMetadataSchema = z.object({
+  schema: z.literal(DEPLOY_BUNDLE_SCHEMA),
+  upgrade: z.string(),
+  env: z.string(),
+  protocol_version: z.object({ old: z.array(z.string()), new: z.array(z.string()) }),
+  contracts_commit: z.string(),
+  contracts_worktree_dirty: z.boolean(),
+  all_contracts_hashes_sha256: sha256Schema,
+  l1: z.object({ chain_id: z.number().int().nullable(), forked_at_block: z.number().int().nullable() }),
+  deployer_address: addressSchema.nullable(),
+  deployer_dependent_deployments: z.array(z.object({ address: addressSchema, contract: z.string() })),
+  zk_governance_commit: z.string().nullable(),
+  toolchain: z.object({ forge: z.string(), rustc: z.string(), foundry_zksync: z.string().nullable() }),
+  generated_by: z.object({ workflow_run: z.string(), runner_os: z.string().nullable() }).nullable(),
+  files: z.record(sha256Schema),
+  bundles: z.array(packedBundleSchema).min(1),
+});
 
+/** `permanent-values/<env>.toml`, as far as the bundle tooling reads it. */
+export const permanentValuesSchema = z.object({
+  l1_chain_id: z.number().int().optional(),
+  zk_token_asset_id: bytes32Schema.optional(),
+  permanent_contracts: z.object({ create2_factory_addr: addressSchema.optional() }).optional(),
+  new_gateway: z.unknown().optional(),
+});
+/** `v0.31.0-interopB/<env>.toml`, as far as the bundle tooling reads it. */
+export const upgradeInputSchema = z.object({ contracts: z.object({ bridgehub_proxy_address: addressSchema }) });
+/** The `ecosystem.toml` keys the fork funding reads. */
+export const ecosystemTomlSchema = z.object({ asset_tracker_proxy_addr: addressSchema.optional() });
+
+export type ManifestBundle = z.infer<typeof manifestBundleSchema>;
+export type BundleManifest = z.infer<typeof bundleManifestSchema>;
+export type SafeTransaction = z.infer<typeof safeTransactionSchema>;
+export type SafeBundle = z.infer<typeof safeBundleSchema>;
+export type PackedBundle = z.infer<typeof packedBundleSchema>;
+export type DeployBundleMetadata = z.infer<typeof deployBundleMetadataSchema>;
 export type TomlRecord = Record<string, unknown>;
 
 // ─── File system + TOML ──────────────────────────────────────────────────────────
@@ -121,7 +138,8 @@ function findPackageDirectory(start: string): string {
   let previous = "";
   while (current !== previous) {
     const packagePath = path.join(current, "package.json");
-    if (fs.existsSync(packagePath) && readJson<{ name?: string }>(packagePath).name === "anvil-interop") return current;
+    if (fs.existsSync(packagePath) && readJsonAs(packagePath, packageJsonSchema).name === "anvil-interop")
+      return current;
     previous = current;
     current = path.dirname(current);
   }
@@ -136,12 +154,25 @@ export function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function readJson<T>(filePath: string): T {
+function formatIssues(error: z.ZodError): string {
+  return error.issues.map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.message}`).join("; ");
+}
+
+function parseWith<Schema extends z.ZodTypeAny>(value: unknown, schema: Schema, source: string): z.output<Schema> {
+  const result = schema.safeParse(value);
+  if (!result.success) throw new Error(`${source}: ${formatIssues(result.error)}`);
+  return result.data;
+}
+
+/** Read a JSON file and validate it against `schema`; the result is typed by the schema. */
+export function readJsonAs<Schema extends z.ZodTypeAny>(filePath: string, schema: Schema): z.output<Schema> {
+  let parsed: unknown;
   try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
+    parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
   } catch (error) {
     throw new Error(`Cannot read JSON ${filePath}: ${formatError(error)}`);
   }
+  return parseWith(parsed, schema, filePath);
 }
 
 export function readToml(filePath: string): TomlRecord {
@@ -152,27 +183,9 @@ export function readToml(filePath: string): TomlRecord {
   }
 }
 
-function tomlValue(config: TomlRecord, keyPath: string): unknown {
-  return keyPath.split(".").reduce<unknown>((value, key) => {
-    if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
-    return (value as TomlRecord)[key];
-  }, config);
-}
-
-export function requireTomlString(config: TomlRecord, keyPath: string, source: string): string {
-  const value = tomlValue(config, keyPath);
-  if (typeof value !== "string" || value.length === 0) throw new Error(`${keyPath} not found in ${source}`);
-  return value;
-}
-
-export function optionalTomlString(config: TomlRecord, keyPath: string): string | undefined {
-  const value = tomlValue(config, keyPath);
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-export function optionalTomlInteger(config: TomlRecord, keyPath: string): number | undefined {
-  const value = tomlValue(config, keyPath);
-  return typeof value === "number" && Number.isSafeInteger(value) ? value : undefined;
+/** Read a TOML file and validate it against `schema`; unknown keys are dropped, not rejected. */
+export function readTomlAs<Schema extends z.ZodTypeAny>(filePath: string, schema: Schema): z.output<Schema> {
+  return parseWith(readToml(filePath), schema, filePath);
 }
 
 export function fileSha256(filePath: string): string {
@@ -308,21 +321,14 @@ export function loadUpgradeEnvironment(name: UpgradeEnvironmentName): UpgradeEnv
   requireFile(permanentValuesPath, `config for env '${name}'`);
   requireFile(inputPath, `config for env '${name}'`);
 
-  const permanentValues = readToml(permanentValuesPath);
-  const input = readToml(inputPath);
-  const bridgehubAddress = ethers.utils.getAddress(
-    requireTomlString(input, "contracts.bridgehub_proxy_address", inputPath)
-  );
-  const zkAssetId = requireTomlString(permanentValues, "zk_token_asset_id", permanentValuesPath);
-  if (!ethers.utils.isHexString(zkAssetId, 32)) {
-    throw new Error(`zk_token_asset_id in ${permanentValuesPath} must be 32 bytes`);
-  }
+  const permanentValues = readTomlAs(permanentValuesPath, permanentValuesSchema.required({ zk_token_asset_id: true }));
+  const input = readTomlAs(inputPath, upgradeInputSchema);
 
   return {
     name,
     outputDirectory,
-    bridgehubAddress,
-    zkAssetId,
+    bridgehubAddress: ethers.utils.getAddress(input.contracts.bridgehub_proxy_address),
+    zkAssetId: permanentValues.zk_token_asset_id,
     hasGateway: permanentValues.new_gateway !== undefined,
   };
 }
