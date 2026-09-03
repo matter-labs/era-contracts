@@ -138,7 +138,7 @@ interface IGetters is IZKChainBase {
     function disabledProofSystems() external view returns (uint8);
 
     /// @return The Airbender-shape commitment recorded when the given batch was verified, or `0` if
-    /// the Airbender lane never verified it.
+    /// the Airbender lane never verified the batch currently stored under that number.
     /// @dev The operator reads this to decide whether a prove call must carry a bootstrap witness
     /// for its previous batch: `0` means the chain has to be seeded from that batch's committed
     /// data, which is the case before the lane is first enabled and again after any period with the

@@ -22,7 +22,9 @@ import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/IComm
 import {
     AirbenderBootstrapWitnessNotExpected,
     AirbenderBootstrapWitnessRequired,
+    AirbenderProvedWitnessCountInvalid,
     AirbenderWitnessNotSupportedOnZKsyncOS,
+    CanOnlyProcessOneBatch,
     BatchHashMismatch,
     InvalidPublicInputsLength,
     VerifiedBatchesExceedsCommittedBatches
@@ -362,6 +364,117 @@ contract ProvingTest is ExecutorTest {
         );
     }
 
+    /// A witness that does not reopen the batch's stored commitment is refused at the facet, not
+    /// merely inside the library. The batch itself is genuine here, so `_checkBatchHashMismatch`
+    /// passes and the authentication check is the only thing standing between a fabricated witness
+    /// and a derived commitment.
+    function test_witnessMustReopenTheStoredCommitment() public {
+        _installAcceptingGate();
+        vm.store(address(executor), _airbenderCommitmentSlot(0), Utils.randomBytes32("seededGenesisAirbender"));
+
+        AirbenderProofWitnesses memory airbender;
+        airbender.proved = new AirbenderCommitmentWitness[](1);
+        airbender.proved[0] = provedWitness;
+        // Pinned by the authentication check, so perturbing it must be caught.
+        airbender.proved[0].stateDiffHash = bytes32(uint256(provedWitness.stateDiffHash) ^ 1);
+
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
+        batches[0] = newStoredBatchInfo;
+
+        vm.expectPartialRevert(AirbenderCommitment.CommitmentWitnessMismatch.selector);
+        _proveWithWitnesses(batches, proof_(), airbender);
+    }
+
+    /// The value the Airbender lane actually receives — not merely that two words were passed.
+    /// Asserts the recorded `prev` and the derived `curr` in that order, so transposing the operands
+    /// of `keccak(prev | curr)`, or routing the Boojum word to this lane, fails here.
+    function test_airbenderLaneReceivesTheChainedTransitionHash() public {
+        bytes32 seed = Utils.randomBytes32("seededGenesisAirbender");
+        vm.store(address(executor), _airbenderCommitmentSlot(0), seed);
+
+        // Boojum accepts; the Airbender lane reports back exactly what it was handed.
+        EraMultiProofVerifier gate = new EraMultiProofVerifier(
+            IVerifier(address(new AcceptingLane())),
+            IVerifier(address(new PublicInputRevealingVerifier()))
+        );
+        vm.etch(getters.getVerifier(), address(gate).code);
+
+        bytes32 currentAirbenderCommitment = AirbenderCommitment.deriveAirbenderCommitment(
+            provedWitness,
+            newStoredBatchInfo
+        );
+        uint256 expected = uint256(keccak256(abi.encodePacked(seed, currentAirbenderCommitment)));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(PublicInputRevealingVerifier.RevealedPublicInput.selector, expected, uint256(0))
+        );
+        _proveWith(_gateProof());
+    }
+
+    /// A batch number is reused after `_revertBatches`, so an entry recorded for a batch that is
+    /// later reverted must not be readable as the predecessor of whatever replaces it — otherwise
+    /// the replacement's successor is handed a `prev` no proof can satisfy, with no way to clear it.
+    ///
+    /// @dev Re-committing a batch overwrites its `storedBatchHashes` entry; that overwrite is what
+    /// is simulated here. `storedBatchHashes` is slot 14 per its declaration — if that were wrong
+    /// the lookup would be unchanged and the assertion would fail, so this self-checks.
+    function test_revertedBatchCommitmentIsNotReadBackForItsReplacement() public {
+        _installAcceptingGate();
+        vm.store(address(executor), _airbenderCommitmentSlot(0), Utils.randomBytes32("seededGenesisAirbender"));
+        _proveWith(_gateProof());
+
+        assertTrue(getters.airbenderCommitment(1) != bytes32(0), "the verified batch must be recorded");
+
+        vm.store(
+            address(executor),
+            keccak256(abi.encode(uint256(1), uint256(14))),
+            Utils.randomBytes32("replacementBatchOne")
+        );
+
+        assertEq(
+            getters.airbenderCommitment(1),
+            bytes32(0),
+            "a replacement batch must not inherit the reverted batch's Airbender commitment"
+        );
+    }
+
+    /// Only the first proved-batch witness is ever read, so more than one would be accepted and
+    /// silently ignored.
+    function test_multipleProvedWitnessesAreRefused() public {
+        _installAcceptingGate();
+        vm.store(address(executor), _airbenderCommitmentSlot(0), Utils.randomBytes32("seededGenesisAirbender"));
+
+        AirbenderProofWitnesses memory airbender;
+        airbender.proved = new AirbenderCommitmentWitness[](2);
+        airbender.proved[0] = provedWitness;
+        airbender.proved[1] = provedWitness;
+
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
+        batches[0] = newStoredBatchInfo;
+
+        vm.expectPartialRevert(AirbenderProvedWitnessCountInvalid.selector);
+        _proveWithWitnesses(batches, proof_(), airbender);
+    }
+
+    /// Era proves one batch per call. The guard moved out of `_verifyProof` when the public input
+    /// array stopped being one entry per batch, so it needs coverage in its new home.
+    function test_oneBatchPerProveIsEnforced() public {
+        _installAcceptingGate();
+        vm.store(address(executor), _airbenderCommitmentSlot(0), Utils.randomBytes32("seededGenesisAirbender"));
+
+        AirbenderProofWitnesses memory airbender;
+        airbender.proved = new AirbenderCommitmentWitness[](1);
+        airbender.proved[0] = provedWitness;
+
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](2);
+        batches[0] = newStoredBatchInfo;
+        batches[1] = newStoredBatchInfo;
+        batches[1].batchNumber = 2;
+
+        vm.expectRevert(CanOnlyProcessOneBatch.selector);
+        _proveWithWitnesses(batches, proof_(), airbender);
+    }
+
     /// The lane's chain only holds values the lane itself established. With Airbender switched off
     /// the gate verifies nothing against the derived commitment, so it must not be recorded — the
     /// next transition after the lane comes back seeds afresh instead.
@@ -534,8 +647,10 @@ contract ProvingTest is ExecutorTest {
     /// `test_airbenderCommitmentIsRecordedAtTheDeclaredSlot`.
     uint256 internal constant AIRBENDER_COMMITMENTS_SLOT = 69;
 
-    function _airbenderCommitmentSlot(uint256 _batchNumber) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_batchNumber, AIRBENDER_COMMITMENTS_SLOT));
+    /// @dev Keyed by the batch's stored hash, so a reverted batch's entry cannot be read back for
+    /// whatever later occupies its number.
+    function _airbenderCommitmentSlot(uint256 _batchNumber) internal view returns (bytes32) {
+        return keccak256(abi.encode(getters.storedBatchHash(_batchNumber), AIRBENDER_COMMITMENTS_SLOT));
     }
 
     function _proveWith(uint256[] memory _proof) internal {

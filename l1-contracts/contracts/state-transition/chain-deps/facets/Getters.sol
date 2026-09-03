@@ -226,7 +226,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function airbenderCommitment(uint256 _batchNumber) external view returns (bytes32) {
-        return s.airbenderCommitments[_batchNumber];
+        return s.airbenderCommitments[s.storedBatchHashes[_batchNumber]];
     }
 
     /// @inheritdoc IGetters

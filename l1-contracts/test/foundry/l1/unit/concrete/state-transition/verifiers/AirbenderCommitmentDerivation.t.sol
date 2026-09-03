@@ -19,7 +19,13 @@ import {AirbenderCommitment} from "contracts/state-transition/libraries/Airbende
 /// - `zksync_airbender_verifier`'s `tests/l1_derivation_fixture.rs`, which checks the pass-through
 ///   hash against the guest's own `compute_pass_through_data_hash`.
 ///
-/// So every expected value here is produced by the code the guest actually runs, not re-derived.
+/// What that anchors, precisely: the pass-through hash, metadata hash, auxiliary output hash and
+/// stored commitment come from a recorded real batch, so the layout and composition are pinned
+/// against an external source. The Airbender and bootstrap commitments are the same composition
+/// with the two divergent words substituted — the substitution rule itself is defined by this
+/// change, so those two carry no independent information beyond the layout the others already fix.
+/// The generators live in `eravm-airbender-verifier` and are not yet committed there, so the chain
+/// of custody is not reproducible from this repo alone.
 ///
 /// This is the test whose absence let the shared-public-input blocker through: the guest's
 /// `test_proof_public_input_matches_l1_shift` pins only the shift and the wrapper packing, over

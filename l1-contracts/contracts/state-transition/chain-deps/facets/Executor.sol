@@ -15,6 +15,7 @@ import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.s
 import {
     AirbenderBootstrapWitnessNotExpected,
     AirbenderBootstrapWitnessRequired,
+    AirbenderProvedWitnessCountInvalid,
     AirbenderWitnessNotSupportedOnZKsyncOS,
     CanOnlyProcessOneBatch,
     CantExecuteUnprovenBatches,
@@ -251,7 +252,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         ) = BatchDecoder.decodeAndCheckProofData(_proofData, _processBatchFrom, _processBatchTo);
 
         bool airbenderLane = airbender.proved.length != 0;
-        if (airbenderLane && s.zksyncOS) {
+        // Only `[0]` is ever read, so anything beyond it would be accepted and ignored.
+        if (airbenderLane && airbender.proved.length != 1) {
+            revert AirbenderProvedWitnessCountInvalid(airbender.proved.length);
+        }
+        // Keyed off either array, so a ZKsync OS caller cannot slip witnesses past this by sending
+        // only the bootstrap one.
+        if ((airbenderLane || airbender.bootstrap.length != 0) && s.zksyncOS) {
             revert AirbenderWitnessNotSupportedOnZKsyncOS();
         }
 
@@ -310,13 +317,16 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         _verifyProof(proofPublicInput, proof);
 
-        // Recorded only once a proof has established it, and only if the lane actually ran: with the
+        // Recorded once the verifier has accepted, and only if the lane is enabled: with the
         // lane switched off the gate verifies nothing against this value, so recording it would put
         // an unattested entry into the chain. Leaving the gap unrecorded means the next transition
         // after the lane is switched back on seeds afresh, which is what an absent attestation
         // should cost.
+        // On a testnet gate this is weaker than it reads: `EraMultiProofTestnetVerifier` accepts an
+        // empty proof before either lane runs, so an entry can be recorded that no Airbender proof
+        // constrained. That is the existing testnet escape hatch, not a property of this chain.
         if (airbenderLane && s.disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
-            s.airbenderCommitments[committedBatches[0].batchNumber] = provedAirbenderCommitment;
+            s.airbenderCommitments[s.storedBatchHashes[committedBatches[0].batchNumber]] = provedAirbenderCommitment;
         }
 
         emit BlocksVerification(s.totalBatchesVerified, currentTotalBatchesVerified);
@@ -356,11 +366,16 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @dev The `prev` end of the Airbender transition: the commitment recorded when the previous
     /// batch was verified, or — on the transition that seeds the chain — one derived from that
     /// batch's own witness.
+    /// @dev Keyed by the batch's stored hash rather than its number. A batch number is reused after
+    /// `_revertBatches`, so keying on it would let a reverted batch's commitment be read back as the
+    /// predecessor of a different batch that later takes the same number — unprovable, and with no
+    /// way to clear the entry. The stored hash changes when a batch is re-committed, so the
+    /// replacement reads `0` and seeds afresh.
     function _previousAirbenderCommitment(
         StoredBatchInfo memory _prevBatch,
         AirbenderProofWitnesses memory _airbender
     ) internal view returns (bytes32) {
-        bytes32 recorded = s.airbenderCommitments[_prevBatch.batchNumber];
+        bytes32 recorded = s.airbenderCommitments[s.storedBatchHashes[_prevBatch.batchNumber]];
         if (recorded != bytes32(0)) {
             // A bootstrap witness here would be silently ignored, so refuse it rather than let the
             // operator believe it had any effect.
