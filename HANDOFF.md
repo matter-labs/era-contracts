@@ -120,7 +120,7 @@ after. Design note with rejected alternatives: `protocol-docs/upgrade-scheduling
 
 `ServerNotifier.setUpgradeTimestamp` — the call that schedules a chain upgrade and arms the
 validator execution path — now consults a pluggable, per-protocol-version precondition checker, so
-release-specific prerequisites fail at *scheduling* time with the same error they would produce at
+release-specific prerequisites fail at _scheduling_ time with the same error they would produce at
 execution time.
 
 - `IUpgradePreconditionChecker` (magic value + reverting `checkUpgradePreconditions` +
