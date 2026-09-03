@@ -143,7 +143,12 @@ jobs:
 
       - name: Run anvil
         run: |
-          anvil --silent &
+          # 100M block gas limit (same as the anvil-interop harness): forge broadcasts deploy
+          # batches whose combined gas exceeds the 30M default, and anvil's automine only mines
+          # on tx arrival — a tx deferred past a full block is never picked up again while forge
+          # waits on its receipt, deadlocking the job. Mixed mining adds a 1s interval tick that
+          # sweeps up any remainder, so the deadlock is impossible even if a batch outgrows 100M.
+          anvil --silent --gas-limit 100000000 --mixed-mining --block-time 1 &
 
           ANVIL_READY=0
           for i in {1..10}; do
