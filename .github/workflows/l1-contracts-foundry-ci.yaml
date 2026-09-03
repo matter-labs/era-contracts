@@ -109,6 +109,9 @@ jobs:
   scripts:
     runs-on: ubuntu-latest
     needs: build
+    # The deploy scripts occasionally wedge waiting on a receipt (see the anvil step); a healthy
+    # run finishes well under 15 minutes, so bound the damage instead of holding a runner for 6h.
+    timeout-minutes: 30
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
@@ -147,8 +150,11 @@ jobs:
           # batches whose combined gas exceeds the 30M default, and anvil's automine only mines
           # on tx arrival — a tx deferred past a full block is never picked up again while forge
           # waits on its receipt, deadlocking the job. Mixed mining adds a 1s interval tick that
-          # sweeps up any remainder, so the deadlock is impossible even if a batch outgrows 100M.
-          anvil --silent --gas-limit 100000000 --mixed-mining --block-time 1 &
+          # sweeps up any remainder. Forge's receipt watcher has also been observed wedging on
+          # its own (broadcast stalls after "Script ran successfully" with mining healthy), which
+          # no mining strategy cures — hence the job timeout, and the anvil log kept as an
+          # artifact so a wedged run shows whether blocks were still being produced.
+          anvil --gas-limit 100000000 --mixed-mining --block-time 1 > anvil.log 2>&1 &
 
           ANVIL_READY=0
           for i in {1..10}; do
@@ -205,6 +211,13 @@ jobs:
       - name: Run DeployErc20 script
         working-directory: ./l1-contracts
         run: forge script ./deploy-scripts/tokens/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+
+      - name: Upload anvil log
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scripts-job-anvil-log
+          path: anvil.log
 # TODO restore scripts verification
 #      - name: Run RegisterZKChain script
 #        working-directory: ./l1-contracts
