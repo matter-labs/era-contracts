@@ -61,12 +61,7 @@ mod core_signatures {
             );
         }
         contract V31L1Nullifier {
-            constructor(
-                address _bridgehub,
-                address _messageRoot,
-                uint256 _eraChainId,
-                address _eraDiamondProxy
-            );
+            constructor(address _bridgehub, address _messageRoot);
         }
         contract V31L1MessageRoot {
             constructor(address _bridgehub, uint256 _eraGatewayChainId, address _chainAssetHandler);
@@ -473,20 +468,6 @@ pub(crate) async fn verify_v31_provenance(
         .await
         .unwrap_or_else(|err| panic!("Failed to call L1AssetRouter.nativeTokenVault(): {err}"));
 
-    // The era_chain_id-dependent constructors (L1AssetRouter / L1Nullifier)
-    // require both the chain id and the chain's diamond proxy. The env provides
-    // era_chain_id; the diamond proxy must resolve from Bridgehub.
-    let era_diamond_proxy = verifiers
-        .network_verifier
-        .try_get_chain_diamond_from_bridgehub(bridgehub_addr, U256::from(era_chain_id))
-        .await
-        .unwrap_or_else(|err| {
-            panic!("Failed to call Bridgehub.getZKChain({era_chain_id}) for provenance: {err}")
-        });
-    if era_diamond_proxy == Address::ZERO {
-        panic!("Bridgehub.getZKChain({era_chain_id}) returned address(0) for provenance");
-    }
-
     let governance = bridgehub
         .owner()
         .call()
@@ -499,13 +480,11 @@ pub(crate) async fn verify_v31_provenance(
         weth,
         nullifier,
         ntv_proxy,
-        era_diamond_proxy,
         governance,
     };
     verify_core_provenance(
         artifact,
         verifiers,
-        era_chain_id,
         legacy_gateway_chain_id,
         result,
         core_context,
@@ -794,14 +773,12 @@ struct CoreProvenanceContext {
     weth: Address,
     nullifier: Address,
     ntv_proxy: Address,
-    era_diamond_proxy: Address,
     governance: Address,
 }
 
 async fn verify_core_provenance(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
-    era_chain_id: u64,
     legacy_gateway_chain_id: u64,
     result: &mut VerificationResult,
     context: CoreProvenanceContext,
@@ -902,22 +879,20 @@ async fn verify_core_provenance(
                 context.weth,
                 context.bridgehub_addr,
                 context.nullifier,
-                U256::from(era_chain_id),
-                context.era_diamond_proxy,
+                // The deploy scripts pass ERA_CHAIN_ID_UNUSED / ERA_DIAMOND_PROXY_UNUSED
+                // (deploy-scripts/utils/Types.sol): nothing this release line deploys has an
+                // Era chain, so generated packages record zero for both words.
+                U256::ZERO,
+                Address::ZERO,
             ))
             .abi_encode(),
             "l1-contracts/L1AssetRouter",
         ),
-        // L1Nullifier impl(bridgehub, messageRoot, eraChainId, eraDiamondProxy).
+        // L1Nullifier impl(bridgehub, messageRoot).
         (
             nullifier_impl,
-            V31L1Nullifier::constructorCall::new((
-                context.bridgehub_addr,
-                message_root_proxy,
-                U256::from(era_chain_id),
-                context.era_diamond_proxy,
-            ))
-            .abi_encode(),
+            V31L1Nullifier::constructorCall::new((context.bridgehub_addr, message_root_proxy))
+                .abi_encode(),
             "l1-contracts/L1Nullifier",
         ),
         // L1Bridgehub impl(_owner=governance, _maxNumberOfZKChains).
@@ -1838,6 +1813,27 @@ mod tests {
             GatewayCTMDeployerConfig::eip712_root_type().as_ref(),
             solidity_signature.as_str(),
             "protocol-ops GatewayCTMDeployerConfig must follow the canonical Solidity fields"
+        );
+    }
+
+    // The L1Nullifier mirror drifted when the constructor dropped its Era arguments (the Rust side
+    // kept encoding four words against the two the deploy scripts record); pin the mirror's
+    // parameter list to the Solidity constructor.
+    #[test]
+    fn l1_nullifier_constructor_matches_solidity_source() {
+        let solidity_source =
+            include_str!("../../../../../../l1-contracts/contracts/bridge/L1Nullifier.sol");
+        let params = solidity_source
+            .split_once("constructor(")
+            .expect("L1Nullifier constructor must exist")
+            .1
+            .split_once(')')
+            .expect("constructor parameter list must be closed")
+            .0;
+        assert_eq!(
+            params.trim(),
+            "IL1Bridgehub _bridgehub, IMessageRootBase _messageRoot",
+            "protocol-ops V31L1Nullifier must follow L1Nullifier's constructor"
         );
     }
 }
