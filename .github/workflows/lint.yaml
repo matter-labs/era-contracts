@@ -52,6 +52,7 @@ jobs:
           components: rustfmt
 
       - name: Check formatting
+        # `+1.91.1` overrides crate-local rust-toolchain.toml files.
         run: cargo +1.91.1 fmt --check
         working-directory: ${{ matrix.working-directory }}
 

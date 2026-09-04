@@ -152,8 +152,9 @@ yarn l1 errors-lint --check
 For Rust:
 
 ```bash
+# `+1.91.1` overrides crate-local nightly toolchains to match CI.
 for dir in protocol-ops tools/{upgrade-readiness-checker,verifier-gen,wallets-gen,zksync-os-genesis-gen}; do
-  (cd "$dir" && cargo +1.91.1 fmt --check)  # nightly disagrees with CI on edge cases
+  (cd "$dir" && cargo +1.91.1 fmt --check)
 done
 (cd protocol-ops && cargo clippy --all-targets -- -D warnings)
 ```
@@ -280,6 +281,7 @@ yarn lint:sol --fix --noPrompt
 yarn lint:ts --fix
 yarn prettier:fix
 yarn l1 errors-lint --check
+# `+1.91.1` overrides crate-local nightly toolchains to match CI.
 for dir in protocol-ops tools/{upgrade-readiness-checker,verifier-gen,wallets-gen,zksync-os-genesis-gen}; do
   (cd "$dir" && cargo +1.91.1 fmt --check)
 done
