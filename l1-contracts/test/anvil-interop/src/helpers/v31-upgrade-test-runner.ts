@@ -920,8 +920,9 @@ async function deployL2Contracts(
   forceDeployEntries: ForceDeployEntry[],
   delegateTo: string
 ): Promise<void> {
-  // MockContractDeployer: no-op fallback at ContractDeployer address so that
-  // forceDeployEra() and conductContractUpgrade() calls succeed silently.
+  // MockContractDeployer: typed no-op `setBytecodeDetailsEVM` at the ContractDeployer address so
+  // conductContractUpgrade() calls succeed. It implements the production IZKOSContractDeployer
+  // interface and has no fallback, so any call with a stale or unexpected selector reverts loudly.
   await l2Provider.send("anvil_setCode", [L2_CONTRACT_DEPLOYER_ADDR, getBytecode("MockContractDeployer")]);
 
   // SystemContractProxyAdmin: _setupProxyAdmin() calls owner() and forceSetOwner().

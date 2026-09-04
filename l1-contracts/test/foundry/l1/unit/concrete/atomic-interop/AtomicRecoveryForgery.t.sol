@@ -77,7 +77,6 @@ contract MockRecoveringNativeTokenVault {
 /// suite) since the gate under test is at recovery.
 contract AtomicRecoveryForgeryTest is Test {
     uint256 internal constant L1_CHAIN_ID = 1;
-    uint256 internal constant ERA_CHAIN_ID = 271;
 
     AtomicFlowManagerRecoveryHarness internal manager;
     MockRecoveringNativeTokenVault internal ntv;
@@ -285,7 +284,6 @@ contract AtomicRecoveryForgeryTest is Test {
         // solhint-disable-next-line func-named-parameters
         router.updateL2(
             L1_CHAIN_ID,
-            ERA_CHAIN_ID,
             IL1AssetRouter(makeAddr("l1 asset router")),
             keccak256("base token asset id"),
             makeAddr("aliased owner")

@@ -61,6 +61,21 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
         working-directory: protocol-ops
 
+  protocol-ops-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.91.1
+
+      # Clippy compiles the tests but never executes them; the source-sync mirror guards
+      # (gateway config, L1Nullifier constructor) only bite when their assertions run.
+      - name: Run tests
+        run: cargo test --all-targets
+        working-directory: protocol-ops
+
   typos:
     runs-on: ubuntu-latest
     steps:

@@ -126,7 +126,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](33);
+        bytes4[] memory selectors = new bytes4[](30);
         uint256 i = 0;
         selectors[i++] = getters.getVerifier.selector;
         selectors[i++] = getters.getAdmin.selector;
@@ -141,9 +141,6 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = getters.isValidator.selector;
         selectors[i++] = getters.l2LogsRootHash.selector;
         selectors[i++] = getters.storedBatchHash.selector;
-        selectors[i++] = getters.getL2BootloaderBytecodeHash.selector;
-        selectors[i++] = getters.getL2DefaultAccountBytecodeHash.selector;
-        selectors[i++] = getters.getL2EvmEmulatorBytecodeHash.selector;
         selectors[i++] = getters.getVerifierParams.selector;
         selectors[i++] = getters.isDiamondStorageFrozen.selector;
         selectors[i++] = getters.getPriorityTxMaxGasLimit.selector;
@@ -292,8 +289,6 @@ contract ExecutorTest is UtilsCallMockerTest {
         );
         validatorTimelock = ValidatorTimelock(deployValidatorTimelock(address(dummyBridgehub), owner, 0));
 
-        bytes8 dummyHash = 0x1234567890123456;
-
         genesisStoredBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: 0,
             batchHash: bytes32(""),
@@ -316,11 +311,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             admin: owner,
             validatorTimelock: address(validatorTimelock),
             baseTokenAssetId: baseTokenAssetId,
-            storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
-            // verifier is fetched from CTM
-            l2BootloaderBytecodeHash: dummyHash,
-            l2DefaultAccountBytecodeHash: dummyHash,
-            l2EvmEmulatorBytecodeHash: dummyHash
+            storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo))
         });
         mockDiamondInitInteropCenterCallsWithAddress(
             address(dummyBridgehub),

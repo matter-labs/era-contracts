@@ -24,7 +24,6 @@ import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Commi
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {
     IChainTypeManager,
@@ -236,14 +235,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
-        initializeData.l2BootloaderBytecodeHash = bytes32(0);
-        initializeData.l2DefaultAccountBytecodeHash = bytes32(0);
-        initializeData.l2EvmEmulatorBytecodeHash = bytes32(0);
-
-        bytes memory initCalldata = abi.encode(initializeData);
-
-        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
+        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: hex""});
     }
 
     function getDiamondCutDataWithCustomFacets(

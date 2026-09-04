@@ -150,21 +150,6 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getL2BootloaderBytecodeHash() external view returns (bytes32) {
-        return s.l2BootloaderBytecodeHash;
-    }
-
-    /// @inheritdoc IGetters
-    function getL2DefaultAccountBytecodeHash() external view returns (bytes32) {
-        return s.l2DefaultAccountBytecodeHash;
-    }
-
-    /// @inheritdoc IGetters
-    function getL2EvmEmulatorBytecodeHash() external view returns (bytes32) {
-        return s.l2EvmEmulatorBytecodeHash;
-    }
-
-    /// @inheritdoc IGetters
     function getVerifierParams() external view returns (VerifierParams memory) {
         return s.__DEPRECATED_verifierParams;
     }

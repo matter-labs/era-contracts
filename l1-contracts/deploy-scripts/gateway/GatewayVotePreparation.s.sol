@@ -103,11 +103,10 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         setAddressesBasedOnBridgehub(ctmRepresentativeChainId, bridgehubProxy);
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
-        // TODO: drop `eraChainId` and `isZKsyncOS` from `GatewayCTMDeployerConfig` in the next
-        // release. Neither is read by any audited contract — the `eraChainId` that reaches
-        // `MailboxFacet` on Gateway travels in script-computed creation code — but the struct is
-        // declared in the frozen `gateway-ctm-deployer/GatewayCTMDeployer.sol`, so removing the
-        // fields here would modify audited code.
+        // TODO: drop `isZKsyncOS` from `GatewayCTMDeployerConfig` in the next release — this
+        // OS-only line no longer needs the flag, but the deployed gateway deployers still assert
+        // it (`GatewayCTMDeployerVerifiersZKsyncOS` / `GatewayCTMDeployerCTMZKsyncOS`), so
+        // removing it means touching those contracts.
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: aliasedGovernor,
             salt: toml.readBytes32("$.contracts.create2_factory_salt"),
@@ -121,12 +120,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
             migratorSelectors: Utils.getAllSelectorsForFacet("Migrator"),
             committerSelectors: Utils.getAllSelectorsForFacet("Committer"),
-            // ZKsync OS has no bootloader, default-account or EVM-emulator bytecode.
-            // TODO: drop `eraChainId` and `isZKsyncOS` from `GatewayCTMDeployerConfig` in the next
-            // release — the struct lives in the frozen contract tree, so not here.
-            bootloaderHash: bytes32(0),
-            defaultAccountHash: bytes32(0),
-            evmEmulatorHash: bytes32(0),
             genesisRoot: config.contracts.chainCreationParams.genesisRoot,
             genesisRollupLeafIndex: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,

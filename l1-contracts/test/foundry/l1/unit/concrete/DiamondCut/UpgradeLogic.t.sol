@@ -95,16 +95,8 @@ contract UpgradeLogicTest is DiamondCutTest {
             admin: admin,
             validatorTimelock: makeAddr("validatorTimelock"),
             baseTokenAssetId: baseTokenAssetId,
-            storedBatchZero: bytes32(0),
-            // genesisBatchHash: 0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
-            // genesisIndexRepeatedStorageChanges: 0,
-            // genesisBatchCommitment: bytes32(0),
-            // zkPorterIsAvailable: false,
-            l2BootloaderBytecodeHash: bytes32(0),
-            l2DefaultAccountBytecodeHash: bytes32(0),
-            l2EvmEmulatorBytecodeHash: bytes32(0)
+            storedBatchZero: bytes32(0)
         });
-        // initialProtocolVersion: 0,
 
         bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 

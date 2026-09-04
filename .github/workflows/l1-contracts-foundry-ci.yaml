@@ -109,6 +109,9 @@ jobs:
   scripts:
     runs-on: ubuntu-latest
     needs: build
+    # Keep a stalled receipt wait from holding a runner for 6h; a healthy run finishes well under
+    # 15 minutes.
+    timeout-minutes: 30
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
@@ -143,7 +146,7 @@ jobs:
 
       - name: Run anvil
         run: |
-          anvil --silent &
+          anvil > anvil.log 2>&1 &
 
           ANVIL_READY=0
           for i in {1..10}; do
@@ -165,7 +168,7 @@ jobs:
       - name: Run DeployL1CoreContracts script
         working-directory: ./l1-contracts
         # First we need to deploy the ecosystem contracts
-        run: forge script ./deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY --skip '*/l1-contracts/contracts/*'
+        run: forge script ./deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --slow --private-key $ANVIL_PRIVATE_KEY --skip '*/l1-contracts/contracts/*'
 
       - name: Read bridgehub proxy address
         id: read-bridgehub
@@ -193,13 +196,21 @@ jobs:
             --ffi \
             --rpc-url $ANVIL_RPC_URL \
             --broadcast \
+            --slow \
             --private-key $ANVIL_PRIVATE_KEY \
             --sig "runWithBridgehub(address,bool)" $BRIDGEHUB "false" \
             --skip '*/l1-contracts/contracts/*'
 
       - name: Run DeployErc20 script
         working-directory: ./l1-contracts
-        run: forge script ./deploy-scripts/tokens/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+        run: forge script ./deploy-scripts/tokens/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --slow --private-key $ANVIL_PRIVATE_KEY
+
+      - name: Upload anvil log
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scripts-job-anvil-log
+          path: anvil.log
 # TODO restore scripts verification
 #      - name: Run RegisterZKChain script
 #        working-directory: ./l1-contracts

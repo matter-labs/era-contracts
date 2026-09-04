@@ -18,7 +18,6 @@ import {
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {
     ChainCreationParams,
     ChainTypeManagerInitializeData,
@@ -606,15 +605,10 @@ library GatewayCTMDeployerHelper {
             isFreezable: true,
             selectors: baseConfig.committerSelectors
         });
-        DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
-            l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
-        });
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: facets.diamondInit,
-            initCalldata: abi.encode(initializeData)
+            initCalldata: hex""
         });
         return abi.encode(diamondCut);
     }

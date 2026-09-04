@@ -129,6 +129,8 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
         );
         assertEq(etchedProxyAdmin.upgradeCallCount(), 0);
+
+        _assertAssetRouterInitialized({_viaInitL2: true});
     }
 
     function testZKsyncOSSystemProxyUpgrade_NonGenesis() public {
@@ -183,6 +185,8 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // The upgrade path initializes the atomic-interop built-ins, so an upgraded chain ends up with the
         // same state a fresh one gets from genesis.
         _assertAtomicInteropInitialized();
+
+        _assertAssetRouterInitialized({_viaInitL2: false});
 
         // Note: no ZKsync OS chain can arrive here with the built-ins already seeded — neither they nor
         // their addresses existed in v31 — so the initialization is unconditional and one-shot.
@@ -252,7 +256,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     function _createFixedForceDeploymentsData(bool isGenesis) internal returns (FixedForceDeploymentsData memory) {
         FixedForceDeploymentsData memory data;
         data.l1ChainId = L1_CHAIN_ID;
-        data.eraChainId = ERA_CHAIN_ID;
         data.aliasedL1Governance = aliasedL1GovernanceAddress;
         data.maxNumberOfZKChains = MAX_ZK_CHAINS;
         data.l1AssetRouter = l1AssetRouterAddress;
@@ -313,7 +316,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     function _createEraFixedForceDeploymentsData() internal returns (FixedForceDeploymentsData memory) {
         FixedForceDeploymentsData memory data;
         data.l1ChainId = L1_CHAIN_ID;
-        data.eraChainId = ERA_CHAIN_ID;
         data.aliasedL1Governance = aliasedL1GovernanceAddress;
         data.maxNumberOfZKChains = MAX_ZK_CHAINS;
         data.l1AssetRouter = l1AssetRouterAddress;
@@ -332,6 +334,19 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         data.zkTokenAssetId = DataEncoding.encodeNTVAssetId(ERA_CHAIN_ID, makeAddr("zkToken"));
 
         return data;
+    }
+
+    /// @dev Asserts the L2AssetRouter mock received the current-signature init/update call with the
+    /// fixture's arguments; without explicit handlers a calldata regression would silently succeed
+    /// through the mock's permissive fallback.
+    function _assertAssetRouterInitialized(bool _viaInitL2) internal view {
+        MockContract router = MockContract(payable(L2_ASSET_ROUTER_ADDR));
+        assertEq(router.assetRouterInitL2Calls(), _viaInitL2 ? 1 : 0);
+        assertEq(router.assetRouterUpdateL2Calls(), _viaInitL2 ? 0 : 1);
+        assertEq(router.assetRouterL1ChainId(), L1_CHAIN_ID);
+        assertEq(router.assetRouterL1AssetRouter(), l1AssetRouterAddress);
+        assertEq(router.assetRouterBaseTokenAssetId(), keccak256("baseTokenAsset"));
+        assertEq(router.assetRouterAliasedOwner(), aliasedL1GovernanceAddress);
     }
 
     function _createAdditionalForceDeploymentsData()
@@ -544,8 +559,46 @@ contract MockContract {
     // L2ChainAssetHandler.initL2 (constants are resolved internally)
     function initL2(uint256, address) external {}
 
-    // L2AssetRouter.updateL2
-    function updateL2(uint256, uint256, address, bytes32, address) external {}
+    // L2AssetRouter.initL2 / updateL2 (current signatures); arguments are recorded so the tests
+    // can assert the generated router calldata instead of relying on the permissive fallback.
+    uint256 public assetRouterInitL2Calls;
+    uint256 public assetRouterUpdateL2Calls;
+    uint256 public assetRouterL1ChainId;
+    address public assetRouterL1AssetRouter;
+    bytes32 public assetRouterBaseTokenAssetId;
+    address public assetRouterAliasedOwner;
+
+    function initL2(
+        uint256 _l1ChainId,
+        address _l1AssetRouter,
+        bytes32 _baseTokenAssetId,
+        address _aliasedOwner
+    ) external {
+        ++assetRouterInitL2Calls;
+        _recordAssetRouterArgs(_l1ChainId, _l1AssetRouter, _baseTokenAssetId, _aliasedOwner);
+    }
+
+    function updateL2(
+        uint256 _l1ChainId,
+        address _l1AssetRouter,
+        bytes32 _baseTokenAssetId,
+        address _aliasedOwner
+    ) external {
+        ++assetRouterUpdateL2Calls;
+        _recordAssetRouterArgs(_l1ChainId, _l1AssetRouter, _baseTokenAssetId, _aliasedOwner);
+    }
+
+    function _recordAssetRouterArgs(
+        uint256 _l1ChainId,
+        address _l1AssetRouter,
+        bytes32 _baseTokenAssetId,
+        address _aliasedOwner
+    ) private {
+        assetRouterL1ChainId = _l1ChainId;
+        assetRouterL1AssetRouter = _l1AssetRouter;
+        assetRouterBaseTokenAssetId = _baseTokenAssetId;
+        assetRouterAliasedOwner = _aliasedOwner;
+    }
 
     // L2NativeTokenVault.updateL2
     function updateL2(

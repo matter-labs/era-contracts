@@ -57,30 +57,6 @@ contract UtilsFacet is ZKChainBase {
         return s.__DEPRECATED_verifierParams;
     }
 
-    function util_setL2BootloaderBytecodeHash(bytes32 _l2BootloaderBytecodeHash) external {
-        s.l2BootloaderBytecodeHash = _l2BootloaderBytecodeHash;
-    }
-
-    function util_getL2BootloaderBytecodeHash() external view returns (bytes32) {
-        return s.l2BootloaderBytecodeHash;
-    }
-
-    function util_setL2DefaultAccountBytecodeHash(bytes32 _l2DefaultAccountBytecodeHash) external {
-        s.l2DefaultAccountBytecodeHash = _l2DefaultAccountBytecodeHash;
-    }
-
-    function util_getL2DefaultAccountBytecodeHash() external view returns (bytes32) {
-        return s.l2DefaultAccountBytecodeHash;
-    }
-
-    function util_setL2EvmEmulatorBytecodeHash(bytes32 _l2EvmEmulatorBytecodeHash) external {
-        s.l2EvmEmulatorBytecodeHash = _l2EvmEmulatorBytecodeHash;
-    }
-
-    function util_getL2EvmEmulatorBytecodeHash() external view returns (bytes32) {
-        return s.l2EvmEmulatorBytecodeHash;
-    }
-
     function util_setPendingAdmin(address _pendingAdmin) external {
         s.pendingAdmin = _pendingAdmin;
     }
