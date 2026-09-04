@@ -288,3 +288,8 @@ uint256 constant PACKED_NUMBER_OF_L1_TRANSACTIONS_LOG_MASK = 0xfffffffffffffffff
 
 /// @dev Bit offset for extracting the upper 128 bits (L2 tx count) from the packed log value.
 uint256 constant PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS = 128;
+
+/// @dev The maximal execution delay configurable in the `ValidatorTimelock`.
+/// @dev Footgun prevention only, not a trust guarantee: governance can upgrade the timelock, and outside
+/// stage 1 a chain admin can revoke the validator roles and stall execution anyway.
+uint32 constant MAX_VALIDATOR_TIMELOCK_EXECUTION_DELAY = 7 days;
