@@ -178,11 +178,11 @@ function dockerRun(args: string[], opts: SpawnSyncOptions = {}): number {
 
 function cmdRegen(pk: string, rpc: string, binMount: string[]): number {
   // Forward any iteration-skip flags the wrapper script understands. Useful
-  // for re-running just PUVT (`SKIP_PREPARE=1 SKIP_BROADCAST=1`) after
+  // for re-running just PUVT (`SKIP_PREPARE=1 SKIP_REHEARSAL=1`) after
   // refreshing only the protocol_ops binary, or skipping PUVT for fast
   // iteration on the sim layer.
   const passthrough: string[] = [];
-  for (const k of ["SKIP_PREPARE", "SKIP_BROADCAST", "SKIP_PUVT", "KEEP_ANVIL"]) {
+  for (const k of ["SKIP_PREPARE", "SKIP_REHEARSAL", "SKIP_PUVT", "KEEP_ANVIL"]) {
     if (process.env[k]) {
       passthrough.push("-e", `${k}=${process.env[k]}`);
     }
@@ -206,7 +206,7 @@ function cmdRegen(pk: string, rpc: string, binMount: string[]): number {
     "/contracts/l1-contracts",
     IMAGE,
     "bash",
-    "test/anvil-interop/regen-and-verify-stage.sh",
+    "test/anvil-interop/regen-upgrade-calldata.sh",
   ];
   return dockerRun(args);
 }
@@ -566,7 +566,7 @@ async function main(): Promise<void> {
         "",
         "  # phases 1 + 1.5 — prepare + fork-replay + PUVT",
         "  cd l1-contracts/test/anvil-interop && \\",
-        "    DEPLOYER_PK_FILE=~/.test_pk L1_FORK_URL=<sepolia-rpc> ./regen-and-verify-stage.sh",
+        "    DEPLOYER_PK_FILE=~/.test_pk L1_FORK_URL=<sepolia-rpc> ./regen-upgrade-calldata.sh stage",
         "",
         "  # phase 2 — real-Sepolia broadcast",
         "  protocol_ops ecosystem upgrade-broadcast --manifest <prepare>/manifest.json \\",

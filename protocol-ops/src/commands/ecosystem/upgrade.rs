@@ -555,7 +555,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // works on a fork via `anvil_impersonateAccount`; on a real chain
         // nobody can sign as that contract. The caller must pass
         // `--deployer-address <real-EOA>` (or derive it from the broadcast
-        // signer's private key — see `regen-and-verify-stage.sh` for an
+        // signer's private key — see `regen-upgrade-calldata.sh` for an
         // example using `cast wallet address`).
         // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly.
         //

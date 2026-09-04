@@ -77,7 +77,7 @@ the deploys must exist on real Sepolia first or the rehearsal reverts.
 2. **Build the binary** — `cargo build` (not `cargo check`; check produces no
    binary, and the regen runs the compiled `target/debug/protocol_ops`). Confirm
    with `strings target/debug/protocol_ops | grep <new-flag-or-env-var>`.
-3. Dry-run on a Sepolia fork to prove the fix: `regen-and-verify-stage.sh`
+3. Dry-run on a Sepolia fork to prove the fix: `regen-upgrade-calldata.sh`
    (`L1_FORK_URL=…`, `DEPLOYER_PK_FILE=…`). Goal = prepare succeeds + PUVT green.
    **Discard its `ecosystem.toml`** — macOS addresses aren't the committed ones.
 4. Commit + push the **code** branches (era-contracts; zk-governance if its deploy

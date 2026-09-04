@@ -107,13 +107,32 @@ permissionless `PriorityOpLowerBound.lowerBoundPriorityOp(chain)` call they need
 (`TESTONLY_prepareVersionSpecificTestUpgradePrerequisites`), so the first precondition is
 satisfied automatically.
 
-## Why no PUVT
+## PUVT: not yet green for v33
 
-`ecosystem verify-upgrade` implements only the v31 verifier
-(`protocol-ops/src/upgrade_verification/versions/v31/`). There is no v33 element set, so
-running it here would check v31's expectations against a v33 artifact. Validation is instead:
-the fork rehearsal (every prepare bundle replayed under impersonation) plus the simulator
-scenario (every governance call executed against a Sepolia fork).
+`regen-upgrade-calldata.sh` runs `ecosystem verify-upgrade` as its last step, but **PUVT does
+not pass for this artifact yet.**
+
+The module is named `upgrade_verification/versions/v31/`, which reads as "a verifier for v31"
+— it is not. It is the verifier for the upgrade _out of_ v31, written while this release was
+still numbered v32, and it says so: `EXPECTED_NEW_PROTOCOL_VERSION_STR = "0.32.0"` against a
+genesis that now declares `0.33.0`. So it targets this release; it just has not been carried
+across the v32 -> v33 renumbering, and it still assumes the shape v31 stage/mainnet had.
+
+Known blockers, in the order a run hits them:
+
+1. **Version constant.** `EXPECTED_NEW_PROTOCOL_VERSION_STR` is `"0.32.0"`; genesis is
+   `0.33.0`.
+2. **`[new_gateway]` is mandatory.** `verify_upgrade.rs` bails with "missing required
+   `[new_gateway]` config for v31 verification". This release brings up no Gateway and
+   testnet has no such block.
+3. **Stage 0 assumes a zk-governance redeploy.** The verifier probes PUH governance from
+   chain (`get_proxy_admin(bridgehub_owner) != 0`, true on testnet) and then requires four
+   extra stage-0 calls plus a top-level `[zk_governance]` artifact table. v33 ships no new
+   governance set, so a _correct_ artifact has neither — it has 2 stage-0 calls, not 6.
+
+Until those are addressed, validation rests on the fork rehearsal (every prepare bundle
+replayed under impersonation) and the simulator scenario (every governance call executed
+against a Sepolia fork). Use `SKIP_PUVT=1` to stop before the failing step.
 
 ## Reproducing
 
