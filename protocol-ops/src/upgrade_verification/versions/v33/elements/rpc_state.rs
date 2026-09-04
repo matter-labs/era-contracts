@@ -189,9 +189,42 @@ async fn verify_v33_proxy_admins(
         &["upgrade_addresses", "shared", "transparent_proxy_admin"],
     )?;
 
-    result
-        .expect_deployed_bytecode(verifiers, &expected_core_admin, "TransparentProxyAdmin")
-        .await;
+    // The core `ProxyAdmin` is not deployed by this upgrade — it predates the
+    // release, so its bytecode is whatever compiler and OpenZeppelin version
+    // built it back then and will not match this repo's `TransparentProxyAdmin`
+    // artifact. What actually has to hold for the stage-1 proxy swaps to be
+    // executable is checked instead: the admin has code, and its owner is the
+    // governance that issues those `upgrade` calls. Every core proxy pointing
+    // at this admin is verified below.
+    if verifiers
+        .network_verifier
+        .get_bytecode_hash_at(&expected_core_admin)
+        .await
+        == FixedBytes::<32>::ZERO
+    {
+        result.report_error(&format!(
+            "transparent_proxy_admin {expected_core_admin} has no code on L1"
+        ));
+    } else {
+        match Ownable::new(
+            expected_core_admin,
+            verifiers.network_verifier.get_l1_provider(),
+        )
+        .owner()
+        .call()
+        .await
+        {
+            Ok(actual) => expect_address_eq(
+                result,
+                "transparent_proxy_admin.owner()",
+                actual,
+                verifiers.bridgehub_owner,
+            ),
+            Err(err) => result.report_error(&format!(
+                "Failed to call transparent_proxy_admin.owner(): {err}"
+            )),
+        }
+    }
 
     let admin_slot = match FixedBytes::<32>::from_hex(EIP1967_PROXY_ADMIN_SLOT) {
         Ok(slot) => slot,

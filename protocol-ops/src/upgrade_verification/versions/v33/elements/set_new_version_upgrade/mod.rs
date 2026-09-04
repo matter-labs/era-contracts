@@ -29,17 +29,14 @@ use std::collections::HashSet;
 use crate::upgrade_verification::{
     artifacts::CtmFlavor,
     constants::{
-        BOOTLOADER_CONTRACT, DEFAULT_ACCOUNT_CONTRACT, ERA_SYSTEM_UPGRADE_TX_TYPE,
-        EVM_EMULATOR_CONTRACT, L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR,
-        L2_UPGRADE_GAS_LIMIT, L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT,
-        ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE,
+        L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_UPGRADE_GAS_LIMIT,
+        L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT, ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE,
     },
     verifiers::{VerificationResult, Verifiers},
 };
 
 use super::{fixed_force_deployment::FixedForceDeploymentsData, protocol_version::ProtocolVersion};
 
-mod era;
 mod zksync_os;
 
 sol! {
@@ -206,7 +203,7 @@ impl ProposedUpgrade {
         let initial_error_count = result.errors;
         let expected_version = ProtocolVersion::from(expected_new_protocol_version);
 
-        self.verify_static_fields(result, verifiers, expected_new_protocol_version, ctm_flavor);
+        self.verify_static_fields(result, expected_new_protocol_version, ctm_flavor);
         self.verify_l2_protocol_upgrade_tx(
             verifiers,
             result,
@@ -227,20 +224,10 @@ impl ProposedUpgrade {
     fn verify_static_fields(
         &self,
         result: &mut VerificationResult,
-        verifiers: &Verifiers,
         expected_new_protocol_version: U256,
         ctm_flavor: CtmFlavor,
     ) {
         match ctm_flavor {
-            CtmFlavor::Era => {
-                result.expect_zk_bytecode(verifiers, &self.bootloaderHash, BOOTLOADER_CONTRACT);
-                result.expect_zk_bytecode(
-                    verifiers,
-                    &self.defaultAccountHash,
-                    DEFAULT_ACCOUNT_CONTRACT,
-                );
-                result.expect_zk_bytecode(verifiers, &self.evmEmulatorHash, EVM_EMULATOR_CONTRACT);
-            }
             CtmFlavor::ZksyncOs => {
                 expect_zero_bytecode_hash(result, &self.bootloaderHash, "ZKsync OS bootloaderHash");
                 expect_zero_bytecode_hash(
@@ -364,42 +351,6 @@ impl ProposedUpgrade {
         }
 
         match ctm_flavor {
-            CtmFlavor::Era => {
-                if tx.txType != U256::from(ERA_SYSTEM_UPGRADE_TX_TYPE) {
-                    result.report_error(&format!(
-                        "Era L2 upgrade tx must use txType {ERA_SYSTEM_UPGRADE_TX_TYPE}, got {}",
-                        tx.txType
-                    ));
-                }
-                let decoded =
-                    match IComplexUpgrader::forceDeployAndUpgradeCall::abi_decode(&tx.data) {
-                        Ok(decoded) => decoded,
-                        Err(err) => {
-                            result.report_error(&format!(
-                            "Era L2 upgrade tx data must decode as forceDeployAndUpgrade: {err}"
-                        ));
-                            return Ok(());
-                        }
-                    };
-                verify_factory_deps(
-                    verifiers,
-                    result,
-                    &tx.factoryDeps,
-                    era::EXPECTED_V33_ERA_BYTECODES,
-                    "Era",
-                    bytecodes_supplier_addr,
-                    FactoryDepHashKind::EraZkBytecode,
-                )
-                .await;
-                era::verify_era_force_deploy_and_upgrade(
-                    verifiers,
-                    result,
-                    &decoded,
-                    expected_fixed_force_deployments_data,
-                )
-                .await?;
-                result.report_ok("Decoded Era forceDeployAndUpgrade L2 upgrade tx");
-            }
             CtmFlavor::ZksyncOs => {
                 if tx.txType != U256::from(ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE) {
                     result.report_error(&format!(

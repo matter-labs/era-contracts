@@ -139,45 +139,81 @@ take this upgrade at all** until they go to v31 first.
 The cut also needs all batches executed. A live chain normally has a few committed-but-unexecuted
 batches, so the scenario carries `emulateAllBatchesExecuted`; a real rollout waits for them.
 
-## PUVT: not yet green for v33
+## PUVT
 
-`regen-upgrade-calldata.sh` runs `ecosystem verify-upgrade` as its last step, but **PUVT does
-not pass for this artifact yet.**
+`regen-upgrade-calldata.sh` runs `ecosystem verify-upgrade` as its last step. **It passes for
+this artifact: exit 0, 172 checks, 0 errors, 18 warnings.**
 
-The module is named `upgrade_verification/versions/v31/`, which reads as "a verifier for v31"
-— it is not. It is the verifier for the upgrade _out of_ v31, written while this release was
-still numbered v32, and it says so: `EXPECTED_NEW_PROTOCOL_VERSION_STR = "0.32.0"` against a
-genesis that now declares `0.33.0`. So it targets this release; it just has not been carried
-across the v32 -> v33 renumbering, and it still assumes the shape v31 stage/mainnet had.
+Getting there took two rounds. The first was the module rename: the verifier lived in
+`upgrade_verification/versions/v31/`, which reads as "a verifier for v31" — it never was. It is
+the verifier for the upgrade _out of_ v31, written while this release was still numbered v32,
+and it said so (`EXPECTED_NEW_PROTOCOL_VERSION_STR = "0.32.0"` against a genesis declaring
+`0.33.0`). It is now `versions/v33/`, with the load-bearing v31 strings deliberately left alone:
+`GOV_SALT_SEED = b"v31:gov"` is a CREATE2 salt, and the expected *old* protocol version really is
+0.31.0.
 
-Nine assumptions have been fixed (see the commit that renamed the module and the one after it);
-PUVT now runs from config load through to stage-1 call verification with 68 checks passing. Two
-classes remain, and neither is more of the same:
+The second round closed the two classes that were left:
 
-**1. The bytecode registry and the deployment are built under different profiles.** Provenance
-matches a deploy by hashing its creation code and looking it up in `AllContractsHashes.json`.
-The artifact is built under `FOUNDRY_PROFILE=anvil-interop` (`cbor_metadata = false`) so CREATE2
-addresses are reproducible across machines; `AllContractsHashes.json` is generated under the
-default profile, _with_ metadata. For `L1Bridgehub` the deployed runtime is 18824 bytes and the
-registry records 18878 — a 54-byte CBOR blob — so no deployment ever matches and all 29 land as
-"not present in the create2 deployments". Reconciling this is a decision, not a patch:
+**The bytecode registry and the deployment are built under different profiles.** Provenance
+matches a deploy by hashing its creation code against `AllContractsHashes.json`. The artifact was
+originally built under `FOUNDRY_PROFILE=anvil-interop` (`cbor_metadata = false`), while the
+registry is generated under the default profile, *with* metadata — a 54-byte CBOR difference on
+`L1Bridgehub`, enough that no deployment ever matched and all 29 landed as "not present in the
+create2 deployments". Resolved by rebuilding and redeploying under the **default** profile, so
+the deployed code and the registry agree: 31 CREATE2 deployments now resolve. See "Why the
+default profile" below for what this costs.
 
-- regenerate the registry under `anvil-interop` (but `check-hashes` CI builds the default
-  profile), or
-- deploy from a default-profile build (but then CREATE2 addresses stop being reproducible,
-  which is the entire reason `anvil-interop` exists), or
-- teach the matcher to compare metadata-stripped creation code (weakens the check slightly,
-  changes bytecode provenance tool-wide).
+**The stage-0/1/2 expected-call tables described v31's ceremony.** Rewritten against the call
+sequence the v33 scripts actually assemble, read out of the generators rather than off the
+artifact:
 
-**2. The stage-0/1/2 expected-call tables still describe v31's ceremony.** Stage 1 expects
-`transparent_proxy_admin.upgrade(...)` at call #0 where v33 has `pauseMigration()`,
-`upgradeAndCall` where v33 uses `upgrade`, and a `ChainRegistrationSender.acceptOwnership()` v33
-does not emit; it has no notion of `setDefaultUpgrade` at all. This is a rewrite of the
-expectation tables against v33's actual 2/20/3-call shape, not a set of small gates.
+- Stage 1 core: `pauseMigration()` (unconditional in v33 — it re-asserts the stage-0 pause that
+  `PUH.executeEmergencyUpgrade` clears), then the eight `prepareUpgradeProxiesCalls` impl swaps
+  (`L1MessageRoot` is a plain `upgrade`; v31's `initializeL1V31Upgrade` reinitializer is gone),
+  then the two `setL1InteropHandler` wiring calls — present only when this run deployed the
+  handler, which PUVT decides from the CREATE2 log rather than from the call list.
+- Stage 1 per-CTM (9 calls): `checkDeadline`, `checkMigrationsPaused`, the four
+  `prepareUpgradeCTMCalls` proxy swaps, then `setDefaultUpgrade`, `setChainCreationParams`,
+  `setNewVersionUpgrade`. `setDefaultUpgrade` is checked to store the *generic*
+  `DefaultUpgradeZKsyncOS` and explicitly not this release's one-shot `V32UpgradeZKsyncOS` —
+  storing the one-shot contract would silently re-run this release's migration on a later patch
+  upgrade.
+- Stage 2 expected `canonical + 13` calls unconditionally; the 13 are the new-Gateway bring-up
+  block, and v33 brings up no Gateway. Now conditional on the artifact carrying `[new_gateway]`.
 
-Until both are addressed, validation rests on the fork rehearsal (every prepare bundle
-replayed under impersonation) and the simulator scenario (every governance call executed
-against a Sepolia fork). Use `SKIP_PUVT=1` to stop before the failing step.
+Three further things surfaced while doing this and are worth knowing:
+
+- **Four constructor signatures were stale.** `ExecutorFacet` takes no arguments, and
+  `MailboxFacet`, `L1Nullifier` and `L1AssetRouter` no longer take `eraChainId` /
+  `eraDiamondProxy`. PUVT expected the v31 shapes.
+- **`L1MessageRoot.ERA_GATEWAY_CHAIN_ID` had two sources of truth.** `DefaultCoreUpgrade.s.sol`
+  reads `[legacy_gateway] chain_id` from the *upgrade input* and passes 0 when absent; PUVT read
+  it from *permanent-values*, where testnet carries a documented placeholder (EVM-1200) that no
+  contract should be constructed with. PUVT now mirrors the deploy script.
+- **The core `ProxyAdmin` was checked by bytecode hash.** It predates this release, so its code
+  will never match the current `TransparentProxyAdmin` artifact — which is why two historical
+  hashes were already hard-coded as exceptions. Replaced with the property that actually has to
+  hold for the stage-1 swaps to execute: it has code, and its owner is the governance issuing
+  the calls.
+
+### Known gap in the emitted artifact
+
+`ecosystem.toml` records `bytecodes_supplier_addr` and `permissionless_validator_addr` but no
+matching `*_implementation_addr`, so a reader cannot tell from the artifact alone which
+implementation those two proxies are upgraded to. PUVT works around this by requiring the
+address in the governance call to be a contract this upgrade CREATE2-deployed from
+`l1-contracts/BytecodesSupplier` / `l1-contracts/PermissionlessValidator` — a stronger tie than
+comparing two artifact fields, but it does not make the artifact self-describing. Adding the two
+fields to the serializer is a one-line change on each side; it was not done here because it
+changes `ecosystem.toml` and therefore forces a full regen of the scenarios and the provenance
+check.
+
+### The 18 warnings
+
+All expected. Sixteen are ZKsync OS chains still on v0.29/v0.30 — this upgrade starts from v31,
+so they cannot take it until they get there (see "Preconditions" above). One is chain 278701 on
+v0.31.0 rather than v0.31.1, which is fine: the old-version check compares major.minor. One is
+chain 301, which sits on a CTM this artifact does not touch.
 
 ## Reproducing
 

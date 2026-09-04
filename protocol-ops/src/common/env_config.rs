@@ -220,6 +220,10 @@ pub struct PermanentContracts {
 pub struct UpgradeInputs {
     pub owner_address: Option<Address>,
     pub era_chain_id: Option<u64>,
+    /// `[legacy_gateway] chain_id` as read by `DefaultCoreUpgrade.s.sol`, which
+    /// bakes it into `L1MessageRoot.ERA_GATEWAY_CHAIN_ID`. Absent means the
+    /// deploy passed 0 — see [`EnvConfig::message_root_era_gateway_chain_id`].
+    pub legacy_gateway_chain_id: Option<u64>,
 }
 
 /// Fully-resolved per-env config.
@@ -355,6 +359,19 @@ impl EnvConfig {
         self.permanent.legacy_gateway.as_ref().map(|gw| gw.chain_id)
     }
 
+    /// The value the deploy actually baked into `L1MessageRoot.ERA_GATEWAY_CHAIN_ID`.
+    ///
+    /// `DefaultCoreUpgrade.s.sol` reads `[legacy_gateway] chain_id` from the
+    /// **upgrade input** TOML and leaves the constructor arg at 0 when the
+    /// section is absent, so this must mirror the upgrade input and not
+    /// permanent-values. The two diverge on testnet, where permanent-values
+    /// carries a documented placeholder chain id (EVM-1200) that no contract
+    /// should be constructed with. Permanent-values stays the source of truth
+    /// for the historical-migration `chain_intervals` that pair with it.
+    pub fn message_root_era_gateway_chain_id(&self) -> u64 {
+        self.upgrade_input.legacy_gateway_chain_id.unwrap_or(0)
+    }
+
     pub fn legacy_gateway_chain_intervals(&self) -> &[ChainInterval] {
         self.permanent
             .legacy_gateway
@@ -412,7 +429,28 @@ fn parse_upgrade_input(content: &str) -> UpgradeInputs {
             out.era_chain_id = Some(id);
         }
     }
+    out.legacy_gateway_chain_id = read_uint_under_section(content, "legacy_gateway", "chain_id");
     out
+}
+
+fn read_uint_under_section(content: &str, section_name: &str, key: &str) -> Option<u64> {
+    let mut in_section = false;
+    for raw in content.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Some(section) = parse_section_header(line) {
+            in_section = section == section_name;
+            continue;
+        }
+        if in_section {
+            if let Some(v) = match_unquoted_uint(line, key) {
+                return Some(v);
+            }
+        }
+    }
+    None
 }
 
 /// Read `[contracts] create2_factory_salt` from a v31 input TOML.

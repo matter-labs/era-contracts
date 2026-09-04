@@ -112,19 +112,18 @@ pub const ECADD_SYSTEM_CONTRACT: Address = literal_addr(0x06);
 pub const ECMUL_SYSTEM_CONTRACT: Address = literal_addr(0x07);
 pub const ECPAIRING_SYSTEM_CONTRACT: Address = literal_addr(0x08);
 
-/// v33 L2 protocol upgrade transaction parameters.
-/// `txType` differs between Era VM (254) and ZKsync OS (126); gas + pubdata
-/// limits are fixed by v33 deploy scripts and travel with the artifact.
-pub const ERA_SYSTEM_UPGRADE_TX_TYPE: u64 = 254;
+/// v33 L2 protocol upgrade transaction parameters. Gas + pubdata limits are
+/// fixed by the v33 deploy scripts and travel with the artifact. Era VM's
+/// `txType` (254) is not listed: v33 is a ZKsync OS-only release.
 pub const ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE: u64 = 126;
 pub const L2_UPGRADE_GAS_LIMIT: u64 = 72_000_000;
 pub const L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT: u64 = 800;
 
 /// AllContractsHashes file-name keys consulted by the bytecode verifier.
+/// The Era VM system contracts (`Bootloader`, `DefaultAccount`, `EvmEmulator`)
+/// are absent: only an Era CTM's chain-creation and upgrade payloads named
+/// them, and v33 has no Era flavor.
 pub const L2_V32_UPGRADE_CONTRACT: &str = "l1-contracts/L2V32Upgrade";
-pub const BOOTLOADER_CONTRACT: &str = "Bootloader";
-pub const DEFAULT_ACCOUNT_CONTRACT: &str = "system-contracts/DefaultAccount";
-pub const EVM_EMULATOR_CONTRACT: &str = "EvmEmulator";
 
 #[cfg(test)]
 mod tests {

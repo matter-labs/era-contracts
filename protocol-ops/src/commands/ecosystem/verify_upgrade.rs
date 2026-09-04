@@ -111,6 +111,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.permanent_values_path.display()
         )
     })?;
+    let message_root_era_gateway_chain_id = env_cfg.message_root_era_gateway_chain_id();
     let legacy_gateway_chain_intervals = env_cfg.legacy_gateway_chain_intervals().to_vec();
     let l1_chain_id = env_cfg.l1_chain_id().ok_or_else(|| {
         anyhow::anyhow!(
@@ -233,6 +234,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         args.zk_governance_commit.as_str(),
         era_chain_id,
         legacy_gateway_chain_id,
+        message_root_era_gateway_chain_id,
         &legacy_gateway_chain_intervals,
         new_gateway_chain_id,
         new_gateway_representative_chain_id,

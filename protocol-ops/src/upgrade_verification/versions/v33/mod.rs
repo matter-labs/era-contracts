@@ -26,7 +26,6 @@ use elements::{
 };
 
 pub(crate) const EXPECTED_NEW_PROTOCOL_VERSION_STR: &str = "0.33.0";
-pub(crate) const EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR: &str = "0.31.0";
 pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.31.0";
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
 pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
@@ -47,7 +46,6 @@ pub(crate) fn get_expected_old_protocol_version_for_ctm_flavor(
     flavor: CtmFlavor,
 ) -> ProtocolVersion {
     let version = match flavor {
-        CtmFlavor::Era => EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR,
         CtmFlavor::ZksyncOs => EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR,
     };
     ProtocolVersion::from_str(version).unwrap()
@@ -69,7 +67,6 @@ pub(crate) fn is_expected_old_protocol_version_for_ctm_flavor(
 
 pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static str {
     match flavor {
-        CtmFlavor::Era => "v0.31.x",
         CtmFlavor::ZksyncOs => "v0.31.x",
     }
 }
@@ -101,6 +98,7 @@ pub(crate) async fn verify(
     zk_governance_commit: &str,
     era_chain_id: u64,
     legacy_gateway_chain_id: u64,
+    message_root_era_gateway_chain_id: u64,
     legacy_gateway_chain_intervals: &[ChainInterval],
     new_gateway_chain_id: Option<u64>,
     new_gateway_representative_chain_id: Option<u64>,
@@ -173,7 +171,7 @@ pub(crate) async fn verify(
         artifact,
         &verifiers,
         era_chain_id,
-        legacy_gateway_chain_id,
+        message_root_era_gateway_chain_id,
         result,
     )
     .await?;

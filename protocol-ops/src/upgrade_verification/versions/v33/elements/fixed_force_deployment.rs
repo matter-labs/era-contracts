@@ -255,8 +255,12 @@ impl FixedForceDeploymentsData {
             result,
             verifiers,
             &self.interopHandlerBytecodeInfo,
+            // Era's `InteropHandler.sol` is gone; the file survives only in
+            // the unreachable Era column. ZKsyncOS force-deploys
+            // `L2InteropHandler`, which is what `zksync_os.rs` expects at
+            // `L2_INTEROP_HANDLER_ADDR`.
             "l1-contracts/InteropHandler",
-            "l1-contracts/InteropHandler",
+            "l1-contracts/L2InteropHandler",
         );
         expect_bytecode_info(
             result,

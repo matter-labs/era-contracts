@@ -26,7 +26,12 @@ pub(crate) struct EcosystemUpgradeArtifact {
     /// decoding; stage-0 verification binds decoded calls back to these values.
     pub(crate) zk_governance: Option<ZkGovernanceArtifact>,
     /// Raw top-level `[misc]` table for shared metadata that does not belong to
-    /// core or a particular CTM.
+    /// core or a particular CTM. Parsed so the artifact round-trips and the
+    /// section is rejected if malformed; no v33 check reads it today —
+    /// `deployer_addr`, its only entry, stopped being an expected constructor
+    /// argument once the kept proxies moved off deployer-then-transfer
+    /// initialization.
+    #[allow(dead_code)]
     pub(crate) misc: toml::Value,
 }
 
@@ -59,25 +64,33 @@ pub(crate) struct ZkGovernanceArtifact {
     pub(crate) new_emergency_upgrade_board: Address,
 }
 
+/// The CTM flavors a v33 artifact can describe.
+///
+/// v33 is a ZKsync OS-only release: `CTMUpgrade_v33.noGovernancePrepare`
+/// refuses an EraVM CTM before anything is deployed, so no v33 artifact can
+/// carry a `[ctms.era]` block. The enum is kept as a single variant rather
+/// than removed so the flavor stays explicit at every call site and a future
+/// release that reintroduces Era has one place to add it back.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CtmFlavor {
-    Era,
     ZksyncOs,
 }
 
 impl CtmFlavor {
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::Era => "era",
             Self::ZksyncOs => "zksync_os",
         }
     }
 
     fn parse(label: &str) -> anyhow::Result<Self> {
         match label {
-            "era" => Ok(Self::Era),
             "zksync_os" => Ok(Self::ZksyncOs),
-            other => anyhow::bail!("unknown CTM flavor `{other}`; expected `era` or `zksync_os`"),
+            "era" => anyhow::bail!(
+                "v33 is a ZKsync OS-only release, but the artifact carries a `[ctms.era]` block; \
+                 the upgrade scripts refuse EraVM CTMs, so this artifact was not produced by them"
+            ),
+            other => anyhow::bail!("unknown CTM flavor `{other}`; expected `zksync_os`"),
         }
     }
 }
@@ -335,10 +348,10 @@ mod tests {
             [core.upgrade_addresses]
             native_token_vault_implementation_addr = "0x0000000000000000000000000000000000000002"
 
-            [ctms.era]
+            [ctms.zksync_os]
             chain_upgrade_diamond_cut = "0xabcd"
 
-            [ctms.era.contracts_config]
+            [ctms.zksync_os.contracts_config]
             diamond_cut_data = "0x"
             force_deployments_data = "0x"
             new_protocol_version = 2
@@ -346,20 +359,22 @@ mod tests {
             governance_upgrade_timer_initial_delay = 1200
             is_testnet = true
 
-            [ctms.era.state_transition]
+            [ctms.zksync_os.state_transition]
             chain_type_manager_proxy = "0x0000000000000000000000000000000000000003"
         "#;
         let a = EcosystemUpgradeArtifact::from_toml_str(toml).unwrap();
         assert_eq!(a.ctms.len(), 1);
-        assert_eq!(a.ctms[0].flavor, CtmFlavor::Era);
+        assert_eq!(a.ctms[0].flavor, CtmFlavor::ZksyncOs);
         assert_eq!(a.ctms[0].chain_upgrade_diamond_cut, "0xabcd");
         assert!(a.core.get("state_transition").is_none());
         assert!(a.core.get("upgrade_addresses").is_some());
         assert!(a.core.get("deployer_addr").is_some());
     }
 
+    /// v33 accepts only ZKsync OS CTMs; an artifact carrying `[ctms.era]` was
+    /// not produced by the v33 scripts, which refuse EraVM CTMs outright.
     #[test]
-    fn parses_multi_ctm_artifact_in_deterministic_order() {
+    fn rejects_era_ctm_artifact() {
         let toml = r#"
             [governance_calls]
             stage0_calls = "0x"
@@ -367,16 +382,6 @@ mod tests {
             stage2_calls = "0x"
 
             [core]
-
-            [ctms.zksync_os]
-            chain_upgrade_diamond_cut = "0xbb"
-            [ctms.zksync_os.contracts_config]
-            diamond_cut_data = "0x"
-            force_deployments_data = "0x"
-            new_protocol_version = 2
-            old_protocol_version = 1
-            governance_upgrade_timer_initial_delay = 0
-            is_testnet = false
 
             [ctms.era]
             chain_upgrade_diamond_cut = "0xaa"
@@ -388,12 +393,11 @@ mod tests {
             governance_upgrade_timer_initial_delay = 0
             is_testnet = false
         "#;
-        let a = EcosystemUpgradeArtifact::from_toml_str(toml).unwrap();
-        assert_eq!(a.ctms.len(), 2);
-        assert_eq!(a.ctms[0].flavor, CtmFlavor::Era);
-        assert_eq!(a.ctms[1].flavor, CtmFlavor::ZksyncOs);
-        assert_eq!(a.ctms[0].chain_upgrade_diamond_cut, "0xaa");
-        assert_eq!(a.ctms[1].chain_upgrade_diamond_cut, "0xbb");
+        let err = EcosystemUpgradeArtifact::from_toml_str(toml).unwrap_err();
+        assert!(
+            err.to_string().contains("ZKsync OS-only"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]
@@ -406,9 +410,9 @@ mod tests {
 
             [core]
 
-            [ctms.era]
+            [ctms.zksync_os]
             chain_upgrade_diamond_cut = "0xaa"
-            [ctms.era.contracts_config]
+            [ctms.zksync_os.contracts_config]
             diamond_cut_data = "0x"
             force_deployments_data = "0x"
             new_protocol_version = 2

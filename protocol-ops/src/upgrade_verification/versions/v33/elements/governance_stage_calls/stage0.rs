@@ -589,30 +589,15 @@ async fn verify_puh_immutables(
         }
     }
 
-    if let Some(era_ctm) = artifact
-        .ctms
-        .iter()
-        .find(|ctm| ctm.flavor == CtmFlavor::Era)
-    {
-        let expected = required_ctm_address(
-            era_ctm,
-            &["state_transition", "chain_type_manager_proxy"],
-            result,
-        );
-        if let Some(expected) = expected {
-            match new_impl.ERA_CHAIN_TYPE_MANAGER().call().await {
-                Ok(actual) => compare_puh_expected_address(
-                    result,
-                    "PUH.ERA_CHAIN_TYPE_MANAGER()",
-                    actual,
-                    expected,
-                ),
-                Err(err) => result.report_error(&format!(
-                    "Failed to call new PUH.ERA_CHAIN_TYPE_MANAGER(): {err}"
-                )),
-            }
-        }
-    }
+    // v33 touches no Era CTM, so `ERA_CHAIN_TYPE_MANAGER` has no artifact
+    // entry to compare against and must simply survive the PUH redeploy
+    // unchanged.
+    compare_puh_shared_address(
+        result,
+        "PUH.ERA_CHAIN_TYPE_MANAGER()",
+        current_puh.ERA_CHAIN_TYPE_MANAGER().call().await,
+        new_impl.ERA_CHAIN_TYPE_MANAGER().call().await,
+    );
 
     if let Some(zkos_ctm) = artifact
         .ctms

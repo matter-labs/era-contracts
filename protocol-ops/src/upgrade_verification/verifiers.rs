@@ -39,7 +39,6 @@ pub(crate) struct Verifiers {
     pub address_verifier: AddressVerifier,
     pub bytecode_verifier: BytecodeVerifier,
     pub network_verifier: NetworkVerifier,
-    pub era_genesis_config: GenesisConfig,
     pub zksync_os_genesis_config: GenesisConfig,
     pub fee_param_verifier: FeeParamVerifier,
     pub era_chain_id: u64,
@@ -60,14 +59,12 @@ pub(crate) struct Verifiers {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum GenesisConfigKind {
-    Era,
     ZksyncOs,
 }
 
 impl GenesisConfigKind {
     fn local_path(self) -> &'static str {
         match self {
-            Self::Era => "configs/genesis/era/latest.json",
             Self::ZksyncOs => "configs/genesis/zksync-os/latest.json",
         }
     }
@@ -190,8 +187,6 @@ impl Verifiers {
             "aliased_protocol_upgrade_handler_proxy",
         );
 
-        let era_genesis_config =
-            GenesisConfig::init_v33(GenesisConfigKind::Era, contracts_commit).await?;
         let zksync_os_genesis_config =
             GenesisConfig::init_v33(GenesisConfigKind::ZksyncOs, contracts_commit).await?;
 
@@ -202,7 +197,6 @@ impl Verifiers {
             address_verifier,
             bytecode_verifier,
             network_verifier,
-            era_genesis_config,
             zksync_os_genesis_config,
             fee_param_verifier,
             era_chain_id,
@@ -219,7 +213,6 @@ impl Verifiers {
 
     pub(crate) fn genesis_config_for_ctm(&self, flavor: CtmFlavor) -> &GenesisConfig {
         match flavor {
-            CtmFlavor::Era => &self.era_genesis_config,
             CtmFlavor::ZksyncOs => &self.zksync_os_genesis_config,
         }
     }
@@ -488,6 +481,47 @@ impl VerificationResult {
             self.report_ok(&format!("{} at {}", expected_file, address));
         }
         true
+    }
+
+    /// Verifies a proxy this upgrade did **not** deploy.
+    ///
+    /// Some proxies are kept across releases and only have their
+    /// implementation swapped, so they carry no CREATE2 provenance in this
+    /// upgrade's transaction log. What is checkable is that the address is a
+    /// live proxy under the expected `ProxyAdmin`, and that the implementation
+    /// the governance calls point it at was deployed here — the latter is
+    /// verified by the stage-1 payload pass, which reads the call rather than
+    /// the pre-upgrade storage slot.
+    pub(crate) async fn expect_preexisting_proxy(
+        &mut self,
+        verifiers: &Verifiers,
+        address: &Address,
+        expected_admin: Address,
+        label: &str,
+    ) {
+        if verifiers
+            .network_verifier
+            .get_bytecode_hash_at(address)
+            .await
+            == FixedBytes::ZERO
+        {
+            self.report_error(&format!(
+                "{label} proxy {address} is expected to pre-exist, but has no code on L1"
+            ));
+            return;
+        }
+
+        let admin = verifiers.network_verifier.get_proxy_admin(*address).await;
+        if admin != expected_admin {
+            self.report_error(&format!(
+                "{label} proxy {address} is administered by {admin}, expected {expected_admin}"
+            ));
+            return;
+        }
+
+        self.report_ok(&format!(
+            "{label} proxy {address} pre-exists under the expected ProxyAdmin"
+        ));
     }
 
     /// Verifies create2 parameters for a proxy contract that uses a separate implementation.

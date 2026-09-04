@@ -71,6 +71,9 @@ use super::{
     L2TransactionRequestTwoBridgesOuter,
 };
 
+/// Length of the stage-2 new-Gateway bring-up block, when a release has one.
+const GATEWAY_BRING_UP_LEN: usize = 13;
+
 impl GovernanceStage2Calls {
     /// Stage 2 — three sections in order:
     ///   1. Decommission prefix (dynamic): `N × setHistoricalMigrationInterval`
@@ -177,7 +180,15 @@ impl GovernanceStage2Calls {
 
         let canonical_prefix = decommission_count;
         let canonical_count = canonical_prefix + 1 + artifact.ctms.len() * 2;
-        let expected_call_count = canonical_count + 13;
+        // Section 3 below is 13 calls, but only when the release actually
+        // brings up a new Gateway. v33 brings up none, so the block — and its
+        // 13 calls — must be absent.
+        let gateway_bring_up_len = if artifact.new_gateway.is_some() {
+            GATEWAY_BRING_UP_LEN
+        } else {
+            0
+        };
+        let expected_call_count = canonical_count + gateway_bring_up_len;
 
         // ── Section 2: Canonical activation ─────────────────────────
         // Call `canonical_prefix` — ChainAssetHandler.unpauseMigration()
@@ -226,7 +237,7 @@ impl GovernanceStage2Calls {
             );
         }
 
-        // ── Section 3: New-Gateway bring-up (13 calls) ───────────────
+        // ── Section 3: New-Gateway bring-up ([`GATEWAY_BRING_UP_LEN`]) ──
         match artifact.new_gateway.as_ref() {
             Some(new_gw) => {
                 errors += verify_gateway_bring_up_calls(
