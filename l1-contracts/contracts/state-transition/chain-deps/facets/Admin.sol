@@ -15,6 +15,7 @@ import {
     PRICE_UPDATE_INTERVAL,
     PRIORITY_EXPIRATION,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    ZISK_PROOF_SYSTEM_DISABLED,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
     ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT
 } from "../../../common/Config.sol";
@@ -40,6 +41,7 @@ import {
     FeeParamsChangeTooLarge,
     HashMismatch,
     InvalidDAForPermanentRollup,
+    InvalidDisabledProofSystemsMask,
     InvalidL2DACommitmentScheme,
     InvalidPubdataPricingMode,
     NonFullPubdataContentForPermanentRollup,
@@ -405,11 +407,17 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setZiskVerificationDisabled(bool _disabled) external onlyAdmin onlyZKsyncOS {
+    function setDisabledProofSystems(uint8 _disabledProofSystems) external onlyAdmin onlyZKsyncOS {
+        // Only the ZiSK bit is writable here. Clearing any other bit would drop the Airbender lane, which
+        // is the proof a ZKsync OS chain settles on, and an unknown bit would name no proof system at all.
+        if (_disabledProofSystems & ~ZISK_PROOF_SYSTEM_DISABLED != 0) {
+            revert InvalidDisabledProofSystemsMask(_disabledProofSystems);
+        }
         // No drained-queue requirement, unlike the chain-config setters: the switch exists for the
         // case where committed batches cannot be proved, so it has to take effect while they wait.
-        s.ziskVerificationDisabled = _disabled;
-        emit ZiskVerificationDisabledSet(_disabled);
+        uint8 oldDisabledProofSystems = s.disabledProofSystems;
+        s.disabledProofSystems = _disabledProofSystems;
+        emit NewDisabledProofSystems(oldDisabledProofSystems, _disabledProofSystems);
     }
 
     /// @inheritdoc IAdmin

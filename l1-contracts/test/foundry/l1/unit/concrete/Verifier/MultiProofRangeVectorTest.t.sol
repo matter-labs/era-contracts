@@ -90,10 +90,10 @@ contract MultiProofRangeVectorTest is Test {
     /// @dev The verifier reads the requirement from its caller, which in
     ///      production is the chain's diamond. The test contract calls it
     ///      directly, so it stands in for that chain.
-    bool internal ziskDisabled;
+    uint8 internal disabledProofSystemsMask;
 
-    function ziskVerificationDisabled() external view returns (bool) {
-        return ziskDisabled;
+    function disabledProofSystems() external view returns (uint8) {
+        return disabledProofSystemsMask;
     }
 
     function setUp() public {

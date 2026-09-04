@@ -5,7 +5,8 @@ pragma solidity 0.8.28;
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IZKsyncOSVerifier} from "../chain-interfaces/IZKsyncOSVerifier.sol";
 import {IGetters} from "../chain-interfaces/IGetters.sol";
-import {NonZeroCarriedHash} from "../../common/L1ContractErrors.sol";
+import {InvalidDisabledProofSystemsMask, NonZeroCarriedHash} from "../../common/L1ContractErrors.sol";
+import {ZISK_PROOF_SYSTEM_DISABLED} from "../../common/Config.sol";
 
 /// @title Multi-Proof Verifier
 /// @author Matter Labs
@@ -150,7 +151,14 @@ contract MultiProofVerifier is IVerifier, IZKsyncOSVerifier {
         // (`ChainTypeManager.protocolVersionVerifier`), so the requirement is
         // read from the calling chain rather than held here. The caller is that
         // chain's diamond.
-        if (!IGetters(msg.sender).ziskVerificationDisabled()) {
+        uint8 disabledProofSystems = IGetters(msg.sender).disabledProofSystems();
+        // Re-checked against the setter's own predicate, so the Airbender requirement holds here rather
+        // than resting on a value written elsewhere.
+        if (disabledProofSystems & ~ZISK_PROOF_SYSTEM_DISABLED != 0) {
+            revert InvalidDisabledProofSystemsMask(disabledProofSystems);
+        }
+
+        if (disabledProofSystems & ZISK_PROOF_SYSTEM_DISABLED == 0) {
             uint256 ziskStart = 3 + airbenderLen;
             uint256[] memory ziskProof = new uint256[](24);
             for (uint256 i = 0; i < 24; ++i) {

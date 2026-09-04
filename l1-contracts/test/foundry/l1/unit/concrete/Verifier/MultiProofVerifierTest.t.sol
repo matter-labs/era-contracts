@@ -8,7 +8,8 @@ import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/Mu
 import {ZiskTestnetVerifier} from "contracts/state-transition/verifiers/ZiskTestnetVerifier.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
-import {NonZeroCarriedHash} from "contracts/common/L1ContractErrors.sol";
+import {InvalidDisabledProofSystemsMask, NonZeroCarriedHash} from "contracts/common/L1ContractErrors.sol";
+import {AIRBENDER_PROOF_SYSTEM_DISABLED, ZISK_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
 import {DeployCTML1OrGateway} from "deploy-scripts/ctm/DeployCTML1OrGateway.sol";
 
 /// @dev Mock verifier that always returns true.
@@ -99,10 +100,10 @@ contract MultiProofVerifierTest is Test {
     /// @dev The verifier reads the requirement from its caller, which in
     ///      production is the chain's diamond. The test contract calls it
     ///      directly, so it stands in for that chain.
-    bool internal ziskDisabled;
+    uint8 internal disabledProofSystemsMask;
 
-    function ziskVerificationDisabled() external view returns (bool) {
-        return ziskDisabled;
+    function disabledProofSystems() external view returns (uint8) {
+        return disabledProofSystemsMask;
     }
 
     function setUp() public {
@@ -258,8 +259,23 @@ contract MultiProofVerifierTest is Test {
         vm.expectRevert(MultiProofVerifier.ZiskVerificationFailed.selector);
         lane.verify(_rangePublicInputs(), _type5Proof(0, 2));
 
-        ziskDisabled = true;
+        disabledProofSystemsMask = ZISK_PROOF_SYSTEM_DISABLED;
         assertTrue(lane.verify(_rangePublicInputs(), _type5Proof(0, 2)));
+    }
+
+    /// @dev The verifier does not trust the stored mask: a value the setter could never write, such as
+    ///      one clearing the Airbender lane, is refused rather than acted on.
+    function test_disabledProofSystems_rejectsMaskTheSetterCannotWrite() public {
+        MultiProofVerifier lane = new MultiProofVerifier(
+            IVerifier(address(passVerifier)),
+            IVerifier(address(passVerifier))
+        );
+
+        disabledProofSystemsMask = AIRBENDER_PROOF_SYSTEM_DISABLED;
+        vm.expectRevert(
+            abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, AIRBENDER_PROOF_SYSTEM_DISABLED)
+        );
+        lane.verify(_rangePublicInputs(), _type5Proof(0, 2));
     }
 
     // --- Forwarding to the sub-verifiers ---

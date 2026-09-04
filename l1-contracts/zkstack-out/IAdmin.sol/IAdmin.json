@@ -225,6 +225,19 @@
   },
   {
     "type": "function",
+    "name": "setDisabledProofSystems",
+    "inputs": [
+      {
+        "name": "_disabledProofSystems",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setPendingAdmin",
     "inputs": [
       {
@@ -358,19 +371,6 @@
         "name": "_newMaxTxGasLimit",
         "type": "uint64",
         "internalType": "uint64"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setZiskVerificationDisabled",
-    "inputs": [
-      {
-        "name": "_disabled",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "outputs": [],
@@ -587,6 +587,25 @@
         "type": "uint128",
         "indexed": false,
         "internalType": "uint128"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewDisabledProofSystems",
+    "inputs": [
+      {
+        "name": "oldDisabledProofSystems",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "uint8"
+      },
+      {
+        "name": "newDisabledProofSystems",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "uint8"
       }
     ],
     "anonymous": false
@@ -877,19 +896,6 @@
         "name": "isActive",
         "type": "bool",
         "indexed": false,
-        "internalType": "bool"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ZiskVerificationDisabledSet",
-    "inputs": [
-      {
-        "name": "disabled",
-        "type": "bool",
-        "indexed": true,
         "internalType": "bool"
       }
     ],

@@ -125,12 +125,13 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _pubdataContent The new pubdata content.
     function setPubdataContent(PubdataContent _pubdataContent) external;
 
-    /// @notice Sets whether the chain settles on the Airbender proof alone. A multi-proof verifier
-    /// reads it to decide whether a ZiSK proof is also required. Every batch needs both proofs while
-    /// it is false, so a ZiSK lane that cannot produce proofs stops the chain; the switch trades the
-    /// second proof system for liveness. Callable only for ZKsync OS chains.
-    /// @param _disabled Whether the chain settles without a ZiSK proof.
-    function setZiskVerificationDisabled(bool _disabled) external;
+    /// @notice Sets the bit mask of proof systems the chain does not require in order to settle. Every
+    /// batch needs every proof system while the mask is `0`, so a lane that cannot produce proofs stops
+    /// the chain; the switch trades a proof system for liveness. A ZKsync OS chain accepts only
+    /// `ZISK_PROOF_SYSTEM_DISABLED`, so its Airbender lane can not be switched off. Callable only for
+    /// ZKsync OS chains.
+    /// @param _disabledProofSystems The proof systems the chain no longer requires.
+    function setDisabledProofSystems(uint8 _disabledProofSystems) external;
 
     /// @notice Makes the chain as permanent rollup.
     /// @dev This is a security feature needed for chains that should be
@@ -199,8 +200,8 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @notice New pubdata content set
     event NewPubdataContent(PubdataContent indexed oldPubdataContent, PubdataContent indexed newPubdataContent);
 
-    /// @notice ZiSK verification requirement changed
-    event ZiskVerificationDisabledSet(bool indexed disabled);
+    /// @notice The set of proof systems the chain does not require changed
+    event NewDisabledProofSystems(uint8 indexed oldDisabledProofSystems, uint8 indexed newDisabledProofSystems);
 
     event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
 

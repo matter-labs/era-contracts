@@ -273,10 +273,11 @@ struct ZKChainStorage {
     /// Permanent-rollup chains are locked to `FULL_PUBDATA` (see `Admin.setPubdataContent` / `makePermanentRollup`).
     /// @dev STORAGE SLOT: 68 (packed with baseTokenHasTotalSupply + zksyncOSMaxTxGasLimit)
     PubdataContent pubdataContent;
-    /// @dev Whether the chain settles on the Airbender proof alone. A multi-proof verifier reads it to
-    /// decide whether a ZiSK proof is also required. It weakens the guarantee of the second proof
-    /// system, so it exists for the case where that system cannot produce proofs and the chain would
-    /// otherwise stop (see `Admin.setZiskVerificationDisabled`). ZKsync OS only.
+    /// @dev Bit mask of the proof systems this chain does not require in order to settle. `0`, the value
+    /// every chain has until its admin writes it, requires all of them. A multi-proof verifier reads it off
+    /// the calling chain, since one verifier instance serves every chain of a protocol version.
+    /// @dev A ZKsync OS chain accepts only `ZISK_PROOF_SYSTEM_DISABLED`, so its Airbender lane can not be
+    /// switched off (see `Admin.setDisabledProofSystems`).
     /// @dev STORAGE SLOT: 68 (packed with baseTokenHasTotalSupply + zksyncOSMaxTxGasLimit + pubdataContent)
-    bool ziskVerificationDisabled;
+    uint8 disabledProofSystems;
 }

@@ -105,8 +105,8 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function ziskVerificationDisabled() external view returns (bool) {
-        return s.ziskVerificationDisabled;
+    function disabledProofSystems() external view returns (uint8) {
+        return s.disabledProofSystems;
     }
 
     /// @inheritdoc IGetters
