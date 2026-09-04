@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 // solhint-disable no-console, gas-custom-errors
 
+import {UpgradeUtils} from "deploy-scripts/upgrade/default-upgrade/UpgradeUtils.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
@@ -89,14 +90,20 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
 
 /// @notice Test-only Core upgrade that skips governance calls the local fixture cannot satisfy.
 contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
+    function _hasExistingL1InteropCenter() internal pure override returns (bool) {
+        return true;
+    }
+
     /// @notice Override to skip the ownership-acceptance and `setAddresses` calls, which need ownership
     ///         hand-offs the fixture does not perform.
     /// @dev The interop-handler wiring is kept: it is what makes a v31 ecosystem match a from-scratch v32
     ///      one. In this fixture it collapses to nothing — the ecosystem already has a wired handler — so
     ///      the calls themselves are covered by `PreV32ParityCalls.t.sol`, not here.
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
-        console.log("Test mode: keeping only the L1InteropHandler wiring in stage 1");
-        return _buildL1InteropHandlerWiringCalls();
+        Call[][] memory wiring = new Call[][](2);
+        wiring[0] = _buildL1InteropHandlerWiringCalls();
+        wiring[1] = _buildL1InteropCenterWiringCalls();
+        return UpgradeUtils.mergeCallsArray(wiring);
     }
 }
 

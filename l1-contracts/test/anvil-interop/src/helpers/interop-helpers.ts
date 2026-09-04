@@ -22,7 +22,7 @@ import {
   L2_INTEROP_HANDLER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
-import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
+import { encodeBridgeBurnData, encodeAssetRouterDepositData } from "../core/data-encoding";
 import { impersonateAndRun } from "../core/utils";
 import { encodeEvmChain, encodeEvmAddress } from "./erc7930";
 import {
@@ -276,12 +276,12 @@ export async function staticPreviewHash(
 // ── Token transfer data encoding ───────────────────────────────
 
 /**
- * Encode the secondBridgeData for an ERC20 token transfer via L2AssetRouter.
+ * Encode the indirectCallData for an ERC20 token transfer via L2AssetRouter.
  * This is the `data` field of an indirect call starter targeting L2_ASSET_ROUTER_ADDR.
  */
 export function getTokenTransferData(assetId: string, amount: BigNumber, recipientAddress: string): string {
   const transferData = encodeBridgeBurnData(amount, recipientAddress, ethers.constants.AddressZero);
-  return encodeAssetRouterBridgehubDepositData(assetId, transferData);
+  return encodeAssetRouterDepositData(assetId, transferData);
 }
 
 export interface SendAndExecuteTokenInteropParams {

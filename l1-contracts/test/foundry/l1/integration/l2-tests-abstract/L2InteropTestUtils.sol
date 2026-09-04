@@ -172,13 +172,13 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
         uint256 _amount,
         address _receiver
     ) internal view returns (InteropCallStarter[] memory calls) {
-        bytes memory secondBridgeCalldata = InteropLibrary.buildSecondBridgeCalldata(
+        bytes memory indirectCallData = InteropLibrary.buildIndirectCallData(
             L2_NATIVE_TOKEN_VAULT.assetId(_l2Token),
             _amount,
             _receiver,
             address(0)
         );
         calls = new InteropCallStarter[](1);
-        calls[0] = InteropLibrary.buildSecondBridgeCall(secondBridgeCalldata, L2_ASSET_ROUTER_ADDR);
+        calls[0] = InteropLibrary.buildIndirectCall(indirectCallData, L2_ASSET_ROUTER_ADDR);
     }
 }

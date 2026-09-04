@@ -2,10 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L1L2MessageParams, L1L2IndirectMessageParams} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 
 contract L2TxMocker is Test {
@@ -35,14 +32,14 @@ contract L2TxMocker is Test {
         chainContracts[_chainId] = _chainContract;
     }
 
-    function _createL2TransactionRequestDirect(
+    function _createL1L2MessageParams(
         uint256 _chainId,
         uint256 _mintValue,
         uint256 _l2Value,
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit,
         bytes memory _l2CallData
-    ) internal returns (L2TransactionRequestDirect memory request) {
+    ) internal returns (L1L2MessageParams memory request) {
         request.chainId = _chainId;
         request.mintValue = _mintValue;
         request.l2Value = _l2Value;
@@ -56,24 +53,24 @@ contract L2TxMocker is Test {
         request.refundRecipient = mockRefundRecipient;
     }
 
-    function _createL2TransactionRequestTwoBridges(
+    function _createL1L2IndirectMessageParams(
         uint256 _chainId,
         uint256 _mintValue,
-        uint256 _secondBridgeValue,
-        address _secondBridgeAddress,
+        uint256 _indirectCallValue,
+        address _crossChainSender,
         uint256 _l2Value,
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit,
-        bytes memory _secondBridgeCalldata
-    ) internal returns (L2TransactionRequestTwoBridgesOuter memory request) {
+        bytes memory _indirectCallData
+    ) internal returns (L1L2IndirectMessageParams memory request) {
         request.chainId = _chainId;
         request.mintValue = _mintValue;
-        request.secondBridgeAddress = _secondBridgeAddress;
-        request.secondBridgeValue = _secondBridgeValue;
+        request.crossChainSender = _crossChainSender;
+        request.indirectCallValue = _indirectCallValue;
         request.l2Value = _l2Value;
         request.l2GasLimit = _l2GasLimit;
         request.l2GasPerPubdataByteLimit = _l2GasPerPubdataByteLimit;
-        request.secondBridgeCalldata = _secondBridgeCalldata;
+        request.indirectCallData = _indirectCallData;
 
         //mocks
         request.refundRecipient = mockRefundRecipient;

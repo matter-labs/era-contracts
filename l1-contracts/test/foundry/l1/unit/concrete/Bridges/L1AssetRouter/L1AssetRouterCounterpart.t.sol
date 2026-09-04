@@ -5,12 +5,12 @@ import {Test} from "forge-std/Test.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {AssetDeploymentTrackerNotSet} from "contracts/common/L1ContractErrors.sol";
-import {TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
+import {INDIRECT_CALL_MAGIC_VALUE} from "contracts/common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2TransactionRequestTwoBridgesInner} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IndirectCallRequest} from "contracts/common/Messaging.sol";
 
 /// @dev Exposes the internal counterpart-set path + a test-only tracker setter so the counterpart-auth guard
-/// can be unit-tested in isolation (the full `bridgehubDeposit` path is covered by the integration suites).
+/// can be unit-tested in isolation (the full `initiateIndirectCall` path is covered by the integration suites).
 contract L1AssetRouterCounterpartHarness is L1AssetRouter {
     constructor(
         address _weth,
@@ -25,7 +25,7 @@ contract L1AssetRouterCounterpartHarness is L1AssetRouter {
         address _originalCaller,
         bytes32 _assetId,
         address _assetHandlerAddressOnCounterpart
-    ) external view returns (L2TransactionRequestTwoBridgesInner memory) {
+    ) external view returns (IndirectCallRequest memory) {
         return
             _setAssetHandlerAddressOnCounterpart(
                 _chainId,
@@ -80,13 +80,13 @@ contract L1AssetRouterCounterpartTest is Test {
         bytes32 assetId = keccak256("registered asset");
         router.setTrackerForTest(assetId, address(new MockAssetDeploymentTracker()));
 
-        L2TransactionRequestTwoBridgesInner memory request = router.exposedSetAssetHandlerAddressOnCounterpart(
+        IndirectCallRequest memory request = router.exposedSetAssetHandlerAddressOnCounterpart(
             DEST_CHAIN_ID,
             caller,
             assetId,
             handlerOnCounterpart
         );
-        assertEq(request.magicValue, TWO_BRIDGES_MAGIC_VALUE);
+        assertEq(request.magicValue, INDIRECT_CALL_MAGIC_VALUE);
         assertEq(request.l2Contract, L2_ASSET_ROUTER_ADDR);
     }
 }

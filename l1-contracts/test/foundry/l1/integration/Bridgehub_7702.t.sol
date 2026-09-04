@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {L1InteropRequests} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
-import {
-    IL1Bridgehub,
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {L1L2MessageParams, L1L2IndirectMessageParams} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
@@ -72,7 +70,7 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
         vm.deal(currentUser, mintValue);
 
         bytes memory callData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
-        L2TransactionRequestDirect memory txRequest = _createL2TransactionRequestDirect({
+        L1L2MessageParams memory txRequest = _createL1L2MessageParams({
             _chainId: currentChainId,
             _mintValue: mintValue,
             _l2Value: l2Value,
@@ -81,15 +79,12 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
             _l2CallData: callData
         });
 
-        bytes memory calldataForExecutor = abi.encodeWithSelector(
-            IL1Bridgehub.requestL2TransactionDirect.selector,
-            txRequest
-        );
+        bytes memory calldataForExecutor = L1InteropRequests.encodeDirectCalldata(txRequest);
 
         vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
         vm.recordLogs();
         vm.prank(randomCaller);
-        SimpleExecutor(randomCaller).execute(address(addresses.bridgehub), mintValue, calldataForExecutor);
+        SimpleExecutor(randomCaller).execute(address(addresses.interopCenter), mintValue, calldataForExecutor);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Verify ETH balance

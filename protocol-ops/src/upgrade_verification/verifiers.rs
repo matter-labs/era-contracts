@@ -67,6 +67,19 @@ impl GenesisConfigKind {
 }
 
 impl Verifiers {
+    /// The artifact generation determines the built-in's name; old hash manifests keep their original key.
+    pub(crate) fn l2_interop_center_file(&self) -> &'static str {
+        if self
+            .address_verifier
+            .get_by_name("l1_interop_center_proxy")
+            .is_some()
+        {
+            "l1-contracts/L2InteropCenter"
+        } else {
+            "l1-contracts/InteropCenter"
+        }
+    }
+
     /// Creates a v31 verifier context from the single ecosystem TOML.
     #[allow(clippy::too_many_arguments)]
     pub async fn new_v31(

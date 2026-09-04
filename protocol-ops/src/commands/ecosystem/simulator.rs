@@ -75,11 +75,11 @@ struct SimDescriptionEntry {
     arg0_address: Option<Address>,
     /// `Bridgehub.requestL2TransactionDirect(L2TransactionRequestDirect)` —
     /// `l2Contract` is word 3 of the tuple (after offset/chainId/mintValue).
-    /// Only meaningful when `selector = 0xd52471c1`.
+    /// Also matches the recipient of a direct L1InteropCenter.sendMessage.
     l2_contract: Option<Address>,
     /// `Bridgehub.requestL2TransactionTwoBridges(L2TransactionRequestTwoBridgesOuter)` —
     /// `secondBridgeAddress` is word 7 of the tuple.
-    /// Only meaningful when `selector = 0x24fd57fb`.
+    /// Also matches the recipient of an indirect L1InteropCenter.sendMessage.
     second_bridge_address: Option<Address>,
     /// For wrapper selectors (`multicall`, `scheduleTransparent`,
     /// `executeInstant`) — match the first inner call's target.
@@ -141,6 +141,12 @@ impl SimDescriptionRegistry {
     fn lookup(&self, target: Address, data_hex: &str) -> Option<String> {
         let selector = data_hex.get(..10)?;
         let inner = parse_first_inner_call(data_hex);
+        let raw = hex::decode(data_hex.strip_prefix("0x").unwrap_or(data_hex)).ok()?;
+        let l1_message = if crate::common::l1_interop::is_send_message(&raw) {
+            Some(crate::common::l1_interop::decode(&raw).ok()?)
+        } else {
+            None
+        };
         for entry in &self.entries {
             if entry.target != target {
                 continue;
@@ -157,18 +163,32 @@ impl SimDescriptionRegistry {
             }
             // requestL2TransactionDirect: l2Contract at word 3 after the selector.
             if let Some(want) = entry.l2_contract {
-                let word_start = 10 + 3 * 64;
-                let word_hex = data_hex.get(word_start..word_start + 64)?;
-                let parsed: Address = format!("0x{}", &word_hex[24..]).parse().ok()?;
+                let parsed = if let Some(message) = &l1_message {
+                    if message.indirect_value.is_some() {
+                        continue;
+                    }
+                    message.recipient
+                } else {
+                    let word_start = 10 + 3 * 64;
+                    let word_hex = data_hex.get(word_start..word_start + 64)?;
+                    format!("0x{}", &word_hex[24..]).parse::<Address>().ok()?
+                };
                 if parsed != want {
                     continue;
                 }
             }
             // requestL2TransactionTwoBridges: secondBridgeAddress at word 7.
             if let Some(want) = entry.second_bridge_address {
-                let word_start = 10 + 7 * 64;
-                let word_hex = data_hex.get(word_start..word_start + 64)?;
-                let parsed: Address = format!("0x{}", &word_hex[24..]).parse().ok()?;
+                let parsed = if let Some(message) = &l1_message {
+                    if message.indirect_value.is_none() {
+                        continue;
+                    }
+                    message.recipient
+                } else {
+                    let word_start = 10 + 7 * 64;
+                    let word_hex = data_hex.get(word_start..word_start + 64)?;
+                    format!("0x{}", &word_hex[24..]).parse::<Address>().ok()?
+                };
                 if parsed != want {
                     continue;
                 }
@@ -1044,4 +1064,63 @@ fn append_test_upgrade_calls(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::l1_interop;
+    use alloy::primitives::U256;
+    use alloy::sol_types::SolCall;
+
+    #[test]
+    fn current_messages_match_only_the_correct_direct_or_indirect_registry_entry() {
+        let recipient = Address::repeat_byte(0x11);
+        let target = Address::repeat_byte(0x22);
+        let mut encoded_recipient = vec![0, 1, 0, 0, 1, 10, 20];
+        encoded_recipient.extend_from_slice(recipient.as_slice());
+        let mut message = l1_interop::sendMessageCall::new((
+            encoded_recipient.into(),
+            Default::default(),
+            vec![l1_interop::l1ToL2TransactionParamsCall::new((
+                U256::from(100),
+                U256::from(1_000_000),
+                U256::from(800),
+                Address::ZERO,
+            ))
+            .abi_encode()
+            .into()],
+        ));
+        let entry = |indirect: bool| SimDescriptionEntry {
+            target,
+            selector: format!("0x{}", hex::encode(l1_interop::sendMessageCall::SELECTOR)),
+            arg0_address: None,
+            l2_contract: (!indirect).then_some(recipient),
+            second_bridge_address: indirect.then_some(recipient),
+            inner_target: None,
+            inner_selector: None,
+            desc: if indirect { "indirect" } else { "direct" }.into(),
+        };
+        let registry = SimDescriptionRegistry {
+            entries: vec![entry(true), entry(false)],
+        };
+        let data =
+            |call: &l1_interop::sendMessageCall| format!("0x{}", hex::encode(call.abi_encode()));
+        assert_eq!(
+            registry.lookup(target, &data(&message)).as_deref(),
+            Some("direct")
+        );
+        assert_eq!(registry.lookup(Address::ZERO, &data(&message)), None);
+        message.attributes.push(
+            l1_interop::indirectCallCall::new((U256::from(7),))
+                .abi_encode()
+                .into(),
+        );
+        assert_eq!(
+            registry.lookup(target, &data(&message)).as_deref(),
+            Some("indirect")
+        );
+        message.attributes.clear();
+        assert_eq!(registry.lookup(target, &data(&message)), None);
+    }
 }

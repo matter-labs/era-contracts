@@ -75,7 +75,7 @@ export const ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI = 50_000_000_000n;
 // Mirrors contracts/common/Config.sol::REQUIRED_L2_GAS_PRICE_PER_PUBDATA.
 export const ANVIL_INTEROP_REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
 // Two-bridges base-token accounting funds the outer and inner priority requests.
-export const ANVIL_INTEROP_TWO_BRIDGES_PRIORITY_REQUEST_COUNT = 2;
+export const ANVIL_INTEROP_INDIRECT_PRIORITY_REQUEST_COUNT = 2;
 
 // Default TestnetERC20Token deployment parameters for interop test helpers
 export const TEST_TOKEN_DECIMALS = 18;

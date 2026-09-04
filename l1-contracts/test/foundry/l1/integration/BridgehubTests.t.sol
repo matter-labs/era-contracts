@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L1InteropRequests} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
-import {
-    IL1Bridgehub,
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {L1L2MessageParams, L1L2IndirectMessageParams} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -41,7 +41,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
 
     enum RequestType {
         DIRECT,
-        TWO_BRIDGES
+        INDIRECT
     }
 
     struct NewPriorityRequest {
@@ -175,10 +175,8 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
             slicedData[i - 4] = callData[i];
         }
 
-        (l1Sender, l2Receiver, l1Token, amount, b) = abi.decode(
-            slicedData,
-            (address, address, address, uint256, bytes)
-        );
+        (, , bytes memory bridgeMintData) = abi.decode(slicedData, (uint256, bytes32, bytes));
+        (l1Sender, l2Receiver, l1Token, amount, b) = DataEncoding.decodeBridgeMintData(bridgeMintData);
     }
 
     // handle event emitted from logs, just to ensure proper decoding to set mock contract balance
@@ -192,8 +190,10 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         uint256 balanceAfter;
         bytes memory temp;
 
-        if (requestType == RequestType.TWO_BRIDGES) {
+        if (requestType == RequestType.INDIRECT) {
             (l1Sender, receiver, tokenAddress, toSend, temp) = _getDecodedDepositL2Calldata(request.transaction.data);
+            assertEq(contractAddress, L2_ASSET_ROUTER_ADDR);
+            contractAddress = receiver;
         } else {
             (tokenAddress, toSend, receiver) = abi.decode(request.transaction.data, (address, uint256, address));
         }
@@ -228,10 +228,10 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     }
 
     /// @notice Deposits an ERC20 token to a ZK chain that uses ETH as its base token,
-    /// using the TwoBridges path.
+    /// using the indirect path.
     /// @dev ETH is sent as `msg.value` to cover the base token gas cost (`mintValue`).
-    /// The ERC20 token is transferred via the second bridge by approving the shared bridge
-    /// and encoding the token address and amount in `secondBridgeCalldata`.
+    /// The ERC20 token is transferred via the cross-chain sender by approving the shared bridge
+    /// and encoding the token address and amount in `indirectCallData`.
     /// Updates per-user, per-chain, and global deposit tracking for both ETH and the ERC20.
     function depositERC20ToEthChain(uint256 l2Value, address tokenAddress) private useGivenToken(tokenAddress) {
         uint256 gasPrice = 10000000;
@@ -249,25 +249,28 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         vm.deal(currentUser, mintValue);
 
         currentToken.mint(currentUser, l2Value);
-        currentToken.approve(address(addresses.sharedBridge), l2Value);
+        currentToken.approve(address(addresses.l1NativeTokenVault), l2Value);
 
         uint256 userEthBefore = currentUser.balance;
         uint256 userTokenBefore = currentToken.balanceOf(currentUser);
 
-        bytes memory secondBridgeCallData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
-        L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
+        bytes memory indirectCallData = DataEncoding.encodeAssetRouterDepositData(
+            DataEncoding.encodeNTVAssetId(block.chainid, currentTokenAddress),
+            DataEncoding.encodeBridgeBurnData(l2Value, chainContracts[currentChainId], currentTokenAddress)
+        );
+        L1L2IndirectMessageParams memory requestTx = _createL1L2IndirectMessageParams({
             _chainId: currentChainId,
             _mintValue: mintValue,
-            _secondBridgeValue: 0,
-            _secondBridgeAddress: address(addresses.sharedBridge),
+            _indirectCallValue: 0,
+            _crossChainSender: address(addresses.sharedBridge),
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _secondBridgeCalldata: secondBridgeCallData
+            _indirectCallData: indirectCallData
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestIndirect(addresses.interopCenter, mintValue, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -278,7 +281,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         // Verify balances
         // ETH consumed for base token gas
         assertEq(currentUser.balance, userEthBefore - mintValue, "User ETH should decrease by mintValue");
-        // ERC20 consumed for the second bridge deposit
+        // ERC20 consumed for the cross-chain sender deposit
         assertEq(
             currentToken.balanceOf(currentUser),
             userTokenBefore - l2Value,
@@ -294,13 +297,13 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         );
         assertEq(uint256(baseTokenLog.topics[1]), currentChainId, "Base token deposit event chainId mismatch");
 
-        // Verify BridgehubDepositInitiated event emission (ERC20 second bridge)
+        // Verify BridgehubDepositInitiated event emission (ERC20 cross-chain sender)
         Vm.Log memory depositInitiatedLog = logs.requireOne(
             "BridgehubDepositInitiated(uint256,bytes32,address,bytes32,bytes)"
         );
         assertEq(uint256(depositInitiatedLog.topics[1]), currentChainId, "Deposit initiated event chainId mismatch");
 
-        _handleRequestByMockL2Contract(request, RequestType.TWO_BRIDGES);
+        _handleRequestByMockL2Contract(request, RequestType.INDIRECT);
 
         depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += mintValue;
         depositsBridge[currentChainAddress][ETH_TOKEN_ADDRESS] += mintValue;
@@ -313,9 +316,9 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     }
 
     /// @notice Deposits ETH to a ZK chain that uses an ERC20 as its base token,
-    /// using the TwoBridges path.
+    /// using the indirect path.
     /// @dev The ERC20 base token is minted and approved for `mintValue` (gas costs).
-    /// ETH is sent as `secondBridgeValue` via `msg.value`. This is a dual-token flow:
+    /// ETH is sent as `indirectCallValue` via `msg.value`. This is a dual-token flow:
     /// ERC20 pays for L2 gas, ETH is the actual deposit value.
     function depositEthToERC20Chain(uint256 l2Value) private useBaseToken {
         uint256 gasPrice = 10000000;
@@ -332,25 +335,28 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         vm.deal(currentUser, l2Value);
         uint256 mintValue = minRequiredGas;
         currentToken.mint(currentUser, mintValue);
-        currentToken.approve(address(addresses.sharedBridge), mintValue);
+        currentToken.approve(address(addresses.l1NativeTokenVault), mintValue);
 
         uint256 userEthBefore = currentUser.balance;
         uint256 userTokenBefore = currentToken.balanceOf(currentUser);
 
-        bytes memory secondBridgeCallData = abi.encode(ETH_TOKEN_ADDRESS, uint256(0), chainContracts[currentChainId]);
-        L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
+        bytes memory indirectCallData = DataEncoding.encodeAssetRouterDepositData(
+            DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
+            DataEncoding.encodeBridgeBurnData(l2Value, chainContracts[currentChainId], ETH_TOKEN_ADDRESS)
+        );
+        L1L2IndirectMessageParams memory requestTx = _createL1L2IndirectMessageParams({
             _chainId: currentChainId,
             _mintValue: mintValue,
-            _secondBridgeValue: l2Value,
-            _secondBridgeAddress: address(addresses.sharedBridge),
+            _indirectCallValue: l2Value,
+            _crossChainSender: address(addresses.sharedBridge),
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _secondBridgeCalldata: secondBridgeCallData
+            _indirectCallData: indirectCallData
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: l2Value}(requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestIndirect(addresses.interopCenter, l2Value, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -359,7 +365,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         assertNotEq(request.txHash, bytes32(0), "Priority tx hash should not be zero");
 
         // Verify balances
-        // ETH consumed via secondBridgeValue
+        // ETH consumed via indirectCallValue
         assertEq(currentUser.balance, userEthBefore - l2Value, "User ETH should decrease by l2Value");
         // ERC20 base token consumed for gas (mintValue)
         assertEq(
@@ -377,13 +383,13 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         );
         assertEq(uint256(baseTokenLog.topics[1]), currentChainId, "Base token deposit event chainId mismatch");
 
-        // Verify BridgehubDepositInitiated event emission (ETH second bridge)
+        // Verify BridgehubDepositInitiated event emission (ETH cross-chain sender)
         Vm.Log memory depositInitiatedLog = logs.requireOne(
             "BridgehubDepositInitiated(uint256,bytes32,address,bytes32,bytes)"
         );
         assertEq(uint256(depositInitiatedLog.topics[1]), currentChainId, "Deposit initiated event chainId mismatch");
 
-        _handleRequestByMockL2Contract(request, RequestType.TWO_BRIDGES);
+        _handleRequestByMockL2Contract(request, RequestType.INDIRECT);
 
         depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += l2Value;
         depositsBridge[currentChainAddress][ETH_TOKEN_ADDRESS] += l2Value;
@@ -396,9 +402,9 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     }
 
     /// @notice Deposits an ERC20 token to a ZK chain that also uses an ERC20 as its base token,
-    /// using the TwoBridges path.
+    /// using the indirect path.
     /// @dev Two separate ERC20 tokens are involved: the base token (for gas via `mintValue`)
-    /// and the deposit token (for the L2 value via `secondBridgeCalldata`). Both are minted
+    /// and the deposit token (for the L2 value via `indirectCallData`). Both are minted
     /// and approved independently. No ETH is sent with the call.
     /// Caller is responsible for ensuring `currentToken` differs from `baseTokenAddress`.
     function depositERC20ToERC20Chain(uint256 l2Value, address baseTokenAddress) private {
@@ -417,28 +423,31 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
 
         TestnetERC20Token baseToken = TestnetERC20Token(baseTokenAddress);
         baseToken.mint(currentUser, mintValue);
-        baseToken.approve(address(addresses.sharedBridge), mintValue);
+        baseToken.approve(address(addresses.l1NativeTokenVault), mintValue);
 
         currentToken.mint(currentUser, l2Value);
-        currentToken.approve(address(addresses.sharedBridge), l2Value);
+        currentToken.approve(address(addresses.l1NativeTokenVault), l2Value);
 
         uint256 userBaseBefore = baseToken.balanceOf(currentUser);
         uint256 userTokenBefore = currentToken.balanceOf(currentUser);
 
-        bytes memory secondBridgeCallData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
-        L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
+        bytes memory indirectCallData = DataEncoding.encodeAssetRouterDepositData(
+            DataEncoding.encodeNTVAssetId(block.chainid, currentTokenAddress),
+            DataEncoding.encodeBridgeBurnData(l2Value, chainContracts[currentChainId], currentTokenAddress)
+        );
+        L1L2IndirectMessageParams memory requestTx = _createL1L2IndirectMessageParams({
             _chainId: currentChainId,
             _mintValue: mintValue,
-            _secondBridgeValue: 0,
-            _secondBridgeAddress: address(addresses.sharedBridge),
+            _indirectCallValue: 0,
+            _crossChainSender: address(addresses.sharedBridge),
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _secondBridgeCalldata: secondBridgeCallData
+            _indirectCallData: indirectCallData
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges(requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestIndirect(addresses.interopCenter, 0, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -469,7 +478,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
             );
             assertEq(uint256(baseTokenLog.topics[1]), currentChainId, "Base token deposit event chainId mismatch");
 
-            // Verify BridgehubDepositInitiated event emission (ERC20 second bridge)
+            // Verify BridgehubDepositInitiated event emission (ERC20 cross-chain sender)
             Vm.Log memory depositInitiatedLog = logs.requireOne(
                 "BridgehubDepositInitiated(uint256,bytes32,address,bytes32,bytes)"
             );
@@ -480,7 +489,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
             );
         }
 
-        _handleRequestByMockL2Contract(request, RequestType.TWO_BRIDGES);
+        _handleRequestByMockL2Contract(request, RequestType.INDIRECT);
 
         depositsUsers[currentUser][baseTokenAddress] += mintValue;
         depositsBridge[currentChainAddress][baseTokenAddress] += mintValue;
@@ -494,7 +503,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
 
     /// @notice Deposits ETH to a ZK chain that uses ETH as its base token, using the Direct path.
     /// @dev The full `mintValue` (l2Value + gas) is sent as `msg.value` via
-    /// `requestL2TransactionDirect`. The user is dealt exactly `mintValue` in ETH beforehand.
+    /// `L1InteropCenter.sendMessage`. The user is dealt exactly `mintValue` in ETH beforehand.
     function depositEthBase(uint256 l2Value) private {
         uint256 gasPrice = 10000000;
         vm.txGasPrice(gasPrice);
@@ -513,7 +522,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         uint256 userEthBefore = currentUser.balance;
 
         bytes memory callData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
-        L2TransactionRequestDirect memory txRequest = _createL2TransactionRequestDirect({
+        L1L2MessageParams memory txRequest = _createL1L2MessageParams({
             _chainId: currentChainId,
             _mintValue: mintValue,
             _l2Value: l2Value,
@@ -523,7 +532,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionDirect{value: mintValue}(txRequest);
+        bytes32 resultantHash = L1InteropRequests.requestDirect(addresses.interopCenter, mintValue, txRequest);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
@@ -577,13 +586,13 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
 
         uint256 mintValue = l2Value + minRequiredGas;
         currentToken.mint(currentUser, mintValue);
-        currentToken.approve(address(addresses.sharedBridge), mintValue);
+        currentToken.approve(address(addresses.l1NativeTokenVault), mintValue);
 
         uint256 userTokenBefore = currentToken.balanceOf(currentUser);
         uint256 userEthBefore = currentUser.balance;
 
         bytes memory callData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
-        L2TransactionRequestDirect memory txRequest = _createL2TransactionRequestDirect({
+        L1L2MessageParams memory txRequest = _createL1L2MessageParams({
             _chainId: currentChainId,
             _mintValue: mintValue,
             _l2Value: l2Value,
@@ -593,7 +602,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
         });
 
         vm.recordLogs();
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionDirect(txRequest);
+        bytes32 resultantHash = L1InteropRequests.requestDirect(addresses.interopCenter, 0, txRequest);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
@@ -637,7 +646,7 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     /// @notice Routes an ETH deposit to the correct internal handler based on the selected
     /// chain's base token.
     /// @dev If the chain's base token is ETH, uses the Direct path (`depositEthBase`).
-    /// If the chain's base token is ERC20, uses the TwoBridges path (`depositEthToERC20Chain`).
+    /// If the chain's base token is ERC20, uses the indirect path (`depositEthToERC20Chain`).
     function depositEthToBridgeSuccess(
         uint256 userIndexSeed,
         uint256 chainIndexSeed,
@@ -653,9 +662,9 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
     /// @notice Routes an ERC20 deposit to the correct internal handler based on the selected
     /// chain's base token and the deposit token.
     /// @dev Three cases:
-    ///   - ETH-base chain: uses `depositERC20ToEthChain` (TwoBridges, ETH for gas + ERC20 deposit)
+    ///   - ETH-base chain: uses `depositERC20ToEthChain` (indirect, ETH for gas + ERC20 deposit)
     ///   - ERC20-base chain, deposit token == base token: uses `depositERC20Base` (Direct)
-    ///   - ERC20-base chain, deposit token != base token: uses `depositERC20ToERC20Chain` (TwoBridges)
+    ///   - ERC20-base chain, deposit token != base token: uses `depositERC20ToERC20Chain` (indirect)
     function depositERC20ToBridgeSuccess(
         uint256 userIndexSeed,
         uint256 chainIndexSeed,

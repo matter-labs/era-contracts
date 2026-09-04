@@ -227,7 +227,7 @@ impl FixedForceDeploymentsData {
             result,
             verifiers,
             &self.interopCenterBytecodeInfo,
-            "l1-contracts/InteropCenter",
+            verifiers.l2_interop_center_file(),
         );
         // `DeployCTM.s.sol` fills this with `CoreContract.L2InteropHandler`.
         expect_bytecode_info(

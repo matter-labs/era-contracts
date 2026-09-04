@@ -18,6 +18,8 @@
 //! set-asset-handler calls, and RollupDAManager/ServerNotifier ownership
 //! accepts).
 
+use crate::common::l1_interop;
+
 use alloy::{
     hex,
     primitives::{keccak256, Address, Bytes, FixedBytes, U256},
@@ -298,9 +300,28 @@ async fn verify_gateway_bring_up_calls(
     result.print_info("== Gov stage 2 new-Gateway bring-up ===");
 
     // (offset, target_name, method_signature)
-    let direct = "requestL2TransactionDirect((uint256,uint256,address,uint256,bytes,uint256,uint256,bytes[],address))";
-    let two_bridges =
+    let historical_direct = "requestL2TransactionDirect((uint256,uint256,address,uint256,bytes,uint256,uint256,bytes[],address))";
+    let historical_indirect =
         "requestL2TransactionTwoBridges((uint256,uint256,uint256,uint256,uint256,address,address,uint256,bytes))";
+    let has_l1_center = verifiers
+        .address_verifier
+        .name_to_address
+        .contains_key("l1_interop_center_proxy");
+    let request_target = if has_l1_center {
+        "l1_interop_center_proxy"
+    } else {
+        "bridgehub_proxy"
+    };
+    let direct = if has_l1_center {
+        "sendMessage(bytes,bytes,bytes[])"
+    } else {
+        historical_direct
+    };
+    let two_bridges = if has_l1_center {
+        "sendMessage(bytes,bytes,bytes[])"
+    } else {
+        historical_indirect
+    };
     let expected: &[(usize, &str, &str)] = &[
         // Whitelist the new Gateway as a settlement layer on L1 Bridgehub.
         (
@@ -309,7 +330,7 @@ async fn verify_gateway_bring_up_calls(
             "setSettlementLayerStatus(uint256,bool)",
         ),
         // addChainTypeManager L1→L2 (priority tx) — approve + direct.
-        (2, "bridgehub_proxy", direct),
+        (2, request_target, direct),
         // setAssetDeploymentTracker on L1AssetRouter (L1-side, no approve).
         (
             3,
@@ -323,13 +344,13 @@ async fn verify_gateway_bring_up_calls(
             "registerCTMAssetOnL1(address)",
         ),
         // setAssetHandler for chain assetId — approve + two-bridges.
-        (6, "bridgehub_proxy", two_bridges),
+        (6, request_target, two_bridges),
         // chain-asset-handler registration for GW CTM — approve + two-bridges.
-        (8, "bridgehub_proxy", two_bridges),
+        (8, request_target, two_bridges),
         // acceptOwnership on RollupDAManager — approve + direct.
-        (10, "bridgehub_proxy", direct),
+        (10, request_target, direct),
         // acceptOwnership on ServerNotifier — approve + direct.
-        (12, "bridgehub_proxy", direct),
+        (12, request_target, direct),
     ];
 
     // Pass 1 — target + selector check for every entry in the 13-call block.
@@ -684,6 +705,24 @@ fn decode_direct_request(
             "Call #{idx}: requestL2TransactionDirect calldata is too short"
         )));
     }
+    if l1_interop::is_send_message(&call.data) {
+        return Some(l1_interop::decode(&call.data).and_then(|req| {
+            if req.indirect_value.is_some() {
+                return Err("expected direct L1 message".into());
+            }
+            Ok(L2TransactionRequestDirect {
+                chainId: req.chain_id,
+                mintValue: req.mint_value,
+                l2Contract: req.recipient,
+                l2Value: req.call_value,
+                l2Calldata: req.payload,
+                l2GasLimit: req.gas_limit,
+                l2GasPerPubdataByteLimit: req.gas_per_pubdata,
+                factoryDeps: req.factory_deps,
+                refundRecipient: req.refund_recipient,
+            })
+        }));
+    }
     Some(
         L2TransactionRequestDirect::abi_decode(&call.data[4..]).map_err(|err| {
             format!("Call #{idx}: failed to decode L2TransactionRequestDirect: {err}")
@@ -700,6 +739,22 @@ fn decode_two_bridges_request(
         return Some(Err(format!(
             "Call #{idx}: requestL2TransactionTwoBridges calldata is too short"
         )));
+    }
+    if l1_interop::is_send_message(&call.data) {
+        return Some(l1_interop::decode(&call.data).and_then(|req| {
+            let indirect_value = req.indirect_value.ok_or("expected indirect L1 message")?;
+            Ok(L2TransactionRequestTwoBridgesOuter {
+                chainId: req.chain_id,
+                mintValue: req.mint_value,
+                l2Value: req.call_value,
+                l2GasLimit: req.gas_limit,
+                l2GasPerPubdataByteLimit: req.gas_per_pubdata,
+                refundRecipient: req.refund_recipient,
+                secondBridgeAddress: req.recipient,
+                secondBridgeValue: indirect_value,
+                secondBridgeCalldata: req.payload,
+            })
+        }));
     }
     Some(
         L2TransactionRequestTwoBridgesOuter::abi_decode(&call.data[4..]).map_err(|err| {
@@ -720,7 +775,9 @@ fn priority_mint_value(calls: &CallList, idx: usize) -> Option<Result<U256, Stri
         compute_selector("requestL2TransactionDirect((uint256,uint256,address,uint256,bytes,uint256,uint256,bytes[],address))");
     let two_bridges_selector =
         compute_selector("requestL2TransactionTwoBridges((uint256,uint256,uint256,uint256,uint256,address,address,uint256,bytes))");
-    if selector == direct_selector {
+    if l1_interop::is_send_message(&call.data) {
+        Some(l1_interop::decode(&call.data).map(|req| req.mint_value))
+    } else if selector == direct_selector {
         decode_direct_request(calls, idx).map(|decoded| decoded.map(|req| req.mintValue))
     } else if selector == two_bridges_selector {
         decode_two_bridges_request(calls, idx).map(|decoded| decoded.map(|req| req.mintValue))
@@ -1166,4 +1223,131 @@ fn report_expected_two_bridge_inner_call(
     result.report_ok(&format!(
         "GW priority tx #{idx} ({label}) second bridge is expected to emit L2 call {expected_selector} to {expected_l2_contract}"
     ));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::upgrade_verification::versions::v31::elements::{
+        call_list::Call,
+        governance_stage_calls::{
+            requestL2TransactionDirectCall, requestL2TransactionTwoBridgesCall,
+        },
+    };
+
+    fn calls(data: Vec<u8>) -> CallList {
+        CallList {
+            elems: vec![Call {
+                target: Address::ZERO,
+                value: U256::ZERO,
+                data: data.into(),
+            }],
+        }
+    }
+
+    #[test]
+    fn historical_priority_selectors_and_dynamic_fields_remain_decodable() {
+        let direct = L2TransactionRequestDirect {
+            chainId: U256::from(506),
+            mintValue: U256::from(123),
+            l2Contract: Address::repeat_byte(0x11),
+            l2Value: U256::from(17),
+            l2Calldata: Bytes::from_static(b"historical payload"),
+            l2GasLimit: U256::from(1_000_000),
+            l2GasPerPubdataByteLimit: U256::from(800),
+            factoryDeps: vec![Bytes::from_static(b"factory dependency")],
+            refundRecipient: Address::repeat_byte(0x22),
+        };
+        let encoded = requestL2TransactionDirectCall::new((direct.clone(),)).abi_encode();
+        assert_eq!(&encoded[..4], &[0xd5, 0x24, 0x71, 0xc1]);
+        let list = calls(encoded);
+        assert_eq!(
+            decode_direct_request(&list, 0)
+                .unwrap()
+                .unwrap()
+                .abi_encode(),
+            direct.abi_encode()
+        );
+        assert_eq!(
+            priority_mint_value(&list, 0).unwrap().unwrap(),
+            direct.mintValue
+        );
+
+        let indirect = L2TransactionRequestTwoBridgesOuter {
+            chainId: direct.chainId,
+            mintValue: direct.mintValue,
+            l2Value: direct.l2Value,
+            l2GasLimit: direct.l2GasLimit,
+            l2GasPerPubdataByteLimit: direct.l2GasPerPubdataByteLimit,
+            refundRecipient: direct.refundRecipient,
+            secondBridgeAddress: direct.l2Contract,
+            secondBridgeValue: U256::from(29),
+            secondBridgeCalldata: direct.l2Calldata,
+        };
+        let encoded = requestL2TransactionTwoBridgesCall::new((indirect.clone(),)).abi_encode();
+        assert_eq!(&encoded[..4], &[0x24, 0xfd, 0x57, 0xfb]);
+        let list = calls(encoded);
+        assert_eq!(
+            decode_two_bridges_request(&list, 0)
+                .unwrap()
+                .unwrap()
+                .abi_encode(),
+            indirect.abi_encode()
+        );
+        assert_eq!(
+            priority_mint_value(&list, 0).unwrap().unwrap(),
+            indirect.mintValue
+        );
+    }
+
+    #[test]
+    fn current_priority_adapters_preserve_values_and_reject_wrong_mode() {
+        let recipient =
+            hex::decode("000100000201fa140000000000000000000000000000000000012345").unwrap();
+        let mut message = l1_interop::sendMessageCall::new((
+            recipient.into(),
+            Bytes::from_static(b"payload"),
+            vec![
+                l1_interop::l1ToL2TransactionParamsCall::new((
+                    U256::from(100),
+                    U256::from(1_000_000),
+                    U256::from(800),
+                    Address::repeat_byte(0x22),
+                ))
+                .abi_encode()
+                .into(),
+                l1_interop::interopCallValueCall::new((U256::from(17),))
+                    .abi_encode()
+                    .into(),
+            ],
+        ));
+        let direct_calls = calls(message.abi_encode());
+        let direct = decode_direct_request(&direct_calls, 0).unwrap().unwrap();
+        assert_eq!(direct.chainId, U256::from(506));
+        assert_eq!(direct.l2Value, U256::from(17));
+        assert_eq!(direct.refundRecipient, Address::repeat_byte(0x22));
+        assert_eq!(
+            priority_mint_value(&direct_calls, 0).unwrap().unwrap(),
+            U256::from(100)
+        );
+        assert!(decode_two_bridges_request(&direct_calls, 0)
+            .unwrap()
+            .is_err());
+        message.attributes.push(
+            l1_interop::indirectCallCall::new((U256::from(29),))
+                .abi_encode()
+                .into(),
+        );
+        let indirect_calls = calls(message.abi_encode());
+        let indirect = decode_two_bridges_request(&indirect_calls, 0)
+            .unwrap()
+            .unwrap();
+        assert_eq!(indirect.secondBridgeAddress, direct.l2Contract);
+        assert_eq!(indirect.secondBridgeCalldata, direct.l2Calldata);
+        assert_eq!(indirect.secondBridgeValue, U256::from(29));
+        assert_eq!(indirect.l2Value, direct.l2Value);
+        assert!(decode_direct_request(&indirect_calls, 0).unwrap().is_err());
+        assert!(priority_mint_value(&calls(vec![0; 3]), 0).unwrap().is_err());
+        assert!(priority_mint_value(&calls(vec![0; 4]), 0).unwrap().is_err());
+    }
 }

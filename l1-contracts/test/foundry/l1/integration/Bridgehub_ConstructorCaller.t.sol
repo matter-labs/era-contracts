@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IL1Bridgehub, L2TransactionRequestDirect} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {L1InteropRequests} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {L1L2MessageParams} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 
 import {ConstructorForwarder} from "contracts/dev-contracts/ConstructorForwarder.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -53,7 +55,7 @@ contract Bridgehub_ConstructorCaller is BridgehubInvariantTests {
         uint256 mintValue = l2Value + minRequiredGas;
 
         bytes memory callData = abi.encode(ETH_TOKEN_ADDRESS, l2Value, chainContracts[currentChainId]);
-        L2TransactionRequestDirect memory txRequest = _createL2TransactionRequestDirect({
+        L1L2MessageParams memory txRequest = _createL1L2MessageParams({
             _chainId: currentChainId,
             _mintValue: mintValue,
             _l2Value: l2Value,
@@ -64,16 +66,13 @@ contract Bridgehub_ConstructorCaller is BridgehubInvariantTests {
         // The refund recipient is deliberately left unset to exercise the default resolution.
         txRequest.refundRecipient = address(0);
 
-        bytes memory bridgehubCalldata = abi.encodeWithSelector(
-            IL1Bridgehub.requestL2TransactionDirect.selector,
-            txRequest
-        );
+        bytes memory bridgehubCalldata = L1InteropRequests.encodeDirectCalldata(txRequest);
 
         vm.deal(address(this), mintValue);
         vm.recordLogs();
         // The forwarder performs the Bridgehub call inside its own constructor.
         ConstructorForwarder forwarder = new ConstructorForwarder{value: mintValue}(
-            address(addresses.bridgehub),
+            address(addresses.interopCenter),
             bridgehubCalldata
         );
 

@@ -11,6 +11,7 @@ export interface AnvilChain {
 
 export interface CoreDeployedAddresses {
   bridgehub: string;
+  l1InteropCenter?: string;
   stateTransitionManager: string;
   validatorTimelock: string;
   l1SharedBridge: string;

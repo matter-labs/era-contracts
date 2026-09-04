@@ -37,7 +37,7 @@ import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
-import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {L2InteropCenter} from "contracts/interop/interop-center/L2InteropCenter.sol";
 import {CallStatus} from "contracts/common/Messaging.sol";
 import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
 
@@ -66,7 +66,7 @@ import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
 
-    // Function selector for requestL2TransactionDirect(L2TransactionRequestDirect)
+    // Function selector for the L1 ERC-7786 send surface
     bytes4 private constant REQUEST_L2_TX_DIRECT_SELECTOR = 0xd52471c1;
 
     /// @dev Interop is atomic: execution/verification is gated by the AtomicFlowManager's IMT-based
@@ -82,7 +82,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         );
     }
 
-    function test_requestL2TransactionDirectWithCalldata() public {
+    function test_sendDirectWithCalldata() public {
         uint256 chainId = 505;
         uint256 mintValue = 20000000000000000000; // 20 ETH
         address l2Contract = 0x9Ca26d77cDe9CFf9145D06725b400b2Ec4Bbc616;
@@ -129,7 +129,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
 
         assertTrue(proof.chainId > 0, "Chain ID should be positive");
         assertTrue(proof.proof.length > 0, "Proof should have elements");
-        assertEq(proof.message.sender, L2_INTEROP_CENTER_ADDR, "Message sender should be InteropCenter");
+        assertEq(proof.message.sender, L2_INTEROP_CENTER_ADDR, "Message sender should be L2InteropCenter");
 
         // Mock the verification call for L1 context tests
         vm.mockCall(
@@ -416,10 +416,10 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     }
 
     // Note: the public-path test_verifyBundle_revertWhen_messageNotFromInteropCenter (UnauthorizedMessageSender
-    // when the L1 message sender was not the InteropCenter) does not apply to the L2 atomic handler, which
-    // authenticates via the AtomicFlowManager IMT gate rather than the message sender. The InteropCenter-as-
+    // when the L1 message sender was not the L2InteropCenter) does not apply to the L2 atomic handler, which
+    // authenticates via the AtomicFlowManager IMT gate rather than the message sender. The L2InteropCenter-as-
     // author authentication is NOT dropped — it moves to `AtomicFlowManager.append` being `onlyInteropCenter`
-    // (only the InteropCenter can commit a bundle to the IMT, so only its bundles can be finalized here). That
+    // (only the L2InteropCenter can commit a bundle to the IMT, so only its bundles can be finalized here). That
     // gate is covered by AtomicFlowManagerAccessControl.t.sol; the L1 message-sender check for withdrawals is
     // covered by L1InteropHandler.t.sol (test_ExecuteBundle_RevertWhen_UnauthorizedMessageSender).
 
@@ -495,14 +495,14 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(bundle, finality);
     }
 
-    /// @notice Test pause functionality in InteropCenter
+    /// @notice Test pause functionality in L2InteropCenter
     function test_interopCenter_pause() public {
-        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+        address interopCenterOwner = L2InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
 
         vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
 
-        assertTrue(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be paused");
+        assertTrue(L2InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "L2InteropCenter should be paused");
 
         bytes memory recipient = abi.encodePacked(uint256(271), address(0x123));
         bytes memory payload = abi.encode("test");
@@ -510,42 +510,42 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
 
         // The whenNotPaused modifier reverts before the atomic-attribute check, so no attributes needed.
         vm.expectRevert("Pausable: paused");
-        InteropCenter(L2_INTEROP_CENTER_ADDR).sendMessage(recipient, payload, attributes);
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).sendMessage(recipient, payload, attributes);
     }
 
-    /// @notice Test unpause functionality in InteropCenter
+    /// @notice Test unpause functionality in L2InteropCenter
     function test_interopCenter_unpause() public {
-        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+        address interopCenterOwner = L2InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
 
         vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
-        assertTrue(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be paused");
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+        assertTrue(L2InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "L2InteropCenter should be paused");
 
         vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
 
-        assertFalse(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be unpaused");
+        assertFalse(L2InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "L2InteropCenter should be unpaused");
     }
 
-    /// @notice Test that only owner can pause InteropCenter
+    /// @notice Test that only owner can pause L2InteropCenter
     function test_interopCenter_pause_onlyOwner() public {
         address nonOwner = makeAddr("nonOwner");
 
         vm.prank(nonOwner);
         vm.expectRevert("Ownable: caller is not the owner");
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
     }
 
-    /// @notice Test that only owner can unpause InteropCenter
+    /// @notice Test that only owner can unpause L2InteropCenter
     function test_interopCenter_unpause_onlyOwner() public {
-        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+        address interopCenterOwner = L2InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
         vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
 
         address nonOwner = makeAddr("nonOwner");
         vm.prank(nonOwner);
         vm.expectRevert("Ownable: caller is not the owner");
-        InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
     }
 
     /// @notice `verifyAtomicBundle` marks the bundle `Verified` and emits `BundleVerified`, and does so

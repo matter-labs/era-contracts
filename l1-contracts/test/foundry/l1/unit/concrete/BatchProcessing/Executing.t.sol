@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {L1InteropRequests} from "../../../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {StdStorage, Test, Vm, stdStorage} from "forge-std/Test.sol";
 import {EVENT_INDEX, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../Utils/Utils.sol";
 
@@ -28,7 +29,7 @@ import {
 import {PriorityOpsBatchInfo, PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InteropRoot} from "contracts/common/Messaging.sol";
-import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L1L2MessageParams} from "../../../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 
 contract ExecutingTest is ExecutorTest {
@@ -399,8 +400,10 @@ contract ExecutingTest is ExecutorTest {
         uint256 l2Value = 10 ether;
         uint256 totalCost = baseCost + l2Value;
 
-        dummyBridgehub.requestL2TransactionDirect{value: totalCost}(
-            L2TransactionRequestDirect({
+        L1InteropRequests.requestDirect(
+            l1InteropCenter,
+            totalCost,
+            L1L2MessageParams({
                 chainId: l2ChainId,
                 mintValue: totalCost,
                 l2Contract: address(0),

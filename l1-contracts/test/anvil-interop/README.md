@@ -2,11 +2,21 @@
 
 End-to-end tests for ZKsync interoperability across 6 Anvil chains: L1 contract deployment, L1<->L2 bridging (ETH + ERC20), L2<->L2 interop transfers, and gateway setup with chain migration.
 
+L1 deposits use the registered `L1InteropCenter.sendMessage`: direct sends carry transaction
+parameters, value and factory dependencies; token deposits add `indirectCall` and target the
+L1 asset router. Encoders live in `src/core/interop-requests.ts`, with ABIs loaded through
+`src/core/contracts.ts`. Gateway migration still reads `BridgehubDepositFinalized` to obtain
+the canonical priority hash. See [the protocol design](../../../protocol-docs/l1-interop-center.md).
+
+After changing this send surface, regenerate only `chain-states/v0.34.0/`, then run both the
+integration suite and `yarn test:v31-to-v32`. The latter uses the frozen v31 source fixture;
+its older Bridgehub has no center getter, so the upgrade deploys and wires the new proxy.
+
 ## Chain Topology
 
 ```
 ┌──────────────┐
-│  L1 (31337)  │  port 9545 — Bridgehub, CTM, L1AssetRouter, L1NTV
+│  L1 (31337)  │  port 9545 — Bridgehub, L1InteropCenter, CTM, L1AssetRouter, L1NTV
 │  settlement  │
 └──────┬───────┘
        │
