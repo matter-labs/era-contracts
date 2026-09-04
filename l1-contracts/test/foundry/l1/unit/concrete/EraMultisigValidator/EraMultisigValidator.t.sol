@@ -16,6 +16,7 @@ import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts
 import {AddressHasNoCode, RoleAccessDenied} from "contracts/common/L1ContractErrors.sol";
 import {
     AlreadySigned,
+    ExecutionDelayNotConfigurable,
     InitializeNotAvailable,
     MemberAlreadyExists,
     MemberDoesNotExist,
@@ -689,5 +690,80 @@ contract EraMultisigValidatorTest is Test {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
         bytes32 hash = eraMultisig.calculateHash(chainAddress, from, to, data);
         assertTrue(hash != bytes32(0));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    EXECUTION DELAY READ-THROUGH
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev The downstream timelock is a real contract here, so the read-through path is really exercised.
+
+    function test_executionDelay_readsThroughToValidatorTimelock() public {
+        vm.prank(owner);
+        validatorTimelock.setExecutionDelay(1 hours);
+
+        assertEq(validatorTimelock.executionDelay(), 1 hours);
+        assertEq(eraMultisig.executionDelay(), 1 hours);
+    }
+
+    function test_chainExecutionDelay_readsThroughToValidatorTimelock() public {
+        vm.prank(owner);
+        validatorTimelock.setChainExecutionDelay(chainAddress, 2 days);
+
+        assertEq(validatorTimelock.chainExecutionDelay(chainAddress), 2 days);
+        assertEq(eraMultisig.chainExecutionDelay(chainAddress), 2 days);
+        // A chain that never set its own delay reads through as zero as well.
+        assertEq(eraMultisig.chainExecutionDelay(makeAddr("otherChain")), 0);
+    }
+
+    /// @dev The read-through must preserve the downstream `max(ecosystem, chain)` semantics.
+    function test_getExecutionDelay_readsThroughToValidatorTimelock() public {
+        vm.startPrank(owner);
+        validatorTimelock.setExecutionDelay(1 hours);
+        validatorTimelock.setChainExecutionDelay(chainAddress, 3 hours);
+        vm.stopPrank();
+
+        assertEq(eraMultisig.getExecutionDelay(chainAddress), 3 hours);
+
+        // Raising the ecosystem-wide floor above the chain's own value must be reflected too.
+        vm.prank(owner);
+        validatorTimelock.setExecutionDelay(5 hours);
+        assertEq(eraMultisig.getExecutionDelay(chainAddress), 5 hours);
+    }
+
+    /// @dev The setters are disabled so a caller cannot get a successful tx that changes nothing.
+    function test_RevertWhen_setExecutionDelay() public {
+        vm.expectRevert(ExecutionDelayNotConfigurable.selector);
+        vm.prank(owner);
+        eraMultisig.setExecutionDelay(1 hours);
+    }
+
+    function test_RevertWhen_increaseChainExecutionDelay() public {
+        // `owner` is the chain admin, i.e. the party that would otherwise be authorised.
+        vm.expectRevert(ExecutionDelayNotConfigurable.selector);
+        vm.prank(owner);
+        eraMultisig.increaseChainExecutionDelay(chainAddress, 1 hours);
+    }
+
+    function test_RevertWhen_setChainExecutionDelay() public {
+        vm.expectRevert(ExecutionDelayNotConfigurable.selector);
+        vm.prank(owner);
+        eraMultisig.setChainExecutionDelay(chainAddress, 1 hours);
+    }
+
+    /// @dev The revert is caller-independent: no access-control error, the function is just unavailable.
+    function test_RevertWhen_setExecutionDelayNonOwner() public {
+        vm.expectRevert(ExecutionDelayNotConfigurable.selector);
+        vm.prank(nonMember);
+        eraMultisig.setExecutionDelay(1 hours);
+    }
+
+    /// @dev Configuring the downstream timelock still works and is reflected here.
+    function test_setExecutionDelayOnDownstreamTimelockIsReflected() public {
+        vm.prank(owner);
+        validatorTimelock.setExecutionDelay(90 minutes);
+
+        assertEq(eraMultisig.executionDelay(), 90 minutes);
+        assertEq(eraMultisig.getExecutionDelay(chainAddress), 90 minutes);
     }
 }
