@@ -20,7 +20,7 @@ not an ancestor and current genesis remains `0.32.0`, execution version 5.
 
 - Remove the two Bridgehub request ABIs immediately. This assumes no external v34
   consumers or cross-chain sender implementations; repository search finds three
-  production implementors but cannot establish the external inventory. One-release
+  production implementers but cannot establish the external inventory. One-release
   forwarding shims are the rejected alternative if partners still require them.
 - Resolve authorization dynamically through Bridgehub. Per-chain storage saves gas
   but adds diamond storage and a configuration migration for every chain.
@@ -46,17 +46,17 @@ The detailed design, alternatives and migration instructions are in
 
 ## Behavior and regression coverage
 
-| Change                                                                                        | Justification and coverage                                                                                                                                                                                                                     |
-| --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| New permissionless sends, owner-only pause/unpause, locked initializer, nonreentrant wrappers | `Interop/L1InteropCenter.t.sol`, `Interop/InteropAttributeDomains.t.sol`: direct/indirect success and failure, exact funding fuzzing, bundle length, attributes, event recipient, owner/zero-address checks and reentry through both wrappers. |
-| Mailbox and three L1 senders accept only the registered center                                | `Base/OnlyL1InteropCenter.t.sol`, Mailbox request tests, AssetRouter, CTMDeploymentTracker and ChainRegistrationSender tests include unauthorized Bridgehub/caller negatives and confirmation access checks.                                   |
-| Canonical confirmation after Mailbox dispatch                                                 | `integration/L1InteropCenterIntegration.t.sol`: real router/vault/Mailbox/nullifier, recorded `depositHappened`, canonical hash and `bridgeRecoverFailedTransfer` refund. Only the L2 inclusion proof is mocked to isolate proof verification. |
-| Exact funding across ETH and ERC20 base/deposit assets                                        | Integration funding matrix and `L1InteropDepositHarnesses.t.sol` exercise both migrated deposit harnesses. `L1InteropRequestHelpers.t.sol` fuzzes forwarded ETH in governance/admin helpers.                                                   |
-| Bridgehub registry setter                                                                     | Bridgehub tests check owner/upgrader access, zero address rejection, event and state. The field occupies the first reserved gap slot.                                                                                                          |
-| Migration admin recognition                                                                   | PermanentRestriction tests cover valid message/bundle, direct false positives, truncated attributes, old selectors and unapproved admins.                                                                                                      |
-| Upgrade deployment and wiring                                                                 | `Upgrades/L1InteropCenterWiring.t.sol` checks new proxy ownership/registration, existing proxy upgrade preserving owner/pause state, and missing proxy rejection. Local upgrade integration and the frozen v31 harness pass.                   |
-| L2 rename and mirrored indirect vocabulary                                                    | Full L2 Foundry and Anvil interop suites; executable runtime equality and unchanged storage below. The built-in still rejects initiation on L1.                                                                                                |
-| Historical and current tooling                                                                | Rust tests retain selectors `0xd52471c1` and `0x24fd57fb`, check current mode/value decoding, simulator recognition, gateway CREATE2 decoding and stage-1 layout. TS tests cover ERC-7930 recipients and attribute encoding.                   |
+| Change                                                                                        | Justification and coverage                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| New permissionless sends, owner-only pause/unpause, locked initializer, nonreentrant wrappers | `Interop/L1InteropCenter.t.sol`, `Interop/InteropAttributeDomains.t.sol`: direct/indirect success and failure, exact funding fuzzing, bundle length, attributes, event recipient, owner/zero-address checks and reentry through both wrappers.                                                                                                                        |
+| Mailbox and three L1 senders accept only the registered center                                | `Base/OnlyL1InteropCenter.t.sol`, Mailbox request tests, AssetRouter, CTMDeploymentTracker and ChainRegistrationSender tests include unauthorized Bridgehub/caller negatives and confirmation access checks.                                                                                                                                                          |
+| Canonical confirmation after Mailbox dispatch                                                 | `integration/L1InteropCenterIntegration.t.sol`: real router/vault/Mailbox/nullifier, recorded `depositHappened`, canonical hash and `bridgeRecoverFailedTransfer` refund. Only the L2 inclusion proof is mocked to isolate proof verification.                                                                                                                        |
+| Exact funding across ETH and ERC20 base/deposit assets                                        | Integration funding matrix and `L1InteropDepositHarnesses.t.sol` exercise both migrated deposit harnesses. `L1InteropRequestHelpers.t.sol` fuzzes forwarded ETH; `L1InteropRequestHelpersIntegration.t.sol` executes all four governance/admin, direct/indirect ERC20-base combinations against the real vault and Mailbox.                                           |
+| Bridgehub registry setter                                                                     | Bridgehub tests check owner/upgrader access, zero address rejection, event and state. The field occupies the first reserved gap slot.                                                                                                                                                                                                                                 |
+| Migration admin recognition                                                                   | PermanentRestriction tests cover valid message/bundle, direct false positives, truncated attributes, old selectors and unapproved admins.                                                                                                                                                                                                                             |
+| Upgrade deployment and wiring                                                                 | `Upgrades/L1InteropCenterWiring.t.sol` checks new proxy ownership/registration, existing proxy upgrade preserving owner/pause state, and missing proxy rejection. `L1InteropCenterOwnership.t.sol` covers governance acceptance; `L1InteropCenterDiscovery.t.sol` covers historical/current registry ABIs. Local upgrade integration and the frozen v31 harness pass. |
+| L2 rename and mirrored indirect vocabulary                                                    | Full L2 Foundry and Anvil interop suites; executable runtime equality and unchanged storage below. The built-in still rejects initiation on L1.                                                                                                                                                                                                                       |
+| Historical and current tooling                                                                | Rust tests retain selectors `0xd52471c1` and `0x24fd57fb`, check current mode/value decoding, simulator recognition, gateway CREATE2 decoding, stage-1 new/existing proxy provenance, optional historical aliases and current stage-2 approval/call positions. TS tests cover ERC-7930 recipients and attribute encoding.                                             |
 
 Prividium's sender remains the L1 asset router; its tests run in the full suite.
 The nullifier's forwarded confirmation ABI and `BridgehubDepositFinalized` event remain
@@ -118,27 +118,30 @@ Reproduce current measurements with `L1RequestGas.t.sol`.
 ## Validation
 
 Toolchain: upstream Foundry v1.5.1, commit `b0a9dd9ce` (repository pin), Solidity 0.8.28,
-Node 22, Yarn 1.22.22, Rust 1.95. All commands are local; Anvil creates local chains only.
+Node 22, Yarn 1.22.22, Rust 1.91.1 for protocol-ops checks (matching CI),
+Rust 1.95 for the local upgrade harness, and nightly-2026-02-10 for the OS genesis generator. All commands are local; Anvil creates local chains only.
 Recorded completed runs:
 
-| Command                                                                                                                       | Result                                                                                                                          |
-| ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `forge clean --root da-contracts && forge clean --root l1-contracts` then `yarn da build:foundry` and `yarn l1 build:foundry` | Pass; clean L1 build and ABI copy 195.47 s.                                                                                     |
-| `yarn l1 test:foundry`                                                                                                        | **2,517 passed, 0 failed, 0 skipped**, 300 suites; 66.29 s tests / 68.66 s command. Includes Prividium and gateway integration. |
-| Same full test command at base, with the new direct comparison test                                                           | 2,471 passed, 0 failed; 62.25 s tests / 72.24 s command. Untouched baseline has 2,470 tests.                                    |
-| `yarn lint:check`                                                                                                             | Pass, 19.87 s; markdownlint, solhint, eslint, CI-script typecheck, prettier and 215 documentation anchors.                      |
-| `yarn l1 errors-lint --check`                                                                                                 | Pass; all selector comments correct, 6.56 s.                                                                                    |
-| `yarn calculate-hashes:fix` then `yarn calculate-hashes:check`                                                                | Pass; strict manifest contains 173 contracts, check 1.80 s.                                                                     |
-| `forge selectors list` with normalized final newline                                                                          | Regenerated `l1-contracts/selectors` using upstream Forge; exact comparison checked.                                            |
-| `forge inspect <Contract> storage-layout --json` at base and current source                                                   | All 11 layouts above pass; only the reserved Bridgehub gap changes.                                                             |
-| `cargo fmt --manifest-path protocol-ops/Cargo.toml --check`                                                                   | Pass.                                                                                                                           |
-| `cargo clippy --manifest-path protocol-ops/Cargo.toml --locked --offline --all-targets -- -D warnings`                        | Pass, 7.71 s on the completed run.                                                                                              |
-| `cargo test --manifest-path protocol-ops/Cargo.toml --locked --offline`                                                       | **39 passed, 0 failed**, 0.04 s tests; binary/doc targets also pass.                                                            |
-| Anvil directory: `yarn build` and `yarn test:unit`                                                                            | Pass; 51 unit cases, 2.92 s build / 3.79 s unit command.                                                                        |
-| `ANVIL_INTEROP_PORT_OFFSET=20000 ANVIL_INTEROP_FRESH_DEPLOY=1 yarn l1 test:hardhat:interop`                                   | **105 passing**, 300.53 s total.                                                                                                |
-| Anvil directory: `ANVIL_INTEROP_PORT_OFFSET=20000 yarn test:v31-to-v32`                                                       | Pass; frozen v31 upgrade of L1-settled chain 10 and gateway chain 11 with final-version checks, 254.09 s.                       |
-| Anvil directory: `ANVIL_INTEROP_PORT_OFFSET=20000 yarn setup-and-dump`                                                        | Pass; six v0.34.0 snapshots and addresses regenerated, 183.60 s. Historical snapshots unchanged.                                |
-| `git diff --check` and tracked-file audit                                                                                     | Pass; no dependencies, build outputs or temporary evidence included.                                                            |
+| Command                                                                                                                       | Result                                                                                                                                 |
+| ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `forge clean --root da-contracts && forge clean --root l1-contracts` then `yarn da build:foundry` and `yarn l1 build:foundry` | Pass; clean default-profile build and ABI copy with the pinned dependency remapping.                                                   |
+| `yarn l1 test:foundry`                                                                                                        | **2,524 passed, 0 failed, 0 skipped**, 303 suites; 67.54 s tests / 68.91 s command. Includes Prividium and gateway integration.        |
+| Same full test command at base, with the new direct comparison test                                                           | 2,471 passed, 0 failed; 62.25 s tests / 72.24 s command. Untouched baseline has 2,470 tests.                                           |
+| `yarn lint:check`                                                                                                             | Pass; markdownlint, solhint, eslint, CI-script typecheck, prettier and documentation anchors.                                          |
+| `yarn l1 errors-lint --check`                                                                                                 | Pass; all selector comments correct, 6.56 s.                                                                                           |
+| `yarn calculate-hashes:fix` then `yarn calculate-hashes:check`                                                                | Pass; strict manifest contains 173 contracts, check 1.80 s.                                                                            |
+| OS genesis generator using `nightly-2026-02-10`, `--locked --release`                                                         | Pass; generator artifact rename updated and `configs/genesis/zksync-os/latest.json` reproduces exactly after the clean build.          |
+| `forge selectors list --threads 1` with normalized final newline                                                              | Regenerated `l1-contracts/selectors` using upstream Forge; exact comparison checked.                                                   |
+| `forge inspect <Contract> storage-layout --json` at base and current source                                                   | All 11 layouts above pass; only the reserved Bridgehub gap changes.                                                                    |
+| `cargo fmt --manifest-path protocol-ops/Cargo.toml --check`                                                                   | Pass.                                                                                                                                  |
+| `cargo clippy --manifest-path protocol-ops/Cargo.toml --locked --offline --all-targets -- -D warnings`                        | Pass with the CI-pinned Rust toolchain.                                                                                                |
+| `cargo test --manifest-path protocol-ops/Cargo.toml --locked --offline`                                                       | **46 passed, 0 failed**; binary/doc targets also pass.                                                                                 |
+| Anvil directory: `yarn tsc --noEmit` and `yarn test:unit`                                                                     | Pass; 51 unit cases and TypeScript typecheck.                                                                                          |
+| `ANVIL_INTEROP_PORT_OFFSET=20000 ANVIL_INTEROP_FRESH_DEPLOY=1 yarn l1 test:hardhat:interop`                                   | **105 passing**, 300.53 s total.                                                                                                       |
+| Anvil directory: `ANVIL_INTEROP_PORT_OFFSET=20000 yarn test:v31-to-v32`                                                       | Pass; frozen v31 upgrade of L1-settled chain 10 and gateway chain 11 with final-version checks, 240.04 s.                              |
+| Anvil directory: `ANVIL_INTEROP_PORT_OFFSET=20000 yarn setup-and-dump`                                                        | Pass; six v0.34.0 snapshots and addresses regenerated twice (190.37 / 145.98 s); CI comparator passes. Historical snapshots unchanged. |
+| `yarn l1 test:hardhat:interop --port-offset 20000`                                                                            | **104 passing**, all ten groups; 82.1 s test run.                                                                                      |
+| `git diff --check` and tracked-file audit                                                                                     | Pass; no dependencies, build outputs or temporary evidence included.                                                                   |
 
 Rust used a workspace-local `CARGO_HOME` containing the already-installed registry cache.
 Foundry tests required host execution because sandboxed macOS system-configuration lookup
@@ -158,16 +161,42 @@ result = subprocess.run(
 pathlib.Path("l1-contracts/selectors").write_text(result.stdout.rstrip() + "\n")
 ```
 
-The state dumper's final formatting glob had no matches; `addresses.json` was explicitly
-formatted afterward. Only task-owned Anvil ports were used and cleaned up. Generated
+The state dumper uses a relative formatting glob so workspace punctuation cannot prevent
+formatting. Only task-owned Anvil ports were used and cleaned up. Generated
 chain-11/chain-14 test config changes were restored after runs.
+
+## CI and review corrections
+
+The first CI run exposed five failures, addressed at their sources:
+
+- Pin the duplicate `erc4626-tests` remapping to CI's resolution. All 156 L1 manifest
+  entries differed only through compiler metadata; the 17 DA entries already matched.
+- Rebuild DA contracts in the snapshot writer after selecting `anvil-interop`. The
+  prior local snapshots embedded default-profile DA bytecode and different CREATE2 addresses.
+- Use `L2InteropCenter` in the OS genesis generator and regenerate the genesis image.
+- Preserve CTMDeploymentTracker's scoped `locked-ether` annotation on its renamed
+  payable interface method, which immediately rejects nonzero ETH. No detector was disabled globally.
+- Correct the spelling of “implementers” in the documentation.
+
+Independent review passes also tightened deployment ownership acceptance, historical CTM
+address discovery, explicit new/existing proxy provenance, and optional historical address
+aliases. ERC20 request helpers approve the NativeTokenVault that performs `transferFrom`;
+the Rust verifier mirrors that spender and the current 13-call gateway layout, binds
+approvals to Bridgehub's registered gateway base token, and rejects ETH-bearing approvals. Targeted
+regressions accompany these fixes. These are independent agent reviews, not approvals
+from the named human reviewers or a quantified probability of approval.
 
 ## Limits and follow-ups
 
 No production/mainnet fork upgrade was attempted: the full repository command explicitly
 excludes the RPC-dependent mainnet test and ChainRegistrarTest. All required local suites
 were run; live Safe/governance execution and external integrator compatibility remain human
-release checks. The existing disabled withdrawal invariants (EVM-1391) were not enabled;
+release checks. Historical Rust tests retain request/approval decoding from real frozen calldata. Full
+verification of the old 16-call gateway ceremony remains outside the current 13-call
+verifier, as on the base branch. The v31 upgrade harness prepares and executes the current
+upgrade ceremony against frozen v31 state.
+
+The existing disabled withdrawal invariants (EVM-1391) were not enabled;
 both migrated deposit helper families are exercised by explicit matrix tests.
 
 Proposed follow-ups, not filed:
@@ -191,8 +220,8 @@ Protocol owns the change; Kalman Lajko is the natural interop/interface reviewer
 Stanislav Bezkorovainyi the deployment/tooling reviewer, with bridge/withdrawal reviewers
 for custody and recovery. No review requests were sent.
 
-ABIs, selectors, AllContractsHashes and v0.34.0 states are regenerated locally; no artifact
-regeneration workflow is needed for the current source. Normal PR CI should verify them;
+ABIs, selectors, AllContractsHashes, the OS genesis and v0.34.0 states are regenerated locally.
+PR CI verifies them at the reviewed commit;
 the hash-update workflow only accepts upstream-repository branches, so it cannot update
 this fork PR directly. The human may comment on EVM-1521 with the draft PR and validation
 results and select the appropriate status once review is ready. No Linear, Slack or Notion

@@ -30,6 +30,14 @@ pub(crate) struct EcosystemUpgradeArtifact {
     pub(crate) misc: toml::Value,
 }
 
+pub(crate) fn l1_interop_center_new_proxy(core: &toml::Value) -> anyhow::Result<bool> {
+    core.get("upgrade_addresses")
+        .and_then(|value| value.get("bridgehub"))
+        .and_then(|value| value.get("l1_interop_center_new_proxy"))
+        .and_then(toml::Value::as_bool)
+        .context("current core artifact requires boolean bridgehub.l1_interop_center_new_proxy")
+}
+
 #[derive(Debug)]
 pub(crate) struct NewGatewayArtifact {
     /// `gateway_state_transition.chain_type_manager_proxy_addr` — the L1

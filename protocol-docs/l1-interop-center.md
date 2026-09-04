@@ -29,8 +29,8 @@ The returned send ID is the canonical Mailbox priority-transaction hash.
   built-in deployment is inappropriate for an L1 contract.
 - **Keep: remove the Bridgehub request entry points.** This assumes the fresh
   v34 OS-only line has no external request consumers or external
-  `IL1CrossChainSender` implementors. The repository contains three production
-  implementors: L1AssetRouter, CTMDeploymentTracker and ChainRegistrationSender.
+  `IL1CrossChainSender` implementers. The repository contains three production
+  implementers: L1AssetRouter, CTMDeploymentTracker and ChainRegistrationSender.
   Repository search cannot prove absence of external implementations; the
   assumption requires reviewer confirmation. One-release forwarding shims are
   the alternative if that assumption is overturned.
@@ -104,6 +104,7 @@ validation outcomes belong in `HANDOFF.md` once measured.
 
 Fresh ecosystems deploy a transparent upgradeable proxy, initialize it with the deployer,
 transfer ownership to governance and register it with `Bridgehub.setInteropCenter`.
+The ecosystem ownership-acceptance step completes the pending transfer to governance.
 Deployment and upgrade TOML uses
 `bridgehub.l1_interop_center_{implementation,proxy}_addr`.
 
@@ -111,9 +112,13 @@ The shared core upgrade flow (also exposed as `CoreUpgrade_v34`) deploys the pro
 absent. Stage 1 upgrades Bridgehub, then accepts the center's ownership and sets the registry
 before stage 2 can submit priority requests. The CTM upgrade regenerates the Mailbox facet.
 For an ecosystem already using this surface, set `has_l1_interop_center = true` in the upgrade
-input: discovery then reads the existing proxy and stage 1 upgrades its implementation.
+inputs for both core and CTM preparation: discovery then reads the existing proxy and stage 1 upgrades its implementation.
 The default is false for historical source chains whose Bridgehub has no getter; discovery
 does not probe a missing method or suppress its revert.
+
+ERC20 base-token approvals target the NativeTokenVault discovered through the asset router;
+it pulls the request funding. Governance and chain-admin helpers retain the same caller
+for approval and message submission.
 
 No prior request selectors are forwarded. Integrators discover `interopCenter()` and migrate
 to the attributes above. The original `BridgehubDepositFinalized` event remains the gateway

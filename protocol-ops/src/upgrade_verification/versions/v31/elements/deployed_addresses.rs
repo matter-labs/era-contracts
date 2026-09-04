@@ -2,8 +2,8 @@ use anyhow::{Context, Result};
 
 use crate::upgrade_verification::{
     artifacts::{
-        required_address_in_value as required_address, CtmArtifact, CtmFlavor,
-        EcosystemUpgradeArtifact,
+        l1_interop_center_new_proxy, required_address_in_value as required_address, CtmArtifact,
+        CtmFlavor, EcosystemUpgradeArtifact,
     },
     constants::{L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR},
     verifiers::{VerificationResult, Verifiers},
@@ -932,12 +932,7 @@ async fn verify_core_provenance(
             &ctor_args,
             "l1-contracts/L1InteropCenter",
         );
-        let new_proxy = core
-            .get("upgrade_addresses")
-            .and_then(|value| value.get("bridgehub"))
-            .and_then(|value| value.get("l1_interop_center_new_proxy"))
-            .and_then(toml::Value::as_bool)
-            .unwrap_or(true);
+        let new_proxy = l1_interop_center_new_proxy(core)?;
         if new_proxy {
             result
                 .expect_create2_params_proxy_with_bytecode(
@@ -950,6 +945,15 @@ async fn verify_core_provenance(
                 )
                 .await;
         } else {
+            let registered_center = BridgehubContract::new(
+                context.bridgehub_addr,
+                &verifiers.network_verifier.l1_provider,
+            )
+            .interopCenter()
+            .call()
+            .await
+            .context("read existing L1 Interop Center from source Bridgehub")?;
+            result.expect_address(verifiers, &registered_center, "l1_interop_center_proxy");
             // Existing proxies retain their original CREATE2 constructor and initializer.
             // Stage 1 independently binds the upgraded implementation to this proxy.
             result

@@ -104,7 +104,7 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     /// Walk every Bridgehub-discoverable ecosystem ownable (bridgehub itself,
-    /// asset router, l1 nullifier, ctm deployer, chain asset handler) and
+    /// asset router, l1 nullifier, ctm deployer, chain asset handler, interop center) and
     /// accept the pending ownership transfer where one is targeted at
     /// `_governor`. Idempotent — running against an already-correct ecosystem
     /// is a no-op.
@@ -130,6 +130,10 @@ contract AdminFunctions is Script, IAdminFunctions {
         }
         if (Ownable2Step(chainAssetHandler).pendingOwner() == _governor) {
             governanceAcceptOwner(_governor, chainAssetHandler);
+        }
+        address center = IL1Bridgehub(_bridgehub).interopCenter();
+        if (Ownable2Step(center).pendingOwner() == _governor) {
+            governanceAcceptOwner(_governor, center);
         }
     }
 
@@ -256,9 +260,7 @@ contract AdminFunctions is Script, IAdminFunctions {
 
         _savePreGovernanceAcceptOwnershipCalls(acceptCalls, acceptCount);
 
-        // Bridgehub-discoverable ecosystem proxies. Mirrors the contracts visited
-        // by `governanceAcceptOwnerAggregated`, since the same ProxyAdmins gate
-        // their `upgradeAndCall` invocations during stage 1 governance calls.
+        // Historical Bridgehub-discoverable proxies whose ProxyAdmins gate stage 1.
         address assetRouter = address(IL1Bridgehub(_bridgehub).assetRouter());
         address chainAssetHandler = address(IL1Bridgehub(_bridgehub).chainAssetHandler());
         address ctmDeploymentTracker = address(IL1Bridgehub(_bridgehub).l1CtmDeployer());
@@ -753,7 +755,6 @@ contract AdminFunctions is Script, IAdminFunctions {
             0,
             data.gatewayChainId,
             data.bridgehub,
-            data.l1AssetRouterProxy,
             data.refundRecipient
         );
 
@@ -973,7 +974,6 @@ contract AdminFunctions is Script, IAdminFunctions {
             data.gatewayChainId,
             data.bridgehub,
             gatewayChainInfo.l1AssetRouterProxy,
-            gatewayChainInfo.l1AssetRouterProxy,
             0,
             indirectCallData,
             data.refundRecipient
@@ -1067,7 +1067,6 @@ contract AdminFunctions is Script, IAdminFunctions {
             0,
             data.gatewayChainId,
             data.bridgehub,
-            l2ChainInfo.l1AssetRouterProxy,
             data.refundRecipient
         );
 
@@ -1131,7 +1130,6 @@ contract AdminFunctions is Script, IAdminFunctions {
             0,
             data.gatewayChainId,
             data.bridgehub,
-            l2ChainInfo.l1AssetRouterProxy,
             data.refundRecipient
         );
 
@@ -1238,7 +1236,6 @@ contract AdminFunctions is Script, IAdminFunctions {
             0,
             data.gatewayChainId,
             data.bridgehub,
-            l2ChainInfo.l1AssetRouterProxy,
             data.refundRecipient
         );
 
@@ -1294,7 +1291,6 @@ contract AdminFunctions is Script, IAdminFunctions {
             params.value,
             params.chainId,
             params.bridgehub,
-            l2ChainInfo.l1AssetRouterProxy,
             params.refundRecipient
         );
 

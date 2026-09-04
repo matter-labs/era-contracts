@@ -199,8 +199,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             create2Salt: bytes32(0),
             l2GasLimit: newConfig.priorityTxsL2GasLimit,
             chainId: gatewayConfig.chainId,
-            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
-            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter
+            bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub
         });
         notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName);
     }
@@ -579,7 +578,6 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             dstAddress,
             gatewayConfig.chainId,
             coreAddresses.bridgehub.proxies.bridgehub,
-            coreAddresses.bridges.proxies.l1AssetRouter,
             msg.sender
         );
     }

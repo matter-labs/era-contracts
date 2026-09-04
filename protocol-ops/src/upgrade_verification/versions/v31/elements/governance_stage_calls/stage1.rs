@@ -14,20 +14,20 @@
 
 use alloy::{
     hex,
-    primitives::U256,
+    primitives::{Address, U256},
     sol,
     sol_types::{SolCall, SolValue},
 };
 use anyhow::Context;
 
 use crate::upgrade_verification::{
-    artifacts::{CtmArtifact, EcosystemUpgradeArtifact},
+    artifacts::{l1_interop_center_new_proxy, CtmArtifact, EcosystemUpgradeArtifact},
     verifiers::{VerificationResult, Verifiers},
 };
 
 use super::super::{
     super::expected_old_protocol_version_label, super::get_expected_new_protocol_version,
-    super::get_expected_old_protocol_version_for_ctm_flavor,
+    super::get_expected_old_protocol_version_for_ctm_flavor, call_list::Call,
 };
 use super::super::{
     fixed_force_deployment::FixedForceDeploymentsData, initialize_data_new_chain,
@@ -42,8 +42,8 @@ use super::helpers::{
     required_ctm_address, verify_call_by_address, verify_call_by_name,
 };
 use super::{
-    initializeL1V31UpgradeCall, setChainCreationParamsCall, upgradeAndCallCall, upgradeCall,
-    CallList, GovernanceStage1Calls,
+    acceptOwnershipCall, initializeL1V31UpgradeCall, setChainCreationParamsCall,
+    upgradeAndCallCall, upgradeCall, CallList, GovernanceStage1Calls,
 };
 
 sol! {
@@ -56,6 +56,41 @@ fn has_l1_interop_center(verifiers: &Verifiers) -> bool {
         .address_verifier
         .get_by_name("l1_interop_center_proxy")
         .is_some()
+}
+
+fn validate_center_wiring_call(
+    call: &Call,
+    new_proxy: bool,
+    center: Address,
+    implementation: Address,
+    proxy_admin: Address,
+) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        call.value == U256::ZERO,
+        "center wiring must have zero value"
+    );
+    if new_proxy {
+        anyhow::ensure!(
+            call.target == center,
+            "ownership acceptance must target the new center"
+        );
+        anyhow::ensure!(
+            call.data.as_ref() == acceptOwnershipCall::SELECTOR,
+            "new center requires acceptOwnership()"
+        );
+    } else {
+        anyhow::ensure!(
+            call.target == proxy_admin,
+            "existing center upgrade must target ProxyAdmin"
+        );
+        let upgrade = upgradeCall::abi_decode(&call.data)
+            .context("existing center requires upgrade(address,address)")?;
+        anyhow::ensure!(
+            upgrade.proxy == center && upgrade.implementation == implementation,
+            "existing center upgrade must bind the registered proxy to its verified implementation"
+        );
+    }
+    Ok(())
 }
 
 // Current artifacts include either three handler-wiring calls (a pre-v32 source)
@@ -110,19 +145,19 @@ impl GovernanceStage1Calls {
         verifiers: &Verifiers,
         result: &mut VerificationResult,
     ) -> anyhow::Result<()> {
-        self.verify_call_shape(&artifact.ctms, verifiers, result)
-            .await?;
+        self.verify_call_shape(artifact, verifiers, result).await?;
         self.verify_artifact_payloads(artifact, verifiers, result)
             .await
     }
 
     async fn verify_call_shape(
         &self,
-        ctms: &[CtmArtifact],
+        artifact: &EcosystemUpgradeArtifact,
         verifiers: &Verifiers,
         result: &mut VerificationResult,
     ) -> anyhow::Result<()> {
         result.print_info("== Gov stage 1 calls ===");
+        let ctms = &artifact.ctms;
 
         let current = has_l1_interop_center(verifiers);
         let prefix_len = if current {
@@ -186,7 +221,13 @@ impl GovernanceStage1Calls {
         }
 
         if current {
-            errors += self.verify_center_wiring(call_offset, prefix_len, verifiers, result);
+            errors += self.verify_center_wiring(
+                call_offset,
+                prefix_len,
+                l1_interop_center_new_proxy(&artifact.core)?,
+                verifiers,
+                result,
+            )?;
         }
 
         // Per-CTM block (6 calls per CTM, in artifact order):
@@ -333,9 +374,10 @@ impl GovernanceStage1Calls {
         &self,
         offset: usize,
         prefix_len: usize,
+        new_proxy: bool,
         verifiers: &Verifiers,
         result: &mut VerificationResult,
-    ) -> usize {
+    ) -> anyhow::Result<usize> {
         let mut errors = 0;
         if prefix_len == 14 {
             errors += verify_call_by_name(
@@ -375,35 +417,21 @@ impl GovernanceStage1Calls {
             }
         }
         let index = offset + prefix_len - 2;
-        if self.calls.elems[index]
-            .data
-            .starts_with(&upgradeCall::SELECTOR)
-        {
-            errors += verify_call_by_name(
-                &self.calls,
-                index,
-                "transparent_proxy_admin",
-                "upgrade(address,address)",
-                verifiers,
-                result,
-            );
-            errors += verify_upgrade_call_args(
-                &self.calls,
-                index,
-                "l1_interop_center_proxy",
-                "l1_interop_center_implementation",
-                verifiers,
-                result,
-            );
-        } else {
-            errors += verify_call_by_name(
-                &self.calls,
-                index,
-                "l1_interop_center_proxy",
-                "acceptOwnership()",
-                verifiers,
-                result,
-            );
+        let address = |name| {
+            verifiers
+                .address_verifier
+                .get_by_name(name)
+                .with_context(|| format!("Missing center wiring address: {name}"))
+        };
+        if let Err(error) = validate_center_wiring_call(
+            &self.calls.elems[index],
+            new_proxy,
+            address("l1_interop_center_proxy")?,
+            address("l1_interop_center_implementation")?,
+            address("transparent_proxy_admin")?,
+        ) {
+            result.report_error(&format!("Invalid center wiring: {error}"));
+            errors += 1;
         }
         errors += verify_call_by_name(
             &self.calls,
@@ -423,7 +451,7 @@ impl GovernanceStage1Calls {
                 errors += 1;
             }
         }
-        errors
+        Ok(errors)
     }
 
     async fn verify_artifact_payloads(
@@ -1099,6 +1127,66 @@ mod center_tests {
         assert_eq!(current_prefix_len(1 + 14 + 12, 2).unwrap(), 14);
         for count in [0, 10, 11, 13, 14, 16, 18] {
             assert!(current_prefix_len(count, 0).is_err());
+        }
+    }
+
+    #[test]
+    fn center_wiring_is_bound_to_artifact_provenance_and_implementation() {
+        let center = Address::repeat_byte(0x11);
+        let implementation = Address::repeat_byte(0x22);
+        let proxy_admin = Address::repeat_byte(0x33);
+        let accept = Call {
+            target: center,
+            value: U256::ZERO,
+            data: acceptOwnershipCall {}.abi_encode().into(),
+        };
+        let mut upgrade = Call {
+            target: proxy_admin,
+            value: U256::ZERO,
+            data: upgradeCall::new((center, implementation))
+                .abi_encode()
+                .into(),
+        };
+        let validate = |call: &Call, new_proxy| {
+            validate_center_wiring_call(call, new_proxy, center, implementation, proxy_admin)
+        };
+        assert!(validate(&accept, true).is_ok());
+        assert!(validate(&upgrade, false).is_ok());
+        assert!(validate(&accept, false).is_err());
+        assert!(validate(&upgrade, true).is_err());
+
+        upgrade.data = upgradeCall::new((center, Address::ZERO))
+            .abi_encode()
+            .into();
+        assert!(validate(&upgrade, false).is_err());
+        upgrade.data = upgradeCall::new((Address::ZERO, implementation))
+            .abi_encode()
+            .into();
+        assert!(validate(&upgrade, false).is_err());
+        upgrade.data = upgradeCall::new((center, implementation))
+            .abi_encode()
+            .into();
+        upgrade.target = center;
+        assert!(validate(&upgrade, false).is_err());
+        upgrade.target = proxy_admin;
+        upgrade.value = U256::from(1);
+        assert!(validate(&upgrade, false).is_err());
+    }
+
+    #[test]
+    fn current_artifacts_require_explicit_proxy_provenance() {
+        for flag in ["true", "false"] {
+            let core = toml::from_str::<toml::Value>(&format!(
+                "[upgrade_addresses.bridgehub]\nl1_interop_center_new_proxy = {flag}"
+            ))
+            .unwrap();
+            assert_eq!(l1_interop_center_new_proxy(&core).unwrap(), flag == "true");
+        }
+        for value in ["", "l1_interop_center_new_proxy = 'false'"] {
+            let core =
+                toml::from_str::<toml::Value>(&format!("[upgrade_addresses.bridgehub]\n{value}"))
+                    .unwrap();
+            assert!(l1_interop_center_new_proxy(&core).is_err());
         }
     }
 }

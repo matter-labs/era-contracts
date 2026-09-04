@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 // solhint-disable gas-custom-errors, reason-string
 
 import {IL1InteropCenter} from "contracts/interop/IL1InteropCenter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {L1InteropRequests} from "./L1InteropRequests.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
@@ -75,7 +76,6 @@ struct PrepareL1L2MessageParams {
     address dstAddress;
     uint256 chainId;
     address bridgehubAddress;
-    address l1SharedBridgeProxy;
     address refundRecipient;
 }
 
@@ -351,8 +351,7 @@ library Utils {
         bytes32 create2Salt,
         uint256 l2GasLimit,
         uint256 chainId,
-        address bridgehubAddress,
-        address l1SharedBridgeProxy
+        address bridgehubAddress
     ) internal returns (address) {
         bytes memory initCode = abi.encodePacked(bytecode, constructorArgs);
         address contractAddress = getL2AddressViaDeterministicCreate2(create2Salt, initCode);
@@ -365,7 +364,6 @@ library Utils {
             dstAddress: DETERMINISTIC_CREATE2_ADDRESS,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy,
             refundRecipient: msg.sender
         });
         return contractAddress;
@@ -457,7 +455,6 @@ library Utils {
         address dstAddress,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
         address refundRecipient
     ) internal returns (bytes32 txHash) {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddress);
@@ -470,7 +467,6 @@ library Utils {
             dstAddress: dstAddress,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy,
             refundRecipient: refundRecipient
         });
         (L1L2MessageParams memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) = prepareL1L2Message(
@@ -480,8 +476,9 @@ library Utils {
         address baseTokenAddress = bridgehub.baseToken(chainId);
         if (ADDRESS_ONE != baseTokenAddress) {
             IERC20 baseToken = IERC20(baseTokenAddress);
+            address nativeTokenVault = address(IL1AssetRouter(address(bridgehub.assetRouter())).nativeTokenVault());
             vm.broadcast(getBroadcasterAddress());
-            bool success = baseToken.approve(l1SharedBridgeProxy, requiredValueToDeploy);
+            bool success = baseToken.approve(nativeTokenVault, requiredValueToDeploy);
             require(success, "Approval failed");
             requiredValueToDeploy = 0;
         }
@@ -510,8 +507,7 @@ library Utils {
         address addr,
         uint256 amount,
         uint256 chainId,
-        address bridgehubAddress,
-        address l1SharedBridgeProxy
+        address bridgehubAddress
     ) internal returns (bytes32 txHash) {
         runL1L2Message({
             l2Calldata: hex"",
@@ -521,7 +517,6 @@ library Utils {
             dstAddress: addr,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy,
             refundRecipient: addr
         });
 
@@ -537,7 +532,6 @@ library Utils {
         address dstAddress,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
         address refundRecipient
     ) internal view returns (Call[] memory calls) {
         (L1L2MessageParams memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) = prepareL1L2Message(
@@ -550,14 +544,12 @@ library Utils {
                 dstAddress: dstAddress,
                 chainId: chainId,
                 bridgehubAddress: bridgehubAddress,
-                l1SharedBridgeProxy: l1SharedBridgeProxy,
                 refundRecipient: refundRecipient
             })
         );
 
         (uint256 ethAmountToPass, Call[] memory newCalls) = prepareApproveBaseTokenGovernanceCalls(
             IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
         );
@@ -583,7 +575,6 @@ library Utils {
         uint256 l2GasLimit,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
         address crossChainSender,
         uint256 indirectCallValue,
         bytes memory indirectCallData,
@@ -605,7 +596,6 @@ library Utils {
 
         (uint256 ethAmountToPass, Call[] memory newCalls) = prepareApproveBaseTokenGovernanceCalls(
             IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
         );
@@ -626,7 +616,6 @@ library Utils {
 
     function prepareApproveBaseTokenGovernanceCalls(
         IL1Bridgehub bridgehub,
-        address l1SharedBridgeProxy,
         uint256 chainId,
         uint256 amountToApprove
     ) internal view returns (uint256 ethAmountToPass, Call[] memory calls) {
@@ -635,7 +624,10 @@ library Utils {
             console.log("Base token not ETH, approving");
             IERC20 baseToken = IERC20(baseTokenAddress);
 
-            bytes memory approvalCalldata = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, amountToApprove));
+            bytes memory approvalCalldata = abi.encodeCall(
+                baseToken.approve,
+                (address(IL1AssetRouter(address(bridgehub.assetRouter())).nativeTokenVault()), amountToApprove)
+            );
 
             calls = new Call[](1);
             calls[0] = Call({target: baseTokenAddress, value: 0, data: approvalCalldata});
@@ -656,7 +648,6 @@ library Utils {
         uint256 l2Value,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
         address refundRecipient
     ) internal view returns (Call[] memory calls) {
         // 1) Prepare the L1L2MessageParams (same logic as before)
@@ -670,7 +661,6 @@ library Utils {
                 dstAddress: dstAddress,
                 chainId: chainId,
                 bridgehubAddress: bridgehubAddress,
-                l1SharedBridgeProxy: l1SharedBridgeProxy,
                 refundRecipient: refundRecipient
             })
         );
@@ -678,7 +668,6 @@ library Utils {
         // 2) Prepare approval calls if base token != ETH
         (uint256 ethAmountToPass, Call[] memory approvalCalls) = prepareApproveBaseTokenAdminCalls(
             IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
         );
@@ -708,7 +697,6 @@ library Utils {
         uint256 l2GasLimit,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
         address crossChainSender,
         uint256 indirectCallValue,
         bytes memory indirectCallData,
@@ -732,7 +720,6 @@ library Utils {
         // 2) Prepare approval calls if base token != ETH
         (uint256 ethAmountToPass, Call[] memory approvalCalls) = prepareApproveBaseTokenAdminCalls(
             IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
         );
@@ -765,7 +752,6 @@ library Utils {
         address dstAddress,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
         address refundRecipient
     ) internal returns (bytes32 txHash) {
         // 1) Prepare the calls (no actual execution done here)
@@ -778,7 +764,6 @@ library Utils {
             0,
             chainId,
             bridgehubAddress,
-            l1SharedBridgeProxy,
             refundRecipient
         );
 
@@ -807,7 +792,6 @@ library Utils {
         uint256 l2GasLimit,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
         address crossChainSender,
         uint256 indirectCallValue,
         bytes memory indirectCallData,
@@ -819,7 +803,6 @@ library Utils {
             l2GasLimit,
             chainId,
             bridgehubAddress,
-            l1SharedBridgeProxy,
             crossChainSender,
             indirectCallValue,
             indirectCallData,
@@ -853,8 +836,7 @@ library Utils {
         bytes[] memory factoryDeps,
         address dstAddress,
         uint256 chainId,
-        address bridgehubAddress,
-        address l1SharedBridgeProxy
+        address bridgehubAddress
     ) internal returns (bytes32 txHash) {
         (L1L2MessageParams memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) = prepareL1L2Message(
             PrepareL1L2MessageParams({
@@ -866,14 +848,12 @@ library Utils {
                 dstAddress: dstAddress,
                 chainId: chainId,
                 bridgehubAddress: bridgehubAddress,
-                l1SharedBridgeProxy: l1SharedBridgeProxy,
                 refundRecipient: msg.sender
             })
         );
 
         requiredValueToDeploy = approveBaseTokenGovernance(
             IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
             governor,
             salt,
             chainId,
@@ -912,7 +892,6 @@ library Utils {
         uint256 l2GasLimit,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
         address crossChainSender,
         uint256 indirectCallValue,
         bytes memory indirectCallData
@@ -933,7 +912,6 @@ library Utils {
 
         requiredValueToDeploy = approveBaseTokenGovernance(
             IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
             governor,
             salt,
             chainId,
@@ -965,7 +943,6 @@ library Utils {
 
     function approveBaseTokenGovernance(
         IL1Bridgehub bridgehub,
-        address l1SharedBridgeProxy,
         address governor,
         bytes32 salt,
         uint256 chainId,
@@ -976,7 +953,10 @@ library Utils {
             console.log("Base token not ETH, approving");
             IERC20 baseToken = IERC20(baseTokenAddress);
 
-            bytes memory approvalCalldata = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, amountToApprove));
+            bytes memory approvalCalldata = abi.encodeCall(
+                baseToken.approve,
+                (address(IL1AssetRouter(address(bridgehub.assetRouter())).nativeTokenVault()), amountToApprove)
+            );
 
             executeUpgrade(governor, salt, address(baseToken), approvalCalldata, 0, 0);
 
@@ -989,7 +969,6 @@ library Utils {
 
     function prepareApproveBaseTokenAdminCalls(
         IL1Bridgehub bridgehub,
-        address l1SharedBridgeProxy,
         uint256 chainId,
         uint256 amountToApprove
     ) internal view returns (uint256 ethAmountToPass, Call[] memory calls) {
@@ -1000,7 +979,10 @@ library Utils {
 
             // Build approval calldata
             IERC20 baseToken = IERC20(baseTokenAddress);
-            bytes memory approvalCalldata = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, amountToApprove));
+            bytes memory approvalCalldata = abi.encodeCall(
+                baseToken.approve,
+                (address(IL1AssetRouter(address(bridgehub.assetRouter())).nativeTokenVault()), amountToApprove)
+            );
 
             calls[0] = Call({target: baseTokenAddress, value: 0, data: approvalCalldata});
 
@@ -1064,7 +1046,6 @@ library Utils {
         bytes[] memory factoryDeps,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
         address refundRecipient
     ) internal {
         runL1L2Message({
@@ -1075,7 +1056,6 @@ library Utils {
             dstAddress: 0x0000000000000000000000000000000000000000,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy,
             refundRecipient: refundRecipient
         });
     }

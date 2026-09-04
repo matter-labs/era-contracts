@@ -95,7 +95,6 @@ abstract contract GatewayGovernanceUtils is Script {
                     L2_BRIDGEHUB_ADDR,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
                     prepareGWGovCallsStruct._refundRecipient
                 )
             );
@@ -154,7 +153,6 @@ abstract contract GatewayGovernanceUtils is Script {
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
                     _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
                     0,
                     indirectCallData,
                     prepareGWGovCallsStruct._refundRecipient
@@ -177,7 +175,6 @@ abstract contract GatewayGovernanceUtils is Script {
                     Utils.MAX_PRIORITY_TX_GAS,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
                     _gatewayGovernanceConfig.ctmDeploymentTrackerProxy,
                     0,
                     indirectCallData,
@@ -200,7 +197,6 @@ abstract contract GatewayGovernanceUtils is Script {
                     prepareGWGovCallsStruct._gatewayRollupDAManager,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
                     prepareGWGovCallsStruct._refundRecipient
                 )
             );
@@ -215,7 +211,6 @@ abstract contract GatewayGovernanceUtils is Script {
             //         prepareGWGovCallsStruct._gatewayValidatorTimelock,
             //         _gatewayGovernanceConfig.gatewayChainId,
             //         _gatewayGovernanceConfig.bridgehubProxy,
-            //         _gatewayGovernanceConfig.l1AssetRouterProxy,
             //         prepareGWGovCallsStruct._refundRecipient
             //     )
             // );
@@ -229,7 +224,6 @@ abstract contract GatewayGovernanceUtils is Script {
                     prepareGWGovCallsStruct._gatewayServerNotifier,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
                     prepareGWGovCallsStruct._refundRecipient
                 )
             );

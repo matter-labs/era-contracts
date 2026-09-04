@@ -230,7 +230,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             dstAddress: to,
             chainId: gatewayChainId,
             bridgehubAddress: coreAddresses.bridgehub.proxies.bridgehub,
-            l1SharedBridgeProxy: coreAddresses.bridges.proxies.l1AssetRouter,
             refundRecipient: msg.sender
         });
     }

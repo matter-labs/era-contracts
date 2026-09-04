@@ -35,7 +35,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     /// @dev L1AssetRouter smart contract that is used to bridge assets (including chains) between L1 and L2.
     IAssetRouterBase public immutable override L1_ASSET_ROUTER;
 
-    /// @notice Checks that the message sender is the bridgehub.
+    /// @notice Checks that the caller is the registered L1 Interop Center.
     modifier onlyL1InteropCenter() {
         if (msg.sender != BRIDGE_HUB.interopCenter()) {
             revert OnlyL1InteropCenter(msg.sender, BRIDGE_HUB.interopCenter());
@@ -92,6 +92,8 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     }
 
     /// @inheritdoc IL1CrossChainSender
+    // Payable for interface compatibility; every nonzero msg.value reverts below.
+    // slither-disable-next-line locked-ether
     function initiateIndirectCall(
         uint256 _chainId,
         address _originalCaller,

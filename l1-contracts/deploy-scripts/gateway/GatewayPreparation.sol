@@ -253,8 +253,7 @@ contract GatewayPreparation is Script {
             new bytes[](0),
             L2_BRIDGEHUB_ADDRESS,
             config.gatewayChainId,
-            config.bridgehub,
-            config.sharedBridgeProxy
+            config.bridgehub
         );
 
         saveOutput(l2TxHash);
@@ -308,7 +307,6 @@ contract GatewayPreparation is Script {
             config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy,
-            config.sharedBridgeProxy,
             0,
             indirectCallData
         );
@@ -331,7 +329,6 @@ contract GatewayPreparation is Script {
             Utils.MAX_PRIORITY_TX_GAS,
             config.gatewayChainId,
             config.bridgehub,
-            config.sharedBridgeProxy,
             config.ctmDeploymentTracker,
             0,
             indirectCallData
@@ -352,8 +349,7 @@ contract GatewayPreparation is Script {
             create2Salt: bytes32(0),
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             chainId: config.gatewayChainId,
-            bridgehubAddress: config.bridgehub,
-            l1SharedBridgeProxy: config.sharedBridgeProxy
+            bridgehubAddress: config.bridgehub
         });
 
         saveOutput(l2ChainAdminAddress);
@@ -422,7 +418,6 @@ contract GatewayPreparation is Script {
             config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy,
-            config.sharedBridgeProxy,
             0,
             indirectCallData,
             msg.sender
@@ -485,7 +480,6 @@ contract GatewayPreparation is Script {
             l2ChainAdmin,
             config.gatewayChainId,
             config.bridgehub,
-            config.sharedBridgeProxy,
             msg.sender
         );
 
@@ -542,7 +536,6 @@ contract GatewayPreparation is Script {
             chainAdminOnGateway,
             config.gatewayChainId,
             config.bridgehub,
-            config.sharedBridgeProxy,
             msg.sender
         );
 
@@ -571,7 +564,6 @@ contract GatewayPreparation is Script {
             chainAdminOnGateway,
             config.gatewayChainId,
             config.bridgehub,
-            config.sharedBridgeProxy,
             msg.sender
         );
 
@@ -596,7 +588,6 @@ contract GatewayPreparation is Script {
             addr,
             config.gatewayChainId,
             config.bridgehub,
-            config.sharedBridgeProxy,
             msg.sender
         );
 

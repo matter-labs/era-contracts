@@ -73,6 +73,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         uint256 governanceUpgradeTimerInitialDelay;
         bool hasPreV32IntrospectionOverride;
         bool usePreV32IntrospectionOverride;
+        bool hasL1InteropCenter;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -222,6 +223,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         if (toml.keyExists("$.pre_v32_introspection")) {
             newConfig.hasPreV32IntrospectionOverride = true;
             newConfig.usePreV32IntrospectionOverride = toml.readBool("$.pre_v32_introspection");
+        }
+        if (toml.keyExists("$.has_l1_interop_center")) {
+            newConfig.hasL1InteropCenter = toml.readBool("$.has_l1_interop_center");
         }
 
         initializeConfig(chainCreationParams, permanentConfig, governance);
@@ -383,11 +387,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
         if (preV32Ecosystem) {
             ctmAddresses = AddressIntrospector.getCTMAddressesV31(ctm);
-            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubAddr);
         } else {
             ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
-            coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
         }
+        _discoverCoreAddresses(bridgehubAddr, preV32Ecosystem);
 
         config.ownerAddress = ctmAddresses.admin.governance;
 
@@ -408,6 +411,17 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             ctmProtocolVersion != getNewProtocolVersion(),
             "The new protocol version is already present on the ChainTypeManager"
         );
+    }
+
+    /// @notice Uses the source ecosystem's registry ABI during CTM preparation.
+    function _discoverCoreAddresses(address _bridgehub, bool _preV32Ecosystem) internal {
+        if (_preV32Ecosystem) {
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(_bridgehub);
+        } else if (!newConfig.hasL1InteropCenter) {
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesPreL1InteropCenter(_bridgehub);
+        } else {
+            coreAddresses = AddressIntrospector.getCoreDeployedAddresses(_bridgehub);
+        }
     }
 
     function getFixedForceDeploymentsData() internal override returns (FixedForceDeploymentsData memory data) {

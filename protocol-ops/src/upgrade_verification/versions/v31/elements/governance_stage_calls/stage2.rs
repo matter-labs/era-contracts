@@ -40,7 +40,7 @@ use crate::{
     },
 };
 
-use super::super::super::utils::compute_selector;
+use super::super::super::utils::{compute_selector, network_verifier::Bridgehub};
 
 sol! {
     /// Mirrors `IChainAssetHandler.sol::MigrationInterval`. PUVT decodes
@@ -72,6 +72,27 @@ use super::{
     CallList, GovernanceStage2Calls, L2TransactionRequestDirect,
     L2TransactionRequestTwoBridgesOuter,
 };
+
+struct GatewayBringUpLayout;
+
+impl GatewayBringUpLayout {
+    const LEN: usize = 13;
+    const WHITELIST: usize = 0;
+    const ADD_CTM: usize = 2;
+    const SET_DEPLOYMENT_TRACKER: usize = 3;
+    const REGISTER_CTM_ASSET: usize = 4;
+    const SET_ASSET_HANDLER: usize = 6;
+    const SET_CTM_ADDRESS: usize = 8;
+    const ACCEPT_DA_MANAGER: usize = 10;
+    const ACCEPT_NOTIFIER: usize = 12;
+    const APPROVAL_PAIRS: [(usize, usize); 5] = [
+        (Self::ADD_CTM - 1, Self::ADD_CTM),
+        (Self::SET_ASSET_HANDLER - 1, Self::SET_ASSET_HANDLER),
+        (Self::SET_CTM_ADDRESS - 1, Self::SET_CTM_ADDRESS),
+        (Self::ACCEPT_DA_MANAGER - 1, Self::ACCEPT_DA_MANAGER),
+        (Self::ACCEPT_NOTIFIER - 1, Self::ACCEPT_NOTIFIER),
+    ];
+}
 
 impl GovernanceStage2Calls {
     /// Stage 2 — three sections in order:
@@ -179,7 +200,7 @@ impl GovernanceStage2Calls {
 
         let canonical_prefix = decommission_count;
         let canonical_count = canonical_prefix + 1 + artifact.ctms.len() * 2;
-        let expected_call_count = canonical_count + 13;
+        let expected_call_count = canonical_count + GatewayBringUpLayout::LEN;
 
         // ── Section 2: Canonical activation ─────────────────────────
         // Call `canonical_prefix` — ChainAssetHandler.unpauseMigration()
@@ -325,32 +346,48 @@ async fn verify_gateway_bring_up_calls(
     let expected: &[(usize, &str, &str)] = &[
         // Whitelist the new Gateway as a settlement layer on L1 Bridgehub.
         (
-            0,
+            GatewayBringUpLayout::WHITELIST,
             "bridgehub_proxy",
             "setSettlementLayerStatus(uint256,bool)",
         ),
         // addChainTypeManager L1→L2 (priority tx) — approve + direct.
-        (2, request_target, direct),
+        (GatewayBringUpLayout::ADD_CTM, request_target, direct),
         // setAssetDeploymentTracker on L1AssetRouter (L1-side, no approve).
         (
-            3,
+            GatewayBringUpLayout::SET_DEPLOYMENT_TRACKER,
             "l1_asset_router_proxy",
             "setAssetDeploymentTracker(bytes32,address)",
         ),
         // registerCTMAssetOnL1 on L1CTMDeploymentTracker (L1-side).
         (
-            4,
+            GatewayBringUpLayout::REGISTER_CTM_ASSET,
             "ctm_deployment_tracker_proxy",
             "registerCTMAssetOnL1(address)",
         ),
         // setAssetHandler for chain assetId — approve + two-bridges.
-        (6, request_target, two_bridges),
+        (
+            GatewayBringUpLayout::SET_ASSET_HANDLER,
+            request_target,
+            two_bridges,
+        ),
         // chain-asset-handler registration for GW CTM — approve + two-bridges.
-        (8, request_target, two_bridges),
+        (
+            GatewayBringUpLayout::SET_CTM_ADDRESS,
+            request_target,
+            two_bridges,
+        ),
         // acceptOwnership on RollupDAManager — approve + direct.
-        (10, request_target, direct),
+        (
+            GatewayBringUpLayout::ACCEPT_DA_MANAGER,
+            request_target,
+            direct,
+        ),
         // acceptOwnership on ServerNotifier — approve + direct.
-        (12, request_target, direct),
+        (
+            GatewayBringUpLayout::ACCEPT_NOTIFIER,
+            request_target,
+            direct,
+        ),
     ];
 
     // Pass 1 — target + selector check for every entry in the 13-call block.
@@ -397,23 +434,28 @@ async fn verify_gateway_bring_up_calls(
     }
     errors += check_set_asset_deployment_tracker(
         calls,
-        base + 3,
+        base + GatewayBringUpLayout::SET_DEPLOYMENT_TRACKER,
         representative_ctm_registration_data,
         ctm_deployment_tracker,
         result,
     );
-    errors +=
-        check_register_ctm_asset_on_l1(calls, base + 4, representative_ctm, verifiers, result);
+    errors += check_register_ctm_asset_on_l1(
+        calls,
+        base + GatewayBringUpLayout::REGISTER_CTM_ASSET,
+        representative_ctm,
+        verifiers,
+        result,
+    );
 
     let direct_requests = [
         (
-            2usize,
+            GatewayBringUpLayout::ADD_CTM,
             "addChainTypeManager",
             L2_BRIDGEHUB_ADDR,
             "addChainTypeManager(address)",
         ),
         (
-            10,
+            GatewayBringUpLayout::ACCEPT_DA_MANAGER,
             "acceptOwnership RollupDAManager",
             match new_gw.gateway_rollup_da_manager_addr {
                 Some(addr) => addr,
@@ -429,7 +471,7 @@ async fn verify_gateway_bring_up_calls(
             "acceptOwnership()",
         ),
         (
-            12,
+            GatewayBringUpLayout::ACCEPT_NOTIFIER,
             "acceptOwnership ServerNotifier",
             match new_gw.gateway_server_notifier_addr {
                 Some(addr) => addr,
@@ -472,7 +514,7 @@ async fn verify_gateway_bring_up_calls(
         );
         errors += check_l2_target(idx, label, req.l2Contract, expected_l2_contract, result);
         errors += check_l2_selector(idx, label, &req.l2Calldata, expected_selector, result);
-        if offset == 3 {
+        if offset == GatewayBringUpLayout::ADD_CTM {
             errors += check_inner_address_arg(
                 idx,
                 label,
@@ -486,14 +528,14 @@ async fn verify_gateway_bring_up_calls(
 
     let two_bridge_requests = [
         (
-            7usize,
+            GatewayBringUpLayout::SET_ASSET_HANDLER,
             "setAssetHandlerAddress",
             l1_asset_router,
             L2_ASSET_ROUTER_ADDR,
             "setAssetHandlerAddress(uint256,bytes32,address)",
         ),
         (
-            9,
+            GatewayBringUpLayout::SET_CTM_ADDRESS,
             "setCTMAssetAddress",
             ctm_deployment_tracker,
             L2_BRIDGEHUB_ADDR,
@@ -546,7 +588,7 @@ async fn verify_gateway_bring_up_calls(
             errors += 1;
         }
         match offset {
-            7 => {
+            GatewayBringUpLayout::SET_ASSET_HANDLER => {
                 errors += check_asset_router_second_bridge_calldata(
                     idx,
                     &req.secondBridgeCalldata,
@@ -554,7 +596,7 @@ async fn verify_gateway_bring_up_calls(
                     result,
                 );
             }
-            9 => {
+            GatewayBringUpLayout::SET_CTM_ADDRESS => {
                 errors += check_ctm_tracker_second_bridge_calldata(
                     idx,
                     &req.secondBridgeCalldata,
@@ -574,19 +616,62 @@ async fn verify_gateway_bring_up_calls(
         );
     }
 
-    // All approve calls in this block target the same ZK base-token address,
-    // approve the L1AssetRouter as spender, and their amount must exactly
-    // match the following priority tx's mintValue.
+    let bridgehub = Bridgehub::new(
+        verifiers.bridgehub_address,
+        verifiers.network_verifier.get_l1_provider(),
+    );
+    let expected_base_token = match bridgehub.baseToken(expected_new_gw_chain_id).call().await {
+        Ok(token) => token,
+        Err(err) => {
+            result.report_error(&format!(
+                "Failed to read new gateway base token from Bridgehub: {err}"
+            ));
+            return errors + 1;
+        }
+    };
+
+    errors
+        + verify_gateway_approvals(
+            calls,
+            base,
+            has_l1_center,
+            expected_base_token,
+            l1_asset_router,
+            verifiers.address_verifier.get_by_name("native_token_vault"),
+            result,
+        )
+}
+
+fn verify_gateway_approvals(
+    calls: &CallList,
+    base: usize,
+    has_l1_center: bool,
+    expected_base_token: Address,
+    l1_asset_router: Address,
+    native_token_vault: Option<Address>,
+    result: &mut VerificationResult,
+) -> usize {
+    let expected_spender = if has_l1_center {
+        let Some(vault) = native_token_vault else {
+            result.report_error("Current gateway approvals require native_token_vault");
+            return 1;
+        };
+        vault
+    } else {
+        l1_asset_router
+    };
+    let mut errors = 0;
+    // Historical 16-call appendices contain a leading registration call and
+    // a final legacy request; current 13-call appendices omit both.
     let approve_selector = compute_selector("approve(address,uint256)");
-    let approve_pairs = [
-        (2usize, 3usize),
-        (6, 7),
-        (8, 9),
-        (10, 11),
-        (12, 13),
-        (14, 15),
-    ];
-    let mut approve_target: Option<Address> = None;
+    let approve_pairs: &[(usize, usize)] = match calls.elems.len().checked_sub(base) {
+        Some(GatewayBringUpLayout::LEN) => &GatewayBringUpLayout::APPROVAL_PAIRS,
+        Some(16) if !has_l1_center => &[(2, 3), (6, 7), (8, 9), (10, 11), (12, 13), (14, 15)],
+        _ => {
+            result.report_error("Unexpected gateway approval block length");
+            return 1;
+        }
+    };
     for (approve_offset, priority_offset) in approve_pairs {
         let idx = base + approve_offset;
         let Some(call) = calls.elems.get(idx) else {
@@ -594,6 +679,20 @@ async fn verify_gateway_bring_up_calls(
             errors += 1;
             continue;
         };
+        if call.target != expected_base_token {
+            result.report_error(&format!(
+                "Approve call #{idx} target mismatch: expected gateway base token {}, got {}",
+                expected_base_token, call.target,
+            ));
+            errors += 1;
+        }
+        if call.value != U256::ZERO {
+            result.report_error(&format!(
+                "Approve call #{idx} value must be 0, got {}",
+                call.value
+            ));
+            errors += 1;
+        }
         if call.data.len() < 4 || hex::encode(&call.data[0..4]) != approve_selector {
             result.report_error(&format!(
                 "Call #{idx}: expected approve(address,uint256) selector 0x{approve_selector}, got 0x{}",
@@ -612,10 +711,10 @@ async fn verify_gateway_bring_up_calls(
                 continue;
             }
         };
-        if spender != l1_asset_router {
+        if spender != expected_spender {
             result.report_error(&format!(
-                "Approve call #{idx} spender mismatch: expected l1_asset_router_proxy {}, got {}",
-                l1_asset_router, spender
+                "Approve call #{idx} spender mismatch: expected {}, got {}",
+                expected_spender, spender
             ));
             errors += 1;
         }
@@ -641,22 +740,6 @@ async fn verify_gateway_bring_up_calls(
             }
             None => {}
         }
-        match approve_target {
-            None => approve_target = Some(call.target),
-            Some(t) if t != call.target => {
-                result.report_error(&format!(
-                    "Approve call #{idx} target {} differs from earlier approve target {} — GW bring-up should approve a single base token",
-                    call.target, t,
-                ));
-                errors += 1;
-            }
-            _ => {}
-        }
-    }
-    if let Some(t) = approve_target {
-        result.report_ok(&format!(
-            "All 6 GW priority-tx approve calls target the same base token {t}"
-        ));
     }
 
     errors
@@ -1234,6 +1317,316 @@ mod tests {
             requestL2TransactionDirectCall, requestL2TransactionTwoBridgesCall,
         },
     };
+
+    sol! {
+        function approve(address spender, uint256 amount);
+    }
+
+    // Registered gateway base token recorded as labels.l1_zk_token in the
+    // frozen v0.31.0-interopB/sim-descriptions.toml fixture.
+    const GATEWAY_BASE_TOKEN: Address =
+        alloy::primitives::address!("f41d4478f1d6b8a096c0369b05c0b24ae00cc2df");
+
+    fn historical_gateway_block() -> (CallList, Address, Address) {
+        let fixture: toml::Value = toml::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml"
+        )))
+        .unwrap();
+        let all = CallList::parse(
+            fixture["governance_calls"]["stage2_calls"]
+                .as_str()
+                .unwrap(),
+        );
+        let core = &fixture["core"]["upgrade_addresses"];
+        (
+            CallList {
+                elems: all.elems[all.elems.len() - 16..].to_vec(),
+            },
+            core["bridges"]["l1_asset_router_proxy_addr"]
+                .as_str()
+                .unwrap()
+                .parse()
+                .unwrap(),
+            core["native_token_vault_addr"]
+                .as_str()
+                .unwrap()
+                .parse()
+                .unwrap(),
+        )
+    }
+
+    fn current_gateway_block(historical: &CallList, vault: Address) -> CallList {
+        // The present helper omits registerLegacyToken and the final legacy request.
+        let mut current = CallList {
+            elems: historical.elems[1..14].to_vec(),
+        };
+        for call in &mut current.elems {
+            if call.data.starts_with(&approveCall::SELECTOR) {
+                let approval = approveCall::abi_decode(&call.data).unwrap();
+                call.data = approveCall::new((vault, approval.amount))
+                    .abi_encode()
+                    .into();
+                continue;
+            }
+            let (chain, recipient, payload, mint, gas, pubdata, refund, value, attribute) = if call
+                .data
+                .starts_with(&requestL2TransactionDirectCall::SELECTOR)
+            {
+                let req = requestL2TransactionDirectCall::abi_decode(&call.data)
+                    .unwrap()
+                    ._request;
+                (
+                    req.chainId,
+                    req.l2Contract,
+                    req.l2Calldata,
+                    req.mintValue,
+                    req.l2GasLimit,
+                    req.l2GasPerPubdataByteLimit,
+                    req.refundRecipient,
+                    req.l2Value,
+                    l1_interop::factoryDepsCall::new((req.factoryDeps,)).abi_encode(),
+                )
+            } else if call
+                .data
+                .starts_with(&requestL2TransactionTwoBridgesCall::SELECTOR)
+            {
+                let req = requestL2TransactionTwoBridgesCall::abi_decode(&call.data)
+                    .unwrap()
+                    ._request;
+                (
+                    req.chainId,
+                    req.secondBridgeAddress,
+                    req.secondBridgeCalldata,
+                    req.mintValue,
+                    req.l2GasLimit,
+                    req.l2GasPerPubdataByteLimit,
+                    req.refundRecipient,
+                    req.l2Value,
+                    l1_interop::indirectCallCall::new((req.secondBridgeValue,)).abi_encode(),
+                )
+            } else {
+                continue;
+            };
+            let chain_bytes = chain.to_be_bytes::<32>();
+            let first_byte = chain_bytes.iter().position(|byte| *byte != 0).unwrap_or(31);
+            let chain_reference = &chain_bytes[first_byte..];
+            let mut encoded_recipient = vec![0, 1, 0, 0, chain_reference.len() as u8];
+            encoded_recipient.extend_from_slice(chain_reference);
+            encoded_recipient.push(20);
+            encoded_recipient.extend_from_slice(recipient.as_slice());
+            call.target = Address::repeat_byte(0x77);
+            call.data = l1_interop::sendMessageCall::new((
+                encoded_recipient.into(),
+                payload,
+                vec![
+                    l1_interop::l1ToL2TransactionParamsCall::new((mint, gas, pubdata, refund))
+                        .abi_encode()
+                        .into(),
+                    l1_interop::interopCallValueCall::new((value,))
+                        .abi_encode()
+                        .into(),
+                    attribute.into(),
+                ],
+            ))
+            .abi_encode()
+            .into();
+        }
+        current
+    }
+
+    #[test]
+    fn gateway_approvals_preserve_historical_layouts_and_use_current_vault() {
+        let (historical, router, vault) = historical_gateway_block();
+        let pre_center = CallList {
+            elems: historical.elems[1..14].to_vec(),
+        };
+        let current = current_gateway_block(&historical, vault);
+        for (block, current_mode) in [(&historical, false), (&pre_center, false), (&current, true)]
+        {
+            let mut result = VerificationResult::default();
+            assert_eq!(
+                verify_gateway_approvals(
+                    block,
+                    0,
+                    current_mode,
+                    GATEWAY_BASE_TOKEN,
+                    router,
+                    Some(vault),
+                    &mut result
+                ),
+                0
+            );
+            assert_eq!(result.errors, 0);
+        }
+        let mut result = VerificationResult::default();
+        assert!(
+            verify_gateway_approvals(
+                &current,
+                0,
+                false,
+                GATEWAY_BASE_TOKEN,
+                router,
+                Some(vault),
+                &mut result
+            ) > 0
+        );
+        assert!(
+            verify_gateway_approvals(
+                &pre_center,
+                0,
+                true,
+                GATEWAY_BASE_TOKEN,
+                router,
+                Some(vault),
+                &mut result
+            ) > 0
+        );
+        assert!(
+            verify_gateway_approvals(
+                &current,
+                0,
+                true,
+                GATEWAY_BASE_TOKEN,
+                router,
+                None,
+                &mut result
+            ) > 0
+        );
+
+        let mut wrong_amount = current.clone();
+        wrong_amount.elems[1].data = approveCall::new((vault, U256::ZERO)).abi_encode().into();
+        assert!(
+            verify_gateway_approvals(
+                &wrong_amount,
+                0,
+                true,
+                GATEWAY_BASE_TOKEN,
+                router,
+                Some(vault),
+                &mut result
+            ) > 0
+        );
+        let truncated = CallList {
+            elems: current.elems[..12].to_vec(),
+        };
+        assert!(
+            verify_gateway_approvals(
+                &truncated,
+                0,
+                true,
+                GATEWAY_BASE_TOKEN,
+                router,
+                Some(vault),
+                &mut result
+            ) > 0
+        );
+    }
+
+    #[test]
+    fn current_gateway_approvals_reject_wrong_token_and_eth_value() {
+        let (historical, router, vault) = historical_gateway_block();
+        let current = current_gateway_block(&historical, vault);
+        let mut result = VerificationResult::default();
+        assert_eq!(
+            verify_gateway_approvals(
+                &current,
+                0,
+                true,
+                GATEWAY_BASE_TOKEN,
+                router,
+                Some(vault),
+                &mut result,
+            ),
+            0
+        );
+
+        // Redirect every approval together: agreement with earlier targets is
+        // insufficient to establish that the registered base token is approved.
+        let mut wrong_token = current.clone();
+        for call in &mut wrong_token.elems {
+            if call.data.starts_with(&approveCall::SELECTOR) {
+                call.target = Address::repeat_byte(0x99);
+            }
+        }
+        let mut result = VerificationResult::default();
+        assert_eq!(
+            verify_gateway_approvals(
+                &wrong_token,
+                0,
+                true,
+                GATEWAY_BASE_TOKEN,
+                router,
+                Some(vault),
+                &mut result,
+            ),
+            5
+        );
+        assert_eq!(result.errors, 5);
+
+        let mut with_eth = current;
+        with_eth
+            .elems
+            .iter_mut()
+            .find(|call| call.data.starts_with(&approveCall::SELECTOR))
+            .unwrap()
+            .value = U256::from(1);
+        let mut result = VerificationResult::default();
+        assert_eq!(
+            verify_gateway_approvals(
+                &with_eth,
+                0,
+                true,
+                GATEWAY_BASE_TOKEN,
+                router,
+                Some(vault),
+                &mut result,
+            ),
+            1
+        );
+        assert_eq!(result.errors, 1);
+    }
+
+    #[test]
+    fn current_gateway_layout_checks_indirect_requests_and_ctm_argument() {
+        let (historical, _, vault) = historical_gateway_block();
+        let current = current_gateway_block(&historical, vault);
+        assert_eq!(current.elems.len(), GatewayBringUpLayout::LEN);
+        for offset in [
+            GatewayBringUpLayout::SET_ASSET_HANDLER,
+            GatewayBringUpLayout::SET_CTM_ADDRESS,
+        ] {
+            assert!(decode_two_bridges_request(&current, offset)
+                .unwrap()
+                .is_ok());
+        }
+        let req = decode_direct_request(&current, GatewayBringUpLayout::ADD_CTM)
+            .unwrap()
+            .unwrap();
+        let expected_ctm = Address::abi_decode(&req.l2Calldata[4..]).unwrap();
+        let mut result = VerificationResult::default();
+        assert_eq!(
+            check_inner_address_arg(
+                GatewayBringUpLayout::ADD_CTM,
+                "addChainTypeManager",
+                "addChainTypeManager(address)",
+                &req.l2Calldata,
+                expected_ctm,
+                &mut result,
+            ),
+            0
+        );
+        assert!(
+            check_inner_address_arg(
+                GatewayBringUpLayout::ADD_CTM,
+                "addChainTypeManager",
+                "addChainTypeManager(address)",
+                &req.l2Calldata,
+                Address::ZERO,
+                &mut result,
+            ) > 0
+        );
+    }
 
     fn calls(data: Vec<u8>) -> CallList {
         CallList {

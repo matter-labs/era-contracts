@@ -39,6 +39,9 @@ remappings = [
   "system-contracts/contracts/Constants.sol=frozen-system-constants/Constants.sol",
   "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
   "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
+  # Both OpenZeppelin submodules contain this dependency; pin the CI resolution
+  # so filesystem traversal order cannot change compiler metadata hashes.
+  "erc4626-tests/=lib/openzeppelin-contracts-upgradeable-v4/lib/erc4626-tests/",
   "test-utils/=test/foundry/l1/integration/utils/",
 ]
 optimizer = true
