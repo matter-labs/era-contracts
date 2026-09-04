@@ -88,11 +88,11 @@ contract ZKChainDeployer is L1ContractDeployer {
         IMigrator(chainAddress).unpauseDeposits();
     }
 
-    /// Same as `_deployZKChain`, with a dedicated reverter in the chain's config. The reverter
-    /// only applies to this one deployment.
-    function _deployZKChainWithReverter(address _baseToken, address _reverter) internal {
+    /// Registers `_chainId` with a dedicated reverter in its config (deposits stay paused, like
+    /// `_deployZKChainWithPausedDeposits`). The reverter only applies to this one deployment.
+    function _deployZKChainWithReverter(address _baseToken, uint256 _chainId, address _reverter) internal {
         dedicatedReverterForNextChain = _reverter;
-        _deployZKChain(_baseToken);
+        _deployZKChainInner(_baseToken, _chainId);
         dedicatedReverterForNextChain = address(0);
     }
 

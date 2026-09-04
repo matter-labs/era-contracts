@@ -8,11 +8,12 @@ import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 
-/// Validator roles handed out by RegisterZKChain.s.sol. Chain 10 is registered without a
-/// dedicated reverter, chain 11 with `validator_sender_operator_reverter` set.
+/// Validator roles handed out by RegisterZKChain.s.sol. One chain is registered without a
+/// dedicated reverter, one with `validator_sender_operator_reverter` set. Explicit chain ids keep
+/// this suite off the config files the other suites write concurrently (ids 10 and up).
 contract ValidatorRolesOnRegistrationTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer {
-    uint256 internal constant CHAIN_WITHOUT_REVERTER = 10;
-    uint256 internal constant CHAIN_WITH_REVERTER = 11;
+    uint256 internal constant CHAIN_WITHOUT_REVERTER = 917100;
+    uint256 internal constant CHAIN_WITH_REVERTER = 917101;
     address internal constant ETH_OPERATOR = address(0);
     address internal constant PROVE_OPERATOR = address(2);
     address internal constant DEDICATED_REVERTER = address(4);
@@ -24,8 +25,8 @@ contract ValidatorRolesOnRegistrationTests is L1ContractDeployer, ZKChainDeploye
         _deployTokens();
         _registerNewTokens(tokens);
         _deployEra();
-        _deployZKChain(ETH_TOKEN_ADDRESS);
-        _deployZKChainWithReverter(ETH_TOKEN_ADDRESS, DEDICATED_REVERTER);
+        _deployZKChainWithPausedDeposits(ETH_TOKEN_ADDRESS, CHAIN_WITHOUT_REVERTER);
+        _deployZKChainWithReverter(ETH_TOKEN_ADDRESS, CHAIN_WITH_REVERTER, DEDICATED_REVERTER);
         timelock = IValidatorTimelock(ctmAddresses.stateTransition.proxies.validatorTimelock);
     }
 
