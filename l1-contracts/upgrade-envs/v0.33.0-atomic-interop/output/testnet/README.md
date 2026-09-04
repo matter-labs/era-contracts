@@ -93,43 +93,51 @@ state.
 | `setChainCreationParams` `zkTokenAssetId`                                            | byte-identical to the live v31 value                                 |
 | Etherscan verification                                                               | 30/30                                                                |
 
-### Two scenario files, and why the order matters
+### Two scenario files
 
-The scenarios are split by role via `--scenario`:
-
-| file                     | contents                                                                                     |
-| ------------------------ | -------------------------------------------------------------------------------------------- |
-| `…-1-ecosystem.json`     | the Camp-B ChainAdmin bundle, governance stages 0/1/2, and `test_create_chain_zkos` (27 txs) |
-| `…-2-chain-8022833.json` | just the per-chain diamond cut for chain 8022833 (1 tx)                                      |
+| file                     | contents                                                                                                                 | produced by                                                                            |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `…-1-ecosystem.json`     | Camp-B ChainAdmin bundle, governance stages 0/1/2, `test_create_chain_zkos`, and an `ack_test_upgrade_chain_zkos` marker | `ecosystem governance-toml-to-simulator --ack test_upgrade_chain_zkos`                 |
+| `…-2-chain-8022833.json` | `set-upgrade-timestamp` then the diamond cut, for one chain                                                              | `chain set-upgrade-timestamp` + `chain upgrade`, via `ecosystem manifest-to-simulator` |
 
 The transaction-simulator shares **one fork across every scenario file** and walks them in
-alphabetical order, so the chain file runs on the state the ecosystem file left behind. That is
-why the names carry `-1-` / `-2-`: a chain file that sorted first would revert (no v33 version
-registered on the CTM yet), and one that repeated the ceremony would revert too
-(`TimerAlreadyStarted`, proxies already re-pointed).
+alphabetical order, so the chain file runs on the state the ecosystem file left behind. Hence
+the `-1-` / `-2-` prefixes: sorted the other way the chain file would revert, because
+`ServerNotifier.setUpgradeTimestamp` requires `ctm.upgradeCutHash(oldVersion)` to exist and only
+stage 1 puts it there.
 
-The run is validated by the simulator's own invariant pass:
+### Why the per-chain upgrade is not in the artifact
 
-```
-✔️ test_create_chain_zkos created chain 556 … on v33.0.0
-✔️ test_upgrade_chain_zkos upgraded chain 0x02b1ac1c… from v31.0.1 to v33.0.0
-```
+Earlier releases had the CTM prepare emit a `test_upgrade_chain` smoke call into
+`[test_upgrade_calls]`, and the simulator scenario carried it. v33 opts out
+(`CTMUpgrade_v33.TESTONLY_emitsTestUpgradeChainCall() == false`).
 
-Chain 8022833 was picked because `baseTokenSupportsTotalSupply()` is true for it. That holds for
-9 of the 25 ZKsync OS chains — exactly the ones already on v31. The other 16 are still on v29/v30,
-where the getter does not exist, and **cannot take this upgrade at all** until they go to v31
-first.
+A single generated call cannot stand for this release's per-chain upgrade. `V32UpgradeZKsyncOS`
+requires a **recorded priority-op lower bound** and **all batches executed**, and the real
+rollout sets an upgrade timestamp first. Emitting one call would either revert or — worse — pass
+while silently skipping the preconditions. So the artifact says nothing about it, and
+`protocol_ops chain upgrade` produces the real per-chain bundle as its own scenario.
 
-The per-chain cut needs two preconditions that are live-chain state rather than properties of the
-calldata:
+The ecosystem scenario then carries `ack_test_upgrade_chain_zkos`: an empty-calldata marker
+recording that the per-chain upgrade is deliberately elsewhere. The transaction-simulator's
+provenance check validates the claim rather than trusting it — the acknowledged tag must be a
+real checked tag, it must genuinely not be derivable from the TOML (so an ack can never hide a
+dropped transaction), and the calldata must be exactly `0x`. The simulator skips it at replay
+and re-checks the calldata rule there.
 
-- `PriorityOpLowerBound.lowerBoundPriorityOp(chain)` must have been called. This is **already done
-  on real Sepolia** for all 9 eligible chains, pinned while their queues were fully drained, so
-  `firstUnprocessed >= bound` holds permanently (the bound is fixed; `firstUnprocessed` only
-  grows). The scenario therefore needs no mock for it. On a fresh rollout this is
-  `protocol_ops chain record-priority-op-lower-bound`.
-- `emulateAllBatchesExecuted`, since a live chain normally has a few committed-but-unexecuted
-  batches that the cut rejects with `NotAllBatchesExecuted()`. A real rollout waits for them.
+### Preconditions that live on chain, not in the calldata
+
+`PriorityOpLowerBound.lowerBoundPriorityOp(chain)` must have been called for a chain before it
+can take the cut. It is permissionless and first-call-wins, and pinning it while the chain's
+priority queue is drained fixes a bound that `firstUnprocessed` already satisfies — and only
+ever grows past. This has been done on Sepolia for all 9 eligible chains.
+
+Eligibility is `baseTokenSupportsTotalSupply()`, which is true for exactly the 9 ZKsync OS chains
+already on v31. The other 16 are still on v29/v30, where the getter does not exist, and **cannot
+take this upgrade at all** until they go to v31 first.
+
+The cut also needs all batches executed. A live chain normally has a few committed-but-unexecuted
+batches, so the scenario carries `emulateAllBatchesExecuted`; a real rollout waits for them.
 
 ## PUVT: not yet green for v33
 
@@ -150,16 +158,16 @@ classes remain, and neither is more of the same:
 matches a deploy by hashing its creation code and looking it up in `AllContractsHashes.json`.
 The artifact is built under `FOUNDRY_PROFILE=anvil-interop` (`cbor_metadata = false`) so CREATE2
 addresses are reproducible across machines; `AllContractsHashes.json` is generated under the
-default profile, *with* metadata. For `L1Bridgehub` the deployed runtime is 18824 bytes and the
+default profile, _with_ metadata. For `L1Bridgehub` the deployed runtime is 18824 bytes and the
 registry records 18878 — a 54-byte CBOR blob — so no deployment ever matches and all 29 land as
 "not present in the create2 deployments". Reconciling this is a decision, not a patch:
 
-  * regenerate the registry under `anvil-interop` (but `check-hashes` CI builds the default
-    profile), or
-  * deploy from a default-profile build (but then CREATE2 addresses stop being reproducible,
-    which is the entire reason `anvil-interop` exists), or
-  * teach the matcher to compare metadata-stripped creation code (weakens the check slightly,
-    changes bytecode provenance tool-wide).
+- regenerate the registry under `anvil-interop` (but `check-hashes` CI builds the default
+  profile), or
+- deploy from a default-profile build (but then CREATE2 addresses stop being reproducible,
+  which is the entire reason `anvil-interop` exists), or
+- teach the matcher to compare metadata-stripped creation code (weakens the check slightly,
+  changes bytecode provenance tool-wide).
 
 **2. The stage-0/1/2 expected-call tables still describe v31's ceremony.** Stage 1 expects
 `transparent_proxy_admin.upgrade(...)` at call #0 where v33 has `pauseMigration()`,
@@ -176,9 +184,8 @@ against a Sepolia fork). Use `SKIP_PUVT=1` to stop before the failing step.
 ```bash
 # 0. Toolchain: foundry-zksync v0.1.5 (.github/actions/install-zksync-foundry) on PATH,
 #    plus `cd protocol-ops && cargo build --release`.
-#    FOUNDRY_PROFILE=anvil-interop is mandatory for every build AND the regen: it sets
-#    bytecode_hash=none / cbor_metadata=false, without which every CREATE2 address moves.
-export FOUNDRY_PROFILE=anvil-interop
+#    Build with the DEFAULT profile — see "Why the default profile" below. Do NOT set
+#    FOUNDRY_PROFILE=anvil-interop here, even though other anvil-interop tooling does.
 yarn da build:foundry && yarn sc build:foundry && yarn l1 build:foundry
 
 # 1 + 2. Prepare against a Sepolia fork, then rehearse the bundles on it.
@@ -203,6 +210,22 @@ protocol_ops ecosystem governance-toml-to-simulator --env testnet \
 # 5. Rehearse the scenario (forks Sepolia; needs the step-3 deploys to be on chain).
 yarn --cwd <transaction-simulator> simulate --file <scenario.json>
 ```
+
+### Why the default profile
+
+`anvil-interop` sets `cbor_metadata = false`, stripping the trailing metadata blob so CREATE2
+addresses come out identical on any machine. This artifact deliberately does **not** use it.
+
+PUVT resolves each deployment by hashing its creation code and looking the hash up in
+`AllContractsHashes.json`, which is generated under the default profile. A metadata-stripped
+build is ~54 bytes shorter per contract (measured on `L1Bridgehub`: 18824 vs 18878), so no
+deployment ever matches and provenance reports every contract as "not present in the create2
+deployments" — the check silently verifies nothing.
+
+The cost is that CREATE2 addresses now depend on the metadata hash, which embeds source paths.
+A reviewer re-running the prepare from a different checkout path will get **different
+addresses**. Verify the artifact by its contents and by the on-chain deployments listed in
+`transactions.txt`, not by diffing addresses against your own run.
 
 ### Salts must be rotated per regen
 

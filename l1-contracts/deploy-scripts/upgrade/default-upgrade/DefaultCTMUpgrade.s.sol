@@ -639,10 +639,22 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         vm.writeToml(ctmAdminCallsSerialized, upgradeConfig.outputPath, ".ctm_admin_calls");
     }
 
-    function prepareDefaultTestUpgradeCalls() public {
-        (Call[] memory testUpgradeChainCall, address ZKChainAdmin) = TESTONLY_prepareTestUpgradeChainCall();
-        vm.serializeAddress("test_upgrade_calls", "test_upgrade_chain_caller", ZKChainAdmin);
-        vm.serializeBytes("test_upgrade_calls", "test_upgrade_chain", abi.encode(testUpgradeChainCall));
+    /// @notice Whether to emit the `test_upgrade_chain` smoke call into `[test_upgrade_calls]`.
+    /// @dev A release whose per-chain upgrade needs preconditions the artifact cannot express —
+    ///      v33 requires a recorded priority-op lower bound and an upgrade timestamp — should not
+    ///      pretend a single generated call covers it. Turning this off keeps the artifact honest;
+    ///      the per-chain upgrade is then produced by `protocol_ops chain upgrade`, which emits the
+    ///      real bundle, and the simulator scenario acknowledges the absence explicitly.
+    function TESTONLY_emitsTestUpgradeChainCall() internal view virtual returns (bool) {
+        return true;
+    }
+
+    function prepareDefaultTestUpgradeCalls() public virtual {
+        if (TESTONLY_emitsTestUpgradeChainCall()) {
+            (Call[] memory testUpgradeChainCall, address ZKChainAdmin) = TESTONLY_prepareTestUpgradeChainCall();
+            vm.serializeAddress("test_upgrade_calls", "test_upgrade_chain_caller", ZKChainAdmin);
+            vm.serializeBytes("test_upgrade_calls", "test_upgrade_chain", abi.encode(testUpgradeChainCall));
+        }
         (Call[] memory testCreateChainCall, address bridgehubAdmin) = TESTONLY_prepareCreateChainCall();
         vm.serializeAddress("test_upgrade_calls", "test_create_chain_caller", bridgehubAdmin);
 

@@ -326,43 +326,6 @@ fn load_descriptions(path: Option<&Path>) -> SimDescriptionRegistry {
     }
 }
 
-/// Which slice of the upgrade a scenario file covers. See `--scenario`.
-///
-/// The transaction-simulator shares one fork across every scenario file and runs them in
-/// alphabetical order, so an upgrade splits across files rather than being duplicated: the
-/// ecosystem file performs the governance ceremony once, and each chain file then cuts one
-/// chain over on top of the state it left behind. A chain file that re-ran the ceremony would
-/// revert (`TimerAlreadyStarted`, proxies already pointed at the new impls, ...).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
-#[serde(rename_all = "kebab-case")]
-pub enum ScenarioMode {
-    /// Everything in one file: Camp-B bundles, governance stages 0/1/2, and every `test_*`
-    /// smoke transaction the prepare emitted.
-    Full,
-    /// Camp-B bundles, governance stages 0/1/2, and the `test_create_chain_*` smoke test
-    /// (which validates the new chain-creation params, an ecosystem-level property).
-    Ecosystem,
-    /// Only the `test_upgrade_chain_*` calls — the per-chain diamond cut. Carries no
-    /// governance calls, so it must run after an `ecosystem` file on the same fork.
-    Chain,
-}
-
-impl ScenarioMode {
-    /// Whether the Camp-B bundles and the governance stages belong in this file.
-    fn includes_governance(&self) -> bool {
-        matches!(self, ScenarioMode::Full | ScenarioMode::Ecosystem)
-    }
-
-    /// Whether a `[test_upgrade_calls]` tag belongs in this file.
-    fn includes_test_tag(&self, tag: &str) -> bool {
-        match self {
-            ScenarioMode::Full => true,
-            ScenarioMode::Ecosystem => tag.starts_with("test_create_chain"),
-            ScenarioMode::Chain => tag.starts_with("test_upgrade_chain"),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct GovernanceTomlToSimulatorArgs {
     #[clap(flatten)]
@@ -419,14 +382,18 @@ pub struct GovernanceTomlToSimulatorArgs {
     #[clap(long, value_delimiter = ',', num_args = 1..)]
     pub camp_a_signers: Vec<Address>,
 
-    /// Which slice of the upgrade this scenario file covers.
+    /// Acknowledge a checked tag that this artifact deliberately does not carry.
     ///
-    /// Default `full` keeps the single-file behaviour. Split an upgrade into `ecosystem` plus
-    /// one `chain` file per chain when the scenarios are committed to the
-    /// transaction-simulator, and name them so the ecosystem file sorts first — the simulator
-    /// shares one fork across files and runs them alphabetically.
-    #[clap(long, value_enum, default_value_t = ScenarioMode::Full)]
-    pub scenario: ScenarioMode,
+    /// Emits an empty-calldata marker transaction tagged `ack_<tag>`. The transaction-simulator's
+    /// era-contracts provenance check accepts the marker in place of a derived entry, recording
+    /// that the reviewer knows the work exists elsewhere — for v33 that is the per-chain upgrade,
+    /// which `protocol_ops chain upgrade` produces as its own bundle because it needs
+    /// preconditions (a recorded priority-op lower bound, an upgrade timestamp) that a single
+    /// generated call cannot express.
+    ///
+    /// Repeatable: `--ack test_upgrade_chain_zkos`.
+    #[clap(long = "ack", num_args = 1..)]
+    pub acks: Vec<String>,
 
     /// Optional path to a `sim-descriptions.toml` that overrides each
     /// emitted tx's `description` field with a human-readable string keyed by
@@ -687,7 +654,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
     // governance stages 0/1/2. Order matters: setup writes the state
     // (pendingOwner, verifier registry, etc.) that the gov calls then read.
     let mut transactions = Vec::new();
-    if let Some(ref manifest) = manifest_path.filter(|_| args.scenario.includes_governance()) {
+    if let Some(ref manifest) = manifest_path {
         logger::info(format!(
             "Including manifest bundles from {}",
             manifest.display()
@@ -702,20 +669,39 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
         .with_context(|| format!("failed to expand manifest bundles {}", manifest.display()))?;
         transactions.extend(extra);
     }
-    let governance = governance_toml_to_simulator_transactions(
-        &governance_toml,
-        &network,
-        from,
-        &descriptions,
-        args.scenario,
-    )
-    .with_context(|| {
-        format!(
-            "failed to convert governance TOML {}",
-            governance_toml.display()
-        )
-    })?;
+    let governance =
+        governance_toml_to_simulator_transactions(&governance_toml, &network, from, &descriptions)
+            .with_context(|| {
+                format!(
+                    "failed to convert governance TOML {}",
+                    governance_toml.display()
+                )
+            })?;
     transactions.extend(governance);
+
+    // Acknowledgement markers, appended last. Empty calldata is load-bearing: the simulator
+    // rejects an `ack_` entry that carries any, precisely so it can never smuggle in a real call,
+    // and skips executing it. `to` is the governance sender so the entry is well-formed without
+    // naming a contract it does not touch.
+    for tag in &args.acks {
+        let tag = tag.trim_start_matches("ack_");
+        logger::info(format!("Acknowledging absent tag {tag}"));
+        transactions.push(SimulatorTransaction {
+            description: format!(
+                "ACK: {tag} is deliberately absent from this artifact — the per-chain upgrade is                  generated separately by `protocol_ops chain upgrade`. The reviewer is responsible                  for checking that file."
+            ),
+            network: network.to_string(),
+            from: format!("{from:#x}"),
+            to: format!("{from:#x}"),
+            data: "0x".to_string(),
+            value: "0".to_string(),
+            value_to_mint: None,
+            time_increase: None,
+            emulate_all_batches_executed: None,
+            tag: format!("ack_{tag}"),
+        });
+    }
+
     let body = serde_json::to_string_pretty(&transactions)?;
 
     if let Some(out) = args.out {
@@ -829,6 +815,87 @@ fn write_sim_inputs(
         kept.len(),
         out_dir.display()
     ));
+    Ok(())
+}
+
+/// Args for `ecosystem manifest-to-simulator`.
+#[derive(Debug, Clone, Serialize, Deserialize, Parser)]
+pub struct ManifestToSimulatorArgs {
+    /// One or more `manifest.json` files produced by protocol-ops commands that emit Safe
+    /// bundles. Repeat to compose a scenario from several steps, in the order given — the
+    /// per-chain upgrade is `chain set-upgrade-timestamp` followed by `chain upgrade`, and the
+    /// simulator replays them in sequence on one fork.
+    #[clap(long, num_args = 1..)]
+    pub manifest: Vec<PathBuf>,
+
+    /// Transaction-simulator network name.
+    #[clap(long, default_value = "sepolia")]
+    pub network: String,
+
+    /// Tag applied to every emitted transaction, e.g. `chain_upgrade_8022833`.
+    #[clap(long)]
+    pub tag: String,
+
+    /// EOAs we hold keys for. Their bundles are dropped: the fork inherits their effect from
+    /// chain tip, and replaying them reverts. See `--camp-a-signers` on
+    /// `governance-toml-to-simulator`.
+    #[clap(long, value_delimiter = ',', num_args = 1..)]
+    pub camp_a_signers: Vec<Address>,
+
+    /// Output JSON path. Printed to stdout when omitted.
+    #[clap(long)]
+    pub out: Option<PathBuf>,
+}
+
+/// Convert a protocol-ops Safe-bundle manifest straight into a transaction-simulator scenario.
+///
+/// `governance-toml-to-simulator` builds a scenario out of an ecosystem artifact. A per-chain
+/// upgrade has no artifact — it is generated per chain by `chain upgrade`, whose output is a Safe
+/// bundle — so this converts that bundle directly. The result is not covered by the era-contracts
+/// provenance check (there is no TOML to re-derive it from); the ecosystem scenario acknowledges
+/// the gap with an `ack_` marker and the reviewer checks this file on its own terms.
+pub async fn run_manifest_to_simulator(args: ManifestToSimulatorArgs) -> anyhow::Result<()> {
+    let descriptions = SimDescriptionRegistry::default();
+    let mut transactions = Vec::new();
+    for manifest in &args.manifest {
+        let mut batch = manifest_to_simulator_transactions(
+            manifest,
+            &args.network,
+            &args.camp_a_signers,
+            &descriptions,
+            &HashMap::new(),
+        )?;
+        anyhow::ensure!(
+            !batch.is_empty(),
+            "no Camp-B bundles in {} — every bundle was classified Camp A, so there is nothing \
+             for the simulator to impersonate",
+            manifest.display()
+        );
+        logger::info(format!(
+            "{}: {} transaction(s)",
+            manifest.display(),
+            batch.len()
+        ));
+        transactions.append(&mut batch);
+    }
+    for tx in &mut transactions {
+        tx.tag = args.tag.clone();
+    }
+    let body = serde_json::to_string_pretty(&transactions)?;
+    match args.out {
+        Some(out) => {
+            if let Some(parent) = out.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(&out, format!("{body}\n"))?;
+            logger::info(format!(
+                "Wrote {} transaction(s) to {}",
+                transactions.len(),
+                out.display()
+            ));
+        }
+        None => println!("{body}"),
+    }
     Ok(())
 }
 
@@ -972,7 +1039,6 @@ fn governance_toml_to_simulator_transactions(
     network: &str,
     from: Address,
     descriptions: &SimDescriptionRegistry,
-    scenario: ScenarioMode,
 ) -> anyhow::Result<Vec<SimulatorTransaction>> {
     let content =
         fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
@@ -982,19 +1048,15 @@ fn governance_toml_to_simulator_transactions(
     // A `chain` scenario runs on the fork an `ecosystem` scenario already advanced, so it must
     // not replay the ceremony: stage 0 would revert `TimerAlreadyStarted`, and stage 1 would
     // re-point proxies that already carry the new implementations.
-    let stages: &[(u8, &str)] = if scenario.includes_governance() {
-        &[
-            (0u8, parsed.governance_calls.stage0_calls.as_str()),
-            (1u8, parsed.governance_calls.stage1_calls.as_str()),
-            (2u8, parsed.governance_calls.stage2_calls.as_str()),
-        ]
-    } else {
-        &[]
-    };
+    let stages = [
+        (0u8, parsed.governance_calls.stage0_calls.as_str()),
+        (1u8, parsed.governance_calls.stage1_calls.as_str()),
+        (2u8, parsed.governance_calls.stage2_calls.as_str()),
+    ];
     let mut out = Vec::new();
     let mut should_fund_sender = true;
     let mut stage2_topup_pending = true;
-    for &(stage, encoded_calls) in stages {
+    for (stage, encoded_calls) in stages {
         let calls = decode_calls(encoded_calls)
             .with_context(|| format!("failed to decode stage{stage}_calls"))?;
         for (idx, call) in calls.into_iter().enumerate() {
@@ -1049,13 +1111,7 @@ fn governance_toml_to_simulator_transactions(
         }
     }
 
-    append_test_upgrade_calls(
-        &mut out,
-        &parsed.test_upgrade_calls,
-        network,
-        descriptions,
-        scenario,
-    )?;
+    append_test_upgrade_calls(&mut out, &parsed.test_upgrade_calls, network, descriptions)?;
 
     Ok(out)
 }
@@ -1065,14 +1121,9 @@ fn append_test_upgrade_calls(
     test_upgrade_calls: &BTreeMap<String, String>,
     network: &str,
     descriptions: &SimDescriptionRegistry,
-    scenario: ScenarioMode,
 ) -> anyhow::Result<()> {
     for (tag, encoded_calls) in test_upgrade_calls {
         if !tag.starts_with("test_") || tag.ends_with("_caller") {
-            continue;
-        }
-        if !scenario.includes_test_tag(tag) {
-            logger::info(format!("Skipping {tag} (--scenario)"));
             continue;
         }
 

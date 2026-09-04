@@ -193,8 +193,14 @@ struct GovernanceCalls {
 struct TestUpgradeCalls {
     test_create_chain: String,
     test_create_chain_caller: String,
-    test_upgrade_chain: String,
-    test_upgrade_chain_caller: String,
+    /// Absent when the release opts out via `TESTONLY_emitsTestUpgradeChainCall()`. v33 does: its
+    /// per-chain upgrade needs a recorded priority-op lower bound and an upgrade timestamp, so a
+    /// single generated call cannot stand for it and `protocol_ops chain upgrade` emits the real
+    /// bundle instead.
+    #[serde(default)]
+    test_upgrade_chain: Option<String>,
+    #[serde(default)]
+    test_upgrade_chain_caller: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1156,14 +1162,16 @@ fn write_merged_ecosystem_toml(
                 "test_create_chain_era_caller".into(),
                 Value::String(test_calls.test_create_chain_caller),
             );
-            test_table.insert(
-                "test_upgrade_chain_era".into(),
-                Value::String(test_calls.test_upgrade_chain),
-            );
-            test_table.insert(
-                "test_upgrade_chain_era_caller".into(),
-                Value::String(test_calls.test_upgrade_chain_caller),
-            );
+            if let (Some(call), Some(caller)) = (
+                test_calls.test_upgrade_chain,
+                test_calls.test_upgrade_chain_caller,
+            ) {
+                test_table.insert("test_upgrade_chain_era".into(), Value::String(call));
+                test_table.insert(
+                    "test_upgrade_chain_era_caller".into(),
+                    Value::String(caller),
+                );
+            }
         }
         if let Some(test_calls) = zksync_os_test_calls {
             test_table.insert(
@@ -1174,14 +1182,16 @@ fn write_merged_ecosystem_toml(
                 "test_create_chain_zkos_caller".into(),
                 Value::String(test_calls.test_create_chain_caller),
             );
-            test_table.insert(
-                "test_upgrade_chain_zkos".into(),
-                Value::String(test_calls.test_upgrade_chain),
-            );
-            test_table.insert(
-                "test_upgrade_chain_zkos_caller".into(),
-                Value::String(test_calls.test_upgrade_chain_caller),
-            );
+            if let (Some(call), Some(caller)) = (
+                test_calls.test_upgrade_chain,
+                test_calls.test_upgrade_chain_caller,
+            ) {
+                test_table.insert("test_upgrade_chain_zkos".into(), Value::String(call));
+                test_table.insert(
+                    "test_upgrade_chain_zkos_caller".into(),
+                    Value::String(caller),
+                );
+            }
         }
         doc.insert("test_upgrade_calls".into(), Value::Table(test_table));
     }

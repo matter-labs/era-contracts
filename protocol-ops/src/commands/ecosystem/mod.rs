@@ -71,6 +71,11 @@ pub enum EcosystemCommands {
     /// discover the Atlas CTM address without having to look it up by hand.
     #[command(name = "list-ctms")]
     ListCtms(ListCtmsArgs),
+    /// Convert a protocol-ops Safe-bundle manifest (e.g. from `chain upgrade`) into a
+    /// transaction-simulator scenario.
+    #[command(name = "manifest-to-simulator")]
+    ManifestToSimulator(simulator::ManifestToSimulatorArgs),
+
     /// Convert a protocol-ops governance TOML into transaction-simulator JSON.
     #[command(name = "governance-toml-to-simulator")]
     GovernanceTomlToSimulator(GovernanceTomlToSimulatorArgs),
@@ -80,6 +85,9 @@ pub async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
     match args {
         EcosystemCommands::Init(args) => init::run(args).await,
         EcosystemCommands::UpgradePrepareAll(args) => upgrade::run_upgrade_prepare_all(args).await,
+        EcosystemCommands::ManifestToSimulator(args) => {
+            simulator::run_manifest_to_simulator(args).await
+        }
         EcosystemCommands::UpgradeGovernance(args) => upgrade::run_upgrade_governance(args).await,
         EcosystemCommands::VerifyUpgrade(args) => verify_upgrade::run(args).await,
         EcosystemCommands::UpgradeBroadcast(args) => broadcast::run(args).await,

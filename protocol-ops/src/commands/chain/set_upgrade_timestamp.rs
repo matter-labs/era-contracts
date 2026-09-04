@@ -42,6 +42,18 @@ pub struct ChainSetUpgradeTimestampArgs {
     #[clap(long)]
     pub upgrade_timestamp: String,
 
+    /// `PriorityOpLowerBound` registry address, for the pre-flight that refuses to schedule an
+    /// upgrade whose diamond cut would revert `LowerBoundNotRecorded()`.
+    ///
+    /// Normally discovered by reading `PRIORITY_OP_LOWER_BOUND()` off the CTM's `defaultUpgrade`.
+    /// That only works while the CTM stores this release's *one-shot* upgrade contract. v33
+    /// deliberately stores the generic `DefaultUpgradeZKsyncOS` there instead — so that later
+    /// verifier-only upgrades can reuse it — and the generic contract has no such immutable.
+    /// Pass the registry explicitly in that case; it is the `priority_op_lower_bound_addr` from
+    /// the release's `ecosystem.toml`.
+    #[clap(long)]
+    pub priority_op_lower_bound: Option<Address>,
+
     #[clap(flatten)]
     #[serde(flatten)]
     pub shared: SharedRunArgs,
@@ -81,6 +93,7 @@ async fn ensure_priority_op_bound_ready(
     rpc_url: &str,
     bridgehub: Address,
     chain_id: u64,
+    explicit_registry: Option<Address>,
 ) -> anyhow::Result<()> {
     let provider: RootProvider<Ethereum> =
         ProviderBuilder::default().connect_http(rpc_url.parse()?);
@@ -107,22 +120,29 @@ async fn ensure_priority_op_bound_ready(
         return Ok(());
     }
 
-    let default_upgrade = IChainTypeManagerAbi::new(ctm, &provider)
-        .defaultUpgrade()
-        .call()
-        .await
-        .context("read CTM defaultUpgrade")?;
-
     // From here on every failure is fatal: this is a safety check, and an RPC hiccup must not be
     // mistaken for "no precondition to enforce".
-    let registry = IPriorityOpLowerBoundGate::new(default_upgrade, &provider)
-        .PRIORITY_OP_LOWER_BOUND()
-        .call()
-        .await
-        .context(
-            "read PRIORITY_OP_LOWER_BOUND from the CTM's default upgrade — expected on v33+, so a \
-             failure here means the upgrade contract or the RPC is not what this command assumes",
-        )?;
+    let registry = match explicit_registry {
+        Some(addr) => addr,
+        None => {
+            let default_upgrade = IChainTypeManagerAbi::new(ctm, &provider)
+                .defaultUpgrade()
+                .call()
+                .await
+                .context("read CTM defaultUpgrade")?;
+            IPriorityOpLowerBoundGate::new(default_upgrade, &provider)
+                .PRIORITY_OP_LOWER_BOUND()
+                .call()
+                .await
+                .context(
+                    "read PRIORITY_OP_LOWER_BOUND from the CTM's default upgrade. That getter only \
+                     exists on a release whose one-shot upgrade contract is what the CTM stores as \
+                     its defaultUpgrade; v33 stores the generic DefaultUpgradeZKsyncOS instead. \
+                     Pass --priority-op-lower-bound with the registry address from the release's \
+                     ecosystem.toml",
+                )?
+        }
+    };
 
     let registry = IPriorityOpLowerBoundGate::new(registry, &provider);
     anyhow::ensure!(
@@ -165,7 +185,13 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
 
     // Checked against the real chain, not the fork: this is a precondition of the upgrade the
     // scheduled timestamp commits the server to.
-    ensure_priority_op_bound_ready(&args.shared.l1_rpc_url, bridgehub, chain_id).await?;
+    ensure_priority_op_bound_ready(
+        &args.shared.l1_rpc_url,
+        bridgehub,
+        chain_id,
+        args.priority_op_lower_bound,
+    )
+    .await?;
 
     let admin_address =
         crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)

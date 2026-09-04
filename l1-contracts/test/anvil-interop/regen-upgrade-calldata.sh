@@ -87,10 +87,19 @@ if [[ "$SKIP_PUVT" != "1" && -z "${GW_RPC_URL:-}" ]]; then
   exit 1
 fi
 
-# `bytecode_hash=none` / `cbor_metadata=false`. Without it the compiler embeds a metadata
-# hash that varies with absolute paths, every CREATE2 address shifts, and the artifact stops
-# being reproducible on another machine.
-export FOUNDRY_PROFILE="${FOUNDRY_PROFILE:-anvil-interop}"
+# Build with the DEFAULT profile — do not switch this to `anvil-interop`.
+#
+# `anvil-interop` sets `cbor_metadata = false`, which strips the trailing CBOR metadata blob and
+# makes CREATE2 addresses identical across machines. Tempting, but it breaks verification:
+# PUVT resolves a deployment by hashing its creation code and looking it up in
+# `AllContractsHashes.json`, which is generated under the default profile. A metadata-stripped
+# build is ~54 bytes shorter per contract, so nothing ever matches and every deployment reports
+# as "not present in the create2 deployments".
+#
+# The cost is that CREATE2 addresses depend on the metadata hash, which embeds source paths — so
+# a reviewer re-running this from a different checkout path gets different addresses and must
+# compare the artifact's *contents* rather than diffing addresses.
+export FOUNDRY_PROFILE="${FOUNDRY_PROFILE:-default}"
 echo "Profile:      $FOUNDRY_PROFILE"
 
 _PO_DIR="$(cd "$(dirname "$0")"/../../../protocol-ops && pwd)"
