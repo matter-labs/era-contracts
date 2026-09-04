@@ -51,13 +51,6 @@ ecosystem contract _on the fork_ to compute deterministic CREATE2 addresses),
 replays the prepare bundles, runs PUVT, and emits the git-portable calldata set.
 Nothing touches real L1 — the deployer is impersonated.
 
-For Era environments, CI also normalizes the clean build's final
-`DefaultAccount` compiler-metadata word to the canonical v31 release artifact.
-This is fail-closed: the executable prefix must match the reviewed #2268 build,
-and the restored bytecode hash must match both the selected environment and
-`AllContractsHashes.json`. Contract-code changes therefore cannot be hidden by
-the normalization.
-
 **Outputs** (under `l1-contracts/upgrade-envs/v0.31.0-interopB/output/<env>/`):
 
 | Artifact                                        | Purpose                                                            |

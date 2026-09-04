@@ -83,7 +83,7 @@ impl Verifiers {
         env: VerifyUpgradeEnv,
         artifact: &EcosystemUpgradeArtifact,
         l1_rpc: impl Into<String>,
-        gw_rpc: impl Into<String>,
+        gw_rpc: Option<String>,
         contracts_commit: Option<&str>,
         zk_governance_commit: &str,
         era_chain_id: u64,
@@ -118,7 +118,7 @@ impl Verifiers {
         let bytecode_verifier =
             BytecodeVerifier::init_v31(contracts_commit, zk_governance_commit).await?;
         let network_verifier =
-            NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into(), era_chain_id).await?;
+            NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc, era_chain_id).await?;
         // The gateway-RPC chain-id cross-check and representative-CTM
         // resolution only apply when this upgrade brings up a Gateway.
         // Gateway-less envs (no `[new_gateway]` in the artifact) skip them; all
@@ -127,11 +127,12 @@ impl Verifiers {
         // so it stays unconditional.
         let has_new_gateway = artifact.new_gateway.is_some();
         if has_new_gateway {
+            let gateway_chain_id = network_verifier.get_gateway_chain_id().ok_or_else(|| {
+                anyhow::anyhow!("this upgrade brings up a Gateway; pass --gw-rpc-url")
+            })?;
             anyhow::ensure!(
-                network_verifier.get_gateway_chain_id() == new_gateway_chain_id,
-                "gateway RPC chain id {} does not match env [new_gateway].chain_id {}",
-                network_verifier.get_gateway_chain_id(),
-                new_gateway_chain_id,
+                gateway_chain_id == new_gateway_chain_id,
+                "gateway RPC chain id {gateway_chain_id} does not match env [new_gateway].chain_id {new_gateway_chain_id}",
             );
         }
         let fee_param_verifier =

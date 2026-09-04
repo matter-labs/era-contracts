@@ -53,11 +53,6 @@ diamond_init_priority_tx_max_pubdata = 99000
 diamond_init_minimal_l2_gas_price = 250000000
 bootloader_hash = "0x0100099b799188da75411d9c2815a792e60e031bc5f89c2938b6deced048ad83"
 default_aa_hash = "0x010005f9d84c1863bf21a9393f2fd1631af92aab68f12c35dba580c8d7a06146"
-# Trailing 32-byte compiler-metadata word of the reviewed DefaultAccount build above. The
-# EraVM build is not bit-reproducible in that word alone; `protocol_ops dev
-# restore-default-account` swaps it back into a fresh build, which must then hash to
-# `default_aa_hash` exactly (anything else means the executable changed).
-default_aa_metadata_word = "0x3ad06056e66b778b11945dd3cf11269b479679b45850c25af96c8ca9f309acb0"
 evm_emulator_hash = "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63"
 bridgehub_proxy_address = "0xc4FD2580C3487bba18D63f50301020132342fdbD"
 rollup_da_manager = "0xB168490e38E5E7e1B8eB256a701Ee8314Cbf0E15"

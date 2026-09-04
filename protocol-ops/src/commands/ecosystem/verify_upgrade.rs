@@ -31,9 +31,10 @@ pub struct VerifyUpgradeArgs {
     #[clap(long, default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
 
-    /// Gateway RPC URL used by read-only gateway-side checks.
+    /// Gateway RPC URL for the read-only gateway-side checks. Needed only for envs that
+    /// bring up a Gateway (`[new_gateway]`); gateway-less envs run without it.
     #[clap(long, alias = "gw-rpc")]
-    pub gw_rpc_url: String,
+    pub gw_rpc_url: Option<String>,
 
     /// Path to the v31 ecosystem upgrade TOML produced by `upgrade-prepare`.
     #[clap(long)]
@@ -188,7 +189,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         transactions_log_path.display()
     ));
     logger::info(format!("L1 RPC URL: {}", args.l1_rpc_url));
-    logger::info(format!("Gateway RPC URL: {}", args.gw_rpc_url));
+    logger::info(format!(
+        "Gateway RPC URL: {}",
+        args.gw_rpc_url.as_deref().unwrap_or("none")
+    ));
     if let Some(contracts_commit) = &args.contracts_commit {
         logger::info(format!("Contracts commit: {contracts_commit}"));
     } else {
@@ -236,7 +240,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         args.env,
         &artifact,
         &args.l1_rpc_url,
-        &args.gw_rpc_url,
+        args.gw_rpc_url.as_deref(),
         args.contracts_commit.as_deref(),
         args.zk_governance_commit.as_str(),
         era_chain_id,

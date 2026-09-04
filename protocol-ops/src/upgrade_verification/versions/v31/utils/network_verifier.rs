@@ -136,8 +136,10 @@ pub struct NetworkVerifier {
     pub l1_provider: RootProvider,
     pub era_chain_id: u64,
     pub l1_chain_id: u64,
-    pub gateway_chain_id: u64,
-    pub gw_provider: RootProvider,
+    /// Both absent on gateway-less envs; every gateway-side check is gated on the artifact's
+    /// `[new_gateway]` and errors out if it is reached without a gateway RPC.
+    pub gateway_chain_id: Option<u64>,
+    pub gw_provider: Option<RootProvider>,
 
     // todo: maybe merge into one struct.
     pub create2_known_bytecodes: HashMap<Address, String>,
@@ -154,7 +156,7 @@ struct ParsedCreate2Deployment {
 impl NetworkVerifier {
     pub async fn new_v31(
         l1_rpc: String,
-        gw_rpc: String,
+        gw_rpc: Option<String>,
         era_chain_id: u64,
     ) -> anyhow::Result<Self> {
         let l1_provider = RootProvider::new_http(l1_rpc.parse().context("invalid L1 RPC URL")?);
@@ -162,12 +164,22 @@ impl NetworkVerifier {
             .get_chain_id()
             .await
             .context("failed to fetch L1 chain id")?;
-        let gw_provider =
-            RootProvider::new_http(gw_rpc.parse().context("invalid gateway RPC URL")?);
-        let gateway_chain_id = gw_provider
-            .get_chain_id()
-            .await
-            .context("failed to fetch gateway chain id")?;
+        let gw_provider = gw_rpc
+            .map(|url| {
+                url.parse()
+                    .context("invalid gateway RPC URL")
+                    .map(RootProvider::new_http)
+            })
+            .transpose()?;
+        let gateway_chain_id = match &gw_provider {
+            Some(provider) => Some(
+                provider
+                    .get_chain_id()
+                    .await
+                    .context("failed to fetch gateway chain id")?,
+            ),
+            None => None,
+        };
 
         Ok(Self {
             l1_provider,
@@ -355,7 +367,7 @@ impl NetworkVerifier {
         self.create2_constructor_params.insert(addr, params);
     }
 
-    pub fn get_gateway_chain_id(&self) -> u64 {
+    pub fn get_gateway_chain_id(&self) -> Option<u64> {
         self.gateway_chain_id
     }
 
@@ -393,8 +405,10 @@ impl NetworkVerifier {
         self.l1_provider.clone()
     }
 
-    pub fn get_gw_provider(&self) -> RootProvider {
-        self.gw_provider.clone()
+    pub fn get_gw_provider(&self) -> anyhow::Result<RootProvider> {
+        self.gw_provider
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("this check needs the Gateway RPC; pass --gw-rpc-url"))
     }
 
     pub async fn try_get_l1_chain_id(&self) -> anyhow::Result<u64> {
@@ -484,7 +498,7 @@ impl NetworkVerifier {
         let slot = FixedBytes::<32>::from_hex(EIP1967_PROXY_ADMIN_SLOT)
             .context("invalid EIP-1967 admin slot literal")?;
         let storage = self
-            .gw_provider
+            .get_gw_provider()?
             .get_storage_at(addr, U256::from_be_bytes(slot.0))
             .await
             .with_context(|| format!("failed to read Gateway proxy admin slot for {addr}"))?;

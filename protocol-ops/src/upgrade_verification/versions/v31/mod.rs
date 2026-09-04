@@ -89,7 +89,7 @@ pub(crate) async fn verify(
     env: VerifyUpgradeEnv,
     artifact: &EcosystemUpgradeArtifact,
     l1_rpc_url: &str,
-    gw_rpc_url: &str,
+    gw_rpc_url: Option<&str>,
     contracts_commit: Option<&str>,
     zk_governance_commit: &str,
     era_chain_id: u64,
@@ -111,7 +111,7 @@ pub(crate) async fn verify(
         env,
         artifact,
         l1_rpc_url,
-        gw_rpc_url,
+        gw_rpc_url.map(str::to_string),
         contracts_commit,
         zk_governance_commit,
         era_chain_id,
@@ -129,10 +129,10 @@ pub(crate) async fn verify(
         "v31 verifier context loaded with {} named addresses",
         verifiers.address_verifier.name_to_address.len()
     ));
-    result.report_ok(&format!(
-        "Gateway RPC chain ID: {}",
-        verifiers.network_verifier.get_gateway_chain_id()
-    ));
+    match verifiers.network_verifier.get_gateway_chain_id() {
+        Some(chain_id) => result.report_ok(&format!("Gateway RPC chain ID: {chain_id}")),
+        None => result.report_ok("Gateway RPC: none (gateway-less env)"),
+    }
 
     // Populate the create2 maps so deployment provenance can match
     // deployed addresses against expected init bytecode + constructor args.

@@ -111,11 +111,13 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 # full workflow → `protocol_ops` subcommand map.
 #
 # ── TROUBLESHOOTING ───────────────────────────────────────────────────────
-# canonical DefaultAccount restore failed    → the env's default-AA hash is not
-#                                               the reviewed AllContractsHashes
-#                                               entry, or executable bytes changed.
-#                                               Refresh/review generated artifacts;
-#                                               never bypass this check.
+# `default aa hash factory dep mismatch`      → the system-contracts build did not
+#                                               reproduce the pinned DefaultAccount.
+#                                               The builds must run under exactly
+#                                               the toolchain l1-contracts-ci's
+#                                               `build` job uses (foundry-zksync
+#                                               only, upstream Foundry installed
+#                                               only afterwards); check that order.
 # prepare reverts on owner-gated calls        → the ecosystem is already upgraded;
 #                                               pass `fork_block` = a block BEFORE
 #                                               that deployment (ownership has since
@@ -300,10 +302,6 @@ jobs:
       # `AllContractsHashes.json` — da → l1 → l2 → system-contracts. Keeping the
       # calldata generation on the same sequence as the artifact generation is the
       # cheapest way to not have to wonder whether a difference came from here.
-      #
-      # The canonical DefaultAccount metadata normalization immediately below
-      # closes the only known clean-runner difference without accepting changed
-      # executable bytecode.
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
       - name: Build l1-contracts artifacts (EVM + zkout)
@@ -315,8 +313,9 @@ jobs:
 
       # Upstream Foundry supplies anvil. Installed only now, after every contract build,
       # so the builds see exactly the toolchain l1-contracts-ci's `build` job uses
-      # (foundry-zksync alone, no second forge or restored solc cache on PATH): that job's
-      # artifacts reproduce AllContractsHashes.json, and the regen's should too.
+      # (foundry-zksync alone, no second forge or restored solc cache on PATH). That job's
+      # artifacts reproduce AllContractsHashes.json, and so does this build: run
+      # 33860270077 produced the pinned DefaultAccount hash unchanged.
       - name: Install Foundry (for Anvil)
         uses: foundry-rs/foundry-toolchain@v1
         with:
@@ -326,20 +325,6 @@ jobs:
       - name: Build protocol_ops
         working-directory: protocol-ops
         run: cargo build --release
-
-      # A clean runner and the reviewed #2268 release artifact differ only in
-      # DefaultAccount's final compiler-metadata word. Normalize that word only
-      # after proving the executable prefix is the reviewed one, then require the
-      # resulting hash to match both the env config and AllContractsHashes.json.
-      - name: Restore canonical v31 DefaultAccount artifact
-        env:
-          ENVIRONMENT: ${{ inputs.environment }}
-        run: |
-          set -euo pipefail
-          ./protocol-ops/target/release/protocol_ops dev restore-default-account \
-            "$GITHUB_WORKSPACE/system-contracts/zkout/DefaultAccount.sol/DefaultAccount.json" \
-            "$GITHUB_WORKSPACE/l1-contracts/upgrade-envs/v0.31.0-interopB/$ENVIRONMENT.toml" \
-            "$GITHUB_WORKSPACE/AllContractsHashes.json"
 
       # Pick the per-network L1 RPC (secret), mask it, and resolve the deployer
       # EOA address. stage + testnet fork Sepolia; mainnet forks mainnet.
