@@ -6,7 +6,9 @@ use alloy::signers::local::PrivateKeySigner;
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 
-use crate::commands::dev::execute_safe::{execute_one_bundle_with_gas_floor, parse_gwei};
+use crate::commands::dev::execute_safe::{
+    execute_one_bundle_with_gas_floor, parse_gwei, GAS_PRICE_FLOOR_WEI,
+};
 use crate::common::{anvil::set_balance, logger, preflight::is_local_rpc, PrivateKey};
 
 /// Apply every bundle listed in a `manifest.json` file, routing each one to the
@@ -76,7 +78,7 @@ pub async fn run(args: DevExecuteManifestArgs) -> Result<()> {
         .iter()
         .map(|k| k.expose().to_string())
         .collect();
-    apply_manifest(
+    apply_manifest_with_gas_floor(
         &args.manifest,
         &keys,
         args.wallets.as_deref(),
@@ -95,9 +97,30 @@ pub async fn apply_manifest(
     wallets_path: Option<&Path>,
     l1_rpc_url: &str,
     fund_targets: bool,
+) -> Result<()> {
+    apply_manifest_with_gas_floor(
+        manifest_path,
+        private_keys,
+        wallets_path,
+        l1_rpc_url,
+        fund_targets,
+        GAS_PRICE_FLOOR_WEI,
+    )
+    .await
+}
+
+/// [`apply_manifest`] with an explicit gas price floor (wei). The
+/// five-argument form keeps the default so external crates that link
+/// `protocol_ops` (zksync-os-integration-tests) keep compiling.
+pub async fn apply_manifest_with_gas_floor(
+    manifest_path: &Path,
+    private_keys: &[String],
+    wallets_path: Option<&Path>,
+    l1_rpc_url: &str,
+    fund_targets: bool,
     gas_price_floor_wei: u128,
 ) -> Result<()> {
-    apply_manifest_from(
+    apply_manifest_from_with_gas_floor(
         manifest_path,
         0,
         private_keys,
@@ -113,6 +136,27 @@ pub async fn apply_manifest(
 /// Used by `apply --broadcast` to skip bundles written by earlier commands
 /// (e.g. ecosystem bundles from `bootstrap`).
 pub async fn apply_manifest_from(
+    manifest_path: &Path,
+    start_index: usize,
+    private_keys: &[String],
+    wallets_path: Option<&Path>,
+    l1_rpc_url: &str,
+    fund_targets: bool,
+) -> Result<()> {
+    apply_manifest_from_with_gas_floor(
+        manifest_path,
+        start_index,
+        private_keys,
+        wallets_path,
+        l1_rpc_url,
+        fund_targets,
+        GAS_PRICE_FLOOR_WEI,
+    )
+    .await
+}
+
+/// [`apply_manifest_from`] with an explicit gas price floor (wei).
+pub async fn apply_manifest_from_with_gas_floor(
     manifest_path: &Path,
     start_index: usize,
     private_keys: &[String],
