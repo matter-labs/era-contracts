@@ -1,6 +1,6 @@
 //! Governance ceremony call-list verification (Stages 0/1/2).
 //!
-//! This module owns the two public entrypoints called from `v31::verify`
+//! This module owns the two public entrypoints called from `v33::verify`
 //! ([`verify_governance_stage_calls`] and [`verify_per_chain_protocol_versions`]),
 //! the shared `sol!` types referenced by external decoders, and the three
 //! per-stage wrapper structs.
@@ -55,7 +55,7 @@ pub struct GovernanceStage2Calls {
 sol! {
     function upgrade(address proxy, address implementation);
     function upgradeAndCall(address proxy, address implementation, bytes data);
-    function initializeL1V31Upgrade();
+    function initializeL1V33Upgrade();
     function setAddresses();
     function updateSecurityCouncil(address _newSecurityCouncil);
     function updateGuardians(address _newGuardians);
@@ -281,7 +281,7 @@ pub(crate) async fn verify_per_chain_protocol_versions(
 
         let Some((flavor, expected_protocol)) = expected_by_ctm.get(&chain_ctm).copied() else {
             result.report_warn(&format!(
-                "Chain {chain_id} uses CTM {} which is not present in this v31 artifact",
+                "Chain {chain_id} uses CTM {} which is not present in this v33 artifact",
                 chain_ctm
             ));
             continue;

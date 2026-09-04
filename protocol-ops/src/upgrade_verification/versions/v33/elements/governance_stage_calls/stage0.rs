@@ -124,7 +124,7 @@ impl GovernanceStage0Calls {
 
         if puh_governed {
             let expected_zk_governance = artifact.zk_governance.as_ref().context(
-                "PUH-governed v31 artifact is missing required top-level [zk_governance] table",
+                "PUH-governed v33 artifact is missing required top-level [zk_governance] table",
             )?;
             // zk-governance redeploy block — PUH-governed envs only.
             // Call `base_count`     — PUH ProxyAdmin.upgradeAndCall(PUH proxy, new impl, "").

@@ -6,7 +6,7 @@ use crate::upgrade_verification::{
     },
     constants::EIP1967_PROXY_ADMIN_SLOT,
     verifiers::{VerificationResult, Verifiers},
-    versions::v31::{
+    versions::v33::{
         utils::{
             fee_param_verifier::{FeeParamVerifier, FeeParams},
             network_verifier::{
@@ -27,14 +27,14 @@ use alloy::{
 const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
 
 // `DiamondInit` writes the default fee params from `Config.sol` into
-// `ZKChainStorage.s.feeParams`; this slot matches the v31 storage layout.
+// `ZKChainStorage.s.feeParams`; this slot matches the v33 storage layout.
 const FEE_PARAMS_STORAGE_SLOT: u64 = 38;
 const MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 10_800;
 const TESTNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 0;
 
 /// Core proxies whose EIP-1967 admin slot must match the ecosystem
 /// `transparent_proxy_admin`.
-/// These are the proxies that the v31 governance stage 1 calls upgrade.
+/// These are the proxies that the v33 governance stage 1 calls upgrade.
 const CORE_PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
     "bridgehub_proxy",
     "l1_nullifier_proxy",
@@ -122,7 +122,7 @@ fn expect_fee_params_eq(result: &mut VerificationResult, actual: &FeeParams, exp
 /// - The L1 RPC chain id (sanity).
 /// - Runtime bytecode at the configured Create2Factory address.
 /// - Runtime bytecode at the ecosystem `transparent_proxy_admin` address.
-/// - EIP-1967 proxy-admin slot for every v31 stage-1 proxy → must equal the
+/// - EIP-1967 proxy-admin slot for every v33 stage-1 proxy → must equal the
 ///   ecosystem `transparent_proxy_admin`.
 /// - Pre-upgrade core wiring: AssetRouter owner / legacy bridge / NTV and
 ///   Bridgehub / ChainAssetHandler wiring.
@@ -140,7 +140,7 @@ fn expect_fee_params_eq(result: &mut VerificationResult, actual: &FeeParams, exp
 /// `factoryDeps` are restored separately inside
 /// `set_new_version_upgrade::verify_factory_deps` so they sit alongside the
 /// rest of the L2 upgrade tx checks.
-pub(crate) async fn verify_v31_artifact_state(
+pub(crate) async fn verify_v33_artifact_state(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     create2_factory: Address,
@@ -152,14 +152,14 @@ pub(crate) async fn verify_v31_artifact_state(
     result
         .expect_deployed_bytecode(verifiers, &create2_factory, CREATE2_FACTORY_CONTRACT_NAME)
         .await;
-    verify_v31_proxy_admins(artifact, verifiers, result).await?;
-    verify_v31_core_wiring(artifact, verifiers, result).await?;
-    verify_v31_validator_timelocks(artifact, verifiers, result).await?;
-    verify_v31_era_fee_params(verifiers, result).await;
-    verify_v31_timer_admin_state(artifact, verifiers, result).await?;
-    verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
-    verify_v31_ctm_flavor(artifact, verifiers, result).await?;
-    verify_v31_chain_settlement_layers(verifiers, result).await;
+    verify_v33_proxy_admins(artifact, verifiers, result).await?;
+    verify_v33_core_wiring(artifact, verifiers, result).await?;
+    verify_v33_validator_timelocks(artifact, verifiers, result).await?;
+    verify_v33_era_fee_params(verifiers, result).await;
+    verify_v33_timer_admin_state(artifact, verifiers, result).await?;
+    verify_v33_ctm_permissionless_validator(artifact, verifiers, result).await?;
+    verify_v33_ctm_flavor(artifact, verifiers, result).await?;
+    verify_v33_chain_settlement_layers(verifiers, result).await;
 
     Ok(())
 }
@@ -177,7 +177,7 @@ async fn verify_l1_chain_id(verifiers: &Verifiers, result: &mut VerificationResu
     }
 }
 
-async fn verify_v31_proxy_admins(
+async fn verify_v33_proxy_admins(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
@@ -274,7 +274,7 @@ async fn verify_v31_proxy_admins(
     Ok(())
 }
 
-async fn verify_v31_core_wiring(
+async fn verify_v33_core_wiring(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
@@ -480,7 +480,7 @@ async fn verify_v31_core_wiring(
     Ok(())
 }
 
-async fn verify_v31_validator_timelocks(
+async fn verify_v33_validator_timelocks(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
@@ -549,7 +549,7 @@ async fn verify_v31_validator_timelocks(
     Ok(())
 }
 
-async fn verify_v31_era_fee_params(verifiers: &Verifiers, result: &mut VerificationResult) {
+async fn verify_v33_era_fee_params(verifiers: &Verifiers, result: &mut VerificationResult) {
     let era_chain_id = verifiers.era_chain_id;
     let diamond = match verifiers
         .network_verifier
@@ -621,7 +621,7 @@ async fn verify_v31_era_fee_params(verifiers: &Verifiers, result: &mut Verificat
 ///
 /// `CtmArtifact.value` is the raw `[ctms.<flavor>]` TOML table, so these
 /// fields do not need a dedicated typed artifact struct to be loadable.
-async fn verify_v31_timer_admin_state(
+async fn verify_v33_timer_admin_state(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
@@ -674,7 +674,7 @@ async fn verify_v31_timer_admin_state(
     Ok(())
 }
 
-async fn verify_v31_ctm_permissionless_validator(
+async fn verify_v33_ctm_permissionless_validator(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
@@ -696,7 +696,7 @@ async fn verify_v31_ctm_permissionless_validator(
 
         if expected_permissionless_validator == Address::ZERO {
             result.report_error(&format!(
-                "{label}.permissionless_validator_addr is address(0); v31 CTM implementations must be constructed with a PermissionlessValidator proxy"
+                "{label}.permissionless_validator_addr is address(0); v33 CTM implementations must be constructed with a PermissionlessValidator proxy"
             ));
             continue;
         }
@@ -717,12 +717,12 @@ async fn verify_v31_ctm_permissionless_validator(
     Ok(())
 }
 
-/// `isZKsyncOS()` is `external pure` on the v31 CTM impl so it's safe to call
+/// `isZKsyncOS()` is `external pure` on the v33 CTM impl so it's safe to call
 /// directly on the implementation contract (no proxy, no init required). This
 /// guards against the artifact mislabeling a ZKsync OS CTM as Era or vice
 /// versa — an artifact-side swap that all other per-CTM checks would happily
 /// pass through.
-async fn verify_v31_ctm_flavor(
+async fn verify_v33_ctm_flavor(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
@@ -756,7 +756,7 @@ async fn verify_v31_ctm_flavor(
     Ok(())
 }
 
-/// Stage-1 `MessageRoot.initializeL1V31Upgrade()` iterates
+/// Stage-1 `MessageRoot.initializeL1V33Upgrade()` iterates
 /// `Bridgehub.getAllZKChainChainIDs()` and `require`s every chain to have
 /// `settlementLayer(chainId) == block.chainid`. Failing that on execution
 /// would revert the governance proposal after signers approve it, so PUVT
@@ -764,9 +764,9 @@ async fn verify_v31_ctm_flavor(
 ///
 /// `L1MessageRootStageSepolia` skips chain
 /// `STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID` (270) because it's still
-/// settling on the legacy stage Gateway at v31 upgrade time; PUVT applies
+/// settling on the legacy stage Gateway at v33 upgrade time; PUVT applies
 /// the same skip when `is_stage` is set.
-async fn verify_v31_chain_settlement_layers(
+async fn verify_v33_chain_settlement_layers(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
 ) {
@@ -798,7 +798,7 @@ async fn verify_v31_chain_settlement_layers(
                 "Bridgehub.settlementLayer({chain_id}) == L1 ({expected_l1})"
             )),
             Ok(sl) => result.report_error(&format!(
-                "Bridgehub.settlementLayer({chain_id}) mismatch: expected L1 {expected_l1}, got {sl}. Stage-1 MessageRoot.initializeL1V31Upgrade() would revert."
+                "Bridgehub.settlementLayer({chain_id}) mismatch: expected L1 {expected_l1}, got {sl}. Stage-1 MessageRoot.initializeL1V33Upgrade() would revert."
             )),
             Err(err) => result.report_error(&format!(
                 "Failed to call Bridgehub.settlementLayer({chain_id}): {err}"

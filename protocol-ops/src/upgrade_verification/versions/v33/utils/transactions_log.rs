@@ -1,4 +1,4 @@
-//! Parser for the `transactions.txt` files emitted by the v31 prepare flow
+//! Parser for the `transactions.txt` files emitted by the v33 prepare flow
 //! alongside `ecosystem.toml` and `extra-verification-logs.txt`.
 //!
 //! Each non-empty, non-comment line is a 0x-prefixed 32-byte L1 transaction

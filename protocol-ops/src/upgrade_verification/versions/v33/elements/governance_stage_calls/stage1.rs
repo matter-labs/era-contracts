@@ -34,15 +34,15 @@ use super::super::{
     set_new_version_upgrade,
 };
 use super::facets::{
-    verify_default_upgrade_payload, verify_v31_chain_creation_facet_cuts,
-    verify_v31_upgrade_facet_cuts,
+    verify_default_upgrade_payload, verify_v33_chain_creation_facet_cuts,
+    verify_v33_upgrade_facet_cuts,
 };
 use super::helpers::{
     expect_address_equal, expect_hex_equal, expect_named_address, protocol_label,
     required_ctm_address, verify_call_by_address, verify_call_by_name,
 };
 use super::{
-    initializeL1V31UpgradeCall, setChainCreationParamsCall, upgradeAndCallCall, upgradeCall,
+    initializeL1V33UpgradeCall, setChainCreationParamsCall, upgradeAndCallCall, upgradeCall,
     CallList, GovernanceStage1Calls,
 };
 
@@ -124,7 +124,7 @@ impl GovernanceStage1Calls {
             (2, "transparent_proxy_admin", "upgrade(address,address)"),
             // Upgrade native token vault proxy.
             (3, "transparent_proxy_admin", "upgrade(address,address)"),
-            // Upgrade message root proxy and initialize v31 state.
+            // Upgrade message root proxy and initialize v33 state.
             (
                 4,
                 "transparent_proxy_admin",
@@ -236,7 +236,7 @@ impl GovernanceStage1Calls {
                 errors += 3;
             }
 
-            // v31 swaps the per-CTM ValidatorTimelock implementation in-place
+            // v33 swaps the per-CTM ValidatorTimelock implementation in-place
             // (the impl gains UPGRADER_ROLE + upgradeChainFromVersion). The
             // governance call routes through the same TUPP ProxyAdmin the
             // CTM proxy uses (they share a transparent proxy admin per CTM).
@@ -474,15 +474,15 @@ fn verify_message_root_upgrade_call_args(
                 "message_root_implementation_addr",
             );
 
-            // `initializeL1V31Upgrade()` takes no args, so the inner payload
+            // `initializeL1V33Upgrade()` takes no args, so the inner payload
             // must be exactly its 4-byte selector. Decoding-only would accept
             // trailing bytes that alloy silently ignores.
-            let expected_selector = initializeL1V31UpgradeCall::SELECTOR;
+            let expected_selector = initializeL1V33UpgradeCall::SELECTOR;
             if decoded.data.as_ref() == expected_selector.as_slice() {
-                result.report_ok("MessageRoot upgrade payload calls initializeL1V31Upgrade")
+                result.report_ok("MessageRoot upgrade payload calls initializeL1V33Upgrade")
             } else {
                 result.report_error(&format!(
-                    "MessageRoot upgradeAndCall payload must be exactly initializeL1V31Upgrade() selector 0x{}, got 0x{}",
+                    "MessageRoot upgradeAndCall payload must be exactly initializeL1V33Upgrade() selector 0x{}, got 0x{}",
                     hex::encode(expected_selector),
                     hex::encode(decoded.data.as_ref()),
                 ));
@@ -768,7 +768,7 @@ async fn verify_set_chain_creation_params_payload(
         ctm.flavor.label()
     ));
     errors +=
-        verify_v31_chain_creation_facet_cuts(&params.diamondCut.facetCuts, ctm, verifiers, result)
+        verify_v33_chain_creation_facet_cuts(&params.diamondCut.facetCuts, ctm, verifiers, result)
             .await;
 
     // Decode forceDeploymentsData and verify each field independently so the
@@ -951,7 +951,7 @@ async fn verify_set_new_version_upgrade_payload(
         errors += 1;
     }
 
-    errors += verify_v31_upgrade_facet_cuts(&diamond_cut.facetCuts, ctm, verifiers, result).await?;
+    errors += verify_v33_upgrade_facet_cuts(&diamond_cut.facetCuts, ctm, verifiers, result).await?;
     // Phase 5: when the artifact names a `bytecodes_supplier_addr` we also
     // verify that every L2 upgrade tx `factoryDeps` entry has been published
     // in `BytecodesSupplier` on the live L1 RPC. The legacy PUVT performed

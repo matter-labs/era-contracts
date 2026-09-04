@@ -6,7 +6,7 @@ use crate::upgrade_verification::{
 };
 
 sol! {
-    // v31: the chain-creation diamond cut's initCalldata is abi.encode(InitializeDataNewChain)
+    // v33: the chain-creation diamond cut's initCalldata is abi.encode(InitializeDataNewChain)
     // — just the three bytecode hashes. ChainTypeManagerBase prepends the selector and all
     // per-chain fields (chainId, admin, bridgehub, …) at chain-creation time.
     // The verifier is fetched from CTM.protocolVersionVerifier() inside DiamondInit; fee params

@@ -326,6 +326,43 @@ fn load_descriptions(path: Option<&Path>) -> SimDescriptionRegistry {
     }
 }
 
+/// Which slice of the upgrade a scenario file covers. See `--scenario`.
+///
+/// The transaction-simulator shares one fork across every scenario file and runs them in
+/// alphabetical order, so an upgrade splits across files rather than being duplicated: the
+/// ecosystem file performs the governance ceremony once, and each chain file then cuts one
+/// chain over on top of the state it left behind. A chain file that re-ran the ceremony would
+/// revert (`TimerAlreadyStarted`, proxies already pointed at the new impls, ...).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+pub enum ScenarioMode {
+    /// Everything in one file: Camp-B bundles, governance stages 0/1/2, and every `test_*`
+    /// smoke transaction the prepare emitted.
+    Full,
+    /// Camp-B bundles, governance stages 0/1/2, and the `test_create_chain_*` smoke test
+    /// (which validates the new chain-creation params, an ecosystem-level property).
+    Ecosystem,
+    /// Only the `test_upgrade_chain_*` calls — the per-chain diamond cut. Carries no
+    /// governance calls, so it must run after an `ecosystem` file on the same fork.
+    Chain,
+}
+
+impl ScenarioMode {
+    /// Whether the Camp-B bundles and the governance stages belong in this file.
+    fn includes_governance(&self) -> bool {
+        matches!(self, ScenarioMode::Full | ScenarioMode::Ecosystem)
+    }
+
+    /// Whether a `[test_upgrade_calls]` tag belongs in this file.
+    fn includes_test_tag(&self, tag: &str) -> bool {
+        match self {
+            ScenarioMode::Full => true,
+            ScenarioMode::Ecosystem => tag.starts_with("test_create_chain"),
+            ScenarioMode::Chain => tag.starts_with("test_upgrade_chain"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct GovernanceTomlToSimulatorArgs {
     #[clap(flatten)]
@@ -382,21 +419,14 @@ pub struct GovernanceTomlToSimulatorArgs {
     #[clap(long, value_delimiter = ',', num_args = 1..)]
     pub camp_a_signers: Vec<Address>,
 
-    /// Drop the `test_*` smoke transactions the prepare appends
-    /// (`test_create_chain_*`, `test_upgrade_chain_*`), emitting only the
-    /// governance ceremony and the Camp-B bundles.
+    /// Which slice of the upgrade this scenario file covers.
     ///
-    /// Those smoke tests exercise a *live* chain, so some of their
-    /// preconditions are races rather than properties of the calldata. The
-    /// v33 per-chain upgrade is the clearest case: it requires
-    /// `getFirstUnprocessedPriorityTx() >= lowerBound`, but the bound is
-    /// pinned at `getTotalPriorityTxs()` during the same run — so any deposit
-    /// that arrives between the fork and the pin makes the cut revert with
-    /// `PriorityQueueNotReady()`. On a real rollout the operator waits for the
-    /// queue to drain; a static fork never does. Use this when committing a
-    /// scenario that CI must pass deterministically.
-    #[clap(long, default_value_t = false)]
-    pub skip_test_upgrade_calls: bool,
+    /// Default `full` keeps the single-file behaviour. Split an upgrade into `ecosystem` plus
+    /// one `chain` file per chain when the scenarios are committed to the
+    /// transaction-simulator, and name them so the ecosystem file sorts first — the simulator
+    /// shares one fork across files and runs them alphabetically.
+    #[clap(long, value_enum, default_value_t = ScenarioMode::Full)]
+    pub scenario: ScenarioMode,
 
     /// Optional path to a `sim-descriptions.toml` that overrides each
     /// emitted tx's `description` field with a human-readable string keyed by
@@ -657,7 +687,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
     // governance stages 0/1/2. Order matters: setup writes the state
     // (pendingOwner, verifier registry, etc.) that the gov calls then read.
     let mut transactions = Vec::new();
-    if let Some(ref manifest) = manifest_path {
+    if let Some(ref manifest) = manifest_path.filter(|_| args.scenario.includes_governance()) {
         logger::info(format!(
             "Including manifest bundles from {}",
             manifest.display()
@@ -677,7 +707,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
         &network,
         from,
         &descriptions,
-        args.skip_test_upgrade_calls,
+        args.scenario,
     )
     .with_context(|| {
         format!(
@@ -942,22 +972,29 @@ fn governance_toml_to_simulator_transactions(
     network: &str,
     from: Address,
     descriptions: &SimDescriptionRegistry,
-    skip_test_upgrade_calls: bool,
+    scenario: ScenarioMode,
 ) -> anyhow::Result<Vec<SimulatorTransaction>> {
     let content =
         fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
     let parsed: GovernanceCallsToml =
         toml::from_str(&content).with_context(|| format!("failed to parse {}", path.display()))?;
 
-    let stages = [
-        (0u8, parsed.governance_calls.stage0_calls.as_str()),
-        (1u8, parsed.governance_calls.stage1_calls.as_str()),
-        (2u8, parsed.governance_calls.stage2_calls.as_str()),
-    ];
+    // A `chain` scenario runs on the fork an `ecosystem` scenario already advanced, so it must
+    // not replay the ceremony: stage 0 would revert `TimerAlreadyStarted`, and stage 1 would
+    // re-point proxies that already carry the new implementations.
+    let stages: &[(u8, &str)] = if scenario.includes_governance() {
+        &[
+            (0u8, parsed.governance_calls.stage0_calls.as_str()),
+            (1u8, parsed.governance_calls.stage1_calls.as_str()),
+            (2u8, parsed.governance_calls.stage2_calls.as_str()),
+        ]
+    } else {
+        &[]
+    };
     let mut out = Vec::new();
     let mut should_fund_sender = true;
     let mut stage2_topup_pending = true;
-    for (stage, encoded_calls) in stages {
+    for &(stage, encoded_calls) in stages {
         let calls = decode_calls(encoded_calls)
             .with_context(|| format!("failed to decode stage{stage}_calls"))?;
         for (idx, call) in calls.into_iter().enumerate() {
@@ -1012,13 +1049,13 @@ fn governance_toml_to_simulator_transactions(
         }
     }
 
-    if skip_test_upgrade_calls {
-        logger::info(
-            "Skipping the prepare's test_* smoke transactions (--skip-test-upgrade-calls)",
-        );
-    } else {
-        append_test_upgrade_calls(&mut out, &parsed.test_upgrade_calls, network, descriptions)?;
-    }
+    append_test_upgrade_calls(
+        &mut out,
+        &parsed.test_upgrade_calls,
+        network,
+        descriptions,
+        scenario,
+    )?;
 
     Ok(out)
 }
@@ -1028,9 +1065,14 @@ fn append_test_upgrade_calls(
     test_upgrade_calls: &BTreeMap<String, String>,
     network: &str,
     descriptions: &SimDescriptionRegistry,
+    scenario: ScenarioMode,
 ) -> anyhow::Result<()> {
     for (tag, encoded_calls) in test_upgrade_calls {
         if !tag.starts_with("test_") || tag.ends_with("_caller") {
+            continue;
+        }
+        if !scenario.includes_test_tag(tag) {
+            logger::info(format!("Skipping {tag} (--scenario)"));
             continue;
         }
 

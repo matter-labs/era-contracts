@@ -2,7 +2,7 @@
 //!
 //! Used by two Stage 1 decoders:
 //! - `setNewVersionUpgrade.diamondCut.facetCuts` — the upgrade-side cut
-//!   (Remove the current chain's facets, then Add the v31 facets).
+//!   (Remove the current chain's facets, then Add the v33 facets).
 //! - `setChainCreationParams.diamondCut.facetCuts` — the chain-creation cut
 //!   (all-Add, no Remove half).
 //!
@@ -46,7 +46,7 @@ pub(super) async fn verify_default_upgrade_payload(
         .context("decoding DefaultUpgrade.upgrade calldata")?;
     upgrade
         ._proposedUpgrade
-        .verify_v31_template(
+        .verify_v33_template(
             verifiers,
             result,
             expected_new_protocol_version,
@@ -59,8 +59,8 @@ pub(super) async fn verify_default_upgrade_payload(
 
 /// Upgrade-side facet-cut decomposition. Compares the proposed
 /// `(Remove* …, Add* …)` against an exact reconstruction of what the
-/// representative chain currently has, plus the expected v31 added facets.
-pub(super) async fn verify_v31_upgrade_facet_cuts(
+/// representative chain currently has, plus the expected v33 added facets.
+pub(super) async fn verify_v33_upgrade_facet_cuts(
     facet_cuts: &[set_new_version_upgrade::FacetCut],
     ctm: &CtmArtifact,
     verifiers: &Verifiers,
@@ -69,7 +69,7 @@ pub(super) async fn verify_v31_upgrade_facet_cuts(
     let initial_error_count = result.errors;
     let proposed_facet_cuts = proposed_upgrade_facet_cut_set(facet_cuts, result);
 
-    match expected_v31_upgrade_facet_cuts(ctm, verifiers, result).await? {
+    match expected_v33_upgrade_facet_cuts(ctm, verifiers, result).await? {
         Some(ExpectedFacetCuts::Exact {
             facets: expected_facet_cuts,
             chain_id,
@@ -153,12 +153,12 @@ struct RepresentativeChainDiamond {
     diamond: Address,
 }
 
-async fn expected_v31_upgrade_facet_cuts(
+async fn expected_v33_upgrade_facet_cuts(
     ctm: &CtmArtifact,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
 ) -> anyhow::Result<Option<ExpectedFacetCuts>> {
-    let added_facets = expected_v31_added_facets(ctm, verifiers, result).await?;
+    let added_facets = expected_v33_added_facets(ctm, verifiers, result).await?;
     let Some(representative) = find_representative_chain_diamond(ctm, verifiers, result).await?
     else {
         result.report_error(&format!(
@@ -305,13 +305,13 @@ async fn inspect_chain_for_facet_cut_reconstruction(
     Ok(Some(RepresentativeChainDiamond { chain_id, diamond }))
 }
 
-async fn expected_v31_added_facets(
+async fn expected_v33_added_facets(
     ctm: &CtmArtifact,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
 ) -> anyhow::Result<FacetCutSet> {
     let mut facets_to_add = FacetCutSet::new();
-    for (facet_name, is_freezable) in EXPECTED_V31_UPGRADE_FACETS {
+    for (facet_name, is_freezable) in EXPECTED_V33_UPGRADE_FACETS {
         let Some(facet_address) =
             required_ctm_address(ctm, &["state_transition", facet_name], result)
         else {
@@ -361,7 +361,7 @@ async fn expected_v31_added_facets(
     Ok(facets_to_add)
 }
 
-const EXPECTED_V31_UPGRADE_FACETS: [(&str, bool); 6] = [
+const EXPECTED_V33_UPGRADE_FACETS: [(&str, bool); 6] = [
     ("admin_facet_addr", false),
     ("getters_facet_addr", false),
     ("mailbox_facet_addr", true),
@@ -371,20 +371,20 @@ const EXPECTED_V31_UPGRADE_FACETS: [(&str, bool); 6] = [
 ];
 
 /// Independently reconstructs the expected chain-creation facet set from the
-/// v31 facet addresses in the artifact, decodes the proposed cut while
+/// v33 facet addresses in the artifact, decodes the proposed cut while
 /// enforcing the all-Add invariant, and compares the two sets. This catches
 /// drift in the artifact's `diamond_cut_data` blob itself — the blob hex
 /// check in the caller only catches gov-call ↔ artifact drift.
 ///
-/// The v31 chain-creation facet list matches the v31 upgrade facet list (the
-/// same six facets, all Add), so `expected_v31_added_facets` is reused as-is.
-pub(super) async fn verify_v31_chain_creation_facet_cuts(
+/// The v33 chain-creation facet list matches the v33 upgrade facet list (the
+/// same six facets, all Add), so `expected_v33_added_facets` is reused as-is.
+pub(super) async fn verify_v33_chain_creation_facet_cuts(
     facet_cuts: &[FacetCut],
     ctm: &CtmArtifact,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
 ) -> usize {
-    let expected = match expected_v31_added_facets(ctm, verifiers, result).await {
+    let expected = match expected_v33_added_facets(ctm, verifiers, result).await {
         Ok(set) => set,
         Err(err) => {
             result.report_error(&format!(

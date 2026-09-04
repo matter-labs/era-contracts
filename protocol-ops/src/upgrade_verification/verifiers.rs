@@ -15,7 +15,7 @@ use crate::{
     common::env_config::{ChainInterval, EnvConfig},
     upgrade_verification::{
         artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
-        versions::v31::utils::{
+        versions::v33::utils::{
             address_verifier::AddressVerifier,
             apply_l2_to_l1_alias,
             bytecode_verifier::BytecodeVerifier,
@@ -72,9 +72,9 @@ impl GenesisConfigKind {
 }
 
 impl Verifiers {
-    /// Creates a v31 verifier context from the single ecosystem TOML.
+    /// Creates a v33 verifier context from the single ecosystem TOML.
     #[allow(clippy::too_many_arguments)]
-    pub async fn new_v31(
+    pub async fn new_v33(
         env: VerifyUpgradeEnv,
         artifact: &EcosystemUpgradeArtifact,
         l1_rpc: impl Into<String>,
@@ -109,9 +109,9 @@ impl Verifiers {
             &["upgrade_addresses", "bridgehub", "bridgehub_proxy_addr"],
         )?;
         let bytecode_verifier =
-            BytecodeVerifier::init_v31(contracts_commit, zk_governance_commit).await?;
+            BytecodeVerifier::init_v33(contracts_commit, zk_governance_commit).await?;
         let network_verifier =
-            NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into(), era_chain_id).await?;
+            NetworkVerifier::new_v33(l1_rpc.into(), gw_rpc.into(), era_chain_id).await?;
         anyhow::ensure!(
             network_verifier.get_gateway_chain_id() == new_gateway_chain_id,
             "gateway RPC chain id {} does not match env [new_gateway].chain_id {}",
@@ -174,7 +174,7 @@ impl Verifiers {
         })?;
         let aliased_bridgehub_owner = apply_l2_to_l1_alias(bridgehub_owner);
 
-        let mut address_verifier = AddressVerifier::new_v31_from_artifact(artifact)?;
+        let mut address_verifier = AddressVerifier::new_v33_from_artifact(artifact)?;
         address_verifier.add_address(bridgehub_owner, "protocol_upgrade_handler_proxy");
         address_verifier.add_address(
             aliased_bridgehub_owner,
@@ -182,9 +182,9 @@ impl Verifiers {
         );
 
         let era_genesis_config =
-            GenesisConfig::init_v31(GenesisConfigKind::Era, contracts_commit).await?;
+            GenesisConfig::init_v33(GenesisConfigKind::Era, contracts_commit).await?;
         let zksync_os_genesis_config =
-            GenesisConfig::init_v31(GenesisConfigKind::ZksyncOs, contracts_commit).await?;
+            GenesisConfig::init_v33(GenesisConfigKind::ZksyncOs, contracts_commit).await?;
 
         Ok(Self {
             env,
@@ -226,18 +226,18 @@ pub struct GenesisConfig {
 }
 
 impl GenesisConfig {
-    pub async fn init_v31(
+    pub async fn init_v33(
         kind: GenesisConfigKind,
         contracts_commit: Option<&str>,
     ) -> anyhow::Result<Self> {
         if let Some(contracts_commit) = contracts_commit {
-            return Self::init_v31_from_github(kind, contracts_commit).await;
+            return Self::init_v33_from_github(kind, contracts_commit).await;
         }
 
-        Self::init_v31_from_local(kind)
+        Self::init_v33_from_local(kind)
     }
 
-    fn init_v31_from_local(kind: GenesisConfigKind) -> anyhow::Result<Self> {
+    fn init_v33_from_local(kind: GenesisConfigKind) -> anyhow::Result<Self> {
         let path = repo_relative_path(kind.local_path());
         let data = fs::read_to_string(&path)
             .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
@@ -245,7 +245,7 @@ impl GenesisConfig {
             .map_err(|e| anyhow::anyhow!("failed to parse {}: {e}", path.display()))
     }
 
-    async fn init_v31_from_github(kind: GenesisConfigKind, commit: &str) -> anyhow::Result<Self> {
+    async fn init_v33_from_github(kind: GenesisConfigKind, commit: &str) -> anyhow::Result<Self> {
         let path = kind.local_path();
         let data = get_contents_from_github(commit, "matter-labs/era-contracts", path).await;
         serde_json::from_str(&data).map_err(|e| {

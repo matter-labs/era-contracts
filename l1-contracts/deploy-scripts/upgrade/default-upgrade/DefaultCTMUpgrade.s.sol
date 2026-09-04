@@ -948,18 +948,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         return ctmAddresses;
     }
 
-    /// @notice Calls a release must land before its `test_upgrade_chain` smoke test can succeed.
-    /// @dev Empty by default. A release that adds a *precondition* to the per-chain upgrade must
-    ///      override this, or the emitted smoke test reverts on that precondition and every
-    ///      downstream consumer of `[test_upgrade_calls]` (notably the transaction-simulator
-    ///      scenario) fails on a step that is not actually broken. The calls are prepended to the
-    ///      diamond cut and run under the same ZK chain admin.
-    function TESTONLY_prepareVersionSpecificTestUpgradePrerequisites(
-        address // _chainDiamondProxyAddress
-    ) internal virtual returns (Call[] memory prerequisites) {
-        prerequisites = new Call[](0);
-    }
-
     /// @notice Tests that it is possible to upgrade a chain to the new version
     function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
         address chainDiamondProxyAddress = L1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).getZKChain(
@@ -981,12 +969,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
                 (chainDiamondProxyAddress, oldProtocolVersion, upgradeCutData)
             );
 
-        Call[] memory prerequisites = TESTONLY_prepareVersionSpecificTestUpgradePrerequisites(chainDiamondProxyAddress);
-        calls = new Call[](prerequisites.length + 1);
-        for (uint256 i = 0; i < prerequisites.length; ++i) {
-            calls[i] = prerequisites[i];
-        }
-        calls[prerequisites.length] = Call({target: chainDiamondProxyAddress, data: upgradeCallData, value: 0});
+        calls = new Call[](1);
+        calls[0] = Call({target: chainDiamondProxyAddress, data: upgradeCallData, value: 0});
     }
 
     /// @notice Tests that it is possible to create a new chain with the new version

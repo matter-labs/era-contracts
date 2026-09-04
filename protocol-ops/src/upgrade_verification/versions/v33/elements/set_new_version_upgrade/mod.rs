@@ -193,7 +193,7 @@ impl ProposedUpgrade {
     /// Top-level entry: dispatches `verify_static_fields` (bytecode hashes
     /// per flavor + empty-field invariants) and `verify_l2_protocol_upgrade_tx`
     /// (canonical L2 tx shape + inner `forceDeployAndUpgrade(Universal)` walk).
-    pub async fn verify_v31_template(
+    pub async fn verify_v33_template(
         &self,
         verifiers: &Verifiers,
         result: &mut VerificationResult,
@@ -219,7 +219,7 @@ impl ProposedUpgrade {
 
         let new_errors = (result.errors - initial_error_count) as usize;
         if new_errors == 0 {
-            result.report_ok("DefaultUpgrade ProposedUpgrade matches v31 template");
+            result.report_ok("DefaultUpgrade ProposedUpgrade matches v33 template");
         }
         Ok(new_errors)
     }
@@ -272,11 +272,11 @@ impl ProposedUpgrade {
         }
 
         if !self.l1ContractsUpgradeCalldata.is_empty() {
-            result.report_error("ProposedUpgrade l1ContractsUpgradeCalldata must be empty for v31");
+            result.report_error("ProposedUpgrade l1ContractsUpgradeCalldata must be empty for v33");
         }
 
         if !self.postUpgradeCalldata.is_empty() {
-            result.report_error("ProposedUpgrade postUpgradeCalldata must be empty for v31");
+            result.report_error("ProposedUpgrade postUpgradeCalldata must be empty for v33");
         }
 
         if self.upgradeTimestamp != U256::default() {
@@ -385,7 +385,7 @@ impl ProposedUpgrade {
                     verifiers,
                     result,
                     &tx.factoryDeps,
-                    era::EXPECTED_V31_ERA_BYTECODES,
+                    era::EXPECTED_V33_ERA_BYTECODES,
                     "Era",
                     bytecodes_supplier_addr,
                     FactoryDepHashKind::EraZkBytecode,
@@ -422,7 +422,7 @@ impl ProposedUpgrade {
                     verifiers,
                     result,
                     &tx.factoryDeps,
-                    zksync_os::EXPECTED_V31_ZKSYNC_OS_BYTECODES,
+                    zksync_os::EXPECTED_V33_ZKSYNC_OS_BYTECODES,
                     "ZKsync OS",
                     bytecodes_supplier_addr,
                     FactoryDepHashKind::ZksyncOsEvmBytecode,
@@ -442,7 +442,7 @@ impl ProposedUpgrade {
     }
 }
 
-/// Calldata-only check that `factoryDeps[]` matches the expected v31 set, plus
+/// Calldata-only check that `factoryDeps[]` matches the expected v33 set, plus
 /// an optional live-RPC check that each bytecode was actually published to the
 /// `BytecodesSupplier` (required for the L2 sequencer to fetch it during the
 /// upgrade tx). When `bytecodes_supplier_addr` is `None` the supplier round-trip
@@ -502,14 +502,14 @@ async fn verify_factory_deps(
 
     if errors == 0 {
         result.report_ok(&format!(
-            "{label} L2 upgrade tx factoryDeps match expected v31 dependency set"
+            "{label} L2 upgrade tx factoryDeps match expected v33 dependency set"
         ));
     }
 
     // Re-add the legacy PUVT `BytecodesSupplier.publishingBlock(hash) != 0`
     // check for every factoryDep when an RPC + supplier address are
     // available. This is intentionally a post-calldata check: it requires
-    // reading on-chain state from a live L1 RPC with the v31 prepare bundles
+    // reading on-chain state from a live L1 RPC with the v33 prepare bundles
     // already replayed.
     if let Some(supplier_addr) = bytecodes_supplier_addr {
         let supplier =

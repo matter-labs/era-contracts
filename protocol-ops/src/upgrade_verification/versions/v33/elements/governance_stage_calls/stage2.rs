@@ -34,7 +34,7 @@ use crate::{
             L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT,
         },
         verifiers::{VerificationResult, Verifiers},
-        versions::v31::MAX_PRIORITY_TX_GAS_LIMIT,
+        versions::v33::MAX_PRIORITY_TX_GAS_LIMIT,
     },
 };
 
@@ -90,7 +90,7 @@ impl GovernanceStage2Calls {
         let mut errors = 0;
 
         // ── Section 1: Legacy-GW decommission prefix (dynamic) ───────
-        // v31 `CoreUpgrade` prepends `N × setHistoricalMigrationInterval`
+        // v33 `CoreUpgrade` prepends `N × setHistoricalMigrationInterval`
         // followed by one `setSettlementLayerStatus(legacy_gw_chain_id, false)`
         // before the canonical `unpauseMigration`. N is env-dependent
         // (`permanent-values/<env>.toml`'s `[[legacy_gateway.chain_intervals]]`),
@@ -239,7 +239,7 @@ impl GovernanceStage2Calls {
                 .await;
             }
             None => {
-                result.report_error("v31 verification requires a [new_gateway] artifact block");
+                result.report_error("v33 verification requires a [new_gateway] artifact block");
                 errors += 1;
             }
         }
@@ -923,7 +923,7 @@ fn check_historical_migration_interval(
         &mut errors,
         result,
     );
-    // Deploy script ([CoreUpgrade_v31.s.sol:394]) always passes `0`.
+    // Deploy script ([CoreUpgrade_v33.s.sol:394]) always passes `0`.
     expect(
         decoded.migrationNumber,
         U256::ZERO,

@@ -10,7 +10,6 @@ import {Utils} from "../../utils/Utils.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 
 import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
-import {IPriorityOpLowerBound} from "contracts/upgrades/IPriorityOpLowerBound.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 
@@ -59,26 +58,6 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
     function serializeVersionSpecificStateTransition() internal virtual override {
         require(priorityOpLowerBound != address(0), "PriorityOpLowerBound not deployed");
         vm.serializeAddress("state_transition", "priority_op_lower_bound_addr", priorityOpLowerBound);
-    }
-
-    /// @inheritdoc DefaultCTMUpgrade
-    /// @dev `V32UpgradeZKsyncOS` reverts with `LowerBoundNotRecorded()` unless the chain's
-    ///      priority-op lower bound was pinned first, so the smoke test has to pin it. The call is
-    ///      permissionless, which is why it can share the chain admin's sender rather than needing
-    ///      one of its own. On a real rollout this is `protocol_ops chain
-    ///      record-priority-op-lower-bound`, run per chain between the governance ceremony and the
-    ///      diamond cut; here it just makes the generated smoke test self-contained.
-    function TESTONLY_prepareVersionSpecificTestUpgradePrerequisites(
-        address _chainDiamondProxyAddress
-    ) internal virtual override returns (Call[] memory prerequisites) {
-        require(priorityOpLowerBound != address(0), "PriorityOpLowerBound not deployed");
-
-        prerequisites = new Call[](1);
-        prerequisites[0] = Call({
-            target: priorityOpLowerBound,
-            data: abi.encodeCall(IPriorityOpLowerBound.lowerBoundPriorityOp, (_chainDiamondProxyAddress)),
-            value: 0
-        });
     }
 
     /// @inheritdoc DefaultCTMUpgrade

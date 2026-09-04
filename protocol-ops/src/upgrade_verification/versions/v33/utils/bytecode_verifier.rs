@@ -13,7 +13,7 @@ use super::{
 const ERA_CONTRACTS_REPO: &str = "matter-labs/era-contracts";
 const ZK_GOVERNANCE_REPO: &str = "zksync-association/zk-governance";
 const ALL_CONTRACTS_HASHES_PATH: &str = "AllContractsHashes.json";
-const ZK_GOVERNANCE_V31_CONTRACTS: &[&str] = &[
+const ZK_GOVERNANCE_CONTRACTS: &[&str] = &[
     "l1-contracts/ProtocolUpgradeHandler",
     "l1-contracts/TestnetProtocolUpgradeHandler",
     "l1-contracts/Guardians",
@@ -37,7 +37,7 @@ pub struct BytecodeVerifier {
 }
 
 impl BytecodeVerifier {
-    pub async fn init_v31(
+    pub async fn init_v33(
         contracts_commit: Option<&str>,
         zk_governance_commit: &str,
     ) -> anyhow::Result<Self> {
@@ -53,7 +53,7 @@ impl BytecodeVerifier {
             ALL_CONTRACTS_HASHES_PATH,
         )
         .await?
-        .filter_required(ZK_GOVERNANCE_V31_CONTRACTS)?;
+        .filter_required(ZK_GOVERNANCE_CONTRACTS)?;
         verifier.extend_from_contract_hashes(contract_hashes);
 
         Ok(verifier)
@@ -390,7 +390,7 @@ impl ContractHashes {
             .collect();
         anyhow::ensure!(
             missing.is_empty(),
-            "zk-governance AllContractsHashes.json is missing required v31 contract(s): {}",
+            "zk-governance AllContractsHashes.json is missing required v33 contract(s): {}",
             missing.join(", ")
         );
 

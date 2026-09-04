@@ -20,7 +20,7 @@ pub(crate) struct EcosystemUpgradeArtifact {
     /// past the canonical 5 (unpauseMigration + per-CTM checks) and which
     /// deployed-GW-CTM address to cross-check.
     pub(crate) new_gateway: Option<NewGatewayArtifact>,
-    /// Optional `[zk_governance]` table emitted on PUH-governed v31 upgrades.
+    /// Optional `[zk_governance]` table emitted on PUH-governed v33 upgrades.
     /// It names the four zk-governance contracts deployed via L1 CREATE2 so
     /// provenance verification can stay decoupled from stage-0 calldata
     /// decoding; stage-0 verification binds decoded calls back to these values.

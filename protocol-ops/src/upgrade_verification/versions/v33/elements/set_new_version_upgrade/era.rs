@@ -49,11 +49,11 @@ struct EraExpectedFd {
     input_kind: EraFdInput,
 }
 
-/// Expected v31 Era `ForceDeployment[]` passed to `ComplexUpgrader.forceDeployAndUpgrade`.
+/// Expected v33 Era `ForceDeployment[]` passed to `ComplexUpgrader.forceDeployAndUpgrade`.
 ///
 /// Order mirrors the deploy script: system contracts (EraVmSystemContract enum 0..30),
 /// then fixed-address core contracts (_fillFixedAddressCoreContracts), then L2V32Upgrade.
-fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
+fn expected_v33_era_force_deployments() -> Vec<EraExpectedFd> {
     macro_rules! simple {
         ($file:expr, $addr:literal) => {
             EraExpectedFd {
@@ -146,7 +146,7 @@ fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
             L2_NATIVE_TOKEN_VAULT_ADDR
         ),
         simple!("l1-contracts/L2MessageRoot", L2_MESSAGE_ROOT_ADDR),
-        // L2WrappedBaseToken is intentionally NOT force-deployed by v31 (its impl is left as-is).
+        // L2WrappedBaseToken is intentionally NOT force-deployed by v33 (its impl is left as-is).
         simple!(
             "l1-contracts/L2MessageVerification",
             L2_MESSAGE_VERIFICATION_ADDR
@@ -172,13 +172,13 @@ fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
 }
 
 /// Validate the full `ForceDeployment[]` array from `ComplexUpgrader.forceDeployAndUpgrade`
-/// against the expected v31 list.
-async fn verify_v31_era_force_deployments(
+/// against the expected v33 list.
+async fn verify_v33_era_force_deployments(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
     deployments: &[IComplexUpgrader::ForceDeployment],
 ) -> anyhow::Result<()> {
-    let expected = expected_v31_era_force_deployments();
+    let expected = expected_v33_era_force_deployments();
     let mut expected_map: HashMap<Address, EraExpectedFd> =
         expected.into_iter().map(|e| (e.address, e)).collect();
 
@@ -241,7 +241,7 @@ async fn verify_v31_era_force_deployments(
     }
 
     if missing.is_empty() {
-        result.report_ok("All Era force deployments match the expected v31 list");
+        result.report_ok("All Era force deployments match the expected v33 list");
     }
     Ok(())
 }
@@ -284,7 +284,7 @@ async fn verify_l2_chain_asset_handler_input(
     let expected_aliased_governance = verifiers
         .address_verifier
         .get_by_name("aliased_protocol_upgrade_handler_proxy")
-        .expect("aliased_protocol_upgrade_handler_proxy must be registered by Verifiers::new_v31");
+        .expect("aliased_protocol_upgrade_handler_proxy must be registered by Verifiers::new_v33");
     if aliased_owner == expected_aliased_governance {
         result.report_ok("L2ChainAssetHandler input aliasedOwner matches aliased governance");
     } else {
@@ -312,7 +312,7 @@ async fn verify_l2_chain_asset_handler_input(
 
 /// Era L2 factory-dep bytecode set. Mirrors
 /// `CoreOnGatewayHelper.getFullListOfFactoryDependencies(false, [L2V32Upgrade])`.
-pub(super) const EXPECTED_V31_ERA_BYTECODES: &[&str] = &[
+pub(super) const EXPECTED_V33_ERA_BYTECODES: &[&str] = &[
     "Bootloader",
     "system-contracts/DefaultAccount",
     "EvmEmulator",
@@ -386,7 +386,7 @@ pub(super) async fn verify_era_force_deploy_and_upgrade(
         ));
     }
 
-    verify_v31_era_force_deployments(verifiers, result, &decoded._forceDeployments).await?;
+    verify_v33_era_force_deployments(verifiers, result, &decoded._forceDeployments).await?;
 
     verify_l2_upgrade_inner_calldata(
         verifiers,

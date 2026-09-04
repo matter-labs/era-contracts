@@ -85,27 +85,43 @@ state.
 | `setChainCreationParams` `zkTokenAssetId`                                            | byte-identical to the live v31 value                                 |
 | Etherscan verification                                                               | 30/30                                                                |
 
-### Why the scenario has no `test_*` smoke transactions
+### Two scenario files, and why the order matters
 
-The prepare also emits two smoke transactions into `[test_upgrade_calls]`
-(`test_create_chain_zkos`, `test_upgrade_chain_zkos`), which the emitter appends to the
-scenario by default. They are excluded here via `--skip-test-upgrade-calls`, because
-`test_upgrade_chain_zkos` **cannot pass deterministically against a fork of a live chain**:
+The scenarios are split by role via `--scenario`:
 
-- `V32UpgradeZKsyncOS` requires `getFirstUnprocessedPriorityTx() >= lowerBound`, and the bound
-  is pinned at `getTotalPriorityTxs()` during the same run. Any deposit that lands between the
-  fork block and the pin makes the cut revert `PriorityQueueNotReady()`. Chain 8022833 had 3
-  queued-but-unprocessed ops while this artifact was produced. A real rollout waits for the
-  queue to drain (the runbook's "drain priority ops" step); a static fork never drains.
-- It also needs `emulateAllBatchesExecuted`, since a live chain normally has a few
-  committed-but-unexecuted batches that the cut rejects with `NotAllBatchesExecuted()`.
+| file                     | contents                                                                                     |
+| ------------------------ | -------------------------------------------------------------------------------------------- |
+| `…-1-ecosystem.json`     | the Camp-B ChainAdmin bundle, governance stages 0/1/2, and `test_create_chain_zkos` (27 txs) |
+| `…-2-chain-8022833.json` | just the per-chain diamond cut for chain 8022833 (1 tx)                                      |
 
-Both are properties of live-chain timing, not of the calldata, so committing them would make
-the scenario fail in CI for reasons a reviewer cannot act on. Re-emit without the flag to run
-them locally at a moment when the chain's queue is drained; `CTMUpgrade_v33` now prepends the
-permissionless `PriorityOpLowerBound.lowerBoundPriorityOp(chain)` call they need
-(`TESTONLY_prepareVersionSpecificTestUpgradePrerequisites`), so the first precondition is
-satisfied automatically.
+The transaction-simulator shares **one fork across every scenario file** and walks them in
+alphabetical order, so the chain file runs on the state the ecosystem file left behind. That is
+why the names carry `-1-` / `-2-`: a chain file that sorted first would revert (no v33 version
+registered on the CTM yet), and one that repeated the ceremony would revert too
+(`TimerAlreadyStarted`, proxies already re-pointed).
+
+The run is validated by the simulator's own invariant pass:
+
+```
+✔️ test_create_chain_zkos created chain 556 … on v33.0.0
+✔️ test_upgrade_chain_zkos upgraded chain 0x02b1ac1c… from v31.0.1 to v33.0.0
+```
+
+Chain 8022833 was picked because `baseTokenSupportsTotalSupply()` is true for it. That holds for
+9 of the 25 ZKsync OS chains — exactly the ones already on v31. The other 16 are still on v29/v30,
+where the getter does not exist, and **cannot take this upgrade at all** until they go to v31
+first.
+
+The per-chain cut needs two preconditions that are live-chain state rather than properties of the
+calldata:
+
+- `PriorityOpLowerBound.lowerBoundPriorityOp(chain)` must have been called. This is **already done
+  on real Sepolia** for all 9 eligible chains, pinned while their queues were fully drained, so
+  `firstUnprocessed >= bound` holds permanently (the bound is fixed; `firstUnprocessed` only
+  grows). The scenario therefore needs no mock for it. On a fresh rollout this is
+  `protocol_ops chain record-priority-op-lower-bound`.
+- `emulateAllBatchesExecuted`, since a live chain normally has a few committed-but-unexecuted
+  batches that the cut rejects with `NotAllBatchesExecuted()`. A real rollout waits for them.
 
 ## PUVT: not yet green for v33
 

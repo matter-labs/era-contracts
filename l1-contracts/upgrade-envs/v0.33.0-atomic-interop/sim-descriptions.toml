@@ -37,7 +37,6 @@ server_notifier_pa        = "0xfa181338785BF9427a367FfcE6bfe2C81586b3d9"  # Serv
 gov_upgrade_timer         = "0xDc03F39823CbDc7Ed2c465674d84948c81fC6ec0"
 upgrade_stage_validator   = "0x732E664132da25DfCE0Bd2FCf4C180aFF96fF500"
 l1_interop_handler        = "0xE24e805EDfDCb4e6DA75A44304d488639F25a159"
-priority_op_lower_bound   = "0xD1B518bdDcB7faCC21Bd65D0d29fbCd3FDaFd948"
 
 # ── Camp-B: CTM admin ceremony ────────────────────────────────────────────────
 [[entries]]
@@ -187,11 +186,6 @@ selector = "0x8265f458"
 desc = "ChainTypeManager.setNewVersionUpgrade(cut, 0x1f00000001 -> 0x2100000000, ZKsyncOSTestnetVerifier): registers the v33 diamond cut. THE version bump."
 
 # ── Post-upgrade smoke tests (simulator-only, not part of the proposal) ──────
-[[entries]]
-target = "priority_op_lower_bound"
-selector = "0xf0c1e458"
-desc = "SIM-ONLY smoke test: pin chain 8022833's priority-op lower bound (permissionless; the real rollout runs `protocol_ops chain record-priority-op-lower-bound` per chain)"
-
 [[entries]]
 target = "bridgehub"
 selector = "0xf113c88b"
