@@ -52,17 +52,17 @@ pub const ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR: Address =
     address!("0x4e59b44847b379578588920ca78fbf26c0b4956c");
 /// Alias of `L2_GENESIS_UPGRADE_ADDR` in Solidity — same on-chain address
 /// (`BUILT_IN_CONTRACTS_OFFSET + 0x01`), exposed under the version-specific
-/// name because v31 force-deploys `L2V32Upgrade` there.
+/// name because v33 force-deploys `L2V32Upgrade` there.
 pub const L2_VERSION_SPECIFIC_UPGRADER_ADDR: Address = l2_addr(0x01);
 pub const L2_BRIDGEHUB_ADDR: Address = l2_addr(0x02);
 pub const L2_ASSET_ROUTER_ADDR: Address = l2_addr(0x03);
 pub const L2_NATIVE_TOKEN_VAULT_ADDR: Address = l2_addr(0x04);
 pub const L2_MESSAGE_ROOT_ADDR: Address = l2_addr(0x05);
-/// The removed v31 GWAssetTracker's address: the v32 upgrade swaps its system proxy's
+/// The removed v33 GWAssetTracker's address: the v32 upgrade swaps its system proxy's
 /// implementation for `EmptyContract` (see `getRemovedTrackerNeutralizations`).
 pub const L2_REMOVED_GW_ASSET_TRACKER_ADDR: Address = l2_addr(0x10);
 pub const SLOAD_CONTRACT_ADDR: Address = l2_addr(0x06);
-// v31 no longer force-deploys the WrappedBaseToken, so this address is only referenced by the
+// v33 no longer force-deploys the WrappedBaseToken, so this address is only referenced by the
 // address-consistency test below; keep it as part of the canonical L2 address map.
 #[allow(dead_code)]
 pub const L2_WRAPPED_BASE_TOKEN_IMPL_ADDR: Address = l2_addr(0x07);
@@ -112,19 +112,18 @@ pub const ECADD_SYSTEM_CONTRACT: Address = literal_addr(0x06);
 pub const ECMUL_SYSTEM_CONTRACT: Address = literal_addr(0x07);
 pub const ECPAIRING_SYSTEM_CONTRACT: Address = literal_addr(0x08);
 
-/// v31 L2 protocol upgrade transaction parameters.
-/// `txType` differs between Era VM (254) and ZKsync OS (126); gas + pubdata
-/// limits are fixed by v31 deploy scripts and travel with the artifact.
-pub const ERA_SYSTEM_UPGRADE_TX_TYPE: u64 = 254;
+/// v33 L2 protocol upgrade transaction parameters. Gas + pubdata limits are
+/// fixed by the v33 deploy scripts and travel with the artifact. Era VM's
+/// `txType` (254) is not listed: v33 is a ZKsync OS-only release.
 pub const ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE: u64 = 126;
 pub const L2_UPGRADE_GAS_LIMIT: u64 = 72_000_000;
 pub const L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT: u64 = 800;
 
 /// AllContractsHashes file-name keys consulted by the bytecode verifier.
+/// The Era VM system contracts (`Bootloader`, `DefaultAccount`, `EvmEmulator`)
+/// are absent: only an Era CTM's chain-creation and upgrade payloads named
+/// them, and v33 has no Era flavor.
 pub const L2_V32_UPGRADE_CONTRACT: &str = "l1-contracts/L2V32Upgrade";
-pub const BOOTLOADER_CONTRACT: &str = "Bootloader";
-pub const DEFAULT_ACCOUNT_CONTRACT: &str = "system-contracts/DefaultAccount";
-pub const EVM_EMULATOR_CONTRACT: &str = "EvmEmulator";
 
 #[cfg(test)]
 mod tests {

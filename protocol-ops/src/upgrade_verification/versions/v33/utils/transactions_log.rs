@@ -1,4 +1,4 @@
-//! Parser for the `transactions.txt` files emitted by the v31 prepare flow
+//! Parser for the `transactions.txt` files emitted by the v33 prepare flow
 //! alongside `ecosystem.toml` and `extra-verification-logs.txt`.
 //!
 //! Each non-empty, non-comment line is a 0x-prefixed 32-byte L1 transaction
@@ -123,18 +123,30 @@ mod tests {
         assert!(parse_hash(&bad).is_err());
     }
 
-    /// Sanity check against the committed stage log.
+    /// Sanity check against whatever real transaction logs this release has committed.
+    ///
+    /// Pinned to `output/stage/` before, which made the test fail outright on a release that
+    /// has no stage regen yet — the opposite of what its name promises. It now scans every
+    /// `output/<env>/transactions.txt` the release actually carries and skips when there are
+    /// none, so it grows with each env that gets regenerated instead of hard-coding one.
     #[test]
-    fn reads_committed_stage_log_if_present() {
+    fn reads_committed_logs_if_present() {
         use crate::common::paths::resolve_l1_contracts_path;
         let Ok(l1) = resolve_l1_contracts_path() else {
             return;
         };
-        let log = l1.join("upgrade-envs/v0.33.0-atomic-interop/output/stage/transactions.txt");
-        let hashes = read(&log).expect("real stage transactions.txt must parse");
-        assert!(
-            !hashes.is_empty(),
-            "stage transactions.txt should have entries"
-        );
+        let Ok(envs) = std::fs::read_dir(l1.join("upgrade-envs/v0.33.0-atomic-interop/output"))
+        else {
+            return;
+        };
+        for env in envs.flatten() {
+            let log = env.path().join("transactions.txt");
+            if !log.is_file() {
+                continue;
+            }
+            let hashes =
+                read(&log).unwrap_or_else(|e| panic!("{} must parse: {e:#}", log.display()));
+            assert!(!hashes.is_empty(), "{} should have entries", log.display());
+        }
     }
 }

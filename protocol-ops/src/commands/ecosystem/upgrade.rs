@@ -193,8 +193,14 @@ struct GovernanceCalls {
 struct TestUpgradeCalls {
     test_create_chain: String,
     test_create_chain_caller: String,
-    test_upgrade_chain: String,
-    test_upgrade_chain_caller: String,
+    /// Absent when the release opts out via `TESTONLY_emitsTestUpgradeChainCall()`. v33 does: its
+    /// per-chain upgrade needs a recorded priority-op lower bound and an upgrade timestamp, so a
+    /// single generated call cannot stand for it and `protocol_ops chain upgrade` emits the real
+    /// bundle instead.
+    #[serde(default)]
+    test_upgrade_chain: Option<String>,
+    #[serde(default)]
+    test_upgrade_chain_caller: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -407,6 +413,19 @@ pub struct UpgradePrepareAllArgs {
     /// pass it explicitly.
     #[clap(long)]
     pub rollup_da_manager_address: Option<Address>,
+
+    /// Also redeploy the zk-governance set (ProtocolUpgradeHandler impl,
+    /// Guardians, SecurityCouncil, EmergencyUpgradeBoard) from the sibling
+    /// `zk-governance` checkout and fold the four calls that wire it into the
+    /// live PUH proxy into stage 0.
+    ///
+    /// Off by default, and deliberately not implied by `governance_kind =
+    /// "puh"`: swapping the governance set is release-specific work that v31
+    /// happened to carry (its CREATE2 salt seed is `b"v31:gov"`), not a step
+    /// every protocol upgrade wants. A release that only moves the protocol
+    /// version must leave the live handler alone. Requires a PUH-governed env.
+    #[clap(long, default_value_t = false)]
+    pub redeploy_zk_governance: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -542,7 +561,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // works on a fork via `anvil_impersonateAccount`; on a real chain
         // nobody can sign as that contract. The caller must pass
         // `--deployer-address <real-EOA>` (or derive it from the broadcast
-        // signer's private key — see `regen-and-verify-stage.sh` for an
+        // signer's private key — see `regen-upgrade-calldata.sh` for an
         // example using `cast wallet address`).
         // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly.
         //
@@ -751,22 +770,35 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 
     // Phase 1b on the same fork: redeploy ProtocolUpgradeHandler + Guardians
     // and capture the stage-0 governance calls that wire them into the live
-    // PUH proxy. Only meaningful on PUH-governed envs (stage / mainnet) —
-    // legacy-Governance envs (e.g. testnet's internal `0xc4fd…` bridgehub
-    // owned by ZKsync `Governance.sol`) don't have a PUH to redeploy, so we
-    // skip this step entirely and the merged governance.toml carries only
-    // the core + per-CTM calls.
+    // PUH proxy.
+    //
+    // This is release-specific work, not something every upgrade wants: the
+    // redeploy exists because v31 shipped a new zk-governance set, and its
+    // CREATE2 salt seed is literally `b"v31:gov"`. A protocol upgrade that is
+    // not also a governance migration must leave the live PUH set alone, so
+    // the step is opt-in via `--redeploy-zk-governance` rather than implied by
+    // `governance_kind = "puh"`.
+    //
+    // It still *requires* a PUH-governed env — there is nothing to redeploy on
+    // an env owned by a legacy ZKsync `Governance.sol` — so asking for it
+    // anywhere else is a hard error rather than a silent no-op.
     let governance_kind = env_cfg
         .as_ref()
         .map(|c| c.governance_kind())
         .unwrap_or_default();
     let is_puh_governed = governance_kind == crate::common::env_config::GovernanceKind::Puh;
+    if args.redeploy_zk_governance && !is_puh_governed {
+        anyhow::bail!(
+            "--redeploy-zk-governance requires a PUH-governed environment, but governance_kind \
+             is not \"puh\" — there is no ProtocolUpgradeHandler to redeploy"
+        );
+    }
     let zksync_os_ctm_proxy = prepared
         .ctm_tomls
         .iter()
         .find(|e| e.is_zk_sync_os)
         .map(|e| e.proxy);
-    let puh_outcome = if is_puh_governed {
+    let puh_outcome = if args.redeploy_zk_governance {
         let mut puh_inputs =
             crate::commands::ecosystem::zk_governance::ZkGovernanceInputs::from_env(
                 env_cfg.as_ref(),
@@ -782,6 +814,13 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             .await
             .context("PUH/Guardians redeploy step")?,
         )
+    } else if is_puh_governed {
+        logger::info(
+            "Skipping PUH/Guardians redeploy: this release does not ship a new zk-governance \
+             set, so the live ProtocolUpgradeHandler is left as-is. Pass \
+             --redeploy-zk-governance to include it.",
+        );
+        None
     } else {
         logger::info(
             "Skipping PUH/Guardians redeploy (governance_kind != \"puh\" — env uses legacy Governance.sol)",
@@ -1123,14 +1162,16 @@ fn write_merged_ecosystem_toml(
                 "test_create_chain_era_caller".into(),
                 Value::String(test_calls.test_create_chain_caller),
             );
-            test_table.insert(
-                "test_upgrade_chain_era".into(),
-                Value::String(test_calls.test_upgrade_chain),
-            );
-            test_table.insert(
-                "test_upgrade_chain_era_caller".into(),
-                Value::String(test_calls.test_upgrade_chain_caller),
-            );
+            if let (Some(call), Some(caller)) = (
+                test_calls.test_upgrade_chain,
+                test_calls.test_upgrade_chain_caller,
+            ) {
+                test_table.insert("test_upgrade_chain_era".into(), Value::String(call));
+                test_table.insert(
+                    "test_upgrade_chain_era_caller".into(),
+                    Value::String(caller),
+                );
+            }
         }
         if let Some(test_calls) = zksync_os_test_calls {
             test_table.insert(
@@ -1141,14 +1182,16 @@ fn write_merged_ecosystem_toml(
                 "test_create_chain_zkos_caller".into(),
                 Value::String(test_calls.test_create_chain_caller),
             );
-            test_table.insert(
-                "test_upgrade_chain_zkos".into(),
-                Value::String(test_calls.test_upgrade_chain),
-            );
-            test_table.insert(
-                "test_upgrade_chain_zkos_caller".into(),
-                Value::String(test_calls.test_upgrade_chain_caller),
-            );
+            if let (Some(call), Some(caller)) = (
+                test_calls.test_upgrade_chain,
+                test_calls.test_upgrade_chain_caller,
+            ) {
+                test_table.insert("test_upgrade_chain_zkos".into(), Value::String(call));
+                test_table.insert(
+                    "test_upgrade_chain_zkos_caller".into(),
+                    Value::String(caller),
+                );
+            }
         }
         doc.insert("test_upgrade_calls".into(), Value::Table(test_table));
     }

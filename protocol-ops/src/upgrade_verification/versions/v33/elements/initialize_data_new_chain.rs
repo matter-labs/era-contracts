@@ -1,12 +1,9 @@
 use alloy::{primitives::FixedBytes, sol};
 
-use crate::upgrade_verification::{
-    artifacts::CtmFlavor,
-    verifiers::{VerificationResult, Verifiers},
-};
+use crate::upgrade_verification::{artifacts::CtmFlavor, verifiers::VerificationResult};
 
 sol! {
-    // v31: the chain-creation diamond cut's initCalldata is abi.encode(InitializeDataNewChain)
+    // v33: the chain-creation diamond cut's initCalldata is abi.encode(InitializeDataNewChain)
     // — just the three bytecode hashes. ChainTypeManagerBase prepends the selector and all
     // per-chain fields (chainId, admin, bridgehub, …) at chain-creation time.
     // The verifier is fetched from CTM.protocolVersionVerifier() inside DiamondInit; fee params
@@ -29,26 +26,8 @@ impl InitializeDataNewChain {
     ///   `ChainCreationParamsLib.getChainCreationParams` leaves them at
     ///   `bytes32(0)`. Anything non-zero here would indicate the wrong
     ///   chain-creation params were wired into a ZKsync OS CTM.
-    pub fn verify(
-        &self,
-        flavor: CtmFlavor,
-        verifiers: &Verifiers,
-        result: &mut VerificationResult,
-    ) {
+    pub fn verify(&self, flavor: CtmFlavor, result: &mut VerificationResult) {
         match flavor {
-            CtmFlavor::Era => {
-                result.expect_zk_bytecode(verifiers, &self.l2BootloaderBytecodeHash, "Bootloader");
-                result.expect_zk_bytecode(
-                    verifiers,
-                    &self.l2DefaultAccountBytecodeHash,
-                    "system-contracts/DefaultAccount",
-                );
-                result.expect_zk_bytecode(
-                    verifiers,
-                    &self.l2EvmEmulatorBytecodeHash,
-                    "EvmEmulator",
-                );
-            }
             CtmFlavor::ZksyncOs => {
                 self.expect_zero(
                     "l2BootloaderBytecodeHash",

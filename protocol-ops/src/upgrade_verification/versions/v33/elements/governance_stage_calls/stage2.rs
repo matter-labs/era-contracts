@@ -34,7 +34,7 @@ use crate::{
             L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT,
         },
         verifiers::{VerificationResult, Verifiers},
-        versions::v31::MAX_PRIORITY_TX_GAS_LIMIT,
+        versions::v33::MAX_PRIORITY_TX_GAS_LIMIT,
     },
 };
 
@@ -71,6 +71,9 @@ use super::{
     L2TransactionRequestTwoBridgesOuter,
 };
 
+/// Length of the stage-2 new-Gateway bring-up block, when a release has one.
+const GATEWAY_BRING_UP_LEN: usize = 13;
+
 impl GovernanceStage2Calls {
     /// Stage 2 — three sections in order:
     ///   1. Decommission prefix (dynamic): `N × setHistoricalMigrationInterval`
@@ -90,7 +93,7 @@ impl GovernanceStage2Calls {
         let mut errors = 0;
 
         // ── Section 1: Legacy-GW decommission prefix (dynamic) ───────
-        // v31 `CoreUpgrade` prepends `N × setHistoricalMigrationInterval`
+        // v33 `CoreUpgrade` prepends `N × setHistoricalMigrationInterval`
         // followed by one `setSettlementLayerStatus(legacy_gw_chain_id, false)`
         // before the canonical `unpauseMigration`. N is env-dependent
         // (`permanent-values/<env>.toml`'s `[[legacy_gateway.chain_intervals]]`),
@@ -177,7 +180,15 @@ impl GovernanceStage2Calls {
 
         let canonical_prefix = decommission_count;
         let canonical_count = canonical_prefix + 1 + artifact.ctms.len() * 2;
-        let expected_call_count = canonical_count + 13;
+        // Section 3 below is 13 calls, but only when the release actually
+        // brings up a new Gateway. v33 brings up none, so the block — and its
+        // 13 calls — must be absent.
+        let gateway_bring_up_len = if artifact.new_gateway.is_some() {
+            GATEWAY_BRING_UP_LEN
+        } else {
+            0
+        };
+        let expected_call_count = canonical_count + gateway_bring_up_len;
 
         // ── Section 2: Canonical activation ─────────────────────────
         // Call `canonical_prefix` — ChainAssetHandler.unpauseMigration()
@@ -226,7 +237,7 @@ impl GovernanceStage2Calls {
             );
         }
 
-        // ── Section 3: New-Gateway bring-up (13 calls) ───────────────
+        // ── Section 3: New-Gateway bring-up ([`GATEWAY_BRING_UP_LEN`]) ──
         match artifact.new_gateway.as_ref() {
             Some(new_gw) => {
                 errors += verify_gateway_bring_up_calls(
@@ -238,8 +249,17 @@ impl GovernanceStage2Calls {
                 )
                 .await;
             }
+            None if verifiers.new_gateway_chain_id.is_none() => {
+                // This release brings up no Gateway, and the env declares none either, so there
+                // is no 13-call block to find. Nothing to verify rather than something missing.
+                result.print_info(
+                    "Stage 2: no new-Gateway bring-up block (release and env both declare none)",
+                );
+            }
             None => {
-                result.report_error("v31 verification requires a [new_gateway] artifact block");
+                result.report_error(
+                    "env declares [new_gateway] but the artifact carries no [new_gateway] block",
+                );
                 errors += 1;
             }
         }
@@ -350,13 +370,23 @@ async fn verify_gateway_bring_up_calls(
         return errors + 1;
     };
 
-    let expected_new_gw_chain_id = U256::from(verifiers.new_gateway_chain_id);
+    // Reached only when the artifact carries a `[new_gateway]` block, which the caller pairs
+    // with the env declaring one — so both Options are populated here.
+    let (Some(new_gateway_chain_id), Some(representative_ctm)) = (
+        verifiers.new_gateway_chain_id,
+        verifiers.new_gateway_representative_ctm,
+    ) else {
+        result.report_error(
+            "artifact has a [new_gateway] block but the env config declares no [new_gateway]",
+        );
+        return errors + 1;
+    };
+    let expected_new_gw_chain_id = U256::from(new_gateway_chain_id);
     let expected_l2_gas_limit = U256::from(MAX_PRIORITY_TX_GAS_LIMIT);
     let expected_l2_gas_per_pubdata_byte_limit = U256::from(L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT);
     // GatewayVotePreparation registers the representative/source CTM as the
     // L1 CTM asset; the newly deployed GW CTM appears in the L2 Bridgehub
     // add/setCTMAssetAddress payloads.
-    let representative_ctm = verifiers.new_gateway_representative_ctm;
     let representative_ctm_registration_data = address_as_bytes32(representative_ctm);
     let representative_ctm_asset_id = ctm_asset_id(
         verifiers.expected_l1_chain_id,
@@ -368,7 +398,7 @@ async fn verify_gateway_bring_up_calls(
         errors += check_set_settlement_layer_status(
             base,
             &call.data,
-            U256::from(verifiers.new_gateway_chain_id),
+            U256::from(new_gateway_chain_id),
             true,
             "new GW whitelist",
             result,
@@ -923,7 +953,7 @@ fn check_historical_migration_interval(
         &mut errors,
         result,
     );
-    // Deploy script ([CoreUpgrade_v31.s.sol:394]) always passes `0`.
+    // Deploy script ([CoreUpgrade_v33.s.sol:394]) always passes `0`.
     expect(
         decoded.migrationNumber,
         U256::ZERO,
@@ -1050,13 +1080,13 @@ fn check_register_ctm_asset_on_l1(
     };
     if ctm == expected_ctm {
         result.report_ok(&format!(
-            "registerCTMAssetOnL1 CTM matches Bridgehub.chainTypeManager({})",
+            "registerCTMAssetOnL1 CTM matches Bridgehub.chainTypeManager({:?})",
             verifiers.new_gateway_representative_chain_id
         ));
         0
     } else {
         result.report_error(&format!(
-            "registerCTMAssetOnL1 CTM mismatch: expected Bridgehub.chainTypeManager({}) {}, got {}",
+            "registerCTMAssetOnL1 CTM mismatch: expected Bridgehub.chainTypeManager({:?}) {}, got {}",
             verifiers.new_gateway_representative_chain_id, expected_ctm, ctm
         ));
         1

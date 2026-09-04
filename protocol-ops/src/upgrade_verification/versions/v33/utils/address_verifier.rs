@@ -11,13 +11,13 @@ pub struct AddressVerifier {
     pub name_to_address: HashMap<String, Address>,
 }
 
-const V31_ADDRESS_TABLES: &[&str] = &[
+const V33_ADDRESS_TABLES: &[&str] = &[
     "deployed_addresses",
     "upgrade_addresses",
     "state_transition",
 ];
 
-const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
+const V33_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
     (
         &["upgrade_addresses", "shared", "transparent_proxy_admin"],
         "transparent_proxy_admin",
@@ -125,6 +125,22 @@ const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
         &[
             "upgrade_addresses",
             "bridges",
+            "l1_interop_handler_proxy_addr",
+        ],
+        "l1_interop_handler_proxy",
+    ),
+    (
+        &[
+            "upgrade_addresses",
+            "bridges",
+            "l1_interop_handler_implementation_addr",
+        ],
+        "l1_interop_handler_implementation_addr",
+    ),
+    (
+        &[
+            "upgrade_addresses",
+            "bridges",
             "l1_nullifier_implementation_addr",
         ],
         "l1_nullifier_implementation_addr",
@@ -132,7 +148,7 @@ const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
 ];
 
 impl AddressVerifier {
-    pub fn new_v31_from_artifact(artifact: &EcosystemUpgradeArtifact) -> anyhow::Result<Self> {
+    pub fn new_v33_from_artifact(artifact: &EcosystemUpgradeArtifact) -> anyhow::Result<Self> {
         let mut result = Self {
             address_to_name: Default::default(),
             name_to_address: Default::default(),
@@ -140,7 +156,7 @@ impl AddressVerifier {
 
         result.add_address(Address::ZERO, "zero");
         add_addresses_from_artifact(&mut result, artifact)?;
-        add_v31_address_aliases(&mut result, artifact)?;
+        add_v33_address_aliases(&mut result, artifact)?;
 
         Ok(result)
     }
@@ -180,7 +196,7 @@ fn add_addresses_from_artifact(
     address_verifier: &mut AddressVerifier,
     artifact: &EcosystemUpgradeArtifact,
 ) -> anyhow::Result<()> {
-    for table_name in V31_ADDRESS_TABLES {
+    for table_name in V33_ADDRESS_TABLES {
         if let Some(table) = artifact.core.get(*table_name) {
             add_addresses_from_value(address_verifier, &format!("core.{table_name}"), table)?;
         }
@@ -188,7 +204,7 @@ fn add_addresses_from_artifact(
 
     for ctm in &artifact.ctms {
         let ctm_path = format!("ctms.{}", ctm.flavor.label());
-        for table_name in V31_ADDRESS_TABLES {
+        for table_name in V33_ADDRESS_TABLES {
             if let Some(table) = ctm.value.get(*table_name) {
                 add_addresses_from_value(
                     address_verifier,
@@ -227,18 +243,18 @@ fn add_addresses_from_value(
     Ok(())
 }
 
-fn add_v31_address_aliases(
+fn add_v33_address_aliases(
     address_verifier: &mut AddressVerifier,
     artifact: &EcosystemUpgradeArtifact,
 ) -> anyhow::Result<()> {
-    for (path, alias) in V31_ADDRESS_ALIASES {
-        add_v31_address_alias(address_verifier, "core", &artifact.core, path, alias)?;
+    for (path, alias) in V33_ADDRESS_ALIASES {
+        add_v33_address_alias(address_verifier, "core", &artifact.core, path, alias)?;
     }
 
     Ok(())
 }
 
-fn add_v31_address_alias(
+fn add_v33_address_alias(
     address_verifier: &mut AddressVerifier,
     root_name: &str,
     root: &toml::Value,

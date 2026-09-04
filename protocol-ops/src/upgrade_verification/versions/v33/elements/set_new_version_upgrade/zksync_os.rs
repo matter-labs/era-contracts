@@ -39,10 +39,10 @@ struct ZksyncOSExpectedFd {
     upgrade_type: ZksyncOSUpgradeType,
 }
 
-/// Expected v31 ZKsyncOS `UniversalContractUpgradeInfo[]` passed to
+/// Expected v33 ZKsyncOS `UniversalContractUpgradeInfo[]` passed to
 /// `ComplexUpgrader.forceDeployAndUpgradeUniversal` — excludes the L2V32Upgrade delegate-target
-/// entry, which is validated separately by `verify_zksync_os_l2_v31_deployment`.
-fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
+/// entry, which is validated separately by `verify_zksync_os_l2_v33_deployment`.
+fn expected_v33_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
     macro_rules! proxy {
         ($file:expr, $addr:expr) => {
             ZksyncOSExpectedFd {
@@ -52,9 +52,9 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
             }
         };
     }
-    // NOTE: every entry below is a SystemProxyUpgrade. v31 no longer performs any unsafe
+    // NOTE: every entry below is a SystemProxyUpgrade. v33 no longer performs any unsafe
     // ZKsyncOS force deployment except the L2V32Upgrade delegate target (validated separately);
-    // verify_v31_zksync_os_force_deployments enforces that no other unsafe FD is present.
+    // verify_v33_zksync_os_force_deployments enforces that no other unsafe FD is present.
     vec![
         // ── Fixed-address core contracts (getFixedAddressCoreContracts, 12 entries; L2WrappedBaseToken excluded) ──
         proxy!("l1-contracts/L2Bridgehub", L2_BRIDGEHUB_ADDR),
@@ -64,7 +64,7 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
             L2_NATIVE_TOKEN_VAULT_ADDR
         ),
         proxy!("l1-contracts/L2MessageRoot", L2_MESSAGE_ROOT_ADDR),
-        // L2WrappedBaseToken is intentionally NOT force-deployed by v31 (its impl is left as-is).
+        // L2WrappedBaseToken is intentionally NOT force-deployed by v33 (its impl is left as-is).
         proxy!(
             "l1-contracts/L2MessageVerification",
             L2_MESSAGE_VERIFICATION_ADDR
@@ -108,25 +108,25 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR
         ),
         // ── Removed-tracker neutralizations (getRemovedTrackerNeutralizations, 1 entry):
-        //    the v31 GWAssetTracker's proxy gets its implementation swapped for EmptyContract. ──
+        //    the v33 GWAssetTracker's proxy gets its implementation swapped for EmptyContract. ──
         proxy!(
             "l1-contracts/EmptyContract",
             L2_REMOVED_GW_ASSET_TRACKER_ADDR
         ),
-        // ── ProxyAdmin (0x1000c) is a direct-deployed contract present from genesis; v31 no longer
+        // ── ProxyAdmin (0x1000c) is a direct-deployed contract present from genesis; v33 no longer
         //    force-deploys it (it would require an unsafe overwrite), so it is not in this list. ──
     ]
 }
 
 /// Validate all entries of `UniversalContractUpgradeInfo[]` except the L2V32Upgrade delegate-target
-/// (which is already validated by `verify_zksync_os_l2_v31_deployment`).
-fn verify_v31_zksync_os_force_deployments(
+/// (which is already validated by `verify_zksync_os_l2_v33_deployment`).
+fn verify_v33_zksync_os_force_deployments(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
     deployments: &[IComplexUpgrader::UniversalContractUpgradeInfo],
     delegate_to: Address,
 ) {
-    let expected = expected_v31_zksync_os_force_deployments();
+    let expected = expected_v33_zksync_os_force_deployments();
     let mut expected_map: HashMap<Address, ZksyncOSExpectedFd> =
         expected.into_iter().map(|e| (e.address, e)).collect();
 
@@ -137,7 +137,7 @@ fn verify_v31_zksync_os_force_deployments(
             continue;
         }
 
-        // Guard: no other entry may be an unsafe force deployment. v31 deliberately uses only
+        // Guard: no other entry may be an unsafe force deployment. v33 deliberately uses only
         // SystemProxyUpgrade for the fixed-address contracts; an unsafe FD here would overwrite
         // bytecode in place (e.g. the old L2WrappedBaseToken / SystemContractProxyAdmin entries),
         // which we have removed. Catch any regression that reintroduces one.
@@ -204,7 +204,7 @@ fn verify_v31_zksync_os_force_deployments(
 
     if missing.is_empty() {
         result.report_ok(
-            "All ZKsyncOS force deployments match the expected v31 list (excluding L2V32Upgrade delegate target)",
+            "All ZKsyncOS force deployments match the expected v33 list (excluding L2V32Upgrade delegate target)",
         );
     }
 }
@@ -338,7 +338,7 @@ fn verify_zksync_os_bytecode_info_triplet(
 
 /// ZKsync OS L2 factory-dep bytecode set. Mirrors
 /// `CoreOnGatewayHelper.getFullListOfFactoryDependencies(true, [L2V32Upgrade])`.
-pub(super) const EXPECTED_V31_ZKSYNC_OS_BYTECODES: &[&str] = &[
+pub(super) const EXPECTED_V33_ZKSYNC_OS_BYTECODES: &[&str] = &[
     "l1-contracts/SystemContractProxy",
     "l1-contracts/SystemContractProxyAdmin",
     "l1-contracts/EmptyContract",
@@ -373,7 +373,7 @@ pub(super) async fn verify_zksync_os_force_deploy_and_upgrade(
     expected_fixed_force_deployments_data: &str,
 ) -> anyhow::Result<()> {
     // Validate all expected force deployments (18 fixed entries; L2V32Upgrade delegate validated below).
-    verify_v31_zksync_os_force_deployments(
+    verify_v33_zksync_os_force_deployments(
         verifiers,
         result,
         &decoded._forceDeployments,
@@ -387,7 +387,7 @@ pub(super) async fn verify_zksync_os_force_deploy_and_upgrade(
         .filter(|deployment| deployment.newAddress == decoded._delegateTo);
     match (matching_deployments.next(), matching_deployments.next()) {
         (Some(deployment), None) => {
-            verify_zksync_os_l2_v31_deployment(verifiers, result, decoded._delegateTo, deployment);
+            verify_zksync_os_l2_v33_deployment(verifiers, result, decoded._delegateTo, deployment);
         }
         (None, _) => result.report_error(&format!(
             "ZKsync OS forceDeployAndUpgradeUniversal does not deploy delegate target {}",
@@ -409,7 +409,7 @@ pub(super) async fn verify_zksync_os_force_deploy_and_upgrade(
     .await
 }
 
-fn verify_zksync_os_l2_v31_deployment(
+fn verify_zksync_os_l2_v33_deployment(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
     delegate_to: Address,

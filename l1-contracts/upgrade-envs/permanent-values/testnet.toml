@@ -1,10 +1,17 @@
 l1_chain_id = 11155111
 
-# TODO(testnet): no L1NativeTokenVault asset ID is registered yet because the
-# EraVM ZK token has not been deployed on testnet. Populate this once the
-# token is live; PUVT and `ecosystem upgrade-prepare-all --env testnet` will
-# bail without it.
-# zk_token_asset_id = "0x..." # TODO
+# ZK token asset ID as registered in this ecosystem's L1NativeTokenVault (0xF8d4A519...).
+# Resolves to 0xd1Ee6cE0A0fDB29793cbDC41DcFE5d356C7d5C7f ("ZKsync"/ZK), whose originChainId
+# is 301 — the bridged L1 representation of the chain-301 ZK token.
+#
+# Recovered from live state rather than chosen: it is the `zkTokenAssetId` field of the
+# ZKsync OS CTM's current chain-creation params, as emitted by `NewChainCreationParams` in
+# the v31 upgrade (tx 0xb7141992..., block 11172145). Keeping it identical means the v33
+# params carry the same L2 `InteropCenter.ZK_TOKEN_ASSET_ID` the ecosystem already runs with.
+#
+# NOTE: not 0xc479e944..., which is what the same NTV assigns to 0xF41D4478... (a stage-NTV
+# bridged ZK token that testnet re-registered as an L1-native asset).
+zk_token_asset_id = "0xefb0794fa43edc760ef9bf5b09af2fc0a667a288453d2d55d48878897dc2f317"
 
 # Whether this environment's CTM verifier is the testnet one. Env-wide, not per-CTM.
 # Non-mainnet envs run `ZKsyncOSTestnetVerifier`, which accepts unproven batches.
@@ -18,6 +25,10 @@ create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 
 [core_contracts]
 bridgehub_proxy_addr = "0xc4fd2580c3487bba18d63f50301020132342fdbd"
+# `bridgehub.owner()` is the ProtocolUpgradeHandler 0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D,
+# not a plain `Ownable` — so governance replay must impersonate the handler directly rather
+# than taking the schedule+execute path.
+governance_kind = "puh"
 
 
 # TODO(EVM-1200): The single-CTM `[ctm_contracts]` block below is for ZKsync OS (Atlas)
@@ -29,22 +40,21 @@ ctm_proxy_addr = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
 l1_bytecodes_supplier_addr = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
 rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 
-# v31 multi-CTM list — consumed by `scripts/v31-simulate-upgrade.ts`.
-# Testnet is currently pre-v31 (Atlas on v30, Era on v29) — overrides are required
-# because the v31 getters (`ctm.isZKsyncOS()`, `ctm.L1_BYTECODES_SUPPLIER()`) don't
-# exist on either CTM yet.
+# Multi-CTM list. Both CTMs are on v31 now, so the getters the overrides used to stand in
+# for (`ctm.isZKsyncOS()`, `ctm.L1_BYTECODES_SUPPLIER()`) exist on chain.
+#
+# Only the ZKsync OS entry is upgradeable onto v33: `upgrade-prepare-all` logs
+# "skipping Era CTM ..." for the other, and `CTMUpgrade_v33.noGovernancePrepare` would refuse
+# it outright. The Era entry stays listed because it describes the environment.
 [[ctm_contracts.ctms]]
-# Atlas (ZKsyncOS) CTM (witness chain: 8022833, v30)
-# rollup_da_manager queried via `chain.getRollupDAManager()` on chain 8022833's
-# diamond (pv=0x1e00000001). Chain 8022832 is the legacy v29 outlier on this
-# CTM and still points at the old RollupDAManager `0x2732eA4D...`; the v31
-# upgrade flow targets the current v30 state, so we pin the v30 value.
-# bytecodes_supplier shared with Era on testnet (per
-# v0.30.0-zksync-os-blobs/testnet.toml `l1_bytecodes_supplier_addr`).
+# Atlas (ZKsyncOS) CTM (witness chain: 8022833)
+# No `bytecodes_supplier`: `ChainTypeManagerBase` exposes it as the immutable
+# `L1_BYTECODES_SUPPLIER`, so protocol-ops auto-resolves it from the CTM. The override this
+# entry used to carry had gone stale (it named the pre-v31 supplier), which is exactly the
+# drift an override invites — the getter cannot go stale.
+# rollup_da_manager queried via `chain.getRollupDAManager()` on chain 8022833's diamond.
 proxy = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
 is_zk_sync_os = true
-
-bytecodes_supplier = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
 rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 
 [[ctm_contracts.ctms]]

@@ -19,21 +19,20 @@ pub(crate) mod elements;
 pub(crate) mod utils;
 
 use elements::{
-    deployed_addresses::verify_v31_provenance,
+    deployed_addresses::verify_v33_provenance,
     governance_stage_calls::{verify_governance_stage_calls, verify_per_chain_protocol_versions},
     protocol_version::ProtocolVersion,
-    rpc_state::verify_v31_artifact_state,
+    rpc_state::verify_v33_artifact_state,
 };
 
-pub(crate) const EXPECTED_NEW_PROTOCOL_VERSION_STR: &str = "0.32.0";
-pub(crate) const EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR: &str = "0.31.0";
+pub(crate) const EXPECTED_NEW_PROTOCOL_VERSION_STR: &str = "0.33.0";
 pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.31.0";
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
 pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
 
 /// Stage Sepolia's Era chain (270) is the single registered chain still
-/// settling on the legacy stage Gateway at v31 upgrade time.
-/// `L1MessageRootStageSepolia._v31InitializeInner` skips it (see
+/// settling on the legacy stage Gateway at v33 upgrade time.
+/// `L1MessageRootStageSepolia._v33InitializeInner` skips it (see
 /// `l1-contracts/contracts/dev-contracts/L1MessageRootStageSepolia.sol`),
 /// so PUVT must apply the same skip when pre-flighting the
 /// `Bridgehub.settlementLayer(chainId) == L1` invariant on stage.
@@ -47,38 +46,43 @@ pub(crate) fn get_expected_old_protocol_version_for_ctm_flavor(
     flavor: CtmFlavor,
 ) -> ProtocolVersion {
     let version = match flavor {
-        CtmFlavor::Era => EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR,
         CtmFlavor::ZksyncOs => EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR,
     };
     ProtocolVersion::from_str(version).unwrap()
 }
 
+/// Whether `version` is the release this upgrade starts from.
+///
+/// Compares major.minor and ignores the patch: a CTM sitting on a patch release of the source
+/// version (testnet's ZKsync OS CTM is on v0.31.1) is still on v31, and this upgrade applies to
+/// it unchanged — the diamond cut is keyed on the CTM's own reported version, not on a pinned
+/// patch. Requiring an exact match rejected a legitimately-patched ecosystem.
 pub(crate) fn is_expected_old_protocol_version_for_ctm_flavor(
     version: ProtocolVersion,
     flavor: CtmFlavor,
 ) -> bool {
-    version == get_expected_old_protocol_version_for_ctm_flavor(flavor)
+    let expected = get_expected_old_protocol_version_for_ctm_flavor(flavor);
+    version.major == expected.major && version.minor == expected.minor
 }
 
 pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static str {
     match flavor {
-        CtmFlavor::Era => "v0.31.0",
-        CtmFlavor::ZksyncOs => "v0.31.0",
+        CtmFlavor::ZksyncOs => "v0.31.x",
     }
 }
 
-/// Run the full v31 verification pipeline.
+/// Run the full v33 verification pipeline.
 ///
 /// Ordering mirrors the legacy PUVT (`UpgradeOutput::verify` in
 /// `protocol-upgrade-verification-tool`):
 ///
 ///   1. Verifier construction (incl. SystemConfig.json fee-params init).
-///   2. CREATE2 provenance map population — v31-specific prep that must precede
+///   2. CREATE2 provenance map population — v33-specific prep that must precede
 ///      provenance consumption below.
 ///   3. RPC state checks — chain ids, Create2Factory bytecode, proxy admins,
 ///      live core wiring, validator timelocks, fee params, settlement layer.
 ///      Subsumes legacy's early chain-id sanity (legacy steps 2–3).
-///   4. Deployment provenance — every named v31 deploy + the new-GW CTM
+///   4. Deployment provenance — every named v33 deploy + the new-GW CTM
 ///      provenance flow (legacy step 4).
 ///   5. Per-chain protocol-version sweep — was bundled inside legacy
 ///      `deployed_addresses.verify`; sits next to provenance for the same
@@ -94,9 +98,10 @@ pub(crate) async fn verify(
     zk_governance_commit: &str,
     era_chain_id: u64,
     legacy_gateway_chain_id: u64,
+    message_root_era_gateway_chain_id: u64,
     legacy_gateway_chain_intervals: &[ChainInterval],
-    new_gateway_chain_id: u64,
-    new_gateway_representative_chain_id: u64,
+    new_gateway_chain_id: Option<u64>,
+    new_gateway_representative_chain_id: Option<u64>,
     l1_chain_id: u64,
     tx_hashes: &[FixedBytes<32>],
     create2_factory: Address,
@@ -105,7 +110,7 @@ pub(crate) async fn verify(
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
     result.print_info("== Config verification ==");
-    let mut verifiers = Verifiers::new_v31(
+    let mut verifiers = Verifiers::new_v33(
         env,
         artifact,
         l1_rpc_url,
@@ -122,7 +127,7 @@ pub(crate) async fn verify(
     )
     .await?;
     result.report_ok(&format!(
-        "v31 verifier context loaded with {} named addresses",
+        "v33 verifier context loaded with {} named addresses",
         verifiers.address_verifier.name_to_address.len()
     ));
     result.report_ok(&format!(
@@ -160,13 +165,13 @@ pub(crate) async fn verify(
         count,
     ));
 
-    verify_v31_artifact_state(artifact, &verifiers, create2_factory, result).await?;
+    verify_v33_artifact_state(artifact, &verifiers, create2_factory, result).await?;
 
-    verify_v31_provenance(
+    verify_v33_provenance(
         artifact,
         &verifiers,
         era_chain_id,
-        legacy_gateway_chain_id,
+        message_root_era_gateway_chain_id,
         result,
     )
     .await?;

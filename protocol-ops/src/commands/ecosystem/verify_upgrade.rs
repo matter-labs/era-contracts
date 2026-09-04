@@ -8,7 +8,7 @@ use crate::{
     common::logger,
     upgrade_verification::{
         artifact_shape, artifacts::EcosystemUpgradeArtifact, verifiers::VerificationResult,
-        versions::v31::utils::transactions_log,
+        versions::v33::utils::transactions_log,
     },
 };
 
@@ -22,7 +22,7 @@ use super::zk_governance::GOV_SALT_SEED;
 /// scripts or creating an anvil fork.
 #[derive(Debug, Clone, Parser)]
 pub struct VerifyUpgradeArgs {
-    /// Environment whose permanent-values and v31 input TOMLs define verification constants.
+    /// Environment whose permanent-values and v33 input TOMLs define verification constants.
     #[clap(long, value_enum)]
     pub env: VerifyUpgradeEnv,
 
@@ -35,7 +35,7 @@ pub struct VerifyUpgradeArgs {
     #[clap(long, alias = "gw-rpc")]
     pub gw_rpc_url: String,
 
-    /// Path to the v31 ecosystem upgrade TOML produced by `upgrade-prepare`.
+    /// Path to the v33 ecosystem upgrade TOML produced by `upgrade-prepare`.
     #[clap(long)]
     pub ecosystem_toml: PathBuf,
 
@@ -111,6 +111,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.permanent_values_path.display()
         )
     })?;
+    let message_root_era_gateway_chain_id = env_cfg.message_root_era_gateway_chain_id();
     let legacy_gateway_chain_intervals = env_cfg.legacy_gateway_chain_intervals().to_vec();
     let l1_chain_id = env_cfg.l1_chain_id().ok_or_else(|| {
         anyhow::anyhow!(
@@ -130,14 +131,12 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.permanent_values_path.display()
         )
     })?;
-    let new_gateway = env_cfg.new_gateway().ok_or_else(|| {
-        anyhow::anyhow!(
-            "{} is missing required `[new_gateway]` config for v31 verification",
-            env_cfg.permanent_values_path.display()
-        )
-    })?;
-    let new_gateway_chain_id = new_gateway.chain_id;
-    let new_gateway_representative_chain_id = new_gateway.ctm_representative_chain_id;
+    // Optional: a release that brings up no Gateway (v33) has no `[new_gateway]` block, and the
+    // Gateway-specific checks — the stage-2 bring-up block and the GW CTM deployment provenance —
+    // are skipped rather than asserted against absent config.
+    let new_gateway = env_cfg.new_gateway();
+    let new_gateway_chain_id = new_gateway.map(|gw| gw.chain_id);
+    let new_gateway_representative_chain_id = new_gateway.map(|gw| gw.ctm_representative_chain_id);
 
     // Collect every pinned CREATE2 salt declared in the env config — the Core
     // salt from `[contracts] create2_factory_salt` plus the per-CTM salts under
@@ -170,7 +169,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         env_cfg.permanent_values_path.display()
     ));
     logger::info(format!(
-        "V31 input: {}",
+        "V33 input: {}",
         env_cfg.upgrade_input_path.display()
     ));
     logger::info(format!("Ecosystem TOML: {}", args.ecosystem_toml.display()));
@@ -193,9 +192,15 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     logger::info(format!(
         "Legacy Gateway chain ID: {legacy_gateway_chain_id}"
     ));
-    logger::info(format!("New Gateway chain ID: {new_gateway_chain_id}"));
     logger::info(format!(
-        "New Gateway representative chain ID: {new_gateway_representative_chain_id}"
+        "New Gateway: {}",
+        match new_gateway_chain_id {
+            Some(id) => format!("chain {id}"),
+            None => "none — this release brings up no Gateway".to_string(),
+        }
+    ));
+    logger::info(format!(
+        "New Gateway representative chain ID: {new_gateway_representative_chain_id:?}"
     ));
     logger::info(format!("L1 chain ID (expected): {l1_chain_id}"));
     logger::info(format!("CREATE2 factory: {create2_factory}"));
@@ -220,7 +225,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
 
     let mut result = VerificationResult::default();
 
-    let verification_result = crate::upgrade_verification::versions::v31::verify(
+    let verification_result = crate::upgrade_verification::versions::v33::verify(
         args.env,
         &artifact,
         &args.l1_rpc_url,
@@ -229,6 +234,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         args.zk_governance_commit.as_str(),
         era_chain_id,
         legacy_gateway_chain_id,
+        message_root_era_gateway_chain_id,
         &legacy_gateway_chain_intervals,
         new_gateway_chain_id,
         new_gateway_representative_chain_id,
@@ -260,7 +266,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
 }
 
 fn print_encoded_upgrade_data(label: &str, stage_calls_hex: &str) {
-    use crate::upgrade_verification::versions::v31::elements::call_list::{
+    use crate::upgrade_verification::versions::v33::elements::call_list::{
         CallList, UpgradeProposal,
     };
     use alloy::sol_types::SolValue;

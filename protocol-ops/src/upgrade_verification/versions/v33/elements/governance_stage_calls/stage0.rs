@@ -113,18 +113,26 @@ impl GovernanceStage0Calls {
             result,
         )
         .await?;
-        // PUH-redeploy block is 4 calls: upgradeAndCall + the three update*
-        // setters (SecurityCouncil, Guardians, EmergencyUpgradeBoard).
-        let pre_gov_accept_tail_start = if puh_governed {
+        // The PUH-redeploy block (4 calls: upgradeAndCall + the three update* setters) is present
+        // only when the *release* ships a new zk-governance set, which the artifact records as a
+        // `[zk_governance]` table. Keying off `puh_governed` alone was wrong: an env can be
+        // PUH-governed while the release leaves the handler untouched, as v33 does.
+        let redeploys_zk_governance = puh_governed && artifact.zk_governance.is_some();
+        if puh_governed && artifact.zk_governance.is_none() {
+            result.print_info(
+                "Stage 0: no zk-governance redeploy block (release ships no new governance set)",
+            );
+        }
+        let pre_gov_accept_tail_start = if redeploys_zk_governance {
             base_count + 4
         } else {
             base_count
         };
         let expected_call_count = pre_gov_accept_tail_start + pre_gov_accept_targets.len();
 
-        if puh_governed {
+        if redeploys_zk_governance {
             let expected_zk_governance = artifact.zk_governance.as_ref().context(
-                "PUH-governed v31 artifact is missing required top-level [zk_governance] table",
+                "PUH-governed v33 artifact is missing required top-level [zk_governance] table",
             )?;
             // zk-governance redeploy block — PUH-governed envs only.
             // Call `base_count`     — PUH ProxyAdmin.upgradeAndCall(PUH proxy, new impl, "").
@@ -581,30 +589,15 @@ async fn verify_puh_immutables(
         }
     }
 
-    if let Some(era_ctm) = artifact
-        .ctms
-        .iter()
-        .find(|ctm| ctm.flavor == CtmFlavor::Era)
-    {
-        let expected = required_ctm_address(
-            era_ctm,
-            &["state_transition", "chain_type_manager_proxy"],
-            result,
-        );
-        if let Some(expected) = expected {
-            match new_impl.ERA_CHAIN_TYPE_MANAGER().call().await {
-                Ok(actual) => compare_puh_expected_address(
-                    result,
-                    "PUH.ERA_CHAIN_TYPE_MANAGER()",
-                    actual,
-                    expected,
-                ),
-                Err(err) => result.report_error(&format!(
-                    "Failed to call new PUH.ERA_CHAIN_TYPE_MANAGER(): {err}"
-                )),
-            }
-        }
-    }
+    // v33 touches no Era CTM, so `ERA_CHAIN_TYPE_MANAGER` has no artifact
+    // entry to compare against and must simply survive the PUH redeploy
+    // unchanged.
+    compare_puh_shared_address(
+        result,
+        "PUH.ERA_CHAIN_TYPE_MANAGER()",
+        current_puh.ERA_CHAIN_TYPE_MANAGER().call().await,
+        new_impl.ERA_CHAIN_TYPE_MANAGER().call().await,
+    );
 
     if let Some(zkos_ctm) = artifact
         .ctms

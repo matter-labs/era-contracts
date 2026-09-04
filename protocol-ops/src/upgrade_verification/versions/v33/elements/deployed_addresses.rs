@@ -7,7 +7,7 @@ use crate::upgrade_verification::{
     },
     constants::{L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR},
     verifiers::{VerificationResult, Verifiers},
-    versions::v31::{
+    versions::v33::{
         utils::{
             apply_l2_to_l1_alias,
             network_verifier::{Bridgehub as BridgehubContract, L1AssetRouter},
@@ -37,7 +37,7 @@ const ZK_GOVERNANCE_SECURITY_COUNCIL_FILE: &str = "l1-contracts/SecurityCouncil"
 const ZK_GOVERNANCE_EMERGENCY_BOARD_FILE: &str = "l1-contracts/EmergencyUpgradeBoard";
 
 /// Expected constructor signatures for every contract deployed by
-/// `CoreUpgrade_v31` (i.e. `verify_core_provenance`).
+/// `CoreUpgrade_v33` (i.e. `verify_core_provenance`).
 ///
 /// These declarations exist only to drive `abi_encode` for the expected
 /// constructor-args byte slice; they are NOT used as RPC clients. The
@@ -45,13 +45,13 @@ const ZK_GOVERNANCE_EMERGENCY_BOARD_FILE: &str = "l1-contracts/EmergencyUpgradeB
 /// `l1-contracts/contracts/core` / `l1-contracts/contracts/bridge`.
 mod core_signatures {
     alloy::sol! {
-        contract V31L1Bridgehub {
+        contract V33L1Bridgehub {
             constructor(address _owner, uint256 _maxNumberOfZKChains);
         }
-        contract V31L1NativeTokenVault {
+        contract V33L1NativeTokenVault {
             constructor(address _wethToken, address _assetRouter, address _l1Nullifier);
         }
-        contract V31L1AssetRouter {
+        contract V33L1AssetRouter {
             constructor(
                 address _l1WethToken,
                 address _bridgehub,
@@ -60,62 +60,60 @@ mod core_signatures {
                 address _eraDiamondProxy
             );
         }
-        contract V31L1Nullifier {
-            constructor(
-                address _bridgehub,
-                address _messageRoot,
-                uint256 _eraChainId,
-                address _eraDiamondProxy
-            );
+        contract V33L1Nullifier {
+            constructor(address _bridgehub, address _messageRoot);
         }
-        contract V31L1MessageRoot {
+        contract V33L1MessageRoot {
             constructor(address _bridgehub, uint256 _eraGatewayChainId, address _chainAssetHandler);
         }
-        contract V31L1ChainAssetHandler {
+        contract V33L1ChainAssetHandler {
             constructor(address _owner, address _bridgehub);
         }
-        contract V31CTMDeploymentTracker {
+        contract V33CTMDeploymentTracker {
             constructor(address _bridgehub, address _l1AssetRouter);
         }
-        contract V31ChainRegistrationSender {
+        contract V33ChainRegistrationSender {
             constructor(address _bridgehub);
+            function initialize(address _owner);
+        }
+        contract V33L1InteropHandler {
+            constructor(address _messageRoot, address _l1AssetRouter);
             function initialize(address _owner);
         }
     }
 }
 
 /// Expected constructor signatures for every contract deployed by
-/// `CTMUpgrade_v31` (i.e. `verify_ctm_provenance` and
+/// `CTMUpgrade_v33` (i.e. `verify_ctm_provenance` and
 /// `verify_ctm_base_provenance`).
 ///
-/// `V31ChainTypeManager._interopCenter` is intentionally the L2 built-in
+/// `V33ChainTypeManager._interopCenter` is intentionally the L2 built-in
 /// `INTEROP_CENTER` address — the contract stores it in an L1-side
 /// `immutable` but uses it only when constructing L2-aliased messages
 /// (see `ChainTypeManagerBase.sol`). Pass `L2_INTEROP_CENTER_ADDR` here.
 mod ctm_signatures {
     alloy::sol! {
-        contract V31AdminFacet {
+        contract V33AdminFacet {
             constructor(uint256 _l1ChainId, address _rollupDAManager);
         }
-        contract V31ExecutorFacet {
+        contract V33ExecutorFacet {
+            constructor();
+        }
+        contract V33CommitterFacet {
             constructor(uint256 _l1ChainId);
         }
-        contract V31CommitterFacet {
-            constructor(uint256 _l1ChainId);
-        }
-        contract V31MailboxFacet {
+        contract V33MailboxFacet {
             constructor(
-                uint256 _eraChainId,
                 uint256 _l1ChainId,
                 address _chainAssetHandler,
                 address _eip7702Checker,
                 bool _isTestnet
             );
         }
-        contract V31MigratorFacet {
+        contract V33MigratorFacet {
             constructor(uint256 _l1ChainId, bool _isTestnet);
         }
-        contract V31ChainTypeManager {
+        contract V33ChainTypeManager {
             constructor(
                 address _bridgehub,
                 address _interopCenter,
@@ -123,13 +121,13 @@ mod ctm_signatures {
                 address _permissionlessValidator
             );
         }
-        contract V31DualVerifier {
+        contract V33DualVerifier {
             constructor(address _fflonkVerifier, address _plonkVerifier);
         }
-        contract V31ZKsyncOSVerifier {
+        contract V33ZKsyncOSVerifier {
             constructor(address _plonkVerifier);
         }
-        contract V31GovernanceUpgradeTimer {
+        contract V33GovernanceUpgradeTimer {
             constructor(
                 uint256 _initialDelay,
                 uint256 _maxAdditionalDelay,
@@ -137,16 +135,16 @@ mod ctm_signatures {
                 address _initialOwner
             );
         }
-        contract V31UpgradeStageValidator {
+        contract V33UpgradeStageValidator {
             constructor(address chainTypeManager, uint256 newProtocolVersion);
         }
-        contract V31ValidatorTimelock {
+        contract V33ValidatorTimelock {
             constructor(address _bridgehubAddr);
         }
-        contract V31PermissionlessValidator {
+        contract V33PermissionlessValidator {
             function initialize();
         }
-        contract V31BytecodesSupplier {
+        contract V33BytecodesSupplier {
             function initialize();
         }
     }
@@ -318,7 +316,7 @@ mod gateway_signatures {
 /// the exact constructor inputs from the live pre-upgrade PUH state.
 mod governance_signatures {
     alloy::sol! {
-        contract V31ProtocolUpgradeHandler {
+        contract V33ProtocolUpgradeHandler {
             constructor(
                 address _l2ProtocolGovernor,
                 address _eraChainTypeManager,
@@ -332,7 +330,7 @@ mod governance_signatures {
             );
         }
 
-        contract V31Guardians {
+        contract V33Guardians {
             constructor(
                 address _protocolUpgradeHandler,
                 address _bridgeHub,
@@ -341,11 +339,11 @@ mod governance_signatures {
             );
         }
 
-        contract V31SecurityCouncil {
+        contract V33SecurityCouncil {
             constructor(address _protocolUpgradeHandler, address[] _members);
         }
 
-        contract V31EmergencyUpgradeBoard {
+        contract V33EmergencyUpgradeBoard {
             constructor(
                 address _protocolUpgradeHandler,
                 address _securityCouncil,
@@ -429,7 +427,7 @@ pub struct StateTransition {
 
 /// Deployment provenance.
 ///
-/// For every named v31 implementation that the prepare scripts deploy via
+/// For every named v33 implementation that the prepare scripts deploy via
 /// CREATE2 (or `Create2AndTransfer`), assert that the executed-bundle log
 /// contains a deployment whose init bytecode + abi-encoded constructor
 /// args match what we'd expect for that contract. This is the
@@ -442,15 +440,15 @@ pub struct StateTransition {
 /// live implementation slot and the executed-bundle CREATE2 provenance.
 ///
 /// Larger structural follow-up: unify `EcosystemUpgradeArtifact` and the
-/// legacy `UpgradeOutput` into a single v31 TOML reader. The current
+/// legacy `UpgradeOutput` into a single v33 TOML reader. The current
 /// commit keeps both side-by-side; Phase 6 reuses only the create2
 /// machinery from `NetworkVerifier` (which does not depend on
 /// `UpgradeOutput`) so the unification can land independently.
-pub(crate) async fn verify_v31_provenance(
+pub(crate) async fn verify_v33_provenance(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     era_chain_id: u64,
-    legacy_gateway_chain_id: u64,
+    message_root_era_gateway_chain_id: u64,
     result: &mut VerificationResult,
 ) -> Result<()> {
     result.print_info("== Deployment provenance ==");
@@ -497,15 +495,24 @@ pub(crate) async fn verify_v31_provenance(
         .unwrap_or_else(|err| {
             panic!("Failed to call Bridgehub.getZKChain({era_chain_id}) for provenance: {err}")
         });
+    // Zero is a legitimate value here, not a failure. `DefaultCoreUpgrade` sets
+    // `config.eraDiamondProxyAddress = bridgehub.getZKChain(assetRouter.ERA_CHAIN_ID())` and
+    // embeds whatever comes back into the L1AssetRouter / L1Nullifier constructors. On an
+    // ecosystem whose `ERA_CHAIN_ID` names no registered chain that is address(0) — testnet's
+    // deployed L1AssetRouter carries exactly that — so provenance must compare against zero
+    // rather than refuse to run.
     if era_diamond_proxy == Address::ZERO {
-        panic!("Bridgehub.getZKChain({era_chain_id}) returned address(0) for provenance");
+        result.print_info(&format!(
+            "Bridgehub.getZKChain({era_chain_id}) is address(0); verifying constructor args \
+             against a zero Era diamond"
+        ));
     }
 
     let governance = bridgehub
         .owner()
         .call()
         .await
-        .context("calling Bridgehub.owner() for v31 provenance")?;
+        .context("calling Bridgehub.owner() for v33 provenance")?;
 
     let core_context = CoreProvenanceContext {
         bridgehub_addr,
@@ -520,30 +527,24 @@ pub(crate) async fn verify_v31_provenance(
         artifact,
         verifiers,
         era_chain_id,
-        legacy_gateway_chain_id,
+        message_root_era_gateway_chain_id,
         result,
         core_context,
     )
     .await?;
 
     for ctm in &artifact.ctms {
-        verify_ctm_provenance(
-            artifact,
-            ctm,
-            verifiers,
-            era_chain_id,
-            l1_chain_id,
-            result,
-            core_context,
-        )
-        .await?;
+        verify_ctm_provenance(artifact, ctm, verifiers, l1_chain_id, result, core_context).await?;
     }
 
-    verify_v31_new_gateway_ctm_provenance(artifact, verifiers, era_chain_id, l1_chain_id, result)
+    verify_v33_new_gateway_ctm_provenance(artifact, verifiers, era_chain_id, l1_chain_id, result)
         .await?;
 
+    // Whether a new zk-governance set was deployed is a property of the *release*, not of the
+    // env's governance shape. v33 ships none, so its artifact carries no `[zk_governance]` table
+    // and there is nothing to trace provenance for — even though the handler is proxy-admin'd.
     let governance_admin = verifiers.network_verifier.get_proxy_admin(governance).await;
-    if governance_admin != Address::ZERO {
+    if governance_admin != Address::ZERO && artifact.zk_governance.is_some() {
         verify_zk_governance_provenance(artifact, verifiers, result).await?;
     }
 
@@ -559,7 +560,7 @@ async fn verify_zk_governance_provenance(
     result.print_info("-- zk-governance deployment provenance --");
 
     let zk_governance = artifact.zk_governance.as_ref().context(
-        "zk-governance v31 artifact is missing required top-level [zk_governance] table",
+        "zk-governance v33 artifact is missing required top-level [zk_governance] table",
     )?;
 
     let provider = verifiers.network_verifier.get_l1_provider();
@@ -663,7 +664,7 @@ async fn verify_zk_governance_provenance(
         ZK_GOVERNANCE_TESTNET_PUH_FILE
     };
 
-    let puh_ctor_args = V31ProtocolUpgradeHandler::constructorCall::new((
+    let puh_ctor_args = V33ProtocolUpgradeHandler::constructorCall::new((
         l2_protocol_governor,
         era_ctm,
         zksync_os_ctm_proxy,
@@ -682,7 +683,7 @@ async fn verify_zk_governance_provenance(
         puh_file,
     );
 
-    let guardians_ctor_args = V31Guardians::constructorCall::new((
+    let guardians_ctor_args = V33Guardians::constructorCall::new((
         current_puh_addr,
         bridgehub,
         U256::from(verifiers.era_chain_id),
@@ -697,7 +698,7 @@ async fn verify_zk_governance_provenance(
     );
 
     let security_council_ctor_args =
-        V31SecurityCouncil::constructorCall::new((current_puh_addr, security_council_members))
+        V33SecurityCouncil::constructorCall::new((current_puh_addr, security_council_members))
             .abi_encode();
     result.expect_create2_params(
         verifiers,
@@ -708,7 +709,7 @@ async fn verify_zk_governance_provenance(
 
     // The new board embeds the *new* SecurityCouncil + Guardians (so it never
     // dangles against the stale set) and preserves the existing ZK Foundation safe.
-    let emergency_board_ctor_args = V31EmergencyUpgradeBoard::constructorCall::new((
+    let emergency_board_ctor_args = V33EmergencyUpgradeBoard::constructorCall::new((
         current_puh_addr,
         zk_governance.new_security_council,
         zk_governance.new_guardians,
@@ -816,7 +817,7 @@ async fn verify_core_provenance(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     era_chain_id: u64,
-    legacy_gateway_chain_id: u64,
+    message_root_era_gateway_chain_id: u64,
     result: &mut VerificationResult,
     context: CoreProvenanceContext,
 ) -> Result<()> {
@@ -847,7 +848,8 @@ async fn verify_core_provenance(
     let bridgehub_impl = in_bh("bridgehub_implementation_addr")?;
     let crs_impl = in_bh("chain_registration_sender_implementation_addr")?;
     let crs_proxy = in_bh("chain_registration_sender_proxy_addr")?;
-    let deployer = required_address(&artifact.misc, "misc", &["deployer_addr"])?;
+    let interop_handler_impl = in_bridges("l1_interop_handler_implementation_addr")?;
+    let interop_handler_proxy = in_bridges("l1_interop_handler_proxy_addr")?;
     let core_proxy_admin = required_address(
         core,
         "core",
@@ -855,20 +857,20 @@ async fn verify_core_provenance(
     )?;
 
     // Every env deploys the canonical `L1MessageRoot`: the stage-sepolia variant (which skipped
-    // chain 270's settlement check during the v31 rollout) was removed together with the v31
+    // chain 270's settlement check during the v33 rollout) was removed together with the v33
     // stage-1 initializer.
     let message_root_file = "l1-contracts/L1MessageRoot";
 
     // ChainRegistrationSender impl args are reused for the TUPP impl check below.
     let crs_ctor_args =
-        V31ChainRegistrationSender::constructorCall::new((context.bridgehub_addr,)).abi_encode();
+        V33ChainRegistrationSender::constructorCall::new((context.bridgehub_addr,)).abi_encode();
 
     // Single dispatch table: (address, encoded ctor args, expected file).
     let checks: Vec<(Address, Vec<u8>, &str)> = vec![
         // L1ChainAssetHandler impl(_owner=governance, _bridgehub).
         (
             chain_asset_handler_impl,
-            V31L1ChainAssetHandler::constructorCall::new((
+            V33L1ChainAssetHandler::constructorCall::new((
                 context.governance,
                 context.bridgehub_addr,
             ))
@@ -880,18 +882,30 @@ async fn verify_core_provenance(
         // ctor signature, different runtime bytecode.
         (
             message_root_impl,
-            V31L1MessageRoot::constructorCall::new((
+            V33L1MessageRoot::constructorCall::new((
                 context.bridgehub_addr,
-                U256::from(legacy_gateway_chain_id),
+                U256::from(message_root_era_gateway_chain_id),
                 chain_asset_handler_proxy,
             ))
             .abi_encode(),
             message_root_file,
         ),
+        // L1InteropHandler impl(messageRoot, assetRouter). Deployed on both
+        // branches of `deployVersionSpecificEcosystemContractsL1`; only the
+        // proxy is conditional (checked below).
+        (
+            interop_handler_impl,
+            V33L1InteropHandler::constructorCall::new((
+                message_root_proxy,
+                context.asset_router_proxy,
+            ))
+            .abi_encode(),
+            "l1-contracts/L1InteropHandler",
+        ),
         // L1NativeTokenVault impl(weth, assetRouter, nullifier).
         (
             ntv_impl,
-            V31L1NativeTokenVault::constructorCall::new((
+            V33L1NativeTokenVault::constructorCall::new((
                 context.weth,
                 context.asset_router_proxy,
                 context.nullifier,
@@ -902,7 +916,7 @@ async fn verify_core_provenance(
         // CTMDeploymentTracker impl(bridgehub, l1AssetRouter).
         (
             ctmdt_impl,
-            V31CTMDeploymentTracker::constructorCall::new((
+            V33CTMDeploymentTracker::constructorCall::new((
                 context.bridgehub_addr,
                 context.asset_router_proxy,
             ))
@@ -912,7 +926,7 @@ async fn verify_core_provenance(
         // L1AssetRouter impl(weth, bridgehub, nullifier, eraChainId, eraDiamondProxy).
         (
             asset_router_impl,
-            V31L1AssetRouter::constructorCall::new((
+            V33L1AssetRouter::constructorCall::new((
                 context.weth,
                 context.bridgehub_addr,
                 context.nullifier,
@@ -922,22 +936,17 @@ async fn verify_core_provenance(
             .abi_encode(),
             "l1-contracts/L1AssetRouter",
         ),
-        // L1Nullifier impl(bridgehub, messageRoot, eraChainId, eraDiamondProxy).
+        // L1Nullifier impl(bridgehub, messageRoot).
         (
             nullifier_impl,
-            V31L1Nullifier::constructorCall::new((
-                context.bridgehub_addr,
-                message_root_proxy,
-                U256::from(era_chain_id),
-                context.era_diamond_proxy,
-            ))
-            .abi_encode(),
+            V33L1Nullifier::constructorCall::new((context.bridgehub_addr, message_root_proxy))
+                .abi_encode(),
             "l1-contracts/L1Nullifier",
         ),
         // L1Bridgehub impl(_owner=governance, _maxNumberOfZKChains).
         (
             bridgehub_impl,
-            V31L1Bridgehub::constructorCall::new((
+            V33L1Bridgehub::constructorCall::new((
                 context.governance,
                 U256::from(MAX_NUMBER_OF_ZK_CHAINS),
             ))
@@ -956,17 +965,51 @@ async fn verify_core_provenance(
         result.expect_create2_params(verifiers, addr, args.as_slice(), file);
     }
 
-    // ChainRegistrationSender TransparentUpgradeableProxy(impl, proxyAdmin, initialize(deployer)).
+    // Like the two CTM-side kept proxies, the ChainRegistrationSender proxy
+    // pre-dates this release; only its implementation (checked above, in
+    // `checks`) is redeployed here.
     result
-        .expect_create2_params_proxy_with_bytecode(
+        .expect_preexisting_proxy(
             verifiers,
             &crs_proxy,
-            V31ChainRegistrationSender::initializeCall::new((deployer,)).abi_encode(),
             core_proxy_admin,
-            crs_ctor_args,
-            "l1-contracts/ChainRegistrationSender",
+            "ChainRegistrationSender",
         )
         .await;
+
+    // The interop handler proxy is deployed only for an ecosystem that does
+    // not already have one. When it is deployed here it is initialized
+    // straight to governance — no deployer-then-transfer step — so the TUPP
+    // init payload must name the owner, not the deployer.
+    if verifiers
+        .network_verifier
+        .create2_known_bytecodes
+        .contains_key(&interop_handler_proxy)
+    {
+        result
+            .expect_create2_params_proxy_with_bytecode(
+                verifiers,
+                &interop_handler_proxy,
+                V33L1InteropHandler::initializeCall::new((context.governance,)).abi_encode(),
+                core_proxy_admin,
+                V33L1InteropHandler::constructorCall::new((
+                    message_root_proxy,
+                    context.asset_router_proxy,
+                ))
+                .abi_encode(),
+                "l1-contracts/L1InteropHandler",
+            )
+            .await;
+    } else {
+        result
+            .expect_preexisting_proxy(
+                verifiers,
+                &interop_handler_proxy,
+                core_proxy_admin,
+                "L1InteropHandler",
+            )
+            .await;
+    }
 
     Ok(())
 }
@@ -975,7 +1018,6 @@ async fn verify_ctm_provenance(
     artifact: &EcosystemUpgradeArtifact,
     ctm: &CtmArtifact,
     verifiers: &Verifiers,
-    era_chain_id: u64,
     l1_chain_id: u64,
     result: &mut VerificationResult,
     context: CoreProvenanceContext,
@@ -1018,7 +1060,6 @@ async fn verify_ctm_provenance(
     )?;
 
     let ctm_file = match ctm.flavor {
-        CtmFlavor::Era => "l1-contracts/EraChainTypeManager",
         CtmFlavor::ZksyncOs => "l1-contracts/ZKsyncOSChainTypeManager",
     };
 
@@ -1027,14 +1068,13 @@ async fn verify_ctm_provenance(
         // CommitterFacet(_l1ChainId).
         (
             committer,
-            V31CommitterFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
+            V33CommitterFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
             "l1-contracts/CommitterFacet",
         ),
-        // MailboxFacet(eraChainId, l1ChainId, chainAssetHandler, eip7702Checker, isTestnet).
+        // MailboxFacet(l1ChainId, chainAssetHandler, eip7702Checker, isTestnet).
         (
             mailbox,
-            V31MailboxFacet::constructorCall::new((
-                U256::from(era_chain_id),
+            V33MailboxFacet::constructorCall::new((
                 U256::from(l1_chain_id),
                 chain_asset_handler,
                 eip7702,
@@ -1046,7 +1086,7 @@ async fn verify_ctm_provenance(
         // MigratorFacet(_l1ChainId, _isTestnet).
         (
             migrator,
-            V31MigratorFacet::constructorCall::new((
+            V33MigratorFacet::constructorCall::new((
                 U256::from(l1_chain_id),
                 ctm.contracts_config.is_testnet,
             ))
@@ -1056,7 +1096,7 @@ async fn verify_ctm_provenance(
         // GovernanceUpgradeTimer(initialDelay, maxAdditionalDelay, timerGovernance, initialOwner).
         (
             timer,
-            V31GovernanceUpgradeTimer::constructorCall::new((
+            V33GovernanceUpgradeTimer::constructorCall::new((
                 U256::from(ctm.contracts_config.governance_upgrade_timer_initial_delay),
                 U256::from(GOVERNANCE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS),
                 timer_governance,
@@ -1068,7 +1108,7 @@ async fn verify_ctm_provenance(
         // UpgradeStageValidator(chainTypeManager=ctm_proxy, newProtocolVersion).
         (
             stage_validator,
-            V31UpgradeStageValidator::constructorCall::new((
+            V33UpgradeStageValidator::constructorCall::new((
                 ctm_proxy,
                 U256::from(ctm.contracts_config.new_protocol_version),
             ))
@@ -1081,7 +1121,7 @@ async fn verify_ctm_provenance(
         // constructing L2-aliased messages (see ChainTypeManagerBase.sol).
         (
             ctm_impl,
-            V31ChainTypeManager::constructorCall::new((
+            V33ChainTypeManager::constructorCall::new((
                 bridgehub_addr,
                 L2_INTEROP_CENTER_ADDR,
                 bytecodes_supplier,
@@ -1090,15 +1130,15 @@ async fn verify_ctm_provenance(
             .abi_encode(),
             ctm_file,
         ),
-        // Validator impl(bridgehub). Deployed once per CTM by `CTMUpgrade_v31`;
+        // Validator impl(bridgehub). Deployed once per CTM by `CTMUpgrade_v33`;
         // stage-1 governance swaps this behind the per-CTM ValidatorTimelock
-        // proxy. v31 deploys `MultisigCommitter` (a superset of ValidatorTimelock
+        // proxy. v33 deploys `MultisigCommitter` (a superset of ValidatorTimelock
         // with the same `(bridgehub)` constructor) as the default validator impl,
         // so the upgrade does not downgrade proxies already running a
         // MultisigCommitter.
         (
             validator_timelock_impl,
-            V31ValidatorTimelock::constructorCall::new((bridgehub_addr,)).abi_encode(),
+            V33ValidatorTimelock::constructorCall::new((bridgehub_addr,)).abi_encode(),
             "l1-contracts/MultisigCommitter",
         ),
     ];
@@ -1106,36 +1146,26 @@ async fn verify_ctm_provenance(
         result.expect_create2_params(verifiers, addr, args.as_slice(), file);
     }
 
-    // BytecodesSupplier TransparentUpgradeableProxy(impl, proxyAdmin, initialize()).
-    result
-        .expect_create2_params_proxy_with_bytecode(
-            verifiers,
-            &bytecodes_supplier,
-            V31BytecodesSupplier::initializeCall::new(()).abi_encode(),
-            transparent_proxy_admin,
-            Vec::<u8>::new(),
-            "l1-contracts/BytecodesSupplier",
-        )
-        .await;
-
-    // PermissionlessValidator TransparentUpgradeableProxy(impl, proxyAdmin, initialize()).
-    result
-        .expect_create2_params_proxy_with_bytecode(
-            verifiers,
-            &permissionless_validator,
-            V31PermissionlessValidator::initializeCall::new(()).abi_encode(),
-            transparent_proxy_admin,
-            Vec::<u8>::new(),
-            "l1-contracts/PermissionlessValidator",
-        )
-        .await;
+    // BytecodesSupplier and PermissionlessValidator are kept across the
+    // release: v33 swaps their implementations but reuses the existing
+    // proxies, so neither proxy appears in this upgrade's CREATE2
+    // deployments. The stage-1 payload pass checks that the governance calls
+    // point each one at an implementation deployed here.
+    for (proxy, label) in [
+        (&bytecodes_supplier, "BytecodesSupplier"),
+        (&permissionless_validator, "PermissionlessValidator"),
+    ] {
+        result
+            .expect_preexisting_proxy(verifiers, proxy, transparent_proxy_admin, label)
+            .await;
+    }
 
     Ok(())
 }
 
 /// Per-CTM, per-flavor provenance for the contracts that ship one copy per
 /// CTM (verifiers, DiamondInit, default_upgrade, genesis_upgrade, getters/
-/// executor/admin facets, ServerNotifier, EIP7702Checker). The v31 upgrade
+/// executor/admin facets, ServerNotifier, EIP7702Checker). The v33 upgrade
 /// deploys these once for Era and once for ZKsyncOS, so verification
 /// iterates per CTM and uses each CTM's own `flavor`.
 ///
@@ -1157,12 +1187,6 @@ fn verify_ctm_base_provenance(
     // against the matching set.
     let (verifier_plonk_file, verifier_fflonk_file, main_verifier_file, testnet_verifier_file) =
         match ctm.flavor {
-            CtmFlavor::Era => (
-                "l1-contracts/EraVerifierPlonk",
-                Some("l1-contracts/EraVerifierFflonk"),
-                "l1-contracts/EraDualVerifier",
-                "l1-contracts/EraTestnetVerifier",
-            ),
             CtmFlavor::ZksyncOs => (
                 "l1-contracts/ZKsyncOSVerifierPlonk",
                 None,
@@ -1268,8 +1292,8 @@ fn verify_ctm_base_provenance(
         "l1-contracts/DiamondInit",
     );
 
-    // ExecutorFacet(l1ChainId) — file is shared across flavors, but the
-    // address is per-CTM.
+    // ExecutorFacet() — file is shared across flavors, but the address is
+    // per-CTM.
     let executor = required_address(
         &ctm.value,
         &scope,
@@ -1278,7 +1302,7 @@ fn verify_ctm_base_provenance(
     result.expect_create2_params(
         verifiers,
         &executor,
-        V31ExecutorFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
+        V33ExecutorFacet::constructorCall::new(()).abi_encode(),
         "l1-contracts/ExecutorFacet",
     );
 
@@ -1296,7 +1320,7 @@ fn verify_ctm_base_provenance(
     result.expect_create2_params(
         verifiers,
         &admin,
-        V31AdminFacet::constructorCall::new((U256::from(l1_chain_id), rollup_da_manager))
+        V33AdminFacet::constructorCall::new((U256::from(l1_chain_id), rollup_da_manager))
             .abi_encode(),
         "l1-contracts/AdminFacet",
     );
@@ -1316,21 +1340,21 @@ fn verify_ctm_base_provenance(
         main_verifier_file
     };
     let encoded = if is_zksync_os {
-        V31ZKsyncOSVerifier::constructorCall::new((plonk,)).abi_encode()
+        V33ZKsyncOSVerifier::constructorCall::new((plonk,)).abi_encode()
     } else {
         let fflonk = required_address(
             &ctm.value,
             &scope,
             &["state_transition", "verifier_fflonk_addr"],
         )?;
-        V31DualVerifier::constructorCall::new((fflonk, plonk)).abi_encode()
+        V33DualVerifier::constructorCall::new((fflonk, plonk)).abi_encode()
     };
     result.expect_create2_params(verifiers, &verifier, encoded, verifier_file);
 
     Ok(())
 }
 
-async fn verify_v31_new_gateway_ctm_provenance(
+async fn verify_v33_new_gateway_ctm_provenance(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     era_chain_id: u64,
@@ -1339,6 +1363,15 @@ async fn verify_v31_new_gateway_ctm_provenance(
 ) -> Result<()> {
     use ctm_signatures::*;
     use gateway_signatures::*;
+
+    // A release that brings up no Gateway (v33) records no `[new_gateway]` block, and the env
+    // declares none either — nothing was deployed, so there is no provenance to trace.
+    if artifact.new_gateway.is_none() && verifiers.new_gateway_chain_id.is_none() {
+        result.print_info(
+            "New Gateway CTM provenance: skipped — release and env both declare no Gateway",
+        );
+        return Ok(());
+    }
 
     result.print_info("-- New Gateway CTM deployment provenance --");
 
@@ -1427,14 +1460,13 @@ async fn verify_v31_new_gateway_ctm_provenance(
     let direct_checks: Vec<(Address, Vec<u8>, &str)> = vec![
         (
             admin,
-            V31AdminFacet::constructorCall::new((U256::from(l1_chain_id), rollup_da_manager))
+            V33AdminFacet::constructorCall::new((U256::from(l1_chain_id), rollup_da_manager))
                 .abi_encode(),
             "l1-contracts/AdminFacet",
         ),
         (
             mailbox,
-            V31MailboxFacet::constructorCall::new((
-                U256::from(era_chain_id),
+            V33MailboxFacet::constructorCall::new((
                 U256::from(l1_chain_id),
                 L2_CHAIN_ASSET_HANDLER_ADDR,
                 Address::ZERO,
@@ -1445,13 +1477,13 @@ async fn verify_v31_new_gateway_ctm_provenance(
         ),
         (
             executor,
-            V31ExecutorFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
+            V33ExecutorFacet::constructorCall::new(()).abi_encode(),
             "l1-contracts/ExecutorFacet",
         ),
         (getters, Vec::new(), "l1-contracts/GettersFacet"),
         (
             migrator,
-            V31MigratorFacet::constructorCall::new((
+            V33MigratorFacet::constructorCall::new((
                 U256::from(l1_chain_id),
                 source_ctm.contracts_config.is_testnet,
             ))
@@ -1460,7 +1492,7 @@ async fn verify_v31_new_gateway_ctm_provenance(
         ),
         (
             committer,
-            V31CommitterFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
+            V33CommitterFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
             "l1-contracts/CommitterFacet",
         ),
         (diamond_init, diamond_init_args, "l1-contracts/DiamondInit"),
@@ -1704,13 +1736,13 @@ fn source_ctm_for_new_gateway<'a>(
             &scope,
             &["state_transition", "chain_type_manager_proxy"],
         )?;
-        if ctm_proxy == verifiers.new_gateway_representative_ctm {
+        if Some(ctm_proxy) == verifiers.new_gateway_representative_ctm {
             return Ok(ctm);
         }
     }
 
     anyhow::bail!(
-        "new Gateway representative CTM {} is not present in any [ctms.*].state_transition.chain_type_manager_proxy",
+        "new Gateway representative CTM {:?} is not present in any [ctms.*].state_transition.chain_type_manager_proxy",
         verifiers.new_gateway_representative_ctm
     )
 }

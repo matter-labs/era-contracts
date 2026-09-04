@@ -135,7 +135,7 @@ struct ParsedCreate2Deployment {
 }
 
 impl NetworkVerifier {
-    pub async fn new_v31(
+    pub async fn new_v33(
         l1_rpc: String,
         gw_rpc: String,
         era_chain_id: u64,

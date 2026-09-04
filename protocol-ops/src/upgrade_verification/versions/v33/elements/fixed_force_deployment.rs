@@ -191,12 +191,12 @@ impl FixedForceDeploymentsData {
         }
 
         // aliasedL1Governance = applyL1ToL2Alias(Bridgehub.owner()), registered
-        // in the address book at `Verifiers::new_v31`.
+        // in the address book at `Verifiers::new_v33`.
         let expected_aliased_governance = verifiers
             .address_verifier
             .get_by_name("aliased_protocol_upgrade_handler_proxy")
             .expect(
-                "aliased_protocol_upgrade_handler_proxy must be registered by Verifiers::new_v31",
+                "aliased_protocol_upgrade_handler_proxy must be registered by Verifiers::new_v33",
             );
         if self.aliasedL1Governance != expected_aliased_governance {
             result.report_error(&format!(
@@ -255,8 +255,12 @@ impl FixedForceDeploymentsData {
             result,
             verifiers,
             &self.interopHandlerBytecodeInfo,
+            // Era's `InteropHandler.sol` is gone; the file survives only in
+            // the unreachable Era column. ZKsyncOS force-deploys
+            // `L2InteropHandler`, which is what `zksync_os.rs` expects at
+            // `L2_INTEROP_HANDLER_ADDR`.
             "l1-contracts/InteropHandler",
-            "l1-contracts/InteropHandler",
+            "l1-contracts/L2InteropHandler",
         );
         expect_bytecode_info(
             result,
@@ -286,7 +290,7 @@ impl FixedForceDeploymentsData {
         let expected_chain_registration_sender = verifiers
             .address_verifier
             .get_by_name("chain_registration_sender_proxy")
-            .expect("chain_registration_sender_proxy must be registered by Verifiers::new_v31");
+            .expect("chain_registration_sender_proxy must be registered by Verifiers::new_v33");
         let expected_chain_registration_sender_alias =
             apply_l2_to_l1_alias(expected_chain_registration_sender);
         if self.aliasedChainRegistrationSender == expected_chain_registration_sender_alias {

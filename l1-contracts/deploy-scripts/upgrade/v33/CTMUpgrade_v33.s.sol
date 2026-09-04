@@ -40,6 +40,14 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
     ///         nothing outside this release knows about it.
     address internal priorityOpLowerBound;
 
+    /// @notice The generic ZKsync OS upgrade contract left on the CTM as its `defaultUpgrade`.
+    /// @dev Deliberately NOT `V32UpgradeZKsyncOS`. That one is this release's one-shot cut: it
+    ///      requires a recorded priority-op lower bound and a fully executed batch queue, which
+    ///      only hold while a chain is crossing v31 -> v33. `setDefaultUpgrade` is what later
+    ///      upgrades reuse when they need no custom logic (a verifier-only patch, say), so it must
+    ///      hold the generic contract or every one of those would revert.
+    address internal ctmStoredDefaultUpgrade;
+
     /// @inheritdoc DeployCTMUtils
     /// @dev Supplies the registry to `V32UpgradeZKsyncOS`'s constructor; everything else falls
     ///      through to the shared implementation.
@@ -57,7 +65,25 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
     /// @inheritdoc DefaultCTMUpgrade
     function serializeVersionSpecificStateTransition() internal virtual override {
         require(priorityOpLowerBound != address(0), "PriorityOpLowerBound not deployed");
+        require(ctmStoredDefaultUpgrade != address(0), "DefaultUpgradeZKsyncOS not deployed");
         vm.serializeAddress("state_transition", "priority_op_lower_bound_addr", priorityOpLowerBound);
+        vm.serializeAddress("state_transition", "ctm_stored_default_upgrade_addr", ctmStoredDefaultUpgrade);
+    }
+
+    /// @inheritdoc DefaultCTMUpgrade
+    function getCtmStoredDefaultUpgrade() internal virtual override returns (address) {
+        require(ctmStoredDefaultUpgrade != address(0), "DefaultUpgradeZKsyncOS not deployed");
+        return ctmStoredDefaultUpgrade;
+    }
+
+    /// @inheritdoc DefaultCTMUpgrade
+    /// @dev v33's per-chain upgrade is not a single call. `V32UpgradeZKsyncOS` requires a recorded
+    ///      priority-op lower bound and all batches executed, and the real rollout sets an upgrade
+    ///      timestamp on the ServerNotifier before the cut. A lone generated `test_upgrade_chain`
+    ///      call would either revert or, worse, pass while skipping those steps. The per-chain
+    ///      upgrade is produced by `protocol_ops chain upgrade` instead.
+    function TESTONLY_emitsTestUpgradeChainCall() internal view virtual override returns (bool) {
+        return false;
     }
 
     /// @inheritdoc DefaultCTMUpgrade
@@ -77,6 +103,11 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
         // The registry must exist first: the upgrade contract embeds its address as an immutable.
         priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound", false);
         console.log("Deployed PriorityOpLowerBound at", priorityOpLowerBound);
+
+        // Deployed here rather than in the shared scaffold because only a release whose cut is
+        // one-shot needs a separate contract for the CTM to keep. See {ctmStoredDefaultUpgrade}.
+        ctmStoredDefaultUpgrade = deploySimpleContract("DefaultUpgradeZKsyncOS", false);
+        console.log("Deployed DefaultUpgradeZKsyncOS at", ctmStoredDefaultUpgrade);
 
         console.log("Deploying V32UpgradeZKsyncOS");
         return deploySimpleContract("V32UpgradeZKsyncOS", false);

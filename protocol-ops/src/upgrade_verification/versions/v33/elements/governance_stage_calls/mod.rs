@@ -1,6 +1,6 @@
 //! Governance ceremony call-list verification (Stages 0/1/2).
 //!
-//! This module owns the two public entrypoints called from `v31::verify`
+//! This module owns the two public entrypoints called from `v33::verify`
 //! ([`verify_governance_stage_calls`] and [`verify_per_chain_protocol_versions`]),
 //! the shared `sol!` types referenced by external decoders, and the three
 //! per-stage wrapper structs.
@@ -30,7 +30,8 @@ use crate::upgrade_verification::{
     verifiers::{VerificationResult, Verifiers},
 };
 
-use super::super::get_expected_old_protocol_version_for_ctm_flavor;
+use super::super::is_expected_old_protocol_version_for_ctm_flavor;
+use super::protocol_version::ProtocolVersion;
 use super::{super::expected_old_protocol_version_label, call_list::CallList};
 
 mod facets;
@@ -55,8 +56,9 @@ pub struct GovernanceStage2Calls {
 sol! {
     function upgrade(address proxy, address implementation);
     function upgradeAndCall(address proxy, address implementation, bytes data);
-    function initializeL1V31Upgrade();
     function setAddresses();
+    function setDefaultUpgrade(address newUpgrade);
+    function setL1InteropHandler(address handler);
     function updateSecurityCouncil(address _newSecurityCouncil);
     function updateGuardians(address _newGuardians);
     function updateEmergencyUpgradeBoard(address _newEmergencyUpgradeBoard);
@@ -204,9 +206,11 @@ pub(crate) async fn verify_per_chain_protocol_versions(
     let mut setup_errors = 0usize;
     for ctm in &artifact.ctms {
         let artifact_old_protocol_version = U256::from(ctm.contracts_config.old_protocol_version);
-        let expected_old_protocol_version: U256 =
-            get_expected_old_protocol_version_for_ctm_flavor(ctm.flavor).into();
-        if artifact_old_protocol_version != expected_old_protocol_version {
+        // Patch-insensitive: see `is_expected_old_protocol_version_for_ctm_flavor`.
+        if !is_expected_old_protocol_version_for_ctm_flavor(
+            ProtocolVersion::from(artifact_old_protocol_version),
+            ctm.flavor,
+        ) {
             result.report_error(&format!(
                 "{} CTM old protocol version must be {}, got {}",
                 ctm.flavor.label(),
@@ -226,7 +230,9 @@ pub(crate) async fn verify_per_chain_protocol_versions(
         };
 
         if let Some((previous_flavor, _)) =
-            expected_by_ctm.insert(ctm_proxy, (ctm.flavor, expected_old_protocol_version))
+            // Chains are expected on the CTM's *actual* old version, patch included — pinning a
+            // patch-zero constant here would flag every chain on a patched source release.
+            expected_by_ctm.insert(ctm_proxy, (ctm.flavor, artifact_old_protocol_version))
         {
             result.report_error(&format!(
                 "CTM proxy {} is configured for both {} and {}",
@@ -281,7 +287,7 @@ pub(crate) async fn verify_per_chain_protocol_versions(
 
         let Some((flavor, expected_protocol)) = expected_by_ctm.get(&chain_ctm).copied() else {
             result.report_warn(&format!(
-                "Chain {chain_id} uses CTM {} which is not present in this v31 artifact",
+                "Chain {chain_id} uses CTM {} which is not present in this v33 artifact",
                 chain_ctm
             ));
             continue;

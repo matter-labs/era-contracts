@@ -18,7 +18,7 @@ Reviewers diff it; downstream tools (PUVT, the simulator converter) read it.
 
 ## Relevant files
 
-- `l1-contracts/test/anvil-interop/regen-and-verify-stage.sh` — wraps prepare
+- `l1-contracts/test/anvil-interop/regen-upgrade-calldata.sh` — wraps prepare
   → fork-broadcast → PUVT in one script.
 - `l1-contracts/test/anvil-interop/yarn ts-node scripts/regen-via-docker.ts broadcast` —
   idempotent CREATE2 broadcaster that pre-filters against on-chain `eth_getCode`.
@@ -87,7 +87,7 @@ alongside the CREATE2 salts so each broadcast lands cleanly.
 ## Phases
 
 Mental model — each phase has one job and produces one canonical artifact.
-The wrapper script `regen-and-verify-stage.sh` currently bundles **1 + 1.5**
+The wrapper script `regen-upgrade-calldata.sh` currently bundles **1 + 1.5**
 together; phases **2**, **3**, and **3.5** are explicit follow-up scripts.
 
 **Ordering rule**: phases 2 + 2b **must** run before phase 3. The sim JSON
@@ -145,7 +145,7 @@ not needed on Linux.
 `openssl-sys` crate, which needs `pkg-config` plus the OpenSSL dev headers on
 the host. Without `pkg-config` the build fails with
 `could not find system library 'openssl' … pkg-config could not be found`,
-and — because `regen-and-verify-stage.sh` silently falls back to a stale
+and — because `regen-upgrade-calldata.sh` silently falls back to a stale
 `target/debug/protocol_ops` — the regen then runs old code (e.g. missing the
 `CREATE2_SALT_GOV` env var) instead of erroring. Install once:
 
@@ -171,7 +171,7 @@ cd l1-contracts/test/anvil-interop
 # phases 1 + 1.5 — prepare + fork-replay + PUVT, no Docker
 DEPLOYER_PK_FILE=~/.test_pk \
 L1_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
-./regen-and-verify-stage.sh
+./regen-upgrade-calldata.sh stage
 
 # phase 2 — broadcast the deployer's Camp-A bundles to REAL Sepolia (see below)
 # phase 3 — emit tx-simulator JSON via `protocol_ops ecosystem governance-toml-to-simulator`
@@ -335,7 +335,7 @@ image's binary is used and no host cross-build runs.
 
 ### Pre-flight: rotate CREATE2 salts when re-running against contaminated state
 
-The biggest footgun: `regen-and-verify-stage.sh` forks **current Sepolia tip**,
+The biggest footgun: `regen-upgrade-calldata.sh` forks **current Sepolia tip**,
 and Sepolia state diverges every time you broadcast deployer-setup bundles
 (steps 4 below: ChainTypeManager init, ServerNotifier ProxyAdmin upgrade,
 etc.). The prepare's Solidity isn't
@@ -367,7 +367,7 @@ for i in 1 2 3; do python3 -c "import secrets; print('0x' + secrets.token_hex(32
 
 Rotation is cheap — it just produces new deploy addresses; reviewers re-diff
 the new `output/stage/ecosystem.toml` like any normal regen. Don't rotate
-mid-broadcast (i.e. between `regen-and-verify-stage.sh` and
+mid-broadcast (i.e. between `regen-upgrade-calldata.sh` and
 `yarn ts-node scripts/regen-via-docker.ts broadcast`) — the broadcast script reads the
 fresh salts from the freshly-emitted prepare output.
 
@@ -467,12 +467,12 @@ git push
 | `Ownable2Step: caller is not the new owner` on stage1 `acceptOwnership` | Phase 2b gap — the CTM admin EOA never broadcast its `transferOwnership(PUH)` setup. Grep `prepare/manifest.json` for the failing target address, find the bundle that contains the `0xf2fde38b` call, broadcast it from the matching admin key. |
 | `AddressAlreadySet(...)`                                                | State contamination from prior broadcasts — rotate CREATE2 salts (pre-flight section above) and re-run from phase 1.                                                                                                                             |
 
-## Iteration flags on `regen-and-verify-stage.sh`
+## Iteration flags on `regen-upgrade-calldata.sh`
 
 | Flag               | Effect                                                              |
 | ------------------ | ------------------------------------------------------------------- |
 | `SKIP_PREPARE=1`   | Reuse the existing `regen/prepare/` (skip step 1's forge scripts)   |
-| `SKIP_BROADCAST=1` | Reuse `regen/executed.json` (skip funding + bundle replay)          |
+| `SKIP_REHEARSAL=1` | Reuse `regen/executed.json` (skip funding + bundle replay)          |
 | `KEEP_ANVIL=1`     | Leave the fork anvil running on port 29545 for ad-hoc `cast` probes |
 
 ## CI checks gated by step 3

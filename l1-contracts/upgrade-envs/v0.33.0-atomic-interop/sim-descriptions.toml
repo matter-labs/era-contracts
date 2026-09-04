@@ -1,0 +1,212 @@
+# Human-readable descriptions for this release's transaction-simulator scenarios.
+#
+# Loaded by `protocol_ops ecosystem governance-toml-to-simulator`, which auto-discovers this
+# file at `upgrade-envs/<release>/sim-descriptions.toml`. Each `[[entries]]` block matches a
+# tx by `(target, selector)` plus optional discriminators; first match wins, and an unmatched
+# tx keeps its auto-generated `[unlabelled] …` description.
+#
+# The registry is release-wide, not per-env. Entries below are keyed by **testnet** addresses,
+# which do not collide with stage or mainnet, so adding stage/mainnet entries later is safe.
+#
+# Address-typed fields (`target`, `arg0_address`, `inner_target`) accept a `0x…` literal or a
+# label from `[labels]`. Prefer labels: a salt rotation then only edits `[labels]`.
+
+[labels]
+# --- testnet (Sepolia) core ecosystem, all pre-existing proxies ---
+bridgehub                 = "0xc4FD2580C3487bba18D63f50301020132342fdbD"
+l1_asset_router           = "0xB5d9C3F41E434b91295BD7962db5c873cEcCE2be"
+l1_nullifier              = "0x9e24E2c23933d30eF2DEB70A0D977Fb1Ca20AbEa"
+ntv                       = "0xF8d4A5195737043f45F998539D5C62Eee02E3426"
+l1_message_root           = "0xe7047cD9979D053ceb6dB637bc0383b87A3C7f58"
+ctm_deployment_tracker    = "0x6FCe8BB8480feBe1a8f3F5Ed083cF54703975477"
+chain_asset_handler       = "0xDfA2193b161d7bd45FC81b4E80225eebDc3CF96C"
+chain_registration_sender = "0xdFf4C5797B2522D8ed9b27b8993cE455e66D5D40"
+ecosystem_tpa             = "0xE00456791Da489418355B0a6b27965A54c7C01d2"  # ecosystem TransparentProxyAdmin (PUH-owned)
+puh                       = "0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D"
+
+# --- testnet ZKsync OS (Atlas) CTM surface ---
+zkos_ctm                  = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
+zkos_ctm_chain_admin      = "0x7cbdDA00285de05a1353803db38770043e359B6d"
+bytecodes_supplier        = "0x4332c61541c4aD8ffFB158c51d9C915e8114E845"
+multisig_committer        = "0x73b668d8374DDB42C9e2F46fd5b754Ac215495bC"
+permissionless_validator  = "0xbc17fe29f7878217261518f63d9102dfc4990c8d"
+server_notifier_proxy     = "0xd9a3c35f2dc092e6cd390a01aa9ffb3c23533c96"
+server_notifier_pa        = "0xfa181338785BF9427a367FfcE6bfe2C81586b3d9"  # ServerNotifier's ProxyAdmin, under the CTM ChainAdmin
+
+# --- deployed by this upgrade (rotate with the CREATE2 salts) ---
+gov_upgrade_timer         = "0xDc03F39823CbDc7Ed2c465674d84948c81fC6ec0"
+upgrade_stage_validator   = "0x732E664132da25DfCE0Bd2FCf4C180aFF96fF500"
+zkos_chain_admin_8022833  = "0x3b7a24e583867ab85694CF55941734653bdfaB9c"  # chain 8022833 ChainAdmin
+l1_interop_handler        = "0xE24e805EDfDCb4e6DA75A44304d488639F25a159"
+
+# ── Camp-B: CTM admin ceremony ────────────────────────────────────────────────
+[[entries]]
+target = "zkos_ctm_chain_admin"
+selector = "0x69340beb"
+inner_target = "server_notifier_pa"
+inner_selector = "0x99a88ec4"
+desc = "ChainAdmin.multicall: upgrade the ZKsync OS CTM's ServerNotifier implementation (operational, outside governance)"
+
+# ── Migration pause / unpause ────────────────────────────────────────────────
+[[entries]]
+target = "chain_asset_handler"
+selector = "0xac700e63"
+desc = "L1ChainAssetHandler.pauseMigration(): freeze chain migrations for the duration of the upgrade"
+
+[[entries]]
+target = "chain_asset_handler"
+selector = "0xf7c7eb92"
+desc = "L1ChainAssetHandler.unpauseMigration(): re-enable chain migrations now that the upgrade is live"
+
+# ── Governance upgrade timer ─────────────────────────────────────────────────
+[[entries]]
+target = "gov_upgrade_timer"
+selector = "0xa39f7449"
+desc = "GovernanceUpgradeTimer.startTimer(): open the 1200s window chains get to upgrade before stage 1 may run"
+
+[[entries]]
+target = "gov_upgrade_timer"
+selector = "0x43bf9936"
+desc = "GovernanceUpgradeTimer.checkDeadline(): assert the stage-0 window has elapsed (reverts if stage 1 runs too early)"
+
+# ── Upgrade stage validator ──────────────────────────────────────────────────
+[[entries]]
+target = "upgrade_stage_validator"
+selector = "0x386584cf"
+desc = "UpgradeStageValidator.checkMigrationsPaused(): assert migrations are still paused mid-upgrade"
+
+[[entries]]
+target = "upgrade_stage_validator"
+selector = "0x37076ce3"
+desc = "UpgradeStageValidator.checkProtocolUpgradePresence(): assert the new protocol version is registered on the CTM"
+
+[[entries]]
+target = "upgrade_stage_validator"
+selector = "0x407a5a0b"
+desc = "UpgradeStageValidator.checkMigrationsUnpaused(): assert migrations were re-enabled"
+
+# ── Core proxy implementation swaps (ecosystem ProxyAdmin) ───────────────────
+[[entries]]
+target = "ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "bridgehub"
+desc = "ProxyAdmin.upgrade(Bridgehub -> new L1Bridgehub impl)"
+
+[[entries]]
+target = "ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "l1_nullifier"
+desc = "ProxyAdmin.upgrade(L1Nullifier -> new impl)"
+
+[[entries]]
+target = "ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "l1_asset_router"
+desc = "ProxyAdmin.upgrade(L1AssetRouter -> new impl)"
+
+[[entries]]
+target = "ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "ntv"
+desc = "ProxyAdmin.upgrade(L1NativeTokenVault -> new impl)"
+
+[[entries]]
+target = "ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "l1_message_root"
+desc = "ProxyAdmin.upgrade(L1MessageRoot -> new impl)"
+
+[[entries]]
+target = "ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "ctm_deployment_tracker"
+desc = "ProxyAdmin.upgrade(CTMDeploymentTracker -> new impl)"
+
+[[entries]]
+target = "ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "chain_asset_handler"
+desc = "ProxyAdmin.upgrade(L1ChainAssetHandler -> new impl)"
+
+[[entries]]
+target = "ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "chain_registration_sender"
+desc = "ProxyAdmin.upgrade(ChainRegistrationSender -> new impl)"
+
+# ── CTM-side proxy implementation swaps ──────────────────────────────────────
+[[entries]]
+target = "ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "zkos_ctm"
+desc = "ProxyAdmin.upgrade(ZKsync OS ChainTypeManager -> new impl)"
+
+[[entries]]
+target = "ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "multisig_committer"
+desc = "ProxyAdmin.upgrade(MultisigCommitter -> new impl)"
+
+[[entries]]
+target = "ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "bytecodes_supplier"
+desc = "ProxyAdmin.upgrade(BytecodesSupplier -> new impl)"
+
+[[entries]]
+target = "ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "permissionless_validator"
+desc = "ProxyAdmin.upgrade(PermissionlessValidator -> new impl)"
+
+# ── One-shot L1InteropHandler wiring (this release introduces the handler) ───
+[[entries]]
+target = "l1_nullifier"
+selector = "0x41a149c9"
+desc = "L1Nullifier.setL1InteropHandler(new L1InteropHandler): one-shot wiring of the handler this release introduces"
+
+[[entries]]
+target = "l1_asset_router"
+selector = "0x41a149c9"
+desc = "L1AssetRouter.setL1InteropHandler(new L1InteropHandler): one-shot wiring of the handler this release introduces"
+
+# ── The actual version bump on the ZKsync OS CTM ─────────────────────────────
+[[entries]]
+target = "zkos_ctm"
+selector = "0x810340c0"
+desc = "ChainTypeManager.setDefaultUpgrade(DefaultUpgradeZKsyncOS): the GENERIC upgrade contract later releases reuse when they need no custom logic. Deliberately not this release's one-shot V32UpgradeZKsyncOS, whose priority-op-bound preconditions only hold while crossing v31 -> v33."
+
+[[entries]]
+target = "zkos_ctm"
+selector = "0x9b016b8b"
+desc = "ChainTypeManager.setChainCreationParams(...): genesis params for chains created from v33 onwards"
+
+[[entries]]
+target = "zkos_ctm"
+selector = "0x8265f458"
+desc = "ChainTypeManager.setNewVersionUpgrade(cut, 0x1f00000001 -> 0x2100000000, ZKsyncOSTestnetVerifier): registers the v33 diamond cut. THE version bump."
+
+# ── Post-upgrade smoke tests (simulator-only, not part of the proposal) ──────
+[[entries]]
+target = "bridgehub"
+selector = "0xf113c88b"
+desc = "SIM-ONLY smoke test: create a fresh ZKsync OS chain against the new chain-creation params"
+
+[[entries]]
+target = "0x02B1ac1Cf0A592aefD3C2246B2431388365dB272"
+selector = "0x3b6d7534"
+desc = "SIM-ONLY smoke test: apply the v33 diamond cut to chain 8022833 and confirm it reaches protocol version 0x2100000000"
+
+# ── Per-chain upgrade (its own scenario file, from `protocol_ops chain upgrade`) ──────────
+# Both are `ChainAdmin.multicall`, so they are told apart by the inner call's selector.
+[[entries]]
+target = "zkos_chain_admin_8022833"
+selector = "0x69340beb"
+inner_selector = "0xe2a9d554"
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(8022833, …) — announces when the chain may take the cut. Requires stage 1 to have registered the v33 upgrade cut, which is why this file must run after the ecosystem scenario."
+
+[[entries]]
+target = "zkos_chain_admin_8022833"
+selector = "0x69340beb"
+inner_selector = "0x3b6d7534"
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 8022833, 0x1f00000001 -> 0x2100000000) plus its DA setup — THE per-chain diamond cut."
