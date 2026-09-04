@@ -167,12 +167,15 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
     /// @notice Register the precondition checker for the version this release upgrades chains from.
     /// @dev Appended after the ServerNotifier implementation upgrade in the same call array — the
-    ///      setter only exists on the new implementation and the calls execute in order. This call
-    ///      needs the proxy's own `onlyOwner`, which may legitimately differ from its ProxyAdmin's
-    ///      owner (fresh ecosystems leave the notifier's Ownable2Step transfer to the chain admin
-    ///      pending, so `owner()` is still the deployer); both executors of this call set resolve
-    ///      the signer per target, so a diverged owner routes to a different signer, not a revert.
-    ///      Log both owners so a rollout operator can see who has to sign.
+    ///      setter only exists on the new implementation, and the calls execute in order within
+    ///      one executor run. This call needs the proxy's own `onlyOwner`, which may legitimately
+    ///      differ from its ProxyAdmin's owner (fresh ecosystems leave the notifier's Ownable2Step
+    ///      transfer to the chain admin pending, so `owner()` is still the deployer); both
+    ///      executors resolve the signer per target, so a diverged owner splits the two calls into
+    ///      separately signed Safe bundles, whose execution order becomes a runbook obligation —
+    ///      the registration reverts (harmlessly, retry after the upgrade) if executed first; see
+    ///      {protocol-docs/upgrade-scheduling.md}. Log both owners so a rollout operator can see
+    ///      who has to sign.
     function prepareVersionSpecificCTMAdminCalls() public virtual override returns (Call[] memory calls) {
         require(upgradePreconditionChecker != address(0), "v31: precondition checker not deployed");
 

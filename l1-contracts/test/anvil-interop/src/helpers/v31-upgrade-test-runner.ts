@@ -690,16 +690,18 @@ async function assertSchedulingBlockedOnMissingPrerequisite(params: {
   const oldProtocolVersion: ethers.BigNumber = await ctm.getProtocolVersion(chainId);
   const checkerAddr: string = await serverNotifier.upgradePreconditionChecker(oldProtocolVersion);
   if (checkerAddr === ethers.constants.AddressZero) {
-    // The release registers the checker for exactly one version — the CTM's prepare-time version.
-    // A chain at another version legitimately has no checker; a chain AT that version with no
-    // checker means the CTM-admin call set failed to register it, which only an explicitly-allowed
-    // rehearsal shape may tolerate: this test is the sole coverage of the registration through the
-    // production executor path, so the fixture must fail loudly here.
-    const ctmProtocolVersion: ethers.BigNumber = await ctm.protocolVersion();
-    if (oldProtocolVersion.eq(ctmProtocolVersion) && !allowMissingChecker) {
+    // The release registers the checker under the CTM's prepare-time version, which is exactly
+    // the version the target chains still report here (the CTM's own `protocolVersion()` has
+    // already been bumped by governance stage 1, so it cannot serve as the comparison anchor).
+    // A missing registration for a selected chain therefore means the CTM-admin call set failed —
+    // and this test is the sole coverage of that registration through the production executor
+    // path, so it must fail loudly. Only explicitly-allowed rehearsal shapes (env presets or
+    // forks that may carry chains on other versions) tolerate it.
+    if (!allowMissingChecker) {
       throw new Error(
-        `chain ${chainId}: no precondition checker registered for the CTM's own version ` +
-          `${ctmProtocolVersion.toString()} — the CTM-admin call set should have registered it`
+        `chain ${chainId}: no precondition checker registered for its version ` +
+          `${oldProtocolVersion.toString()} — the CTM-admin call set should have registered it ` +
+          "(pass allowMissingChecker only for rehearsal shapes where this is expected)"
       );
     }
     console.log(

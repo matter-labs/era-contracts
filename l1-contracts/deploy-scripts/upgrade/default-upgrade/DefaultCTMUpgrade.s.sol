@@ -483,7 +483,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         Call[][] memory allCalls = new Call[][](2);
         allCalls[0] = prepareUpgradeServerNotifierCall();
         // Merged after the implementation upgrade: version-specific calls may target functions
-        // that only exist on the new implementation, and the merged array executes in order.
+        // that only exist on the new implementation, and the merged array executes in order
+        // within one executor run (calls whose targets have different owners split into
+        // separately signed bundles; see {protocol-docs/upgrade-scheduling.md}).
         allCalls[1] = prepareVersionSpecificCTMAdminCalls();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
 

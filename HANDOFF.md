@@ -148,8 +148,11 @@ after. Design note with rejected alternatives: `protocol-docs/upgrade-scheduling
   transaction from whoever `owner()` actually is. A candidate fix reviewers suggested: extend the
   `acceptOwnership` collection that `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernance*`
   already does for CTMs to the ServerNotifier (pending = the CTM admin), which would also collapse
-  the bundles back into one. **Pre-merge check:** `cast call <ServerNotifier> 'owner()(address)'`
-  and `'pendingOwner()(address)'` on stage/mainnet, and compare with the ProxyAdmin's owner.
+  the bundles back into one. **Pre-merge check, treat as gating:** `cast call <ServerNotifier>
+'owner()(address)'` and `'pendingOwner()(address)'` on stage/mainnet, compared with the
+  ProxyAdmin's owner. If `owner()` turns out to be an unaccepted deployer EOA, the checker
+  registration needs a signature from that historical key — resolve the ownership (accept the
+  pending transfer) before the rollout rather than treating it as a documentation matter.
 - **"l1-contracts hash manifest is not reproducible on macOS"** — a pristine base-tree rebuild on
   macOS (pinned forge, recursive submodules, frozen lockfile) moves every l1-contracts row of
   `AllContractsHashes.json` while da-contracts reproduces byte-exactly; only the CBOR metadata blob
