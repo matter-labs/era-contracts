@@ -20,6 +20,7 @@ import {
 } from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {
+    AirbenderBootstrapWitnessCountInvalid,
     AirbenderBootstrapWitnessNotExpected,
     AirbenderBootstrapWitnessRequired,
     AirbenderProvedWitnessCountInvalid,
@@ -385,6 +386,141 @@ contract ProvingTest is ExecutorTest {
         _proveWithWitnesses(batches, proof_(), airbender);
     }
 
+    /// A predecessor whose commitment can be opened, standing in for the genesis batch. Only its
+    /// `batchNumber` differs from batch 1, and the pass-through hash does not include that, so
+    /// `provedWitness` opens it too.
+    function _openablePrev() internal view returns (IExecutor.StoredBatchInfo memory prev) {
+        prev = newStoredBatchInfo;
+        prev.batchNumber = 0;
+    }
+
+    /// @dev `_checkBatchHashMismatch` only compares `keccak(abi.encode(prevBatch))` against
+    /// `storedBatchHashes[0]`, so pointing that entry at an openable struct is enough to reach the
+    /// seeding path. The real genesis commitment is a config value with no supplyable preimage.
+    function _installOpenablePrev() internal {
+        vm.store(
+            address(executor),
+            keccak256(abi.encode(uint256(0), uint256(14))),
+            keccak256(abi.encode(_openablePrev()))
+        );
+    }
+
+    function _bootstrapWitnesses() internal view returns (AirbenderProofWitnesses memory airbender) {
+        airbender.proved = new AirbenderCommitmentWitness[](1);
+        airbender.proved[0] = provedWitness;
+        airbender.bootstrap = new AirbenderCommitmentWitness[](1);
+        airbender.bootstrap[0] = provedWitness;
+    }
+
+    /// The seeding path end to end: an unseeded chain derives `prev` from the bootstrap witness and
+    /// hands the lane `keccak(seed | curr)`. Without this, replacing the whole bootstrap branch with
+    /// a constant — never authenticating the witness at all — is invisible.
+    function test_bootstrapSeedReachesTheAirbenderLane() public {
+        _installOpenablePrev();
+        EraMultiProofVerifier gate = new EraMultiProofVerifier(
+            IVerifier(address(new AcceptingLane())),
+            IVerifier(address(new PublicInputRevealingVerifier()))
+        );
+        vm.etch(getters.getVerifier(), address(gate).code);
+
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
+        batches[0] = newStoredBatchInfo;
+
+        uint256 expected = uint256(
+            keccak256(
+                abi.encodePacked(
+                    AirbenderCommitment.deriveBootstrapCommitment(provedWitness, _openablePrev()),
+                    AirbenderCommitment.deriveAirbenderCommitment(provedWitness, newStoredBatchInfo)
+                )
+            )
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(PublicInputRevealingVerifier.RevealedPublicInput.selector, expected, uint256(0))
+        );
+        _proveWithPrev(_openablePrev(), batches, proof_(), _bootstrapWitnesses());
+    }
+
+    /// The bootstrap witness is authenticated like any other: a perturbed pinned word is refused.
+    function test_bootstrapWitnessMustReopenItsBatch() public {
+        _installOpenablePrev();
+        _installAcceptingGate();
+
+        AirbenderProofWitnesses memory airbender = _bootstrapWitnesses();
+        airbender.bootstrap[0].l2ToL1LogsHash = bytes32(uint256(provedWitness.l2ToL1LogsHash) ^ 1);
+
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
+        batches[0] = newStoredBatchInfo;
+
+        vm.expectPartialRevert(AirbenderCommitment.CommitmentWitnessMismatch.selector);
+        _proveWithPrev(_openablePrev(), batches, proof_(), airbender);
+    }
+
+    /// Only the first bootstrap witness is read, so more than one would be silently ignored.
+    function test_multipleBootstrapWitnessesAreRefused() public {
+        _installOpenablePrev();
+        _installAcceptingGate();
+
+        AirbenderProofWitnesses memory airbender = _bootstrapWitnesses();
+        airbender.bootstrap = new AirbenderCommitmentWitness[](2);
+        airbender.bootstrap[0] = provedWitness;
+        airbender.bootstrap[1] = provedWitness;
+
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
+        batches[0] = newStoredBatchInfo;
+
+        vm.expectPartialRevert(AirbenderBootstrapWitnessCountInvalid.selector);
+        _proveWithPrev(_openablePrev(), batches, proof_(), airbender);
+    }
+
+    /// A bootstrap witness with no proved witness reaches no derivation, so it must not be accepted
+    /// and dropped.
+    function test_bootstrapWitnessAloneIsRefused() public {
+        _installAcceptingGate();
+
+        AirbenderProofWitnesses memory airbender;
+        airbender.bootstrap = new AirbenderCommitmentWitness[](1);
+        airbender.bootstrap[0] = provedWitness;
+
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
+        batches[0] = newStoredBatchInfo;
+
+        vm.expectRevert(AirbenderBootstrapWitnessNotExpected.selector);
+        _proveWithWitnesses(batches, proof_(), airbender);
+    }
+
+    /// The Boojum lane's word under the new encoding, which every other v2 test accepts blindly.
+    /// A bug feeding it the Airbender word would leave the Boojum proof unbound to the real chain.
+    function test_boojumLaneReceivesTheStoredCommitmentTransitionHash() public {
+        vm.store(address(executor), _airbenderCommitmentSlot(0), Utils.randomBytes32("seededGenesisAirbender"));
+        EraMultiProofVerifier gate = new EraMultiProofVerifier(
+            IVerifier(address(new PublicInputRevealingVerifier())),
+            IVerifier(address(new AcceptingLane()))
+        );
+        vm.etch(getters.getVerifier(), address(gate).code);
+
+        uint256 expected = uint256(
+            keccak256(abi.encodePacked(genesisStoredBatchInfo.commitment, newStoredBatchInfo.commitment))
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(PublicInputRevealingVerifier.RevealedPublicInput.selector, expected, uint256(1))
+        );
+        _proveWith(_gateProof());
+    }
+
+    function _proveWithPrev(
+        IExecutor.StoredBatchInfo memory _prev,
+        IExecutor.StoredBatchInfo[] memory _batches,
+        uint256[] memory _proof,
+        AirbenderProofWitnesses memory _airbender
+    ) internal {
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils
+            .encodeProveBatchesDataWithAirbender(_prev, _batches, _proof, _airbender);
+        vm.prank(validator);
+        executor.proveBatchesSharedBridge(address(0), proveBatchFrom, proveBatchTo, proveData);
+    }
+
     /// The value the Airbender lane actually receives — not merely that two words were passed.
     /// Asserts the recorded `prev` and the derived `curr` in that order, so transposing the operands
     /// of `keccak(prev | curr)`, or routing the Boojum word to this lane, fails here.
@@ -509,12 +645,12 @@ contract ProvingTest is ExecutorTest {
 
     /// An unseeded chain refuses the transition unless it carries a witness for its predecessor.
     ///
-    /// @dev The matching success case cannot be written against batch 1: the Executor forces `prev`
-    /// to be the genesis batch, whose commitment is a config value (`genesisBatchCommitment`) with
-    /// no preimage anyone can supply, so no witness can open it. Seeding therefore works when the
-    /// lane is enabled on a live chain — where `prev` is a batch the chain itself committed — and
-    /// not for a chain whose first ever proved batch is batch 1. That is a real constraint on
-    /// enabling the lane, not a gap in the test.
+    /// @dev The matching success case is `test_bootstrapSeedReachesTheAirbenderLane`, which points
+    /// `storedBatchHashes[0]` at an openable predecessor. The production constraint is narrower than
+    /// an earlier version of this comment claimed: a real chain's genesis commitment is a config
+    /// value with no supplyable preimage, so seeding works when the lane is enabled on a live chain
+    /// — where `prev` is a batch the chain itself committed — but not for one whose first ever
+    /// proved batch is batch 1.
     function test_bootstrapWitnessIsRequiredWhenTheChainIsUnseeded() public {
         _installAcceptingGate();
 

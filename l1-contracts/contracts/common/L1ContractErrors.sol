@@ -19,6 +19,9 @@ error AddressNotZero();
 /// @notice A bootstrap witness was supplied for a previous batch whose Airbender commitment is
 /// already recorded, where it would be silently ignored.
 error AirbenderBootstrapWitnessNotExpected();
+// 0x5689c78f
+/// @notice A prove call carried more than one bootstrap witness. Only the first would ever be read.
+error AirbenderBootstrapWitnessCountInvalid(uint256 provided);
 // 0xa7009944
 /// @notice The previous batch has no recorded Airbender commitment, so the transition that seeds
 /// the chain must carry a witness for it.

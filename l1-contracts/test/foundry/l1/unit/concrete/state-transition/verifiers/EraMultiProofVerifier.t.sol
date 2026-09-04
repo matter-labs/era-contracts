@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {InvalidPublicInputsLength} from "contracts/common/L1ContractErrors.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
@@ -135,6 +136,21 @@ contract EraMultiProofVerifierTest is Test {
         );
         vm.expectRevert(EraMultiProofVerifier.AirbenderVerificationFailed.selector);
         chain.callVerify(v, _publicInputs(), _default());
+    }
+
+    /// One word per lane, bounded on both sides. The Executor never builds more than two for Era,
+    /// but the gate is deployed independently and enforces its own envelope.
+    function test_revertsOnWrongPublicInputCount() public {
+        uint256[] memory tooFew = new uint256[](1);
+        tooFew[0] = RAW_PUBLIC_INPUT;
+        vm.expectRevert(InvalidPublicInputsLength.selector);
+        chain.callVerify(verifier, tooFew, _default());
+
+        uint256[] memory tooMany = new uint256[](3);
+        tooMany[0] = RAW_PUBLIC_INPUT;
+        tooMany[1] = RAW_AIRBENDER_PUBLIC_INPUT;
+        vm.expectRevert(InvalidPublicInputsLength.selector);
+        chain.callVerify(verifier, tooMany, _default());
     }
 
     /// Each lane must receive the untruncated public input whole; the sub-verifiers own their derivations.

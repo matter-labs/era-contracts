@@ -13,6 +13,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {GW_ASSET_TRACKER} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {
+    AirbenderBootstrapWitnessCountInvalid,
     AirbenderBootstrapWitnessNotExpected,
     AirbenderBootstrapWitnessRequired,
     AirbenderProvedWitnessCountInvalid,
@@ -252,13 +253,16 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         ) = BatchDecoder.decodeAndCheckProofData(_proofData, _processBatchFrom, _processBatchTo);
 
         bool airbenderLane = airbender.proved.length != 0;
+        // A bootstrap witness on its own reaches no derivation, so it would be accepted and dropped.
+        if (!airbenderLane && airbender.bootstrap.length != 0) {
+            revert AirbenderBootstrapWitnessNotExpected();
+        }
         // Only `[0]` is ever read, so anything beyond it would be accepted and ignored.
         if (airbenderLane && airbender.proved.length != 1) {
             revert AirbenderProvedWitnessCountInvalid(airbender.proved.length);
         }
-        // Keyed off either array, so a ZKsync OS caller cannot slip witnesses past this by sending
-        // only the bootstrap one.
-        if ((airbenderLane || airbender.bootstrap.length != 0) && s.zksyncOS) {
+        // Bootstrap-only is already refused above, so presence of the lane is the whole condition.
+        if (airbenderLane && s.zksyncOS) {
             revert AirbenderWitnessNotSupportedOnZKsyncOS();
         }
 
@@ -308,7 +312,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // the witnesses are opened against their `commitment` fields.
         bytes32 provedAirbenderCommitment;
         if (airbenderLane) {
-            provedAirbenderCommitment = _deriveAirbenderPublicInput(prevBatch, committedBatches[0], airbender);
+            provedAirbenderCommitment = AirbenderCommitment.deriveAirbenderCommitment(
+                airbender.proved[0],
+                committedBatches[0]
+            );
             proofPublicInput[1] = _getBatchProofPublicInput(
                 _previousAirbenderCommitment(prevBatch, airbender),
                 provedAirbenderCommitment
@@ -322,11 +329,16 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // an unattested entry into the chain. Leaving the gap unrecorded means the next transition
         // after the lane is switched back on seeds afresh, which is what an absent attestation
         // should cost.
-        // On a testnet gate this is weaker than it reads: `EraMultiProofTestnetVerifier` accepts an
-        // empty proof before either lane runs, so an entry can be recorded that no Airbender proof
-        // constrained. That is the existing testnet escape hatch, not a property of this chain.
-        if (airbenderLane && s.disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
-            s.airbenderCommitments[s.storedBatchHashes[committedBatches[0].batchNumber]] = provedAirbenderCommitment;
+        // The empty-proof term is what stops a testnet gate poisoning the chain permanently:
+        // `EraMultiProofTestnetVerifier` accepts an empty proof before either lane runs, and an
+        // entry recorded off the back of one is constrained by nothing. Once its batch is executed
+        // `_revertBatches` can no longer reach it, so every successor would inherit a `prev` that no
+        // proof can produce. Mainnet never reaches this — `EmptyProofLength` reverts first.
+        //
+        // Indexed by the position `_checkBatchHashMismatch` authenticated, so this does not lean on
+        // the separate invariant that a stored struct's `batchNumber` equals its index.
+        if (airbenderLane && proof.length != 0 && s.disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
+            s.airbenderCommitments[s.storedBatchHashes[currentTotalBatchesVerified]] = provedAirbenderCommitment;
         }
 
         emit BlocksVerification(s.totalBatchesVerified, currentTotalBatchesVerified);
@@ -384,19 +396,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             }
             return recorded;
         }
-        if (_airbender.bootstrap.length != 1) {
+        if (_airbender.bootstrap.length == 0) {
             revert AirbenderBootstrapWitnessRequired();
         }
+        // Only `[0]` is read, so anything past it would be accepted and ignored.
+        if (_airbender.bootstrap.length != 1) {
+            revert AirbenderBootstrapWitnessCountInvalid(_airbender.bootstrap.length);
+        }
         return AirbenderCommitment.deriveBootstrapCommitment(_airbender.bootstrap[0], _prevBatch);
-    }
-
-    /// @dev The Airbender commitment of the batch being proved.
-    function _deriveAirbenderPublicInput(
-        StoredBatchInfo memory,
-        StoredBatchInfo memory _provedBatch,
-        AirbenderProofWitnesses memory _airbender
-    ) internal pure returns (bytes32) {
-        return AirbenderCommitment.deriveAirbenderCommitment(_airbender.proved[0], _provedBatch);
     }
 
     /// @dev Gets zk proof public input for Era.
