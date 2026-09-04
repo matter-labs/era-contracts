@@ -741,7 +741,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.chainId);
         Diamond.DiamondCutData memory upgradeCutData = abi.decode(data.upgradeCutData, (Diamond.DiamondCutData));
 
-        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
+        Call[] memory calls = Utils.prepareAdminL1L2Message(
             data.l1GasPrice,
             abi.encodeCall(
                 IAdmin.upgradeChainFromVersion,
@@ -937,7 +937,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             data.l2ChainId
         );
 
-        bytes memory secondBridgeData;
+        bytes memory indirectCallData;
         {
             bytes32 chainAssetId = L1Bridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
 
@@ -964,10 +964,10 @@ contract AdminFunctions is Script, IAdminFunctions {
                 })
             );
 
-            secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
+            indirectCallData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
         }
 
-        calls = Utils.prepareAdminL1L2TwoBridgesTransaction(
+        calls = Utils.prepareAdminL1L2IndirectMessage(
             data.l1GasPrice,
             Utils.MAX_PRIORITY_TX_GAS,
             data.gatewayChainId,
@@ -975,7 +975,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             gatewayChainInfo.l1AssetRouterProxy,
             gatewayChainInfo.l1AssetRouterProxy,
             0,
-            secondBridgeData,
+            indirectCallData,
             data.refundRecipient
         );
 
@@ -1058,7 +1058,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             IAdmin.setDAValidatorPair,
             (data.l1DAValidator, data.l2DACommitmentScheme)
         );
-        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
+        Call[] memory calls = Utils.prepareAdminL1L2Message(
             data.l1GasPrice,
             callData,
             Utils.MAX_PRIORITY_TX_GAS,
@@ -1122,7 +1122,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             ValidatorTimelock.addValidatorForChainId,
             (data.l2ChainId, data.validatorAddress)
         );
-        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
+        Call[] memory calls = Utils.prepareAdminL1L2Message(
             data.l1GasPrice,
             callData,
             Utils.MAX_PRIORITY_TX_GAS,
@@ -1229,7 +1229,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             );
         }
 
-        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
+        Call[] memory calls = Utils.prepareAdminL1L2Message(
             data.l1GasPrice,
             l2Calldata,
             Utils.MAX_PRIORITY_TX_GAS,
@@ -1285,7 +1285,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             params.bridgehub,
             params.chainId
         );
-        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
+        Call[] memory calls = Utils.prepareAdminL1L2Message(
             params.l1GasPrice,
             params.data,
             Utils.MAX_PRIORITY_TX_GAS,

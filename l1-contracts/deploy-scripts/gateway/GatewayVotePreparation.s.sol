@@ -222,7 +222,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         bytes memory data,
         bytes[] memory factoryDeps
     ) internal {
-        Utils.runL1L2Transaction({
+        Utils.runL1L2Message({
             l2Calldata: data,
             l2GasLimit: 72_000_000,
             l2Value: 0,

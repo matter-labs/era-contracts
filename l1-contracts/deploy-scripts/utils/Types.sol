@@ -27,6 +27,7 @@ address constant ERA_DIAMOND_PROXY_UNUSED = address(0);
 uint32 constant FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG = 34;
 
 struct BridgehubContracts {
+    address interopCenter;
     address bridgehub;
     address messageRoot;
     address ctmDeploymentTracker;

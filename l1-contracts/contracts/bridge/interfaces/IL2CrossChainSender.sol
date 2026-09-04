@@ -16,8 +16,8 @@ interface IL2CrossChainSender {
     /// @param _chainId Destination chain ID.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _value The `msg.value` to be deposited on the target chain.
-    /// @param _data The calldata for the second bridge deposit.
-    /// @return interopCallStarter InteropCallStarter corresponding to the second bridge call.
+    /// @param _data The calldata for the cross-chain sender deposit.
+    /// @return interopCallStarter InteropCallStarter corresponding to the cross-chain sender call.
     function initiateIndirectCall(
         uint256 _chainId,
         address _originalCaller,

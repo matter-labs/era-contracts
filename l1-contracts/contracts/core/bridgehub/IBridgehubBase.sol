@@ -7,38 +7,6 @@ import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 
-struct L2TransactionRequestDirect {
-    uint256 chainId;
-    uint256 mintValue;
-    address l2Contract;
-    uint256 l2Value;
-    bytes l2Calldata;
-    uint256 l2GasLimit;
-    uint256 l2GasPerPubdataByteLimit;
-    bytes[] factoryDeps;
-    address refundRecipient;
-}
-
-struct L2TransactionRequestTwoBridgesOuter {
-    uint256 chainId;
-    uint256 mintValue;
-    uint256 l2Value;
-    uint256 l2GasLimit;
-    uint256 l2GasPerPubdataByteLimit;
-    address refundRecipient;
-    address secondBridgeAddress;
-    uint256 secondBridgeValue;
-    bytes secondBridgeCalldata;
-}
-
-struct L2TransactionRequestTwoBridgesInner {
-    bytes32 magicValue;
-    address l2Contract;
-    bytes l2Calldata;
-    bytes[] factoryDeps;
-    bytes32 txDataHash;
-}
-
 struct BridgehubMintCTMAssetData {
     uint256 chainId;
     TokenBridgingData baseTokenBridgingData;
@@ -57,6 +25,11 @@ struct BridgehubBurnCTMAssetData {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IBridgehubBase {
+    /// @notice Authorized L1 priority-transaction entry point.
+    function interopCenter() external view returns (address);
+
+    event InteropCenterSet(address indexed interopCenter);
+
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);

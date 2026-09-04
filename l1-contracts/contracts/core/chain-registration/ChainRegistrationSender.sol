@@ -8,11 +8,12 @@ import {IChainRegistrationSender} from "./IChainRegistrationSender.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
 
-import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
+import {IndirectCallRequest} from "../../common/Messaging.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {INDIRECT_CALL_MAGIC_VALUE} from "../../common/Config.sol";
 
 import {Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {
@@ -42,9 +43,9 @@ contract ChainRegistrationSender is
     mapping(uint256 chainToBeRegistered => mapping(uint256 chainRegisteredOn => bool isRegistered))
         public chainRegisteredOnChain;
 
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB)) {
+    /// @notice Checks that the caller is the registered L1 Interop Center.
+    modifier onlyL1InteropCenter() {
+        if (msg.sender != BRIDGE_HUB.interopCenter()) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -82,14 +83,14 @@ contract ChainRegistrationSender is
 
     /// @inheritdoc IL1CrossChainSender
     /// @dev Registers a chain on the L2 via a normal deposit: anyone can trigger it (via the
-    /// Bridgehub), but the caller provides the base tokens.
+    /// L1 Interop Center), but the caller provides the base tokens.
     // slither-disable-next-line locked-ether
-    function bridgehubDeposit(
+    function initiateIndirectCall(
         uint256 chainRegisteredOn,
         address,
         uint256,
         bytes calldata _data
-    ) external payable virtual override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) external payable virtual override onlyL1InteropCenter returns (IndirectCallRequest memory request) {
         if (msg.value != 0) {
             revert NoEthAllowed();
         }
@@ -105,8 +106,8 @@ contract ChainRegistrationSender is
         }
         _checkSettlementLayers(chainToBeRegistered, chainRegisteredOn);
 
-        request = L2TransactionRequestTwoBridgesInner({
-            magicValue: TWO_BRIDGES_MAGIC_VALUE,
+        request = IndirectCallRequest({
+            magicValue: INDIRECT_CALL_MAGIC_VALUE,
             l2Contract: L2_BRIDGEHUB_ADDR,
             l2Calldata: _getL2TxCalldata(chainToBeRegistered),
             factoryDeps: new bytes[](0),
@@ -147,5 +148,9 @@ contract ChainRegistrationSender is
 
     /// @inheritdoc IL1CrossChainSender
     /// @dev No-op: failed L1->L2 transactions need no recovery here.
-    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external override {}
+    function confirmL2Transaction(
+        uint256 _chainId,
+        bytes32 _txDataHash,
+        bytes32 _txHash
+    ) external override onlyL1InteropCenter {}
 }

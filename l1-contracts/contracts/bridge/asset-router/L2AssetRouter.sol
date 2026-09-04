@@ -10,7 +10,8 @@ import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
 import {IL2AssetHandler} from "../interfaces/IL2AssetHandler.sol";
 import {IL2Bridgehub} from "../../core/bridgehub/IL2Bridgehub.sol";
 
-import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
+import {IndirectCallRequest} from "../../common/Messaging.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -336,7 +337,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     ) external payable onlyL2InteropCenter returns (InteropCallStarter memory interopCallStarter) {
         address ntvAddr = _nativeTokenVaultAddr();
 
-        L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
+        IndirectCallRequest memory request = _initiateIndirectCall({
             _chainId: _chainId,
             _originalCaller: _originalCaller,
             _value: _value,

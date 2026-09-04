@@ -165,7 +165,7 @@ contract DeployZKScript is Script {
     function supplyEraWallet(address _bridgehub, uint256 _chainId, address addr, uint256 amount) public {
         initializeConfig(_bridgehub, _chainId);
 
-        Utils.runL1L2Transaction(
+        Utils.runL1L2Message(
             hex"",
             Utils.MAX_PRIORITY_TX_GAS,
             amount,

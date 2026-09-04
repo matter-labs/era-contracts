@@ -9,8 +9,7 @@ import {BridgehubL2TransactionRequest, L2CanonicalTransaction} from "../../commo
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IMailbox is IZKChainBase {
-    /// @notice Request execution of L2 transaction through the Bridgehub.
-    /// @dev Only accessible from L1, this is getting checked in the Bridgehub.
+    /// @notice Requests execution of a priority transaction from the registered L1 Interop Center.
     /// @param _request the request for the L2 transaction.
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request

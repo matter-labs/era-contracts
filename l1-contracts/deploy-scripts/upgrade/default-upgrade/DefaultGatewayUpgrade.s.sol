@@ -571,7 +571,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             "l1AssetRouterProxyAddress is zero in newConfig"
         );
 
-        calls = Utils.prepareGovernanceL1L2DirectTransaction(
+        calls = Utils.prepareGovernanceL1L2Message(
             l1GasPrice,
             l2Calldata,
             l2GasLimit,

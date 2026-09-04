@@ -7,6 +7,7 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
+import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IBridgehubBase} from "./IBridgehubBase.sol";
 
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
@@ -15,8 +16,7 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 
-import {BridgehubL2TransactionRequest, TokenBridgingData, TxStatus} from "../../common/Messaging.sol";
-import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
+import {TokenBridgingData, TxStatus} from "../../common/Messaging.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {AlreadyCurrentSL, NotChainAssetHandler, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
@@ -130,12 +130,11 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /// @dev If the Bridgehub is on L2 the address is aliased.
     address public chainRegistrationSender;
 
-    /**
-     * @dev This empty reserved space is put in place to allow future versions to add new
-     * variables without shifting down storage in the inheritance chain.
-     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
-     */
-    uint256[36] private __gap;
+    /// @notice Authorized L1 priority-transaction entry point.
+    address public override interopCenter;
+
+    // One slot from the original 36-slot gap stores the L1 Interop Center.
+    uint256[35] private __gap;
 
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
@@ -356,30 +355,8 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     }
 
     /*//////////////////////////////////////////////////////////////
-                        Mailbox forwarder
+                        Mailbox cost estimator
     //////////////////////////////////////////////////////////////*/
-
-    /// @notice This function is used to send a request to the ZK chain.
-    /// @param _chainId the chainId of the chain
-    /// @param _refundRecipient the refund recipient
-    /// @param _request the request
-    /// @return canonicalTxHash the canonical transaction hash
-    function _sendRequest(
-        uint256 _chainId,
-        address _refundRecipient,
-        BridgehubL2TransactionRequest memory _request
-    ) internal returns (bytes32 canonicalTxHash) {
-        // Although the aliasing might happen in the Mailbox, we still want to determine the refund recipient
-        // in the BH, as the Mailbox won't have msg.sender. Dropping the finality flag here is a deliberate
-        // trade-off: the request struct cannot carry it, see {protocol-docs/bridging.md} for the
-        // double-alias caveat this leaves open.
-        // slither-disable-next-line unused-return
-        (address refundRecipient, ) = AddressAliasHelper.actualRefundRecipient(_refundRecipient, msg.sender);
-        _request.refundRecipient = refundRecipient;
-        address zkChain = zkChainMap.get(_chainId);
-
-        canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
-    }
 
     /// @notice forwards function call to Mailbox based on ChainId
     function l2TransactionBaseCost(

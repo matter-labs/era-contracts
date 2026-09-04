@@ -103,7 +103,7 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
         // Since contract addresses are aliased and we require that depositor == receiver,
         // only EOAs, 7702 delegators, or whitelisted contracts will be able to perform deposits.
         if (_sender == L1_ASSET_ROUTER) {
-            // Non-base token deposit via `requestL2TransactionTwoBridges`
+            // Indirect deposit via the L1 Interop Center; the priority sender remains the L1 asset router.
             if (_l2Value != 0 || _contractL2 != L2_ASSET_ROUTER_ADDR) {
                 return false;
             }
@@ -117,7 +117,7 @@ contract PrividiumTransactionFilterer is ITransactionFilterer, Ownable2StepUpgra
                 return false;
             }
         } else {
-            // Base token deposit via `requestL2TransactionDirect`
+            // Direct base-token deposit via the L1 Interop Center.
             return _contractL2 == _sender && _l2Value > 0 && _l2Calldata.length == 0 && depositsAllowed;
         }
     }

@@ -55,7 +55,7 @@ import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
 import {ICTMDeploymentTracker} from "../core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
-import {InteropCenter} from "../interop/InteropCenter.sol";
+import {L2InteropCenter} from "../interop/interop-center/L2InteropCenter.sol";
 
 import {UpgradeableBeaconDeployer} from "../bridge/UpgradeableBeaconDeployer.sol";
 import {ISystemContractProxy} from "./ISystemContractProxy.sol";
@@ -397,7 +397,7 @@ library L2GenesisForceDeploymentsHelper {
 
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2();
 
-        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
             _fixedForceDeploymentsData.l1ChainId,
             _fixedForceDeploymentsData.aliasedL1Governance,
             _fixedForceDeploymentsData.zkTokenAssetId
