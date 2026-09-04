@@ -265,7 +265,7 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
 
       - name: Checkout zk-governance at the reviewed commit
         uses: actions/checkout@v4
@@ -275,11 +275,6 @@ jobs:
           path: zk-governance
           submodules: recursive
           persist-credentials: false
-
-      - name: Install Foundry (for Anvil)
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: v1.5.1
 
       - name: Install foundry-zksync (for forge --zksync)
         uses: ./.github/actions/install-zksync-foundry
@@ -317,6 +312,16 @@ jobs:
         run: yarn l2 build:foundry
       - name: Build system-contracts artifacts
         run: yarn sc build:foundry
+
+      # Upstream Foundry supplies anvil. Installed only now, after every contract build,
+      # so the builds see exactly the toolchain l1-contracts-ci's `build` job uses
+      # (foundry-zksync alone, no second forge or restored solc cache on PATH): that job's
+      # artifacts reproduce AllContractsHashes.json, and the regen's should too.
+      - name: Install Foundry (for Anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+          cache: false
 
       - name: Build protocol_ops
         working-directory: protocol-ops
