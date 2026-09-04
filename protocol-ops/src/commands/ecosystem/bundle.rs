@@ -51,8 +51,6 @@ const OPTIONAL_BUNDLE_FILES: [&str; 2] =
 const TRANSACTIONS_LOG: &str = "transactions.txt";
 const COMBINED_TRANSACTIONS_LOG: &str = "transactions.combined.txt";
 
-/// Only stage brings up a gateway, so its RPC is the default for PUVT's gateway-side checks.
-const DEFAULT_GATEWAY_RPC_URL: &str = "https://zksync-os-stage-gateway.zksync.dev";
 /// The reviewed zk-governance commit for v31 (same default as the generate workflow input).
 const DEFAULT_ZK_GOVERNANCE_COMMIT: &str = "9b06a16159cd58add109f25598e79731450d1772";
 
@@ -568,7 +566,7 @@ async fn broadcast_impersonated(rpc_url: &str, paths: &BundlePaths) -> anyhow::R
 async fn verify_upgrade(
     env_cfg: &EnvConfig,
     rpc_url: &str,
-    gateway_rpc_url: &str,
+    gateway_rpc_url: Option<&str>,
     zk_governance_commit: &str,
     paths: &BundlePaths,
 ) -> anyhow::Result<()> {
@@ -585,7 +583,7 @@ async fn verify_upgrade(
     fs::create_dir_all(&paths.work_dir)?;
     let combined_path = paths.work_dir.join(COMBINED_TRANSACTIONS_LOG);
     fs::write(&combined_path, combined)?;
-    let args = [
+    let mut args = [
         "verify-upgrade".to_string(),
         "--env".into(),
         env_cfg.env.clone(),
@@ -593,13 +591,15 @@ async fn verify_upgrade(
         paths.ecosystem_toml.display().to_string(),
         "--l1-rpc-url".into(),
         rpc_url.to_string(),
-        "--gw-rpc-url".into(),
-        gateway_rpc_url.to_string(),
         "--transactions-log".into(),
         combined_path.display().to_string(),
         "--zk-governance-commit".into(),
         zk_governance_commit.to_string(),
-    ];
+    ]
+    .to_vec();
+    if let Some(url) = gateway_rpc_url {
+        args.extend(["--gw-rpc-url".to_string(), url.to_string()]);
+    }
     verify_upgrade::run(VerifyUpgradeArgs::try_parse_from(args)?).await
 }
 
@@ -621,9 +621,9 @@ pub struct RehearseUpgradeArgs {
     /// ownership has moved off the deployer and a tip fork would revert.
     #[clap(long)]
     pub fork_block: Option<u64>,
-    /// Gateway RPC for PUVT's read-only gateway checks (gateway-enabled envs only).
-    #[clap(long, default_value = DEFAULT_GATEWAY_RPC_URL)]
-    pub gw_rpc_url: String,
+    /// Gateway RPC for PUVT's read-only gateway checks; needed only for envs with `[new_gateway]`.
+    #[clap(long)]
+    pub gw_rpc_url: Option<String>,
     /// zk-governance commit PUVT verifies the governance bytecodes against; recorded in the bundle.
     #[clap(long, default_value = DEFAULT_ZK_GOVERNANCE_COMMIT)]
     pub zk_governance_commit: String,
@@ -717,7 +717,7 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
     verify_upgrade(
         &env_cfg,
         &rpc_url,
-        &args.gw_rpc_url,
+        args.gw_rpc_url.as_deref(),
         &args.zk_governance_commit,
         &paths,
     )
@@ -746,9 +746,9 @@ pub struct ReplayBundleArgs {
     /// Run PUVT only, against a chain the bundle was already broadcast to.
     #[clap(long, group = "rpc_mode", requires = "rpc")]
     pub verify_only: bool,
-    /// Gateway RPC for PUVT's read-only gateway checks (gateway-enabled envs only).
-    #[clap(long, default_value = DEFAULT_GATEWAY_RPC_URL)]
-    pub gw_rpc_url: String,
+    /// Gateway RPC for PUVT's read-only gateway checks; needed only for envs with `[new_gateway]`.
+    #[clap(long)]
+    pub gw_rpc_url: Option<String>,
     /// zk-governance commit for PUVT; defaults to the one recorded in the bundle.
     #[clap(long)]
     pub zk_governance_commit: Option<String>,
@@ -851,7 +851,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
             verify_upgrade(
                 &env_cfg,
                 &rpc_url,
-                &args.gw_rpc_url,
+                args.gw_rpc_url.as_deref(),
                 &zk_governance_commit,
                 &paths,
             )
@@ -877,7 +877,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
             verify_upgrade(
                 &env_cfg,
                 &rpc_url,
-                &args.gw_rpc_url,
+                args.gw_rpc_url.as_deref(),
                 &zk_governance_commit,
                 &paths,
             )
@@ -887,7 +887,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
             verify_upgrade(
                 &env_cfg,
                 &rpc_url,
-                &args.gw_rpc_url,
+                args.gw_rpc_url.as_deref(),
                 &zk_governance_commit,
                 &paths,
             )
@@ -1081,7 +1081,7 @@ mod tests {
             rpc: Some("http://localhost:8545".into()),
             key: None,
             verify_only: false,
-            gw_rpc_url: String::new(),
+            gw_rpc_url: None,
             zk_governance_commit: None,
         };
         assert!(replay_mode(&base).is_err(), "--rpc alone must be rejected");
