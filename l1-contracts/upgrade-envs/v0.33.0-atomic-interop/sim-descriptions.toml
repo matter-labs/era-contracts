@@ -173,7 +173,7 @@ desc = "L1AssetRouter.setL1InteropHandler(new L1InteropHandler): one-shot wiring
 [[entries]]
 target = "zkos_ctm"
 selector = "0x810340c0"
-desc = "ChainTypeManager.setDefaultUpgrade(V32UpgradeZKsyncOS): the per-chain upgrade contract each chain's diamond cut delegates to"
+desc = "ChainTypeManager.setDefaultUpgrade(DefaultUpgradeZKsyncOS): the GENERIC upgrade contract later releases reuse when they need no custom logic. Deliberately not this release's one-shot V32UpgradeZKsyncOS, whose priority-op-bound preconditions only hold while crossing v31 -> v33."
 
 [[entries]]
 target = "zkos_ctm"

@@ -809,14 +809,25 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             ctmAddresses.stateTransition.proxies.chainTypeManager != address(0),
             "stateTransitionManagerAddress is zero in newConfig"
         );
-        require(ctmAddresses.stateTransition.defaultUpgrade != address(0), "defaultUpgrade is zero in newConfig");
+        address storedDefaultUpgrade = getCtmStoredDefaultUpgrade();
+        require(storedDefaultUpgrade != address(0), "defaultUpgrade is zero in newConfig");
         calls = new Call[](1);
 
         calls[0] = Call({
             target: ctmAddresses.stateTransition.proxies.chainTypeManager,
-            data: abi.encodeCall(IChainTypeManager.setDefaultUpgrade, (ctmAddresses.stateTransition.defaultUpgrade)),
+            data: abi.encodeCall(IChainTypeManager.setDefaultUpgrade, (storedDefaultUpgrade)),
             value: 0
         });
+    }
+
+    /// @notice The upgrade contract to leave stored on the CTM as its `defaultUpgrade`.
+    /// @dev Defaults to this release's own upgrade contract, which is correct whenever that
+    ///      contract carries no one-off logic. A release whose cut *does* carry one-off logic must
+    ///      override this: `setDefaultUpgrade` is what *later* upgrades reuse when they need no
+    ///      custom logic of their own, so storing a one-shot contract there would make every such
+    ///      upgrade revert on preconditions that only ever held during this release.
+    function getCtmStoredDefaultUpgrade() internal virtual returns (address) {
+        return ctmAddresses.stateTransition.defaultUpgrade;
     }
 
     function prepareNewChainCreationParamsCall() public virtual returns (Call[] memory calls) {

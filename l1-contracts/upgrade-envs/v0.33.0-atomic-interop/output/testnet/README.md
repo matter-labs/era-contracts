@@ -48,11 +48,19 @@ Decoded from `ecosystem.toml`. Every call is executed by the PUH.
 handler, chain registration sender, and the CTM-side proxies), `L1Nullifier` +
 `L1AssetRouter` `.setL1InteropHandler(...)`, `GovernanceUpgradeTimer.checkDeadline()`,
 `UpgradeStageValidator.checkMigrationsPaused()`, and finally on the CTM:
-`setDefaultUpgrade(V32UpgradeZKsyncOS)`, `setChainCreationParams(...)`,
+`setDefaultUpgrade(DefaultUpgradeZKsyncOS)`, `setChainCreationParams(...)`,
 `setNewVersionUpgrade(cut, 0x1f00000001, ∞, 0x2100000000, ZKsyncOSTestnetVerifier)`.
 
 **Stage 2** — 3 calls: `unpauseMigration()`,
 `UpgradeStageValidator.checkProtocolUpgradePresence()`, `.checkMigrationsUnpaused()`.
+
+> **Two upgrade contracts, and they are not interchangeable.** The diamond cut delegates to
+> `V32UpgradeZKsyncOS` (`0xe5Ba13e1…`), this release's one-shot payload — it requires a recorded
+> priority-op lower bound and a fully executed batch queue. What the CTM _stores_ as its
+> `defaultUpgrade` is the generic `DefaultUpgradeZKsyncOS` (`0x7Ce89dd4…`), because that is what
+> later upgrades reuse when they need no custom logic (a verifier-only patch, say). Storing the
+> one-shot contract there would make every such upgrade revert on preconditions that only ever
+> held during v31 -> v33.
 
 > **Stages 0 and 1 are two separate ceremonies, ≥ 20 minutes apart.** Stage 0 arms the
 > `GovernanceUpgradeTimer`; stage 1's `checkDeadline()` only passes once `INITIAL_DELAY` has

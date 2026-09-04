@@ -183,11 +183,11 @@
     "tag": "stage1"
   },
   {
-    "description": "ChainTypeManager.setDefaultUpgrade(V32UpgradeZKsyncOS): the per-chain upgrade contract each chain's diamond cut delegates to",
+    "description": "ChainTypeManager.setDefaultUpgrade(DefaultUpgradeZKsyncOS): the GENERIC upgrade contract later releases reuse when they need no custom logic. Deliberately not this release's one-shot V32UpgradeZKsyncOS, whose priority-op-bound preconditions only hold while crossing v31 -> v33.",
     "network": "sepolia",
     "from": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",
     "to": "0x54d55e74de9c6003e7a68a1fe70e633f05761eb5",
-    "data": "0x810340c0000000000000000000000000e5ba13e10f0357fa219b0eaabd49a244e0f3a5ae",
+    "data": "0x810340c00000000000000000000000007ce89dd45c6742d54d83cef3932368955c2dc206",
     "value": "0",
     "tag": "stage1"
   },
