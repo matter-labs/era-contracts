@@ -77,8 +77,18 @@ async fn resolve_gas_price<P: Provider>(provider: &P, floor_wei: u128) -> anyhow
     Ok(std::cmp::max(bumped, floor_wei))
 }
 
-fn gwei_to_wei(gwei: f64) -> u128 {
-    (gwei * 1e9).round() as u128
+/// clap value parser for `--gas-price-floor-gwei`: an exact decimal gwei
+/// amount (e.g. `0.1`, `5`) converted to wei. Rejects negative, non-numeric
+/// and out-of-range values instead of silently truncating them.
+pub fn parse_gwei(s: &str) -> Result<u128, String> {
+    match alloy::primitives::utils::parse_units(s, "gwei").map_err(|e| e.to_string())? {
+        alloy::primitives::utils::ParseUnits::U256(v) => v
+            .try_into()
+            .map_err(|_| format!("gas price floor {s} gwei does not fit in u128 wei")),
+        alloy::primitives::utils::ParseUnits::I256(_) => {
+            Err(format!("gas price floor must not be negative, got {s}"))
+        }
+    }
 }
 
 /// Render a wei gas price as gwei for logging.
@@ -135,8 +145,8 @@ pub struct DevExecuteSafeArgs {
     /// Minimum legacy gas price in gwei. The effective price is
     /// `max(3 x eth_gasPrice, floor)`, resolved once per bundle. Lower it on
     /// mainnet when the base fee is far below the 5 gwei default.
-    #[clap(long, default_value_t = 5.0)]
-    pub gas_price_floor_gwei: f64,
+    #[clap(long = "gas-price-floor-gwei", default_value = "5", value_parser = parse_gwei)]
+    pub gas_price_floor_wei: u128,
 }
 
 pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
@@ -145,7 +155,7 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
         &args.l1_rpc_url,
         args.private_key.expose(),
         args.out.as_deref(),
-        gwei_to_wei(args.gas_price_floor_gwei),
+        args.gas_price_floor_wei,
     )
     .await
 }

@@ -214,6 +214,9 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         IOwnable(address(ctmDeploymentTracker)).transferOwnership(coreAddresses.shared.governance);
 
         IOwnable(coreAddresses.bridgehub.proxies.chainAssetHandler).transferOwnership(coreAddresses.shared.governance);
+        IOwnable(coreAddresses.bridgehub.proxies.chainRegistrationSender).transferOwnership(
+            coreAddresses.shared.governance
+        );
 
         vm.stopBroadcast();
         console.log("Owners updated");

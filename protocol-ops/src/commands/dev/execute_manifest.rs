@@ -6,7 +6,7 @@ use alloy::signers::local::PrivateKeySigner;
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 
-use crate::commands::dev::execute_safe::{execute_one_bundle, GAS_PRICE_FLOOR_WEI};
+use crate::commands::dev::execute_safe::{execute_one_bundle, parse_gwei};
 use crate::common::{anvil::set_balance, logger, preflight::is_local_rpc, PrivateKey};
 
 /// Apply every bundle listed in a `manifest.json` file, routing each one to the
@@ -59,6 +59,12 @@ pub struct DevExecuteManifestArgs {
     /// `--fund-targets=false` when targeting a non-Anvil node (production).
     #[arg(long, default_value = None)]
     pub fund_targets: Option<bool>,
+
+    /// Minimum legacy gas price in gwei. The effective price is
+    /// `max(3 x eth_gasPrice, floor)`, resolved once per bundle. Lower it on
+    /// mainnet when the base fee is far below the 5 gwei default.
+    #[arg(long = "gas-price-floor-gwei", default_value = "5", value_parser = parse_gwei)]
+    pub gas_price_floor_wei: u128,
 }
 
 pub async fn run(args: DevExecuteManifestArgs) -> Result<()> {
@@ -76,6 +82,7 @@ pub async fn run(args: DevExecuteManifestArgs) -> Result<()> {
         args.wallets.as_deref(),
         &args.l1_rpc_url,
         fund,
+        args.gas_price_floor_wei,
     )
     .await
 }
@@ -88,6 +95,7 @@ pub async fn apply_manifest(
     wallets_path: Option<&Path>,
     l1_rpc_url: &str,
     fund_targets: bool,
+    gas_price_floor_wei: u128,
 ) -> Result<()> {
     apply_manifest_from(
         manifest_path,
@@ -96,6 +104,7 @@ pub async fn apply_manifest(
         wallets_path,
         l1_rpc_url,
         fund_targets,
+        gas_price_floor_wei,
     )
     .await
 }
@@ -110,6 +119,7 @@ pub async fn apply_manifest_from(
     wallets_path: Option<&Path>,
     l1_rpc_url: &str,
     fund_targets: bool,
+    gas_price_floor_wei: u128,
 ) -> Result<()> {
     let key_map = build_key_map(private_keys, wallets_path)?;
 
@@ -169,7 +179,7 @@ pub async fn apply_manifest_from(
             })?;
         }
 
-        execute_one_bundle(&bundle_path, l1_rpc_url, key, None, GAS_PRICE_FLOOR_WEI).await?;
+        execute_one_bundle(&bundle_path, l1_rpc_url, key, None, gas_price_floor_wei).await?;
     }
 
     logger::success("All bundles applied.");

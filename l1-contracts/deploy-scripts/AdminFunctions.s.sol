@@ -106,7 +106,7 @@ contract AdminFunctions is Script, IAdminFunctions {
 
     /// Walk every Bridgehub-discoverable ecosystem ownable (bridgehub itself,
     /// asset router, l1 nullifier, native token vault, l1 interop handler,
-    /// ctm deployer, chain asset handler) and accept the pending ownership
+    /// ctm deployer, chain asset handler, chain registration sender) and accept the pending ownership
     /// transfer where one is targeted at `_governor`. Idempotent — running
     /// against an already-correct ecosystem is a no-op.
     function governanceAcceptOwnerAggregated(address _governor, address _bridgehub) public {
@@ -118,6 +118,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         address l1Nullifier = address(assetRouterContract.L1_NULLIFIER());
         address nativeTokenVault = address(assetRouterContract.nativeTokenVault());
         address l1InteropHandler = IL1Nullifier(l1Nullifier).l1InteropHandler();
+        address chainRegistrationSender = L1Bridgehub(_bridgehub).chainRegistrationSender();
 
         if (Ownable2Step(_bridgehub).pendingOwner() == _governor) {
             governanceAcceptOwner(_governor, _bridgehub);
@@ -139,6 +140,9 @@ contract AdminFunctions is Script, IAdminFunctions {
         }
         if (Ownable2Step(chainAssetHandler).pendingOwner() == _governor) {
             governanceAcceptOwner(_governor, chainAssetHandler);
+        }
+        if (Ownable2Step(chainRegistrationSender).pendingOwner() == _governor) {
+            governanceAcceptOwner(_governor, chainRegistrationSender);
         }
     }
 
