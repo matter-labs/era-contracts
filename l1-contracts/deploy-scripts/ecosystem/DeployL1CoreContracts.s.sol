@@ -119,9 +119,10 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             "BridgedStandardERC20",
             false
         );
+        // Single-step Ownable; its owner controls the implementation of every bridged token.
         coreAddresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner(
             "BridgedTokenBeacon",
-            config.ownerAddress,
+            coreAddresses.shared.governance,
             false
         );
         (

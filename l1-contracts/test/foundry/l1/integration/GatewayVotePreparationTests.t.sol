@@ -269,7 +269,8 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
 
         vm.serializeAddress("contracts", "governance_security_council_address", address(0));
         vm.serializeUint("contracts", "governance_min_delay", 0);
-        string memory contractsToml = vm.serializeUint("contracts", "validator_timelock_execution_delay", 0);
+        vm.serializeUint("contracts", "validator_timelock_execution_delay", 0);
+        string memory contractsToml = vm.serializeUint("contracts", "max_number_of_chains", 100);
 
         vm.serializeAddress("gw_vote_prep", "owner_address", addresses.bridgehub.owner());
         vm.serializeBool("gw_vote_prep", "testnet_verifier", true);
