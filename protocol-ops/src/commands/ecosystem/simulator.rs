@@ -717,7 +717,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
                 )
             })?;
     transactions.extend(governance);
-    let body = serde_json::to_string_pretty(&transactions)?;
+    let body = serde_json::to_string_pretty(&transactions)? + "\n";
 
     if let Some(out) = args.out {
         if let Some(parent) = out.parent() {

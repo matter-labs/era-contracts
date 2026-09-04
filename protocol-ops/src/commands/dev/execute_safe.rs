@@ -605,7 +605,7 @@ fn persist_executed_bundle(path: &Path, bundle: &ExecutedBundle) -> anyhow::Resu
         }
     }
     let serialized =
-        serde_json::to_string_pretty(bundle).context("failed to serialise executed bundle")?;
+        serde_json::to_string_pretty(bundle).context("failed to serialise executed bundle")? + "\n";
     let temporary_path = path.with_extension("tmp");
     fs::write(&temporary_path, serialized).with_context(|| {
         format!(

@@ -81,7 +81,7 @@ pub async fn run(args: DevManifestToSimulatorArgs) -> anyhow::Result<()> {
     let manifest_path = resolve_manifest_path(&args.manifest)?;
     let transactions =
         manifest_to_simulator_transactions(&manifest_path, &args.network, &args.value_to_mint)?;
-    let body = serde_json::to_string_pretty(&transactions)?;
+    let body = serde_json::to_string_pretty(&transactions)? + "\n";
 
     if let Some(out) = args.out {
         if let Some(parent) = out.parent() {
