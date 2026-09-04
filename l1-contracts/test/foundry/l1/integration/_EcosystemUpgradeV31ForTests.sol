@@ -70,8 +70,11 @@ contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
         address defaultUpgradeAddr = getAddresses().stateTransition.defaultUpgrade;
 
         vm.serializeAddress("state_transition", "upgrade_precondition_checker_addr", upgradePreconditionChecker);
-        string memory stateTransition =
-            vm.serializeAddress("state_transition", "default_upgrade_addr", defaultUpgradeAddr);
+        string memory stateTransition = vm.serializeAddress(
+            "state_transition",
+            "default_upgrade_addr",
+            defaultUpgradeAddr
+        );
         vm.serializeBytes("root", "chain_upgrade_diamond_cut", upgradeCutData);
         string memory toml = vm.serializeString("root", "state_transition", stateTransition);
         vm.writeToml(toml, outputPath);
