@@ -505,9 +505,12 @@ async fn fund_bundle_targets(
         }
     }
 
+    // `upgrade-prepare-all` writes the address under `[core]`; older outputs had it top-level.
     let ecosystem: toml::Value = crate::common::files::read_toml_file(ecosystem_toml_path)?;
-    let Some(asset_tracker) = ecosystem
-        .get("asset_tracker_proxy_addr")
+    let Some(asset_tracker) = [ecosystem.get("core"), Some(&ecosystem)]
+        .into_iter()
+        .flatten()
+        .find_map(|table| table.get("asset_tracker_proxy_addr"))
         .and_then(toml::Value::as_str)
         .and_then(|value| value.parse::<Address>().ok())
     else {
