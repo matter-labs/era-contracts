@@ -1,3 +1,4 @@
+use alloy::providers::RootProvider;
 use anyhow::Result;
 
 use crate::types::L2DACommitmentScheme;
@@ -45,16 +46,105 @@ alloy::sol! {
 /// Governance) for contracts that reach governance via their existing ceremony.
 /// Notably this rejects `owner == <deployer EOA>` — the property the
 /// TransitionaryOwner rollout is meant to guarantee.
-fn owner_reached_governance(
+/// How a contract's `Ownable2Step` state relates to the ecosystem governance.
+#[derive(Debug, PartialEq, Eq)]
+enum GovernanceOwnership {
+    /// Governance holds it outright.
+    Governance,
+    /// Handoff in flight: an ecosystem-controlled intermediate holds it and governance is
+    /// `pendingOwner`, with the `acceptOwnership()` deferred to a stage-0 governance call.
+    PendingHandoff,
+    /// Held by the account that owns the governance contract itself. Legacy
+    /// `Governance.sol` ecosystems keep their ValidatorTimelock there and v31 does not move
+    /// it (`ValidatorTimelockUpgrade` only swaps the implementation), so this is a standing
+    /// topology difference rather than a defect: the same principals are in control, but
+    /// without the governance timelock in front of them. Reported as a warning, never
+    /// silently accepted.
+    GovernanceController,
+    /// Anything else: nobody the ecosystem's governance chain accounts for.
+    Foreign,
+}
+
+fn classify_governance_ownership(
     owner: Address,
     pending: Address,
     governance: Address,
+    governance_controller: Option<Address>,
     transitionary_owner: Option<Address>,
     ecosystem_admin: Address,
-) -> bool {
-    owner == governance
-        || (pending == governance
-            && (Some(owner) == transitionary_owner || owner == ecosystem_admin))
+) -> GovernanceOwnership {
+    if owner == governance {
+        GovernanceOwnership::Governance
+    } else if pending == governance
+        && (Some(owner) == transitionary_owner || owner == ecosystem_admin)
+    {
+        GovernanceOwnership::PendingHandoff
+    } else if governance_controller.is_some_and(|controller| owner == controller) {
+        GovernanceOwnership::GovernanceController
+    } else {
+        GovernanceOwnership::Foreign
+    }
+}
+
+/// `governance.owner()`, or `None` when governance is not `Ownable` (a
+/// ProtocolUpgradeHandler is not) or the owner is unset.
+async fn governance_controller(provider: &RootProvider, governance: Address) -> Option<Address> {
+    match Ownable2Step::new(governance, provider.clone())
+        .owner()
+        .call()
+        .await
+    {
+        Ok(owner) if owner != Address::ZERO => Some(owner),
+        _ => None,
+    }
+}
+
+/// Check one `Ownable2Step` contract against the ecosystem governance and report the verdict.
+/// Shared by the ValidatorTimelock, RollupDAManager and verifier checks so all three agree
+/// on what counts as governed.
+async fn report_governance_ownership(
+    result: &mut VerificationResult,
+    provider: &RootProvider,
+    what: &str,
+    contract: Address,
+    governance: Address,
+    transitionary_owner: Option<Address>,
+    ecosystem_admin: Address,
+) {
+    let ownable = Ownable2Step::new(contract, provider.clone());
+    let (owner, pending) = match (
+        ownable.owner().call().await,
+        ownable.pendingOwner().call().await,
+    ) {
+        (Ok(owner), Ok(pending)) => (owner, pending),
+        (Ok(owner), Err(_)) => (owner, Address::ZERO),
+        (Err(err), _) => {
+            result.report_error(&format!("Failed to call {what}.owner(): {err}"));
+            return;
+        }
+    };
+    let controller = governance_controller(provider, governance).await;
+    match classify_governance_ownership(
+        owner,
+        pending,
+        governance,
+        controller,
+        transitionary_owner,
+        ecosystem_admin,
+    ) {
+        GovernanceOwnership::Governance => {
+            result.report_ok(&format!("{what}.owner() matches governance ({governance})"))
+        }
+        GovernanceOwnership::PendingHandoff => result.report_ok(&format!(
+            "{what} owned by TransitionaryOwner/ecosystem-admin ({owner}) with governance ({governance}) pending (accept deferred to stage 0)"
+        )),
+        GovernanceOwnership::GovernanceController => result.report_warn(&format!(
+            "{what}.owner() is {owner}, which owns governance {governance} rather than being it.              The same principals control it, but without the governance timelock in front; v31              does not transfer this ownership. Expected on legacy-`Governance.sol` ecosystems."
+        )),
+        GovernanceOwnership::Foreign => result.report_error(&format!(
+            "{what}.owner() mismatch: expected governance {governance} (or TransitionaryOwner with governance pending), got {owner}"
+        )),
+    }
 }
 
 // `DiamondInit` writes the default fee params from `Config.sol` into
@@ -202,7 +292,7 @@ pub(crate) async fn verify_v31_artifact_state(
     verify_v31_rollup_da_managers(artifact, verifiers, result).await?;
     verify_v31_zksync_os_verifier_ownership(artifact, verifiers, result).await?;
     verify_v31_transitionary_owner(artifact, verifiers, result).await?;
-    verify_v31_era_fee_params(verifiers, result).await;
+    verify_v31_era_fee_params(artifact, verifiers, result).await;
     verify_v31_timer_admin_state(artifact, verifiers, result).await?;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
     verify_v31_ctm_flavor(artifact, verifiers, result).await?;
@@ -673,34 +763,16 @@ async fn verify_v31_validator_timelocks(
         // acceptOwnership() is a stage-0 governance call — not executed on this
         // fork. So accept either a completed transfer (owner == governance) or a
         // pending one (pendingOwner == governance, accept deferred to stage 0).
-        let vt_ownable = Ownable2Step::new(validator_timelock, provider.clone());
-        match (
-            vt_ownable.owner().call().await,
-            vt_ownable.pendingOwner().call().await,
-        ) {
-            (Ok(owner), _) if owner == expected_owner => result.report_ok(&format!(
-                "{label}.ValidatorTimelock.owner() matches governance ({expected_owner})"
-            )),
-            (Ok(owner), Ok(pending))
-                if owner_reached_governance(
-                    owner,
-                    pending,
-                    expected_owner,
-                    artifact.transitionary_owner,
-                    required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?,
-                ) =>
-            {
-                result.report_ok(&format!(
-                    "{label}.ValidatorTimelock owned by TransitionaryOwner/ecosystem-admin ({owner}) with governance ({expected_owner}) pending (acceptOwnership deferred to stage 0)"
-                ))
-            }
-            (Ok(owner), _) => result.report_error(&format!(
-                "{label}.ValidatorTimelock.owner() mismatch: expected governance {expected_owner} (or TransitionaryOwner with governance pending), got {owner}"
-            )),
-            (Err(err), _) => result.report_error(&format!(
-                "Failed to call {label}.ValidatorTimelock.owner(): {err}"
-            )),
-        }
+        report_governance_ownership(
+            result,
+            &provider,
+            &format!("{label}.ValidatorTimelock"),
+            validator_timelock,
+            expected_owner,
+            artifact.transitionary_owner,
+            required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?,
+        )
+        .await;
 
         let timelock_view = ValidatorTimelock::new(validator_timelock, provider.clone());
         match timelock_view.executionDelay().call().await {
@@ -736,34 +808,16 @@ async fn verify_v31_rollup_da_managers(
         let ecosystem_admin =
             required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?;
 
-        let ownable = Ownable2Step::new(rollup_da_manager, provider.clone());
-        match (
-            ownable.owner().call().await,
-            ownable.pendingOwner().call().await,
-        ) {
-            (Ok(owner), _) if owner == governance => result.report_ok(&format!(
-                "{label}.RollupDAManager.owner() matches governance ({governance})"
-            )),
-            (Ok(owner), Ok(pending))
-                if owner_reached_governance(
-                    owner,
-                    pending,
-                    governance,
-                    artifact.transitionary_owner,
-                    ecosystem_admin,
-                ) =>
-            {
-                result.report_ok(&format!(
-                    "{label}.RollupDAManager owned by TransitionaryOwner/ecosystem-admin ({owner}) with governance ({governance}) pending"
-                ))
-            }
-            (Ok(owner), _) => result.report_error(&format!(
-                "{label}.RollupDAManager.owner() mismatch: expected governance {governance} (or TransitionaryOwner with governance pending), got {owner}"
-            )),
-            (Err(err), _) => result.report_error(&format!(
-                "Failed to call {label}.RollupDAManager.owner(): {err}"
-            )),
-        }
+        report_governance_ownership(
+            result,
+            &provider,
+            &format!("{label}.RollupDAManager"),
+            rollup_da_manager,
+            governance,
+            artifact.transitionary_owner,
+            ecosystem_admin,
+        )
+        .await;
 
         // When v31 deployed a fresh rollup L1 DA validator for this CTM (Era),
         // verify the freshly deployed manager + validator bytecode and that the
@@ -846,34 +900,16 @@ async fn verify_v31_zksync_os_verifier_ownership(
         let ecosystem_admin =
             required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?;
 
-        let ownable = Ownable2Step::new(verifier, provider.clone());
-        match (
-            ownable.owner().call().await,
-            ownable.pendingOwner().call().await,
-        ) {
-            (Ok(owner), _) if owner == governance => result.report_ok(&format!(
-                "{label}.verifier.owner() matches governance ({governance})"
-            )),
-            (Ok(owner), Ok(pending))
-                if owner_reached_governance(
-                    owner,
-                    pending,
-                    governance,
-                    transitionary_owner,
-                    ecosystem_admin,
-                ) =>
-            {
-                result.report_ok(&format!(
-                    "{label}.verifier owned by TransitionaryOwner/ecosystem-admin ({owner}) with governance ({governance}) pending"
-                ))
-            }
-            (Ok(owner), _) => result.report_error(&format!(
-                "{label}.verifier.owner() mismatch: expected governance {governance} (or TransitionaryOwner with governance pending), got {owner}"
-            )),
-            (Err(err), _) => result.report_error(&format!(
-                "Failed to call {label}.verifier.owner(): {err}"
-            )),
-        }
+        report_governance_ownership(
+            result,
+            &provider,
+            &format!("{label}.verifier"),
+            verifier,
+            governance,
+            transitionary_owner,
+            ecosystem_admin,
+        )
+        .await;
     }
 
     Ok(())
@@ -932,7 +968,18 @@ async fn verify_v31_transitionary_owner(
     Ok(())
 }
 
-async fn verify_v31_era_fee_params(verifiers: &Verifiers, result: &mut VerificationResult) {
+async fn verify_v31_era_fee_params(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) {
+    // These are Era chain-creation fee params, read off the Era chain's diamond. An
+    // ecosystem with no Era CTM never registered that chain, so there is nothing to check
+    // — as opposed to an Era ecosystem whose chain is missing, which stays an error.
+    if !artifact.ctms.iter().any(|ctm| ctm.flavor == CtmFlavor::Era) {
+        result.report_ok("Era fee params: not applicable (no Era CTM in this ecosystem)");
+        return;
+    }
     let era_chain_id = verifiers.era_chain_id;
     let diamond = match verifiers
         .network_verifier
@@ -1187,5 +1234,83 @@ async fn verify_v31_chain_settlement_layers(
                 "Failed to call Bridgehub.settlementLayer({chain_id}): {err}"
             )),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn addr(byte: u8) -> Address {
+        Address::repeat_byte(byte)
+    }
+
+    const GOVERNANCE: u8 = 0x11;
+    const TRANSITIONARY: u8 = 0x22;
+    const ECOSYSTEM_ADMIN: u8 = 0x33;
+    const CONTROLLER: u8 = 0x44;
+    const STRANGER: u8 = 0x55;
+
+    fn classify(owner: u8, pending: u8, controller: Option<u8>) -> GovernanceOwnership {
+        classify_governance_ownership(
+            addr(owner),
+            addr(pending),
+            addr(GOVERNANCE),
+            controller.map(addr),
+            Some(addr(TRANSITIONARY)),
+            addr(ECOSYSTEM_ADMIN),
+        )
+    }
+
+    #[test]
+    fn governance_holding_it_outright_is_accepted() {
+        assert_eq!(
+            classify(GOVERNANCE, 0, None),
+            GovernanceOwnership::Governance
+        );
+    }
+
+    #[test]
+    fn handoff_in_flight_is_accepted_for_both_intermediates() {
+        for intermediate in [TRANSITIONARY, ECOSYSTEM_ADMIN] {
+            assert_eq!(
+                classify(intermediate, GOVERNANCE, None),
+                GovernanceOwnership::PendingHandoff
+            );
+        }
+    }
+
+    /// A pending handoff to governance is not enough on its own: an unknown intermediate
+    /// can still act on the contract until governance accepts.
+    #[test]
+    fn handoff_from_an_unknown_intermediate_is_not_accepted() {
+        assert_eq!(
+            classify(STRANGER, GOVERNANCE, None),
+            GovernanceOwnership::Foreign
+        );
+    }
+
+    #[test]
+    fn the_account_owning_governance_is_flagged_not_accepted_silently() {
+        assert_eq!(
+            classify(CONTROLLER, 0, Some(CONTROLLER)),
+            GovernanceOwnership::GovernanceController
+        );
+    }
+
+    #[test]
+    fn a_stranger_is_foreign_whether_or_not_governance_is_ownable() {
+        assert_eq!(
+            classify(STRANGER, 0, Some(CONTROLLER)),
+            GovernanceOwnership::Foreign
+        );
+        assert_eq!(classify(STRANGER, 0, None), GovernanceOwnership::Foreign);
+    }
+
+    /// `governance_controller` returns `None` for an unset owner, so a contract whose owner
+    /// reads as the zero address must never be mistaken for a governance-controlled one.
+    #[test]
+    fn an_unset_owner_is_foreign() {
+        assert_eq!(classify(0, 0, None), GovernanceOwnership::Foreign);
     }
 }
