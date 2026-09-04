@@ -15,8 +15,11 @@ Related documents:
 chain admins use to signal the ZKsync OS server. It is a `TransparentUpgradeableProxy` with a
 dedicated `ProxyAdmin` owned by the CTM's ecosystem admin (`chainAdmin`), deliberately _outside_
 governance: it can be upgraded operationally without touching the diamond, the CTM, or the
-governance timelock. Its `owner()` is the CTM admin on L1; on Gateway it is the aliased L1
-governance (`GatewayCTMDeployerCTMBase`).
+governance timelock. Its `owner()` is _intended_ to be the CTM admin on L1 — but the fresh-deploy
+flow currently initializes the owner as the deployer and leaves the `Ownable2Step` transfer to the
+chain admin pending (nothing accepts it), so verify `owner()` per ecosystem before relying on any
+owner-gated operation. On Gateway the owner is the aliased L1 governance
+(`GatewayCTMDeployerCTMBase`).
 
 It emits three events the server watches:
 
@@ -83,14 +86,16 @@ Two asymmetries of the registry are deliberate:
 - **Registration key vs lookup key.** The release flow registers under the CTM's own
   `protocolVersion()` at prepare time, while `setUpgradeTimestamp` looks up the _chain's_ current
   version. A chain lagging behind the CTM's prepare-time version therefore finds no checker —
-  which is fail-open but safe: such a chain also has no `upgradeCutHash` for its version from this
-  release, so the cut-availability check rejects the scheduling first.
+  which is fail-open but safe: `upgradeCutHash` entries persist across releases, so what such a
+  chain can schedule is the _earlier_ release's upgrade (whose cut its version still maps to), and
+  that upgrade carries its own execution-time requirements. This release's checker only guards
+  this release's transition.
 - **The magic check proves intent, not health.** Registration only validates the magic value; a
   checker whose checks are themselves broken (reverting getters, wrong addresses) registers
-  cleanly and then blocks scheduling for every chain on that version until the CTM admin
-  deregisters it — an ecosystem-multisig round-trip. Releases must therefore exercise the checker
-  (its preview, against a real chain) before putting the registration into the call set; the
-  repo's integration tests do this for the shipped checker.
+  cleanly and then blocks scheduling for every chain on that version until the owner deregisters
+  it — a transaction from whoever `owner()` currently is (see above). Releases must therefore
+  exercise the checker (its preview, against a real chain) before putting the registration into
+  the call set; the repo's integration tests do this for the shipped checker.
 
 ### The v32 checker
 
@@ -148,8 +153,14 @@ soft-deprecated.
    execute **before** the governance stage that registers the upgrade cut
    (`setNewVersionUpgrade`, a separate signer): scheduling becomes possible the moment
    `upgradeCutHash(oldVersion)` is set, so a cut registered first would open an unguarded
-   scheduling window. The standard flows preserve this order — protocol-ops executes the CTM-admin
-   calls during prepare, ahead of the governance stages.
+   scheduling window (which merely reproduces pre-checker behaviour, but defeats the point). The
+   standard flows _emit_ in this order — protocol-ops executes the CTM-admin calls during prepare,
+   ahead of the governance stages — but the two are signed by different bodies (the ecosystem
+   admin vs governance), so honoring the order at execution time is a runbook obligation, not
+   something the tooling can enforce. The same applies within the CTM-admin call set itself: when
+   the ServerNotifier's `owner()` differs from its ProxyAdmin's owner, the implementation upgrade
+   and the registration land in separately signed bundles, and the registration reverts (harmless,
+   retry after the upgrade) if executed first.
 2. Per chain, record the priority-op lower bound (`RecordPriorityOpLowerBound.s.sol`) — well before
    the chain schedules, and note the pinned bound includes any priority ops pending at record time,
    so the chain must have processed past it (its normal operation) before scheduling passes.

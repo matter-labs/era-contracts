@@ -914,12 +914,19 @@ For `chain.set-upgrade-timestamp`:
 - the call is wrapped through `ChainAdmin.multicall((address,uint256,bytes)[],bool)` (or
   `ChainAdminOwnable.multicall`); decode every inner call and require
   `_requireSuccess = true`;
-- the inner call is `ServerNotifier.setUpgradeTimestamp(uint256,uint256)`
-  (`0xe2a9d554`; arguments: chain ID, timestamp) on the ServerNotifier proxy.
-  The chain admin contracts themselves have no `setUpgradeTimestamp` (removed
-  before the v31 rollout), and the pre-v31 three-argument ServerNotifier
-  variant (`0x26079da9`) no longer exists after the prepare bundle upgrades
-  the ServerNotifier implementation — flag either shape;
+- the expected inner call from current tooling is
+  `ServerNotifier.setUpgradeTimestamp(uint256,uint256)` (`0xe2a9d554`;
+  arguments: chain ID, timestamp) on the ServerNotifier proxy;
+- a legacy inner call with the SAME selector `0xe2a9d554` may target the chain
+  admin itself: v31-era `ChainAdmin` deployments carry an `onlySelf`
+  `setUpgradeTimestamp(uint256,uint256)` with DIFFERENT argument semantics
+  (protocol version, timestamp) — the source removed it only in the v0.33
+  cycle and ecosystem upgrades do not replace deployed chain admins, so
+  disambiguate by the inner target and verify the argument semantics
+  accordingly rather than flagging the shape;
+- the pre-v31 three-argument ServerNotifier variant (`0x26079da9`) no longer
+  exists once the prepare bundle upgrades the ServerNotifier implementation —
+  flag it in any calldata generated after that upgrade;
 - timestamp matches phase metadata or rollout command evidence and is not zero;
 - for `ServerNotifier.setUpgradeTimestamp`, the chain ID argument equals the
   reviewed chain ID, and the call succeeds only when the precondition checker

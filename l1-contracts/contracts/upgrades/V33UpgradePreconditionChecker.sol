@@ -58,6 +58,9 @@ contract V33UpgradePreconditionChecker is IUpgradePreconditionChecker {
     }
 
     /// @inheritdoc IUpgradePreconditionChecker
+    /// @dev The zero-chain guard is defence-in-depth for direct callers only: `ServerNotifier`
+    /// resolves the chain's protocol version before consulting the checker, which already reverts
+    /// for a chain id the CTM does not know.
     function previewUpgradePreconditions(uint256, address _zkChain) external view returns (bytes4[] memory failed) {
         if (_zkChain == address(0)) {
             failed = new bytes4[](1);
@@ -65,6 +68,8 @@ contract V33UpgradePreconditionChecker is IUpgradePreconditionChecker {
             return failed;
         }
 
+        // Sized for all three checks, though at most two can fire: an unrecorded bound reads as
+        // zero, which passes the queue check trivially.
         bytes4[] memory collected = new bytes4[](3);
         uint256 count = 0;
         if (!_baseTokenBackfilled(_zkChain)) {

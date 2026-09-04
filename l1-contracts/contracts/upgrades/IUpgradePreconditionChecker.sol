@@ -25,7 +25,7 @@ interface IUpgradePreconditionChecker {
     /// @notice Non-reverting mirror of `checkUpgradePreconditions`.
     /// @param _chainId The id of the chain whose upgrade is being scheduled.
     /// @param _zkChain The chain's DiamondProxy address.
-    /// @return failed The error selectors of every failed precondition; empty when the check passes.
+    /// @return failed The error selectors of the failed preconditions; empty when the check passes.
     function previewUpgradePreconditions(
         uint256 _chainId,
         address _zkChain

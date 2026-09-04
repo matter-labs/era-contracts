@@ -128,8 +128,9 @@ contract V33UpgradePreconditionCheckerTest is Test {
         assertEq(checker.previewUpgradePreconditions(CHAIN_ID, chain).length, 0);
     }
 
-    /// @notice The preview collects every failed precondition, while the reverting check stops at
-    /// the first one; the queue check is only reported against a recorded bound.
+    /// @notice The preview collects the failed preconditions, while the reverting check stops at
+    /// the first one. An unrecorded bound reads as zero and trivially passes the queue check, so
+    /// `LowerBoundNotRecorded` and `PriorityQueueNotReady` never appear together (max 2 entries).
     function test_previewCollectsAllFailures() public {
         registry = new PriorityOpLowerBound();
         checker = new V33UpgradePreconditionChecker(registry);

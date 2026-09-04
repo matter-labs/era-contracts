@@ -65,6 +65,7 @@ const ARTIFACTS = {
   Ownable2Step: "Ownable2Step.sol/Ownable2Step.json",
   IServerNotifier: "IServerNotifier.sol/IServerNotifier.json",
   PriorityOpLowerBound: "PriorityOpLowerBound.sol/PriorityOpLowerBound.json",
+  V33UpgradePreconditionChecker: "V33UpgradePreconditionChecker.sol/V33UpgradePreconditionChecker.json",
   ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
   DefaultUpgradeZKsyncOS: "DefaultUpgradeZKsyncOS.sol/DefaultUpgradeZKsyncOS.json",
   V32UpgradeZKsyncOS: "V32UpgradeZKsyncOS.sol/V32UpgradeZKsyncOS.json",

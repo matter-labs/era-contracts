@@ -101,7 +101,7 @@ selector = "0x69340beb"  # multicall
 # No inner_target label: the ServerNotifier proxy's full address is not recorded in this file;
 # the selector below only exists on that proxy, so it discriminates on its own.
 inner_selector = "0x0a294855"  # setUpgradePreconditionChecker(uint256,address)
-desc = "Atlas ChainAdmin: multicall → ServerNotifier proxy.setUpgradePreconditionChecker(oldProtocolVersion, V33UpgradePreconditionChecker). Registers the scheduling-time precondition checker; executes after the in-place implementation upgrade above. See protocol-docs/upgrade-scheduling.md."
+desc = "Atlas ChainAdmin: multicall → ServerNotifier proxy.setUpgradePreconditionChecker(oldProtocolVersion, V33UpgradePreconditionChecker). Registers the scheduling-time precondition checker; must execute AFTER the in-place implementation upgrade above (the setter only exists on the new implementation). Signer = ServerNotifier.owner() — verify on the live ecosystem: a pending Ownable2Step transfer can leave it with the deployer, in which case this call lands in a separately signed bundle and the ordering is a runbook obligation. See protocol-docs/upgrade-scheduling.md."
 
 # ─── Stage 0: PUH governance (timers + PUH/Guardians redeploy + acceptOwnership) ───
 

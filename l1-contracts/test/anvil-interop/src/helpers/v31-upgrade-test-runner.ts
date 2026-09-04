@@ -656,30 +656,52 @@ export async function runEcosystemGovernanceUpgrade(params: {
 
 // ── Per-chain upgrade + L2 relay ─────────────────────────────────────
 
+/** Render a checker error selector with its name for logs, e.g. "0x5c25a57b (LowerBoundNotRecorded)". */
+function describeCheckerSelector(selector: string): string {
+  try {
+    const errorFragment = new ethers.utils.Interface(getAbi("V33UpgradePreconditionChecker")).getError(selector);
+    return `${selector} (${errorFragment.name})`;
+  } catch {
+    return selector;
+  }
+}
+
 /**
  * Assert the scheduling-time enforcement of the v32 upgrade prerequisite: the CTM-admin call set
  * (replayed with the prepare bundles) registered the release's precondition checker on the
  * ServerNotifier, so `setUpgradeTimestamp` must revert while the chain's backfill prerequisite is
  * missing. The expected failure is read from the on-chain preview rather than re-derived, so this
  * cannot drift from the checker's own ordering. Returns the handles for the post-shim positive
- * scheduling, or `null` when the chain is outside the registration's version (no assertion to
- * make). See {protocol-docs/upgrade-scheduling.md}.
+ * scheduling, or `null` when there is nothing to schedule against (chain outside the registration's
+ * version, or facets too old for the preview). See {protocol-docs/upgrade-scheduling.md}.
  */
 async function assertSchedulingBlockedOnMissingPrerequisite(params: {
   l1Provider: ethers.providers.JsonRpcProvider;
   ctmAddr: string;
   chainId: number;
   scheduleTimestamp: number;
+  /** Env-preset rehearsals may target CTMs prepared by older tooling with no checker registered. */
+  allowMissingChecker: boolean;
 }): Promise<{ serverNotifier: ethers.Contract; chainAdmin: string; oldProtocolVersion: ethers.BigNumber } | null> {
-  const { l1Provider, ctmAddr, chainId, scheduleTimestamp } = params;
+  const { l1Provider, ctmAddr, chainId, scheduleTimestamp, allowMissingChecker } = params;
 
   const ctm = new ethers.Contract(ctmAddr, getAbi("IChainTypeManager"), l1Provider);
   const serverNotifier = new ethers.Contract(await ctm.serverNotifierAddress(), getAbi("IServerNotifier"), l1Provider);
   const oldProtocolVersion: ethers.BigNumber = await ctm.getProtocolVersion(chainId);
   const checkerAddr: string = await serverNotifier.upgradePreconditionChecker(oldProtocolVersion);
   if (checkerAddr === ethers.constants.AddressZero) {
-    // The release registers the checker for exactly one version (the CTM's prepare-time version);
-    // a chain at any other version legitimately has no checker — nothing to assert here.
+    // The release registers the checker for exactly one version — the CTM's prepare-time version.
+    // A chain at another version legitimately has no checker; a chain AT that version with no
+    // checker means the CTM-admin call set failed to register it, which only an explicitly-allowed
+    // rehearsal shape may tolerate: this test is the sole coverage of the registration through the
+    // production executor path, so the fixture must fail loudly here.
+    const ctmProtocolVersion: ethers.BigNumber = await ctm.protocolVersion();
+    if (oldProtocolVersion.eq(ctmProtocolVersion) && !allowMissingChecker) {
+      throw new Error(
+        `chain ${chainId}: no precondition checker registered for the CTM's own version ` +
+          `${ctmProtocolVersion.toString()} — the CTM-admin call set should have registered it`
+      );
+    }
     console.log(
       `  ⚠️ chain ${chainId}: no precondition checker registered for its version ` +
         `${oldProtocolVersion.toString()}; skipping the scheduling assertions`
@@ -689,8 +711,8 @@ async function assertSchedulingBlockedOnMissingPrerequisite(params: {
   const chainAdmin: string = await ctm.getChainAdmin(chainId);
 
   // Ask the on-chain preview what scheduling would say right now. On a fork whose facets predate
-  // the checker's getters the preview itself reverts — scheduling is blocked either way, just
-  // without a specific selector to pin (same guard as `modelV31BackfillPrerequisite`).
+  // the checker's getters the preview reverts (same guard as `modelV31BackfillPrerequisite`); such
+  // a chain cannot be made schedulable by the shim either, so assert the block and skip scheduling.
   let failed: string[] | null = null;
   try {
     failed = await serverNotifier.previewUpgradePreconditions(chainId);
@@ -698,23 +720,35 @@ async function assertSchedulingBlockedOnMissingPrerequisite(params: {
     failed = null;
   }
 
-  if (failed !== null && failed.length === 0) {
+  if (failed === null) {
+    await expectRevert(
+      () => serverNotifier.callStatic.setUpgradeTimestamp(chainId, scheduleTimestamp, { from: chainAdmin }),
+      `chain ${chainId}: scheduling on pre-checker facets`,
+      undefined,
+      l1Provider
+    );
+    console.log(
+      `  ✅ chain ${chainId}: scheduling blocked (facets predate the checker's getters); ` +
+        "skipping the positive scheduling"
+    );
+    return null;
+  }
+
+  if (failed.length === 0) {
     // Fork rehearsals can target a chain whose prerequisite is already satisfied (the bound was
     // recorded in an earlier run against the same CREATE2 registry) — nothing to block on.
     console.log(`  chain ${chainId}: prerequisite already satisfied; skipping the blocked-scheduling assertion`);
     return { serverNotifier, chainAdmin, oldProtocolVersion };
   }
 
-  const expectedSelector = failed === null ? undefined : failed[0];
   await expectRevert(
     () => serverNotifier.callStatic.setUpgradeTimestamp(chainId, scheduleTimestamp, { from: chainAdmin }),
     `chain ${chainId}: scheduling before the backfill prerequisite`,
-    expectedSelector,
+    failed[0],
     l1Provider
   );
   console.log(
-    `  ✅ chain ${chainId}: scheduling blocked${expectedSelector ? ` with ${expectedSelector}` : ""} ` +
-      "before the prerequisite"
+    `  ✅ chain ${chainId}: scheduling blocked with ${describeCheckerSelector(failed[0])} before the prerequisite`
   );
 
   return { serverNotifier, chainAdmin, oldProtocolVersion };
@@ -728,6 +762,8 @@ export async function runChainUpgradesAndRelayL2(params: {
   ctmAddr: string;
   upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>;
   protocolOpsOutDir: string;
+  /** Tolerate a CTM with no registered checker (env-preset rehearsals prepared by older tooling). */
+  allowMissingChecker?: boolean;
 }): Promise<void> {
   const {
     l1Provider,
@@ -764,6 +800,7 @@ export async function runChainUpgradesAndRelayL2(params: {
       ctmAddr: params.ctmAddr,
       chainId: chain.chainId,
       scheduleTimestamp,
+      allowMissingChecker: params.allowMissingChecker ?? false,
     });
 
     // ZKsync OS chains must additionally have the v31 base-token backfill behind them
@@ -957,6 +994,7 @@ export async function runChainUpgradesPerCtm(params: {
       ctmAddr,
       upgradeChainAddresses: chains,
       protocolOpsOutDir,
+      allowMissingChecker: true,
     });
   }
 }

@@ -363,16 +363,20 @@ pub async fn resolve_server_notifier(
 /// Dry-run `ServerNotifier.previewUpgradePreconditions(chainId)`.
 ///
 /// Returns the failed checks' error selectors (empty when scheduling would pass), or `None` when
-/// the call reverts with empty data — a pre-v34 implementation without the preview selector (an
-/// old chain whose facets predate the checker's getters bubbles the same empty revert) — and the
-/// caller then falls back to the scheduling call's own revert as the source of truth. Transport
-/// failures and reverts that carry data are real errors and are propagated.
+/// the call reverts with empty data — a pre-v34 implementation without the preview selector, or a
+/// chain id the CTM does not know (the notifier's protocol-version resolution dereferences the
+/// zero chain) — and the caller then falls back to the scheduling call's own revert as the source
+/// of truth. Reverts that carry data are genuine failures inside the view (e.g. a chain whose
+/// facets predate the checker's getters reverts through the diamond's `Error("F")`) and are
+/// propagated, decoded where possible; so are transport failures, including providers that report
+/// a revert with no data field at all — a loud failure beats silently skipping the check.
 pub async fn preview_upgrade_preconditions(
     l1_rpc_url: &str,
     server_notifier: Address,
     chain_id: u64,
 ) -> anyhow::Result<Option<Vec<[u8; 4]>>> {
     use crate::common::abi::IServerNotifierAbi;
+    use alloy::sol_types::SolError;
 
     let notifier = IServerNotifierAbi::new(server_notifier, provider(l1_rpc_url)?);
     match notifier
@@ -385,6 +389,12 @@ pub async fn preview_upgrade_preconditions(
             if let Some(data) = err.as_revert_data() {
                 if data.is_empty() {
                     return Ok(None);
+                }
+                if let Ok(revert) = alloy::sol_types::Revert::abi_decode(&data) {
+                    anyhow::bail!(
+                        "ServerNotifier.previewUpgradePreconditions({chain_id}) reverted: {}",
+                        revert.reason
+                    );
                 }
                 anyhow::bail!(
                     "ServerNotifier.previewUpgradePreconditions({chain_id}) reverted with 0x{}",
