@@ -1,6 +1,6 @@
 # Multi-Chain Anvil Interop Tests
 
-End-to-end tests for ZKsync interoperability across 5 Anvil chains: L1 contract deployment, L1<->L2 bridging (ETH + ERC20), L2<->L2 interop transfers, and gateway setup with chain migration.
+End-to-end tests for ZKsync interoperability across 6 Anvil chains: L1 contract deployment, L1<->L2 bridging (ETH + ERC20), L2<->L2 interop transfers, and gateway setup with chain migration.
 
 ## Chain Topology
 
@@ -12,12 +12,13 @@ End-to-end tests for ZKsync interoperability across 5 Anvil chains: L1 contract 
        │
        ├──► L2  (10)  port 4050 — settled directly on L1
        │
-       ├──► GW  (11)  port 4051 — gateway chain (settled on L1, settlement layer for L2A/L2B)
+       ├──► GW  (11)  port 4051 — gateway chain (settled on L1, settlement layer for L2A/L2B/L2C)
        │     │
        │     ├──► L2A (12)  port 4052 — settled via GW
-       │     └──► L2B (13)  port 4053 — settled via GW
+       │     ├──► L2B (13)  port 4053 — settled via GW
+       │     └──► L2C (14)  port 4054 — custom-base-token chain settled via GW
        │
-       └──► (L2A and L2B also registered on L1 but migrated to GW)
+       └──► (L2A, L2B, and L2C also registered on L1 but migrated to GW)
 ```
 
 ## Quick Start
@@ -38,7 +39,7 @@ yarn test:hardhat:interop --keep-chains
 
 Tests load pregenerated Anvil snapshots from `chain-states/v0.34.0/` by default (the current protocol version, configured as `stateVersion` in `config/anvil-config.json`). This skips the full deployment and cuts test time from ~5 min to ~85s.
 
-The runner auto-detects pregenerated state by checking for `chain-states/<protocol-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `FRESH_DEPLOY=1`), it runs the full 5-step deployment.
+The runner auto-detects pregenerated state by checking for `chain-states/<protocol-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `ANVIL_INTEROP_FRESH_DEPLOY=1`), it runs the full deployment.
 
 Only the directory for the current protocol version, selected by `stateVersion`, is regenerated. Upgrade scenarios select their frozen source fixture explicitly; those fixtures must not be regenerated from current contracts.
 
@@ -51,7 +52,7 @@ cd contracts/l1-contracts/test/anvil-interop
 yarn setup-and-dump
 ```
 
-This runs the full deployment with deterministic settings (`blockTime=1`, `timestamp=1`) and dumps each chain's state to the `chain-states/` directory.
+This runs the full deployment with pinned settings (`blockTime=1`, `timestamp=1`) and dumps each chain's state to the `chain-states/` directory. Interval mining makes the final block height and block-indexed state wall-clock-dependent, so the CI determinism check uses `compare-chain-states.ts` to normalize the documented drift and requires every non-normalized field to match.
 
 ## Running Tests Without Redeployment
 
@@ -240,11 +241,11 @@ test/anvil-interop/
 │   ├── l1-deployment.toml         # L1 contract deployment params
 │   ├── ctm-deployment.toml        # ChainTypeManager params
 │   ├── permanent-values.toml      # Immutable protocol values
-│   └── chain-{10,11,12,13}.toml   # Per-chain deployment params (generated)
+│   └── chain-{10,11,12,13,14}.toml # Per-chain deployment params (generated)
 ├── chain-states/
 │   └── v0.34.0/                   # Pregenerated Anvil state snapshots (current, regenerated)
 │       ├── 31337.json.gz          # L1 state dump (gzip; kept out of diffs)
-│       ├── {10,11,12,13}.json.gz  # L2 chain state dumps (gzip)
+│       ├── {10,11,12,13,14}.json.gz # L2 chain state dumps (gzip)
 │       └── addresses.json         # All contract addresses + test tokens
 ├── src/
 │   ├── deployment-runner.ts       # Orchestrates all deployment steps
