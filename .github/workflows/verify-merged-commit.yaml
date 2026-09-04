@@ -42,7 +42,7 @@ jobs:
 
           # These are long-lived bases that are merged into but are not protected today.
           case "$REF_NAME" in
-            main | draft-* | atomic-imt-* | release-*) matches_base="true" ;;
+            main | draft-* | draft/* | atomic-imt-* | release-* | release/*) matches_base="true" ;;
             *) matches_base="false" ;;
           esac
 
@@ -102,6 +102,15 @@ jobs:
           node-version-file: .nvmrc
           cache: yarn
 
+      - name: Install genesis-generator toolchain
+        working-directory: tools/zksync-os-genesis-gen
+        run: rustup toolchain install
+
+      - name: Cache genesis-generator build
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: tools/zksync-os-genesis-gen
+
       - name: Install dependencies
         run: yarn
 
@@ -134,7 +143,7 @@ jobs:
       - name: Save the verified solc build cache
         uses: ./.github/actions/save-solc-cache
 
-      # The three checks whose answers come from the artifacts, so a cache could have shifted them.
+      # The four checks whose answers come from the artifacts, so a cache could have shifted them.
       # Here they are answered by a build with no cache at all.
       - name: Check hashes
         run: yarn calculate-hashes:check
@@ -149,6 +158,21 @@ jobs:
             echo "::error::l1-contracts/zkstack-out does not match a clean build of this commit."
             git --no-pager status --porcelain -- zkstack-out
             git --no-pager diff -- zkstack-out || true
+            exit 1
+          fi
+
+      - name: Regenerate ZKsync OS genesis
+        working-directory: tools/zksync-os-genesis-gen
+        run: |
+          cargo run --locked --release --bin zksync-os-genesis-gen -- \
+            --output-file ../../configs/genesis/zksync-os/latest.json
+
+      - name: Check ZKsync OS genesis
+        run: |
+          if [ -n "$(git status --porcelain -- configs/genesis/zksync-os/latest.json)" ]; then
+            echo "::error::configs/genesis/zksync-os/latest.json does not match a clean build of this commit."
+            git --no-pager status --porcelain -- configs/genesis/zksync-os/latest.json
+            git --no-pager diff --stat -- configs/genesis/zksync-os/latest.json
             exit 1
           fi
 
