@@ -249,6 +249,8 @@ pub mod testnet_verifier {
     alloy::sol!(
         #[sol(rpc)]
         interface ITestnetVerifier {
+            function isTestnetVerifier() external view returns (bool);
+            // Legacy pre-v34 name (a public constant on testnet verifiers of those versions).
             function IS_TESTNET_VERIFIER() external view returns (bool);
         }
     );

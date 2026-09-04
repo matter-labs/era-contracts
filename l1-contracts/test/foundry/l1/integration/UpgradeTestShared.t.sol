@@ -51,6 +51,7 @@ abstract contract UpgradeIntegrationTestBase is Test {
     address internal _eraDiamond;
     address internal _newChainDiamond;
     bytes32 internal _expectedUpgradeCutHash;
+    address internal _expectedNewVerifier;
     address internal _expectedNewChainAdmin;
     bytes32 internal _expectedBaseTokenAssetId;
     Call[] internal _ctmAdminCalls;
