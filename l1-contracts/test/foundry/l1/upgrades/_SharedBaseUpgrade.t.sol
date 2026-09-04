@@ -8,14 +8,14 @@ import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerif
 import {
     PRIORITY_TX_MAX_GAS_LIMIT,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    SYSTEM_UPGRADE_L2_TX_TYPE
+    ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
 import {
     L2_FORCE_DEPLOYER_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 contract BaseUpgrade is Test {
@@ -56,7 +56,7 @@ contract BaseUpgrade is Test {
         bytes[] memory bytesEmptyArray = new bytes[](1);
         bytesEmptyArray[0] = "11111111111111111111111111111111";
         uint256[] memory uintEmptyArray = new uint256[](1);
-        uintEmptyArray[0] = uint256(L2ContractHelper.hashL2Bytecode(bytesEmptyArray[0]));
+        uintEmptyArray[0] = uint256(ZKSyncOSBytecodeInfo.hashEVMBytecode(bytesEmptyArray[0]));
 
         protocolVersion = SemVer.packSemVer(0, 1, 0);
         chainId = 1;
@@ -72,7 +72,7 @@ contract BaseUpgrade is Test {
         bytes memory postUpgradeCalldata = abi.encode(chainId, bridgeHub, stateTransitionManager, sharedBridge);
 
         l2CanonicalTransaction = L2CanonicalTransaction({
-            txType: SYSTEM_UPGRADE_L2_TX_TYPE,
+            txType: ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
             to: uint256(uint160(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR)),
             gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,

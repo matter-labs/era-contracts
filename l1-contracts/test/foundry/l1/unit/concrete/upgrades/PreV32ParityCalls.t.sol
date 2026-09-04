@@ -57,8 +57,6 @@ contract PreV32ParityCallsTest is Test {
         chainRegistrationSender = makeAddr("chainRegistrationSender");
         address proxyAdmin = makeAddr("proxyAdmin");
         address messageRoot = makeAddr("messageRoot");
-        uint256 eraChainId = 9;
-        address eraDiamondProxy = makeAddr("eraDiamondProxy");
 
         // A v31-shaped pair of bridges: deployed and initialized, but with no interop handler, since that
         // storage only exists from v32 on.
@@ -79,9 +77,7 @@ contract PreV32ParityCallsTest is Test {
         L1AssetRouter assetRouterImpl = new L1AssetRouter({
             _l1WethToken: makeAddr("weth"),
             _bridgehub: bridgehub,
-            _l1Nullifier: address(l1Nullifier),
-            _eraChainId: eraChainId,
-            _eraDiamondProxy: eraDiamondProxy
+            _l1Nullifier: address(l1Nullifier)
         });
         assetRouter = L1AssetRouter(
             payable(

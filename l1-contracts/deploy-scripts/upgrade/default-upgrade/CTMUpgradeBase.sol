@@ -17,7 +17,7 @@ import {FacetCutsLib} from "./FacetCutsLib.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 
 abstract contract CTMUpgradeBase is DeployCTMScript {
-    /// @notice Build the active VM's full force-deployment list in universal format.
+    /// @notice Build the full force-deployment list in universal format.
     function getUniversalForceDeployments(
         uint256 _l1ChainId,
         address _ownerAddress
@@ -41,12 +41,12 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         return new CoreContract[](0);
     }
 
-    /// @notice Get L2 upgrade target and data for the active VM.
+    /// @notice Get the L2 upgrade target and data.
     function getL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual returns (address, bytes memory);
 
-    /// @notice Get the L1 -> L2 upgrade transaction type for the active VM.
+    /// @notice Get the L1 -> L2 upgrade transaction type.
     function getUpgradeTxType() internal virtual returns (uint256);
 
     /// @notice Build L1 -> L2 upgrade tx
@@ -84,17 +84,15 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
 
     function validateUniversalForceDeployments(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments,
-        PublishFactoryDepsResult memory _factoryDepsResult
+        PublishFactoryDepsResult memory // _factoryDepsResult
     ) internal virtual {
-        // Era force deployments must have bytecode hashes in factory deps.
+        // The retired EraVM ordinal must never appear in a generated upgrade: on chain it would
+        // revert only at execution time, so fail the preparation loudly here instead.
         for (uint256 i; i < _deployments.length; i++) {
-            if (_deployments[i].upgradeType == IComplexUpgrader.ContractUpgradeType.EraForceDeployment) {
-                IL2ContractDeployer.ForceDeployment memory fd = abi.decode(
-                    _deployments[i].deployedBytecodeInfo,
-                    (IL2ContractDeployer.ForceDeployment)
-                );
-                require(_isHashInFactoryDeps(_factoryDepsResult, fd.bytecodeHash), "Bytecode hash not in factory deps");
-            }
+            require(
+                _deployments[i].upgradeType != IComplexUpgrader.ContractUpgradeType.__DEPRECATED_EraForceDeployment,
+                "Retired EraForceDeployment ordinal in force deployments"
+            );
         }
     }
 
@@ -171,18 +169,6 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         StateTransitionDeployedAddresses memory
     ) internal virtual returns (bytes memory) {
         return new bytes(0);
-    }
-
-    function _isHashInFactoryDeps(PublishFactoryDepsResult memory _result, bytes32 _hash) private pure returns (bool) {
-        if (_result.factoryDepsHashes.length == 0) {
-            return true;
-        }
-        for (uint256 i = 0; i < _result.factoryDepsHashes.length; i++) {
-            if (bytes32(_result.factoryDepsHashes[i]) == _hash) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /// @notice Returns the FixedForceDeploymentsData for bytecodeInfo reuse.

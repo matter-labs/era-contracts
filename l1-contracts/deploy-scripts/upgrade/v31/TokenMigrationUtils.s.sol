@@ -71,10 +71,10 @@ library TokenMigrationUtils {
     ///      generates. The anvil-interop test harness also uses the override
     ///      to point at its per-scenario fixture under `outputs/`.
     function _readConfiguredBridgedTokens() private view returns (address[] memory) {
-        string memory inputPath = "/upgrade-envs/v0.31.0-interopB/local-bridged-tokens.toml";
-        try vm.envString("UPGRADE_BRIDGED_TOKENS_INPUT_OVERRIDE") returns (string memory overridePath) {
-            inputPath = overridePath;
-        } catch {}
+        string memory inputPath = vm.envOr(
+            "UPGRADE_BRIDGED_TOKENS_INPUT_OVERRIDE",
+            string("/upgrade-envs/v0.31.0-interopB/local-bridged-tokens.toml")
+        );
 
         string memory upgradeToml = vm.readFile(string.concat(vm.projectRoot(), inputPath));
 

@@ -42,7 +42,7 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
     }
 
     function getV31L2UpgradeCalldata() internal view returns (bytes memory) {
-        return abi.encodeCall(IL2V32Upgrade.upgrade, (true, address(0), "", ""));
+        return abi.encodeCall(IL2V32Upgrade.upgrade, (address(0), "", ""));
     }
 
     function getL2UpgradeTargetAndData(

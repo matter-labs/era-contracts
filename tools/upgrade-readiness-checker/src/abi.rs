@@ -74,15 +74,23 @@ alloy::sol! {
         function chainTypeManager(uint256 _chainId) external view returns (address);
     }
 
-    // `SettlementLayerV31UpgradeBase.sol` — the upgrade contract at `DiamondCutData.initAddress`.
-    // v31+ chains mutate `l2ProtocolUpgradeTx.data` per-chain inside `upgrade()` before
-    // hashing, by calling `getL2UpgradeTxData(bridgehub, chainId, zksyncOS, existingData)`.
-    // To get the same canonical tx hash the sequencer will produce, we need to replay that
-    // mutation — easiest via an eth_call to the upgrade contract itself. For pre-v31 upgrade
-    // contracts this selector does not exist, so the call reverts and we fall back to the
-    // unmutated data.
+    // The current upgrade contract at `DiamondCutData.initAddress`. Current upgrades mutate
+    // `l2ProtocolUpgradeTx.data` per-chain inside `upgrade()` before hashing. Replaying this
+    // view call produces the same canonical transaction hash as the chain upgrade.
     #[sol(rpc)]
     interface ISettlementLayerUpgrade {
+        function getL2UpgradeTxData(
+            address bridgehub,
+            uint256 chainId,
+            bytes memory existingTxData
+        ) external view returns (bytes memory);
+    }
+
+    // Upgrade contracts from v31 through the runtime cut expose the same rewrite with the
+    // retired VM discriminator. The readiness checker keeps this binding because it can also
+    // be used to monitor those already-published upgrades.
+    #[sol(rpc)]
+    interface ILegacySettlementLayerUpgrade {
         function getL2UpgradeTxData(
             address bridgehub,
             uint256 chainId,

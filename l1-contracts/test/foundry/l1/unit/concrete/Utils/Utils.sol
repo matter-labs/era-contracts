@@ -25,11 +25,10 @@ import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.so
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {
     IExecutor,
-    SystemLogKey,
     MAX_NUMBER_OF_BLOBS,
     TOTAL_BLOBS_IN_COMMITMENT
 } from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {InteropRoot, L2CanonicalTransaction, L2Log} from "contracts/common/Messaging.sol";
 
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
@@ -51,150 +50,8 @@ address constant TEST_ROLLUP_DA_MANAGER_OWNER = address(0x1234567890DEADBEEF);
 uint256 constant EVENT_INDEX = 0;
 
 library Utils {
-    function packBatchTimestampAndBlockTimestamp(
-        uint256 batchTimestamp,
-        uint256 blockTimestamp
-    ) public pure returns (bytes32) {
-        uint256 packedNum = (batchTimestamp << 128) | blockTimestamp;
-        return bytes32(packedNum);
-    }
-
     function randomBytes32(bytes memory seed) public view returns (bytes32) {
         return keccak256(abi.encodePacked(block.timestamp, seed));
-    }
-
-    function constructL2Log(
-        bool isService,
-        address sender,
-        uint256 key,
-        bytes32 value
-    ) public pure returns (bytes memory) {
-        bytes2 servicePrefix = 0x0001;
-        if (!isService) {
-            servicePrefix = 0x0000;
-        }
-
-        // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(servicePrefix, bytes2(0x0000), sender, key, value);
-    }
-
-    function createSystemLogs(bytes32 _outputHash) public returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](10);
-        logs[0] = constructL2Log(
-            true,
-            L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY),
-            bytes32("")
-        );
-        logs[1] = constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            bytes32("")
-        );
-        logs[2] = constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
-            keccak256("")
-        );
-        logs[3] = constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
-            bytes32("")
-        );
-        logs[4] = constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
-            bytes32("")
-        );
-        logs[5] = constructL2Log(
-            true,
-            L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY),
-            _outputHash
-        );
-        logs[6] = constructL2Log(
-            true,
-            L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
-            bytes32(uint256(L2_DA_COMMITMENT_SCHEME))
-        );
-        logs[7] = constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.MESSAGE_ROOT_ROLLING_HASH_KEY),
-            bytes32(uint256(uint160(0)))
-        );
-        logs[8] = constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.L2_TXS_STATUS_ROLLING_HASH_KEY),
-            bytes32("")
-        );
-        logs[9] = constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.SETTLEMENT_LAYER_CHAIN_ID_KEY),
-            bytes32(uint256(uint160(block.chainid)))
-        );
-
-        return logs;
-    }
-
-    function createSystemLogsWithNoneDAValidator() public returns (bytes[] memory) {
-        bytes[] memory systemLogs = createSystemLogs(bytes32(0));
-        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY)] = constructL2Log(
-            true,
-            L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
-            bytes32(uint256(L2DACommitmentScheme.NONE))
-        );
-
-        return systemLogs;
-    }
-
-    function createSystemLogsWithUpgradeTransaction(
-        bytes32 _expectedSystemContractUpgradeTxHash
-    ) public returns (bytes[] memory) {
-        bytes[] memory logsWithoutUpgradeTx = createSystemLogs(bytes32(0));
-        bytes[] memory logs = new bytes[](logsWithoutUpgradeTx.length + 1);
-        for (uint256 i = 0; i < logsWithoutUpgradeTx.length; i++) {
-            logs[i] = logsWithoutUpgradeTx[i];
-        }
-        logs[logsWithoutUpgradeTx.length] = constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY),
-            _expectedSystemContractUpgradeTxHash
-        );
-        return logs;
-    }
-
-    function createSystemLogsWithUpgradeTransactionForCTM(
-        bytes32 _expectedSystemContractUpgradeTxHash,
-        bytes32 _outputHash
-    ) public returns (bytes[] memory) {
-        bytes[] memory logsWithoutUpgradeTx = createSystemLogs(_outputHash);
-        bytes[] memory logs = new bytes[](logsWithoutUpgradeTx.length + 1);
-        for (uint256 i = 0; i < logsWithoutUpgradeTx.length; i++) {
-            logs[i] = logsWithoutUpgradeTx[i];
-        }
-        logs[uint256(SystemLogKey.PREV_BATCH_HASH_KEY)] = constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
-            bytes32(uint256(0x01))
-        );
-        logs[logsWithoutUpgradeTx.length] = constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY),
-            _expectedSystemContractUpgradeTxHash
-        );
-        return logs;
     }
 
     function createStoredBatchInfo() public pure returns (IExecutor.StoredBatchInfo memory) {
@@ -212,19 +69,25 @@ library Utils {
             });
     }
 
-    function createCommitBatchInfo() public view returns (CommitBatchInfo memory) {
+    function createCommitBatchInfoZKsyncOS() public view returns (CommitBatchInfoZKsyncOS memory) {
         return
-            CommitBatchInfo({
+            CommitBatchInfoZKsyncOS({
                 batchNumber: 1,
-                timestamp: uint64(uint256(randomBytes32("timestamp"))),
-                indexRepeatedStorageChanges: 0,
-                newStateRoot: randomBytes32("newStateRoot"),
+                newStateCommitment: randomBytes32("newStateCommitment"),
                 numberOfLayer1Txs: 0,
+                numberOfLayer2Txs: 0,
                 priorityOperationsHash: keccak256(""),
-                bootloaderHeapInitialContentsHash: randomBytes32("bootloaderHeapInitialContentsHash"),
-                eventsQueueStateHash: randomBytes32("eventsQueueStateHash"),
-                systemLogs: abi.encode(randomBytes32("systemLogs")),
-                operatorDAInput: abi.encodePacked(uint256(0))
+                dependencyRootsRollingHash: keccak256(""),
+                l2LogsTreeRoot: bytes32(""),
+                daCommitmentScheme: L2_DA_COMMITMENT_SCHEME,
+                daCommitment: bytes32(""),
+                firstBlockTimestamp: uint64(uint256(randomBytes32("timestamp")) >> 200),
+                firstBlockNumber: 1,
+                lastBlockTimestamp: uint64(uint256(randomBytes32("timestamp")) >> 200),
+                lastBlockNumber: 2,
+                chainId: 9,
+                operatorDAInput: abi.encodePacked(uint256(0)),
+                slChainId: block.chainid
             });
     }
 
@@ -236,20 +99,6 @@ library Utils {
         return result;
     }
 
-    function encodeCommitBatchesData(
-        IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
-        CommitBatchInfo[] memory _newBatchesData
-    ) internal pure returns (uint256, uint256, bytes memory) {
-        return (
-            _newBatchesData[0].batchNumber,
-            _newBatchesData[_newBatchesData.length - 1].batchNumber,
-            bytes.concat(
-                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
-                abi.encode(_lastCommittedBatchData, _newBatchesData)
-            )
-        );
-    }
-
     function encodeCommitBatchesDataZKsyncOS(
         IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
         CommitBatchInfoZKsyncOS[] memory _newBatchesData
@@ -258,7 +107,7 @@ library Utils {
             _newBatchesData[0].batchNumber,
             _newBatchesData[_newBatchesData.length - 1].batchNumber,
             bytes.concat(
-                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS),
+                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT),
                 abi.encode(_lastCommittedBatchData, _newBatchesData)
             )
         );
@@ -299,12 +148,11 @@ library Utils {
     }
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](19);
+        bytes4[] memory selectors = new bytes4[](18);
         uint256 i = 0;
         selectors[i++] = AdminFacet.setPendingAdmin.selector;
         selectors[i++] = AdminFacet.acceptAdmin.selector;
         selectors[i++] = AdminFacet.setValidator.selector;
-        selectors[i++] = AdminFacet.setPorterAvailability.selector;
         selectors[i++] = AdminFacet.setPriorityTxMaxGasLimit.selector;
         selectors[i++] = AdminFacet.changeFeeParams.selector;
         selectors[i++] = AdminFacet.setTokenMultiplier.selector;
@@ -345,10 +193,9 @@ library Utils {
     }
 
     function getCommitterSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](2);
+        bytes4[] memory selectors = new bytes4[](1);
         uint256 i = 0;
         selectors[i++] = CommitterFacet.commitBatchesSharedBridge.selector;
-        selectors[i++] = CommitterFacet.precommitSharedBridge.selector;
         return selectors;
     }
 
@@ -433,8 +280,6 @@ library Utils {
         selectors[i++] = UtilsFacet.util_getPriorityModePermissionlessValidator.selector;
         selectors[i++] = UtilsFacet.util_setPriorityModeTransactionFilterer.selector;
         selectors[i++] = UtilsFacet.util_getPriorityModeTransactionFilterer.selector;
-        selectors[i++] = UtilsFacet.util_setZkPorterAvailability.selector;
-        selectors[i++] = UtilsFacet.util_getZkPorterAvailability.selector;
         selectors[i++] = UtilsFacet.util_setChainTypeManager.selector;
         selectors[i++] = UtilsFacet.util_getChainTypeManager.selector;
         selectors[i++] = UtilsFacet.util_setPriorityTxMaxGasLimit.selector;
@@ -454,6 +299,7 @@ library Utils {
         selectors[i++] = UtilsFacet.util_getBaseTokenGasPriceMultiplierDenominator.selector;
         selectors[i++] = UtilsFacet.util_getBaseTokenGasPriceMultiplierNominator.selector;
         selectors[i++] = UtilsFacet.util_getL2DACommimentScheme.selector;
+        selectors[i++] = UtilsFacet.util_setL2DACommitmentScheme.selector;
         selectors[i++] = UtilsFacet.util_setSettlementLayer.selector;
         selectors[i++] = UtilsFacet.util_getSettlementLayer.selector;
         selectors[i++] = UtilsFacet.util_setPausedDepositsTimestamp.selector;
@@ -470,11 +316,12 @@ library Utils {
         selectors[i++] = UtilsFacet.util_getL2SystemContractsUpgradeTxHash.selector;
         selectors[i++] = UtilsFacet.util_setPriorityTreeNextLeafIndex.selector;
         selectors[i++] = UtilsFacet.util_setPriorityOpsRequestTimestamp.selector;
-        selectors[i++] = UtilsFacet.util_setZksyncOS.selector;
         selectors[i++] = UtilsFacet.util_setZKsyncOSMaxTxGasLimit.selector;
         selectors[i++] = UtilsFacet.util_getZKsyncOSMaxTxGasLimit.selector;
         selectors[i++] = UtilsFacet.util_setBaseTokenHasTotalSupply.selector;
         selectors[i++] = UtilsFacet.util_getPubdataContent.selector;
+        selectors[i++] = UtilsFacet.util_setDeprecatedPrecommitmentForTheLatestBatch.selector;
+        selectors[i++] = UtilsFacet.util_getDeprecatedPrecommitmentForTheLatestBatch.selector;
 
         return selectors;
     }
@@ -489,7 +336,6 @@ library Utils {
                 chainId: 1,
                 bridgehub: bridgehub,
                 chainTypeManager: address(0x1234567890876543567890),
-                interopCenter: address(0x1234567890876543567890),
                 protocolVersion: 0,
                 admin: address(0x32149872498357874258787),
                 validatorTimelock: address(0x85430237648403822345345),
@@ -499,7 +345,7 @@ library Utils {
     }
 
     function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address bridgehub) public returns (address) {
-        DiamondInit diamondInit = new DiamondInit(false);
+        DiamondInit diamondInit = new DiamondInit();
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,
             makeInitializeData(bridgehub)
@@ -516,22 +362,12 @@ library Utils {
         return address(diamondProxy);
     }
 
+    /// @dev Historical alias from the dual-VM era; identical to {makeDiamondProxy}.
     function makeZKsyncOSDiamondProxy(
         Diamond.FacetCut[] memory _facetCuts,
         address _bridgehub
     ) public returns (address) {
-        DiamondInit diamondInit = new DiamondInit(true);
-        InitializeData memory initializeData = makeInitializeData(_bridgehub);
-
-        bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, initializeData);
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: _facetCuts,
-            initAddress: address(diamondInit),
-            initCalldata: diamondInitData
-        });
-
-        DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
-        return address(diamondProxy);
+        return makeDiamondProxy(_facetCuts, _bridgehub);
     }
 
     function makeEmptyL2CanonicalTransaction() public returns (L2CanonicalTransaction memory) {
@@ -558,90 +394,6 @@ library Utils {
             });
     }
 
-    function createBatchCommitment(
-        CommitBatchInfo calldata _newBatchData,
-        bytes32 _stateDiffHash,
-        bytes32[] memory _blobCommitments,
-        bytes32[] memory _blobHashes
-    ) public pure returns (bytes32) {
-        bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
-        bytes32 metadataHash = keccak256(_batchMetaParameters());
-        bytes32 auxiliaryOutputHash = keccak256(
-            _batchAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes)
-        );
-
-        return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
-    }
-
-    function _batchPassThroughData(CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
-        return
-            // solhint-disable-next-line func-named-parameters
-            abi.encodePacked(
-                _batch.indexRepeatedStorageChanges,
-                _batch.newStateRoot,
-                uint64(0), // index repeated storage changes in zkPorter
-                bytes32(0) // zkPorter batch hash
-            );
-    }
-
-    function _batchMetaParameters() internal pure returns (bytes memory) {
-        // The EraVM bytecode-hash slots are deprecated and zero on every chain initialized by the
-        // current DiamondInit; the Era commitment format still packs them.
-        return abi.encodePacked(false, bytes32(0), bytes32(0), bytes32(0));
-    }
-
-    function _batchAuxiliaryOutput(
-        CommitBatchInfo calldata _batch,
-        bytes32 _stateDiffHash,
-        bytes32[] memory _blobCommitments,
-        bytes32[] memory _blobHashes
-    ) internal pure returns (bytes memory) {
-        bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
-
-        return
-            // solhint-disable-next-line func-named-parameters
-            abi.encodePacked(
-                l2ToL1LogsHash,
-                _stateDiffHash,
-                _batch.bootloaderHeapInitialContentsHash,
-                _batch.eventsQueueStateHash,
-                _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes)
-            );
-    }
-
-    /// @dev Encodes the commitment to blobs to be used in the auxiliary output of the batch commitment
-    /// @param _blobCommitments - the commitments to the blobs
-    /// @param _blobHashes - the hashes of the blobs
-    /// @param blobAuxOutputWords - The circuit commitment to the blobs split into 32-byte words
-    function _encodeBlobAuxiliaryOutput(
-        bytes32[] memory _blobCommitments,
-        bytes32[] memory _blobHashes
-    ) internal pure returns (bytes32[] memory blobAuxOutputWords) {
-        // These invariants should be checked by the caller of this function, but we double check
-        // just in case.
-        if (_blobCommitments.length != TOTAL_BLOBS_IN_COMMITMENT) {
-            revert InvalidBlobCommitmentsLength();
-        }
-        if (_blobHashes.length != TOTAL_BLOBS_IN_COMMITMENT) {
-            revert InvalidBlobHashesLength();
-        }
-
-        // for each blob we have:
-        // linear hash (hash of preimage from system logs) and
-        // output hash of blob commitments: keccak(versioned hash || opening point || evaluation value)
-        // These values will all be bytes32(0) when we submit pubdata via calldata instead of blobs.
-        //
-        // For now, only up to 2 blobs are supported by the contract, while 16 are required by the circuits.
-        // All the unfilled blobs will have their commitment as 0, including the case when we use only 1 blob.
-
-        blobAuxOutputWords = new bytes32[](2 * TOTAL_BLOBS_IN_COMMITMENT);
-
-        for (uint256 i = 0; i < TOTAL_BLOBS_IN_COMMITMENT; i++) {
-            blobAuxOutputWords[i * 2] = _blobHashes[i];
-            blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
-        }
-    }
-
     function constructRollupL2DAValidatorOutputHash(
         bytes32 _stateDiffHash,
         bytes32 _totalPubdataHash,
@@ -649,30 +401,6 @@ library Utils {
         bytes32[] memory _blobHashes
     ) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(_stateDiffHash, _totalPubdataHash, _blobsAmount, _blobHashes));
-    }
-
-    function getDefaultBlobCommitment() public pure returns (bytes memory) {
-        bytes16 blobOpeningPoint = 0x7142c5851421a2dc03dde0aabdb0ffdb;
-        bytes32 blobClaimedValue = 0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0;
-        bytes
-            memory commitment = hex"ad5a32c9486ad7ab553916b36b742ed89daffd4538d95f4fc8a6c5c07d11f4102e34b3c579d9b4eb6c295a78e484d3bf";
-        bytes
-            memory blobProof = hex"b7565b1cf204d9f35cec98a582b8a15a1adff6d21f3a3a6eb6af5a91f0a385c069b34feb70bea141038dc7faca5ed364";
-
-        return abi.encodePacked(blobOpeningPoint, blobClaimedValue, commitment, blobProof);
-    }
-
-    function defaultPointEvaluationPrecompileInput(bytes32 _versionedHash) public view returns (bytes memory) {
-        return
-            abi.encodePacked(
-                _versionedHash,
-                bytes32(uint256(uint128(0x7142c5851421a2dc03dde0aabdb0ffdb))), // opening point
-                abi.encodePacked(
-                    bytes32(0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0), // claimed value
-                    hex"ad5a32c9486ad7ab553916b36b742ed89daffd4538d95f4fc8a6c5c07d11f4102e34b3c579d9b4eb6c295a78e484d3bf", // commitment
-                    hex"b7565b1cf204d9f35cec98a582b8a15a1adff6d21f3a3a6eb6af5a91f0a385c069b34feb70bea141038dc7faca5ed364" // proof
-                )
-            );
     }
 
     function emptyData() internal pure returns (PriorityOpsBatchInfo[] calldata _empty) {

@@ -8,12 +8,11 @@ import {IChainUpgrader} from "../../chain-interfaces/IChainUpgrader.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Note: In our CTM we have a single implementation of ValidatorTimelock for everyone,
-/// so the interface must remain backwards compatible as the same timelock is utilized
-/// for chains with different protocol versions.
+/// @dev The same upgradeable timelock serves chains on different protocol versions, so its external
+/// interface must remain backwards compatible.
 interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     /// @notice Struct specifying which validator roles to grant or revoke in a single call.
-    /// @param rotatePrecommitterRole Whether to rotate the PRECOMMITTER_ROLE.
+    /// @param rotatePrecommitterRole Deprecated selector-preserving flag; ignored by the implementation.
     /// @param rotateCommitterRole Whether to rotate the COMMITTER_ROLE.
     /// @param rotateReverterRole Whether to rotate the REVERTER_ROLE.
     /// @param rotateProverRole Whether to rotate the PROVER_ROLE.
@@ -31,7 +30,7 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     /// @notice The delay between committing and executing batches is changed.
     event NewExecutionDelay(uint256 _newExecutionDelay);
 
-    /// @notice Role hash for addresses allowed to precommit batches on a chain.
+    /// @notice Deprecated role hash retained for ABI compatibility.
     function PRECOMMITTER_ROLE() external view returns (bytes32);
     /// @notice Role hash for addresses allowed to commit batches on a chain.
     function COMMITTER_ROLE() external view returns (bytes32);
@@ -43,8 +42,7 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     function EXECUTOR_ROLE() external view returns (bytes32);
     /// @notice Role hash for addresses allowed to upgrade chains.
     function UPGRADER_ROLE() external view returns (bytes32);
-    /// @notice Optional admin role hash for managing PRECOMMITTER_ROLE assignments.
-    /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
+    /// @notice Deprecated optional admin role hash retained for ABI compatibility.
     function OPTIONAL_PRECOMMITTER_ADMIN_ROLE() external view returns (bytes32);
     /// @notice Optional admin role hash for managing COMMITTER_ROLE assignments.
     /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
@@ -82,12 +80,12 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     /// @notice Revokes the specified validator roles for a given validator on the target chain.
     /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to update.
-    /// @param params Flags indicating which roles to revoke.
+    /// @param _params Flags indicating which roles to revoke.
     /// @dev Note that the access control is managed by the inner `revokeRole` functions.
     function removeValidatorRoles(
         address _chainAddress,
         address _validator,
-        ValidatorRotationParams memory params
+        ValidatorRotationParams memory _params
     ) external;
     /// @notice Convenience wrapper to revoke all validator roles for a given validator on the target chain.
     /// @param _chainAddress The address identifier of the ZK chain.
@@ -100,11 +98,11 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     /// @notice Grants the specified validator roles for a given validator on the target chain.
     /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to update.
-    /// @param params Flags indicating which roles to grant.
+    /// @param _params Flags indicating which roles to grant.
     function addValidatorRoles(
         address _chainAddress,
         address _validator,
-        ValidatorRotationParams memory params
+        ValidatorRotationParams memory _params
     ) external;
     /// @notice Convenience wrapper to grant all validator roles for a given validator on the target chain.
     /// @param _chainAddress The address identifier of the ZK chain.
@@ -121,8 +119,6 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     function hasRoleForChainId(uint256 _chainId, bytes32 _role, address _address) external view returns (bool);
 
     // Chain interaction functions
-    /// @dev Make a call to the zkChain diamond contract with the same calldata.
-    function precommitSharedBridge(address _chainAddress, uint256 _l2BlockNumber, bytes calldata _l2Block) external;
     /// @dev Records the timestamp for all provided committed batches and make
     /// a call to the zkChain diamond contract with the same calldata.
     function commitBatchesSharedBridge(

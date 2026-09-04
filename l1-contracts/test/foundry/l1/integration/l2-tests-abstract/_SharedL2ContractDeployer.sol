@@ -12,7 +12,6 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
 import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {
@@ -59,7 +58,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {SystemContractsArgs} from "./Utils.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
 
@@ -73,7 +72,6 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     BridgedStandardERC20 internal standardErc20Impl;
 
     UpgradeableBeacon internal beacon;
-    BeaconProxy internal proxy;
 
     IL2AssetRouter l2AssetRouter = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
     IL2Bridgehub l2Bridgehub = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
@@ -148,13 +146,6 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         // the governor, so this only affects the L2-context (which uses this test beacon).
         beacon.transferOwnership(ownerWallet);
 
-        // One of the purposes of deploying it here is to publish its bytecode
-        BeaconProxy beaconProxy = new BeaconProxy(address(beacon), new bytes(0));
-        proxy = beaconProxy;
-        bytes32 beaconProxyBytecodeHash;
-        assembly {
-            beaconProxyBytecodeHash := extcodehash(beaconProxy)
-        }
         UNBUNDLER_ADDRESS = makeAddr("unbundlerAddress");
         EXECUTION_ADDRESS = makeAddr("executionAddress");
 
@@ -177,7 +168,6 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
                 gatewayChainId: GATEWAY_CHAIN_ID,
                 l1AssetRouter: l1AssetRouter,
                 l2TokenBeacon: address(beacon),
-                l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
                 aliasedOwner: ownerWallet,
                 contractsDeployedAlready: false,
                 l1CtmDeployer: l1CTMDeployer,

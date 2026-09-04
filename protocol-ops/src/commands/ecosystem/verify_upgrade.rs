@@ -186,7 +186,9 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         "zk-governance commit: {}",
         args.zk_governance_commit
     ));
-    logger::info(format!("Representative ZK chain ID: {era_chain_id}"));
+    logger::info(format!(
+        "Era chain ID (v31-ceremony input; feeds the PUH ERA_CHAIN_ID constructor check): {era_chain_id}"
+    ));
     logger::info(format!(
         "Legacy Gateway chain ID: {legacy_gateway_chain_id}"
     ));

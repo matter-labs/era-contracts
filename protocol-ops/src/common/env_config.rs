@@ -108,7 +108,7 @@ pub struct NewGatewayConfig {
     pub refund_recipient: Option<Address>,
     /// Chain ID whose registered CTM `GatewayVotePreparation` should treat as
     /// the "source" — the deployed GW CTM is a variant of this CTM. Pick the
-    /// chain whose CTM is the one the new gateway will host (typically Era).
+    /// chain whose CTM is the one the new gateway will host.
     pub ctm_representative_chain_id: u64,
     /// Optional pre-deployed server notifier address. When present, the
     /// `GatewayVotePreparation` skips the redeploy + ownership-transfer
@@ -178,7 +178,8 @@ pub struct CtmContracts {
     /// field so the legacy shape isn't carried in two places.
     #[serde(default)]
     pub ctm_proxy_addr: Option<Address>,
-    /// v31 multi-CTM list — proxy + per-CTM overrides for pre-v31 envs.
+    /// Multi-CTM list — proxy + optional per-CTM address overrides. Every
+    /// entry must be a ZKsync OS CTM; the prepare flow fails on anything else.
     #[serde(default, rename = "ctms")]
     pub ctms: Vec<CtmEntry>,
 }
@@ -186,8 +187,6 @@ pub struct CtmContracts {
 #[derive(Debug, Deserialize, Clone)]
 pub struct CtmEntry {
     pub proxy: Address,
-    #[serde(default)]
-    pub is_zk_sync_os: Option<bool>,
     #[serde(default)]
     pub bytecodes_supplier: Option<Address>,
     #[serde(default)]

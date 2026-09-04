@@ -12,7 +12,7 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../../../deploy-scripts/utils/Types.sol";
 import {PublishFactoryDepsResult} from "../../../../deploy-scripts/utils/bytecode/BytecodePublisher.s.sol";
@@ -127,6 +127,7 @@ uint256 constant ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT = 13;
 // Slot of `L1MessageRoot.v31UpgradeChainBatchNumber` (mapping). Layout:
 // `Initializable(0)`, `MessageRootBase(1-12)`, `__gap[37](13-49)`, this(50).
 uint256 constant L1_MESSAGE_ROOT_V31_UPGRADE_BATCH_NUMBER_SLOT = 50;
+
 contract UpgradeIntegrationTest_Local is
     UpgradeIntegrationTestBase,
     L1ContractDeployer,
@@ -196,7 +197,6 @@ contract UpgradeIntegrationTest_Local is
         proposedUpgrade.l2ProtocolUpgradeTx.data = DefaultUpgradeZKsyncOS(cut.initAddress).getL2UpgradeTxData(
             address(addresses.bridgehub),
             eraZKChainId,
-            true,
             proposedUpgrade.l2ProtocolUpgradeTx.data
         );
         _expectedRewrittenUpgradeTxHash = keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx));
@@ -223,11 +223,6 @@ contract UpgradeIntegrationTest_Local is
         console.log("setUp: Existing ZKsync OS chain deployed");
         chainId = eraZKChainId;
         acceptPendingAdmin();
-        assertTrue(addresses.chainTypeManager.isZKsyncOS(), "Fixture CTM is not ZKsync OS");
-        assertTrue(
-            IGetters(addresses.bridgehub.getZKChain(eraZKChainId)).getZKsyncOS(),
-            "Existing chain fixture is not ZKsync OS"
-        );
         console.log("setUp: Pending admin accepted");
         ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml";
         ECOSYSTEM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
@@ -269,7 +264,6 @@ contract UpgradeIntegrationTest_Local is
         // Protocol version bumps
         assertEq(IChainTypeManager(ctm).protocolVersion(), _expectedNewVersion, "CTM protocolVersion not bumped");
         assertEq(IGetters(_eraDiamond).getProtocolVersion(), _expectedNewVersion, "Existing chain not upgraded");
-        assertTrue(IGetters(_eraDiamond).getZKsyncOS(), "Existing chain is not ZKsync OS after upgrade");
         assertEq(
             IGetters(_eraDiamond).getL2SystemContractsUpgradeTxHash(),
             _expectedRewrittenUpgradeTxHash,
@@ -283,7 +277,6 @@ contract UpgradeIntegrationTest_Local is
         assertTrue(_newChainDiamond != address(0), "New chain ID not registered");
         assertEq(IGetters(_newChainDiamond).getChainId(), NEW_CHAIN_ID, "New diamond points at wrong chainId");
         assertEq(IGetters(_newChainDiamond).getProtocolVersion(), _expectedNewVersion, "New chain wrong version");
-        assertTrue(IGetters(_newChainDiamond).getZKsyncOS(), "New chain is not ZKsync OS");
         assertEq(IBridgehubBase(bridgehub).chainTypeManager(NEW_CHAIN_ID), ctm, "New chain not linked to CTM");
         assertEq(
             IChainTypeManager(ctm).getChainAdmin(NEW_CHAIN_ID),
@@ -382,7 +375,7 @@ contract UpgradeIntegrationTest_LocalProductionVerifier is UpgradeIntegrationTes
     function setupUpgrade(bool skipFactoryDepsCheck) public override {
         // The genesis fixture registers a testnet verifier; swap in a production one via the CTM
         // owner before the upgrade scripts read it.
-        ChainTypeManagerBase ctm_ = ChainTypeManagerBase(address(addresses.chainTypeManager));
+        ChainTypeManager ctm_ = ChainTypeManager(address(addresses.chainTypeManager));
         address productionVerifier = address(new ZKsyncOSVerifier(IVerifier(address(0))));
         uint256 currentVersion = ctm_.protocolVersion();
         address ctmOwner = ctm_.owner();

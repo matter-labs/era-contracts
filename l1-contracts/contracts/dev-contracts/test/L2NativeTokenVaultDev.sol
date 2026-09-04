@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
-import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
 import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
@@ -11,21 +9,8 @@ import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 
 /// @author Matter Labs
-/// @notice This is used for fast debugging of the L2NTV by running it in L1 context, i.e. normal foundry instead of foundry --zksync.
+/// @notice This is used for fast debugging of the L2NTV by running it in L1 context, i.e. normal foundry.
 contract L2NativeTokenVaultDev is L2NativeTokenVault {
-    /// @notice copied from L1NTV for L1 compilation
-    function calculateCreate2TokenAddress(
-        uint256 _originChainId,
-        address _l1Token
-    ) public view override returns (address) {
-        bytes32 salt = _getCreate2Salt(_originChainId, _l1Token);
-        return
-            Create2.computeAddress(
-                salt,
-                keccak256(abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, "")))
-            );
-    }
-
     function deployBridgedStandardERC20(address _owner) external {
         _transferOwnership(_owner);
 
@@ -35,20 +20,10 @@ contract L2NativeTokenVaultDev is L2NativeTokenVault {
 
         tokenBeacon.transferOwnership(owner());
         bridgedTokenBeacon = IBeacon(address(tokenBeacon));
-        emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), L2_TOKEN_PROXY_BYTECODE_HASH);
+        emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), L2_TOKEN_PROXY_BYTECODE_HASH());
     }
 
     function test() external pure {
         // test
-    }
-
-    function _deployBeaconProxy(bytes32 _salt, uint256) internal virtual override returns (BeaconProxy proxy) {
-        // Use CREATE2 to deploy the BeaconProxy
-        address proxyAddress = Create2.deploy(
-            0,
-            _salt,
-            abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, ""))
-        );
-        return BeaconProxy(payable(proxyAddress));
     }
 }

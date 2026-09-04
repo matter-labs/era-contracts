@@ -39,6 +39,10 @@ pub(crate) struct Verifiers {
     pub bytecode_verifier: BytecodeVerifier,
     pub network_verifier: NetworkVerifier,
     pub zksync_os_genesis_config: GenesisConfig,
+    /// Era chain id from the env's v31 input TOML. Consumed only by
+    /// v31-ceremony checks: the PUH/Guardians `ERA_CHAIN_ID` constructor
+    /// arg (real ABI of the external zk-governance contracts) and the
+    /// v31-generation L1AssetRouter wiring checks.
     pub era_chain_id: u64,
     pub legacy_gateway_chain_id: u64,
     pub legacy_gateway_chain_intervals: Vec<ChainInterval>,
@@ -105,8 +109,7 @@ impl Verifiers {
         )?;
         let bytecode_verifier =
             BytecodeVerifier::init_v31(contracts_commit, zk_governance_commit).await?;
-        let network_verifier =
-            NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into(), era_chain_id).await?;
+        let network_verifier = NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into()).await?;
         anyhow::ensure!(
             network_verifier.get_gateway_chain_id() == new_gateway_chain_id,
             "gateway RPC chain id {} does not match env [new_gateway].chain_id {}",

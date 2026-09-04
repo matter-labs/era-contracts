@@ -31,6 +31,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {L2AdminFactory} from "contracts/governance/L2AdminFactory.sol";
 
 import {ChainTypeManagerTest} from "test/foundry/l1/unit/concrete/state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -374,6 +375,29 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         // Should not fail
         permRestriction.validateCall(call, owner);
+    }
+
+    function test_allowL2Admin_WhitelistsActualFactoryDeployment() public {
+        L2AdminFactory factory = new L2AdminFactory(new address[](0));
+        (TestPermanentRestriction factoryRestriction, ) = _deployPermRestriction(bridgehub, address(factory), owner);
+
+        uint256 deploymentNonce = vm.getNonce(address(factory));
+        assertEq(deploymentNonce, 1, "new contract must start with EVM account nonce 1");
+
+        address expectedAdmin = L2ContractHelper.computeCreateAddress(address(factory), deploymentNonce);
+        vm.expectEmit(true, false, false, true, address(factoryRestriction));
+        emit IPermanentRestriction.AllowL2Admin(expectedAdmin);
+        factoryRestriction.allowL2Admin(deploymentNonce);
+
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit L2AdminFactory.AdminDeployed(expectedAdmin);
+        address deployedAdmin = factory.deployAdmin(new address[](0));
+
+        assertEq(deployedAdmin, expectedAdmin, "allowL2Admin must use the factory's EVM CREATE address");
+        assertTrue(factoryRestriction.allowedL2Admins(deployedAdmin), "deployed admin not whitelisted");
+
+        Call memory call = _encodeMigraationCall(true, true, true, true, true, deployedAdmin);
+        factoryRestriction.validateCall(call, owner);
     }
 
     function createNewChainBridgehub() internal {

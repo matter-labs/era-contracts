@@ -51,7 +51,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
             "/l1-contracts",
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml"
         );
-        initializeConfig(inputPath, L2_BRIDGEHUB_ADDR);
+        initializeConfig(inputPath);
         coreAddresses.bridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
         coreAddresses.bridges.proxies.l1AssetRouter = L2_ASSET_ROUTER_ADDR;
         coreAddresses.bridges.proxies.l1NativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
@@ -73,7 +73,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         ctmAddresses.admin.eip7702Checker = address(0);
         initializeGeneratedData();
         deployStateTransitionDiamondFacets();
-        string memory ctmContractName = "ZKsyncOSChainTypeManager";
+        string memory ctmContractName = "ChainTypeManager";
         (
             ctmAddresses.stateTransition.implementations.chainTypeManager,
             ctmAddresses.stateTransition.proxies.chainTypeManager

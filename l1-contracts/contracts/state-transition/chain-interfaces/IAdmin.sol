@@ -26,10 +26,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _active Active flag
     function setValidator(address _validator, bool _active) external;
 
-    /// @notice Change zk porter availability
-    /// @param _zkPorterIsAvailable The availability of zk porter shard
-    function setPorterAvailability(bool _zkPorterIsAvailable) external;
-
     /// @notice Change the max L2 gas limit for L1 -> L2 transactions
     /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
@@ -61,9 +57,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// However, for some chains (e.g., Prividium or Gateway), a custom filterer may be required
     /// for correct system operation. This function allows ZK Governance to set it.
     function setPriorityModeTransactionFilterer(address _priorityModeTransactionFilterer) external;
-
-    /// @notice Allow EVM emulation on chain
-    function allowEvmEmulation() external returns (bytes32 canonicalTxHash);
 
     /// @notice Allow Priority Mode to be activated on the chain (does not activate it).
     function permanentlyAllowPriorityMode() external;
@@ -119,9 +112,8 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice Sets the pubdata content. Orthogonal to the DA commitment scheme: it selects whether
     /// the whole pubdata (`FULL_PUBDATA`) or only the mandatory L2->L1 log region (`LOGS_ONLY`) is
-    /// committed. Committed into the ZKsync OS batch public input via the chain config hash, so it is
-    /// enforced by the batch proof. Callable only for ZKsync OS chains — the setting has no meaning on
-    /// Era-VM chains.
+    /// committed. Committed into the batch public input via the chain config hash, so it is enforced by
+    /// the batch proof.
     /// @param _pubdataContent The new pubdata content.
     function setPubdataContent(PubdataContent _pubdataContent) external;
 
@@ -131,9 +123,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// and tries to set the DA validator pair to something which does not publish DA to Ethereum.
     /// @dev DANGEROUS: once activated, there is no way back!
     function makePermanentRollup() external;
-
-    /// @notice Porter availability status changes
-    event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
 
     /// @notice Validator's status changed
     event ValidatorStatusUpdate(address indexed validatorAddress, bool isActive);
@@ -179,9 +168,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice Emitted when the contract is unfrozen.
     event Unfreeze();
-
-    /// @notice The EVM emulator has been enabled
-    event EnableEvmEmulator();
 
     /// @notice New L2 DA commitment scheme set
     event NewL2DACommitmentScheme(

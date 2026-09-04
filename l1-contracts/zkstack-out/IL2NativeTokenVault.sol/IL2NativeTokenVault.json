@@ -14,6 +14,19 @@
   },
   {
     "type": "function",
+    "name": "L2_TOKEN_PROXY_BYTECODE_HASH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "WETH_TOKEN",
     "inputs": [],
     "outputs": [

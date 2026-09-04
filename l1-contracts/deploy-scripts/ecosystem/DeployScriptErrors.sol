@@ -3,5 +3,5 @@
 pragma solidity ^0.8.24;
 
 error UnknownCoreContract();
-error UnknownZkSyncOsSystemContract();
+error UnknownL2SystemContract();
 error DeduplicateBytecodesCountMismatch();

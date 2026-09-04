@@ -30,4 +30,7 @@ interface IL2NativeTokenVault is INativeTokenVaultBase {
 
     /// @notice The wrapped base token (WETH) address
     function WETH_TOKEN() external view returns (address);
+
+    /// @notice The deployed bytecode hash of bridged-token beacon proxies.
+    function L2_TOKEN_PROXY_BYTECODE_HASH() external view returns (bytes32);
 }

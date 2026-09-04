@@ -6,7 +6,6 @@ pragma solidity ^0.8.20;
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
  * @notice Interface for sending arbitrary length messages to L1.
- * @dev Shared interface between Era and ZK OS L1Messenger contracts.
  * @dev by default ZkSync can send fixed-length messages on L1.
  * A fixed length message has 4 parameters `senderAddress`, `isService`, `key`, `value`,
  * the first one is taken from the context, the other three are chosen by the sender.

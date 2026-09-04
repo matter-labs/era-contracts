@@ -143,8 +143,8 @@ struct BridgehubL2TransactionRequest {
 /// @param timestamp The block timestamp at which the imported root was created on the dependency
 /// chain. Double checked against `MessageRoot.historicalRoot` during batch execution.
 /// See {protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}.
-/// @param sides The sides of the dynamic incremental merkle tree emitted in the L2ToL1Messenger for precommit based interop
-/// For proof and commit based interop, the sides contain a single root.
+/// @param sides The imported root. The retired precommit encoding used this field for incremental-tree
+/// sides; current proof and commit encodings contain a single root.
 struct InteropRoot {
     uint256 chainId;
     uint256 blockOrBatchNumber;

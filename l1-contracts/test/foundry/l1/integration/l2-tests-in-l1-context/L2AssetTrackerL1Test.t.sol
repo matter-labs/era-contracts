@@ -25,7 +25,6 @@ import {
 import {MAX_TOKEN_BALANCE} from "contracts/common/Config.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
-import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol";
 import {IL2AssetHandler} from "contracts/bridge/interfaces/IL2AssetHandler.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
@@ -120,7 +119,7 @@ contract L2AssetTrackerL1Test is Test, SharedL2ContractL1Deployer {
         uint256 depositsBefore = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
         assertFalse(tracker.isAssetRegistered(baseTokenAssetId), "Asset should not be registered before call");
 
-        // Call as BaseTokenHolder (onlyBaseTokenHolderOrL2BaseToken modifier).
+        // Call as BaseTokenHolder.
         vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, amount);
 
@@ -141,59 +140,11 @@ contract L2AssetTrackerL1Test is Test, SharedL2ContractL1Deployer {
         assertEq(savedAmount, mockedTotalSupply, "totalPreV31TotalSupply.amount should equal mocked totalSupply");
     }
 
-    /// @notice On Era, L2BaseTokenEra.mint() calls handleFinalizeBaseTokenBridgingOnL2 directly
-    /// (msg.sender = L2_BASE_TOKEN_SYSTEM_CONTRACT). This must be allowed by access control.
-    function test_handleFinalizeBaseTokenBridgingOnL2_calledByL2BaseToken() public {
-        bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
-        uint256 amount = 300;
-        uint256 l1ChainId = 1;
-        uint256 mockedTotalSupply = 1000;
-
-        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
-        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(l1ChainId);
-        stdstore
-            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
-            .sig("originChainId(bytes32)")
-            .with_key(baseTokenAssetId)
-            .checked_write(l1ChainId);
-
-        vm.mockCall(
-            address(L2_BASE_TOKEN_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(IERC20.totalSupply.selector),
-            abi.encode(mockedTotalSupply)
-        );
-
-        // Mock currentSettlementLayerChainId to return L1 (not in gateway mode)
-        vm.mockCall(
-            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
-            abi.encode(l1ChainId)
-        );
-
-        L2AssetTracker tracker = L2AssetTracker(L2_ASSET_TRACKER_ADDR);
-        uint256 depositsBefore = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
-        uint256 chainBalanceBefore = tracker.chainBalance(block.chainid, baseTokenAssetId);
-        assertFalse(tracker.isAssetRegistered(baseTokenAssetId), "Asset should not be registered before call");
-
-        // Call as L2BaseToken (the Era flow: L2BaseTokenEra.mint() → asset tracker).
+    /// @notice The base-token system contract was an authorized caller only in the retired Era flow.
+    function test_handleFinalizeBaseTokenBridgingOnL2_revertWhenCalledByL2BaseToken() public {
         vm.prank(address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
-        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, amount);
-
-        // The base token's origin is L1, so the block.chainid branch is not taken; the balance is unchanged.
-        assertEq(
-            tracker.chainBalance(block.chainid, baseTokenAssetId),
-            chainBalanceBefore,
-            "Chain balance should remain unchanged for foreign-origin base token"
-        );
-
-        uint256 depositsAfter = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
-        assertEq(depositsAfter - depositsBefore, amount, "totalSuccessfulDepositsFromL1 should increase by amount");
-
-        // First contact triggers _registerLegacyTokenIfNeeded: registration + supply snapshot set.
-        assertTrue(tracker.isAssetRegistered(baseTokenAssetId), "Asset should be registered after call");
-        (bool isSaved, uint256 savedAmount) = tracker.totalPreV31TotalSupply(baseTokenAssetId);
-        assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
-        assertEq(savedAmount, mockedTotalSupply, "totalPreV31TotalSupply.amount should equal mocked totalSupply");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(L2_BASE_TOKEN_SYSTEM_CONTRACT)));
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(1, 100);
     }
 
     /// @notice A random address must not be able to call handleFinalizeBaseTokenBridgingOnL2.
@@ -274,7 +225,6 @@ contract L2AssetTrackerL1Test is Test, SharedL2ContractL1Deployer {
         L2NativeTokenVault ntv = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
         uint256 liveL1ChainId = ntv.L1_CHAIN_ID();
         address liveOwner = ntv.owner();
-        bytes32 liveProxyBytecodeHash = ntv.L2_TOKEN_PROXY_BYTECODE_HASH();
         address liveWethToken = ntv.WETH_TOKEN();
         TokenBridgingData memory bridgingData = TokenBridgingData({
             assetId: ntv.BASE_TOKEN_ASSET_ID(),
@@ -289,7 +239,7 @@ contract L2AssetTrackerL1Test is Test, SharedL2ContractL1Deployer {
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         // solhint-disable-next-line func-named-parameters
-        ntv.updateL2(liveL1ChainId, liveOwner, liveProxyBytecodeHash, liveWethToken, bridgingData, metadata);
+        ntv.updateL2(liveL1ChainId, liveOwner, liveWethToken, bridgingData, metadata);
 
         vm.expectRevert(BaseTokenNativeToThisChain.selector);
         L2_ASSET_TRACKER.assertBaseTokenRecoveryIsAccountingNeutral(505);

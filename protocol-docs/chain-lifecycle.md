@@ -38,19 +38,16 @@ version, fee params, the priority tree, and the `nativeTokenVault` reference (th
 constant `L2_NATIVE_TOKEN_VAULT_ADDR` when running under the L2 Bridgehub, otherwise derived from
 the Bridgehub's asset router — no immutable needed).
 
-For ZKsync OS chains (`IS_ZKSYNC_OS`) it additionally stores the chain's genesis (batch 0) chain
-batch root: `s.l2LogsRootHashes[0] = ChainBatchRootTree.genesisChainBatchRoot()`. Batch 0 has no
+It also stores the chain's genesis (batch 0) chain batch root:
+`s.l2LogsRootHashes[0] = ChainBatchRootTree.genesisChainBatchRoot()`. Batch 0 has no
 L2->L1 logs, no multichain root, and a freshly seeded (empty) interop commitment tree at both batch
 boundaries, so this value is exact and computable in advance (see `ChainBatchRootTree` for the
-fixed 8-leaf layout of a ZKsync OS chain batch root).
+fixed 8-leaf layout of a chain batch root).
 
 ### Genesis batch root seeding
 
 Called by the Bridgehub right after registration, inside the same `createNewChain` transaction.
-It is a one-time, Bridgehub-only entry point, and a no-op for EraVM chains
-(`IGetters.getZKsyncOS() == false`).
-
-For a ZKsync OS chain it pulls the genesis root back from the chain itself
+It is a one-time, Bridgehub-only entry point. It pulls the genesis root back from the chain itself
 (`l2LogsRootHash(0)`, stored by `DiamondInit`) — keeping the "chain reports its own roots"
 interface intact; the `MessageRoot` never computes a chain's batch-root format — and pushes it as
 the batch-0 leaf of the chain's tree, updating the aggregated shared root. Guards: the read root
@@ -231,7 +228,7 @@ addresses, so there are no wiring parameters, and the manager never custodies fu
 flow through the normal interop path; destination mints go through the `InteropHandler`).
 
 Pre-existing ZKsync OS chains receive the same two built-ins through the upgrade's force deployments
-(`SystemContractsProcessing.getZKsyncOSOnlyContracts`), so they end up with atomic interop
+(`SystemContractsProcessing.getAdditionalFixedAddressCoreContracts`), so they end up with atomic interop
 as well. Both `initL2`s therefore run on the upgrade path too, unconditionally: neither the built-ins
 nor their addresses existed in v31, so no chain can arrive at this upgrade with them already seeded,
 and the force deployments in the same transaction install their code before the `initL2`s run. Era
@@ -243,3 +240,9 @@ system-proxied built-in on every ZKsync OS chain, so the upgrade swaps that prox
 `EmptyContract` — otherwise the retired tracker code would stay callable. Chains created on v32 receive
 the same EmptyContract-backed proxy from genesis, so fresh and upgraded chains match at the reserved
 address.
+
+Finally, the list upgrades the `L2ComplexUpgrader` system proxy at `0x800f` itself. Existing chains
+enter the transaction through the v31 implementation, which still exposed the retired Era force-deploy
+selector. Updating the proxy during its own universal-deployment loop is safe: the active delegatecall
+continues on the old code until it finishes, while subsequent transactions resolve to the current
+OS-only implementation. New chains already install that implementation through genesis.

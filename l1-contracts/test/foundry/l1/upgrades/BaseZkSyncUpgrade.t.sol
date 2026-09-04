@@ -8,7 +8,7 @@ import {BaseZkSyncUpgrade, ProposedUpgrade} from "contracts/upgrades/BaseZkSyncU
 import {
     MAX_ALLOWED_MINOR_VERSION_DELTA,
     MAX_NEW_FACTORY_DEPS,
-    SYSTEM_UPGRADE_L2_TX_TYPE
+    ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
@@ -23,7 +23,7 @@ import {
     ProtocolVersionTooSmall
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {TimeNotReached, TooManyFactoryDeps, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -144,7 +144,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
     // L2 system upgrade tx type is wrong
     function test_revertWhen_InvalidTxType(uint256 newTxType) public {
-        vm.assume(newTxType != SYSTEM_UPGRADE_L2_TX_TYPE && newTxType > 0);
+        vm.assume(newTxType != ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE && newTxType > 0);
         proposedUpgrade.l2ProtocolUpgradeTx.txType = newTxType;
 
         vm.expectRevert(abi.encodeWithSelector(InvalidTxType.selector, newTxType));
@@ -194,14 +194,10 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    // Upgrade with mock factoryDepHash
-    function test_upgrade_WithMockFactoryDepHash() public {
-        bytes[] memory factoryDeps = new bytes[](1);
-        factoryDeps[0] = "11111111111111111111111111111111";
-
+    function test_upgrade_WithFactoryDepHash() public {
+        bytes memory factoryDep = hex"6001600055";
         proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps = new uint256[](1);
-
-        bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(factoryDeps[0]);
+        proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps[0] = uint256(ZKSyncOSBytecodeInfo.hashEVMBytecode(factoryDep));
 
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }

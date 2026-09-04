@@ -9,121 +9,36 @@ import {
     InvalidUpgradeTxn,
     PubdataGreaterThanLimit,
     TooMuchGas,
-    TxnBodyGasLimitNotEnoughGas,
     UpgradeTxVerifyParam,
     ValidateTxnNotEnoughGas
 } from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Unit tests for TransactionValidator library
 contract TransactionValidatorTest is Test {
-    // ============ getOverheadForTransaction Tests ============
-
-    function test_getOverheadForTransaction_smallEncoding() public pure {
-        uint256 overhead = TransactionValidator.getOverheadForTransaction(100);
-        // Should be at least TX_SLOT_OVERHEAD_L2_GAS
-        assertGt(overhead, 0);
-    }
-
-    function test_getOverheadForTransaction_largeEncoding() public pure {
-        uint256 overhead = TransactionValidator.getOverheadForTransaction(10000);
-        // Larger encoding should have larger overhead
-        assertGt(overhead, TransactionValidator.getOverheadForTransaction(100));
-    }
-
-    function test_getOverheadForTransaction_zeroEncoding() public pure {
-        uint256 overhead = TransactionValidator.getOverheadForTransaction(0);
-        // Should still have base overhead
-        assertGt(overhead, 0);
-    }
-
-    // ============ getTransactionBodyGasLimit Tests ============
-
-    function test_getTransactionBodyGasLimit_sufficientGas() public pure {
-        uint256 totalGasLimit = 1000000;
-        uint256 encodingLength = 100;
-
-        uint256 bodyGasLimit = TransactionValidator.getTransactionBodyGasLimit(totalGasLimit, encodingLength, false);
-
-        // Body gas should be less than total (overhead subtracted)
-        assertLt(bodyGasLimit, totalGasLimit);
-        assertGt(bodyGasLimit, 0);
-    }
-
-    function test_getTransactionBodyGasLimit_zksyncOS() public pure {
-        uint256 totalGasLimit = 1000000;
-        uint256 encodingLength = 100;
-
-        uint256 bodyGasLimit = TransactionValidator.getTransactionBodyGasLimit(totalGasLimit, encodingLength, true);
-
-        // ZKsync OS has no overhead
-        assertEq(bodyGasLimit, totalGasLimit);
-    }
-
-    function test_getTransactionBodyGasLimit_revertsOnInsufficientGas() public {
-        uint256 totalGasLimit = 100; // Too small
-        uint256 encodingLength = 10000; // Large encoding
-
-        vm.expectRevert(TxnBodyGasLimitNotEnoughGas.selector);
-        TransactionValidator.getTransactionBodyGasLimit(totalGasLimit, encodingLength, false);
-    }
-
-    function test_getTransactionBodyGasLimit_exactOverhead() public pure {
-        uint256 encodingLength = 100;
-        uint256 overhead = TransactionValidator.getOverheadForTransaction(encodingLength);
-        uint256 totalGasLimit = overhead;
-
-        uint256 bodyGasLimit = TransactionValidator.getTransactionBodyGasLimit(totalGasLimit, encodingLength, false);
-        assertEq(bodyGasLimit, 0);
-    }
-
     // ============ getMinimalPriorityTransactionGasLimit Tests ============
 
-    function test_getMinimalPriorityTransactionGasLimit_nonZKsyncOS() public pure {
+    function test_getMinimalPriorityTransactionGasLimit_basicValues() public pure {
         uint256 minGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(
-            100, // encodingLength
             50, // calldataLength
-            0, // numberOfFactoryDependencies
-            800, // l2GasPricePerPubdata
-            false // zksyncOS
+            800 // l2GasPricePerPubdata
         );
 
         assertGt(minGas, 0);
-    }
-
-    function test_getMinimalPriorityTransactionGasLimit_zksyncOS() public pure {
-        uint256 minGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(
-            100, // encodingLength
-            50, // calldataLength
-            0, // numberOfFactoryDependencies
-            800, // l2GasPricePerPubdata
-            true // zksyncOS
-        );
-
-        assertGt(minGas, 0);
-    }
-
-    function test_getMinimalPriorityTransactionGasLimit_withFactoryDeps() public pure {
-        uint256 minGasNoDeps = TransactionValidator.getMinimalPriorityTransactionGasLimit(100, 50, 0, 800, false);
-
-        uint256 minGasWithDeps = TransactionValidator.getMinimalPriorityTransactionGasLimit(100, 50, 5, 800, false);
-
-        // More factory deps should require more gas
-        assertGt(minGasWithDeps, minGasNoDeps);
     }
 
     function test_getMinimalPriorityTransactionGasLimit_zeroMaxFeePerGas() public pure {
         // Zero max fee is possible for upgrade/service transactions
-        uint256 minGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(100, 50, 0, 800, true);
+        uint256 minGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(50, 800);
 
         assertGt(minGas, 0);
     }
 
-    function test_getMinimalPriorityTransactionGasLimit_largerEncodingRequiresMoreOrEqualGas() public pure {
-        uint256 minGasSmall = TransactionValidator.getMinimalPriorityTransactionGasLimit(100, 50, 0, 800, false);
+    function test_getMinimalPriorityTransactionGasLimit_largerCalldataRequiresMoreOrEqualGas() public pure {
+        uint256 minGasSmall = TransactionValidator.getMinimalPriorityTransactionGasLimit(50, 800);
 
-        uint256 minGasLarge = TransactionValidator.getMinimalPriorityTransactionGasLimit(1000, 500, 0, 800, false);
+        uint256 minGasLarge = TransactionValidator.getMinimalPriorityTransactionGasLimit(500, 800);
 
-        // Larger encoding should require at least as much gas
+        // Larger calldata should require at least as much gas
         assertGe(minGasLarge, minGasSmall);
     }
 
@@ -249,17 +164,17 @@ contract TransactionValidatorTest is Test {
 
     // ============ Fuzz Tests ============
 
-    function testFuzz_getOverheadForTransaction(uint256 encodingLength) public pure {
-        vm.assume(encodingLength < type(uint128).max); // Prevent overflow
-
-        uint256 overhead = TransactionValidator.getOverheadForTransaction(encodingLength);
-        assertGt(overhead, 0);
-    }
-
-    function testFuzz_getTransactionBodyGasLimit_zksyncOS(uint256 totalGasLimit, uint256 encodingLength) public pure {
-        // ZKsync OS has no overhead, so total = body
-        uint256 bodyGasLimit = TransactionValidator.getTransactionBodyGasLimit(totalGasLimit, encodingLength, true);
-        assertEq(bodyGasLimit, totalGasLimit);
+    function testFuzz_getMinimalPriorityTransactionGasLimit_monotonicInCalldata(
+        uint32 calldataLength,
+        uint32 delta,
+        uint32 gasPerPubdata
+    ) public pure {
+        uint256 shorter = TransactionValidator.getMinimalPriorityTransactionGasLimit(calldataLength, gasPerPubdata);
+        uint256 longer = TransactionValidator.getMinimalPriorityTransactionGasLimit(
+            uint256(calldataLength) + delta,
+            gasPerPubdata
+        );
+        assertGe(longer, shorter);
     }
 
     function testFuzz_validateUpgradeTransaction_validFrom(uint16 from) public pure {

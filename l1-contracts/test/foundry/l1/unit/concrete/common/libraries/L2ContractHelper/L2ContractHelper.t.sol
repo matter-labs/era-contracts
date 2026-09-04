@@ -3,82 +3,55 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {BytecodeError, LengthIsNotDivisibleBy32, MalformedBytecode} from "contracts/common/L1ContractErrors.sol";
+import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 
 contract L2ContractHelperTest is Test {
-    address daiOnEthereum = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
-    address daiOnEra = 0x4B9eb6c0b6ea15176BBF62841C6B2A8a398cb656;
+    function test_hashFactoryDeps_emptyArray() public pure {
+        uint256[] memory hashedFactoryDeps = L2ContractHelper.hashFactoryDeps(new bytes[](0));
 
-    address l2Bridge = 0x11f943b2c77b743AB90f4A0Ae7d5A4e7FCA3E102;
-    address l2TokenBeacon = 0x1Eb710030273e529A6aD7E1e14D4e601765Ba3c6;
-    bytes32 l2TokenProxyBytecodeHash = 0x01000121a363b3fbec270986067c1b553bf540c30a6f186f45313133ff1a1019;
-
-    // Bytecode must be provided in 32-byte words
-    function test_RevertWhen_BytecodeLengthIsNotMultipleOf32() public {
-        bytes memory bytecode = new bytes(63);
-
-        vm.expectRevert(abi.encodeWithSelector(LengthIsNotDivisibleBy32.selector, 63));
-        bytes32 hash = L2ContractHelper.hashL2Bytecode(bytecode);
+        assertEq(hashedFactoryDeps.length, 0);
     }
 
-    // Bytecode length must be less than 2^16 words
-    function test_RevertWhen_BytecodeLengthIsTooLarge() public {
-        bytes memory bytecode = new bytes(2 ** 16 * 32);
+    function test_hashFactoryDeps_acceptsArbitraryEvmBytecodeLengths() public pure {
+        bytes[] memory factoryDeps = new bytes[](4);
+        factoryDeps[0] = hex"";
+        factoryDeps[1] = hex"00";
+        factoryDeps[2] = hex"6001600055";
+        factoryDeps[3] = new bytes(33);
 
-        vm.expectRevert(abi.encodeWithSelector(MalformedBytecode.selector, BytecodeError.NumberOfWords));
-        bytes32 hash = L2ContractHelper.hashL2Bytecode(bytecode);
+        uint256[] memory hashedFactoryDeps = L2ContractHelper.hashFactoryDeps(factoryDeps);
+
+        assertEq(hashedFactoryDeps.length, factoryDeps.length);
+        for (uint256 i = 0; i < factoryDeps.length; ++i) {
+            assertEq(
+                hashedFactoryDeps[i],
+                uint256(ZKSyncOSBytecodeInfo.hashEVMBytecode(factoryDeps[i])),
+                "wrong observable bytecode hash"
+            );
+        }
     }
 
-    // Bytecode length in words must be odd
-    function test_RevertWhen_BytecodeLengthIsNotOdd() public {
-        bytes memory bytecode = new bytes(64);
+    function test_hashFactoryDeps_preservesOrder() public pure {
+        bytes[] memory factoryDeps = new bytes[](2);
+        factoryDeps[0] = hex"6001600055";
+        factoryDeps[1] = hex"6002600055";
 
-        vm.expectRevert(abi.encodeWithSelector(MalformedBytecode.selector, BytecodeError.WordsMustBeOdd));
-        bytes32 hash = L2ContractHelper.hashL2Bytecode(bytecode);
+        uint256[] memory hashedFactoryDeps = L2ContractHelper.hashFactoryDeps(factoryDeps);
+
+        assertEq(hashedFactoryDeps[0], uint256(keccak256(factoryDeps[0])));
+        assertEq(hashedFactoryDeps[1], uint256(keccak256(factoryDeps[1])));
+        assertNotEq(hashedFactoryDeps[0], hashedFactoryDeps[1]);
     }
 
-    function test_SuccessfulHashing() public {
-        bytes memory bytecode = new bytes(32);
-        bytes32 hash = L2ContractHelper.hashL2Bytecode(bytecode);
+    function testFuzz_hashFactoryDeps_usesObservableBytecodeHash(bytes memory _bytecode) public pure {
+        bytes[] memory factoryDeps = new bytes[](1);
+        factoryDeps[0] = _bytecode;
 
-        assertEq(hash, bytes32(0x01000001f862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925));
-    }
+        uint256[] memory hashedFactoryDeps = L2ContractHelper.hashFactoryDeps(factoryDeps);
 
-    // Incorrectly formatted bytecodeHash
-    function test_RevertWhen_BytecodeHashVersionIsNotOne() public {
-        bytes32 bytecodeHash = bytes32(0x02000001f862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925);
-
-        vm.expectRevert(abi.encodeWithSelector(MalformedBytecode.selector, BytecodeError.Version));
-        L2ContractHelper.validateBytecodeHash(bytecodeHash);
-    }
-
-    // Code length in words must be odd
-    function test_RevertWhen_CodeLengthInWordsIsNotOdd() public {
-        bytes32 bytecodeHash = bytes32(0x01000002f862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925);
-
-        vm.expectRevert(abi.encodeWithSelector(MalformedBytecode.selector, BytecodeError.WordsMustBeOdd));
-        L2ContractHelper.validateBytecodeHash(bytecodeHash);
-    }
-
-    function test_SuccessfulValidation() public {
-        bytes32 bytecodeHash = bytes32(0x01000001f862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925);
-
-        L2ContractHelper.validateBytecodeHash(bytecodeHash);
-    }
-
-    // computeCreate2Address
-    function test_ComputeCreate2Address() public {
-        bytes32 constructorInputHash = keccak256(abi.encode(l2TokenBeacon, ""));
-        bytes32 salt = bytes32(uint256(uint160(daiOnEthereum)));
-
-        address computedAddress = L2ContractHelper.computeCreate2Address(
-            l2Bridge,
-            salt,
-            l2TokenProxyBytecodeHash,
-            constructorInputHash
-        );
-
-        assertEq(computedAddress, daiOnEra);
+        assertEq(hashedFactoryDeps.length, 1);
+        assertEq(hashedFactoryDeps[0], uint256(keccak256(_bytecode)));
     }
 }

@@ -162,7 +162,6 @@ sol! {
 
     interface IL2V32Upgrade {
         function upgrade(
-            bool _isZKsyncOS,
             address _ctmDeployer,
             bytes calldata _fixedForceDeploymentsData,
             bytes calldata _additionalForceDeploymentsData
@@ -490,19 +489,12 @@ pub(super) async fn verify_l2_v31_upgrade_inner_calldata(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
     calldata: &[u8],
-    expected_is_zksync_os: bool,
     expected_fixed_force_deployments_data: &str,
 ) -> anyhow::Result<()> {
     use anyhow::Context;
     let decoded = IL2V32Upgrade::upgradeCall::abi_decode(calldata)
         .context("decoding IL2V32Upgrade.upgrade inner calldata")?;
 
-    if decoded._isZKsyncOS != expected_is_zksync_os {
-        result.report_error(&format!(
-            "IL2V32Upgrade.upgrade _isZKsyncOS mismatch: expected {}, got {}",
-            expected_is_zksync_os, decoded._isZKsyncOS
-        ));
-    }
     result.expect_address(
         verifiers,
         &decoded._ctmDeployer,

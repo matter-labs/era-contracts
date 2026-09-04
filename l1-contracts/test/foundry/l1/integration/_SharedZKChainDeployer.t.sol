@@ -32,7 +32,6 @@ contract ZKChainDeployer is L1ContractDeployer {
         address validatorSenderOperatorExecute;
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
-        bool allowEvmEmulator;
     }
 
     ChainConfig internal eraConfig;
@@ -123,7 +122,7 @@ contract ZKChainDeployer is L1ContractDeployer {
 
     function _processGenesisUpgrade(uint256 _chainId) internal {
         IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(_chainId));
-        // Slot 34 is "l2SystemContractsUpgradeBatchNumber" in ZKChainStorage
+        // Slot 34 is "l2SystemContractsUpgradeTxHash" in ZKChainStorage
         vm.store(address(chain), bytes32(uint256(34)), bytes32(0));
     }
 
@@ -153,8 +152,7 @@ contract ZKChainDeployer is L1ContractDeployer {
             validatorSenderOperatorProve: address(2),
             validatorSenderOperatorExecute: address(3),
             baseTokenGasPriceMultiplierNominator: uint128(1),
-            baseTokenGasPriceMultiplierDenominator: uint128(1),
-            allowEvmEmulator: false
+            baseTokenGasPriceMultiplierDenominator: uint128(1)
         });
     }
 
@@ -188,8 +186,6 @@ contract ZKChainDeployer is L1ContractDeployer {
         );
         vm.serializeUint("chain", "governance_min_delay", 0);
         vm.serializeAddress("chain", "governance_security_council_address", address(0));
-
-        vm.serializeBool("chain", "allow_evm_emulator", description.allowEvmEmulator);
 
         string memory single_serialized = vm.serializeUint(
             "chain",
@@ -234,7 +230,6 @@ contract ZKChainDeployer is L1ContractDeployer {
         uint256 _protocolVersion,
         bytes32 _storedBatchZero,
         address _bridgehub,
-        address _interopCenter,
         address _chainTypeManager
     ) internal returns (address) {
         Diamond.DiamondCutData memory diamondCut = abi.decode(
@@ -246,12 +241,11 @@ contract ZKChainDeployer is L1ContractDeployer {
 
         {
             // stack too deep
-            // InitializeData layout includes bridgehub, interop center, and CTM for v31+ init calldata.
+            // InitializeData layout includes bridgehub and CTM for v32+ init calldata.
             initData1 = bytes.concat(
                 IDiamondInit.initialize.selector,
                 bytes32(_chainId),
                 bytes32(uint256(uint160(address(_bridgehub)))),
-                bytes32(uint256(uint160(address(_interopCenter)))),
                 bytes32(uint256(uint160(_chainTypeManager)))
             );
         }

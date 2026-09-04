@@ -8,7 +8,7 @@ import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitm
 import {IL2InteropCommitmentTree} from "contracts/atomic-interop/IL2InteropCommitmentTree.sol";
 import {IMTLeaf, IndexedMerkleTree} from "contracts/common/libraries/IndexedMerkleTree.sol";
 import {CommitmentTreeNotAppender} from "contracts/atomic-interop/AtomicInteropErrors.sol";
-import {Unauthorized} from "contracts/l2-system/zksync-os/errors/ZKOSContractErrors.sol";
+import {Unauthorized} from "contracts/l2-system/zksync-os/errors/SystemContractErrors.sol";
 import {
     IMTAlreadyInitialized,
     IMTNotInitialized,

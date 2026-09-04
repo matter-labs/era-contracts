@@ -207,6 +207,12 @@ pub async fn stage_vote_prepare(
     .context("Failed to resolve CTM proxy from bridgehub")?;
     logger::info(format!("CTM proxy (from L1): {:#x}", ctm_proxy));
 
+    // Fail closed if the CTM is not a supported ZKsync OS CTM (resolved from its
+    // reported protocol version).
+    crate::common::l1_contracts::ensure_supported_os_ctm(&runner.rpc_url, ctm_proxy)
+        .await
+        .context("Failed to verify the CTM is a supported ZKsync OS CTM")?;
+
     // Source force_deployments_data: prefer an explicit override (used by
     // the v31 ecosystem flow, which has just produced the post-upgrade
     // `force_deployments_data` in the CTM prepare's output TOML) over the
@@ -235,7 +241,6 @@ pub async fn stage_vote_prepare(
     let toml_content = format!(
         r#"# Used by the gateway vote preparation forge script
 testnet_verifier = {testnet_verifier}
-is_zk_sync_os = {zksync_os}
 refund_recipient = "{refund:#x}"
 gateway_chain_id = {gw}
 force_deployments_data = "{fd}"
@@ -261,13 +266,6 @@ validator_timelock_execution_delay = 0
             .await
             .context("Failed to resolve testnet verifier status")?;
             logger::info(format!("Testnet verifier (from L1): {v}"));
-            v
-        },
-        zksync_os = {
-            let v = crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
-                .await
-                .context("Failed to resolve isZKsyncOS from CTM")?;
-            logger::info(format!("ZKsync OS (from L1): {v}"));
             v
         },
         gw = chain_id,

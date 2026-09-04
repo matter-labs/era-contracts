@@ -16,7 +16,7 @@ abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
     ) internal virtual override returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
         return
             SystemContractsProcessing.mergeUniversalForceDeployments(
-                SystemContractsProcessing.getBaseZKsyncOSForceDeployments(),
+                SystemContractsProcessing.getBaseForceDeployments(),
                 getAdditionalUniversalForceDeployments()
             );
     }

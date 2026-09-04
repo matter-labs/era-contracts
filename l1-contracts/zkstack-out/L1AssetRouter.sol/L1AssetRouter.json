@@ -16,16 +16,6 @@
         "name": "_l1Nullifier",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "_eraChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_eraDiamondProxy",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
@@ -39,32 +29,6 @@
         "name": "",
         "type": "address",
         "internalType": "contract IL1Bridgehub"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ERA_CHAIN_ID",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ERA_DIAMOND_PROXY",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IZKChain"
       }
     ],
     "stateMutability": "view"

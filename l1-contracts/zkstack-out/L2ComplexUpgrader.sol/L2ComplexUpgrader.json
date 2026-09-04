@@ -1,56 +1,6 @@
 [
   {
     "type": "function",
-    "name": "forceDeployAndUpgrade",
-    "inputs": [
-      {
-        "name": "_forceDeployments",
-        "type": "tuple[]",
-        "internalType": "struct IL2ContractDeployer.ForceDeployment[]",
-        "components": [
-          {
-            "name": "bytecodeHash",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "newAddress",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "callConstructor",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "value",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "input",
-            "type": "bytes",
-            "internalType": "bytes"
-          }
-        ]
-      },
-      {
-        "name": "_delegateTo",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_calldata",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
     "name": "forceDeployAndUpgradeUniversal",
     "inputs": [
       {

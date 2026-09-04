@@ -10,7 +10,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract TestBaseFacet is ZKChainBase {
@@ -37,7 +37,7 @@ bytes constant ERROR_ONLY_BRIDGEHUB = "ZKChain: not bridgehub";
 bytes constant ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by admin or state transition manager";
 bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by validator or state transition manager";
 
-contract ZKChainBaseTest is UtilsTest {
+contract ZKChainBaseTest is UtilsCallMockerTest {
     TestBaseFacet internal testBaseFacet;
     UtilsFacet internal utilsFacet;
     address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));

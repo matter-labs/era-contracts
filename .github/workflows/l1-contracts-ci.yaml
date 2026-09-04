@@ -52,7 +52,7 @@ jobs:
       # Reads the cross-commit solc cache, never writes it. A PR's later runs can restore what its
       # earlier runs saved, so a PR could plant a forged artifact plus a manifest vouching for it and
       # have check-hashes attest to bytecode that never came from its sources. Constraining the writer
-      # is the only fix: verify-merged-commit.yaml builds clean and saves only after those checks pass.
+      # is the only fix: verify-merged-commit.yaml saves artifacts from a clean, cache-disabled build.
       # A PR pays only its own incremental recompile, since it still warms from the base's cache.
       - name: Create cache
         uses: actions/cache/save@v4
