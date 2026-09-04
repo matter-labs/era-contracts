@@ -98,8 +98,19 @@ plus `v0.31.0-interopB/<env>.toml` — and the L1 to fork is read from that env'
 needs no workflow edit: commit the config pair, add its anvil port to
 `ENV_ANVIL_PORTS` in `protocol-ops/src/commands/ecosystem/bundle.rs` if it needs its own fork, and (if PUVT
 should accept it) a variant in `VerifyUpgradeEnv`. Committed today: `stage`,
-`testnet`, `mainnet`. PUVT must pass for both the generate job and the independent
-bundle-handoff verification job.
+`testnet`, `mainnet`, `adi`. PUVT must pass for both the generate job and the
+independent bundle-handoff verification job.
+
+`adi` is the first standalone ecosystem in this list: single-chain, ZKsync-OS, on L1
+mainnet, and owned by a legacy `Governance.sol` rather than a ProtocolUpgradeHandler.
+Its config pair is committed and the env is dispatchable, but PUVT does not yet model
+that topology — it runs the Era-diamond fee-parameter check against a chain the
+ecosystem never registered, and its ownership checks do not allow a
+legacy-Governance-owned ValidatorTimelock with governance pending. Expect those
+errors on an `adi` run until PUVT gains the matching gates; read the printed output
+rather than trusting the exit code. Note also that ADI's Governance has a real
+security council and a three-day `minDelay()`, so a ceremony replay needs the council
+impersonated or the delay advanced.
 
 > **Already-deployed ecosystems.** Re-running the prepare against the chain tip
 > of an ecosystem whose v31 upgrade is already live reverts (the deployer no

@@ -226,7 +226,7 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment = basename of the config pair upgrade-envs/permanent-values/<env>.toml + upgrade-envs/v0.31.0-interopB/<env>.toml. Today: stage, testnet, mainnet. The L1 to fork is chosen from that env's l1_chain_id (1 → mainnet, 11155111 → Sepolia)."
+        description: "Environment = basename of the config pair upgrade-envs/permanent-values/<env>.toml + upgrade-envs/v0.31.0-interopB/<env>.toml. Today: stage, testnet, mainnet, adi. The L1 to fork is chosen from that env's l1_chain_id (1 → mainnet, 11155111 → Sepolia)."
         required: true
         type: string
       l1_rpc_url:

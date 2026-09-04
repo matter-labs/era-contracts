@@ -56,8 +56,12 @@ const DEFAULT_ZK_GOVERNANCE_COMMIT: &str = "9b06a16159cd58add109f25598e79731450d
 
 /// Anvil port of each env's generate fork; a replay of the same env uses port + 1, so a
 /// replay can run next to a rehearsal of the same env.
-const ENV_ANVIL_PORTS: [(&str, u16); 3] =
-    [("stage", 29_545), ("testnet", 29_547), ("mainnet", 29_549)];
+const ENV_ANVIL_PORTS: [(&str, u16); 4] = [
+    ("stage", 29_545),
+    ("testnet", 29_547),
+    ("mainnet", 29_549),
+    ("adi", 29_551),
+];
 const REPLAY_PORT_OFFSET: u16 = 1;
 const ANVIL_GAS_PRICE_WEI: u64 = 1_000_000_000;
 const ANVIL_STARTUP_TIMEOUT_MS: u64 = 60_000;
@@ -991,6 +995,28 @@ mod tests {
             "{:#}",
             result.expect_err("expected the integrity check to fail")
         )
+    }
+
+    /// Every committed env config must load and expose a usable topology. Catches schema
+    /// mistakes in a new env's config pair (e.g. `bridgehub_proxy_address` outside
+    /// `[contracts]`, or a CTM array that resolves to nothing).
+    #[test]
+    fn every_committed_env_config_loads() {
+        for env in ["stage", "testnet", "mainnet", "adi"] {
+            let Ok(cfg) = EnvConfig::load(env) else {
+                return; // no checkout around the test binary
+            };
+            assert_ne!(cfg.bridgehub(), Address::ZERO, "{env}: bridgehub is unset");
+            assert!(
+                !cfg.ctms().is_empty(),
+                "{env}: no [[ctm_contracts.ctms]] entries"
+            );
+            assert!(
+                cfg.zk_token_asset_id().is_some(),
+                "{env}: zk_token_asset_id is unset"
+            );
+            assert!(anvil_port(env).is_ok(), "{env}: no anvil port assigned");
+        }
     }
 
     #[test]
