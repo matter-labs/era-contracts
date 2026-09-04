@@ -57,7 +57,10 @@ const EIP1967_ADMIN_SLOT: B256 = B256::new([
 const PROXY_ADMIN_UPGRADE_AND_CALL_SELECTOR: [u8; 4] = [0x96, 0x23, 0x60, 0x9d];
 /// `ProtocolUpgradeHandler.initialize(address,address,address)` selector — the proxy
 /// initializer, guarded by `reinitializer(2)`, run as the `upgradeAndCall` hook.
-const PUH_INITIALIZE_SELECTOR: [u8; 4] = [0xc0, 0xc5, 0x3b, 0x8b];
+/// `initialize(address,address,address)` on the PUH implementation — the hook the
+/// stage-0 impl swap carries. `stage0::the_verifier_and_generator_agree_on_the_puh_hook`
+/// pins this to the verifier's `initializeCall` selector.
+pub(crate) const PUH_INITIALIZE_SELECTOR: [u8; 4] = [0xc0, 0xc5, 0x3b, 0x8b];
 /// `bridgehub.chainAssetHandler()` selector.
 const BRIDGEHUB_CHAIN_ASSET_HANDLER_SELECTOR: [u8; 4] = [0x70, 0xd8, 0xaf, 0x87];
 
@@ -276,11 +279,15 @@ pub async fn deploy_puh_guardians(
         "New EmergencyBoard:   {new_emergency_upgrade_board:#x}"
     ));
 
-    // Stage-0 wiring, executed as the PUH via governance. The impl swap goes
-    // first; then the three `onlySelf` setters repoint the proxy at the freshly
-    // deployed SecurityCouncil, Guardians and EmergencyUpgradeBoard. The board
+    // Stage-0 wiring, executed as the PUH via governance: ONE call. The impl
+    // swap carries the new implementation's `initialize` as its `upgradeAndCall`
+    // hook, so the proxy is pointed at the freshly deployed SecurityCouncil,
+    // Guardians and EmergencyUpgradeBoard in the same transaction. The board
     // already embeds the new SC + Guardians as immutables (set at deploy), so
-    // pointing the PUH at the new board completes a consistent set.
+    // the set is consistent. Splitting this into a bare swap plus three
+    // `onlySelf` setters — the shape this replaced — leaves the proxy on
+    // `_initialized == 1` in between, where any caller can run `initialize`
+    // first and install their own governance set.
     let stage0_calls = vec![GovernanceCall {
         target: proxy_admin,
         value: U256::ZERO,

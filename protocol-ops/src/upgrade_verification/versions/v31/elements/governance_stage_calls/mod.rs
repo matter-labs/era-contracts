@@ -59,9 +59,11 @@ sol! {
     function setAssetTracker(address _l1AssetTracker);
     function setAddresses();
     function setAddressesV31(address _chainRegistrationSender);
-    function updateSecurityCouncil(address _newSecurityCouncil);
-    function updateGuardians(address _newGuardians);
-    function updateEmergencyUpgradeBoard(address _newEmergencyUpgradeBoard);
+    // The PUH's `reinitializer` initializer, carried as the `upgradeAndCall`
+    // hook of the stage-0 implementation swap. Selector 0xc0c53b8b, which must
+    // stay equal to `PUH_INITIALIZE_SELECTOR` in
+    // `commands::ecosystem::zk_governance` (the generator side).
+    function initialize(address _securityCouncil, address _guardians, address _emergencyUpgradeBoard);
     function updateDAPair(address l1DAValidator, uint8 l2DACommitmentScheme, bool status);
 
     // L2-side selectors carried as `l2Calldata` inside the new-Gateway
