@@ -132,6 +132,20 @@ interface IGetters is IZKChainBase {
     /// substituted when the value was never set explicitly.
     function getZKsyncOSMaxTxGasLimit() external view returns (uint64);
 
+    /// @return Bit mask of the proof systems this Era chain does not require in order to settle.
+    /// @dev `0` means every proof system is required. Read by `EraMultiProofVerifier` from the calling
+    /// chain, since one verifier instance serves every chain of a protocol version.
+    function disabledProofSystems() external view returns (uint8);
+
+    /// @return The Airbender-shape commitment recorded when the given batch was verified, or `0` if
+    /// the Airbender lane never verified the batch currently stored under that number.
+    /// @dev The operator reads this to decide whether a prove call must carry a bootstrap witness
+    /// for its previous batch: `0` means the chain has to be seeded from that batch's committed
+    /// data, which is the case before the lane is first enabled and again after any period with the
+    /// lane switched off.
+    /// @param _batchNumber The batch to look up.
+    function airbenderCommitment(uint256 _batchNumber) external view returns (bytes32);
+
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
     /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.

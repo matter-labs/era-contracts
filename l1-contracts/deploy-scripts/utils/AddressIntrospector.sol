@@ -501,7 +501,7 @@ library AddressIntrospector {
         return address(0);
     }
 
-    /// @notice Get fflonk, plonk and Airbender PLONK sub-verifiers from a dual verifier
+    /// @notice Get fflonk and plonk sub-verifiers from a dual verifier
     /// @param _verifier The verifier address
     /// @param _isZKsyncOS If true, uses ZKsyncOSDualVerifier interface; otherwise EraDualVerifier
     function _getSubVerifiers(
@@ -520,12 +520,17 @@ library AddressIntrospector {
         (address verifierFflonk, address verifierPlonk, address airbenderVerifierPlonk) = _isV29
             ? (address(0), address(0), address(0))
             : _getSubVerifiers(_verifier, _isZKsyncOS);
+        // The gate's lanes are not probed here: detecting them needs a fail-soft `staticcall`, which this
+        // repository forbids and which would turn a miswired verifier into a silent zero. The deploy scripts
+        // report them instead, under `airbender_verifier_addr` and `boojum_verifier_addr`.
         return
             Verifiers({
                 verifier: _verifier,
                 verifierFflonk: verifierFflonk,
                 verifierPlonk: verifierPlonk,
-                airbenderVerifierPlonk: airbenderVerifierPlonk
+                airbenderVerifierPlonk: airbenderVerifierPlonk,
+                airbenderVerifier: address(0),
+                boojumVerifier: address(0)
             });
     }
 }

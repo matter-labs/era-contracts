@@ -15,6 +15,24 @@ error AddressHasNoCode(address);
 error AddressMismatch(address expected, address supplied);
 // 0x42573d7a
 error AddressNotZero();
+// 0xb1fa9058
+/// @notice A bootstrap witness was supplied for a previous batch whose Airbender commitment is
+/// already recorded, where it would be silently ignored.
+error AirbenderBootstrapWitnessNotExpected();
+// 0x5689c78f
+/// @notice A prove call carried more than one bootstrap witness. Only the first would ever be read.
+error AirbenderBootstrapWitnessCountInvalid(uint256 provided);
+// 0xa7009944
+/// @notice The previous batch has no recorded Airbender commitment, so the transition that seeds
+/// the chain must carry a witness for it.
+error AirbenderBootstrapWitnessRequired();
+// 0x3f1cd7a3
+/// @notice A prove call carried a number of proved-batch witnesses other than one. Only the first
+/// would ever be read, so more than one would be accepted and silently ignored.
+error AirbenderProvedWitnessCountInvalid(uint256 provided);
+// 0x8a9f4aa0
+/// @notice The Airbender-lane prove encoding was used on a ZKsync OS chain, which has no such lane.
+error AirbenderWitnessNotSupportedOnZKsyncOS();
 // 0xb577eb6c
 error AlreadyDangerousContract(address);
 // 0x2a5989a0
@@ -204,8 +222,12 @@ error InvalidNTVBurnData();
 error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 numHashes);
 // 0x99f6cc22
 error InvalidPackedPrecommitmentLength(uint256 length);
+// 0x1b6712bc
+error InvalidDisabledProofSystemsMask(uint8 mask);
 // 0x09bde339
 error InvalidProof();
+// 0x3e157423
+error InvalidPublicInputsLength();
 // 0x5a1c353a
 error InvalidProofFormat();
 // 0x48c5fa28

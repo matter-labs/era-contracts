@@ -29,8 +29,7 @@ contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
     IMailbox internal mailboxFacet;
     UtilsFacet internal utilsFacet;
     DummyBridgehub internal dummyBridgehub;
-    address internal testnetVerifier =
-        address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     uint256 constant eraChainId = 9;
 
     function getAdminSelectors() internal pure returns (bytes4[] memory) {

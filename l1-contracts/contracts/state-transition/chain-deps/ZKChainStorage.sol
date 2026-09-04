@@ -258,12 +258,30 @@ struct ZKChainStorage {
     uint256 lastTokenMultiplierUpdateTimestamp;
     /// @dev Whether the chain has correct base token total supply tracked. It is the case for all chains,
     /// except for ZKsync OS chains that have existed before the v31 upgrade.
-    /// @dev STORAGE SLOT: 68
+    /// @dev STORAGE SLOT: 68 (offset 0)
     bool baseTokenHasTotalSupply;
     /// @dev The ZKsync OS single-transaction gas limit (EIP-7825), committed into each batch proof
     /// public input. A chain may raise the cap above the Ethereum limit but must not set it below.
     /// `0` means the default (`ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`) for chains that existed before
     /// this field was introduced.
-    /// @dev STORAGE SLOT: 68
+    /// @dev STORAGE SLOT: 68 (offset 1)
     uint64 zksyncOSMaxTxGasLimit;
+    /// @dev Bit mask of the proof systems this Era chain does not require. `0`, the value every chain has
+    /// until its admin writes it, requires all of them.
+    /// @dev Era only; set via `Admin.setDisabledProofSystems` and read by `EraMultiProofVerifier` off the
+    /// calling chain, since one verifier instance serves every chain of a protocol version.
+    /// @dev STORAGE SLOT: 68 (offset 9). Packed with the two fields above: 1 + 8 + 1 of 32 bytes.
+    uint8 disabledProofSystems;
+    /// @dev The Airbender-shape commitment of each verified batch, written when that batch's proof
+    /// is accepted and read back as the `prev` end of the next transition's Airbender public input.
+    /// @dev Era only. Recording it is what makes the Airbender lane a chain of values that lane
+    /// itself established, so it still binds a batch's predecessor when the Boojum lane is disabled
+    /// and the stored Boojum commitment is proven by nothing.
+    /// @dev Unset (`0`) for the last batch verified before the lane was enabled. The first proof
+    /// after that seeds the chain instead, via `AirbenderCommitment.deriveBootstrapCommitment`.
+    /// @dev Keyed by the batch's entry in `storedBatchHashes`, not its number: numbers are reused
+    /// after a revert, and an entry left over from a reverted batch would otherwise be read back as
+    /// the predecessor of its replacement, which no proof can satisfy.
+    /// @dev STORAGE SLOT: 69
+    mapping(bytes32 storedBatchHash => bytes32 airbenderCommitment) airbenderCommitments;
 }

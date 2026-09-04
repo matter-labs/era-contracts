@@ -59,8 +59,7 @@ contract ExecutorProofTest is UtilsCallMockerTest {
     UtilsFacet internal utilsFacet;
     TestExecutorFacet internal executor;
     TestCommitterFacet internal committer;
-    address internal testnetVerifier =
-        address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
 
     function getTestExecutorFacetSelectors() private pure returns (bytes4[] memory) {
@@ -156,8 +155,11 @@ contract ExecutorProofTest is UtilsCallMockerTest {
         );
 
         bytes32 prevCommitment = 0x8199d18dbc01ea80a635f515d6a12312daa1aa32b5404944477dcd41fd7b2bdf;
+        // The Executor emits the transition hash untruncated; `PUBLIC_INPUT_SHIFT` is applied by the
+        // chain's verifier once it has selected the proof system. The pinned value is the one the Boojum
+        // prover targets, so it must still be reproduced after the shift.
         uint256 result = executor.getBatchProofPublicInput(prevCommitment, nextCommitment);
-        assertEq(result, 0xB29C9ADF0177455F74D0A0F38065E77A6D425370D418CD37DBF3EAA0, "getBatchProofPublicInput");
+        assertEq(result >> 32, 0xB29C9ADF0177455F74D0A0F38065E77A6D425370D418CD37DBF3EAA0, "getBatchProofPublicInput");
     }
 
     // add this to be excluded from coverage report

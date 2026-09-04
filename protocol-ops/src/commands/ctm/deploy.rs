@@ -23,6 +23,8 @@ pub struct CtmDeployInput {
     pub vm_type: VMOption,
     pub reuse_gov_and_admin: bool,
     pub with_testnet_verifier: bool,
+    /// Require both a Boojum and an Airbender proof to settle a batch (Era only).
+    pub with_airbender_verifier: bool,
     pub with_legacy_bridge: bool,
     pub zk_token_asset_id: Option<B256>,
     pub create2_factory_salt: Option<B256>,
@@ -56,6 +58,7 @@ pub fn deploy(
         zk_token_asset_id,
         input.with_legacy_bridge,
         input.vm_type,
+        input.with_airbender_verifier,
     );
 
     let input_path = runner.input_path(&DEPLOY_CTM_INVOCATION)?;

@@ -168,6 +168,43 @@
   },
   {
     "type": "error",
+    "name": "AirbenderBootstrapWitnessCountInvalid",
+    "inputs": [
+      {
+        "name": "provided",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AirbenderBootstrapWitnessNotExpected",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AirbenderBootstrapWitnessRequired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AirbenderProvedWitnessCountInvalid",
+    "inputs": [
+      {
+        "name": "provided",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AirbenderWitnessNotSupportedOnZKsyncOS",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "BatchHashMismatch",
     "inputs": [
       {
@@ -201,6 +238,22 @@
     "type": "error",
     "name": "CommitBasedInteropNotSupported",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CommitmentWitnessMismatch",
+    "inputs": [
+      {
+        "name": "storedCommitment",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "derivedCommitment",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
   },
   {
     "type": "error",
@@ -260,6 +313,22 @@
       },
       {
         "name": "priorityOpsDataLength",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidBlobAuxOutputLength",
+    "inputs": [
+      {
+        "name": "provided",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "expected",
         "type": "uint256",
         "internalType": "uint256"
       }

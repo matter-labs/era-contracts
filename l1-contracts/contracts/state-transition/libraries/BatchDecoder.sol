@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IExecutor} from "../chain-interfaces/IExecutor.sol";
+import {AirbenderProofWitnesses, IExecutor} from "../chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS, PrecommitInfo} from "../chain-interfaces/ICommitter.sol";
 import {PriorityOpsBatchInfo} from "./PriorityTree.sol";
 import {
@@ -25,6 +25,11 @@ library BatchDecoder {
     /// @notice The currently supported encoding version for ZKSync OS commit data.
     /// We use different encoding only for commit, while prove/execute are common for Era VM and ZKsync OS chains.
     uint8 internal constant SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 4;
+
+    /// @dev Prove-data encoding that additionally carries the Airbender-lane witnesses. Version 1
+    /// stays valid and yields none, which the multi-proof gate then rejects for want of a second
+    /// public input — so the choice of encoding cannot be used to skip the lane.
+    uint8 internal constant SUPPORTED_ENCODING_VERSION_PROOF_AIRBENDER = 2;
 
     /// @notice Decodes commit data from a calldata bytes into the last committed batch data and an array of new batch data.
     /// @param _commitData The calldata byte array containing the data for committing batches.
@@ -181,7 +186,8 @@ library BatchDecoder {
         returns (
             IExecutor.StoredBatchInfo memory prevBatch,
             IExecutor.StoredBatchInfo[] memory provedBatches,
-            uint256[] memory proof
+            uint256[] memory proof,
+            AirbenderProofWitnesses memory airbender
         )
     {
         uint8 encodingVersion = uint8(_proofData[0]);
@@ -189,6 +195,11 @@ library BatchDecoder {
             (prevBatch, provedBatches, proof) = abi.decode(
                 _proofData[1:],
                 (IExecutor.StoredBatchInfo, IExecutor.StoredBatchInfo[], uint256[])
+            );
+        } else if (encodingVersion == SUPPORTED_ENCODING_VERSION_PROOF_AIRBENDER) {
+            (prevBatch, provedBatches, proof, airbender) = abi.decode(
+                _proofData[1:],
+                (IExecutor.StoredBatchInfo, IExecutor.StoredBatchInfo[], uint256[], AirbenderProofWitnesses)
             );
         } else {
             revert UnsupportedProofBatchEncoding(encodingVersion);
@@ -204,6 +215,7 @@ library BatchDecoder {
     /// @return prevBatch The batch information before the batches to be verified.
     /// @return provedBatches An array containing the the batches to be verified.
     /// @return proof An array containing the proof for the verifier.
+    /// @return airbender The Airbender-lane witnesses, empty under the legacy encoding.
     function decodeAndCheckProofData(
         bytes calldata _proofData,
         uint256 _processBatchFrom,
@@ -214,10 +226,11 @@ library BatchDecoder {
         returns (
             IExecutor.StoredBatchInfo memory prevBatch,
             IExecutor.StoredBatchInfo[] memory provedBatches,
-            uint256[] memory proof
+            uint256[] memory proof,
+            AirbenderProofWitnesses memory airbender
         )
     {
-        (prevBatch, provedBatches, proof) = _decodeProofData(_proofData);
+        (prevBatch, provedBatches, proof, airbender) = _decodeProofData(_proofData);
 
         if (provedBatches.length == 0) {
             revert EmptyData();
