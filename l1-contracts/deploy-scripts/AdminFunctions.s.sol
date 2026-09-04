@@ -370,12 +370,7 @@ contract AdminFunctions is Script, IAdminFunctions {
                 // direct transfer to governance through its wrapper (the legacy-Gov
                 // ceremony). No TransitionaryOwner hop.
                 if (ownable.pendingOwner() != _governance) {
-                    _issueAsOwner(
-                        owner,
-                        target,
-                        abi.encodeCall(Ownable2Step.transferOwnership, (_governance)),
-                        _wraps
-                    );
+                    _issueAsOwner(owner, target, abi.encodeCall(Ownable2Step.transferOwnership, (_governance)), _wraps);
                 }
             }
             // Defer the stage-0 governance acceptOwnership once pending == governance.
