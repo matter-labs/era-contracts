@@ -142,19 +142,32 @@ still numbered v32, and it says so: `EXPECTED_NEW_PROTOCOL_VERSION_STR = "0.32.0
 genesis that now declares `0.33.0`. So it targets this release; it just has not been carried
 across the v32 -> v33 renumbering, and it still assumes the shape v31 stage/mainnet had.
 
-Known blockers, in the order a run hits them:
+Nine assumptions have been fixed (see the commit that renamed the module and the one after it);
+PUVT now runs from config load through to stage-1 call verification with 68 checks passing. Two
+classes remain, and neither is more of the same:
 
-1. **Version constant.** `EXPECTED_NEW_PROTOCOL_VERSION_STR` is `"0.32.0"`; genesis is
-   `0.33.0`.
-2. **`[new_gateway]` is mandatory.** `verify_upgrade.rs` bails with "missing required
-   `[new_gateway]` config for v31 verification". This release brings up no Gateway and
-   testnet has no such block.
-3. **Stage 0 assumes a zk-governance redeploy.** The verifier probes PUH governance from
-   chain (`get_proxy_admin(bridgehub_owner) != 0`, true on testnet) and then requires four
-   extra stage-0 calls plus a top-level `[zk_governance]` artifact table. v33 ships no new
-   governance set, so a _correct_ artifact has neither — it has 2 stage-0 calls, not 6.
+**1. The bytecode registry and the deployment are built under different profiles.** Provenance
+matches a deploy by hashing its creation code and looking it up in `AllContractsHashes.json`.
+The artifact is built under `FOUNDRY_PROFILE=anvil-interop` (`cbor_metadata = false`) so CREATE2
+addresses are reproducible across machines; `AllContractsHashes.json` is generated under the
+default profile, *with* metadata. For `L1Bridgehub` the deployed runtime is 18824 bytes and the
+registry records 18878 — a 54-byte CBOR blob — so no deployment ever matches and all 29 land as
+"not present in the create2 deployments". Reconciling this is a decision, not a patch:
 
-Until those are addressed, validation rests on the fork rehearsal (every prepare bundle
+  * regenerate the registry under `anvil-interop` (but `check-hashes` CI builds the default
+    profile), or
+  * deploy from a default-profile build (but then CREATE2 addresses stop being reproducible,
+    which is the entire reason `anvil-interop` exists), or
+  * teach the matcher to compare metadata-stripped creation code (weakens the check slightly,
+    changes bytecode provenance tool-wide).
+
+**2. The stage-0/1/2 expected-call tables still describe v31's ceremony.** Stage 1 expects
+`transparent_proxy_admin.upgrade(...)` at call #0 where v33 has `pauseMigration()`,
+`upgradeAndCall` where v33 uses `upgrade`, and a `ChainRegistrationSender.acceptOwnership()` v33
+does not emit; it has no notion of `setDefaultUpgrade` at all. This is a rewrite of the
+expectation tables against v33's actual 2/20/3-call shape, not a set of small gates.
+
+Until both are addressed, validation rests on the fork rehearsal (every prepare bundle
 replayed under impersonation) and the simulator scenario (every governance call executed
 against a Sepolia fork). Use `SKIP_PUVT=1` to stop before the failing step.
 
