@@ -14,19 +14,6 @@
   },
   {
     "type": "function",
-    "name": "ERA_CHAIN_ID",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "L1_ASSET_ROUTER",
     "inputs": [],
     "outputs": [
@@ -210,11 +197,6 @@
     "inputs": [
       {
         "name": "_l1ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_eraChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -461,11 +443,6 @@
     "inputs": [
       {
         "name": "_l1ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_eraChainId",
         "type": "uint256",
         "internalType": "uint256"
       },

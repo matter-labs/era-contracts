@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {Diamond} from "../../libraries/Diamond.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "../../chain-interfaces/IDiamondInit.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "../../IChainTypeManager.sol";
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 
@@ -124,17 +123,12 @@ abstract contract GatewayCTMDeployerCTMBase {
             selectors: baseConfig.committerSelectors
         });
 
-        // Only system contract hashes are initialized here; verifier is fetched from CTM on-chain.
-        DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
-            l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
-        });
-
+        // The chain-creation init tail is empty: the verifier is fetched from the CTM on-chain and
+        // the remaining fields of `InitializeData` are mandatory data prepended by the CTM itself.
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: facets.diamondInit,
-            initCalldata: abi.encode(initializeData)
+            initCalldata: hex""
         });
 
         _result.diamondCutData = abi.encode(diamondCut);

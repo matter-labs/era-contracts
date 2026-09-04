@@ -190,63 +190,6 @@
   },
   {
     "type": "event",
-    "name": "NewL2BootloaderBytecodeHash",
-    "inputs": [
-      {
-        "name": "previousBytecodeHash",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "newBytecodeHash",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "NewL2DefaultAccountBytecodeHash",
-    "inputs": [
-      {
-        "name": "previousBytecodeHash",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "newBytecodeHash",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "NewL2EvmEmulatorBytecodeHash",
-    "inputs": [
-      {
-        "name": "previousBytecodeHash",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "newBytecodeHash",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "NewProtocolVersion",
     "inputs": [
       {
@@ -499,38 +442,12 @@
   },
   {
     "type": "error",
-    "name": "MalformedBytecode",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "enum BytecodeError"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "NewProtocolMajorVersionNotZero",
     "inputs": []
   },
   {
     "type": "error",
     "name": "PatchCantSetUpgradeTxn",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "PatchUpgradeCantSetBootloader",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "PatchUpgradeCantSetDefaultAccount",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "PatchUpgradeCantSetEvmEmulator",
     "inputs": []
   },
   {

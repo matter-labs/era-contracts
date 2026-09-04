@@ -169,7 +169,6 @@ library L2UtilsBase {
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
                 _args.l1ChainId,
-                _args.eraChainId,
                 IL1AssetRouter(_args.l1AssetRouter),
                 baseTokenAssetId,
                 _args.aliasedOwner

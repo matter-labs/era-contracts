@@ -8,7 +8,6 @@ import {console2 as console} from "forge-std/Script.sol";
 
 import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../utils/Utils.sol";
@@ -211,20 +210,12 @@ abstract contract DeployCTMUtils is DeployUtils {
 
         require(stateTransition.verifiers.verifier != address(0), "verifier is zero");
 
-        // ZKsync OS has no bootloader, default-account or EVM-emulator bytecode; `DiamondInit` skips
-        // its non-zero checks for OS chains and never reads the slots back.
-        // TODO: drop these three fields from `InitializeDataNewChain` in the next release; the struct
-        // is part of the frozen `DiamondInit` ABI, so they cannot go here.
-        DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            l2BootloaderBytecodeHash: bytes32(0),
-            l2DefaultAccountBytecodeHash: bytes32(0),
-            l2EvmEmulatorBytecodeHash: bytes32(0)
-        });
-
+        // The chain-creation init tail is empty: the verifier is fetched from the CTM on-chain and
+        // the remaining fields of `InitializeData` are mandatory data prepended by the CTM itself.
         diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: stateTransition.facets.diamondInit,
-            initCalldata: abi.encode(initializeData)
+            initCalldata: hex""
         });
     }
 

@@ -112,14 +112,16 @@ struct ZKChainStorage {
     address __DEPRECATED_allowList;
     /// @dev STORAGE SLOT: 20-22 (3 bytes32 fields)
     VerifierParams __DEPRECATED_verifierParams;
-    /// @notice Bytecode hash of bootloader program.
-    /// @dev Used as an input to zkp-circuit.
+    /// @dev Deprecated slot, retained to preserve the storage layout. Formerly `l2BootloaderBytecodeHash`
+    /// (EraVM bootloader bytecode hash, a zkp-circuit input); ZKsync OS chains have no bootloader.
+    /// Read only by the EraVM-only commit path (unreachable for ZKsync OS chains); no longer written.
     /// @dev STORAGE SLOT: 23
-    bytes32 l2BootloaderBytecodeHash;
-    /// @notice Bytecode hash of default account (bytecode for EOA).
-    /// @dev Used as an input to zkp-circuit.
+    bytes32 __DEPRECATED_l2BootloaderBytecodeHash;
+    /// @dev Deprecated slot, retained to preserve the storage layout. Formerly `l2DefaultAccountBytecodeHash`
+    /// (EraVM default-account bytecode hash, a zkp-circuit input); ZKsync OS chains have no default account.
+    /// Same lifecycle as {__DEPRECATED_l2BootloaderBytecodeHash}.
     /// @dev STORAGE SLOT: 24
-    bytes32 l2DefaultAccountBytecodeHash;
+    bytes32 __DEPRECATED_l2DefaultAccountBytecodeHash;
     /// @dev Indicates that the porter may be touched on L2 transactions.
     /// @dev Used as an input to zkp-circuit.
     /// @dev STORAGE SLOT: 25
@@ -220,10 +222,11 @@ struct ZKChainStorage {
     /// it does not enforce any other parameters, e.g. `pubdataPricingMode`
     /// @dev STORAGE SLOT: 57
     bool isPermanentRollup;
-    /// @notice Bytecode hash of evm emulator.
-    /// @dev Used as an input to zkp-circuit.
+    /// @dev Deprecated slot, retained to preserve the storage layout. Formerly `l2EvmEmulatorBytecodeHash`
+    /// (EraVM EVM-emulator bytecode hash, a zkp-circuit input); ZKsync OS chains have no EVM emulator.
+    /// Same lifecycle as {__DEPRECATED_l2BootloaderBytecodeHash}.
     /// @dev STORAGE SLOT: 58
-    bytes32 l2EvmEmulatorBytecodeHash;
+    bytes32 __DEPRECATED_l2EvmEmulatorBytecodeHash;
     /// @notice The precommitment for the latest uncommitted batch (i.e. totalBatchesCommitted + 1).
     /// @dev Whenever the `totalBatchesCommitted` changes, this variable is reset to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`
     /// (the value of the constant can be found in Config.sol).

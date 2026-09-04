@@ -61,12 +61,7 @@ mod core_signatures {
             );
         }
         contract V31L1Nullifier {
-            constructor(
-                address _bridgehub,
-                address _messageRoot,
-                uint256 _eraChainId,
-                address _eraDiamondProxy
-            );
+            constructor(address _bridgehub, address _messageRoot);
         }
         contract V31L1MessageRoot {
             constructor(address _bridgehub, uint256 _eraGatewayChainId, address _chainAssetHandler);
@@ -176,13 +171,6 @@ mod gateway_signatures {
         }
 
         #[derive(Debug)]
-        struct InitializeDataNewChain {
-            bytes32 l2BootloaderBytecodeHash;
-            bytes32 l2DefaultAccountBytecodeHash;
-            bytes32 l2EvmEmulatorBytecodeHash;
-        }
-
-        #[derive(Debug)]
         struct GatewayDADeployerConfig {
             bytes32 salt;
             address aliasedGovernanceAddress;
@@ -213,7 +201,6 @@ mod gateway_signatures {
         struct GatewayCTMDeployerConfig {
             address aliasedGovernanceAddress;
             bytes32 salt;
-            uint256 eraChainId;
             uint256 l1ChainId;
             bool testnetVerifier;
             bool isZKsyncOS;
@@ -223,9 +210,6 @@ mod gateway_signatures {
             bytes4[] gettersSelectors;
             bytes4[] migratorSelectors;
             bytes4[] committerSelectors;
-            bytes32 bootloaderHash;
-            bytes32 defaultAccountHash;
-            bytes32 evmEmulatorHash;
             bytes32 genesisRoot;
             uint256 genesisRollupLeafIndex;
             bytes32 genesisBatchCommitment;
@@ -484,20 +468,6 @@ pub(crate) async fn verify_v31_provenance(
         .await
         .unwrap_or_else(|err| panic!("Failed to call L1AssetRouter.nativeTokenVault(): {err}"));
 
-    // The era_chain_id-dependent constructors (L1AssetRouter / L1Nullifier)
-    // require both the chain id and the chain's diamond proxy. The env provides
-    // era_chain_id; the diamond proxy must resolve from Bridgehub.
-    let era_diamond_proxy = verifiers
-        .network_verifier
-        .try_get_chain_diamond_from_bridgehub(bridgehub_addr, U256::from(era_chain_id))
-        .await
-        .unwrap_or_else(|err| {
-            panic!("Failed to call Bridgehub.getZKChain({era_chain_id}) for provenance: {err}")
-        });
-    if era_diamond_proxy == Address::ZERO {
-        panic!("Bridgehub.getZKChain({era_chain_id}) returned address(0) for provenance");
-    }
-
     let governance = bridgehub
         .owner()
         .call()
@@ -510,13 +480,11 @@ pub(crate) async fn verify_v31_provenance(
         weth,
         nullifier,
         ntv_proxy,
-        era_diamond_proxy,
         governance,
     };
     verify_core_provenance(
         artifact,
         verifiers,
-        era_chain_id,
         legacy_gateway_chain_id,
         result,
         core_context,
@@ -805,14 +773,12 @@ struct CoreProvenanceContext {
     weth: Address,
     nullifier: Address,
     ntv_proxy: Address,
-    era_diamond_proxy: Address,
     governance: Address,
 }
 
 async fn verify_core_provenance(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
-    era_chain_id: u64,
     legacy_gateway_chain_id: u64,
     result: &mut VerificationResult,
     context: CoreProvenanceContext,
@@ -913,22 +879,20 @@ async fn verify_core_provenance(
                 context.weth,
                 context.bridgehub_addr,
                 context.nullifier,
-                U256::from(era_chain_id),
-                context.era_diamond_proxy,
+                // The deploy scripts pass ERA_CHAIN_ID_UNUSED / ERA_DIAMOND_PROXY_UNUSED
+                // (deploy-scripts/utils/Types.sol): nothing this release line deploys has an
+                // Era chain, so generated packages record zero for both words.
+                U256::ZERO,
+                Address::ZERO,
             ))
             .abi_encode(),
             "l1-contracts/L1AssetRouter",
         ),
-        // L1Nullifier impl(bridgehub, messageRoot, eraChainId, eraDiamondProxy).
+        // L1Nullifier impl(bridgehub, messageRoot).
         (
             nullifier_impl,
-            V31L1Nullifier::constructorCall::new((
-                context.bridgehub_addr,
-                message_root_proxy,
-                U256::from(era_chain_id),
-                context.era_diamond_proxy,
-            ))
-            .abi_encode(),
+            V31L1Nullifier::constructorCall::new((context.bridgehub_addr, message_root_proxy))
+                .abi_encode(),
             "l1-contracts/L1Nullifier",
         ),
         // L1Bridgehub impl(_owner=governance, _maxNumberOfZKChains).
@@ -1378,8 +1342,15 @@ async fn verify_v31_new_gateway_ctm_provenance(
     expect_gateway_facet_cut(result, "migrator", migrator_cut, migrator, false);
     expect_gateway_facet_cut(result, "committer", committer_cut, committer, true);
 
-    let initialize_data = InitializeDataNewChain::abi_decode(&diamond_cut.initCalldata)
-        .context("decode new_gateway.diamond_cut_data.initCalldata as InitializeDataNewChain")?;
+    // The chain-creation init tail is empty from v34 onwards (InitializeDataNewChain removed).
+    if diamond_cut.initCalldata.is_empty() {
+        result.report_ok("new_gateway.diamond_cut_data.initCalldata is empty (expected from v34)");
+    } else {
+        result.report_error(&format!(
+            "new_gateway.diamond_cut_data.initCalldata must be empty from v34 onwards, got {} bytes",
+            diamond_cut.initCalldata.len()
+        ));
+    }
     let genesis_config = verifiers.genesis_config_for_ctm(source_ctm.flavor);
     let gw_provider = verifiers.network_verifier.get_gw_provider();
 
@@ -1559,7 +1530,6 @@ async fn verify_v31_new_gateway_ctm_provenance(
         baseConfig: GatewayCTMDeployerConfig {
             aliasedGovernanceAddress: aliased_governance,
             salt: gateway_salt,
-            eraChainId: U256::from(era_chain_id),
             l1ChainId: U256::from(l1_chain_id),
             testnetVerifier: source_ctm.contracts_config.is_testnet,
             isZKsyncOS: true,
@@ -1569,9 +1539,6 @@ async fn verify_v31_new_gateway_ctm_provenance(
             gettersSelectors: getters_cut.selectors.clone(),
             migratorSelectors: migrator_cut.selectors.clone(),
             committerSelectors: committer_cut.selectors.clone(),
-            bootloaderHash: initialize_data.l2BootloaderBytecodeHash,
-            defaultAccountHash: initialize_data.l2DefaultAccountBytecodeHash,
-            evmEmulatorHash: initialize_data.l2EvmEmulatorBytecodeHash,
             genesisRoot: parse_bytes32_hex("genesis_root", &genesis_config.genesis_root)?,
             genesisRollupLeafIndex: U256::from(
                 genesis_config.genesis_rollup_leaf_index.unwrap_or_default(),
@@ -1826,4 +1793,79 @@ fn zksync_os_genesis_batch_commitment() -> FixedBytes<32> {
 fn hex_bytes(label: &str, value: &str) -> Result<Vec<u8>> {
     hex::decode(value.trim_start_matches("0x"))
         .with_context(|| format!("{label} must be 0x-prefixed hex"))
+}
+
+#[cfg(test)]
+mod tests {
+    use alloy::sol_types::{SolConstructor, SolStruct};
+
+    use super::gateway_signatures::GatewayCTMDeployerConfig;
+
+    // This mirror already drifted from the Solidity struct once (a stray `eraChainId` field),
+    // silently breaking the gateway CTM CREATE2-address verification; keep it pinned to the
+    // Solidity source of truth (same intent as the fixed_force_deployment.rs layout test).
+    #[test]
+    fn gateway_ctm_deployer_config_matches_solidity_layout() {
+        let solidity_source = include_str!(
+            "../../../../../../l1-contracts/contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol"
+        );
+        let struct_body = solidity_source
+            .split_once("struct GatewayCTMDeployerConfig {")
+            .expect("canonical Solidity struct must exist")
+            .1
+            .split_once('}')
+            .expect("canonical Solidity struct must be closed")
+            .0;
+        let solidity_signature = format!(
+            "GatewayCTMDeployerConfig({})",
+            struct_body
+                .lines()
+                .map(str::trim)
+                .filter(|line| line.ends_with(';'))
+                .map(|line| line.trim_end_matches(';'))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        assert_eq!(
+            GatewayCTMDeployerConfig::eip712_root_type().as_ref(),
+            solidity_signature.as_str(),
+            "protocol-ops GatewayCTMDeployerConfig must follow the canonical Solidity fields"
+        );
+    }
+
+    // The L1Nullifier mirror drifted when the constructor dropped its Era arguments (the Rust side
+    // kept encoding four words against the two the deploy scripts record); pin the mirror's
+    // parameter list to the Solidity constructor.
+    #[test]
+    fn l1_nullifier_constructor_matches_solidity_source() {
+        let solidity_source =
+            include_str!("../../../../../../l1-contracts/contracts/bridge/L1Nullifier.sol");
+        let params = solidity_source
+            .split_once("constructor(")
+            .expect("L1Nullifier constructor must exist")
+            .1
+            .split_once(')')
+            .expect("constructor parameter list must be closed")
+            .0;
+        assert_eq!(
+            params.trim(),
+            "IL1Bridgehub _bridgehub, IMessageRootBase _messageRoot",
+            "protocol-ops V31L1Nullifier must follow L1Nullifier's constructor"
+        );
+        // Tie the Rust mirror itself to the source: both constructor parameters are single
+        // words, so the encoding the verifier compares against must be exactly one word per
+        // Solidity parameter. Reverting the mirror to the four-argument shape fails here (and
+        // the two-tuple `constructorCall::new` above stops compiling).
+        let solidity_arity = params.split(',').count();
+        let encoded = super::core_signatures::V31L1Nullifier::constructorCall::new((
+            alloy::primitives::Address::ZERO,
+            alloy::primitives::Address::ZERO,
+        ))
+        .abi_encode();
+        assert_eq!(
+            encoded.len(),
+            solidity_arity * 32,
+            "V31L1Nullifier must encode one word per Solidity constructor parameter"
+        );
+    }
 }

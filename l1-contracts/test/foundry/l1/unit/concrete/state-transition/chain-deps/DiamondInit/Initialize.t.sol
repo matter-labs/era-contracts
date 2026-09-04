@@ -125,8 +125,12 @@ contract InitializeTest is DiamondInitTest {
         assertEq(utilsFacet.util_getValidator(initializeData.validatorTimelock), true);
 
         assertEq(utilsFacet.util_getStoredBatchHashes(0), initializeData.storedBatchZero);
-        assertEq(utilsFacet.util_getL2BootloaderBytecodeHash(), initializeData.l2BootloaderBytecodeHash);
-        assertEq(utilsFacet.util_getL2DefaultAccountBytecodeHash(), initializeData.l2DefaultAccountBytecodeHash);
-        assertEq(utilsFacet.util_getL2EvmEmulatorBytecodeHash(), initializeData.l2EvmEmulatorBytecodeHash);
+        // The EraVM bytecode-hash slots are deprecated tombstones: initialization must leave the
+        // physical slots zero. Read the raw slots (indices from ZKChainStorage's layout, see
+        // `forge inspect GettersFacet storage-layout`) instead of keeping dormant getters that would
+        // silently follow the fields if they were ever moved.
+        assertEq(vm.load(address(diamondProxy), bytes32(uint256(23))), bytes32(0)); // __DEPRECATED_l2BootloaderBytecodeHash
+        assertEq(vm.load(address(diamondProxy), bytes32(uint256(24))), bytes32(0)); // __DEPRECATED_l2DefaultAccountBytecodeHash
+        assertEq(vm.load(address(diamondProxy), bytes32(uint256(58))), bytes32(0)); // __DEPRECATED_l2EvmEmulatorBytecodeHash
     }
 }
