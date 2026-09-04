@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+// TODO(EVM-1644): LEGACY UPGRADE PROCESS — remove once the registry-driven upgrade process
+// (contracts/upgrades/registry: CTMUpgradeExecutor / EcosystemUpgradeExecutor +
+// release/transition registries) has fully replaced off-chain governance-calldata generation. Kept for the
+// v34 bootstrap edge, which still ships script-composed stage0/1/2 calls.
+
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
@@ -8,13 +13,13 @@ import {L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddr
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
-import {CoreContract} from "../../ecosystem/CoreContract.sol";
+import {L2EcosystemContract} from "../../ecosystem/CoreContract.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
-import {FacetCutsLib} from "./FacetCutsLib.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
+import {Utils} from "../../utils/Utils.sol";
 
 abstract contract CTMUpgradeBase is DeployCTMScript {
     /// @notice Build the active VM's full force-deployment list in universal format.
@@ -36,9 +41,9 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     function getAdditionalFactoryDependencyContracts()
         internal
         virtual
-        returns (CoreContract[] memory additionalDependencyContracts)
+        returns (L2EcosystemContract[] memory additionalDependencyContracts)
     {
-        return new CoreContract[](0);
+        return new L2EcosystemContract[](0);
     }
 
     /// @notice Get L2 upgrade target and data for the active VM.
@@ -98,20 +103,18 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         }
     }
 
-    /// @notice Generate upgrade cut data.
+    /// @notice Generate the committed upgrade cut: NO facet cuts, only the engine init — the
+    ///         engine performs the facet changes itself (the bootstrap engine derives the full
+    ///         reinstall from its pinned genesis release; `upgradeFromTransition` applies the
+    ///         transition's derived delta), so no hand-composed selector list ever rides the
+    ///         committed calldata.
     function generateUpgradeCutData(
         StateTransitionDeployedAddresses memory _stateTransition,
         ChainCreationParamsConfig memory _chainCreationParams,
         uint256 _l1ChainId,
         address _ownerAddress,
-        PublishFactoryDepsResult memory _factoryDepsResult,
-        address _registeredChainIdDiamondProxy
+        PublishFactoryDepsResult memory _factoryDepsResult
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
-        Diamond.FacetCut[] memory facetCutsForDeletion = FacetCutsLib.getDeletionCuts(_registeredChainIdDiamondProxy);
-
-        Diamond.FacetCut[] memory facetCuts;
-        facetCuts = getChainCreationFacetCuts(_stateTransition);
-        facetCuts = FacetCutsLib.merge(facetCutsForDeletion, facetCuts);
         uint256 nonce = UpgradeHelperLib.getProtocolUpgradeNonce(_chainCreationParams.latestProtocolVersion);
         ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(
             _stateTransition,
@@ -123,7 +126,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         );
 
         upgradeCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
+            facetCuts: new Diamond.FacetCut[](0),
             initAddress: _stateTransition.defaultUpgrade,
             initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
         });
@@ -155,8 +158,9 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
             evmEmulatorHash: bytes32(0),
-            // Verifier is resolved from CTM; keep zeroed fields for calldata compatibility.
-            verifier: address(0),
+            // The verifier now rides in the proposal itself: the CTM no longer keeps a
+            // version-keyed verifier map (registry-driven upgrades read it from the release).
+            verifier: _stateTransition.verifiers.verifier,
             verifierParams: ProposedUpgradeLib.emptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: encodePostUpgradeCalldata(_stateTransition),

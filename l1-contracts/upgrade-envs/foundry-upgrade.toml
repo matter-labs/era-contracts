@@ -1,0 +1,20 @@
+# Foundry-specific upgrade configuration for the local pipeline tests
+# (test/foundry/l1/integration/UpgradeTestv34_Local.t.sol).
+#
+# The harness deploys at whatever `configs/genesis/*/latest.json` declares and then upgrades to
+# `new_protocol_version`, and `DefaultCTMUpgrade.initUpgrade` requires
+# `ctmProtocolVersion != getNewProtocolVersion()` — so this has to stay ahead of genesis.
+# Genesis is at v34.0.0, so the fixture exercises a v34 -> v35 edge (numbers are parameters;
+# the SHAPE under test is the version pipeline, bootstrap included).
+
+old_protocol_version = 0x2200000000  # v34.0.0 (current genesis)
+
+# The fixture's chains are now labelled at the same version as the core contracts it deploys, so
+# autodetection would classify the ecosystem correctly on its own; the key is kept explicit so the
+# classification does not depend on the introspection heuristic.
+pre_v32_introspection = false
+v28_protocol_version = 0x1c00000000  # v28.0.0 (for reference)
+
+[contracts]
+new_protocol_version = 0x2300000000  # v35.0.0 (target for upgrade)
+latest_protocol_version = 0x2300000000  # v35.0.0

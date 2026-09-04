@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+// TODO(EVM-1644): LEGACY UPGRADE PROCESS — remove once the registry-driven upgrade process
+// (contracts/upgrades/registry: CTMUpgradeExecutor / EcosystemUpgradeExecutor +
+// release/transition registries) has fully replaced off-chain governance-calldata generation. Kept for the
+// v34 bootstrap edge, which still ships script-composed stage0/1/2 calls.
+
 // solhint-disable no-console, gas-custom-errors
 
 import {Script, console2 as console} from "forge-std/Script.sol";
@@ -23,6 +28,7 @@ import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainA
 import {BridgehubAddresses, CoreDeployedAddresses} from "../../utils/Types.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
+import {CoreUpgradeParams} from "./UpgradeParams.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {Utils} from "../../utils/Utils.sol";
 
@@ -47,6 +53,19 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     AdditionalConfigParams internal additionalConfig;
 
     EcosystemUpgradeConfig internal upgradeConfig;
+
+    /// @notice Single-call entry point invoked by the protocol-ops CLI's `upgrade-prepare-all`
+    ///         (`ICoreUpgradeV31` in `contracts/script-interfaces/IUpgradeV31.sol`).
+    function noGovernancePrepare(CoreUpgradeParams memory _params) public virtual {
+        initializeWithArgs(
+            _params.bridgehubProxyAddress,
+            _params.create2FactorySalt,
+            _params.upgradeInputPath,
+            _params.outputPath
+        );
+        prepareEcosystemUpgrade();
+        prepareDefaultGovernanceCalls();
+    }
 
     function initializeWithArgs(
         address bridgehubProxyAddress,

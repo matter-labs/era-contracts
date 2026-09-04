@@ -2,42 +2,19 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-/// @param chainId the id of the chain
-/// @param bridgehub the address of the bridgehub contract
-/// @param chainTypeManager contract's address
-/// @param protocolVersion initial protocol version
-/// @param validatorTimelock address of the validator timelock that delays execution
-/// @param admin address who can manage the contract
-/// @param baseTokenAssetId asset id of the base token of the chain
-/// @param storedBatchZero hash of the initial genesis batch
-/// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
-/// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
-/// @param l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
-// solhint-disable-next-line gas-struct-packing
-struct InitializeData {
-    uint256 chainId;
-    address bridgehub;
-    address interopCenter;
-    address chainTypeManager;
-    uint256 protocolVersion;
-    address admin;
-    address validatorTimelock;
-    bytes32 baseTokenAssetId;
-    bytes32 storedBatchZero;
-    bytes32 l2BootloaderBytecodeHash;
-    bytes32 l2DefaultAccountBytecodeHash;
-    bytes32 l2EvmEmulatorBytecodeHash;
-}
-
-/// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
-/// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
-/// @param l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
-struct InitializeDataNewChain {
-    bytes32 l2BootloaderBytecodeHash;
-    bytes32 l2DefaultAccountBytecodeHash;
-    bytes32 l2EvmEmulatorBytecodeHash;
-}
-
 interface IDiamondInit {
-    function initialize(InitializeData calldata _initData) external returns (bytes32);
+    /// @notice The VM flavour this initializer genesis-installs — the SINGLE source of VM
+    ///         identity for a release: the CTM validates it against its own flavour when the
+    ///         release is pinned, and the upgrade composer derives the L2 tx type from it.
+    // solhint-disable-next-line func-name-mixedcase
+    function IS_ZKSYNC_OS() external view returns (bool);
+
+    /// @notice ZK chain diamond contract initialization.
+    /// @dev The two arguments are the ONLY per-chain data a chain is created with; everything
+    ///      else is read from the ChainTypeManager — which is simply `msg.sender`, since the CTM
+    ///      is the one deploying the diamond proxy (and delegatecall preserves the sender) — and
+    ///      from the genesis registry / bridgehub it points at.
+    /// @param _chainId The chain id of the new chain.
+    /// @param _admin The address to be set as the chain's admin.
+    function initialize(uint256 _chainId, address _admin) external returns (bytes32);
 }

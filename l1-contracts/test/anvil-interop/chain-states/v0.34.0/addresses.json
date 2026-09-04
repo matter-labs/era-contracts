@@ -1,0 +1,56 @@
+{
+  "l1Addresses": {
+    "bridgehub": "0xD86Cf2eE90174Ecf5d3a94862af830e3e34935B8",
+    "l1SharedBridge": "0x8878DAc2791c0F386f1444e2Fb36f5352c5af07f",
+    "l1NullifierProxy": "0x0b35dA0F5c7D9Abc8a8D77a4dd5C96dA486F9b1b",
+    "l1NativeTokenVault": "0xEADd25B7aE5DdBf5992334dCDa0044E1416deCd2",
+    "governance": "0xa60F07cAaFA0aE451296c0ca5C261578A390105e",
+    "transparentProxyAdmin": "0x0FA38b5c8cb180809E0C95E2EE923eC093123285",
+    "messageRoot": "0x989dC32699ab2D6Bf394E5d43F26E204f4d8c7d1",
+    "ctmDeploymentTracker": "0x917Aaac0B49282f663a9F2C5fB6c15391e4ee858",
+    "chainRegistrationSender": "0x51c05231425955D3586048B9D5A57f140207DF26"
+  },
+  "ctmAddresses": {
+    "chainTypeManager": "0x38A95732036B1c8742d4FdDA25a1aB1588C66D29",
+    "releaseCodehash": "0x525b56679569bc31d7b6e4cfc44ae4d526a8c2f39e60e6521bcbeef7474798e2",
+    "chainAdmin": "0x16b5d0b1A5c64195453315C58671A6f847CE1aC2",
+    "verifier": "0xF9F570a3F83c96B7941fDF907a0Fb2adCE6Bc2D3",
+    "rollupL1DAValidator": "0xC533CcE441ED81782127ef99B936bFbeB62DD26B"
+  },
+  "chainAddresses": [
+    {
+      "chainId": 10,
+      "diamondProxy": "0xab2aE8deBcD9E395d0AFf05e7A625768bBf80559"
+    },
+    {
+      "chainId": 11,
+      "diamondProxy": "0xFc31e34F4839B4983B5325B98967FA5471CE61C7"
+    },
+    {
+      "chainId": 12,
+      "diamondProxy": "0x9f27335fdcf1bDB2B63f04aD2e660A83062af19A"
+    },
+    {
+      "chainId": 13,
+      "diamondProxy": "0xc4C26F058CC674a97a6626eaAa78490561ec3D7e"
+    },
+    {
+      "chainId": 14,
+      "diamondProxy": "0xd26ca7e2847C3fbAf30b71016566008247BE0f56"
+    }
+  ],
+  "testTokens": {
+    "10": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "11": "0x0B306BF915C4d645ff596e518fAf3F9669b97016",
+    "12": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "13": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "14": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  },
+  "customBaseTokens": {
+    "14": "0x1c85638e118b37167e9298c2268758e058DdfDA0"
+  },
+  "zkToken": {
+    "l1Address": "0x70e0bA845a1A0F2DA3359C97E0285013525FFC49",
+    "assetId": "0x3abdd76e9c62392af697f095b46d1602d95dd4949ed0bb1e2c2f2f459c959f4b"
+  }
+}

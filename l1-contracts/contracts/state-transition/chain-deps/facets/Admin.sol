@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
+import {ISelfDescribingFacet} from "../../chain-interfaces/ISelfDescribingFacet.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {
@@ -38,7 +39,6 @@ import {
     DiamondAlreadyFrozen,
     DiamondNotFrozen,
     FeeParamsChangeTooLarge,
-    HashMismatch,
     InvalidDAForPermanentRollup,
     InvalidL2DACommitmentScheme,
     InvalidPubdataPricingMode,
@@ -71,7 +71,7 @@ import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 /// @title Admin Contract controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract AdminFacet is ZKChainBase, IAdmin {
+contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZKChainBase
@@ -519,14 +519,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @inheritdoc IAdmin
     function upgradeChainFromVersion(
         address, // _chainAddress (unused in this specific implementation)
-        uint256 _oldProtocolVersion,
-        Diamond.DiamondCutData calldata _diamondCut
+        uint256 _oldProtocolVersion
     ) external onlyAdminOrChainTypeManagerOrValidator {
-        bytes32 cutHashInput = keccak256(abi.encode(_diamondCut));
-        bytes32 upgradeCutHash = IChainTypeManager(s.chainTypeManager).upgradeCutHash(_oldProtocolVersion);
-        if (cutHashInput != upgradeCutHash) {
-            revert HashMismatch(upgradeCutHash, cutHashInput);
-        }
+        // The cut comes from this chain's own ChainTypeManager, which composed it from the
+        // transition it committed for this edge — the caller supplies no bytes, so there is
+        // nothing to check it against and nothing to substitute.
+        Diamond.DiamondCutData memory diamondCut = IChainTypeManager(s.chainTypeManager).upgradeCutForVersion(
+            _oldProtocolVersion
+        );
 
         if (s.protocolVersion != _oldProtocolVersion) {
             revert ProtocolIdMismatch(s.protocolVersion, _oldProtocolVersion);
@@ -544,7 +544,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
                 revert UpgradeTimestampNotReached(timestamp, block.timestamp);
             }
         }
-        _executeDiamondCut(_diamondCut);
+        _executeDiamondCut(diamondCut);
         if (s.protocolVersion <= _oldProtocolVersion) {
             revert ProtocolIdNotGreater();
         }
@@ -603,5 +603,47 @@ contract AdminFacet is ZKChainBase, IAdmin {
         diamondStorage.isFrozen = false;
 
         emit Unfreeze();
+    }
+
+    /// @inheritdoc ISelfDescribingFacet
+    /// @dev Packed list (4 bytes per selector) generated from this facet's ABI — every externally
+    ///      served function except the unregistered helper views `getName()` and `selectors()`
+    ///      (see `Utils.getAllSelectors`). Guarded against drift by FacetSelfDescription.t.sol.
+    ///      0xf9afb97e ROLLUP_DA_MANAGER()
+    ///      0x0e18b681 acceptAdmin()
+    ///      0x60eae0e7 activatePriorityMode()
+    ///      0x5b898748 allowEvmEmulation()
+    ///      0x64bf8d66 changeFeeParams((uint8,uint32,uint32,uint32,uint32,uint64))
+    ///      0x23b31192 deactivatePriorityMode()
+    ///      0xa9f6d941 executeUpgrade(((address,uint8,bool,bytes4[])[],address,bytes))
+    ///      0x27ae4c16 freezeDiamond()
+    ///      0x2878fe74 genesisUpgrade(address,address,bytes,bytes[])
+    ///      0xb4fcb577 getRollupDAManager()
+    ///      0x6e762e98 makePermanentRollup()
+    ///      0x1b48b94a permanentlyAllowPriorityMode()
+    ///      0x2765d079 setDAValidatorPair(address,uint8)
+    ///      0x4dd18bf5 setPendingAdmin(address)
+    ///      0x1cc5d103 setPorterAvailability(bool)
+    ///      0xc5f1f1f5 setPriorityModeTransactionFilterer(address)
+    ///      0xbe6f11cf setPriorityTxMaxGasLimit(uint256)
+    ///      0xe76db865 setPubdataPricingMode(uint8)
+    ///      0x235d9eb5 setTokenMultiplier(uint128,uint128)
+    ///      0x21f603d7 setTransactionFilterer(address)
+    ///      0x4623c91d setValidator(address,bool)
+    ///      0x054e80a3 setZKsyncOSPreV31TotalSupply(uint256)
+    ///      0x17338945 unfreezeDiamond()
+    ///      0x03129ad9 upgradeChainFromVersion(address,uint256)
+    function selectors() public pure returns (bytes4[] memory result) {
+        bytes
+            memory packed = hex"03129ad90e18b681173389451b48b94a1cc5d10321f603d7235d9eb523b311922765d07927ae4c162878fe742f257a5c4623c91d4dd18bf55b89874860eae0e764bf8d666e762e98a9f6d941b4fcb577be6f11cfc5f1f1f5e51935f5e76db865f9afb97e";
+        uint256 count = packed.length / 4;
+        result = new bytes4[](count);
+        for (uint256 i = 0; i < count; ++i) {
+            bytes4 selector;
+            assembly {
+                selector := mload(add(add(packed, 0x20), mul(i, 4)))
+            }
+            result[i] = selector;
+        }
     }
 }

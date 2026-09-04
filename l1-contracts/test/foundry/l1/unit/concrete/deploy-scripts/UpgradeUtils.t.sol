@@ -11,15 +11,26 @@ import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVer
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
-/// @notice Stands in for the CTM: the resolver consults only `protocolVersion()` and
-/// `protocolVersionVerifier()`.
+/// @notice Stands in for the release a v34+ CTM pins: the resolver reads only its `verifier()`.
+contract MockRelease {
+    address public verifier;
+
+    constructor(address _verifier) {
+        verifier = _verifier;
+    }
+}
+
+/// @notice Stands in for the CTM. The resolver consults `protocolVersion()` and then, depending on
+/// it, either the pinned release's `verifier()` (v34+) or the legacy per-version verifier map.
 contract MockCTMVersion {
     uint256 public protocolVersion;
+    address public currentRelease;
     address internal verifier;
 
     constructor(uint256 _protocolVersion, address _verifier) {
         protocolVersion = _protocolVersion;
         verifier = _verifier;
+        currentRelease = address(new MockRelease(_verifier));
     }
 
     function protocolVersionVerifier(uint256) external view returns (address) {
@@ -122,8 +133,14 @@ contract UpgradeUtilsResolveTestnetVerifierTest is Test {
         harness.resolve(ctm);
     }
 
-    function test_revertsWhenCTMHasNoVerifierForCurrentVersion() public {
+    function test_revertsWhenReleasePinsNoVerifier() public {
         IChainTypeManager ctm = _flagVersionCTM(address(0));
+        vm.expectRevert(bytes("release pins no verifier"));
+        harness.resolve(ctm);
+    }
+
+    function test_revertsWhenPreFlagVersionCTMHasNoVerifierForCurrentVersion() public {
+        IChainTypeManager ctm = _preFlagVersionCTM(address(0));
         vm.expectRevert(bytes("verifier not set for the current protocol version"));
         harness.resolve(ctm);
     }

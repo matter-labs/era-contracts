@@ -17,7 +17,8 @@ import {
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
-    L2_ATOMIC_FLOW_MANAGER_ADDR
+    L2_ATOMIC_FLOW_MANAGER_ADDR,
+    L2_ECOSYSTEM_REGISTRY_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
@@ -43,6 +44,7 @@ import {L2InteropCommitmentTree} from "../atomic-interop/L2InteropCommitmentTree
 import {IAtomicFlowManager} from "../atomic-interop/IAtomicFlowManager.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {
+    AddressHasNoCode,
     DeployFailed,
     UnsupportedUpgradeType,
     ZeroAddress,
@@ -50,6 +52,7 @@ import {
     ZKsyncOSNotForceDeployToPrecompileAddress,
     NonCanonicalRepresentation
 } from "../common/L1ContractErrors.sol";
+import {IL2EcosystemRegistry} from "../core/registry/IL2EcosystemRegistry.sol";
 
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
@@ -228,6 +231,20 @@ library L2GenesisForceDeploymentsHelper {
             (ZKChainSpecificForceDeploymentsData)
         );
 
+        // REGISTRY FIRST: pin the ecosystem data on L2 before anything below initializes, so
+        // every later step (and every runtime consumer) has one queryable source. The VERBATIM
+        // bytes are stored, keeping the registry's `dataHash` equal to the hash of the bytes the
+        // L1 release pins. ZKsync OS only, like the other post-v31 built-ins. The registry is
+        // predeployed by the ZKsync OS genesis image (genesis path) or force-deployed by the same
+        // upgrade transaction earlier in its deployment list (upgrade path); since a call to a
+        // codeless address SILENTLY SUCCEEDS, its presence is asserted explicitly.
+        if (_isZKsyncOS) {
+            if (L2_ECOSYSTEM_REGISTRY_ADDR.code.length == 0) {
+                revert AddressHasNoCode(L2_ECOSYSTEM_REGISTRY_ADDR);
+            }
+            IL2EcosystemRegistry(L2_ECOSYSTEM_REGISTRY_ADDR).updateL2(_fixedForceDeploymentsData);
+        }
+
         _setupProxyAdmin();
 
         // The aliased L1 governance address is used as the owner for all L2 contracts.
@@ -260,9 +277,13 @@ library L2GenesisForceDeploymentsHelper {
             _initPreV32Contracts(fixedForceDeploymentsData, additionalForceDeploymentsData);
         }
 
-        // Contracts introduced in this release are initialized on both paths: they are uninitialized on a
-        // new chain and on an upgraded one alike.
-        _initializeV32Contracts(_isZKsyncOS, fixedForceDeploymentsData);
+        // Genesis only: the v32 contract set is brand new on a fresh chain, while every chain the
+        // current release can upgrade (v32 or later) already runs it initialized — their `initL2`s
+        // are one-shot. (The v31→v32 edge, where an UPGRADING chain received these contracts for
+        // the first time, shipped with its own release branch.)
+        if (_isGenesisUpgrade) {
+            _initializeV32Contracts(_isZKsyncOS, fixedForceDeploymentsData);
+        }
 
         emit ForceDeployedContractsInitialized(_isZKsyncOS, _isGenesisUpgrade);
     }
@@ -410,11 +431,10 @@ library L2GenesisForceDeploymentsHelper {
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
     }
 
-    /// @notice Initializes the contracts introduced in this release.
-    /// @dev Only the atomic-interop built-ins are new here, and they exist on ZKsync OS chains only (see
+    /// @notice Initializes the v32 atomic-interop built-ins; ZKsync OS chains only (see
     /// {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}).
-    /// Neither they nor their addresses existed in v31, so a chain always receives them here for the first
-    /// time — from its genesis when it is new, from this upgrade's force deployments when it predates them.
+    /// Genesis only: their `initL2`s are one-shot, and every chain the current release can upgrade
+    /// already runs them initialized.
     function _initializeV32Contracts(
         bool _isZKsyncOS,
         FixedForceDeploymentsData memory _fixedForceDeploymentsData

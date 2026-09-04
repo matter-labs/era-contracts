@@ -5,8 +5,7 @@ pragma solidity 0.8.28;
 import {Diamond} from "../../libraries/Diamond.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "../../chain-interfaces/IDiamondInit.sol";
-import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "../../IChainTypeManager.sol";
+import {ChainTypeManagerInitializeData, IChainTypeManager} from "../../IChainTypeManager.sol";
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
@@ -86,74 +85,31 @@ abstract contract GatewayCTMDeployerCTMBase {
         GatewayCTMDeployerConfig memory baseConfig = _config.baseConfig;
         Facets memory facets = _config.facets;
 
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: facets.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: baseConfig.adminSelectors
-        });
-        facetCuts[1] = Diamond.FacetCut({
-            facet: facets.gettersFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: baseConfig.gettersSelectors
-        });
-        facetCuts[2] = Diamond.FacetCut({
-            facet: facets.mailboxFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: baseConfig.mailboxSelectors
-        });
-        facetCuts[3] = Diamond.FacetCut({
-            facet: facets.executorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: baseConfig.executorSelectors
-        });
-        facetCuts[4] = Diamond.FacetCut({
-            facet: facets.migratorFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: baseConfig.migratorSelectors
-        });
-        facetCuts[5] = Diamond.FacetCut({
-            facet: facets.committerFacet,
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: baseConfig.committerSelectors
-        });
-
-        // Only system contract hashes are initialized here; verifier is fetched from CTM on-chain.
-        DiamondInitializeDataNewChain memory initializeData = DiamondInitializeDataNewChain({
-            l2BootloaderBytecodeHash: baseConfig.bootloaderHash,
-            l2DefaultAccountBytecodeHash: baseConfig.defaultAccountHash,
-            l2EvmEmulatorBytecodeHash: baseConfig.evmEmulatorHash
-        });
+        // Gateway pins a genesis release, exactly like L1: the committed cut carries NO facet
+        // addresses (empty `facetCuts`) and NO init payload (empty `initCalldata`). `DiamondInit`
+        // installs the release's explicit facet routing and reads the base system contract
+        // hashes from it.
+        // TODO(gateway): a `CTMRelease` takes its manifest as a CONSTRUCTOR argument and EraVM has
+        // no constructors, so the release cannot be built inside this deployer's transaction — it
+        // is supplied pre-deployed and merely pinned here. Making this deployer stand up a Gateway
+        // CTM on its own needs an EraVM-deployable release that takes its manifest through an
+        // atomic post-deployment initialization.
+        address currentRelease = _config.currentRelease;
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
+            facetCuts: new Diamond.FacetCut[](0),
             initAddress: facets.diamondInit,
-            initCalldata: abi.encode(initializeData)
+            initCalldata: ""
         });
 
         _result.diamondCutData = abi.encode(diamondCut);
 
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: _config.genesisUpgrade,
-            genesisBatchHash: baseConfig.genesisRoot,
-            genesisIndexRepeatedStorageChanges: uint64(baseConfig.genesisRollupLeafIndex),
-            genesisBatchCommitment: baseConfig.genesisBatchCommitment,
-            diamondCut: diamondCut,
-            forceDeploymentsData: baseConfig.forceDeploymentsData
-        });
-
         ChainTypeManagerInitializeData memory diamondInitData = ChainTypeManagerInitializeData({
             owner: baseConfig.aliasedGovernanceAddress,
             validatorTimelock: _config.validatorTimelockProxy,
-            chainCreationParams: chainCreationParams,
+            releaseCodehash: _config.currentRelease.codehash,
+            currentRelease: currentRelease,
             protocolVersion: baseConfig.protocolVersion,
-            verifier: _config.verifier,
             serverNotifier: _result.serverNotifierProxy
         });
 

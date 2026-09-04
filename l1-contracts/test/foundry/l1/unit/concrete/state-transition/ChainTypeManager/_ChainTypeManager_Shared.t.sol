@@ -10,6 +10,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
+import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
@@ -24,13 +25,9 @@ import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Commi
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
-import {
-    IChainTypeManager,
-    ChainCreationParams,
-    ChainTypeManagerInitializeData
-} from "contracts/state-transition/IChainTypeManager.sol";
+import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -48,6 +45,7 @@ import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCall
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
+import {GenesisFacet, PinnedContract} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 contract ChainTypeManagerTest is UtilsCallMockerTest {
     using stdStorage for StdStorage;
@@ -191,21 +189,30 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             })
         );
 
-        ChainCreationParams memory chainCreationParams = ChainCreationParams({
-            genesisUpgrade: address(genesisUpgradeContract),
-            genesisBatchHash: bytes32(uint256(0x01)),
-            genesisIndexRepeatedStorageChanges: 0x01,
-            genesisBatchCommitment: bytes32(uint256(0x01)),
-            diamondCut: getDiamondCutData(address(diamondInit)),
-            forceDeploymentsData: forceDeploymentsData
-        });
+        // The fixture's CTM runs at protocol version 0, which a real `GenesisRegistry` cannot
+        // pin (zero doubles as its init guard), so the registry the CTM reads is mocked: base
+        // system hashes + genesis params here, and the diamond facet set is mocked per chain
+        // creation from the cut the test passes to `createNewChain` (see `_mockGenesisRegistryFacets`).
+        mockGenesisRegistryContract();
+        // Re-mock `genesisParams` with the fixture's real genesis-upgrade contract (the CTM calls
+        // it while creating a chain) and pin this fixture's `DiamondInit` in the registry.
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
+            abi.encode(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(uint256(0x01)), uint64(0x01))
+        );
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.diamondInit.selector),
+            abi.encode(diamondInit)
+        );
 
         ChainTypeManagerInitializeData memory ctmInitializeDataNoGovernor = ChainTypeManagerInitializeData({
             owner: address(0),
             validatorTimelock: validator,
-            chainCreationParams: chainCreationParams,
+            releaseCodehash: Utils.releaseCodehash(),
+            currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
-            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -219,9 +226,9 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
             owner: governor,
             validatorTimelock: validator,
-            chainCreationParams: chainCreationParams,
+            releaseCodehash: Utils.releaseCodehash(),
+            currentRelease: Utils.TEST_GENESIS_REGISTRY,
             protocolVersion: 0,
-            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -236,14 +243,10 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
-        initializeData.l2BootloaderBytecodeHash = bytes32(0);
-        initializeData.l2DefaultAccountBytecodeHash = bytes32(0);
-        initializeData.l2EvmEmulatorBytecodeHash = bytes32(0);
-
-        bytes memory initCalldata = abi.encode(initializeData);
-
-        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: initCalldata});
+        // The committed cut carries no init payload: DiamondInit reads the base system contract
+        // hashes from the (mocked) genesis registry. The fixture facets still ride in the cut's
+        // own `facetCuts` since the mocked registry pins none.
+        return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: ""});
     }
 
     function getDiamondCutDataWithCustomFacets(
@@ -275,15 +278,79 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
 
         mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
 
+        // From v32 the CTM builds the genesis cut from its registry, not from a passed cut: mock
+        // the registry so `DiamondInit` installs exactly the facets this test wants.
+        _mockGenesisRegistryFacets(_diamondCut.facetCuts);
+
         vm.prank(address(bridgehub));
-        return
-            chainContractAddress.createNewChain({
-                _chainId: chainId,
-                _baseTokenAssetId: baseTokenAssetId,
-                _admin: newChainAdmin,
-                _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
-                _factoryDeps: new bytes[](0)
+        return chainContractAddress.createNewChain({_chainId: chainId, _admin: newChainAdmin});
+    }
+
+    /// @notice Routing is read from each facet's own self-description; the fixture's test facets
+    ///         (e.g. UtilsFacet) do not implement it, so describe them with the cut's routing —
+    ///         sorted, since self-described lists are strictly ascending by contract.
+    function _mockFacetSelfDescriptions(Diamond.FacetCut[] memory _facetCuts) internal {
+        for (uint256 i = 0; i < _facetCuts.length; ++i) {
+            vm.mockCall(
+                _facetCuts[i].facet,
+                abi.encodeWithSelector(ISelfDescribingFacet.selectors.selector),
+                abi.encode(_sortSelectors(_facetCuts[i].selectors))
+            );
+        }
+    }
+
+    /// @dev Insertion sort (fixture-sized lists) into a fresh ascending array.
+    function _sortSelectors(bytes4[] memory _selectors) internal pure returns (bytes4[] memory sorted) {
+        sorted = new bytes4[](_selectors.length);
+        for (uint256 i = 0; i < _selectors.length; ++i) {
+            uint256 j = i;
+            while (j > 0 && sorted[j - 1] > _selectors[i]) {
+                sorted[j] = sorted[j - 1];
+                --j;
+            }
+            sorted[j] = _selectors[i];
+        }
+    }
+
+    /// @notice Mocks the release's typed genesis facet rows from the requested cut.
+    function _mockGenesisRegistryFacets(Diamond.FacetCut[] memory _facetCuts) internal {
+        GenesisFacet[] memory facets = new GenesisFacet[](_facetCuts.length);
+        for (uint256 i = 0; i < _facetCuts.length; ++i) {
+            facets[i] = GenesisFacet({
+                facet: PinnedContract({addr: _facetCuts[i].facet, codehash: _facetCuts[i].facet.codehash}),
+                isFreezable: _facetCuts[i].isFreezable
             });
+        }
+        _mockFacetSelfDescriptions(_facetCuts);
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.genesisFacets.selector),
+            abi.encode(facets)
+        );
+        // The generic mocker (re-invoked via `mockDiamondInitInteropCenterCallsWithAddress`) resets
+        // `diamondInit()` to a self-referential placeholder; re-mock it here, last, so the diamond
+        // is initialized against the fixture's real `DiamondInit` rather than the registry mock.
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.diamondInit.selector),
+            abi.encode(diamondInit)
+        );
+        // `createNewChain` runs the genesis upgrade against `genesisParams.genesisUpgrade`, so it
+        // must be the fixture's real upgrade contract. The generic mocker pins a placeholder there;
+        // re-mock it here, last, so the real contract is what `createNewChain` reads. Commitment ==
+        // 1 keeps both Era and ZKsyncOS genesis validation happy.
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
+            abi.encode(address(genesisUpgradeContract), bytes32(uint256(0x01)), bytes32(uint256(0x01)), uint64(0x01))
+        );
+        // Same reason: the verifier `DiamondInit` installs comes off the release, and the generic
+        // mocker resets it to a codeless placeholder. Re-mock the fixture's real verifier last.
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.verifier.selector),
+            abi.encode(testnetVerifier)
+        );
     }
 
     function createNewChainWithId(Diamond.DiamondCutData memory _diamondCut, uint256 id) internal {
@@ -302,14 +369,10 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
 
+        _mockGenesisRegistryFacets(_diamondCut.facetCuts);
+
         vm.prank(address(bridgehub));
-        chainContractAddress.createNewChain({
-            _chainId: id,
-            _baseTokenAssetId: DataEncoding.encodeNTVAssetId(id, baseToken),
-            _admin: newChainAdmin,
-            _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
-            _factoryDeps: new bytes[](0)
-        });
+        chainContractAddress.createNewChain({_chainId: id, _admin: newChainAdmin});
     }
 
     function _mockGetZKChainFromBridgehub(address _chainAddress) internal {

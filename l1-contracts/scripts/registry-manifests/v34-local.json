@@ -1,0 +1,123 @@
+{
+  "tag": "V34",
+  "oldVersion": "0.34.0",
+  "bootstrapVersion": "0.35.0",
+  "newVersion": "0.36.0",
+  "bootstrap": {
+    "legacyAdminFacet": "0x2b5A4e5493d4a54E717057B127cf0C000C876f9B",
+    "upgradeEngine": {
+      "address": "0x413b1AfCa96a3df5A686d8BFBF93d30688a7f7D9",
+      "codehash": "0x26e99489c25e9d7eecb03794a8efe84631b98de2e3201d1f2e34cdca707bab91"
+    },
+    "ctmImpl": {
+      "proxy": "0x38A95732036B1c8742d4FdDA25a1aB1588C66D29",
+      "expectedOldImpl": "0x6c9F97e5A87d75D1B2685E0891d5BF3f4B78409A",
+      "implNew": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
+      "implNewCodehash": "0x89c19e20d9bc7b035348dbf8c7615425dc9b8545efdebd912d541be275e86d85"
+    },
+    "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "core": {
+    "contracts": {
+      "L1MessageRoot": {
+        "proxy": "0x989dC32699ab2D6Bf394E5d43F26E204f4d8c7d1",
+        "expectedOldImpl": "0x376e68283694feA8E46327a490Ba19F5657272E4",
+        "implNew": "0x045857BDEAE7C1c7252d611eB24eB55564198b4C",
+        "implNewCodehash": "0x46759d98a01267caafae1bea7877e77be55e4348e4ca9963594e7ed53ae8b2b3"
+      }
+    }
+  },
+  "ctms": [
+    {
+      "name": "ZKsyncOS",
+      "isZKsyncOS": true,
+      "ctmProxy": "0x38A95732036B1c8742d4FdDA25a1aB1588C66D29",
+      "release": {
+        "diamondInit": {
+          "address": "0xaB7B4c595d3cE8C85e16DA86630f2fc223B05057",
+          "codehash": "0xa4109babfabdbd16cfcce83a2a18bbf9a36e454c99a7d7d5166ddf7df3e9a50d"
+        },
+        "verifier": {
+          "address": "0xAD523115cd35a8d4E60B3C0953E0E0ac10418309",
+          "codehash": "0x0aeb164bada5e65c3ddca5dba42cec1cb2ec4db362aeab8743e4c2699907096a"
+        },
+        "genesisFacets": [
+          {
+            "name": "AdminFacet",
+            "address": "0x70bDA08DBe07363968e9EE53d899dFE48560605B",
+            "codehash": "0x134df6f6d51965c411571e12b239bb2b961ac81283542a5e4d94f95f6150e5e9",
+            "isFreezable": false
+          },
+          {
+            "name": "GettersFacet",
+            "address": "0x26B862f640357268Bd2d9E95bc81553a2Aa81D7E",
+            "codehash": "0x3bcaedc11bd5be4ecfd4c668d7edc4afcd8c19235c2041b5ab9bb3d8042cd482",
+            "isFreezable": false
+          },
+          {
+            "name": "ExecutorFacet",
+            "address": "0xA56F946D6398Dd7d9D4D9B337Cf9E0F68982ca5B",
+            "codehash": "0x107689b8051e9d0bb74c4c4a5bff8907243089edd704311a3a12e6f9581410eb",
+            "isFreezable": true
+          },
+          {
+            "name": "MigratorFacet",
+            "address": "0x5D42EBdBBa61412295D7b0302d6F50aC449Ddb4F",
+            "codehash": "0x08b8b05f375b0bf6cbd2cf7f277a333da2bf83d58c030270823e3b43a9b955b1",
+            "isFreezable": false
+          },
+          {
+            "name": "CommitterFacet",
+            "address": "0xddE78e6202518FF4936b5302cC2891ec180E8bFf",
+            "codehash": "0xb69473c81f0af2b483721d71d81748a3f020c0d12cadae47f2cb4b0270eda12f",
+            "isFreezable": true
+          },
+          {
+            "name": "MailboxFacet",
+            "address": "0x8001b66D2954BeC4D281Abb191b87Fd72C7ED813",
+            "codehash": "0xc1226af54e52537296789aaae5cc04db5cfd70ae92130dea2b048f948043887c",
+            "isFreezable": true
+          }
+        ],
+        "baseSystemContracts": {
+          "bootloader": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "defaultAccount": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "evmEmulator": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "fixedForceDeploymentsData": "0xf1f2",
+        "l2BytecodeInfos": {},
+        "genesis": {
+          "genesisUpgrade": {
+            "address": "0x4Cc1695D984ed6eEB41310fE8ae4B37a4e45eEbE",
+            "codehash": "0xd2ca9b21d21ca5b197e4f4962d1c854884a31da0ecb015b5eeeb462081931e26"
+          },
+          "batchHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "batchCommitment": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "indexRepeatedStorageChanges": 54
+        }
+      },
+      "transition": {
+        "releaseCodehash": "0x525b56679569bc31d7b6e4cfc44ae4d526a8c2f39e60e6521bcbeef7474798e2",
+        "fromRelease": "0x47aC939E6Bdb2a55f8b427E330a41eB3978b187f",
+        "upgradeEngine": {
+          "address": "0xB06c856C8eaBd1d8321b687E188204C1018BC4E5",
+          "codehash": "0x26e99489c25e9d7eecb03794a8efe84631b98de2e3201d1f2e34cdca707bab91"
+        },
+        "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "upgradeTimestamp": 0,
+        "l2Plan": {
+          "deployments": [
+            {
+              "upgradeType": "ZKsyncOSUnsafeForceDeployment",
+              "deployedBytecodeInfo": "0xd8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce30000000000000000000000000000000000000000000000000000000000000006d8ceeb1af16ce49c7c068d8b9bcbca8a80f978611cb4ec0a1c08a95b0295dce3",
+              "newAddress": "0x00000000000000000000000000000000000ab001"
+            }
+          ],
+          "delegateTo": "0x00000000000000000000000000000000000ab001",
+          "delegateCalldata": "0x",
+          "factoryDepHashes": []
+        }
+      }
+    }
+  ]
+}

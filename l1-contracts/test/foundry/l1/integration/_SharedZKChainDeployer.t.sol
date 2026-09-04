@@ -13,6 +13,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 
@@ -241,36 +242,18 @@ contract ZKChainDeployer is L1ContractDeployer {
             ecosystemConfig.contracts.diamondCutData,
             (Diamond.DiamondCutData)
         );
-        bytes memory initData1;
-        bytes memory initData2;
-
-        {
-            // stack too deep
-            // InitializeData layout includes bridgehub, interop center, and CTM for v31+ init calldata.
-            initData1 = bytes.concat(
-                IDiamondInit.initialize.selector,
-                bytes32(_chainId),
-                bytes32(uint256(uint160(address(_bridgehub)))),
-                bytes32(uint256(uint160(address(_interopCenter)))),
-                bytes32(uint256(uint160(_chainTypeManager)))
-            );
-        }
-        {
-            initData2 = bytes.concat(
-                bytes32(_protocolVersion),
-                bytes32(uint256(uint160(_admin))),
-                bytes32(uint256(uint160(address(0x1337)))),
-                _baseTokenAssetId,
-                _storedBatchZero,
-                diamondCut.initCalldata
-            );
-        }
-        bytes memory initData;
-        {
-            initData = bytes.concat(initData1, initData2);
-        }
-
-        diamondCut.initCalldata = initData;
+        // Composed exactly as ChainTypeManagerBase._deployNewChain does: only (chainId, admin).
+        // DiamondInit reads everything else from the CTM — msg.sender during the proxy
+        // construction, hence the prank — and from the genesis registry / bridgehub it points
+        // at. The bridgehub's asset-id lookup is mocked since this helper bypasses
+        // `Bridgehub.createNewChain` (which is what registers it).
+        diamondCut.initCalldata = abi.encodeCall(IDiamondInit.initialize, (_chainId, _admin));
+        vm.mockCall(
+            _bridgehub,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, _chainId),
+            abi.encode(_baseTokenAssetId)
+        );
+        vm.prank(_chainTypeManager);
         DiamondProxy hyperchainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
         return address(hyperchainContract);
     }

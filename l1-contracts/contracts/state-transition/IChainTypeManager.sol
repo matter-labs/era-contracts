@@ -3,6 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {Diamond} from "./libraries/Diamond.sol";
+import {ICTMTransition} from "../upgrades/registry/objects/ICTMTransition.sol";
 import {L2CanonicalTransaction, TxStatus} from "../common/Messaging.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 
@@ -10,35 +11,19 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
 /// @param owner The address who can manage non-critical updates in the contract
 /// @param validatorTimelock The address that serves as consensus, i.e. can submit blocks to be processed
-/// @param chainCreationParams The struct that contains the fields that define how a new chain should be created
+/// @param currentRelease The `CTMRelease` new chains read their genesis data from
 /// @param protocolVersion The initial protocol version on the newly deployed chain
-/// @param verifier The verifier address for the initial protocol version
 /// @param serverNotifier The address that serves as server notifier
 // solhint-disable-next-line gas-struct-packing
 struct ChainTypeManagerInitializeData {
     address owner;
     address validatorTimelock;
-    ChainCreationParams chainCreationParams;
+    /// @dev `EXTCODEHASH` of the audited `CTMRelease`: every release this CTM ever pins (bootstrap
+    ///      included) must run exactly that code — provenance is enforced by the CTM itself.
+    bytes32 releaseCodehash;
+    address currentRelease;
     uint256 protocolVersion;
-    address verifier;
     address serverNotifier;
-}
-
-/// @notice The struct that contains the fields that define how a new chain should be created
-/// within this CTM.
-/// @param genesisUpgrade The address that is used in the diamond cut initialize address on chain creation
-/// @param genesisBatchHash Batch hash of the genesis (initial) batch
-/// @param genesisIndexRepeatedStorageChanges The serial number of the shortcut storage key for the genesis batch
-/// @param genesisBatchCommitment The zk-proof commitment for the genesis batch
-/// @param diamondCut The diamond cut for the first upgrade transaction on the newly deployed chain
-// solhint-disable-next-line gas-struct-packing
-struct ChainCreationParams {
-    address genesisUpgrade;
-    bytes32 genesisBatchHash;
-    uint64 genesisIndexRepeatedStorageChanges;
-    bytes32 genesisBatchCommitment;
-    Diamond.DiamondCutData diamondCut;
-    bytes forceDeploymentsData;
 }
 
 interface IChainTypeManager {
@@ -71,20 +56,17 @@ interface IChainTypeManager {
     /// @notice ServerNotifier changed
     event NewServerNotifier(address indexed oldServerNotifier, address indexed newServerNotifier);
 
-    /// @notice chain creation parameters changed
-    event NewChainCreationParams(
-        address genesisUpgrade,
-        bytes32 genesisBatchHash,
-        uint64 genesisIndexRepeatedStorageChanges,
-        bytes32 genesisBatchCommitment,
-        Diamond.DiamondCutData newInitialCut,
-        bytes32 newInitialCutHash,
-        bytes forceDeploymentsData,
-        bytes32 forceDeploymentHash
-    );
+    /// @notice The release used for new-chain genesis changed.
+    event NewCurrentRelease(uint256 indexed protocolVersion, address indexed release);
+
+    /// @notice The canonical release factory was set.
+    event NewReleaseCodehash(bytes32 indexed releaseCodehash);
 
     /// @notice New UpgradeCutHash
     event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
+
+    /// @notice The transition committed for chains departing from `oldProtocolVersion`.
+    event NewUpgradeTransition(uint256 indexed oldProtocolVersion, address indexed transition);
 
     /// @notice New UpgradeCutData
     event NewUpgradeCutData(uint256 indexed protocolVersion, Diamond.DiamondCutData diamondCutData);
@@ -94,12 +76,6 @@ interface IChainTypeManager {
 
     /// @notice Updated ProtocolVersion deadline
     event UpdateProtocolVersionDeadline(uint256 indexed protocolVersion, uint256 deadline);
-
-    /// @notice Verifier address changed for a protocol version
-    event NewProtocolVersionVerifier(uint256 indexed protocolVersion, address indexed verifier);
-
-    /// @notice Default upgrade contract changed
-    event NewDefaultUpgrade(address indexed oldDefaultUpgrade, address indexed newDefaultUpgrade);
 
     function isZKsyncOS() external pure returns (bool);
 
@@ -119,25 +95,28 @@ interface IChainTypeManager {
 
     function storedBatchZero() external view returns (bytes32);
 
-    function initialCutHash() external view returns (bytes32);
-
     function l1GenesisUpgrade() external view returns (address);
 
+    /// @dev Deprecated. Populated only by the legacy cut-taking commit path, for pre-v32 Admin
+    ///      facets that verify handed cut bytes. Registry-driven edges commit only the transition.
     function upgradeCutHash(uint256 _protocolVersion) external view returns (bytes32);
 
     function protocolVersion() external view returns (uint256);
 
+    /// @notice The timestamp until which `_protocolVersion` can be used.
+    /// @dev The committed transition pins the deadline its edge was approved with; the current
+    ///      version has no departing transition and is usable indefinitely; versions departed via
+    ///      the legacy cut-taking path read the storage that path wrote. A deadline set via
+    ///      {setProtocolVersionDeadline} takes precedence over all of these.
     function protocolVersionDeadline(uint256 _protocolVersion) external view returns (uint256);
 
+    /// @notice Moves the deadline of a departed protocol version — operational state that keeps
+    ///         changing after the commit (extended while chains lag, shortened to retire a
+    ///         version), for legacy and registry-committed versions alike.
+    function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external;
+
     function protocolVersionIsActive(uint256 _protocolVersion) external view returns (bool);
-
-    function protocolVersionVerifier(uint256 _protocolVersion) external view returns (address);
-
-    function setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) external;
-
-    function defaultUpgrade() external view returns (address);
-
-    function setDefaultUpgrade(address _defaultUpgrade) external;
+    function currentRelease() external view returns (address);
 
     function getProtocolVersion(uint256 _chainId) external view returns (uint256);
 
@@ -153,32 +132,35 @@ interface IChainTypeManager {
 
     function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external;
 
-    function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external;
+    function setCurrentRelease(address _release) external;
+
+    /// @notice Sets the canonical release factory (migration path for CTMs whose storage
+    ///         predates the field; fresh CTMs receive it in `initialize`).
+    function setReleaseCodehash(bytes32 _releaseCodehash) external;
+
+    /// @notice The canonical release factory whose attestation every pinned release must carry.
+    function releaseCodehash() external view returns (bytes32);
 
     function getChainAdmin(uint256 _chainId) external view returns (address);
 
-    function createNewChain(
-        uint256 _chainId,
-        bytes32 _baseTokenAssetId,
-        address _admin,
-        bytes calldata _initData,
-        bytes[] calldata _factoryDeps
-    ) external returns (address);
+    /// @notice Deploys a new chain. The bridgehub passes only the minimal chain-specific data
+    ///         (id + admin); everything else (base token asset id, genesis facet set, base system
+    ///         hashes, genesis params, force deployments) is derived from the bridgehub and the
+    ///         CTM's current release.
+    function createNewChain(uint256 _chainId, address _admin) external returns (address);
 
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
-        uint256 _newProtocolVersion,
-        address _verifier
+        uint256 _newProtocolVersion
     ) external;
 
-    function createNewVerifierOnlyUpgrade(
-        uint256 _oldProtocolVersion,
-        uint256 _oldProtocolVersionDeadline,
-        uint256 _newProtocolVersion,
-        address _verifier
-    ) external;
+    function setNewVersionUpgradeFromTransition(ICTMTransition _transition) external;
+
+    /// @notice The transition committed for chains departing from `_oldProtocolVersion` — the
+    ///         machine-readable pointer tooling composes that version's upgrade cut from.
+    function upgradeTransition(uint256 _oldProtocolVersion) external view returns (address);
 
     function setUpgradeDiamondCut(Diamond.DiamondCutData calldata _cutData, uint256 _oldProtocolVersion) external;
 
@@ -200,11 +182,12 @@ interface IChainTypeManager {
 
     function deactivatePriorityMode(uint256 _chainId) external;
 
-    function upgradeChainFromVersion(
-        uint256 _chainId,
-        uint256 _oldProtocolVersion,
-        Diamond.DiamondCutData calldata _diamondCut
-    ) external;
+    /// @notice The upgrade cut committed for chains departing from `_oldProtocolVersion`, composed
+    ///         from the transition this CTM pinned for that edge. Chains read it here instead of
+    ///         being handed cut bytes.
+    function upgradeCutForVersion(uint256 _oldProtocolVersion) external view returns (Diamond.DiamondCutData memory);
+
+    function upgradeChainFromVersion(uint256 _chainId, uint256 _oldProtocolVersion) external;
 
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32);
 

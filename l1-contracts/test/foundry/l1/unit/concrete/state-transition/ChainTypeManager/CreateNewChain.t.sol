@@ -2,9 +2,8 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {HashMismatch, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -14,32 +13,13 @@ contract createNewChainTest is ChainTypeManagerTest {
         deploy();
     }
 
-    function test_RevertWhen_InitialDiamondCutHashMismatch() public {
-        Diamond.DiamondCutData memory initialDiamondCutData = getDiamondCutData(sharedBridge);
-        Diamond.DiamondCutData memory correctDiamondCutData = getDiamondCutData(address(diamondInit));
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                HashMismatch.selector,
-                keccak256(abi.encode(correctDiamondCutData)),
-                keccak256(abi.encode(initialDiamondCutData))
-            )
-        );
-        createNewChain(initialDiamondCutData);
-    }
+    // Note: the old `HashMismatch`-on-passed-cut test is gone: from v32 the CTM builds the genesis
+    // cut itself from its registry, so `createNewChain` no longer accepts (or validates) a cut.
 
     function test_RevertWhen_CalledNotByBridgehub() public {
-        Diamond.DiamondCutData memory initialDiamondCutData = getDiamondCutData(diamondInit);
-
         vm.prank(governor);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
-        chainContractAddress.createNewChain({
-            _chainId: chainId,
-            _baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, baseToken),
-            _admin: admin,
-            _initData: abi.encode(abi.encode(initialDiamondCutData), bytes("")),
-            _factoryDeps: new bytes[](0)
-        });
+        chainContractAddress.createNewChain({_chainId: chainId, _admin: admin});
     }
 
     function test_SuccessfulCreationOfNewChain() public {

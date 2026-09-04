@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
-import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
+import {IL2V34Upgrade} from "contracts/upgrades/IL2V34Upgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
@@ -71,8 +71,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         upgradeContract.setPriorityTxMaxGasLimit(1 ether);
         upgradeContract.setPriorityTxMaxPubdata(1000000);
         upgradeContract.setChainTypeManager(mockChainTypeManager);
-        upgradeContract.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
-
+        proposedUpgrade.verifier = mockVerifier;
         upgradeContract.setBridgehub(mockBridgehub);
         upgradeContract.setChainId(CHAIN_ID);
         upgradeContract.setZKsyncOS(true);
@@ -121,12 +120,15 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         assertTrue(recorded != placeholderHash, "rewrite produced the placeholder");
     }
 
-    /// @notice A verifier-only upgrade carries no L2 upgrade transaction, so there is nothing to substitute and
-    ///         the rewrite — which would reject the empty transaction data — must be skipped.
+    /// @notice A transition whose derived delta carries no L2 upgrade transaction leaves the tx all-zero, so
+    ///         there is nothing to substitute and the rewrite — which would reject the empty transaction data —
+    ///         must be skipped.
     function test_upgradeWithoutAnL2TransactionSkipsTheRewrite() public {
-        assertEq(upgradeContract.upgradeVerifierOnly(protocolVersion), Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
+        delete proposedUpgrade.l2ProtocolUpgradeTx;
 
-        assertEq(upgradeContract.getProtocolVersion(), protocolVersion);
+        assertEq(upgradeContract.upgrade(proposedUpgrade), Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
+
+        assertEq(upgradeContract.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
         assertEq(upgradeContract.getVerifier(), mockVerifier);
         assertEq(upgradeContract.getL2SystemContractsUpgradeTxHash(), bytes32(0), "an upgrade tx was recorded");
     }
@@ -141,7 +143,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
     }
 
     function test_revertWhen_theOuterSelectorIsNotForceDeployAndUpgradeUniversal() public {
-        bytes memory wrongOuter = abi.encodeCall(IL2V32Upgrade.upgrade, (true, ctmDeployer, hex"", hex""));
+        bytes memory wrongOuter = abi.encodeCall(IL2V34Upgrade.upgrade, (true, ctmDeployer, hex"", hex""));
 
         vm.expectRevert(UnexpectedUpgradeSelector.selector);
         upgradeContract.getL2UpgradeTxData(mockBridgehub, CHAIN_ID, true, wrongOuter);
@@ -173,7 +175,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
     /// @dev The flag encoded in the ecosystem-wide transaction must agree with the chain being upgraded.
     function test_revertWhen_theWrappedFlagDisagreesWithTheChain() public {
         bytes memory eraShapedInner = abi.encodeCall(
-            IL2V32Upgrade.upgrade,
+            IL2V34Upgrade.upgrade,
             (false, ctmDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, hex"00")
         );
         bytes memory placeholder = abi.encodeCall(
@@ -204,7 +206,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
         // The ecosystem-wide parts are carried over untouched.
         assertEq(forceDeployments.length, 0, "force deployments changed");
         assertEq(rewrittenDelegateTo, delegateTo, "delegate target changed");
-        assertEq(bytes4(innerCalldata), IL2V32Upgrade.upgrade.selector);
+        assertEq(bytes4(innerCalldata), IL2V34Upgrade.upgrade.selector);
 
         (bool isZKsyncOS, address rewrittenCtmDeployer, bytes memory fixedData, bytes memory perChainData) = abi.decode(
             _sliceSelector(innerCalldata),
@@ -307,7 +309,7 @@ contract DefaultUpgradeZKsyncOSTest is BaseUpgrade {
 
     function _placeholderUpgradeTxData() internal view returns (bytes memory) {
         bytes memory innerCalldata = abi.encodeCall(
-            IL2V32Upgrade.upgrade,
+            IL2V34Upgrade.upgrade,
             (true, ctmDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, hex"00")
         );
         return

@@ -523,15 +523,11 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         });
 
         address ctm = migratingChain.getChainTypeManager();
+        // The chain reads the committed cut from its CTM rather than being handed one.
         vm.mockCall(
             ctm,
-            abi.encodeCall(IChainTypeManager.upgradeCutHash, (currentProtocolVersion)),
-            abi.encode(keccak256(abi.encode(diamondCut)))
-        );
-        vm.mockCall(
-            ctm,
-            abi.encodeCall(IChainTypeManager.protocolVersionVerifier, (newProtocolVersion)),
-            abi.encode(address(0x1))
+            abi.encodeCall(IChainTypeManager.upgradeCutForVersion, (currentProtocolVersion)),
+            abi.encode(diamondCut)
         );
         vm.mockCall(
             address(gatewayChain),
@@ -540,7 +536,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
 
         vm.startBroadcast(migratingChain.getAdmin());
-        migratingChain.upgradeChainFromVersion(address(migratingChain), currentProtocolVersion, diamondCut);
+        migratingChain.upgradeChainFromVersion(address(migratingChain), currentProtocolVersion);
         vm.stopBroadcast();
 
         // Verify protocol version was updated

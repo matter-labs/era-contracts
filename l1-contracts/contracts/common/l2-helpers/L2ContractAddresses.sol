@@ -161,6 +161,11 @@ address constant L2_ATOMIC_FLOW_MANAGER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET
 /// calls it at this fixed address. Holds no state and has no initializer.
 address constant L2_INTEROP_ATTRIBUTE_PARSER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x15);
 
+/// @dev The address of the L2 ecosystem registry: the queryable on-chain copy of the ecosystem's
+/// `FixedForceDeploymentsData`, written registry-first at genesis and re-pinned by every protocol
+/// upgrade with the exact bytes the L1 release pins (see `IL2EcosystemRegistry`).
+address constant L2_ECOSYSTEM_REGISTRY_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x16);
+
 ////////////////////////////////////////////////////////////
 // ZKsync OS genesis contracts
 ////////////////////////////////////////////////////////////

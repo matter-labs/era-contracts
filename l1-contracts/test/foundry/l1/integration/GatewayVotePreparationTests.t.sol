@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
+import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 import {GatewayVotePreparation} from "deploy-scripts/gateway/GatewayVotePreparation.s.sol";
 import {
@@ -17,9 +18,14 @@ import {
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {MockCTMForDiamondInit} from "contracts/dev-contracts/test/MockCTMForDiamondInit.sol";
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {GenesisManifestLib} from "contracts/upgrades/registry/libraries/GenesisManifestLib.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
+import {GenesisConfig, ReleaseGenesisData} from "../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice Test-friendly subclass of GatewayVotePreparation that exposes the
 /// initialization + calculateAddresses path without executing L1->L2 transactions.
@@ -38,13 +44,21 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
 
         (contracts, , , directCalldata, ) = GatewayCTMDeployerHelper.calculateAddresses(
             bytes32(uint256(1)),
-            gatewayCTMDeployerConfig
+            gatewayCTMDeployerConfig,
+            getL2BytecodeInfoTable()
         );
     }
 
     /// @notice Exposes the populated config for test assertions.
     function getDeployerConfig() public view returns (GatewayCTMDeployerConfig memory) {
         return gatewayCTMDeployerConfig;
+    }
+
+    /// @dev The real builder reads every L2 contract's bytecode from artifacts, which pushes this
+    ///      test over the gas limit (MemoryOOG). The table's content is irrelevant to the address
+    ///      calculation under test, so an empty enum-length table stands in.
+    function getL2BytecodeInfoTable() internal override returns (bytes[] memory) {
+        return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
     }
 }
 
@@ -191,42 +205,86 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         _simulateCreate2(create2Factory, directCalldata.diamondInitCalldata, "DiamondInit");
         _simulateCreate2(create2Factory, directCalldata.genesisUpgradeCalldata, "GenesisUpgrade");
         _simulateCreate2(create2Factory, directCalldata.multicall3Calldata, "Multicall3");
+        // The bootstrap release is deliberately NOT replayed here: its constructor pins the
+        // verifier, which comes from the verifiers deployer this fixture does not simulate. Its
+        // create2 deployment is covered by the Gateway CTM deployer tests; this one builds an
+        // equivalent release below and only exercises the diamond cut.
 
-        // Mock the CTM calls that DiamondInit.initialize() makes
-        address mockCTM = address(0xC7A1);
+        // A real mock contract for the CTM calls DiamondInit.initialize() makes. The CTM is
+        // `msg.sender` during the proxy construction, so the deploy below pranks as this mock.
+        address mockCTM = address(
+            new MockCTMForDiamondInit(
+                address(0),
+                L2_BRIDGEHUB_ADDR,
+                config.protocolVersion,
+                address(0x1337),
+                bytes32(uint256(1))
+            )
+        );
+        // The L2 bridgehub built-in has no code in this test; etch a stub so it can be mocked.
+        vm.etch(L2_BRIDGEHUB_ADDR, hex"00");
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
+            abi.encode(keccak256("baseTokenAssetId"))
+        );
+        // The Gateway cut is empty (no facets, no init payload): DiamondInit installs the
+        // facet set it reads from the genesis registry the CTM pins and self-describes each
+        // facet's selectors — validating the facets' code, which is what this test checks.
+        // The registry is a REAL GenesisRegistry initialized exactly as
+        // GatewayCTMDeployerCTMBase._deployGenesisRegistry pins it; only the CTM (already a
+        // mock here) has its pointer mocked.
         vm.mockCall(
             mockCTM,
-            abi.encodeWithSelector(IChainTypeManager.PERMISSIONLESS_VALIDATOR.selector),
-            abi.encode(address(0))
-        );
-        vm.mockCall(
-            mockCTM,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector),
-            abi.encode(makeAddr("mockVerifier"))
+            abi.encodeWithSelector(IChainTypeManager.currentRelease.selector),
+            abi.encode(_deployGatewayGenesisRegistry(contracts, config))
         );
 
-        // Build full initCalldata: selector + InitializeData fields.
-        // Use L2_BRIDGEHUB_ADDR as bridgehub so initialize() takes the L2 branch
-        // (sets nativeTokenVault from L2 constants, no external calls).
-        bytes memory initData1 = bytes.concat(
-            IDiamondInit.initialize.selector,
-            bytes32(uint256(GATEWAY_CHAIN_ID)), // chainId
-            bytes32(uint256(uint160(L2_BRIDGEHUB_ADDR))), // bridgehub
-            bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR))), // interopCenter
-            bytes32(uint256(uint160(mockCTM))) // chainTypeManager
-        );
-        bytes memory initData2 = bytes.concat(
-            bytes32(config.protocolVersion), // protocolVersion
-            bytes32(uint256(uint160(address(0xAD01)))), // admin
-            bytes32(uint256(uint160(address(0x1337)))), // validatorTimelock
-            keccak256("baseTokenAssetId"), // baseTokenAssetId (non-zero)
-            bytes32(uint256(1)), // storedBatchZero
-            diamondCut.initCalldata // abi.encode(InitializeDataNewChain)
-        );
-        diamondCut.initCalldata = bytes.concat(initData1, initData2);
+        // Build the initCalldata exactly as ChainTypeManagerBase composes it: only
+        // (chainId, admin) — everything else is read from the mocked CTM and the registry.
+        // BRIDGE_HUB is mocked to L2_BRIDGEHUB_ADDR so initialize() takes the L2 branch
+        // (sets nativeTokenVault/assetTracker from L2 constants, no external calls).
+        diamondCut.initCalldata = abi.encodeCall(IDiamondInit.initialize, (GATEWAY_CHAIN_ID, address(0xAD01)));
 
-        // Deploy the DiamondProxy with real facets - validates all facets have code AND runs initialize()
+        // Deploy the DiamondProxy with real facets - validates all facets have code AND runs
+        // initialize(), pranked as the CTM (the real flow's deployer).
+        vm.prank(mockCTM);
         new DiamondProxy(GATEWAY_CHAIN_ID, diamondCut);
+    }
+
+    /// @notice Deploys a real bootstrap `CTMRelease` pinning the computed Gateway facet set and
+    /// base system hashes — the object the Gateway deployer takes pre-deployed.
+    function _deployGatewayGenesisRegistry(
+        DeployedContracts memory contracts,
+        GatewayCTMDeployerConfig memory config
+    ) internal returns (address) {
+        // The verifiers are deployed by their own deployer contract, which this fixture does not
+        // simulate (it only replays the DIRECT create2 deployments above). The release pins the
+        // verifier's codehash, so give the predicted address code before building the manifest —
+        // the verifier's own behaviour is out of scope here; only the diamond cut is under test.
+        vm.etch(contracts.stateTransition.verifiers.verifier, hex"600160005500");
+
+        CTMRelease release = new CTMRelease(
+            GenesisManifestLib.buildGenesisManifest(
+                GenesisConfig({
+                    facets: contracts.stateTransition.facets,
+                    verifier: contracts.stateTransition.verifiers.verifier,
+                    genesisUpgrade: contracts.stateTransition.genesisUpgrade,
+                    genesis: ReleaseGenesisData({
+                        bootloaderHash: config.bootloaderHash,
+                        defaultAccountHash: config.defaultAccountHash,
+                        evmEmulatorHash: config.evmEmulatorHash,
+                        fixedForceDeploymentsData: config.forceDeploymentsData,
+                        genesisBatchHash: config.genesisRoot,
+                        genesisBatchCommitment: config.genesisBatchCommitment,
+                        genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex)
+                    }),
+                    // Length-checked inventory; content is irrelevant to this fixture.
+                    l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
+                })
+            )
+        );
+        return address(release);
     }
 
     /// @notice Simulates a CREATE2 deployment by calling the deterministic CREATE2 factory.
@@ -255,10 +313,6 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
 
         assertTrue(config.aliasedGovernanceAddress != address(0), "Aliased governance should be set");
         assertTrue(config.l1ChainId != 0, "L1 chain ID should be set");
-        assertTrue(config.adminSelectors.length > 0, "Admin selectors should be populated");
-        assertTrue(config.executorSelectors.length > 0, "Executor selectors should be populated");
-        assertTrue(config.mailboxSelectors.length > 0, "Mailbox selectors should be populated");
-        assertTrue(config.gettersSelectors.length > 0, "Getters selectors should be populated");
         assertTrue(config.genesisRoot != bytes32(0), "Genesis root should be set");
         assertTrue(config.protocolVersion != 0, "Protocol version should be set");
         assertTrue(config.isZKsyncOS, "Config should be in ZKsyncOS mode");

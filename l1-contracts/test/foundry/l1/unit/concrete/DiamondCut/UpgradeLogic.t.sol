@@ -4,7 +4,8 @@ pragma solidity 0.8.28;
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {DiamondInit, InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -66,8 +67,8 @@ contract UpgradeLogicTest is DiamondCutTest {
         // Mock CTM to return a verifier for protocol version 0
         address testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
         vm.mockCall(
-            chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, uint256(0)),
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.verifier.selector),
             abi.encode(testnetVerifier)
         );
 
@@ -85,28 +86,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             selectors: Utils.getGettersSelectors()
         });
 
-        InitializeData memory params = InitializeData({
-            // TODO REVIEW
-            chainId: 1,
-            bridgehub: address(dummyBridgehub),
-            chainTypeManager: chainTypeManager,
-            interopCenter: interopCenter,
-            protocolVersion: 0,
-            admin: admin,
-            validatorTimelock: makeAddr("validatorTimelock"),
-            baseTokenAssetId: baseTokenAssetId,
-            storedBatchZero: bytes32(0),
-            // genesisBatchHash: 0x02c775f0a90abf7a0e8043f2fdc38f0580ca9f9996a895d05a501bfeaa3b2e21,
-            // genesisIndexRepeatedStorageChanges: 0,
-            // genesisBatchCommitment: bytes32(0),
-            // zkPorterIsAvailable: false,
-            l2BootloaderBytecodeHash: bytes32(0),
-            l2DefaultAccountBytecodeHash: bytes32(0),
-            l2EvmEmulatorBytecodeHash: bytes32(0)
-        });
-        // initialProtocolVersion: 0,
-
-        bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);
+        bytes memory diamondInitCalldata = abi.encodeCall(diamondInit.initialize, (uint256(1), admin));
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -115,6 +95,18 @@ contract UpgradeLogicTest is DiamondCutTest {
         });
 
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
+        // The fixture's CTM is a real DummyCTM whose genesis registry pointer,
+        // BRIDGE_HUB immutable and validator timelock are unset; DiamondInit derives all of them
+        // from the CTM (= the proxy deployer, hence the prank), so mock them here.
+        mockGenesisRegistry(chainTypeManager);
+        mockCtmDerivedInitValues(
+            chainTypeManager,
+            address(dummyBridgehub),
+            baseTokenAssetId,
+            makeAddr("validatorTimelock"),
+            bytes32(0)
+        );
+        vm.prank(chainTypeManager);
         diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
         proxyAsAdmin = AdminFacet(address(diamondProxy));
         proxyAsGetters = GettersFacet(address(diamondProxy));

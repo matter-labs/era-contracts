@@ -1,0 +1,79 @@
+# v0.32.0 "atomic-interop" — Sepolia testnet upgrade input (v31 -> v32).
+#
+# First registry-driven upgrade: CTMUpgrade_v32 deploys a genesis `CTMRegistry`
+# and pins it via `setGenesisRegistry` right after the version bump. The real
+# testnet v31 CTM implementations predate the registry work (their
+# `genesisRegistry()` getter reverts), so the v32 governance calldata upgrades
+# each CTM proxy to the new v32 implementation before pinning the registry.
+#
+# Both testnet CTMs are on v31 (0x1f00000000) today:
+#   - Atlas / ZKsync OS CTM 0x54D5…  (chains 531050204, 8022832, 8022833)
+#   - Era CTM               0x3Cc8…  (chain 301)
+# The multi-CTM list is driven from `permanent-values/testnet.toml`.
+
+era_chain_id = 301
+testnet_verifier = true
+governance_upgrade_timer_initial_delay = 1200
+owner_address = "0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D"
+
+# This should always be false for non-loadtest environments.
+support_l2_legacy_shared_bridge_test = false
+
+old_protocol_version = 0x1f00000000
+
+priority_txs_l2_gas_limit = 2000000
+max_expected_l1_gas_price = 50000000000
+
+[contracts]
+governance_min_delay = 0
+
+max_number_of_chains = 100
+# NOTE: rotate this (and the per-CTM `[create2_factory_salts]`) on every regen —
+# reusing a salt collides with already-deployed CREATE2 addresses.
+create2_factory_salt = "0x32000000f6ddcedd3b7f5ca9e2cb874316fb32e63a2bbf9ad406dac384b0001"
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+validator_timelock_execution_delay = 0
+# ZKsync OS (Atlas) genesis — configs/genesis/zksync-os/latest.json.
+# ZKsync OS pins commitment == 1 and sentinel base-system hashes.
+genesis_root = "0x1a4ce8f15e4e9bc1041715f42560b85b3b84cb43f3471d8f98d4b84b49045147"
+genesis_rollup_leaf_index = 0
+genesis_batch_commitment = "0x0000000000000000000000000000000000000000000000000000000000000001"
+recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+priority_tx_max_gas_limit = 72000000
+diamond_init_pubdata_pricing_mode = 0
+diamond_init_batch_overhead_l1_gas = 1000000
+diamond_init_max_pubdata_per_batch = 120000
+diamond_init_max_l2_gas_per_batch = 80000000
+diamond_init_priority_tx_max_pubdata = 99000
+diamond_init_minimal_l2_gas_price = 250000000
+bootloader_hash = "0x0000000000000000000000000000000000000000000000000000000000000001"
+default_aa_hash = "0x0000000000000000000000000000000000000000000000000000000000000001"
+evm_emulator_hash = "0x0000000000000000000000000000000000000000000000000000000000000001"
+bridgehub_proxy_address = "0xc4fd2580c3487bba18d63f50301020132342fdbd"
+rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
+
+governance_security_council_address = "0x25Ab0397DA109A50C8921A1d4a034e0973602469"
+latest_protocol_version = 0x2000000000
+# Atlas CTM's live BytecodesSupplier (CTM.L1_BYTECODES_SUPPLIER()); per-CTM values
+# come from permanent-values [[ctm_contracts.ctms]].
+l1_bytecodes_supplier_addr = "0x4332c61541c4aD8ffFB158c51d9C915e8114E845"
+protocol_upgrade_handler_proxy_address = "0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D"
+
+[tokens]
+token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
+
+# Testnet has no legacy Gateway; a valid chain id is provided for the script.
+[legacy_gateway]
+chain_id = 531050204
+
+# Per-CTM CREATE2 salts. Each CTM prepare deploys a `GovernanceUpgradeTimer`
+# whose constructor args are env-wide constants — without a CTM-distinct salt
+# every CTM would land the timer at the same CREATE2 address and gov-replay's
+# second `startTimer()` would revert.
+[create2_factory_salts]
+# Atlas (ZKsync OS) CTM
+"0x54D55e74De9c6003E7a68a1fE70E633f05761eb5" = "0x32000000e2fa245eeb7a45aaf8e4add75c988abe4019abc7fd81e2f8593ba0001"
+# Era CTM
+"0x3Cc81628a14C824057a97C1B4Ab17758E5D18864" = "0x32000000472581f2aaccdbba79ab5e964cb28eb8d5937fae2bd4aa87c52c0002"

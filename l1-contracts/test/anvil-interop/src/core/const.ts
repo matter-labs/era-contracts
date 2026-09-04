@@ -39,6 +39,8 @@ export const L2_BASE_TOKEN_HOLDER_ADDR = "0x000000000000000000000000000000000001
 export const L2_REMOVED_GW_ASSET_TRACKER_ADDR = "0x0000000000000000000000000000000000010010";
 export const L2_INTEROP_COMMITMENT_TREE_ADDR = "0x0000000000000000000000000000000000010012";
 export const L2_ATOMIC_FLOW_MANAGER_ADDR = "0x0000000000000000000000000000000000010014";
+// The ZKsync-OS-only L2EcosystemRegistry built-in (BUILT_IN_CONTRACTS_OFFSET + 0x16).
+export const L2_ECOSYSTEM_REGISTRY_ADDR = "0x0000000000000000000000000000000000010016";
 
 // ZK-VM system hook addresses: SYSTEM_HOOKS_OFFSET (0x7000) + offset
 export const L1_MESSENGER_HOOK_ADDR = "0x0000000000000000000000000000000000007001";
@@ -65,6 +67,9 @@ export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFf
 // grows the tree and rehashes the populated path, so `sendBundle` needs a generous gas cap.
 export const ATOMIC_SEND_BUNDLE_GAS_LIMIT = 3_000_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
+// The CTM deployment builds the release's complete L2 bytecode inventory in script memory.
+// Foundry's default execution-memory cap is too small for that deterministic artifact pass.
+export const CTM_DEPLOYMENT_FORGE_MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024;
 // 7 gwei, used by Anvil interop specs to exercise the non-zero dynamic fee path.
 export const ANVIL_INTEROP_PROTOCOL_FEE_WEI = "7000000000";
 

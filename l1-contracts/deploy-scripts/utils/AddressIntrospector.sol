@@ -252,9 +252,16 @@ library AddressIntrospector {
             verifiers: Verifiers({verifier: verifier, verifierFflonk: verifierFflonk, verifierPlonk: verifierPlonk}),
             facets: facets,
             genesisUpgrade: ctm.l1GenesisUpgrade(),
-            // `defaultUpgrade` is only stored in the CTM from v32 on.
-            defaultUpgrade: _isPreV32 ? address(0) : ctm.defaultUpgrade(),
-            chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr)
+            // No live source exists: the engine is a per-upgrade deploy the CTM keeps no stable
+            // pointer to (a committed transition pins its own engine, but is keyed by departing
+            // version). Every prepare overwrites this with the engine it deploys, and
+            // `DefaultCTMUpgrade.saveOutput` refuses to serialize it unassigned.
+            defaultUpgrade: address(0),
+            chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr),
+            // The release registry only exists on the CTM from v34 on — every earlier
+            // implementation has no `currentRelease` getter at all — so it is read only off a
+            // registry-era CTM and reported as zero otherwise.
+            currentRelease: ctm.protocolVersion() >= SemVer.packSemVer(0, 34, 0) ? ctm.currentRelease() : address(0)
         });
         info.l1Specific = L1SpecificStateTransitionAddresses({legacyValidatorTimelock: ctm.validatorTimelock()});
         info.admin = CTMAdminAddresses({

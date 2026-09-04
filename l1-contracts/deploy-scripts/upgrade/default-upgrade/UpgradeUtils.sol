@@ -9,7 +9,15 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG} from "../../utils/Types.sol";
+
+/// @dev The per-version verifier map pre-v34 CTMs keep. From v34 the verifier is part of the
+/// installed chain state and lives on the CTM's pinned release, so the map is deprecated storage
+/// there and absent from `IChainTypeManager`.
+interface ILegacyProtocolVersionVerifier {
+    function protocolVersionVerifier(uint256 _protocolVersion) external view returns (address);
+}
 
 /// @dev Getter that v32/v33 testnet verifiers exported as a public constant; pre-v34 production
 /// verifiers don't have it.
@@ -23,20 +31,27 @@ library UpgradeUtils {
     /// @notice Resolves whether the ecosystem runs a testnet verifier by asking the verifier the
     /// given CTM reports for its current protocol version.
     /// @dev The verifier address is read from the CTM itself so a stale or mistyped address in the
-    /// script config cannot skew the answer. From v34 every ZKsync OS verifier exports the flag,
-    /// so it is called directly and a wrong deployment fails loudly. Pre-v34 the deployed verifier
-    /// may answer under the current name (a newer verifier serving an older version) or the legacy
-    /// constant name; a verifier answering neither resolves to "production".
+    /// script config cannot skew the answer. WHERE it is read from depends on the version the CTM
+    /// is on, which is also exactly the version boundary of the flag: from v34 the verifier is part
+    /// of the installed chain state and lives on the CTM's pinned release, and every ZKsync OS
+    /// verifier exports the flag, so it is called directly and a wrong deployment fails loudly.
+    /// Pre-v34 CTMs keep the per-version verifier map, and their deployed verifier may answer under
+    /// the current name (a newer verifier serving an older version) or the legacy constant name; a
+    /// verifier answering neither resolves to "production".
     /// Temporary shim: once every environment these scripts can meet is on v34+, the pre-v34
     /// branches can be deleted in favor of the direct call.
     function resolveTestnetVerifier(IChainTypeManager _ctm) internal view returns (bool) {
         uint256 packedProtocolVersion = _ctm.protocolVersion();
-        address verifier = _ctm.protocolVersionVerifier(packedProtocolVersion);
-        require(verifier != address(0), "verifier not set for the current protocol version");
         (, uint32 minor, ) = SemVer.unpackSemVer(SafeCast.toUint96(packedProtocolVersion));
         if (minor >= FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG) {
-            return IZKsyncOSVerifier(verifier).isTestnetVerifier();
+            address releaseVerifier = ICTMRelease(_ctm.currentRelease()).verifier();
+            require(releaseVerifier != address(0), "release pins no verifier");
+            return IZKsyncOSVerifier(releaseVerifier).isTestnetVerifier();
         }
+        address verifier = ILegacyProtocolVersionVerifier(address(_ctm)).protocolVersionVerifier(
+            packedProtocolVersion
+        );
+        require(verifier != address(0), "verifier not set for the current protocol version");
         require(verifier.code.length != 0, "verifier has no code");
         (bool ok, bytes memory data) = verifier.staticcall(abi.encodeCall(IZKsyncOSVerifier.isTestnetVerifier, ()));
         if (!ok) {

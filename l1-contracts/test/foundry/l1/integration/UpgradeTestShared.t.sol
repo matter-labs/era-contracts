@@ -9,11 +9,11 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
-import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
-import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
+import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
+import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
+import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
 import {IOwnableSingleStep, IChainAdminMulticall} from "../../../../deploy-scripts/AdminFunctions.s.sol";
 import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
-import {ChainUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol";
 import {UpgradeUtils} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeUtils.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -24,7 +24,7 @@ import {LogFinder} from "./utils/LogFinder.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-contract UpgradeIntegrationTestBase is Test {
+abstract contract UpgradeIntegrationTestBase is Test {
     using stdToml for string;
     using LogFinder for Vm.Log[];
 
@@ -32,15 +32,15 @@ contract UpgradeIntegrationTestBase is Test {
 
     uint256 chainId;
 
-    CoreUpgrade_v31 coreUpgrade;
-    CTMUpgrade_v31 ctmUpgrade;
-    ChainUpgrade_v31 chainUpgrade;
+    DefaultCoreUpgrade coreUpgrade;
+    DefaultCTMUpgrade ctmUpgrade;
+    DefaultChainUpgrade chainUpgrade;
 
     /// @notice Per-test fixed paths for the deploy outputs the upgrade scripts read.
     string public ECOSYSTEM_INPUT = "file_1.toml";
-    string public ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/shared.toml";
+    string public ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/foundry-upgrade.toml";
     string public ECOSYSTEM_OUTPUT = "file_3.toml";
-    string public CTM_INPUT = "/upgrade-envs/v0.31.0-interopB/shared.toml";
+    string public CTM_INPUT = "/upgrade-envs/foundry-upgrade.toml";
     string public CORE_OUTPUT = "/script-out/foundry-upgrade/upgrade-core.toml";
     string public CTM_OUTPUT = "/script-out/foundry-upgrade/mainnet-gateway.toml";
     string public CHAIN_INPUT;
@@ -58,7 +58,7 @@ contract UpgradeIntegrationTestBase is Test {
     bool internal _ctmAdminCallsPrepared;
 
     function setupUpgrade(bool skipFactoryDepsCheck) public virtual {
-        console.log("setupUpgrade: Creating CoreUpgrade_v31 and CTMUpgrade_v31");
+        console.log("setupUpgrade: Creating the version-specific core + CTM upgrade scripts");
         coreUpgrade = createCoreUpgrade();
         ctmUpgrade = createCTMUpgrade();
 
@@ -92,8 +92,8 @@ contract UpgradeIntegrationTestBase is Test {
         console.log("setupUpgrade: Deploying new ecosystem contracts");
         coreUpgrade.deployNewEcosystemContractsL1();
 
-        console.log("setupUpgrade: Creating ChainUpgrade_v31");
-        chainUpgrade = new ChainUpgrade_v31();
+        console.log("setupUpgrade: Creating chain upgrade");
+        chainUpgrade = createChainUpgrade();
 
         // Hook for child classes to mutate Core/CTM state after init but before prepare
         // (e.g. local test needs to bump CTM's protocol version from the upgrade input).
@@ -112,15 +112,14 @@ contract UpgradeIntegrationTestBase is Test {
         console.log("setupUpgrade: Complete");
     }
 
-    /// @notice Override in child classes to use mocked versions.
-    function createCoreUpgrade() internal virtual returns (CoreUpgrade_v31) {
-        return new CoreUpgrade_v31();
-    }
+    /// @notice The version-specific (possibly mocked) core upgrade script under test.
+    function createCoreUpgrade() internal virtual returns (DefaultCoreUpgrade);
 
-    /// @notice Override in child classes to use mocked versions.
-    function createCTMUpgrade() internal virtual returns (CTMUpgrade_v31) {
-        return new CTMUpgrade_v31();
-    }
+    /// @notice The version-specific (possibly mocked) CTM upgrade script under test.
+    function createCTMUpgrade() internal virtual returns (DefaultCTMUpgrade);
+
+    /// @notice The version-specific chain upgrade script under test.
+    function createChainUpgrade() internal virtual returns (DefaultChainUpgrade);
 
     /// @notice Hook for test-specific setup before chain upgrade.
     function beforeChainUpgrade() internal virtual {}
@@ -201,28 +200,36 @@ contract UpgradeIntegrationTestBase is Test {
         assertEq(uint256(npv.topics[1]), ctmUpgrade.getOldProtocolVersion(), "CTM old version mismatch");
         assertEq(uint256(npv.topics[2]), ctmUpgrade.getNewProtocolVersion(), "CTM new version mismatch");
 
-        // NewUpgradeCutHash: both fields are indexed -> protocolVersion in topics[1], cutHash in topics[2].
-        // Cut data is stored under the OLD (FROM) version key in setUpgradeDiamondCutInner,
-        // so the event's topics[1] is the old version, not the new one.
-        Vm.Log memory nuch = ecosystemLogs.requireOneFrom(
-            "NewUpgradeCutHash(uint256,bytes32)",
-            ctmUpgrade.getCTMAddress()
+        // The commit shape differs per edge: a transition-committed edge writes only the
+        // transition pointer (the deprecated `upgradeCutHash` stays zero); a legacy cut-taking
+        // edge writes the hash and emits `NewUpgradeCutHash` keyed by the OLD (FROM) version.
+        address committedTransition = IChainTypeManager(ctmUpgrade.getCTMAddress()).upgradeTransition(
+            ctmUpgrade.getOldProtocolVersion()
         );
-        assertEq(uint256(nuch.topics[1]), ctmUpgrade.getOldProtocolVersion(), "Cut hash protocol version mismatch");
-        _expectedUpgradeCutHash = nuch.topics[2];
+        if (committedTransition != address(0)) {
+            Vm.Log memory nut = ecosystemLogs.requireOneFrom(
+                "NewUpgradeTransition(uint256,address)",
+                ctmUpgrade.getCTMAddress()
+            );
+            assertEq(uint256(nut.topics[1]), ctmUpgrade.getOldProtocolVersion(), "Transition version mismatch");
+            assertEq(address(uint160(uint256(nut.topics[2]))), committedTransition, "Committed transition mismatch");
+            _expectedUpgradeCutHash = bytes32(0);
+        } else {
+            Vm.Log memory nuch = ecosystemLogs.requireOneFrom(
+                "NewUpgradeCutHash(uint256,bytes32)",
+                ctmUpgrade.getCTMAddress()
+            );
+            assertEq(uint256(nuch.topics[1]), ctmUpgrade.getOldProtocolVersion(), "Cut hash protocol version mismatch");
+            _expectedUpgradeCutHash = nuch.topics[2];
+        }
         assertEq(
             IChainTypeManager(ctmUpgrade.getCTMAddress()).upgradeCutHash(ctmUpgrade.getOldProtocolVersion()),
             _expectedUpgradeCutHash,
             "Cut hash storage mismatch"
         );
 
-        // NewProtocolVersionVerifier: both fields are indexed.
-        Vm.Log memory npvv = ecosystemLogs.requireOneFrom(
-            "NewProtocolVersionVerifier(uint256,address)",
-            ctmUpgrade.getCTMAddress()
-        );
-        assertEq(uint256(npvv.topics[1]), ctmUpgrade.getNewProtocolVersion(), "Verifier protocol version mismatch");
-        _expectedNewVerifier = address(uint160(uint256(npvv.topics[2])));
+        // The verifier is no longer keyed by version on the CTM; it is pinned by the release,
+        // which `NewCurrentRelease` announces and the state-level asserts check.
 
         // Chain-op events
         chainOpsLogs.requireAtLeast("DiamondCut((address,uint8,bool,bytes4[])[],address,bytes)", 1);

@@ -13,7 +13,7 @@ import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors
 /// @notice The default per-chain upgrade for ZKsync OS chains: {DefaultUpgrade} plus the per-chain
 /// substitution their L2 upgrade transaction needs.
 /// @dev The CTM upgrade emits a single ecosystem-wide L2 upgrade transaction whose inner
-/// `IL2V32Upgrade.upgrade` calldata carries a placeholder for the chain-specific force-deployments data.
+/// `IL2V34Upgrade.upgrade` calldata carries a placeholder for the chain-specific force-deployments data.
 /// Substituting the real data can only happen per chain, which is what this contract adds.
 contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
     /// @inheritdoc DefaultUpgrade
@@ -25,8 +25,8 @@ contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
         // batches still awaiting proof under the old verifier would stop being provable.
         require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 
-        // Upgrades that carry no L2 upgrade transaction, e.g. the verifier-only ones created by
-        // {ChainTypeManagerBase.createNewVerifierOnlyUpgrade}, have nothing to substitute.
+        // A transition whose derived delta carries no L2 upgrade transaction leaves the tx all-zero;
+        // rewriting its data would turn that empty slot into a real, unintended upgrade tx.
         if (_proposedUpgrade.l2ProtocolUpgradeTx.txType != 0) {
             _proposedUpgrade.l2ProtocolUpgradeTx.data = getL2UpgradeTxData(
                 s.bridgehub,

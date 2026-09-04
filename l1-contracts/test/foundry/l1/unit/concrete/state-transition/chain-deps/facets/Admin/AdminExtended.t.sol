@@ -214,36 +214,6 @@ contract AdminExtendedTest is AdminTest {
         adminFacet.setTransactionFilterer(filterer);
     }
 
-    function test_UpgradeChainFromVersion_HashMismatch() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
-
-        uint256 oldProtocolVersion = 0;
-        utilsFacet.util_setProtocolVersion(oldProtocolVersion);
-
-        // Create a diamond cut with wrong hash
-        Diamond.FacetCut[] memory emptyFacets = new Diamond.FacetCut[](0);
-        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: emptyFacets,
-            initAddress: address(0),
-            initCalldata: bytes("")
-        });
-
-        // Mock the upgradeCutHash to return a different hash
-        vm.mockCall(
-            address(this),
-            abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector, oldProtocolVersion),
-            abi.encode(bytes32(uint256(123)))
-        );
-
-        bytes32 inputHash = keccak256(abi.encode(diamondCut));
-        bytes32 expectedHash = bytes32(uint256(123));
-
-        vm.prank(address(this));
-        vm.expectRevert(abi.encodeWithSelector(HashMismatch.selector, expectedHash, inputHash));
-        adminFacet.upgradeChainFromVersion(address(adminFacet), oldProtocolVersion, diamondCut);
-    }
-
     function test_UpgradeChainFromVersion_ProtocolIdMismatch() public {
         vm.prank(address(dummyBridgehub));
         utilsFacet.util_setChainTypeManager(address(this));
@@ -259,17 +229,16 @@ contract AdminExtendedTest is AdminTest {
             initCalldata: bytes("")
         });
 
-        // Mock the upgradeCutHash to match
-        bytes32 cutHash = keccak256(abi.encode(diamondCut));
+        // The chain reads the committed cut from its CTM.
         vm.mockCall(
             address(this),
-            abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector, wrongOldVersion),
-            abi.encode(cutHash)
+            abi.encodeWithSelector(IChainTypeManager.upgradeCutForVersion.selector, wrongOldVersion),
+            abi.encode(diamondCut)
         );
 
         vm.prank(address(this));
         vm.expectRevert(abi.encodeWithSelector(ProtocolIdMismatch.selector, currentVersion, wrongOldVersion));
-        adminFacet.upgradeChainFromVersion(address(adminFacet), wrongOldVersion, diamondCut);
+        adminFacet.upgradeChainFromVersion(address(adminFacet), wrongOldVersion);
     }
 
     function testFuzz_SetTokenMultiplier(uint128 nominator, uint128 denominator) public {

@@ -27,8 +27,8 @@ pub mod new_gateway_prepare;
 pub mod simulator;
 pub mod stage3;
 pub mod upgrade;
-pub mod v31_upgrade_full;
-pub mod v31_upgrade_inner;
+pub mod upgrade_full;
+pub mod upgrade_inner;
 pub mod verify_upgrade;
 pub mod zk_governance;
 

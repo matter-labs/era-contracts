@@ -11,13 +11,11 @@ import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsy
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
 contract DiamondInitTest is UtilsCallMockerTest {
     Diamond.FacetCut[] internal facetCuts;
     address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
-    InitializeData internal initializeData;
 
     function setUp() public virtual {
         facetCuts.push(
@@ -29,12 +27,15 @@ contract DiamondInitTest is UtilsCallMockerTest {
             })
         );
         dummyBridgehub = new DummyBridgehub();
-        initializeData = Utils.makeInitializeData(address(dummyBridgehub));
-        initializeData.l2BootloaderBytecodeHash = bytes32(0);
-        initializeData.l2DefaultAccountBytecodeHash = bytes32(0);
-        initializeData.l2EvmEmulatorBytecodeHash = bytes32(0);
 
-        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), bytes32(0));
+        // DiamondInit derives everything but (chainId, admin) from the CTM — msg.sender during
+        // the proxy construction — so the fixtures prank as Utils.TEST_CHAIN_TYPE_MANAGER and
+        // mock its getters here (incl. the bridgehub's baseTokenAssetId lookup).
+        mockDiamondInitInteropCenterCallsWithAddress(
+            address(dummyBridgehub),
+            address(0),
+            Utils.TEST_BASE_TOKEN_ASSET_ID
+        );
     }
 
     // add this to be excluded from coverage report

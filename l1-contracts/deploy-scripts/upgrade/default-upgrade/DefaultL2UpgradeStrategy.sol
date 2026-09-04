@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+// TODO(EVM-1644): LEGACY UPGRADE PROCESS — remove once the registry-driven upgrade process
+// (contracts/upgrades/registry: CTMUpgradeExecutor / EcosystemUpgradeExecutor +
+// release/transition registries) has fully replaced off-chain governance-calldata generation. Kept for the
+// v34 bootstrap edge, whose L2 payload is still script-composed.
+
 import "../SystemContractsProcessing.s.sol";
 
 import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -25,17 +30,21 @@ abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
         return ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
     }
 
-    function getComplexUpgraderTargetAndData(
+    /// @notice Composes the `ComplexUpgrader` target and calldata via the universal
+    ///         `forceDeployAndUpgradeUniversal` entrypoint (from v32 both VMs use it), which
+    ///         `L2UpgradeTxLib` validates at rewrite time.
+    function getUniversalComplexUpgraderTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments,
         address _delegateTo,
         bytes memory _upgradeCalldata
-    ) internal view returns (address, bytes memory) {
-        bytes memory complexUpgraderCalldata = abi.encodeCall(
-            IComplexUpgrader.forceDeployAndUpgradeUniversal,
-            (_deployments, _delegateTo, _upgradeCalldata)
+    ) internal pure returns (address, bytes memory) {
+        return (
+            address(L2_COMPLEX_UPGRADER_ADDR),
+            abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (_deployments, _delegateTo, _upgradeCalldata)
+            )
         );
-
-        return (address(L2_COMPLEX_UPGRADER_ADDR), complexUpgraderCalldata);
     }
 
     /// @notice L2 upgrade target and data. Subclasses override this to route the upgrade through a

@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+// TODO(EVM-1644): LEGACY UPGRADE PROCESS — remove once the registry-driven upgrade process
+// (contracts/upgrades/registry: CTMUpgradeExecutor / EcosystemUpgradeExecutor +
+// release/transition registries) has fully replaced off-chain governance-calldata generation. Kept for the
+// v34 bootstrap edge, which still ships stage0/1/2 calls (the committed cut itself is already
+// facet-less; only the call orchestration remains script-composed).
+
 // solhint-disable no-console, gas-custom-errors
 
 import {Script, console2 as console} from "forge-std/Script.sol";
@@ -33,7 +39,7 @@ import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
 
 import {BytecodePublisher, PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {CoreContract} from "../../ecosystem/CoreContract.sol";
+import {L2EcosystemContract} from "../../ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
@@ -45,12 +51,10 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {DefaultL2UpgradeStrategy} from "./DefaultL2UpgradeStrategy.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
+import {CTMUpgradeParams} from "./UpgradeParams.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-
-interface IAdminPreV31 {
-    function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
-}
+import {UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
 
 /// @notice Script used for default CTM upgrade flow. Should be run after Ecosystem upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
@@ -123,6 +127,32 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     L1Bridgehub internal bridgehub;
 
     PublishFactoryDepsResult internal factoryDepsResult;
+
+    /// @notice Single-call entry point invoked by the protocol-ops CLI's `upgrade-prepare-all`,
+    ///         once per CTM proxy (`ICTMUpgradeV31` in `contracts/script-interfaces/IUpgradeV31.sol`).
+    function noGovernancePrepare(CTMUpgradeParams memory _params) public virtual {
+        // solhint-disable-next-line func-named-parameters
+        initializeWithArgs(
+            _params.ctmProxy,
+            _params.bytecodesSupplier,
+            _params.rollupDAManager,
+            _params.create2FactorySalt,
+            _params.upgradeInputPath,
+            _params.outputPath,
+            _params.governance,
+            _params.zkTokenAssetId
+        );
+        if (_params.chainRegistrationSender != address(0)) {
+            coreAddresses.bridgehub.proxies.chainRegistrationSender = _params.chainRegistrationSender;
+        }
+        prepareCTMUpgrade();
+        prepareDefaultGovernanceCalls();
+        prepareDefaultCTMAdminCalls();
+
+        // Test-only calls (`test_create_chain`, `test_upgrade_chain`) ride the CTM output TOML
+        // so protocol-ops can lift them into the merged `ecosystem.toml` for simulator checks.
+        prepareDefaultTestUpgradeCalls();
+    }
 
     function initializeWithArgs(
         address ctmProxy,
@@ -218,6 +248,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         });
         ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(Utils.genesisConfigPath());
 
+        // Optional explicit target protocol version from the upgrade input. The genesis config
+        // (`configs/genesis/*/latest.json`) may still declare the PREVIOUS version while an
+        // upgrade to the next one is being prepared, so the upgrade-env preset can pin the
+        // packed version the emitted `setNewVersionUpgrade` must carry.
+        if (toml.keyExists("$.contracts.latest_protocol_version")) {
+            chainCreationParams.latestProtocolVersion = toml.readUint("$.contracts.latest_protocol_version");
+        }
+
         // Optional override for pre-v32 introspection selection
         if (toml.keyExists("$.pre_v32_introspection")) {
             newConfig.hasPreV32IntrospectionOverride = true;
@@ -297,8 +335,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             config.contracts.chainCreationParams,
             config.l1ChainId,
             config.ownerAddress,
-            factoryDepsResult,
-            upToDateZkChain.zkChainProxy
+            factoryDepsResult
         );
     }
 
@@ -347,15 +384,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             value: 0,
             data: abi.encodeCall(
                 IL1Bridgehub.createNewChain,
-                (
-                    chainId,
-                    ctmAddresses.stateTransition.proxies.chainTypeManager,
-                    newChainAssetId,
-                    5,
-                    msg.sender,
-                    abi.encode(newlyGeneratedData.diamondCutData, generatedData.forceDeploymentsData),
-                    new bytes[](0)
-                )
+                (chainId, ctmAddresses.stateTransition.proxies.chainTypeManager, newChainAssetId, msg.sender)
             )
         });
     }
@@ -421,12 +450,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         bytes memory encodedData = abi.encode(data);
         generatedData.forceDeploymentsData = encodedData;
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
-    }
-
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
-        return getChainCreationFacetCuts(stateTransition);
     }
 
     /////////////////////////// Blockchain interactions ////////////////////////////
@@ -555,22 +578,20 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](8);
+        Call[][] memory allCalls = new Call[][](7);
 
         allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
         allCalls[1] = prepareCheckMigrationsPausedCalls();
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
         allCalls[2] = prepareUpgradeCTMCalls();
-        console.log("prepareStage1GovernanceCalls: prepareSetDefaultUpgradeCall");
-        allCalls[3] = prepareSetDefaultUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareNewChainCreationParamsCall");
-        allCalls[4] = prepareNewChainCreationParamsCall();
+        allCalls[3] = prepareNewChainCreationParamsCall();
         console.log("prepareStage1GovernanceCalls: provideSetNewVersionUpgradeCall");
-        allCalls[5] = provideSetNewVersionUpgradeCall();
+        allCalls[4] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
-        allCalls[6] = prepareDAValidatorCall();
+        allCalls[5] = prepareDAValidatorCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
-        allCalls[7] = prepareVersionSpecificStage1GovernanceCallsL1();
+        allCalls[6] = prepareVersionSpecificStage1GovernanceCallsL1();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
@@ -618,19 +639,38 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             target: ctmAddresses.stateTransition.proxies.chainTypeManager,
             data: abi.encodeCall(
                 IChainTypeManager.setNewVersionUpgrade,
-                (
-                    upgradeCut,
-                    previousProtocolVersion,
-                    deadline,
-                    newProtocolVersion,
-                    ctmAddresses.stateTransition.verifiers.verifier
-                )
+                (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
             ),
             value: 0
         });
 
-        calls = new Call[](1);
+        // Pin the release right after the version bump. A CTM migrated from a pre-registry version
+        // has no provenance anchor in storage yet, so the migration setter is emitted first — but
+        // only then: it is one-shot by design, so emitting it against an already-anchored CTM would
+        // revert the whole bundle.
+        address ctmProxy = ctmAddresses.stateTransition.proxies.chainTypeManager;
+        address release = ctmAddresses.stateTransition.currentRelease;
+        require(release != address(0), "current release not deployed");
+        bytes32 releaseCodehash = release.codehash;
+        require(releaseCodehash != bytes32(0), "current release has no code");
+
+        // The anchor call is emitted unconditionally. It cannot be decided from a live read: the
+        // CTM only gained `releaseCodehash()` in v32, so querying the pre-registry implementation
+        // this bundle is about to replace would revert during calldata GENERATION. Emitting it
+        // always is safe because the setter is idempotent for an identical value and rejects only
+        // a genuine re-point — which would mean the pinned release is not attested anyway.
+        calls = new Call[](3);
         calls[0] = ctmCall;
+        calls[1] = Call({
+            target: ctmProxy,
+            data: abi.encodeCall(IChainTypeManager.setReleaseCodehash, (releaseCodehash)),
+            value: 0
+        });
+        calls[2] = Call({
+            target: ctmProxy,
+            data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (release)),
+            value: 0
+        });
     }
 
     function preparePauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
@@ -672,40 +712,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         });
     }
 
-    /// @notice Points the CTM at the upgrade contract deployed by this release, so that later upgrades that need
-    /// no custom upgrade logic (e.g. verifier-only ones) can reuse it.
-    /// @dev Must be executed after the CTM implementation upgrade, as `setDefaultUpgrade` is only present
-    /// starting from v32.
-    function prepareSetDefaultUpgradeCall() public virtual returns (Call[] memory calls) {
-        require(
-            ctmAddresses.stateTransition.proxies.chainTypeManager != address(0),
-            "stateTransitionManagerAddress is zero in newConfig"
-        );
-        require(ctmAddresses.stateTransition.defaultUpgrade != address(0), "defaultUpgrade is zero in newConfig");
-        calls = new Call[](1);
-
-        calls[0] = Call({
-            target: ctmAddresses.stateTransition.proxies.chainTypeManager,
-            data: abi.encodeCall(IChainTypeManager.setDefaultUpgrade, (ctmAddresses.stateTransition.defaultUpgrade)),
-            value: 0
-        });
-    }
-
+    /// @notice Stage-1 slot for pinning new-chain genesis data. Empty from v32 on: the CTM this
+    ///         repo upgrades to reads all genesis data from its pinned release and no longer
+    ///         implements the legacy `setChainCreationParams`.
+    /// @dev `setCurrentRelease` validates `genesisParams` at the CTM's CURRENT protocol version,
+    ///      which only becomes the new version once `setNewVersionUpgrade` runs — so the release
+    ///      is pinned right AFTER the version bump, in `provideSetNewVersionUpgradeCall`.
     function prepareNewChainCreationParamsCall() public virtual returns (Call[] memory calls) {
-        require(
-            ctmAddresses.stateTransition.proxies.chainTypeManager != address(0),
-            "stateTransitionManagerAddress is zero in newConfig"
-        );
-        calls = new Call[](1);
-
-        calls[0] = Call({
-            target: ctmAddresses.stateTransition.proxies.chainTypeManager,
-            data: abi.encodeCall(
-                IChainTypeManager.setChainCreationParams,
-                (getChainCreationParams(ctmAddresses.stateTransition))
-            ),
-            value: 0
-        });
+        return new Call[](0);
     }
 
     /// @notice Checks to make sure that migrations are paused
@@ -804,14 +818,13 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
         admin = IZKChain(chainDiamondProxyAddress).getAdmin();
 
-        (, uint32 oldProtocolVersionMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(oldProtocolVersion));
-        // Pre-v31 chain diamonds only expose the legacy 2-arg selector; the v31 selector reverts with "F".
-        bytes memory upgradeCallData = oldProtocolVersionMinor < 31
-            ? abi.encodeCall(IAdminPreV31.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData))
-            : abi.encodeCall(
-                IAdmin.upgradeChainFromVersion,
-                (chainDiamondProxyAddress, oldProtocolVersion, upgradeCutData)
-            );
+        // Each protocol generation exposes a different `upgradeChainFromVersion` on the chain
+        // diamond; calling the wrong one hits the DiamondProxy fallback and reverts with "F".
+        bytes memory upgradeCallData = UpgradeChainCall.encode(
+            chainDiamondProxyAddress,
+            oldProtocolVersion,
+            upgradeCutData
+        );
 
         calls = new Call[](1);
         calls[0] = Call({target: chainDiamondProxyAddress, data: upgradeCallData, value: 0});
@@ -921,9 +934,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
                 ctmAddresses.stateTransition.implementations.serverNotifier
             );
         }
-        if (priorityOpLowerBound != address(0)) {
-            vm.serializeAddress("state_transition", "priority_op_lower_bound_addr", priorityOpLowerBound);
-        }
+        // Introspection reports the engine as zero (nothing on-chain to read it from), so an
+        // unassigned engine surviving to serialization means the prepare never deployed one —
+        // downstream that zero silently becomes a dead upgrade cut.
+        require(ctmAddresses.stateTransition.defaultUpgrade != address(0), "default upgrade not deployed");
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",

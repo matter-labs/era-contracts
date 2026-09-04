@@ -36,6 +36,15 @@ pub mod i_chain_type_manager {
 }
 pub use i_chain_type_manager::IChainTypeManagerAbi;
 
+pub mod i_ctm_release {
+    alloy::sol!(
+        #[sol(rpc)]
+        ICTMReleaseAbi,
+        "../l1-contracts/zkstack-out/ICTMRelease.sol/ICTMRelease.json"
+    );
+}
+pub use i_ctm_release::ICTMReleaseAbi;
+
 pub mod zk_chain {
     alloy::sol!(
         #[sol(rpc)]
@@ -189,15 +198,6 @@ pub mod i_register_on_all_chains {
     );
 }
 pub use i_register_on_all_chains::IRegisterOnAllChainsAbi;
-
-pub mod i_finalize_upgrade {
-    alloy::sol!(
-        #[sol(rpc)]
-        IFinalizeUpgradeAbi,
-        "../l1-contracts/zkstack-out/IFinalizeUpgrade.sol/IFinalizeUpgrade.json"
-    );
-}
-pub use i_finalize_upgrade::IFinalizeUpgradeAbi;
 
 pub mod il1_native_token_vault {
     alloy::sol!(

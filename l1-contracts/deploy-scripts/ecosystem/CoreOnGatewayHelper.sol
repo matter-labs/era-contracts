@@ -6,22 +6,9 @@ import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 
-import {CoreContract, ZkSyncOsSystemContract, ZKsyncOSUpgradeType} from "./CoreContract.sol";
+import {L2EcosystemContract, ZkSyncOsSystemContract, ZKsyncOSUpgradeType} from "./CoreContract.sol";
+import {L2InventoryLib} from "contracts/upgrades/registry/libraries/L2InventoryLib.sol";
 import {UnknownCoreContract, UnknownZkSyncOsSystemContract} from "./DeployScriptErrors.sol";
-import {
-    L2_ASSET_ROUTER_ADDR,
-    L2_ASSET_TRACKER_ADDR,
-    L2_BASE_TOKEN_HOLDER_ADDR,
-    L2_BRIDGEHUB_ADDR,
-    L2_CHAIN_ASSET_HANDLER_ADDR,
-    L2_INTEROP_CENTER_ADDR,
-    L2_INTEROP_HANDLER_ADDR,
-    L2_INTEROP_ROOT_STORAGE,
-    L2_MESSAGE_ROOT_ADDR,
-    L2_MESSAGE_VERIFICATION,
-    L2_NATIVE_TOKEN_VAULT_ADDR,
-    L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
-} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_NTV_BEACON_DEPLOYER_ADDR,
@@ -35,14 +22,16 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title CoreOnGatewayHelper
-/// @notice Resolves CoreContract enum values to ZKsyncOS artifact names
+/// @notice Resolves L2EcosystemContract enum values to ZKsyncOS artifact names
 ///         and provides bytecode / force-deployment helpers for core L2 contracts.
 ///         Delegates bytecode reading to ContractsBytecodesLib / BytecodeUtils.
 library CoreOnGatewayHelper {
     // ======================== Name resolution ========================
 
-    /// @notice Resolve a CoreContract to its (fileName, contractName).
-    function resolve(CoreContract _c) internal view returns (string memory fileName, string memory contractName) {
+    /// @notice Resolve a L2EcosystemContract to its (fileName, contractName).
+    function resolve(
+        L2EcosystemContract _c
+    ) internal view returns (string memory fileName, string memory contractName) {
         contractName = _resolveContractName(_c);
         fileName = string.concat(contractName, ".sol");
     }
@@ -51,14 +40,14 @@ library CoreOnGatewayHelper {
 
     /// @notice Get bytecode info for force deployments / upgrades:
     ///         proxy-upgrade bytecode info (impl + SystemContractProxy blake2s).
-    function getBytecodeInfo(CoreContract _c) internal returns (bytes memory) {
+    function getBytecodeInfo(L2EcosystemContract _c) internal returns (bytes memory) {
         (string memory fileName, string memory contractName) = resolve(_c);
         return Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
     }
 
     /// @notice Get a bytecode hash (keccak256) of the deployed EVM bytecode.
     /// @dev Note, that it is NOT suitable for force deployments as these require bytecode info.
-    function getDeployedBytecodeHash(CoreContract _c) internal view returns (bytes32) {
+    function getDeployedBytecodeHash(L2EcosystemContract _c) internal view returns (bytes32) {
         (string memory fileName, string memory contractName) = resolve(_c);
         return BytecodeUtils.getDeployedBytecodeHash(fileName, contractName);
     }
@@ -66,7 +55,7 @@ library CoreOnGatewayHelper {
     // ======================== Factory dependencies ========================
 
     function getFullListOfFactoryDependencies(
-        CoreContract[] memory _additionalDependencyContracts
+        L2EcosystemContract[] memory _additionalDependencyContracts
     ) internal returns (bytes[] memory factoryDeps) {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
         bytes[] memory sharedDependencies = _getFactoryDependencyBytecodes(_getSharedFactoryDependencyContracts());
@@ -86,7 +75,11 @@ library CoreOnGatewayHelper {
 
     // ======================== Private helpers ========================
 
-    function _getSharedFactoryDependencyContracts() private pure returns (CoreContract[] memory dependencyContracts) {
+    function _getSharedFactoryDependencyContracts()
+        private
+        pure
+        returns (L2EcosystemContract[] memory dependencyContracts)
+    {
         // Reuse the canonical fixed-address core contract list - the same contract
         // IDs `getBaseZKsyncOSForceDeployments` upgrades on L2 at upgrade
         // time. Every bytecode hash the upgrade tx's force-deploy path
@@ -98,11 +91,14 @@ library CoreOnGatewayHelper {
         // Plus `UpgradeableBeaconDeployer`, which
         // `FixedForceDeploymentsData.beaconDeployerInfo` references but
         // which is not one of the fixed-address core contracts.
-        CoreContract[] memory fixedAddressCoreContracts = SystemContractsProcessing.getFixedAddressCoreContracts();
+        L2EcosystemContract[] memory fixedAddressCoreContracts = SystemContractsProcessing
+            .getFixedAddressCoreContracts();
         // The ZKsync-OS-only contracts are force-deployed by `getBaseZKsyncOSForceDeployments` from a
         // separate list, so their preimages have to be merged in here as well.
-        CoreContract[] memory zksyncOSOnlyContracts = SystemContractsProcessing.getZKsyncOSOnlyContracts();
-        dependencyContracts = new CoreContract[](fixedAddressCoreContracts.length + zksyncOSOnlyContracts.length + 1);
+        L2EcosystemContract[] memory zksyncOSOnlyContracts = SystemContractsProcessing.getZKsyncOSOnlyContracts();
+        dependencyContracts = new L2EcosystemContract[](
+            fixedAddressCoreContracts.length + zksyncOSOnlyContracts.length + 1
+        );
         uint256 index;
         for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
             dependencyContracts[index++] = fixedAddressCoreContracts[i];
@@ -110,11 +106,11 @@ library CoreOnGatewayHelper {
         for (uint256 i = 0; i < zksyncOSOnlyContracts.length; i++) {
             dependencyContracts[index++] = zksyncOSOnlyContracts[i];
         }
-        dependencyContracts[index] = CoreContract.UpgradeableBeaconDeployer;
+        dependencyContracts[index] = L2EcosystemContract.UpgradeableBeaconDeployer;
     }
 
     function _getFactoryDependencyBytecodes(
-        CoreContract[] memory _dependencyContracts
+        L2EcosystemContract[] memory _dependencyContracts
     ) private returns (bytes[] memory dependencyBytecodes) {
         dependencyBytecodes = new bytes[](_dependencyContracts.length);
 
@@ -136,86 +132,72 @@ library CoreOnGatewayHelper {
         }
     }
 
-    /// @notice Resolve a CoreContract enum to its contract name.
-    function _resolveContractName(CoreContract _c) internal pure returns (string memory) {
-        if (_c == CoreContract.L2NativeTokenVault) return "L2NativeTokenVaultZKOS";
+    /// @notice Resolve a L2EcosystemContract enum to its contract name.
+    function _resolveContractName(L2EcosystemContract _c) internal pure returns (string memory) {
+        if (_c == L2EcosystemContract.L2NativeTokenVault) return "L2NativeTokenVaultZKOS";
 
-        if (_c == CoreContract.L2Bridgehub) return "L2Bridgehub";
-        if (_c == CoreContract.L2AssetRouter) return "L2AssetRouter";
-        if (_c == CoreContract.L2MessageRoot) return "L2MessageRoot";
-        if (_c == CoreContract.UpgradeableBeaconDeployer) return "UpgradeableBeaconDeployer";
-        if (_c == CoreContract.BaseTokenHolder) return "BaseTokenHolder";
-        if (_c == CoreContract.L2ChainAssetHandler) return "L2ChainAssetHandler";
-        if (_c == CoreContract.InteropCenter) return "InteropCenter";
-        if (_c == CoreContract.InteropAttributeParser) return "InteropAttributeParser";
-        if (_c == CoreContract.L2InteropCommitmentTree) return "L2InteropCommitmentTree";
-        if (_c == CoreContract.AtomicFlowManager) return "AtomicFlowManager";
-        if (_c == CoreContract.L2InteropHandler) return "L2InteropHandler";
-        if (_c == CoreContract.L2AssetTracker) return "L2AssetTracker";
-        if (_c == CoreContract.L2WrappedBaseToken) return "L2WrappedBaseToken";
-        if (_c == CoreContract.L2MessageVerification) return "L2MessageVerification";
-        if (_c == CoreContract.L2InteropRootStorage) return "L2InteropRootStorage";
-        if (_c == CoreContract.BeaconProxy) return "BeaconProxy";
-        if (_c == CoreContract.L2V32Upgrade) return "L2V32Upgrade";
-        if (_c == CoreContract.BridgedStandardERC20) return "BridgedStandardERC20";
-        if (_c == CoreContract.DiamondProxy) return "DiamondProxy";
-        if (_c == CoreContract.ProxyAdmin) return "ProxyAdmin";
-        if (_c == CoreContract.TransparentUpgradeableProxy) return "TransparentUpgradeableProxy";
+        if (_c == L2EcosystemContract.L2Bridgehub) return "L2Bridgehub";
+        if (_c == L2EcosystemContract.L2AssetRouter) return "L2AssetRouter";
+        if (_c == L2EcosystemContract.L2MessageRoot) return "L2MessageRoot";
+        if (_c == L2EcosystemContract.UpgradeableBeaconDeployer) return "UpgradeableBeaconDeployer";
+        if (_c == L2EcosystemContract.BaseTokenHolder) return "BaseTokenHolder";
+        if (_c == L2EcosystemContract.L2ChainAssetHandler) return "L2ChainAssetHandler";
+        if (_c == L2EcosystemContract.InteropCenter) return "InteropCenter";
+        if (_c == L2EcosystemContract.InteropAttributeParser) return "InteropAttributeParser";
+        if (_c == L2EcosystemContract.L2InteropCommitmentTree) return "L2InteropCommitmentTree";
+        if (_c == L2EcosystemContract.AtomicFlowManager) return "AtomicFlowManager";
+        if (_c == L2EcosystemContract.L2EcosystemRegistry) return "L2EcosystemRegistry";
+        if (_c == L2EcosystemContract.L2InteropHandler) return "L2InteropHandler";
+        if (_c == L2EcosystemContract.L2AssetTracker) return "L2AssetTracker";
+        if (_c == L2EcosystemContract.L2WrappedBaseToken) return "L2WrappedBaseToken";
+        if (_c == L2EcosystemContract.L2MessageVerification) return "L2MessageVerification";
+        if (_c == L2EcosystemContract.L2InteropRootStorage) return "L2InteropRootStorage";
+        if (_c == L2EcosystemContract.BeaconProxy) return "BeaconProxy";
+        if (_c == L2EcosystemContract.L2V34Upgrade) return "L2V34Upgrade";
+        if (_c == L2EcosystemContract.BridgedStandardERC20) return "BridgedStandardERC20";
+        if (_c == L2EcosystemContract.DiamondProxy) return "DiamondProxy";
+        if (_c == L2EcosystemContract.ProxyAdmin) return "ProxyAdmin";
+        if (_c == L2EcosystemContract.TransparentUpgradeableProxy) return "TransparentUpgradeableProxy";
 
         revert UnknownCoreContract();
     }
 
-    /// @notice Resolve a CoreContract enum to its ZKsyncOS upgrade type.
+    /// @notice Resolve a L2EcosystemContract enum to its ZKsyncOS upgrade type.
     /// @dev Explicit per-contract mapping — no default fallback, so adding a new
     ///      contract forces the developer to decide the upgrade type here.
-    function _resolveUpgradeType(CoreContract _c) internal pure returns (ZKsyncOSUpgradeType) {
-        if (_c == CoreContract.L2Bridgehub) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2AssetRouter) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2NativeTokenVault) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2MessageRoot) return ZKsyncOSUpgradeType.SystemProxy;
+    function _resolveUpgradeType(L2EcosystemContract _c) internal pure returns (ZKsyncOSUpgradeType) {
+        if (_c == L2EcosystemContract.L2Bridgehub) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == L2EcosystemContract.L2AssetRouter) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == L2EcosystemContract.L2NativeTokenVault) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == L2EcosystemContract.L2MessageRoot) return ZKsyncOSUpgradeType.SystemProxy;
         // Sits at L2_WRAPPED_BASE_TOKEN_IMPL_ADDR directly as the impl (not a proxy);
         // user-space WETH proxies reference this address. Upgrade via bytecode replacement.
-        if (_c == CoreContract.L2WrappedBaseToken) return ZKsyncOSUpgradeType.Unsafe;
-        if (_c == CoreContract.L2MessageVerification) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2ChainAssetHandler) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2InteropRootStorage) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.BaseTokenHolder) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2AssetTracker) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.InteropCenter) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.InteropAttributeParser) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2InteropCommitmentTree) {
+        if (_c == L2EcosystemContract.L2WrappedBaseToken) return ZKsyncOSUpgradeType.Unsafe;
+        if (_c == L2EcosystemContract.L2MessageVerification) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == L2EcosystemContract.L2ChainAssetHandler) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == L2EcosystemContract.L2InteropRootStorage) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == L2EcosystemContract.BaseTokenHolder) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == L2EcosystemContract.L2AssetTracker) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == L2EcosystemContract.InteropCenter) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == L2EcosystemContract.InteropAttributeParser) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == L2EcosystemContract.L2InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == L2EcosystemContract.L2InteropCommitmentTree) {
             return ZKsyncOSUpgradeType.SystemProxy;
         }
-        if (_c == CoreContract.AtomicFlowManager) {
+        if (_c == L2EcosystemContract.AtomicFlowManager) {
+            return ZKsyncOSUpgradeType.SystemProxy;
+        }
+        if (_c == L2EcosystemContract.L2EcosystemRegistry) {
             return ZKsyncOSUpgradeType.SystemProxy;
         }
         revert UnknownCoreContract();
     }
 
-    /// @notice Resolve a CoreContract enum to its canonical L2 address.
-    /// @dev Only covers contracts with well-known constant addresses.
-    function _resolveAddress(CoreContract _c) internal pure returns (address) {
-        if (_c == CoreContract.L2V32Upgrade) {
-            return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
-        }
-        if (_c == CoreContract.L2Bridgehub) return L2_BRIDGEHUB_ADDR;
-        if (_c == CoreContract.L2AssetRouter) return L2_ASSET_ROUTER_ADDR;
-        if (_c == CoreContract.L2NativeTokenVault) return L2_NATIVE_TOKEN_VAULT_ADDR;
-        if (_c == CoreContract.L2MessageRoot) return L2_MESSAGE_ROOT_ADDR;
-        if (_c == CoreContract.L2WrappedBaseToken) return L2_WRAPPED_BASE_TOKEN_IMPL_ADDR;
-        if (_c == CoreContract.L2MessageVerification) return address(L2_MESSAGE_VERIFICATION);
-        if (_c == CoreContract.L2ChainAssetHandler) return L2_CHAIN_ASSET_HANDLER_ADDR;
-        if (_c == CoreContract.L2InteropRootStorage) return address(L2_INTEROP_ROOT_STORAGE);
-        if (_c == CoreContract.BaseTokenHolder) return L2_BASE_TOKEN_HOLDER_ADDR;
-        if (_c == CoreContract.L2AssetTracker) return L2_ASSET_TRACKER_ADDR;
-        if (_c == CoreContract.InteropCenter) return L2_INTEROP_CENTER_ADDR;
-        if (_c == CoreContract.InteropAttributeParser) return L2_INTEROP_ATTRIBUTE_PARSER_ADDR;
-        if (_c == CoreContract.L2InteropHandler) return L2_INTEROP_HANDLER_ADDR;
-        if (_c == CoreContract.UpgradeableBeaconDeployer) return L2_NTV_BEACON_DEPLOYER_ADDR;
-        if (_c == CoreContract.L2InteropCommitmentTree) return L2_INTEROP_COMMITMENT_TREE_ADDR;
-        if (_c == CoreContract.AtomicFlowManager) return L2_ATOMIC_FLOW_MANAGER_ADDR;
-        revert UnknownCoreContract();
+    /// @notice Resolve a L2EcosystemContract enum to its canonical L2 address.
+    /// @dev Thin delegate to the on-chain inventory ({L2InventoryLib}), so deploy tooling and the
+    ///      transition derivation can never place a member at different addresses.
+    function _resolveAddress(L2EcosystemContract _c) internal pure returns (address) {
+        return L2InventoryLib.fixedAddress(_c);
     }
 
     // ======================== ZkSyncOsSystemContract resolvers ========================

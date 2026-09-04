@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "../AccessControlEnumerablePerChainAddressUpgradeable.sol";
 import {LibMap} from "../libraries/LibMap.sol";
-import {Diamond} from "../libraries/Diamond.sol";
 import {IZKChain} from "../chain-interfaces/IZKChain.sol";
 import {NotAZKChain, TimeNotReached} from "../../common/L1ContractErrors.sol";
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
@@ -291,8 +290,7 @@ contract ValidatorTimelock is
     /// @inheritdoc IChainUpgrader
     function upgradeChainFromVersion(
         address _chainAddress,
-        uint256, // _oldProtocolVersion (unused in this specific implementation)
-        Diamond.DiamondCutData calldata // _diamondCut (unused in this specific implementation)
+        uint256 // _oldProtocolVersion (unused in this specific implementation)
     ) external onlyRole(_chainAddress, UPGRADER_ROLE) {
         _propagateToAddress(_getPropagationAddress(_chainAddress));
     }

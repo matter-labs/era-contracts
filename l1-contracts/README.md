@@ -2,28 +2,63 @@
 
 [![Logo](../eraLogo.svg)](https://zksync.io/)
 
-ZKsync Era is a layer 2 rollup that uses zero-knowledge proofs to scale Ethereum without compromising on security or
+ZKsync is a layer 2 rollup that uses zero-knowledge proofs to scale Ethereum without compromising on security or
 decentralization. Since it's EVM compatible (Solidity/Vyper), 99% of Ethereum projects can redeploy without refactoring
-or re-auditing a single line of code. ZKsync Era also uses an LLVM-based compiler that will eventually let developers
-write smart contracts in C++, Rust and other popular languages.
+or re-auditing a single line of code.
 
-## L1 Contracts
+This workspace holds the ZK Stack's L1 contracts, the L2 built-in contracts of ZKsync OS chains, the Foundry deploy
+and upgrade scripts, and their tests. The repository is ZKsync OS only — EraVM chains cannot be created, upgraded or
+tested from it (see the [root README](../README.md)).
 
-### Building
+## Layout
+
+| Directory                                                              | Contents                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`contracts/`](./contracts)                                            | The contracts: `core/` (bridgehub, message root, chain asset handler), `bridge/`, `interop/` and `atomic-interop/`, `state-transition/` (chain-type manager, chain diamond facets), `upgrades/` (upgrade engines and the `registry/` upgrade objects), `l2-upgrades/` and `l2-system/` (ZKsync OS built-ins), `governance/` |
+| [`deploy-scripts/`](./deploy-scripts)                                  | Foundry scripts for ecosystem, CTM, chain and gateway deployment and for protocol upgrades (`upgrade/`), driven by [`protocol-ops`](../protocol-ops)                                                                                                                                                                        |
+| [`test/foundry/`](./test/foundry)                                      | Unit and integration tests (`l1/`, `zksync-os/`, shared `mocks/`)                                                                                                                                                                                                                                                           |
+| [`test/anvil-interop/`](./test/anvil-interop)                          | End-to-end tests on local Anvil chains: interop, and the v33 -> v34 (bootstrap) and v34 -> v35 (registry-driven) upgrade pipelines                                                                                                                                                                                          |
+| [`test/invariant/`](./test/invariant)                                  | Invariant tests                                                                                                                                                                                                                                                                                                             |
+| [`scripts/`](./scripts)                                                | Repository tooling: selectors, error-selector lint, `zkstack-out` copy, artifact regeneration, contract verification                                                                                                                                                                                                        |
+| [`zkstack-out/`](./zkstack-out)                                        | Generated ABIs consumed by ZK Stack tooling (checked in CI)                                                                                                                                                                                                                                                                 |
+| [`script-config/`](./script-config), [`upgrade-envs/`](./upgrade-envs) | Inputs for the deploy and upgrade scripts                                                                                                                                                                                                                                                                                   |
+
+## Building
+
+Install the pinned upstream Foundry (see the [root README](../README.md#building-and-testing)), then from the
+repository root:
 
 ```shell
-cd era-contracts
-./recompute_hashes.sh
+yarn l1 build:foundry
 ```
 
-### Testing
+This runs `forge build` and refreshes `zkstack-out/` from the artifacts.
 
-Use the following commands to run tests.
+## Testing
 
 ```shell
-cd era-contracts
-yarn l1 test:foundry
+yarn l1 test:foundry                 # Foundry unit + integration suite
+yarn l1 test:hardhat:interop         # interop end-to-end on local Anvil chains
+yarn l1 test:invariant:l1-context    # invariant tests
 ```
+
+The upgrade pipelines run from `test/anvil-interop` (`yarn test:upgrade-v33-to-v34`, `yarn test:upgrade-v34-to-v35`);
+its README covers the chain-state fixtures and port offsets. Coverage: `yarn l1 coverage:foundry` and
+`yarn l1 coverage:anvil`.
+
+## Generated artifacts
+
+`selectors`, `zkstack-out/`, the anvil chain states and the repository-level `AllContractsHashes.json` are derived
+from the sources and checked in CI. Regenerate them last, after every source change is final:
+
+```shell
+yarn l1 regen           # zkstack-out, selectors, chain states, committed registry manifest
+yarn l1 errors-lint --fix
+```
+
+`AllContractsHashes.json` is regenerated through the "Update Hashes in PR" workflow (CI is its oracle);
+`../recompute_hashes.sh` does the same locally and asserts the pinned Foundry version. See the repository's
+`AGENTS.md` for the full order of work.
 
 ### Security Testing and Linting
 

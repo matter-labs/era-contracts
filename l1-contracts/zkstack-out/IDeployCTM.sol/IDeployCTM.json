@@ -156,6 +156,11 @@
                 "name": "chainTypeManagerProxyAdmin",
                 "type": "address",
                 "internalType": "address"
+              },
+              {
+                "name": "currentRelease",
+                "type": "address",
+                "internalType": "address"
               }
             ]
           },

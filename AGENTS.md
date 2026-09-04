@@ -319,6 +319,24 @@ npx ts-node setup-and-dump-state.ts
 
    Then commit the updated `selectors` file.
 
+## Making CI Green: Order of Work
+
+**Regenerate artifacts LAST — after every source change is final.**
+
+Every generated artifact (`AllContractsHashes.json`, `zkstack-out/`, `selectors`,
+`test/anvil-interop/chain-states/`, `scripts/registry-manifests/`) is a function of the
+contract sources. A one-line contract edit invalidates all of them, and a full regeneration
+takes tens of minutes. Regenerating early therefore guarantees doing it again.
+
+Work in this order, and do not start the next step until the previous one is finished:
+
+1. Make the tree compile (contracts, deploy scripts, tests, TypeScript).
+2. Fix the foundry tests until the suite is green.
+3. Finish any outstanding source work — review comments, pending commits, cleanups.
+4. Run `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix`.
+5. ONLY THEN regenerate artifacts (`yarn l1 regen`), and dispatch
+   `update-hashes-on-demand` for `AllContractsHashes.json` (CI is its only oracle).
+
 ## Before Pushing Changes
 
 **ALWAYS run linting and formatting before pushing to ensure CI passes:**

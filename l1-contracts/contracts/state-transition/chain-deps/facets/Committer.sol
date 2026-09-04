@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {ZKChainBase} from "./ZKChainBase.sol";
+import {ISelfDescribingFacet} from "../../chain-interfaces/ISelfDescribingFacet.sol";
 import {
     COMMIT_TIMESTAMP_APPROXIMATION_DELTA,
     L2_TO_L1_LOG_SERIALIZE_SIZE,
@@ -89,7 +90,7 @@ uint8 constant RELAYED_EXECUTOR_VERSION_ZKSYNC_OS = 1;
 /// @title ZK chain Committer contract responsible for batch commitment operations.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract CommitterFacet is ZKChainBase, ICommitter {
+contract CommitterFacet is ZKChainBase, ICommitter, ISelfDescribingFacet {
     using UncheckedMath for uint256;
 
     /// @inheritdoc IZKChainBase
@@ -850,5 +851,24 @@ contract CommitterFacet is ZKChainBase, ICommitter {
     /// @notice Sets the given bit in {_num} at index {_index} to 1.
     function _setBit(uint256 _bitMap, uint8 _index) internal pure returns (uint256) {
         return _bitMap | (1 << _index);
+    }
+
+    /// @inheritdoc ISelfDescribingFacet
+    /// @dev Packed list (4 bytes per selector) generated from this facet's ABI — every externally
+    ///      served function except the unregistered helper views `getName()` and `selectors()`
+    ///      (see `Utils.getAllSelectors`). Guarded against drift by FacetSelfDescription.t.sol.
+    ///      0x0db9eb87 commitBatchesSharedBridge(address,uint256,uint256,bytes)
+    ///      0x0b6db820 precommitSharedBridge(address,uint256,bytes)
+    function selectors() public pure returns (bytes4[] memory result) {
+        bytes memory packed = hex"0b6db8200db9eb87";
+        uint256 count = packed.length / 4;
+        result = new bytes4[](count);
+        for (uint256 i = 0; i < count; ++i) {
+            bytes4 selector;
+            assembly {
+                selector := mload(add(add(packed, 0x20), mul(i, 4)))
+            }
+            result[i] = selector;
+        }
     }
 }

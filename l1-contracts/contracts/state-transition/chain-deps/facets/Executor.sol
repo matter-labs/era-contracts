@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {ZKChainBase} from "./ZKChainBase.sol";
+import {ISelfDescribingFacet} from "../../chain-interfaces/ISelfDescribingFacet.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "../../../core/message-root/IMessageRoot.sol";
 import {EMPTY_STRING_KECCAK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
@@ -35,7 +36,7 @@ import {InteropRoot, StoredInteropRoot} from "../../../common/Messaging.sol";
 /// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract ExecutorFacet is ZKChainBase, IExecutor {
+contract ExecutorFacet is ZKChainBase, IExecutor, ISelfDescribingFacet {
     using UncheckedMath for uint256;
     using PriorityTree for PriorityTree.Tree;
 
@@ -311,5 +312,25 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _newLastBatch
     ) external nonReentrant onlyValidatorOrChainTypeManager notPriorityMode onlySettlementLayer {
         _revertBatches(_newLastBatch);
+    }
+
+    /// @inheritdoc ISelfDescribingFacet
+    /// @dev Packed list (4 bytes per selector) generated from this facet's ABI — every externally
+    ///      served function except the unregistered helper views `getName()` and `selectors()`
+    ///      (see `Utils.getAllSelectors`). Guarded against drift by FacetSelfDescription.t.sol.
+    ///      0xa085344d executeBatchesSharedBridge(address,uint256,uint256,bytes)
+    ///      0x9271e450 proveBatchesSharedBridge(address,uint256,uint256,bytes)
+    ///      0x7ca4eff7 revertBatchesSharedBridge(address,uint256)
+    function selectors() public pure returns (bytes4[] memory result) {
+        bytes memory packed = hex"7ca4eff79271e450a085344d";
+        uint256 count = packed.length / 4;
+        result = new bytes4[](count);
+        for (uint256 i = 0; i < count; ++i) {
+            bytes4 selector;
+            assembly {
+                selector := mload(add(add(packed, 0x20), mul(i, 4)))
+            }
+            result[i] = selector;
+        }
     }
 }

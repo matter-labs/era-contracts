@@ -7,6 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {
     Utils,
     DEFAULT_L2_LOGS_TREE_ROOT_HASH,
@@ -29,7 +30,6 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
-import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 
@@ -283,16 +283,10 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encode(bool(true))
         );
         DiamondInit diamondInit = new DiamondInit(isZKsyncOS());
+        // Registry model: the verifier `DiamondInit` installs is served from the pinned release
+        // (mocked below), not from a CTM version-keyed map.
         AcceptingVerifier testnetVerifier = new AcceptingVerifier();
-        // Mock the CTM to return a verifier for protocol version 0
-        vm.mockCall(
-            address(chainTypeManager),
-            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, uint256(0)),
-            abi.encode(address(testnetVerifier))
-        );
         validatorTimelock = ValidatorTimelock(deployValidatorTimelock(address(dummyBridgehub), owner, 0));
-
-        bytes8 dummyHash = 0x1234567890123456;
 
         genesisStoredBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: 0,
@@ -306,22 +300,9 @@ contract ExecutorTest is UtilsCallMockerTest {
             commitment: bytes32("")
         });
 
-        InitializeData memory params = InitializeData({
-            // TODO REVIEW
-            chainId: l2ChainId,
-            bridgehub: address(dummyBridgehub),
-            interopCenter: interopCenter,
-            chainTypeManager: address(chainTypeManager),
-            protocolVersion: 0,
-            admin: owner,
-            validatorTimelock: address(validatorTimelock),
-            baseTokenAssetId: baseTokenAssetId,
-            storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
-            // verifier is fetched from CTM
-            l2BootloaderBytecodeHash: dummyHash,
-            l2DefaultAccountBytecodeHash: dummyHash,
-            l2EvmEmulatorBytecodeHash: dummyHash
-        });
+        // Everything but (chainId, admin) is fetched from the CTM / its genesis registry /
+        // the bridgehub — all mocked below; this fixture's validator timelock and genesis
+        // batch hash differ from the mocker defaults, so they are overridden explicitly.
         mockDiamondInitInteropCenterCallsWithAddress(
             address(dummyBridgehub),
             address(0),
@@ -329,8 +310,22 @@ contract ExecutorTest is UtilsCallMockerTest {
             address(chainTypeManager),
             address(permissionlessValidator)
         );
+        mockCtmDerivedInitValues(
+            address(chainTypeManager),
+            address(dummyBridgehub),
+            baseTokenAssetId,
+            address(validatorTimelock),
+            keccak256(abi.encode(genesisStoredBatchInfo))
+        );
+        // The verifier `DiamondInit` installs comes from the release the CTM pins. Must be mocked
+        // AFTER the shared mockers above, which re-install the release mock with its default.
+        vm.mockCall(
+            Utils.TEST_GENESIS_REGISTRY,
+            abi.encodeWithSelector(ICTMRelease.verifier.selector),
+            abi.encode(address(testnetVerifier))
+        );
 
-        bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
+        bytes memory diamondInitData = abi.encodeCall(diamondInit.initialize, (l2ChainId, owner));
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
@@ -377,6 +372,8 @@ contract ExecutorTest is UtilsCallMockerTest {
         });
 
         uint256 chainId = block.chainid;
+        // DiamondInit treats the proxy deployer as the CTM.
+        vm.prank(address(chainTypeManager));
         DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
 
         executor = TestExecutor(address(diamondProxy));

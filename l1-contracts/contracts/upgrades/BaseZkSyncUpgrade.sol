@@ -6,9 +6,11 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
-import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
+import {ICTMTransition} from "./registry/objects/ICTMTransition.sol";
+import {CTMUpgradeComposer} from "./registry/libraries/CTMUpgradeComposer.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
+import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {ProposedUpgrade} from "../state-transition/libraries/ProposedUpgradeLib.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
@@ -70,6 +72,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         if (block.timestamp < _proposedUpgrade.upgradeTimestamp) {
             revert TimeNotReached(_proposedUpgrade.upgradeTimestamp, block.timestamp);
         }
+
         // If settlement layer is 0, it means that this diamond proxy is located on the settlement layer.
         bool isOnSettlementLayer = s.settlementLayer == address(0);
 
@@ -85,12 +88,11 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
             isOnSettlementLayer
         );
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
-        // Fetch verifier from CTM based on new protocol version.
-        // It must be set for every protocol version.
-        address ctmVerifier = IChainTypeManager(s.chainTypeManager).protocolVersionVerifier(
-            _proposedUpgrade.newProtocolVersion
-        );
-        _setVerifier(IVerifier(ctmVerifier));
+        // Zero means "leave unchanged", the same convention the base-system hashes use: the genesis
+        // upgrade runs after `DiamondInit` has already installed the verifier from the release.
+        if (_proposedUpgrade.verifier != address(0)) {
+            _setVerifier(IVerifier(_proposedUpgrade.verifier));
+        }
         _setBaseSystemContracts(
             _proposedUpgrade.bootloaderHash,
             _proposedUpgrade.defaultAccountHash,
@@ -107,6 +109,17 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
 
         emit UpgradeComplete(_proposedUpgrade.newProtocolVersion, txHash, _proposedUpgrade);
+    }
+
+    /// @notice Applies the transition's DERIVED, ready-to-execute diamond cuts to the diamond
+    ///         this contract is delegatecalled into, verbatim — the cuts were computed from the
+    ///         `(fromRelease, newRelease)` pair at transition initialization and stored, so there
+    ///         is nothing to resolve or re-diff at execution time. An empty list is a no-op.
+    function _applyDerivedFacetCuts(Diamond.FacetCut[] memory _facetCuts) internal {
+        if (_facetCuts.length == 0) {
+            return;
+        }
+        Diamond.diamondCut(Diamond.DiamondCutData({facetCuts: _facetCuts, initAddress: address(0), initCalldata: ""}));
     }
 
     /// @notice Change default account bytecode hash, that is used on L2
@@ -327,6 +340,22 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
 
         s.protocolVersion = _newProtocolVersion;
         emit NewProtocolVersion(previousProtocolVersion, _newProtocolVersion);
+    }
+
+    /// @notice Executes one committed transition. The transition address is the sole source for
+    /// both facet changes (DERIVED from its release pair) and proposal composition.
+    /// @dev CTM binding is commitment-based: this init only runs through the cut the chain reads
+    /// from its own CTM (`upgradeCutForVersion`), which derives it from the transition that CTM
+    /// committed — a transition cannot be aimed at a foreign CTM's chains.
+    function upgradeFromTransition(address _transition) external returns (bytes32) {
+        ICTMTransition transition = ICTMTransition(_transition);
+        // No `validate()` here: this init only runs through the cut the chain's own CTM derives
+        // from its committed transition, and that cut's init calldata names THIS transition
+        // address — so the object is the committed one by construction, and its pins were checked
+        // when it was committed. Pins cannot have moved since: an `EXTCODEHASH` is fixed for a
+        // non-selfdestructible contract.
+        _applyDerivedFacetCuts(transition.facetCuts());
+        return upgrade(CTMUpgradeComposer.buildProposedUpgrade(transition));
     }
 
     /// @notice Placeholder function for custom logic for upgrading L1 contract.

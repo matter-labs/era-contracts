@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
+import {ISelfDescribingFacet} from "../../chain-interfaces/ISelfDescribingFacet.sol";
 
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {PubdataPricingMode} from "../ZKChainStorage.sol";
@@ -22,7 +23,7 @@ import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 /// @title Getters Contract implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
+contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingFacet {
     using UncheckedMath for uint256;
     using PriorityTree for PriorityTree.Tree;
 
@@ -328,5 +329,73 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     /// @inheritdoc ILegacyGetters
     function getL2SystemContractsUpgradeBlockNumber() external view returns (uint256) {
         return s.l2SystemContractsUpgradeBatchNumber;
+    }
+
+    /// @inheritdoc ISelfDescribingFacet
+    /// @dev Packed list (4 bytes per selector) generated from this facet's ABI — every externally
+    ///      served function except the unregistered helper views `getName()` and `selectors()`
+    ///      (see `Utils.getAllSelectors`). Guarded against drift by FacetSelfDescription.t.sol.
+    ///      0x1de72e34 baseTokenGasPriceMultiplierDenominator()
+    ///      0xea6c029c baseTokenGasPriceMultiplierNominator()
+    ///      0x44518012 baseTokenSupportsTotalSupply()
+    ///      0xcdffacc6 facetAddress(bytes4)
+    ///      0x52ef6b2c facetAddresses()
+    ///      0xadfca15e facetFunctionSelectors(address)
+    ///      0x7a0ed627 facets()
+    ///      0x6e9960c3 getAdmin()
+    ///      0x98acd7a6 getBaseToken()
+    ///      0x960dcf24 getBaseTokenAssetId()
+    ///      0x3591c1a0 getBridgehub()
+    ///      0x3408e470 getChainId()
+    ///      0x946ebad1 getChainTypeManager()
+    ///      0x5a590335 getDAValidatorPair()
+    ///      0x79823c9a getFirstUnprocessedPriorityTx()
+    ///      0xd86970d8 getL2BootloaderBytecodeHash()
+    ///      0xfd791f3c getL2DefaultAccountBytecodeHash()
+    ///      0xdd655bb0 getL2EvmEmulatorBytecodeHash()
+    ///      0xe5355c75 getL2SystemContractsUpgradeBatchNumber()
+    ///      0x9d1b5a81 getL2SystemContractsUpgradeBlockNumber()
+    ///      0x7b30c8da getL2SystemContractsUpgradeTxHash()
+    ///      0xd0468156 getPendingAdmin()
+    ///      0x631f4bac getPriorityQueueSize()
+    ///      0x39d7d4aa getPriorityTreeRoot()
+    ///      0xf4ff5e2e getPriorityTreeStartIndex()
+    ///      0x0ec6b0b7 getPriorityTxMaxGasLimit()
+    ///      0x33ce93fe getProtocolVersion()
+    ///      0x06d49e5b getPubdataPricingMode()
+    ///      0xf5c1182c getSemverProtocolVersion()
+    ///      0x6a27e8b5 getSettlementLayer()
+    ///      0xdb1f0bf9 getTotalBatchesCommitted()
+    ///      0xb8c2f66f getTotalBatchesExecuted()
+    ///      0xef3f0bae getTotalBatchesVerified()
+    ///      0xfe26699e getTotalBlocksCommitted()
+    ///      0x39607382 getTotalBlocksExecuted()
+    ///      0xaf6a2dcd getTotalBlocksVerified()
+    ///      0xa1954fc5 getTotalPriorityTxs()
+    ///      0x22c5cf23 getTransactionFilterer()
+    ///      0x46657fe9 getVerifier()
+    ///      0x18e3a941 getVerifierParams()
+    ///      0xc81838b7 getZKsyncOS()
+    ///      0x29b98c67 isDiamondStorageFrozen()
+    ///      0xbd7c5412 isEthWithdrawalFinalized(uint256,uint256)
+    ///      0xc3bbd2d7 isFacetFreezable(address)
+    ///      0xe81e0ba1 isFunctionFreezable(bytes4)
+    ///      0x8708474e isPriorityQueueActive()
+    ///      0xfacd743b isValidator(address)
+    ///      0x9cd939e4 l2LogsRootHash(uint256)
+    ///      0xb22dd78e storedBatchHash(uint256)
+    ///      0x74f4d30d storedBlockHash(uint256)
+    function selectors() public pure returns (bytes4[] memory result) {
+        bytes
+            memory packed = hex"06d49e5b0ec6b0b718e3a9411de72e3422c5cf2329b98c6733ce93fe3408e4703591c1a03960738239d7d4aa4451801246657fe952ef6b2c5a590335631f4bac6a27e8b56e9960c370e7ef4f74f4d30d79823c9a7a0ed6277b30c8da8708474e946ebad1960dcf2498acd7a69cd939e49d1b5a81a1954fc5adfca15eaf6a2dcdb22dd78eb8c2f66fbd7c5412c3bbd2d7c81838b7cdffacc6d0468156d86970d8db1f0bf9dc2f223add655bb0e5355c75e81e0ba1ea6c029cef3f0baef4ff5e2ef5c1182cfacd743bfd791f3cfe26699e";
+        uint256 count = packed.length / 4;
+        result = new bytes4[](count);
+        for (uint256 i = 0; i < count; ++i) {
+            bytes4 selector;
+            assembly {
+                selector := mload(add(add(packed, 0x20), mul(i, 4)))
+            }
+            result[i] = selector;
+        }
     }
 }

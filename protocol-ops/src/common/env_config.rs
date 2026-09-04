@@ -29,7 +29,7 @@ use serde::Deserialize;
 
 use crate::common::paths::resolve_l1_contracts_path;
 
-const V31_UPGRADE_DIR: &str = "upgrade-envs/v0.31.0-interopB";
+const UPGRADE_ENV_DIR: &str = "upgrade-envs/v0.34.0-registry";
 const PERMANENT_VALUES_DIR: &str = "upgrade-envs/permanent-values";
 
 #[derive(Debug, Deserialize)]
@@ -203,18 +203,18 @@ pub struct PermanentContracts {
     // deployed addresses if reused), so it belongs in the v31 input TOML
     // (`upgrade-envs/v0.31.0-interopB/<env>.toml [contracts] create2_factory_salt`)
     // alongside the rest of the per-regen inputs. See
-    // `EnvConfig::v31_create2_factory_salt`.
+    // `EnvConfig::upgrade_create2_factory_salt`.
 }
 
-/// Fields read from the v31 upgrade input TOML (best-effort regex parse —
+/// Fields read from the upgrade input TOML (best-effort regex parse —
 /// the file has unquoted hex literals that the TOML crate rejects).
 ///
-/// CREATE2 salts are *not* stored here; `EnvConfig::v31_create2_factory_salt`
-/// and `v31_create2_factory_salt_per_ctm` re-read them from
-/// `v31_input_path` on demand. That way the salt-keyed entries are not
+/// CREATE2 salts are *not* stored here; `EnvConfig::upgrade_create2_factory_salt`
+/// and `upgrade_create2_factory_salt_per_ctm` re-read them from
+/// `upgrade_input_toml_path` on demand. That way the salt-keyed entries are not
 /// duplicated in Rust state — the TOML is the only source of truth.
 #[derive(Debug, Default, Clone)]
-pub struct V31UpgradeInputs {
+pub struct UpgradeInputs {
     pub owner_address: Option<Address>,
     pub era_chain_id: Option<u64>,
 }
@@ -224,18 +224,18 @@ pub struct V31UpgradeInputs {
 pub struct EnvConfig {
     pub env: String,
     pub permanent_values_path: PathBuf,
-    pub v31_input_path: PathBuf,
+    pub upgrade_input_toml_path: PathBuf,
     pub permanent: PermanentValues,
-    pub v31: V31UpgradeInputs,
+    pub upgrade: UpgradeInputs,
 }
 
 impl EnvConfig {
     /// Load `<l1-contracts>/upgrade-envs/permanent-values/<env>.toml` and the
-    /// v31 upgrade input TOML for the same env. Both files must exist.
+    /// upgrade input TOML for the same env. Both files must exist.
     pub fn load(env: &str) -> anyhow::Result<Self> {
         let l1 = resolve_l1_contracts_path()?;
         let permanent_values_path = l1.join(PERMANENT_VALUES_DIR).join(format!("{env}.toml"));
-        let v31_input_path = l1.join(V31_UPGRADE_DIR).join(format!("{env}.toml"));
+        let upgrade_input_toml_path = l1.join(UPGRADE_ENV_DIR).join(format!("{env}.toml"));
 
         let pv_content = fs::read_to_string(&permanent_values_path).with_context(|| {
             format!(
@@ -250,18 +250,18 @@ impl EnvConfig {
             )
         })?;
 
-        let v31 = if v31_input_path.exists() {
-            parse_v31_upgrade_input(&fs::read_to_string(&v31_input_path)?)
+        let upgrade = if upgrade_input_toml_path.exists() {
+            parse_upgrade_input(&fs::read_to_string(&upgrade_input_toml_path)?)
         } else {
-            V31UpgradeInputs::default()
+            UpgradeInputs::default()
         };
 
         Ok(EnvConfig {
             env: env.to_string(),
             permanent_values_path,
-            v31_input_path,
+            upgrade_input_toml_path,
             permanent,
-            v31,
+            upgrade,
         })
     }
 
@@ -291,12 +291,12 @@ impl EnvConfig {
     /// alongside the rest of the v31 inputs so re-prepares are reproducible.
     /// Re-reads the TOML each call rather than caching, so editing the file
     /// between commands is reflected without restarting the CLI.
-    pub fn v31_create2_factory_salt(&self) -> anyhow::Result<Option<B256>> {
-        if !self.v31_input_path.exists() {
+    pub fn upgrade_create2_factory_salt(&self) -> anyhow::Result<Option<B256>> {
+        if !self.upgrade_input_toml_path.exists() {
             return Ok(None);
         }
-        let content = fs::read_to_string(&self.v31_input_path)
-            .with_context(|| format!("read {}", self.v31_input_path.display()))?;
+        let content = fs::read_to_string(&self.upgrade_input_toml_path)
+            .with_context(|| format!("read {}", self.upgrade_input_toml_path.display()))?;
         Ok(read_core_create2_salt(&content))
     }
 
@@ -307,36 +307,36 @@ impl EnvConfig {
     /// salt every regen prevents the broadcaster from colliding with previously
     /// executed op ids that still sit in the on-chain `Done` map. When absent,
     /// returns `None` and the forge scripts default to `bytes32(0)`.
-    pub fn v31_legacy_gov_salt(&self) -> anyhow::Result<Option<B256>> {
-        if !self.v31_input_path.exists() {
+    pub fn upgrade_legacy_gov_salt(&self) -> anyhow::Result<Option<B256>> {
+        if !self.upgrade_input_toml_path.exists() {
             return Ok(None);
         }
-        let content = fs::read_to_string(&self.v31_input_path)
-            .with_context(|| format!("read {}", self.v31_input_path.display()))?;
+        let content = fs::read_to_string(&self.upgrade_input_toml_path)
+            .with_context(|| format!("read {}", self.upgrade_input_toml_path.display()))?;
         Ok(read_core_legacy_gov_salt(&content))
     }
 
     /// Per-CTM CREATE2 salts from
     /// `upgrade-envs/v0.31.0-interopB/<env>.toml [create2_factory_salts]`,
     /// keyed by CTM proxy. Empty if the env doesn't declare any (legacy
-    /// local-fixture path — `v31_upgrade_inner` will fall back to random
+    /// local-fixture path — `upgrade_inner` will fall back to random
     /// salts in that case). Re-reads the TOML each call (see
-    /// `v31_create2_factory_salt`).
-    pub fn v31_create2_factory_salt_per_ctm(&self) -> anyhow::Result<HashMap<Address, B256>> {
-        if !self.v31_input_path.exists() {
+    /// `upgrade_create2_factory_salt`).
+    pub fn upgrade_create2_factory_salt_per_ctm(&self) -> anyhow::Result<HashMap<Address, B256>> {
+        if !self.upgrade_input_toml_path.exists() {
             return Ok(HashMap::new());
         }
-        let content = fs::read_to_string(&self.v31_input_path)
-            .with_context(|| format!("read {}", self.v31_input_path.display()))?;
+        let content = fs::read_to_string(&self.upgrade_input_toml_path)
+            .with_context(|| format!("read {}", self.upgrade_input_toml_path.display()))?;
         Ok(read_create2_salts_per_ctm(&content))
     }
 
     pub fn owner_address(&self) -> Option<Address> {
-        self.v31.owner_address
+        self.upgrade.owner_address
     }
 
     pub fn era_chain_id(&self) -> Option<u64> {
-        self.v31.era_chain_id
+        self.upgrade.era_chain_id
     }
 
     /// Whether this is the mainnet ecosystem. Drives testnet-vs-real contract
@@ -385,13 +385,13 @@ impl EnvConfig {
 /// expects to find for stage / mainnet are immediately visible.
 pub fn default_protocol_ops_out_dir(env: &str) -> anyhow::Result<PathBuf> {
     Ok(resolve_l1_contracts_path()?
-        .join(V31_UPGRADE_DIR)
+        .join(UPGRADE_ENV_DIR)
         .join("output")
         .join(env))
 }
 
-fn parse_v31_upgrade_input(content: &str) -> V31UpgradeInputs {
-    let mut out = V31UpgradeInputs::default();
+fn parse_upgrade_input(content: &str) -> UpgradeInputs {
+    let mut out = UpgradeInputs::default();
     for line in content.lines() {
         let line = line.trim();
         if let Some(addr) = match_quoted_address(line, "owner_address") {
@@ -555,13 +555,13 @@ mod tests {
         let cfg = EnvConfig::load("stage").expect("load stage env config");
 
         let core_salt = cfg
-            .v31_create2_factory_salt()
+            .upgrade_create2_factory_salt()
             .expect("read core salt")
             .expect("stage.toml must declare [contracts] create2_factory_salt");
         assert_ne!(core_salt, B256::ZERO);
 
         let per_ctm = cfg
-            .v31_create2_factory_salt_per_ctm()
+            .upgrade_create2_factory_salt_per_ctm()
             .expect("read per-CTM salts");
         assert_eq!(per_ctm.len(), 2);
         let era: Address = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"
@@ -583,13 +583,13 @@ mod tests {
         let cfg = EnvConfig::load("mainnet").expect("load mainnet env config");
 
         let core_salt = cfg
-            .v31_create2_factory_salt()
+            .upgrade_create2_factory_salt()
             .expect("read core salt")
             .expect("mainnet.toml must declare [contracts] create2_factory_salt");
         assert_ne!(core_salt, B256::ZERO);
 
         let per_ctm = cfg
-            .v31_create2_factory_salt_per_ctm()
+            .upgrade_create2_factory_salt_per_ctm()
             .expect("read per-CTM salts");
         assert_eq!(per_ctm.len(), 2);
         let era: Address = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"

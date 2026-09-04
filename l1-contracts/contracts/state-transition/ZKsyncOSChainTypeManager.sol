@@ -3,11 +3,14 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
-import {ChainCreationParams} from "./IChainTypeManager.sol";
+import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
+import {ICTMRelease} from "../upgrades/registry/objects/ICTMRelease.sol";
 import {
     GenesisBatchHashZero,
     GenesisBatchCommitmentIncorrect,
-    GenesisUpgradeZero
+    GenesisUpgradeZero,
+    RegistryWrongVM,
+    ZeroAddress
 } from "../common/L1ContractErrors.sol";
 
 /// @title ZKsync OS Chain Type Manager contract
@@ -27,31 +30,35 @@ contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
         return true;
     }
 
-    /// @notice Updates the parameters with which a new chain is created
-    /// @param _chainCreationParams The new chain creation parameters
-    function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal override {
-        // Validate common parameters
-        _validateChainCreationParams(_chainCreationParams);
+    function _setCurrentRelease(address _release) internal override {
+        if (_release == address(0)) {
+            revert ZeroAddress();
+        }
+        _requireGenuineRelease(_release);
+        ICTMRelease release = ICTMRelease(_release);
+        release.validate();
+        // VM identity is single-sourced from the release's pinned DiamondInit immutable —
+        // there is no separate manifest flag to drift from it.
+        if (!IDiamondInit(release.diamondInit()).IS_ZKSYNC_OS()) {
+            revert RegistryWrongVM(true, false);
+        }
+        // No version check here: a release is version-INDEPENDENT. The release <-> protocol-version
+        // binding is established atomically by the transition (which calls `setNewVersionUpgrade`
+        // and `setCurrentRelease` from the same pinned object), not re-derived from the release.
+        // slither-disable-next-line unused-return
+        (address genesisUpgrade, bytes32 genesisBatchHash, bytes32 genesisBatchCommitment, ) = release.genesisParams();
 
-        // For ZKsync OS, the genesis batch commitment must be equal to 1
-        if (_chainCreationParams.genesisBatchCommitment != bytes32(uint256(1))) {
+        if (genesisUpgrade == address(0)) {
+            revert GenesisUpgradeZero();
+        }
+        if (genesisBatchHash == bytes32(0)) {
+            revert GenesisBatchHashZero();
+        }
+        // For ZKsync OS, the genesis batch commitment must be equal to 1.
+        if (genesisBatchCommitment != bytes32(uint256(1))) {
             revert GenesisBatchCommitmentIncorrect();
         }
 
-        // Process the validated parameters
-        _processValidatedChainCreationParams(_chainCreationParams);
-    }
-
-    /// @notice Validates chain creation parameters common to all chain types
-    /// @param _chainCreationParams The chain creation parameters to validate
-    function _validateChainCreationParams(
-        ChainCreationParams calldata _chainCreationParams
-    ) internal pure virtual override {
-        if (_chainCreationParams.genesisUpgrade == address(0)) {
-            revert GenesisUpgradeZero();
-        }
-        if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
-            revert GenesisBatchHashZero();
-        }
+        _storeCurrentRelease(_release);
     }
 }

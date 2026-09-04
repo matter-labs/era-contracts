@@ -27,7 +27,7 @@ on:
 
 jobs:
   # Fast job: uses pre-generated chain states from the repo.
-  # We still compile DummyInteropRecipient so deploy bytecode is available in out/.
+  # We still compile the runtime deployment artifacts that are not part of those states.
   integration-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -49,6 +49,9 @@ jobs:
 
       - name: Install dependencies
         run: yarn
+
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
 
       - name: Build anvil-interop dev artifacts
         run: yarn l1 build:anvil-interop-dev-artifacts
@@ -83,12 +86,40 @@ jobs:
         run: |
           bash cleanup.sh
 
-  # V31 → V32 upgrade test: loads v31 chain states, runs this release's ecosystem upgrade,
-  # executes governance calls, and verifies protocol version is updated. Replaces the former
-  # v29 → v31 and v30 → v31 jobs: this release initializes the contracts introduced in v31 on
-  # the genesis path only, and its address discovery expects the v31 ABI, so a pre-v31
-  # ecosystem can no longer be upgraded straight onto it.
-  v31-to-v32-upgrade-test:
+  # The v33 -> v34 upgrade (the bootstrap edge): loads the FROZEN departing-version chain
+  # states, runs the real CTMUpgrade_v34 / CoreUpgrade_v34 prepare through protocol-ops, replays
+  # the deployer + governance bundles (incl. the four-call bootstrap handover + migrate()),
+  # crosses the chains via the legacy handed-cut entrypoint and relays the L2 upgrade
+  # transactions.
+  upgrade-v33-to-v34-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup anvil-interop environment
+        uses: ./.github/actions/setup-anvil-interop
+        with:
+          artifacts: full
+
+      - name: Run the v33 -> v34 upgrade test
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          echo "Running the v33 -> v34 (bootstrap) upgrade test..."
+          yarn ts-node run-v33-to-v34-upgrade-test.ts
+
+      - name: Cleanup
+        if: always()
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          bash cleanup.sh
+
+  # The v34 -> v35 upgrade: the registry-driven hop through the bound executors.
+  upgrade-v34-to-v35-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -98,49 +129,16 @@ jobs:
         with:
           submodules: true
 
-      # The committed v31 state uses the newer Anvil trace schema, while the
-      # release bytecode is reproduced with the `build` Forge pin.
-      - name: Install Anvil toolchain (state-compatible with committed states)
-        uses: ./.github/actions/install-foundry
-
-      - name: Preserve the pinned Anvil before switching to the build toolchain
-        run: cp "$(command -v anvil)" "$RUNNER_TEMP/anvil-pinned"
-
-      - name: Install foundry
-        uses: ./.github/actions/install-foundry
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
+      - name: Setup anvil-interop environment
+        uses: ./.github/actions/setup-anvil-interop
         with:
-          node-version: 20
-          cache: yarn
+          artifacts: full
 
-      - name: Install dependencies
-        run: yarn
-
-      # Reuses the artifacts l1-contracts-ci built for this commit rather than compiling them again.
-      # Via the action, not a bare cache restore: the prefix key can land a previous commit's `out`,
-      # and without the pruning a deleted contract's stale ABI would reach the upgrade harness.
-      - name: Warm solc build cache
-        uses: ./.github/actions/warm-solc-cache
-
-      - name: Build da-contracts artifacts
-        run: yarn da build:foundry
-
-      - name: Build l1-contracts artifacts
-        run: yarn l1 build:foundry
-
-      - name: Install anvil-interop dependencies
+      - name: Run the v34 -> v35 upgrade test
         working-directory: l1-contracts/test/anvil-interop
-        run: yarn install
-
-      - name: Run V31 to V32 upgrade test
-        working-directory: l1-contracts/test/anvil-interop
-        env:
-          ANVIL_BIN: ${{ runner.temp }}/anvil-pinned
         run: |
-          echo "Running V31 -> V32 upgrade test..."
-          yarn ts-node run-v31-to-v32-upgrade-test.ts
+          echo "Running the v34 -> v35 (registry-driven) upgrade test..."
+          yarn ts-node run-v34-to-v35-upgrade-test.ts
 
       - name: Cleanup
         if: always()

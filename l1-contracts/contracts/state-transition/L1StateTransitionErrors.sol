@@ -24,8 +24,6 @@ error DepositsNotPaused();
 error DepositsPaused();
 // 0xedae13f3
 error ExecutedIsNotConsistentWithVerified(uint256 batchesExecuted, uint256 batchesVerified);
-// 0xc866ff2c
-error InitialForceDeploymentMismatch(bytes32 forceDeploymentHash, bytes32 initialForceDeploymentHash);
 // 0xeaeeb154
 error InitializeNotAvailable();
 // 0xfbd630b8
@@ -68,8 +66,6 @@ error MismatchL2DACommitmentScheme(uint256 operatorProvidedScheme, uint256 expec
 error MismatchNumberOfLayer1Txs(uint256 numberOfLayer1Txs, uint256 expectedLength);
 // 0xf9ba09d6
 error NotAllBatchesExecuted();
-// 0x1c3944f4
-error NotAVerifierOnlyUpgrade(uint256 oldProtocolVersion, uint256 newProtocolVersion);
 // 0xf05c64c6
 error NotChainAdmin(address prevMsgSender, address admin);
 // 0xe246dc63
