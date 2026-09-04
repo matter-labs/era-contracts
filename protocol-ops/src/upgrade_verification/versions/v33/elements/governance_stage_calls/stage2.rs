@@ -238,8 +238,17 @@ impl GovernanceStage2Calls {
                 )
                 .await;
             }
+            None if verifiers.new_gateway_chain_id.is_none() => {
+                // This release brings up no Gateway, and the env declares none either, so there
+                // is no 13-call block to find. Nothing to verify rather than something missing.
+                result.print_info(
+                    "Stage 2: no new-Gateway bring-up block (release and env both declare none)",
+                );
+            }
             None => {
-                result.report_error("v33 verification requires a [new_gateway] artifact block");
+                result.report_error(
+                    "env declares [new_gateway] but the artifact carries no [new_gateway] block",
+                );
                 errors += 1;
             }
         }
@@ -350,13 +359,23 @@ async fn verify_gateway_bring_up_calls(
         return errors + 1;
     };
 
-    let expected_new_gw_chain_id = U256::from(verifiers.new_gateway_chain_id);
+    // Reached only when the artifact carries a `[new_gateway]` block, which the caller pairs
+    // with the env declaring one — so both Options are populated here.
+    let (Some(new_gateway_chain_id), Some(representative_ctm)) = (
+        verifiers.new_gateway_chain_id,
+        verifiers.new_gateway_representative_ctm,
+    ) else {
+        result.report_error(
+            "artifact has a [new_gateway] block but the env config declares no [new_gateway]",
+        );
+        return errors + 1;
+    };
+    let expected_new_gw_chain_id = U256::from(new_gateway_chain_id);
     let expected_l2_gas_limit = U256::from(MAX_PRIORITY_TX_GAS_LIMIT);
     let expected_l2_gas_per_pubdata_byte_limit = U256::from(L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT);
     // GatewayVotePreparation registers the representative/source CTM as the
     // L1 CTM asset; the newly deployed GW CTM appears in the L2 Bridgehub
     // add/setCTMAssetAddress payloads.
-    let representative_ctm = verifiers.new_gateway_representative_ctm;
     let representative_ctm_registration_data = address_as_bytes32(representative_ctm);
     let representative_ctm_asset_id = ctm_asset_id(
         verifiers.expected_l1_chain_id,
@@ -368,7 +387,7 @@ async fn verify_gateway_bring_up_calls(
         errors += check_set_settlement_layer_status(
             base,
             &call.data,
-            U256::from(verifiers.new_gateway_chain_id),
+            U256::from(new_gateway_chain_id),
             true,
             "new GW whitelist",
             result,
@@ -1050,13 +1069,13 @@ fn check_register_ctm_asset_on_l1(
     };
     if ctm == expected_ctm {
         result.report_ok(&format!(
-            "registerCTMAssetOnL1 CTM matches Bridgehub.chainTypeManager({})",
+            "registerCTMAssetOnL1 CTM matches Bridgehub.chainTypeManager({:?})",
             verifiers.new_gateway_representative_chain_id
         ));
         0
     } else {
         result.report_error(&format!(
-            "registerCTMAssetOnL1 CTM mismatch: expected Bridgehub.chainTypeManager({}) {}, got {}",
+            "registerCTMAssetOnL1 CTM mismatch: expected Bridgehub.chainTypeManager({:?}) {}, got {}",
             verifiers.new_gateway_representative_chain_id, expected_ctm, ctm
         ));
         1

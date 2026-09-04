@@ -27,7 +27,7 @@ ctm_proxy_addr = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"
 l1_bytecodes_supplier_addr = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
 rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
 
-# v31 multi-CTM list — consumed by `scripts/v31-simulate-upgrade.ts`.
+# Multi-CTM list — consumed by `protocol_ops` via `--env` (see `EnvConfig::ctms`).
 # Mainnet is currently pre-v31 — overrides are required because the v31 getters
 # (`ctm.isZKsyncOS()`, `ctm.L1_BYTECODES_SUPPLIER()`) don't exist yet.
 [[ctm_contracts.ctms]]

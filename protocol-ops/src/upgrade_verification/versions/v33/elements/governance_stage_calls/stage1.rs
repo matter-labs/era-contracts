@@ -26,7 +26,7 @@ use crate::upgrade_verification::{
 
 use super::super::{
     super::expected_old_protocol_version_label, super::get_expected_new_protocol_version,
-    super::get_expected_old_protocol_version_for_ctm_flavor,
+    super::is_expected_old_protocol_version_for_ctm_flavor,
 };
 use super::super::{
     fixed_force_deployment::FixedForceDeploymentsData,
@@ -847,9 +847,8 @@ async fn verify_set_new_version_upgrade_payload(
     }
 
     let decoded_old_protocol_version = ProtocolVersion::from(artifact_old_protocol_version);
-    let expected_old_protocol_version: U256 =
-        get_expected_old_protocol_version_for_ctm_flavor(ctm.flavor).into();
-    if artifact_old_protocol_version != expected_old_protocol_version {
+    // Patch-insensitive: see `is_expected_old_protocol_version_for_ctm_flavor`.
+    if !is_expected_old_protocol_version_for_ctm_flavor(decoded_old_protocol_version, ctm.flavor) {
         result.report_error(&format!(
             "{} CTM old protocol version must be {}, got {}",
             ctm.flavor.label(),

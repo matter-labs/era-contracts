@@ -113,16 +113,24 @@ impl GovernanceStage0Calls {
             result,
         )
         .await?;
-        // PUH-redeploy block is 4 calls: upgradeAndCall + the three update*
-        // setters (SecurityCouncil, Guardians, EmergencyUpgradeBoard).
-        let pre_gov_accept_tail_start = if puh_governed {
+        // The PUH-redeploy block (4 calls: upgradeAndCall + the three update* setters) is present
+        // only when the *release* ships a new zk-governance set, which the artifact records as a
+        // `[zk_governance]` table. Keying off `puh_governed` alone was wrong: an env can be
+        // PUH-governed while the release leaves the handler untouched, as v33 does.
+        let redeploys_zk_governance = puh_governed && artifact.zk_governance.is_some();
+        if puh_governed && artifact.zk_governance.is_none() {
+            result.print_info(
+                "Stage 0: no zk-governance redeploy block (release ships no new governance set)",
+            );
+        }
+        let pre_gov_accept_tail_start = if redeploys_zk_governance {
             base_count + 4
         } else {
             base_count
         };
         let expected_call_count = pre_gov_accept_tail_start + pre_gov_accept_targets.len();
 
-        if puh_governed {
+        if redeploys_zk_governance {
             let expected_zk_governance = artifact.zk_governance.as_ref().context(
                 "PUH-governed v33 artifact is missing required top-level [zk_governance] table",
             )?;

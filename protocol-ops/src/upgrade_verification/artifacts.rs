@@ -116,6 +116,26 @@ pub(crate) fn required_address_in_value(
         .with_context(|| format!("{path_label} is not a valid address"))
 }
 
+/// Like [`required_address_in_value`], but yields `None` when the key is simply absent.
+///
+/// For fields a release may legitimately stop emitting — the legacy ERC20 bridge, for
+/// instance, which v33's core prepare no longer records. A malformed value is still an error;
+/// only absence is tolerated.
+pub(crate) fn optional_address_in_value(
+    value: &toml::Value,
+    scope: &str,
+    path: &[&str],
+) -> anyhow::Result<Option<Address>> {
+    let mut current = value;
+    for segment in path {
+        match current.get(*segment) {
+            Some(next) => current = next,
+            None => return Ok(None),
+        }
+    }
+    required_address_in_value(value, scope, path).map(Some)
+}
+
 impl EcosystemUpgradeArtifact {
     pub(crate) fn read(path: &Path) -> anyhow::Result<Self> {
         let content = fs::read_to_string(path).with_context(|| {

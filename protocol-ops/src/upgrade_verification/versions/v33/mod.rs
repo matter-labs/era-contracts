@@ -25,7 +25,7 @@ use elements::{
     rpc_state::verify_v33_artifact_state,
 };
 
-pub(crate) const EXPECTED_NEW_PROTOCOL_VERSION_STR: &str = "0.32.0";
+pub(crate) const EXPECTED_NEW_PROTOCOL_VERSION_STR: &str = "0.33.0";
 pub(crate) const EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR: &str = "0.31.0";
 pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.31.0";
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
@@ -53,17 +53,24 @@ pub(crate) fn get_expected_old_protocol_version_for_ctm_flavor(
     ProtocolVersion::from_str(version).unwrap()
 }
 
+/// Whether `version` is the release this upgrade starts from.
+///
+/// Compares major.minor and ignores the patch: a CTM sitting on a patch release of the source
+/// version (testnet's ZKsync OS CTM is on v0.31.1) is still on v31, and this upgrade applies to
+/// it unchanged — the diamond cut is keyed on the CTM's own reported version, not on a pinned
+/// patch. Requiring an exact match rejected a legitimately-patched ecosystem.
 pub(crate) fn is_expected_old_protocol_version_for_ctm_flavor(
     version: ProtocolVersion,
     flavor: CtmFlavor,
 ) -> bool {
-    version == get_expected_old_protocol_version_for_ctm_flavor(flavor)
+    let expected = get_expected_old_protocol_version_for_ctm_flavor(flavor);
+    version.major == expected.major && version.minor == expected.minor
 }
 
 pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static str {
     match flavor {
-        CtmFlavor::Era => "v0.31.0",
-        CtmFlavor::ZksyncOs => "v0.31.0",
+        CtmFlavor::Era => "v0.31.x",
+        CtmFlavor::ZksyncOs => "v0.31.x",
     }
 }
 
@@ -95,8 +102,8 @@ pub(crate) async fn verify(
     era_chain_id: u64,
     legacy_gateway_chain_id: u64,
     legacy_gateway_chain_intervals: &[ChainInterval],
-    new_gateway_chain_id: u64,
-    new_gateway_representative_chain_id: u64,
+    new_gateway_chain_id: Option<u64>,
+    new_gateway_representative_chain_id: Option<u64>,
     l1_chain_id: u64,
     tx_hashes: &[FixedBytes<32>],
     create2_factory: Address,

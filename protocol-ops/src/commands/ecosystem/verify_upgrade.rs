@@ -130,14 +130,12 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.permanent_values_path.display()
         )
     })?;
-    let new_gateway = env_cfg.new_gateway().ok_or_else(|| {
-        anyhow::anyhow!(
-            "{} is missing required `[new_gateway]` config for v33 verification",
-            env_cfg.permanent_values_path.display()
-        )
-    })?;
-    let new_gateway_chain_id = new_gateway.chain_id;
-    let new_gateway_representative_chain_id = new_gateway.ctm_representative_chain_id;
+    // Optional: a release that brings up no Gateway (v33) has no `[new_gateway]` block, and the
+    // Gateway-specific checks — the stage-2 bring-up block and the GW CTM deployment provenance —
+    // are skipped rather than asserted against absent config.
+    let new_gateway = env_cfg.new_gateway();
+    let new_gateway_chain_id = new_gateway.map(|gw| gw.chain_id);
+    let new_gateway_representative_chain_id = new_gateway.map(|gw| gw.ctm_representative_chain_id);
 
     // Collect every pinned CREATE2 salt declared in the env config — the Core
     // salt from `[contracts] create2_factory_salt` plus the per-CTM salts under
@@ -193,9 +191,15 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     logger::info(format!(
         "Legacy Gateway chain ID: {legacy_gateway_chain_id}"
     ));
-    logger::info(format!("New Gateway chain ID: {new_gateway_chain_id}"));
     logger::info(format!(
-        "New Gateway representative chain ID: {new_gateway_representative_chain_id}"
+        "New Gateway: {}",
+        match new_gateway_chain_id {
+            Some(id) => format!("chain {id}"),
+            None => "none — this release brings up no Gateway".to_string(),
+        }
+    ));
+    logger::info(format!(
+        "New Gateway representative chain ID: {new_gateway_representative_chain_id:?}"
     ));
     logger::info(format!("L1 chain ID (expected): {l1_chain_id}"));
     logger::info(format!("CREATE2 factory: {create2_factory}"));

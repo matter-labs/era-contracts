@@ -2,7 +2,8 @@ use anyhow::Result;
 
 use crate::upgrade_verification::{
     artifacts::{
-        required_address_in_value as required_address, CtmFlavor, EcosystemUpgradeArtifact,
+        optional_address_in_value, required_address_in_value as required_address, CtmFlavor,
+        EcosystemUpgradeArtifact,
     },
     constants::EIP1967_PROXY_ADMIN_SLOT,
     verifiers::{VerificationResult, Verifiers},
@@ -297,7 +298,10 @@ async fn verify_v33_core_wiring(
             "ctm_deployment_tracker_proxy_addr",
         ],
     )?;
-    let expected_legacy_bridge = required_address(
+    // v33's core prepare no longer records the legacy ERC20 bridge, so this is absent on a v33
+    // artifact. The upgrade does not touch `L1AssetRouter.legacyBridge()` either way; when the
+    // artifact does carry the address we still cross-check it.
+    let expected_legacy_bridge = optional_address_in_value(
         &artifact.core,
         "core",
         &["upgrade_addresses", "bridges", "erc20_bridge_proxy_addr"],
@@ -383,14 +387,17 @@ async fn verify_v33_core_wiring(
         )),
     };
 
-    match asset_router.legacyBridge().call().await {
-        Ok(actual) => expect_address_eq(
-            result,
-            "L1AssetRouter.legacyBridge()",
-            actual,
-            expected_legacy_bridge,
+    match (
+        expected_legacy_bridge,
+        asset_router.legacyBridge().call().await,
+    ) {
+        (Some(expected), Ok(actual)) => {
+            expect_address_eq(result, "L1AssetRouter.legacyBridge()", actual, expected)
+        }
+        (None, Ok(_)) => result.print_info(
+            "L1AssetRouter.legacyBridge(): skipped — artifact records no erc20_bridge_proxy_addr",
         ),
-        Err(err) => result.report_error(&format!(
+        (_, Err(err)) => result.report_error(&format!(
             "Failed to call L1AssetRouter.legacyBridge() for core wiring checks: {err}"
         )),
     }
@@ -421,13 +428,28 @@ async fn verify_v33_core_wiring(
     }
     let chain_registration_sender_ownership =
         Ownable2Step::new(expected_chain_registration_sender, provider.clone());
+    // Governance must end up owning the sender, but it can get there two ways: a transfer is
+    // still pending (`pendingOwner == governance`, the state right after a fresh deploy), or it
+    // was already accepted (`owner == governance`, `pendingOwner == 0`). Asserting only the
+    // former fails on an ecosystem that has already completed the handover — testnet has.
     match chain_registration_sender_ownership.pendingOwner().call().await {
-        Ok(actual) => expect_address_eq(
+        Ok(actual) if actual == bridgehub_owner => expect_address_eq(
             result,
             "ChainRegistrationSender.pendingOwner()",
             actual,
             bridgehub_owner,
         ),
+        Ok(_) => match chain_registration_sender_ownership.owner().call().await {
+            Ok(owner) => expect_address_eq(
+                result,
+                "ChainRegistrationSender.owner() (transfer already accepted)",
+                owner,
+                bridgehub_owner,
+            ),
+            Err(err) => result.report_error(&format!(
+                "Failed to call ChainRegistrationSender.owner() for pre-upgrade ownership checks: {err}"
+            )),
+        },
         Err(err) => result.report_error(&format!(
             "Failed to call ChainRegistrationSender.pendingOwner() for pre-upgrade ownership checks: {err}"
         )),
@@ -558,8 +580,11 @@ async fn verify_v33_era_fee_params(verifiers: &Verifiers, result: &mut Verificat
     {
         Ok(addr) if addr != Address::ZERO => addr,
         Ok(_) => {
-            result.report_error(&format!(
-                "Cannot verify Era fee params: Bridgehub.getZKChain({era_chain_id}) returned address(0)"
+            // An ecosystem whose `ERA_CHAIN_ID` names no registered chain has no Era diamond to
+            // read fee params from. Absence, not a mismatch — see `FeeParamVerifier::safe_init`.
+            result.print_info(&format!(
+                "Era fee params: skipped — Bridgehub.getZKChain({era_chain_id}) returned \
+                 address(0), so this ecosystem has no Era diamond"
             ));
             return;
         }

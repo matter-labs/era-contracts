@@ -497,8 +497,17 @@ pub(crate) async fn verify_v33_provenance(
         .unwrap_or_else(|err| {
             panic!("Failed to call Bridgehub.getZKChain({era_chain_id}) for provenance: {err}")
         });
+    // Zero is a legitimate value here, not a failure. `DefaultCoreUpgrade` sets
+    // `config.eraDiamondProxyAddress = bridgehub.getZKChain(assetRouter.ERA_CHAIN_ID())` and
+    // embeds whatever comes back into the L1AssetRouter / L1Nullifier constructors. On an
+    // ecosystem whose `ERA_CHAIN_ID` names no registered chain that is address(0) — testnet's
+    // deployed L1AssetRouter carries exactly that — so provenance must compare against zero
+    // rather than refuse to run.
     if era_diamond_proxy == Address::ZERO {
-        panic!("Bridgehub.getZKChain({era_chain_id}) returned address(0) for provenance");
+        result.print_info(&format!(
+            "Bridgehub.getZKChain({era_chain_id}) is address(0); verifying constructor args \
+             against a zero Era diamond"
+        ));
     }
 
     let governance = bridgehub
@@ -542,8 +551,11 @@ pub(crate) async fn verify_v33_provenance(
     verify_v33_new_gateway_ctm_provenance(artifact, verifiers, era_chain_id, l1_chain_id, result)
         .await?;
 
+    // Whether a new zk-governance set was deployed is a property of the *release*, not of the
+    // env's governance shape. v33 ships none, so its artifact carries no `[zk_governance]` table
+    // and there is nothing to trace provenance for — even though the handler is proxy-admin'd.
     let governance_admin = verifiers.network_verifier.get_proxy_admin(governance).await;
-    if governance_admin != Address::ZERO {
+    if governance_admin != Address::ZERO && artifact.zk_governance.is_some() {
         verify_zk_governance_provenance(artifact, verifiers, result).await?;
     }
 
@@ -1340,6 +1352,15 @@ async fn verify_v33_new_gateway_ctm_provenance(
     use ctm_signatures::*;
     use gateway_signatures::*;
 
+    // A release that brings up no Gateway (v33) records no `[new_gateway]` block, and the env
+    // declares none either — nothing was deployed, so there is no provenance to trace.
+    if artifact.new_gateway.is_none() && verifiers.new_gateway_chain_id.is_none() {
+        result.print_info(
+            "New Gateway CTM provenance: skipped — release and env both declare no Gateway",
+        );
+        return Ok(());
+    }
+
     result.print_info("-- New Gateway CTM deployment provenance --");
 
     let Some(new_gateway) = artifact.new_gateway.as_ref() else {
@@ -1704,13 +1725,13 @@ fn source_ctm_for_new_gateway<'a>(
             &scope,
             &["state_transition", "chain_type_manager_proxy"],
         )?;
-        if ctm_proxy == verifiers.new_gateway_representative_ctm {
+        if Some(ctm_proxy) == verifiers.new_gateway_representative_ctm {
             return Ok(ctm);
         }
     }
 
     anyhow::bail!(
-        "new Gateway representative CTM {} is not present in any [ctms.*].state_transition.chain_type_manager_proxy",
+        "new Gateway representative CTM {:?} is not present in any [ctms.*].state_transition.chain_type_manager_proxy",
         verifiers.new_gateway_representative_ctm
     )
 }

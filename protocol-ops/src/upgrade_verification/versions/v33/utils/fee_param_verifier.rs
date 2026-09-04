@@ -58,6 +58,24 @@ impl FeeParamVerifier {
         contracts_commit: Option<&str>,
     ) -> anyhow::Result<Self> {
         let config_based = Self::init_v33_from_source(contracts_commit).await?;
+
+        // The cross-check reads the Era diamond's fee-param storage word. An ecosystem whose
+        // `ERA_CHAIN_ID` names no registered chain has no such diamond — `getHyperchain` returns
+        // zero and the read yields an all-zero word, which is absence, not a mismatch. Testnet is
+        // exactly that: its L1AssetRouter reports 270 while only chain 301 is registered. Skip the
+        // comparison there rather than reporting a difference against nothing.
+        let era_diamond =
+            Bridgehub::new(*bridgehub_addr, network_verifier.get_l1_provider().clone())
+                .getHyperchain(U256::from(network_verifier.era_chain_id))
+                .call()
+                .await
+                .map_err(|e| anyhow::anyhow!("failed to fetch Era diamond from Bridgehub: {e}"))?;
+        if era_diamond == Address::ZERO {
+            return Ok(Self {
+                fee_params: config_based,
+            });
+        }
+
         let era = Self::init_from_on_chain(bridgehub_addr, network_verifier).await?;
 
         if config_based != era {

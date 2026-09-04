@@ -45,9 +45,11 @@ pub(crate) struct Verifiers {
     pub era_chain_id: u64,
     pub legacy_gateway_chain_id: u64,
     pub legacy_gateway_chain_intervals: Vec<ChainInterval>,
-    pub new_gateway_chain_id: u64,
-    pub new_gateway_representative_chain_id: u64,
-    pub new_gateway_representative_ctm: Address,
+    /// `None` on a release that brings up no Gateway (v33). Every Gateway-specific check —
+    /// the stage-2 bring-up block and the GW CTM deployment provenance — is skipped then.
+    pub new_gateway_chain_id: Option<u64>,
+    pub new_gateway_representative_chain_id: Option<u64>,
+    pub new_gateway_representative_ctm: Option<Address>,
     pub expected_l1_chain_id: u64,
     pub zk_token_asset_id: FixedBytes<32>,
     /// CREATE2 salt used by the new-gateway CTM deployer contracts.
@@ -84,8 +86,8 @@ impl Verifiers {
         era_chain_id: u64,
         legacy_gateway_chain_id: u64,
         legacy_gateway_chain_intervals: &[ChainInterval],
-        new_gateway_chain_id: u64,
-        new_gateway_representative_chain_id: u64,
+        new_gateway_chain_id: Option<u64>,
+        new_gateway_representative_chain_id: Option<u64>,
         expected_l1_chain_id: u64,
         zk_token_asset_id: FixedBytes<32>,
     ) -> anyhow::Result<Self> {
@@ -112,32 +114,40 @@ impl Verifiers {
             BytecodeVerifier::init_v33(contracts_commit, zk_governance_commit).await?;
         let network_verifier =
             NetworkVerifier::new_v33(l1_rpc.into(), gw_rpc.into(), era_chain_id).await?;
-        anyhow::ensure!(
-            network_verifier.get_gateway_chain_id() == new_gateway_chain_id,
-            "gateway RPC chain id {} does not match env [new_gateway].chain_id {}",
-            network_verifier.get_gateway_chain_id(),
-            new_gateway_chain_id,
-        );
+        if let Some(expected_gw_chain_id) = new_gateway_chain_id {
+            anyhow::ensure!(
+                network_verifier.get_gateway_chain_id() == expected_gw_chain_id,
+                "gateway RPC chain id {} does not match env [new_gateway].chain_id {}",
+                network_verifier.get_gateway_chain_id(),
+                expected_gw_chain_id,
+            );
+        }
         let fee_param_verifier =
             FeeParamVerifier::safe_init(&bridgehub_address, &network_verifier, contracts_commit)
                 .await?;
-        let new_gateway_representative_ctm = network_verifier
-            .try_get_chain_type_manager_from_bridgehub(
-                bridgehub_address,
-                U256::from(new_gateway_representative_chain_id),
-            )
-            .await
-            .map_err(|e| {
-                anyhow::anyhow!(
-                    "failed to fetch Bridgehub.chainTypeManager({new_gateway_representative_chain_id}) \
-                     for [new_gateway].ctm_representative_chain_id: {e}"
-                )
-            })?;
-        anyhow::ensure!(
-            new_gateway_representative_ctm != Address::ZERO,
-            "Bridgehub.chainTypeManager({new_gateway_representative_chain_id}) returned zero; \
-             [new_gateway].ctm_representative_chain_id must point to the CTM hosted by the new Gateway",
-        );
+        let new_gateway_representative_ctm = match new_gateway_representative_chain_id {
+            Some(chain_id) => {
+                let ctm = network_verifier
+                    .try_get_chain_type_manager_from_bridgehub(
+                        bridgehub_address,
+                        U256::from(chain_id),
+                    )
+                    .await
+                    .map_err(|e| {
+                        anyhow::anyhow!(
+                            "failed to fetch Bridgehub.chainTypeManager({chain_id}) \
+                             for [new_gateway].ctm_representative_chain_id: {e}"
+                        )
+                    })?;
+                anyhow::ensure!(
+                    ctm != Address::ZERO,
+                    "Bridgehub.chainTypeManager({chain_id}) returned zero; \
+                     [new_gateway].ctm_representative_chain_id must point to the CTM hosted by the new Gateway",
+                );
+                Some(ctm)
+            }
+            None => None,
+        };
 
         // Look up the per-CTM CREATE2 salt for the new gateway's source CTM.
         // Keyed by L1 CTM proxy address in [create2_factory_salts] of the
@@ -147,9 +157,8 @@ impl Verifiers {
             let per_ctm = EnvConfig::load(env.as_str())
                 .and_then(|cfg| cfg.create2_factory_salt_for_upgrade_per_ctm())
                 .unwrap_or_default();
-            per_ctm
-                .get(&new_gateway_representative_ctm)
-                .copied()
+            new_gateway_representative_ctm
+                .and_then(|ctm| per_ctm.get(&ctm).copied())
                 .unwrap_or_default()
         };
 
