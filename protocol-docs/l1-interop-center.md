@@ -19,7 +19,7 @@ The returned send ID is the canonical Mailbox priority-transaction hash.
   all bundles would lose the interface parity requested in PR #2271.
 - **Change: minimize L2 sharing.** Put the contracts in `interop/interop-center/`
   and rename the current built-in to `L2InteropCenter`. Keep its implementation
-  and inheritance unchanged. A common interface describes both layers; the L1
+  and storage-bearing inheritance unchanged. A common interface describes both layers; the L1
   base owns its pause and reentrancy wrappers. Moving L2 into the old PR's base
   risks changing storage, preview behavior and code size. L2 keeps its existing
   parser built-in and rejects the new L1-only attributes.
@@ -37,8 +37,8 @@ The returned send ID is the canonical Mailbox priority-transaction hash.
 - **Keep: Bridgehub registry authorization.** Append `interopCenter` without
   moving existing storage. Mailbox and L1 senders resolve the authorized caller
   from this registry. Per-chain diamond storage would save a registry lookup
-  but require another migration and introduce duplicated configuration. Measure
-  the lookup and whole-request costs before release.
+  but require another migration and introduce duplicated configuration.
+  Measurements are recorded in `HANDOFF.md`.
 - **Keep: interop vocabulary.** Use `initiateIndirectCall`,
   `confirmL2Transaction`, `IndirectCallRequest`, `INDIRECT_CALL_MAGIC_VALUE` and
   `MIN_CROSS_CHAIN_SENDER_ADDRESS`. Preserve the internal nullifier confirmation
@@ -48,7 +48,9 @@ The returned send ID is the canonical Mailbox priority-transaction hash.
   asset-router recipient only identifies a migration when an actual
   `indirectCall` attribute is present. Apply this to `sendMessage` and one-call
   `sendBundle`; checking only `sendMessage`, as the old PR did, would leave the
-  equivalent bundle entry point outside migration-admin protection.
+  equivalent bundle entry point outside migration-admin protection. The expected
+  asset handler is the registered `chainAssetHandler`, not Bridgehub; the current
+  chain-migration payload is handled there.
 - **Keep: exact funding and caller identity.** ETH base-token direct sends use
   exactly `mintValue`; indirect sends use `mintValue + indirectCallMessageValue`.
   Other base tokens require zero ETH for direct sends and exactly the indirect
@@ -97,3 +99,34 @@ confirmation access check; **keep** historical ABI decoders for past upgrades;
 **change** the old L2 refactor to a rename that preserves current atomic and
 preview logic. Runtime size, storage-layout comparisons, gas measurements and
 validation outcomes belong in `HANDOFF.md` once measured.
+
+## Deployment and migration
+
+Fresh ecosystems deploy a transparent upgradeable proxy, initialize it with the deployer,
+transfer ownership to governance and register it with `Bridgehub.setInteropCenter`.
+Deployment and upgrade TOML uses
+`bridgehub.l1_interop_center_{implementation,proxy}_addr`.
+
+The shared core upgrade flow (also exposed as `CoreUpgrade_v34`) deploys the proxy when
+absent. Stage 1 upgrades Bridgehub, then accepts the center's ownership and sets the registry
+before stage 2 can submit priority requests. The CTM upgrade regenerates the Mailbox facet.
+For an ecosystem already using this surface, set `has_l1_interop_center = true` in the upgrade
+input: discovery then reads the existing proxy and stage 1 upgrades its implementation.
+The default is false for historical source chains whose Bridgehub has no getter; discovery
+does not probe a missing method or suppress its revert.
+
+No prior request selectors are forwarded. Integrators discover `interopCenter()` and migrate
+to the attributes above. The original `BridgehubDepositFinalized` event remains the gateway
+migration confirmation signal. The nullifier confirmation ABI and recovery data are unchanged.
+Historical Rust decoders and hash-manifest labels remain supported; artifacts that contain
+the center select the current message and governance-call layout.
+
+`factoryDeps` is rejected on indirect sends even when its array is empty. Duplicate,
+unknown and misplaced attributes revert. L2-only attributes remain unsupported on L1;
+L1-only attributes remain unsupported by the L2 parser.
+
+The handshake marker retains its original value:
+`bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1)`.
+Only its Solidity identifier changes to `INDIRECT_CALL_MAGIC_VALUE`.
+The upgrade output also records `bridgehub.l1_interop_center_new_proxy` so verification
+can distinguish new CREATE2 provenance from an existing proxy's unchanged constructor.

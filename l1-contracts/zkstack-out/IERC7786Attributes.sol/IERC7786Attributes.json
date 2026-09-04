@@ -59,6 +59,19 @@
   },
   {
     "type": "function",
+    "name": "factoryDeps",
+    "inputs": [
+      {
+        "name": "_factoryDeps",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
     "name": "indirectCall",
     "inputs": [
       {
@@ -91,6 +104,34 @@
         "name": "_interopCallValue",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "l1ToL2TransactionParams",
+    "inputs": [
+      {
+        "name": "_mintValue",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2GasLimit",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2GasPerPubdataByteLimit",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_refundRecipient",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],

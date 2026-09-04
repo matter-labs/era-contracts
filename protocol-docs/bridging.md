@@ -39,7 +39,7 @@ Registration flows:
 
 - `setAssetHandlerAddressThisChain` — sets the handler locally. The caller is encoded into the asset ID, so
   only the NTV or the asset's registered deployment tracker may call it.
-- `L1AssetRouter.bridgehubDeposit` with encoding version `0x02`
+- `L1AssetRouter.initiateIndirectCall` with encoding version `0x02`
   (`SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION`) — sets the handler for an asset on a remote ZK chain via
   an L1 -> L2 transaction; the deployment tracker's `bridgeCheckCounterpartAddress` validates the counterpart
   address (the L1 NTV only accepts `L2_NATIVE_TOKEN_VAULT_ADDR`). The L2 side (`L2AssetRouter.setAssetHandlerAddress`)
@@ -57,16 +57,19 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
 
 ### Deposit initiation (source side)
 
-- `bridgehubDeposit` (L1, called only by the Bridgehub via `requestL2TransactionTwoBridges`) or
-  `initiateIndirectCall` (L2, called only by the `InteropCenter`) decode the user data. Only encoding
+Users submit direct and indirect L1 sends through `L1InteropCenter.sendMessage` or a one-call
+`sendBundle`. The priority queue, canonical transaction hash and failed-deposit recovery remain in use;
+see [L1 Interop Center](l1-interop-center.md) for attributes, funding and authorization.
+
+- `initiateIndirectCall` (called by `L1InteropCenter` on L1 or `L2InteropCenter` on L2) decode the user data. Only encoding
   version `0x01` (`NEW_ENCODING_VERSION`) is supported for asset transfers; depositing the destination
   chain's base token through this path is rejected (`AssetIdNotSupported`).
 - The router calls `bridgeBurn` on the handler and builds the destination calldata:
   `finalizeDeposit(block.chainid, assetId, bridgeMintData)`.
 - On L1 the deposit is identified by `txDataHash = keccak256(0x01 || abi.encode(originalCaller, assetId, transferData))`
   (`DataEncoding.encodeTxDataHash`); the `0x01` prefix is collision-resistant with the removed legacy
-  format, whose first encoded word was an address with zero upper bytes. The Bridgehub confirms the L1 -> L2
-  transaction hash via `bridgehubConfirmL2Transaction`, which the router forwards to
+  format, whose first encoded word was an address with zero upper bytes. The L1 Interop Center confirms the canonical L1 -> L2
+  transaction hash via `confirmL2Transaction`, which the router forwards to
   `L1Nullifier.bridgehubConfirmL2TransactionForwarded`; the nullifier records
   `depositHappened[chainId][l2TxHash] = txDataHash` (rejecting duplicates).
 - For L2 -> L2 the `InteropCallStarter` targets the L2 asset router (same address on every ZK chain); for an
@@ -74,8 +77,8 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
   calldata is identical. The bridged amount travels inside that calldata, not as call value: the returned
   starter merely echoes the requested `interopCallValue` (always zero for an indirect call) so the
   InteropCenter's `IndirectCallValueMismatch` check passes.
-- `bridgehubDepositBaseToken` lets the Bridgehub (L1; or the Era diamond proxy for `ERA_CHAIN_ID`) /
-  `InteropCenter` (L2) acquire the destination chain's `mintValue`: it burns the base token through the
+- `bridgehubDepositBaseToken` lets the registered `L1InteropCenter` (L1) /
+  `L2InteropCenter` (L2) acquire the destination chain's `mintValue`: it burns the base token through the
   handler but records nothing, because a failed transaction refunds the base token to the L2
   `refundRecipient` rather than being claimable on L1.
 
@@ -97,9 +100,9 @@ with any gas refund). Resolution is split between two helpers in `AddressAliasHe
   address themselves).
 
 The legacy `Mailbox.requestL2Transaction` path composes both helpers in one place, so the
-`aliasingFinalized` flag fully protects it from double aliasing. On the Bridgehub / L1AssetRouter paths
+`aliasingFinalized` flag fully protects it from double aliasing. On the L1InteropCenter / L1AssetRouter paths
 the default is resolved early (the Mailbox never sees the original caller) and the flag is deliberately
-dropped — carrying it would require extending `BridgehubL2TransactionRequest` and the Bridgehub <-> chain
+dropped — carrying it would require extending `BridgehubL2TransactionRequest` and the center <-> chain
 interface. The theoretical double-alias caveat — a contract deployed at exactly the alias of a
 constructor caller would be aliased a second time by the Mailbox — therefore applies to those paths
 only. Triggering it requires any contract to exist at exactly the alias of the constructor caller (a

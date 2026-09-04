@@ -1,5 +1,12 @@
 # Manual review procedure for v31 calldata
 
+This guide's Bridgehub request examples describe historical artifacts. Artifacts with
+`core.upgrade_addresses.bridgehub.l1_interop_center_proxy_addr` use the
+[L1 Interop Center](../../../protocol-docs/l1-interop-center.md): priority calls target that
+proxy with ERC-7786 `sendMessage`, and stage 1 includes its ownership or implementation
+update followed by `Bridgehub.setInteropCenter`. Protocol-ops selects the corresponding
+layout while retaining the historical decoders below.
+
 ## Relevant files
 
 - `protocol-ops/src/commands/ecosystem/verify_upgrade.rs` - PUVT entry point.
