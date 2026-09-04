@@ -6,16 +6,22 @@
 //! The PUH-redeploy block is only emitted on **PUH-governed envs**
 //! (`governance_kind = "puh"` in permanent-values — stage / mainnet today).
 //! `upgrade-prepare-all` appends it via `puh_guardians::deploy_puh_guardians`
-//! when `bridgehub.owner()` is a ProtocolUpgradeHandler proxy. It is four
-//! calls, in this order:
-//!   1. `upgradeAndCall(puh_proxy_admin, new_impl, "")` — swaps the PUH impl,
-//!   2. `updateSecurityCouncil(new_security_council)`,
-//!   3. `updateGuardians(new_guardians)`,
-//!   4. `updateEmergencyUpgradeBoard(new_emergency_upgrade_board)`.
+//! when `bridgehub.owner()` is a ProtocolUpgradeHandler proxy. It is a single
+//! call:
+//!   `upgradeAndCall(puh_proxy_admin, new_impl, initialize(new_security_council,
+//!   new_guardians, new_emergency_upgrade_board))`
 //!
-//! The three `onlySelf` setters repoint the proxy at the freshly deployed
-//! SecurityCouncil, Guardians and EmergencyUpgradeBoard (the board already
-//! embeds the new SC + Guardians as immutables, so the set stays consistent).
+//! The hook runs the new implementation's `reinitializer` initializer in the
+//! same transaction as the implementation swap, pointing the proxy at the
+//! freshly deployed SecurityCouncil, Guardians and EmergencyUpgradeBoard (the
+//! board already embeds the new SC + Guardians as immutables, so the set stays
+//! consistent).
+//!
+//! This used to be four calls — a bare impl swap with an empty hook, then three
+//! `onlySelf` setters. That left the proxy on `_initialized == 1` between the
+//! swap and the setters, in which window any caller could invoke `initialize`
+//! and install their own governance set. Both the generator and this verifier
+//! now require the initializer to ride along with the swap.
 //!
 //! [`verify_puh_immutables`] reads every immutable getter on the *new* PUH
 //! implementation and compares against either the current PUH (for "must-be-
@@ -40,9 +46,8 @@ use super::helpers::{
     verify_call_by_name,
 };
 use super::{
-    acceptOwnershipCall, updateEmergencyUpgradeBoardCall, updateGuardiansCall,
-    updateSecurityCouncilCall, upgradeAndCallCall, CallList, GovernanceStage0Calls, Ownable2Step,
-    ProtocolUpgradeHandler,
+    acceptOwnershipCall, initializeCall, upgradeAndCallCall, CallList, GovernanceStage0Calls,
+    Ownable2Step, ProtocolUpgradeHandler,
 };
 
 impl GovernanceStage0Calls {
@@ -126,10 +131,15 @@ impl GovernanceStage0Calls {
             result,
         )
         .await?;
-        // PUH-redeploy block is 4 calls: upgradeAndCall + the three update*
-        // setters (SecurityCouncil, Guardians, EmergencyUpgradeBoard).
+        // PUH-redeploy block is ONE call: the ProxyAdmin `upgradeAndCall` that
+        // swaps the PUH implementation and, in the same transaction, runs the
+        // new implementation's `initialize(securityCouncil, guardians,
+        // emergencyUpgradeBoard)` as its hook. It used to be four — a bare impl
+        // swap followed by three `onlySelf` setters — which left the proxy on
+        // `_initialized == 1` between the swap and the setters, so any caller
+        // could have front-run `initialize` and taken the whole governance set.
         let pre_gov_accept_tail_start = if puh_governed {
-            base_count + 4
+            base_count + 1
         } else {
             base_count
         };
@@ -139,19 +149,11 @@ impl GovernanceStage0Calls {
             let expected_zk_governance = artifact.zk_governance.as_ref().context(
                 "PUH-governed v31 artifact is missing required top-level [zk_governance] table",
             )?;
-            // zk-governance redeploy block — PUH-governed envs only.
-            // Call `base_count`     — PUH ProxyAdmin.upgradeAndCall(PUH proxy, new impl, "").
-            // Call `base_count + 1` — PUH.updateSecurityCouncil(new security council).
-            // Call `base_count + 2` — PUH.updateGuardians(new guardians).
-            // Call `base_count + 3` — PUH.updateEmergencyUpgradeBoard(new board).
             let upgrade_idx = base_count;
-            let update_security_council_idx = base_count + 1;
-            let update_guardians_idx = base_count + 2;
-            let update_emergency_board_idx = base_count + 3;
             // OZ v5 `TransparentUpgradeableProxyAdmin.upgradeAndCall` is the
             // selector used by `puh_guardians::encode_proxy_admin_upgrade` —
             // the v4 `upgrade(address,address)` selector reverts on the v5
-            // admin. Data arg is empty (no follow-on call).
+            // admin.
             errors += verify_call_by_address(
                 &self.calls,
                 upgrade_idx,
@@ -176,12 +178,6 @@ impl GovernanceStage0Calls {
                                 decoded.implementation, expected_zk_governance.new_puh_impl
                             ));
                             errors += 1;
-                        } else if !decoded.data.is_empty() {
-                            result.report_error(&format!(
-                                "PUH upgradeAndCall #{upgrade_idx} data arg should be empty for a bare impl swap, got {} bytes",
-                                decoded.data.len()
-                            ));
-                            errors += 1;
                         } else {
                             result.report_ok(&format!(
                                 "PUH upgradeAndCall(proxy=bridgehub.owner()) → new impl {}",
@@ -202,144 +198,25 @@ impl GovernanceStage0Calls {
                                 result,
                             )
                             .await?;
+                            // The hook must be the PUH's own `reinitializer`
+                            // initializer, carrying the freshly deployed
+                            // governance set. An empty hook is the pre-fix
+                            // shape and is no longer accepted.
+                            errors += verify_puh_initialize_hook(
+                                upgrade_idx,
+                                &decoded.data,
+                                expected_zk_governance.new_security_council,
+                                expected_zk_governance.new_guardians,
+                                expected_zk_governance.new_emergency_upgrade_board,
+                                verifiers,
+                                result,
+                            )
+                            .await;
                         }
                     }
                     Err(err) => {
                         result.report_error(&format!(
                             "Failed to decode upgradeAndCall(...) at call #{upgrade_idx}: {err}"
-                        ));
-                        errors += 1;
-                    }
-                }
-            }
-            errors += verify_call_by_address(
-                &self.calls,
-                update_security_council_idx,
-                bridgehub_owner,
-                "puh_proxy",
-                "updateSecurityCouncil(address)",
-                verifiers,
-                result,
-            );
-            if let Some(call) = self.calls.elems.get(update_security_council_idx) {
-                match updateSecurityCouncilCall::abi_decode(&call.data) {
-                    Ok(decoded) => {
-                        result.report_ok(&format!(
-                            "PUH updateSecurityCouncil(new={})",
-                            decoded._newSecurityCouncil
-                        ));
-                        if decoded._newSecurityCouncil
-                            == expected_zk_governance.new_security_council
-                        {
-                            result.report_ok(
-                                "PUH updateSecurityCouncil target matches [zk_governance].new_security_council",
-                            );
-                        } else {
-                            result.report_error(&format!(
-                                "PUH updateSecurityCouncil #{update_security_council_idx} argument {} does not match [zk_governance].new_security_council {}",
-                                decoded._newSecurityCouncil, expected_zk_governance.new_security_council
-                            ));
-                            errors += 1;
-                        }
-                        errors += verify_address_has_code(
-                            &decoded._newSecurityCouncil,
-                            "PUH new SecurityCouncil",
-                            verifiers,
-                            result,
-                        )
-                        .await;
-                    }
-                    Err(err) => {
-                        result.report_error(&format!(
-                            "Failed to decode updateSecurityCouncil(...) at call #{update_security_council_idx}: {err}"
-                        ));
-                        errors += 1;
-                    }
-                }
-            }
-            errors += verify_call_by_address(
-                &self.calls,
-                update_guardians_idx,
-                bridgehub_owner,
-                "puh_proxy",
-                "updateGuardians(address)",
-                verifiers,
-                result,
-            );
-            if let Some(call) = self.calls.elems.get(update_guardians_idx) {
-                match updateGuardiansCall::abi_decode(&call.data) {
-                    Ok(decoded) => {
-                        result.report_ok(&format!(
-                            "PUH updateGuardians(new={})",
-                            decoded._newGuardians
-                        ));
-                        if decoded._newGuardians == expected_zk_governance.new_guardians {
-                            result.report_ok(
-                                "PUH updateGuardians target matches [zk_governance].new_guardians",
-                            );
-                        } else {
-                            result.report_error(&format!(
-                                "PUH updateGuardians #{update_guardians_idx} argument {} does not match [zk_governance].new_guardians {}",
-                                decoded._newGuardians, expected_zk_governance.new_guardians
-                            ));
-                            errors += 1;
-                        }
-                        errors += verify_address_has_code(
-                            &decoded._newGuardians,
-                            "PUH new Guardians",
-                            verifiers,
-                            result,
-                        )
-                        .await;
-                    }
-                    Err(err) => {
-                        result.report_error(&format!(
-                            "Failed to decode updateGuardians(...) at call #{update_guardians_idx}: {err}"
-                        ));
-                        errors += 1;
-                    }
-                }
-            }
-            errors += verify_call_by_address(
-                &self.calls,
-                update_emergency_board_idx,
-                bridgehub_owner,
-                "puh_proxy",
-                "updateEmergencyUpgradeBoard(address)",
-                verifiers,
-                result,
-            );
-            if let Some(call) = self.calls.elems.get(update_emergency_board_idx) {
-                match updateEmergencyUpgradeBoardCall::abi_decode(&call.data) {
-                    Ok(decoded) => {
-                        result.report_ok(&format!(
-                            "PUH updateEmergencyUpgradeBoard(new={})",
-                            decoded._newEmergencyUpgradeBoard
-                        ));
-                        if decoded._newEmergencyUpgradeBoard
-                            == expected_zk_governance.new_emergency_upgrade_board
-                        {
-                            result.report_ok(
-                                "PUH updateEmergencyUpgradeBoard target matches [zk_governance].new_emergency_upgrade_board",
-                            );
-                        } else {
-                            result.report_error(&format!(
-                                "PUH updateEmergencyUpgradeBoard #{update_emergency_board_idx} argument {} does not match [zk_governance].new_emergency_upgrade_board {}",
-                                decoded._newEmergencyUpgradeBoard, expected_zk_governance.new_emergency_upgrade_board
-                            ));
-                            errors += 1;
-                        }
-                        errors += verify_address_has_code(
-                            &decoded._newEmergencyUpgradeBoard,
-                            "PUH new EmergencyUpgradeBoard",
-                            verifiers,
-                            result,
-                        )
-                        .await;
-                    }
-                    Err(err) => {
-                        result.report_error(&format!(
-                            "Failed to decode updateEmergencyUpgradeBoard(...) at call #{update_emergency_board_idx}: {err}"
                         ));
                         errors += 1;
                     }
@@ -487,6 +364,83 @@ async fn collect_pre_governance_accept_ownership_targets(
     }
 
     Ok(targets)
+}
+
+/// Pure half of [`verify_puh_initialize_hook`]: decode the stage-0
+/// `upgradeAndCall` hook into the governance set it installs, or say why it is
+/// not a PUH initializer. Split out so the rejection cases are unit-testable
+/// without an RPC-backed `Verifiers`.
+fn parse_puh_initialize_hook(hook: &[u8]) -> Result<(Address, Address, Address), String> {
+    if hook.is_empty() {
+        return Err("empty data arg: the impl swap must run \
+                    initialize(securityCouncil, guardians, emergencyUpgradeBoard) as its hook, \
+                    or the proxy is left initializable by anyone"
+            .to_string());
+    }
+    match initializeCall::abi_decode(hook) {
+        Ok(decoded) => Ok((
+            decoded._securityCouncil,
+            decoded._guardians,
+            decoded._emergencyUpgradeBoard,
+        )),
+        Err(err) => Err(format!(
+            "data arg is not initialize(address,address,address): {err} (got 0x{})",
+            hex::encode(hook)
+        )),
+    }
+}
+
+/// Decode the `upgradeAndCall` hook and require it to be the PUH's
+/// `initialize(securityCouncil, guardians, emergencyUpgradeBoard)` carrying the
+/// three freshly deployed governance contracts. Returns the error count.
+///
+/// `initializeCall::abi_decode` enforces the selector, which must stay equal to
+/// `PUH_INITIALIZE_SELECTOR` in `commands::ecosystem::zk_governance` — the
+/// generator side of the same call (see the test below).
+async fn verify_puh_initialize_hook(
+    upgrade_idx: usize,
+    hook: &[u8],
+    expected_security_council: Address,
+    expected_guardians: Address,
+    expected_emergency_upgrade_board: Address,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> usize {
+    let (security_council, guardians, emergency_upgrade_board) =
+        match parse_puh_initialize_hook(hook) {
+            Ok(parsed) => parsed,
+            Err(why) => {
+                result.report_error(&format!("PUH upgradeAndCall #{upgrade_idx}: {why}"));
+                return 1;
+            }
+        };
+    let mut errors = 0;
+    for (name, got, want) in [
+        (
+            "security council",
+            security_council,
+            expected_security_council,
+        ),
+        ("guardians", guardians, expected_guardians),
+        (
+            "emergency upgrade board",
+            emergency_upgrade_board,
+            expected_emergency_upgrade_board,
+        ),
+    ] {
+        if got == want {
+            result.report_ok(&format!("PUH initialize hook {name} = {got}"));
+            errors +=
+                verify_address_has_code(&got, &format!("PUH new {name}"), verifiers, result).await;
+        } else {
+            result.report_error(&format!(
+                "PUH initialize hook at #{upgrade_idx}: {name} {got} does not match \
+                 [zk_governance] {want}"
+            ));
+            errors += 1;
+        }
+    }
+    errors
 }
 
 fn verify_pre_governance_accept_ownership_tail(
@@ -754,5 +708,57 @@ fn compare_puh_expected_address(
         result.report_error(&format!(
             "{label} mismatch: expected {expected}, got {actual}"
         ));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::commands::ecosystem::zk_governance::PUH_INITIALIZE_SELECTOR;
+    use alloy::sol_types::SolCall;
+
+    /// The generator encodes the stage-0 `upgradeAndCall` hook by hand from a
+    /// literal selector; this verifier decodes it through `initializeCall`. If
+    /// the two ever disagree the upgrade would still be generated and would
+    /// still verify, but the hook would be calling something else on the PUH.
+    #[test]
+    fn the_verifier_and_generator_agree_on_the_puh_hook() {
+        assert_eq!(initializeCall::SELECTOR, PUH_INITIALIZE_SELECTOR);
+    }
+
+    #[test]
+    fn a_well_formed_hook_yields_its_governance_set() {
+        let council = Address::repeat_byte(0x33);
+        let guardians = Address::repeat_byte(0x44);
+        let board = Address::repeat_byte(0x55);
+        let hook = initializeCall {
+            _securityCouncil: council,
+            _guardians: guardians,
+            _emergencyUpgradeBoard: board,
+        }
+        .abi_encode();
+        assert_eq!(
+            parse_puh_initialize_hook(&hook),
+            Ok((council, guardians, board))
+        );
+    }
+
+    /// An empty hook is exactly the pre-fix shape: the impl swap lands but the
+    /// proxy stays initializable, so anyone can call `initialize` and install
+    /// their own governance set. It must be rejected, not passed.
+    #[test]
+    fn an_empty_hook_is_rejected() {
+        let err = parse_puh_initialize_hook(&[]).expect_err("empty hook must be rejected");
+        assert!(err.contains("initializable by anyone"), "{err}");
+    }
+
+    #[test]
+    fn some_other_call_as_the_hook_is_rejected() {
+        let err = parse_puh_initialize_hook(&acceptOwnershipCall {}.abi_encode())
+            .expect_err("a non-initializer hook must be rejected");
+        assert!(
+            err.contains("not initialize(address,address,address)"),
+            "{err}"
+        );
     }
 }

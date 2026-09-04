@@ -1,7 +1,6 @@
 # V31 upgrade documentation
 
-
-In the exmaples below I use `--upgrade-timestamp 1` for both Era and Zksync OS. This can be used to start an immediate upgrade.
+In the examples below I use `--upgrade-timestamp 1` for both Era and Zksync OS. This can be used to start an immediate upgrade.
 
 ## Transaction format
 
@@ -16,13 +15,13 @@ cargo run --release -- dev manifest-to-simulator \
 
 ## ZKsync OS
 
-Note, that the server needs the bytecode supplier to be provided manually into the config. 
+Note, that the server needs the bytecode supplier to be provided manually into the config.
 
 ZKsync OS testnet: `0x4332c61541c4aD8ffFB158c51d9C915e8114E845`
 ZKsync OS mainnet TODO.
 
 ```
-cd protocol_ops 
+cd protocol_ops
 
 cargo run --release -- chain set-upgrade-timestamp \
   --env <env> \
@@ -33,6 +32,7 @@ cargo run --release -- chain set-upgrade-timestamp \
   --out ./v31-upgrade/set-upgrade-timestamp \
   --subdir <unique-run-name>-set-ts
 ```
+
 Then, to check whether the server is ready, use this command:
 
 ```
@@ -62,8 +62,10 @@ cargo run --release -- chain upgrade \
 ```
 
 To execute the upgrade there are two options:
-- use transaction simulator execute-eoa script (avaliable in [this branch](https://github.com/matter-labs/transaction-simulator/pull/321) for now, soon to be merged) after converting the txs to the transaction simulator format
+
+- use transaction simulator execute-eoa script (available in [this branch](https://github.com/matter-labs/transaction-simulator/pull/321) for now, soon to be merged) after converting the txs to the transaction simulator format
 - use the following:
+
 ```
 cargo run --release -- ecosystem upgrade-broadcast \
   --manifest <out-dir>/manifest.json \
@@ -106,11 +108,10 @@ cargo run --release -- chain set-zkos-pre-v31-total-supply \
 
 ## Era
 
-Note, that the server needs the bytecode supplier to be provided manually into the config. 
+Note, that the server needs the bytecode supplier to be provided manually into the config.
 
 Era testnet: `0xB9703133d2A84cebdC2B5D21d01939aE483dbdcE`.
 Era mainnet TODO.
-
 
 The set upgrade timestamp is the same:
 
@@ -138,7 +139,6 @@ cargo run --release -- \
   --target-minor-version 31 \
   --target-patch-version 0 \
 ```
-
 
 If the server is ready, you can finalize the upgrade.
 
@@ -171,6 +171,7 @@ cargo run --release -- chain upgrade \
 ```
 
 The addresses of l1-rollup-da-validator are:
+
 - testnet: 0xC18954Bb455de04D31Ac0196aDC33Bc6579D9174
 - mainnet: TODO
 

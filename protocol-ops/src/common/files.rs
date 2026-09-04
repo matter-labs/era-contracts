@@ -44,7 +44,12 @@ pub fn save_toml_file(
         .map_err(|e| anyhow::anyhow!("write {}: {e}", path.as_ref().display()))
 }
 
+/// Pretty-printed JSON with a final newline, so generated files diff cleanly and GitHub
+/// does not flag them.
 pub fn save_json_file(path: impl AsRef<Path>, content: impl Serialize) -> anyhow::Result<()> {
-    fs::write(path.as_ref(), serde_json::to_string_pretty(&content)?)
-        .map_err(|e| anyhow::anyhow!("write {}: {e}", path.as_ref().display()))
+    fs::write(
+        path.as_ref(),
+        serde_json::to_string_pretty(&content)? + "\n",
+    )
+    .map_err(|e| anyhow::anyhow!("write {}: {e}", path.as_ref().display()))
 }

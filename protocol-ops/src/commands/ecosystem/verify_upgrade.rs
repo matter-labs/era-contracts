@@ -31,9 +31,10 @@ pub struct VerifyUpgradeArgs {
     #[clap(long, default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
 
-    /// Gateway RPC URL used by read-only gateway-side checks.
+    /// Gateway RPC URL for the read-only gateway-side checks. Needed only for envs that
+    /// bring up a Gateway (`[new_gateway]`); gateway-less envs run without it.
     #[clap(long, alias = "gw-rpc")]
-    pub gw_rpc_url: String,
+    pub gw_rpc_url: Option<String>,
 
     /// Path to the v31 ecosystem upgrade TOML produced by `upgrade-prepare`.
     #[clap(long)]
@@ -63,6 +64,16 @@ pub struct VerifyUpgradeArgs {
     #[clap(long)]
     pub transactions_log: Option<PathBuf>,
 
+    /// A prior regen's already-broadcast deployment log for the same env, read
+    /// the same way as `--transactions-log` but exempt from the salt check.
+    /// Its deploys carry that regen's salts, and every regen rotates
+    /// `create2_factory_salt`, so gating them would flag the whole file.
+    /// Feeding it in still lets deployment provenance resolve contracts the
+    /// current prepare reuses rather than redeploys. Optional; a missing file
+    /// is treated as empty.
+    #[clap(long)]
+    pub reference_transactions_log: Option<PathBuf>,
+
     /// Print the ABI-encoded `UpgradeProposal { calls, executor: 0x0, salt: 0x0 }`
     /// for each governance stage (0/1/2) so an operator can byte-compare against
     /// the on-chain submitted governance proposal bytes. When set, the rest of
@@ -76,6 +87,9 @@ pub enum VerifyUpgradeEnv {
     Stage,
     Testnet,
     Mainnet,
+    /// ADI: a standalone ZKsync-OS ecosystem on Ethereum mainnet (L1 chainId 1), one
+    /// ZKsync-OS CTM and one chain (36900), owned by a legacy `Governance.sol`.
+    Adi,
 }
 
 impl VerifyUpgradeEnv {
@@ -84,11 +98,15 @@ impl VerifyUpgradeEnv {
             Self::Stage => "stage",
             Self::Testnet => "testnet",
             Self::Mainnet => "mainnet",
+            Self::Adi => "adi",
         }
     }
 
+    /// Whether to expect the real (non-testnet) verifier and governance bytecodes. True for
+    /// every ecosystem that sits on L1 mainnet, which is not the same as being THE canonical
+    /// mainnet ecosystem — ADI is its own ecosystem there, with `testnet_verifier = false`.
     pub fn is_mainnet(self) -> bool {
-        matches!(self, Self::Mainnet)
+        matches!(self, Self::Mainnet | Self::Adi)
     }
 
     pub fn is_stage(self) -> bool {
@@ -188,7 +206,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         transactions_log_path.display()
     ));
     logger::info(format!("L1 RPC URL: {}", args.l1_rpc_url));
-    logger::info(format!("Gateway RPC URL: {}", args.gw_rpc_url));
+    logger::info(format!(
+        "Gateway RPC URL: {}",
+        args.gw_rpc_url.as_deref().unwrap_or("none")
+    ));
     if let Some(contracts_commit) = &args.contracts_commit {
         logger::info(format!("Contracts commit: {contracts_commit}"));
     } else {
@@ -230,13 +251,26 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         transactions_log_path.display()
     ));
 
+    let reference_tx_hashes = match args.reference_transactions_log.as_ref() {
+        Some(path) if path.is_file() => {
+            let hashes = transactions_log::read(path)?;
+            logger::info(format!(
+                "Loaded {} reference transaction hash(es) from {} (salt check not applied)",
+                hashes.len(),
+                path.display()
+            ));
+            hashes
+        }
+        _ => Vec::new(),
+    };
+
     let mut result = VerificationResult::default();
 
     let verification_result = crate::upgrade_verification::versions::v31::verify(
         args.env,
         &artifact,
         &args.l1_rpc_url,
-        &args.gw_rpc_url,
+        args.gw_rpc_url.as_deref(),
         args.contracts_commit.as_deref(),
         args.zk_governance_commit.as_str(),
         era_chain_id,
@@ -248,6 +282,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         new_gateway_settlement_fee,
         l1_chain_id,
         &tx_hashes,
+        &reference_tx_hashes,
         create2_factory,
         &expected_salts,
         zk_token_asset_id,

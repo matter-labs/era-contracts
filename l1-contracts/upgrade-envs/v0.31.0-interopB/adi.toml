@@ -1,0 +1,63 @@
+# v31 (v0.31.0-interopB) upgrade input for the `adi` environment — a standalone
+# ZKsync-OS ecosystem on Ethereum mainnet, single CTM
+# (0x08A1D2962fC29AA46e869A1E7561112cc1026EfA, pv 0x1e00000001), legacy-
+# `Governance.sol`-owned. See `permanent-values/adi.toml` for the on-chain
+# provenance of every value.
+#
+# Minimal on purpose. The prepare introspects the rest from the live ecosystem
+# (old protocol version, validator timelock, security council, max chains,
+# ecosystem owner) and takes the ZKsync-OS chain-creation params from
+# `configs/genesis/zksync-os/latest.json` — NOT from a `[contracts]` block here.
+# So the `old_protocol_version` / `v28_protocol_version` / genesis / VK / diamond
+# and `[V29]` fields that mainnet.toml carries for its Era CTM are not part of this
+# flow and are deliberately absent. In particular the bootloader / default_aa /
+# evm_emulator hashes are NOT pinned here: those are Era-only chain-creation
+# params, and pinning them is what couples an env config to one specific
+# system-contracts build.
+
+# ADI's L1AssetRouter (0xf25227EFAD2046d19777A4CA540b5C016Df7fe7A) reports this.
+# Verified 2026-09-04: ERA_CHAIN_ID() == 270, L1_CHAIN_ID() == 1. It names the core
+# withdrawal contracts' Era id; ADI itself registers only chain 36900.
+#
+# WORTH A SECOND PAIR OF EYES: 270 is not 324. Canonical mainnet and the removed
+# battlechain env both reported 324 here. 270 is the historic local/era-test id, so
+# either ADI's core contracts were deployed with a non-canonical ERA_CHAIN_ID or
+# this ecosystem genuinely has no canonical-Era relationship. The value below is
+# what the contract returns; confirm it is intended before generating calldata.
+era_chain_id = 270
+
+# Mainnet ecosystem → the real ZKsyncOSDualVerifier, not a testnet verifier.
+# REQUIRED: the CTM upgrade reads this with a bare readBool and reverts if absent.
+testnet_verifier = false
+
+# GovernanceUpgradeTimer initial delay (seconds); 2 days, matching canonical
+# mainnet's v31 value.
+#
+# DECISION NEEDED: this ecosystem's own `Governance.minDelay()` is 259200 (3
+# days), longer than this timer. Confirm whether ADI should keep the canonical
+# 2-day timer or match its 3-day governance delay before generating.
+governance_upgrade_timer_initial_delay = 172800
+
+[contracts]
+# Ecosystem owner = the legacy Governance. Passed to the CTM prepare as the target
+# `governance`; also equals CTM.owner() and bridgehub.owner(), so on-chain
+# introspection agrees.
+owner_address = "0x8253F33026c49A430963FE3991441c02175bda95"
+
+# Read by the bundle tooling (`EnvConfig` → `contracts.bridgehub_proxy_address`)
+# and by the topology resolver. Note the placement: under `[contracts]`, as
+# stage/testnet/mainnet do. The removed battlechain config had it top-level, which
+# the old Bash reader tolerated and the current Rust schema does not.
+bridgehub_proxy_address = "0x7a38c18a229Ef8a0AE7104Ba272A46280f2d59Cb"
+
+# Per-regen CREATE2 salt for this upgrade's implementations. Fresh so a re-prepare
+# lands on unoccupied addresses. ROTATE ON EVERY REGEN.
+create2_factory_salt = "0x641ca02de50fd50531c7894e113ff57aebdc57f2f2c0ad649208b2a970146f36"
+# Per-regen salt for the legacy `Governance.sol` ceremony op ids — rotate on every
+# regen so a re-broadcast cannot collide with an already-executed op id.
+legacy_gov_salt = "0xb6268de745245a50c160109116524bec33001cf25f204da33816536eff29b291"
+
+# Per-CTM CREATE2 salt (one ZKsync-OS CTM), keeping that CTM's
+# GovernanceUpgradeTimer at its own address.
+[create2_factory_salts]
+"0x08A1D2962fC29AA46e869A1E7561112cc1026EfA" = "0x2996f0ee44b7f622954675e2d3707f0dbbf9ec1ee922d51363e5438a6b1604ed"

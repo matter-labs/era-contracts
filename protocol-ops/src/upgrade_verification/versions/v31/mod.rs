@@ -89,7 +89,7 @@ pub(crate) async fn verify(
     env: VerifyUpgradeEnv,
     artifact: &EcosystemUpgradeArtifact,
     l1_rpc_url: &str,
-    gw_rpc_url: &str,
+    gw_rpc_url: Option<&str>,
     contracts_commit: Option<&str>,
     zk_governance_commit: &str,
     era_chain_id: u64,
@@ -101,6 +101,10 @@ pub(crate) async fn verify(
     new_gateway_settlement_fee: U256,
     l1_chain_id: u64,
     tx_hashes: &[FixedBytes<32>],
+    // A prior regen's already-broadcast deployment log. Only enriches the
+    // address book — exempt from the salt gate, since its deploys carry that
+    // regen's (now-rotated) salts.
+    reference_tx_hashes: &[FixedBytes<32>],
     create2_factory: Address,
     expected_salts: &[FixedBytes<32>],
     zk_token_asset_id: FixedBytes<32>,
@@ -111,7 +115,7 @@ pub(crate) async fn verify(
         env,
         artifact,
         l1_rpc_url,
-        gw_rpc_url,
+        gw_rpc_url.map(str::to_string),
         contracts_commit,
         zk_governance_commit,
         era_chain_id,
@@ -129,10 +133,10 @@ pub(crate) async fn verify(
         "v31 verifier context loaded with {} named addresses",
         verifiers.address_verifier.name_to_address.len()
     ));
-    result.report_ok(&format!(
-        "Gateway RPC chain ID: {}",
-        verifiers.network_verifier.get_gateway_chain_id()
-    ));
+    match verifiers.network_verifier.get_gateway_chain_id() {
+        Some(chain_id) => result.report_ok(&format!("Gateway RPC chain ID: {chain_id}")),
+        None => result.report_ok("Gateway RPC: none (gateway-less env)"),
+    }
 
     // Populate the create2 maps so deployment provenance can match
     // deployed addresses against expected init bytecode + constructor args.
@@ -147,12 +151,27 @@ pub(crate) async fn verify(
             network_verifier,
             ..
         } = &mut verifiers;
+        // This run's own log first, salt-gated: a prepare that missed its
+        // config salt and fell back to a random one must fail here.
         network_verifier
             .populate_create2_from_transactions_log(
                 tx_hashes,
                 &create2_factory,
                 &bridgehub_address,
                 expected_salts,
+                true,
+                bytecode_verifier,
+                result,
+            )
+            .await;
+        // Then the reference log, ungated (see `reference_tx_hashes`).
+        network_verifier
+            .populate_create2_from_transactions_log(
+                reference_tx_hashes,
+                &create2_factory,
+                &bridgehub_address,
+                expected_salts,
+                false,
                 bytecode_verifier,
                 result,
             )
