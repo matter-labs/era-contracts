@@ -148,7 +148,7 @@ jobs:
         run: |
           bash cleanup.sh
 
-  # Mandatory determinism gate for the current state version's chain state:
+  # Mandatory determinism gate for the current protocol version's chain state:
   # rebuilds the state from scratch and verifies it matches the committed
   # snapshots. If a contract change alters genesis state, this fails —
   # regenerate via the 'Regenerate Anvil Interop Chain States' workflow and push.

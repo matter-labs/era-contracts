@@ -71,14 +71,10 @@ export class DeploymentRunner {
   }
 
   /**
-   * Repository release/state version string naming the chain-states folder (e.g. "v0.34.0"). Read
-   * from the harness's OWN config (`stateVersion`), NOT the shared `configs/genesis/zksync-os/latest.json`:
-   * the shared genesis pins its own protocol semantic version while the anvil harness runs the current
-   * release, and keeping the harness version local decouples the two. This names the release the
-   * snapshot was generated from; the protocol version the deployed contracts report is a separate
-   * concept recorded inside the fixture itself.
+   * Protocol version string used to name the chain-states folder (e.g. "v0.34.0"). It is read from
+   * the harness's own `stateVersion` config so fixture selection remains explicit.
    */
-  getStateVersionString(): string {
+  getProtocolVersionString(): string {
     const cfg = JSON.parse(fs.readFileSync(this.configPath, "utf-8")) as { stateVersion?: string };
     if (!cfg.stateVersion) {
       throw new Error(`stateVersion missing in ${this.configPath}`);
@@ -786,13 +782,13 @@ export class DeploymentRunner {
     return { chains: chainInfo, l1Addresses, ctmAddresses, chainAddresses };
   }
 
-  /** Resolve the chain-states directory for the current state version. */
+  /** Resolve the chain-states directory for the current protocol version. */
   getChainStatesDir(): string {
-    const version = this.getStateVersionString();
+    const version = this.getProtocolVersionString();
     return path.resolve(this.configDir, "..", "chain-states", version);
   }
 
-  /** Check whether pre-generated chain states exist for the current state version. */
+  /** Check whether pre-generated chain states exist for the current protocol version. */
   hasChainStates(): boolean {
     const stateDir = this.getChainStatesDir();
     return fs.existsSync(path.join(stateDir, "addresses.json"));
