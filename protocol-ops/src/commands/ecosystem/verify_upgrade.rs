@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use alloy::primitives::{keccak256, Address, FixedBytes};
+use alloy::primitives::{keccak256, Address, FixedBytes, U256};
 use clap::{Parser, ValueEnum};
 
 use crate::common::env_config::{default_protocol_ops_out_dir, EnvConfig, GovernanceKind};
@@ -105,12 +105,15 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.v31_input_path.display()
         )
     })?;
-    let legacy_gateway_chain_id = env_cfg.legacy_gateway_chain_id().ok_or_else(|| {
-        anyhow::anyhow!(
-            "{} is missing `[legacy_gateway] chain_id`",
-            env_cfg.permanent_values_path.display()
-        )
-    })?;
+    // Legacy Era chain id for the core withdrawal contracts. Defaults to
+    // `era_chain_id` on single-era envs; split-era testnets set it explicitly
+    // (e.g. 270 legacy vs 301 registered) in permanent-values.
+    let legacy_era_chain_id = env_cfg.legacy_era_chain_id().unwrap_or(era_chain_id);
+    // `[legacy_gateway]` is optional: gateway-less envs (e.g. a testnet that
+    // never had a Gateway) omit it. When absent the legacy GW chain id defaults
+    // to 0 — the v31 FixedForceDeployments check then expects eraGatewayChainId
+    // == 0 and stage 2 emits no decommission/blacklist prefix.
+    let legacy_gateway_chain_id = env_cfg.legacy_gateway_chain_id().unwrap_or(0);
     let legacy_gateway_chain_intervals = env_cfg.legacy_gateway_chain_intervals().to_vec();
     let l1_chain_id = env_cfg.l1_chain_id().ok_or_else(|| {
         anyhow::anyhow!(
@@ -130,15 +133,19 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.permanent_values_path.display()
         )
     })?;
-    let new_gateway = env_cfg.new_gateway().ok_or_else(|| {
-        anyhow::anyhow!(
-            "{} is missing required `[new_gateway]` config for v31 verification",
-            env_cfg.permanent_values_path.display()
-        )
-    })?;
-    let new_gateway_chain_id = new_gateway.chain_id;
-    let new_gateway_representative_chain_id = new_gateway.ctm_representative_chain_id;
-    let new_gateway_settlement_fee = new_gateway.settlement_fee;
+    // `[new_gateway]` is optional: gateway-less envs omit it (no GW CTM deploy /
+    // whitelist). When absent we pass sentinels; the v31 verifier gates every
+    // new-Gateway check on the artifact's `[new_gateway]` block, which is
+    // likewise absent, so these values are never read.
+    let (new_gateway_chain_id, new_gateway_representative_chain_id, new_gateway_settlement_fee) =
+        match env_cfg.new_gateway() {
+            Some(ng) => (
+                ng.chain_id,
+                ng.ctm_representative_chain_id,
+                ng.settlement_fee,
+            ),
+            None => (0u64, 0u64, U256::ZERO),
+        };
 
     // Collect every pinned CREATE2 salt declared in the env config — the Core
     // salt from `[contracts] create2_factory_salt` plus the per-CTM salts under
@@ -158,6 +165,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         // so one salt is collision-free.
         expected_salts.push(keccak256(GOV_SALT_SEED));
     }
+    // The ecosystem TransitionaryOwner (aux ownership step) is deployed via
+    // CREATE2 with this fixed seed — see `TRANSITIONARY_OWNER_SALT` in
+    // `AdminFunctions.s.sol`. Declare it so its deployment passes the salt check.
+    expected_salts.push(keccak256(b"v31:transitionary-owner"));
 
     let transactions_log_path = match args.transactions_log.clone() {
         Some(path) => path,
@@ -229,6 +240,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         args.contracts_commit.as_deref(),
         args.zk_governance_commit.as_str(),
         era_chain_id,
+        legacy_era_chain_id,
         legacy_gateway_chain_id,
         &legacy_gateway_chain_intervals,
         new_gateway_chain_id,

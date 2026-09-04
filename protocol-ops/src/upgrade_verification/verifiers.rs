@@ -43,6 +43,10 @@ pub(crate) struct Verifiers {
     pub zksync_os_genesis_config: GenesisConfig,
     pub fee_param_verifier: FeeParamVerifier,
     pub era_chain_id: u64,
+    /// Legacy Era chain id baked into core withdrawal contracts
+    /// (L1AssetRouter/L1Nullifier/MailboxFacet). Equals `era_chain_id` on
+    /// single-era envs; differs on split-era testnets (270 vs 301).
+    pub legacy_era_chain_id: u64,
     pub legacy_gateway_chain_id: u64,
     pub legacy_gateway_chain_intervals: Vec<ChainInterval>,
     pub new_gateway_chain_id: u64,
@@ -83,6 +87,7 @@ impl Verifiers {
         contracts_commit: Option<&str>,
         zk_governance_commit: &str,
         era_chain_id: u64,
+        legacy_era_chain_id: u64,
         legacy_gateway_chain_id: u64,
         legacy_gateway_chain_intervals: &[ChainInterval],
         new_gateway_chain_id: u64,
@@ -114,32 +119,46 @@ impl Verifiers {
             BytecodeVerifier::init_v31(contracts_commit, zk_governance_commit).await?;
         let network_verifier =
             NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into(), era_chain_id).await?;
-        anyhow::ensure!(
-            network_verifier.get_gateway_chain_id() == new_gateway_chain_id,
-            "gateway RPC chain id {} does not match env [new_gateway].chain_id {}",
-            network_verifier.get_gateway_chain_id(),
-            new_gateway_chain_id,
-        );
+        // The gateway-RPC chain-id cross-check and representative-CTM
+        // resolution only apply when this upgrade brings up a Gateway.
+        // Gateway-less envs (no `[new_gateway]` in the artifact) skip them; all
+        // downstream new-Gateway verification is likewise gated on
+        // `artifact.new_gateway`. `fee_param_verifier` is not gateway-specific,
+        // so it stays unconditional.
+        let has_new_gateway = artifact.new_gateway.is_some();
+        if has_new_gateway {
+            anyhow::ensure!(
+                network_verifier.get_gateway_chain_id() == new_gateway_chain_id,
+                "gateway RPC chain id {} does not match env [new_gateway].chain_id {}",
+                network_verifier.get_gateway_chain_id(),
+                new_gateway_chain_id,
+            );
+        }
         let fee_param_verifier =
             FeeParamVerifier::safe_init(&bridgehub_address, &network_verifier, contracts_commit)
                 .await?;
-        let new_gateway_representative_ctm = network_verifier
-            .try_get_chain_type_manager_from_bridgehub(
-                bridgehub_address,
-                U256::from(new_gateway_representative_chain_id),
-            )
-            .await
-            .map_err(|e| {
-                anyhow::anyhow!(
-                    "failed to fetch Bridgehub.chainTypeManager({new_gateway_representative_chain_id}) \
-                     for [new_gateway].ctm_representative_chain_id: {e}"
+        let new_gateway_representative_ctm = if has_new_gateway {
+            let ctm = network_verifier
+                .try_get_chain_type_manager_from_bridgehub(
+                    bridgehub_address,
+                    U256::from(new_gateway_representative_chain_id),
                 )
-            })?;
-        anyhow::ensure!(
-            new_gateway_representative_ctm != Address::ZERO,
-            "Bridgehub.chainTypeManager({new_gateway_representative_chain_id}) returned zero; \
-             [new_gateway].ctm_representative_chain_id must point to the CTM hosted by the new Gateway",
-        );
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "failed to fetch Bridgehub.chainTypeManager({new_gateway_representative_chain_id}) \
+                         for [new_gateway].ctm_representative_chain_id: {e}"
+                    )
+                })?;
+            anyhow::ensure!(
+                ctm != Address::ZERO,
+                "Bridgehub.chainTypeManager({new_gateway_representative_chain_id}) returned zero; \
+                 [new_gateway].ctm_representative_chain_id must point to the CTM hosted by the new Gateway",
+            );
+            ctm
+        } else {
+            Address::ZERO
+        };
 
         // Look up the per-CTM CREATE2 salt for the new gateway's source CTM.
         // Keyed by L1 CTM proxy address in [create2_factory_salts] of the
@@ -199,6 +218,7 @@ impl Verifiers {
             zksync_os_genesis_config,
             fee_param_verifier,
             era_chain_id,
+            legacy_era_chain_id,
             legacy_gateway_chain_id,
             legacy_gateway_chain_intervals: legacy_gateway_chain_intervals.to_vec(),
             new_gateway_chain_id,
@@ -368,6 +388,7 @@ impl VerificationResult {
         verifiers: &Verifiers,
         address: &Address,
         expected_file: &str,
+        tolerate_hash_mismatch: bool,
     ) {
         let deployed_bytecode = verifiers
             .network_verifier
@@ -400,13 +421,23 @@ impl VerificationResult {
             // hash from `AllContractsHashes.json`. The most common cause is
             // Solidity `immutable` constructor args being substituted into
             // the deployed code, so the runtime hash differs from the
-            // compile-time hash.
-            self.report_error(&format!(
+            // compile-time hash. `tolerate_hash_mismatch` is set for
+            // pre-existing contracts that v31 does not redeploy (e.g. an older
+            // TransparentProxyAdmin deployed from a prior commit) — there a
+            // mismatch is expected legacy state, so it is downgraded to a warning.
+            let msg = format!(
                 "Bytecode hash mismatch at address {}: Expected {} at {}",
                 address,
                 expected_file,
                 Location::caller()
-            ));
+            );
+            if tolerate_hash_mismatch {
+                self.report_warn(&format!(
+                    "{msg} (tolerated: pre-existing contract, not redeployed by v31)"
+                ));
+            } else {
+                self.report_error(&msg);
+            }
         }
     }
 

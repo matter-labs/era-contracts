@@ -69,26 +69,39 @@ impl GovernanceStage0Calls {
             result,
         );
 
-        // Calls 1..=N — per-CTM GovernanceUpgradeTimer.startTimer().
-        // One call per `[ctms.<flavor>]` block, in artifact order.
-        for (ctm_index, ctm) in artifact.ctms.iter().enumerate() {
+        // Calls 1..=N — per-CTM GovernanceUpgradeTimer.startTimer(), one per CTM.
+        // The prepare emits these in env-config CTM order, which can differ from
+        // `artifact.ctms` order, so match each CTM's timer to its startTimer call
+        // by target (order-independent) rather than asserting a fixed position.
+        let timer_window_end = (1 + artifact.ctms.len()).min(self.calls.elems.len());
+        for ctm in artifact.ctms.iter() {
             let timer_label = format!("{}.upgrade_timer", ctm.flavor.label());
-            if let Some(timer) = required_ctm_address(
+            let Some(timer) = required_ctm_address(
                 ctm,
                 &["deployed_addresses", "l1_governance_upgrade_timer"],
                 result,
-            ) {
-                errors += verify_call_by_address(
-                    &self.calls,
-                    1 + ctm_index,
-                    timer,
-                    &timer_label,
-                    "startTimer()",
-                    verifiers,
-                    result,
-                );
-            } else {
+            ) else {
                 errors += 1;
+                continue;
+            };
+            match (1..timer_window_end).find(|&idx| self.calls.elems[idx].target == timer) {
+                Some(idx) => {
+                    errors += verify_call_by_address(
+                        &self.calls,
+                        idx,
+                        timer,
+                        &timer_label,
+                        "startTimer()",
+                        verifiers,
+                        result,
+                    );
+                }
+                None => {
+                    result.report_error(&format!(
+                        "Stage-0 startTimer() call for {timer_label} ({timer}) not found in the timer window [1, {timer_window_end})"
+                    ));
+                    errors += 1;
+                }
             }
         }
 
@@ -373,41 +386,103 @@ async fn collect_pre_governance_accept_ownership_targets(
     governance: Address,
     result: &mut VerificationResult,
 ) -> anyhow::Result<Vec<Address>> {
-    let mut unique_ctms = Vec::new();
+    // Candidates: the core ecosystem Ownable2Step contracts (AssetTracker,
+    // ChainRegistrationSender) plus each CTM proxy with its ValidatorTimelock and
+    // auxiliary ownership targets discovered from the generated artifact. v31's
+    // prepare flow transfers any still-stale Ownable2Step contract to governance
+    // and defers the accept to stage 0; include only candidates whose live
+    // pendingOwner is governance at verify time. Both the core accepts and the
+    // CTM-adjacent accepts flow through the same `ensureOwnable2StepTargets…` aux
+    // mechanism, so they all land in (and are verified from) one trailing block.
+    let mut candidates: Vec<Address> = Vec::new();
+    for name in ["asset_tracker_proxy", "chain_registration_sender_proxy"] {
+        match verifiers.address_verifier.get_by_name(name) {
+            Some(addr) if addr != Address::ZERO => {
+                if !candidates.contains(&addr) {
+                    candidates.push(addr);
+                }
+            }
+            _ => result.report_error(&format!(
+                "{name} must be a known non-zero address while deriving stage-0 deferred acceptOwnership targets"
+            )),
+        }
+    }
     for ctm in &artifact.ctms {
-        let Some(ctm_proxy) = required_ctm_address(
+        if let Some(ctm_proxy) = required_ctm_address(
             ctm,
             &["state_transition", "chain_type_manager_proxy"],
             result,
-        ) else {
-            continue;
-        };
-        if ctm_proxy == Address::ZERO {
-            result.report_error(&format!(
-                "{}.chain_type_manager_proxy must not be zero while deriving stage-0 deferred acceptOwnership targets",
-                ctm.flavor.label()
-            ));
-            continue;
+        ) {
+            if ctm_proxy == Address::ZERO {
+                result.report_error(&format!(
+                    "{}.chain_type_manager_proxy must not be zero while deriving stage-0 deferred acceptOwnership targets",
+                    ctm.flavor.label()
+                ));
+            } else if !candidates.contains(&ctm_proxy) {
+                candidates.push(ctm_proxy);
+            }
         }
-        if !unique_ctms.contains(&ctm_proxy) {
-            unique_ctms.push(ctm_proxy);
+        if let Some(vt) = required_ctm_address(
+            ctm,
+            &["state_transition", "validator_timelock_addr"],
+            result,
+        ) {
+            if vt != Address::ZERO && !candidates.contains(&vt) {
+                candidates.push(vt);
+            }
+        }
+        if let Some(timer) = required_ctm_address(
+            ctm,
+            &["deployed_addresses", "l1_governance_upgrade_timer"],
+            result,
+        ) {
+            if timer != Address::ZERO && !candidates.contains(&timer) {
+                candidates.push(timer);
+            }
+        }
+        if ctm.value.get("rollup_da_pair").is_none() {
+            if let Some(rollup_da_manager) =
+                required_ctm_address(ctm, &["deployed_addresses", "l1_rollup_da_manager"], result)
+            {
+                if rollup_da_manager != Address::ZERO && !candidates.contains(&rollup_da_manager) {
+                    candidates.push(rollup_da_manager);
+                }
+            }
+        }
+        if ctm.flavor == CtmFlavor::ZksyncOs {
+            if let Some(verifier) =
+                required_ctm_address(ctm, &["state_transition", "verifier_addr"], result)
+            {
+                if verifier != Address::ZERO && !candidates.contains(&verifier) {
+                    candidates.push(verifier);
+                }
+            }
         }
     }
 
     let provider = verifiers.network_verifier.get_l1_provider();
     let mut targets = Vec::new();
-    for ctm in unique_ctms {
-        let pending_owner = Ownable2Step::new(ctm, provider.clone())
-            .pendingOwner()
-            .call()
-            .await
-            .with_context(|| {
-                format!(
-                    "read ChainTypeManager.pendingOwner() for {ctm} while deriving stage-0 deferred acceptOwnership targets"
-                )
-            })?;
-        if pending_owner == governance {
-            targets.push(ctm);
+    for candidate in candidates {
+        let ownable = Ownable2Step::new(candidate, provider.clone());
+        // The prepare flow transfers every still-non-governance-owned Ownable2Step
+        // candidate to governance and emits a deferred `acceptOwnership()` for it,
+        // while contracts already owned by governance get neither. So the expected
+        // accept set is exactly the candidates whose live `owner()` is not
+        // governance — independent of whether the transfer has already been
+        // initiated (`pendingOwner == governance`, e.g. on a governance-replayed
+        // fork) or is still pending an out-of-band step (e.g. an Atlas CTM and its
+        // ValidatorTimelock / RollupDAManager owned by a legacy Governance, when
+        // verifying raw against live before that ceremony runs). The live ownership
+        // and transfer-progress state itself is verified separately in `rpc_state`
+        // (`verify_v31_validator_timelocks` / `verify_v31_rollup_da_managers` / …),
+        // so we deliberately do not re-flag it here.
+        let owner = ownable.owner().call().await.with_context(|| {
+            format!(
+                "read owner() for {candidate} while deriving stage-0 deferred acceptOwnership targets"
+            )
+        })?;
+        if owner != governance {
+            targets.push(candidate);
         }
     }
 
@@ -499,12 +574,12 @@ fn verify_pre_governance_accept_ownership_tail(
             .collect::<Vec<_>>()
             .join(", ");
         result.report_error(&format!(
-            "Stage-0 deferred acceptOwnership tail is missing expected CTM target(s): {missing}"
+            "Stage-0 deferred acceptOwnership tail is missing expected target(s): {missing}"
         ));
         errors += 1;
     } else {
         result.report_ok(&format!(
-            "Stage-0 deferred acceptOwnership tail matches {} expected CTM target(s)",
+            "Stage-0 deferred acceptOwnership tail matches {} expected target(s)",
             expected_targets.len()
         ));
     }

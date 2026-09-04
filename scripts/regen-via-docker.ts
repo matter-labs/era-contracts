@@ -206,7 +206,7 @@ function cmdRegen(pk: string, rpc: string, binMount: string[]): number {
     "/contracts/l1-contracts",
     IMAGE,
     "bash",
-    "test/anvil-interop/regen-and-verify-stage.sh",
+    "test/anvil-interop/regen-and-verify.sh",
   ];
   return dockerRun(args);
 }
@@ -568,7 +568,7 @@ async function main(): Promise<void> {
         "",
         "  # phases 1 + 1.5 — prepare + fork-replay + PUVT",
         "  cd l1-contracts/test/anvil-interop && \\",
-        "    DEPLOYER_PK_FILE=~/.test_pk L1_FORK_URL=<sepolia-rpc> ./regen-and-verify-stage.sh",
+        "    DEPLOYER_PK_FILE=~/.test_pk L1_FORK_URL=<sepolia-rpc> ./regen-and-verify.sh",
         "",
         "  # phase 2 — real-Sepolia broadcast",
         "  protocol_ops ecosystem upgrade-broadcast --manifest <prepare>/manifest.json \\",

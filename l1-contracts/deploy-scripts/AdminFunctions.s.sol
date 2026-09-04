@@ -43,8 +43,16 @@ import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
+
+/// @dev CREATE2 salt for the ecosystem `TransitionaryOwner`. Fixed (not
+///      per-regen): the TransitionaryOwner is a fresh, single-purpose contract
+///      whose address should be stable for a given governance address, and its
+///      init code already varies with the governance ctor arg so there is no
+///      cross-env collision.
+bytes32 constant TRANSITIONARY_OWNER_SALT = keccak256("v31:transitionary-owner");
 
 /// @dev Protocol version threshold (packed `major << 32`) at which the Admin
 ///      facet's `upgradeChainFromVersion` gained the leading `address _chainAddress`
@@ -80,6 +88,12 @@ interface ILegacyGovernance {
     }
     function scheduleTransparent(LegacyOperation calldata op, uint256 delay) external;
     function executeInstant(LegacyOperation calldata op) external payable;
+    /// `execute` is `onlyOwnerOrSecurityCouncil` and only requires the op to be
+    /// ready (scheduled + delay elapsed). With `delay = 0` it is ready in the
+    /// same block, so the EOA owner can `scheduleTransparent(op, 0)` then
+    /// `execute(op)` without needing the security council (whose address is 0x0
+    /// on the mainnet Atlas Governance).
+    function execute(LegacyOperation calldata op) external payable;
     function securityCouncil() external view returns (address);
 }
 
@@ -223,7 +237,9 @@ contract AdminFunctions is Script, IAdminFunctions {
         // calls here and persist them so protocol-ops folds them into stage 0
         // of governance_calls in the merged ecosystem.toml. Sized to
         // chainIds.length (max possible), trimmed before serialization.
-        Call[] memory acceptCalls = new Call[](chainIds.length);
+        // Sized for up to two deferred accepts per CTM (the CTM proxy + its
+        // ValidatorTimelock), each Ownable2Step transfer deferring its accept.
+        Call[] memory acceptCalls = new Call[](chainIds.length * 2);
         uint256 acceptCount = 0;
 
         for (uint256 i = 0; i < chainIds.length; i++) {
@@ -251,6 +267,21 @@ contract AdminFunctions is Script, IAdminFunctions {
                 });
             }
 
+            // Transfer the CTM's ValidatorTimelock to governance too. Extracted
+            // to a helper (and scoped) to keep this function under the EVM
+            // stack-depth limit. The helper returns the VT address when a
+            // stage-0 acceptOwnership() is pending, else address(0).
+            {
+                address vtToAccept = _ensureValidatorTimelockOwnedByGovernance(ctm, _governance, _wraps);
+                if (vtToAccept != address(0)) {
+                    acceptCalls[acceptCount++] = Call({
+                        target: vtToAccept,
+                        value: 0,
+                        data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
+                    });
+                }
+            }
+
             _ensureProxyAdminOwnedByGovernance(ctm, _governance, _wraps);
         }
 
@@ -271,6 +302,105 @@ contract AdminFunctions is Script, IAdminFunctions {
         _ensureProxyAdminOwnedByGovernance(l1Nullifier, _governance, _wraps);
     }
 
+    /// Ensure non-proxy CTM-adjacent Ownable2Step contracts are owned by
+    /// governance. These addresses are emitted by the prepare scripts (for
+    /// example GovernanceUpgradeTimer, RollupDAManager, and the ZKsync OS
+    /// verifier), so the Rust orchestration passes them after prepare.
+    ///
+    /// Transfers are issued as the current owner, using the same owner-wrapper
+    /// registry as CTM/ProxyAdmin transfers. The deferred `acceptOwnership()`
+    /// calls are persisted separately and merged into stage 0 governance.
+    function ensureOwnable2StepTargetsOwnedByGovernanceWithWraps(
+        address[] memory _targets,
+        address _governance,
+        OwnerWrap[] memory _wraps
+    ) public {
+        // Deploy (or reuse) the ecosystem TransitionaryOwner. Every target's
+        // ownership is routed through it: the current owner transfers the target
+        // to the TransitionaryOwner, which then accepts it and forwards ownership
+        // to `_governance`. The TransitionaryOwner is trustless — it can only
+        // forward to its immutable GOVERNANCE_ADDRESS — so the deployer never
+        // persists as an owner. Governance finishes the handover via the deferred
+        // stage-0 acceptOwnership() calls collected below. End state per target:
+        // owner == TransitionaryOwner, pendingOwner == _governance.
+        address transitionaryOwner = Utils.deployViaCreate2(
+            abi.encodePacked(type(TransitionaryOwner).creationCode, abi.encode(_governance)),
+            TRANSITIONARY_OWNER_SALT,
+            Utils.DETERMINISTIC_CREATE2_ADDRESS
+        );
+        _saveTransitionaryOwner(transitionaryOwner);
+
+        Call[] memory acceptCalls = new Call[](_targets.length);
+        uint256 acceptCount = 0;
+
+        for (uint256 i = 0; i < _targets.length; i++) {
+            address target = _targets[i];
+            if (target == address(0)) {
+                continue;
+            }
+
+            Ownable2Step ownable = Ownable2Step(target);
+            address owner = ownable.owner();
+            // Already fully governance-owned (e.g. a re-run after governance accepted).
+            if (owner == _governance) {
+                continue;
+            }
+            if (owner == transitionaryOwner || owner.code.length == 0) {
+                // Deployer-temp-owned (the current owner is an EOA — the deployer),
+                // or already routed through the TransitionaryOwner on a re-run.
+                // Route ownership through the TransitionaryOwner so the deployer
+                // never persists as an owner: transfer to it (if not already
+                // pending), then have it accept + forward to governance.
+                if (owner != transitionaryOwner) {
+                    if (ownable.pendingOwner() != transitionaryOwner) {
+                        _issueAsOwner(
+                            owner,
+                            target,
+                            abi.encodeCall(Ownable2Step.transferOwnership, (transitionaryOwner)),
+                            _wraps
+                        );
+                    }
+                    // Callable by anyone; accepts ownership and forwards it to governance.
+                    vm.broadcast(Utils.getBroadcasterAddress());
+                    TransitionaryOwner(transitionaryOwner).claimOwnershipAndGiveToGovernance(target);
+                }
+            } else {
+                // The current owner is a contract (e.g. the legacy Governance):
+                // this is not a deployer-temp-owned contract, so keep the existing
+                // direct transfer to governance through its wrapper (the legacy-Gov
+                // ceremony). No TransitionaryOwner hop.
+                if (ownable.pendingOwner() != _governance) {
+                    _issueAsOwner(
+                        owner,
+                        target,
+                        abi.encodeCall(Ownable2Step.transferOwnership, (_governance)),
+                        _wraps
+                    );
+                }
+            }
+            // Defer the stage-0 governance acceptOwnership once pending == governance.
+            if (ownable.pendingOwner() == _governance) {
+                acceptCalls[acceptCount++] = Call({
+                    target: target,
+                    value: 0,
+                    data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
+                });
+            }
+        }
+
+        _savePreGovernanceAuxAcceptOwnershipCalls(acceptCalls, acceptCount);
+    }
+
+    /// Persist the deployed TransitionaryOwner address so `upgrade-prepare-all`
+    /// can fold it into the merged `ecosystem.toml` (consumed by PUVT + the
+    /// transaction simulator). Always written so the Rust side can read it
+    /// unconditionally.
+    function _saveTransitionaryOwner(address _transitionaryOwner) private {
+        string memory toml = vm.serializeAddress("transitionary_owner", "addr", _transitionaryOwner);
+        string memory path = string.concat(vm.projectRoot(), "/script-out/transitionary-owner.toml");
+        vm.writeToml(toml, path);
+    }
+
     /// Helper: read the EIP-1967 admin slot of `_proxy`, and if its single-step
     /// Ownable owner isn't already `_governance`, transfer ownership to it.
     function _ensureProxyAdminOwnedByGovernance(
@@ -289,17 +419,51 @@ contract AdminFunctions is Script, IAdminFunctions {
         _issueAsOwner(paOwner, proxyAdmin, abi.encodeCall(IOwnableSingleStep.transferOwnership, (_governance)), _wraps);
     }
 
+    /// Helper: transfer a CTM's ValidatorTimelock (reached via
+    /// `validatorTimelockPostV29()`, since `validatorTimelock()` returns
+    /// address(0) pre-v31) to `_governance`. The VT is Ownable2Step, so the
+    /// transfer sets pendingOwner now (issued by its current owner) and the
+    /// accept is deferred to stage-0 governance. Returns the VT address when an
+    /// accept is pending (so the caller appends the deferred acceptOwnership),
+    /// else address(0). No-op when the VT is already governance-owned.
+    function _ensureValidatorTimelockOwnedByGovernance(
+        address _ctm,
+        address _governance,
+        OwnerWrap[] memory _wraps
+    ) private returns (address) {
+        address vt = IChainTypeManager(_ctm).validatorTimelockPostV29();
+        if (vt == address(0)) {
+            return address(0);
+        }
+        Ownable2Step vtOwnable = Ownable2Step(vt);
+        if (vtOwnable.owner() != _governance && vtOwnable.pendingOwner() != _governance) {
+            _issueAsOwner(vtOwnable.owner(), vt, abi.encodeCall(Ownable2Step.transferOwnership, (_governance)), _wraps);
+        }
+        if (vtOwnable.pendingOwner() == _governance) {
+            return vt;
+        }
+        return address(0);
+    }
+
     /// Persist the trimmed `acceptOwnership()` Call list to a TOML so
     /// `protocol_ops ecosystem upgrade-prepare-all` can fold it into stage 0
     /// of the merged governance_calls. Always written (even when empty) so
     /// the Rust side can `vm.readFile` unconditionally.
     function _savePreGovernanceAcceptOwnershipCalls(Call[] memory _calls, uint256 _count) private {
+        _saveCallList(_calls, _count, "pre-governance-accept-ownerships.toml");
+    }
+
+    function _savePreGovernanceAuxAcceptOwnershipCalls(Call[] memory _calls, uint256 _count) private {
+        _saveCallList(_calls, _count, "pre-governance-aux-accept-ownerships.toml");
+    }
+
+    function _saveCallList(Call[] memory _calls, uint256 _count, string memory _fileName) private {
         Call[] memory trimmed = new Call[](_count);
         for (uint256 i = 0; i < _count; i++) {
             trimmed[i] = _calls[i];
         }
         string memory toml = vm.serializeBytes("pre_governance_accept_ownerships", "calls", abi.encode(trimmed));
-        string memory path = string.concat(vm.projectRoot(), "/script-out/pre-governance-accept-ownerships.toml");
+        string memory path = string.concat(vm.projectRoot(), "/script-out/", _fileName);
         vm.writeToml(toml, path);
     }
 
@@ -316,6 +480,28 @@ contract AdminFunctions is Script, IAdminFunctions {
             address currentOwner = IOwnableSingleStep(calls[i].target).owner();
             _issueAsOperationalOwner(currentOwner, calls[i].target, calls[i].data, _wraps);
         }
+    }
+
+    /// Execute a set of calls as a SINGLE `ChainAdmin.multicall`, broadcast by the
+    /// ChainAdmin's EOA owner. Unlike `executeOwnableCallsWithWraps` (which routes
+    /// each call by its target's `owner()`), every call here runs with
+    /// `msg.sender == _chainAdmin`. This is required for calls whose executor must
+    /// be the ChainAdmin as the *pending* owner (e.g. `acceptOwnership()` on a
+    /// ServerNotifier / verifier whose ownership was transferred to the ChainAdmin
+    /// but not yet accepted) — a plain owner-routed call would run as the stale
+    /// current owner and revert. It also mirrors exactly how the transaction
+    /// simulator encodes a `ctm_admin_calls` entry (one `ChainAdmin.multicall`),
+    /// keeping the prepare broadcast and the sim bundle byte-identical.
+    function executeChainAdminMulticall(bytes memory _callsToExecute, address _chainAdmin) public {
+        Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
+        if (calls.length == 0) {
+            return;
+        }
+        address chainAdminOwner = IOwnableSingleStep(_chainAdmin).owner();
+        _anvilFund(chainAdminOwner);
+        vm.startBroadcast(chainAdminOwner);
+        IChainAdminMulticall(_chainAdmin).multicall(calls, true);
+        vm.stopBroadcast();
     }
 
     function _issueAsOperationalOwner(
@@ -404,15 +590,19 @@ contract AdminFunctions is Script, IAdminFunctions {
             predecessor: bytes32(0),
             salt: keccak256(abi.encodePacked(Utils.currentLegacyGovSalt(), _legacyGovSaltCounter++))
         });
+        // Normal `scheduleTransparent(op, 0)` + `execute(op)` path, both from the
+        // EOA owner. `delay = 0` makes the op ready in the same block, and
+        // `execute` is `onlyOwnerOrSecurityCouncil`, so we don't route through
+        // `executeInstant` (which is `onlySecurityCouncil`, and the mainnet Atlas
+        // Governance's `securityCouncil()` is 0x0 — that produced a `from = 0x0`
+        // execute tx that only works under simulator impersonation).
         address eoaOwner = IOwnableSingleStep(_gov).owner();
-        address sc = ILegacyGovernance(_gov).securityCouncil();
         _anvilFund(eoaOwner);
         vm.startBroadcast(eoaOwner);
         ILegacyGovernance(_gov).scheduleTransparent(op, 0);
         vm.stopBroadcast();
-        _anvilFund(sc);
-        vm.startBroadcast(sc);
-        ILegacyGovernance(_gov).executeInstant(op);
+        vm.startBroadcast(eoaOwner);
+        ILegacyGovernance(_gov).execute(op);
         vm.stopBroadcast();
     }
 
@@ -566,10 +756,13 @@ contract AdminFunctions is Script, IAdminFunctions {
         );
     }
 
-    /// @notice Upgrade a chain by reading the diamond cut directly from the CTM.
+    /// @notice Build the `upgradeChainFromVersion` admin Call for a CTM-driven
+    ///         upgrade, reading the diamond cut directly from the CTM.
     /// @dev Reads the diamond cut from the CTM's storage to avoid TOML parsing
-    ///      issues with large hex strings.
-    function upgradeChainFromCTM(address _chainAddress, address _adminAddr, address _accessControlRestriction) public {
+    ///      issues with large hex strings. Shared by `upgradeChainFromCTM` and
+    ///      `upgradeChainFromCTMAndSetDAValidatorPair` so the version-selection
+    ///      logic lives in one place.
+    function _buildUpgradeChainFromCTMCall(address _chainAddress) internal returns (Call memory upgradeCallStruct) {
         console.log("AdminFunctions: upgrading chain", _chainAddress);
 
         IZKChain chain = IZKChain(_chainAddress);
@@ -601,9 +794,64 @@ contract AdminFunctions is Script, IAdminFunctions {
             ? abi.encodeCall(IAdminLegacy.upgradeChainFromVersion, (currentProtocolVersion, diamondCut))
             : abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainAddress, currentProtocolVersion, diamondCut));
 
-        Utils.adminExecute(_adminAddr, _accessControlRestriction, _chainAddress, upgradeCall, 0);
+        upgradeCallStruct = Call({target: _chainAddress, value: 0, data: upgradeCall});
+    }
+
+    /// @notice Upgrade a chain by reading the diamond cut directly from the CTM.
+    /// @dev Reads the diamond cut from the CTM's storage to avoid TOML parsing
+    ///      issues with large hex strings.
+    function upgradeChainFromCTM(address _chainAddress, address _adminAddr, address _accessControlRestriction) public {
+        Call memory upgradeCallStruct = _buildUpgradeChainFromCTMCall(_chainAddress);
+
+        Utils.adminExecute(
+            _adminAddr,
+            _accessControlRestriction,
+            upgradeCallStruct.target,
+            upgradeCallStruct.data,
+            upgradeCallStruct.value
+        );
 
         console.log("AdminFunctions: upgrade completed successfully");
+    }
+
+    /// @notice Upgrade a chain from the CTM and set its DA validator pair in the
+    ///         SAME admin multicall, so both apply atomically in one L1 tx.
+    /// @dev The v31 CTM upgrade resets the chain's L1 DA validator, so the
+    ///      operator must re-set the DA validator pair before the chain can
+    ///      commit batches. For Era this must be done atomically: bundling the
+    ///      upgrade and the `setDAValidatorPair` into one `ChainAdmin.multicall`
+    ///      removes any window where the chain is upgraded but missing its DA
+    ///      validator pair. The `setDAValidatorPair` call runs after the upgrade
+    ///      within the multicall, so it hits the freshly-installed v31 AdminFacet
+    ///      (the new `(address, L2DACommitmentScheme)` signature).
+    /// @param _chainAddress       The chain's diamond proxy.
+    /// @param _adminAddr          The chain's ChainAdmin.
+    /// @param _accessControlRestriction AccessControlRestriction address, or
+    ///        `address(0)` for an Ownable ChainAdmin.
+    /// @param _l1DaValidator      The post-upgrade L1 DA validator to set.
+    /// @param _l2DaCommitmentScheme The L2 DA commitment scheme to set.
+    function upgradeChainFromCTMAndSetDAValidatorPair(
+        address _chainAddress,
+        address _adminAddr,
+        address _accessControlRestriction,
+        address _l1DaValidator,
+        L2DACommitmentScheme _l2DaCommitmentScheme
+    ) public {
+        Call[] memory calls = new Call[](2);
+        // Order matters: the upgrade installs the v31 AdminFacet, and only then
+        // does the chain expose the new `setDAValidatorPair(address,
+        // L2DACommitmentScheme)` signature used below.
+        calls[0] = _buildUpgradeChainFromCTMCall(_chainAddress);
+        calls[1] = Call({
+            target: _chainAddress,
+            value: 0,
+            data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaCommitmentScheme))
+        });
+
+        Utils.adminExecuteCalls(_adminAddr, _accessControlRestriction, calls);
+
+        console.log("AdminFunctions: upgrade + setDAValidatorPair completed successfully");
+        console.log("AdminFunctions: L1 DA validator", _l1DaValidator);
     }
 
     function adminScheduleUpgrade(
@@ -910,6 +1158,25 @@ contract AdminFunctions is Script, IAdminFunctions {
             target: chainInfo.diamondProxy,
             value: 0,
             data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaCommitmentScheme))
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, _accessControlRestriction, calls, _shouldSend);
+    }
+
+    function setZKsyncOSPreV31TotalSupply(
+        address _bridgehub,
+        address _accessControlRestriction,
+        uint256 _chainId,
+        uint256 _preV31TotalSupply,
+        bool _shouldSend
+    ) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.setZKsyncOSPreV31TotalSupply, (_preV31TotalSupply))
         });
 
         saveAndSendAdminTx(chainInfo.admin, _accessControlRestriction, calls, _shouldSend);

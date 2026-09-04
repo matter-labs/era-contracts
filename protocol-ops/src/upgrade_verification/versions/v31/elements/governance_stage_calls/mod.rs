@@ -58,9 +58,11 @@ sol! {
     function initializeL1V31Upgrade();
     function setAssetTracker(address _l1AssetTracker);
     function setAddresses();
+    function setAddressesV31(address _chainRegistrationSender);
     function updateSecurityCouncil(address _newSecurityCouncil);
     function updateGuardians(address _newGuardians);
     function updateEmergencyUpgradeBoard(address _newEmergencyUpgradeBoard);
+    function updateDAPair(address l1DAValidator, uint8 l2DACommitmentScheme, bool status);
 
     // L2-side selectors carried as `l2Calldata` inside the new-Gateway
     // bring-up priority txs. Decoded by `verify_gateway_bring_up_calls` to
@@ -109,6 +111,7 @@ sol! {
 
     #[sol(rpc)]
     contract Ownable2Step {
+        function owner() external view returns (address);
         function pendingOwner() external view returns (address);
     }
 

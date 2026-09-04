@@ -1,10 +1,22 @@
 l1_chain_id = 11155111
 
-# TODO(testnet): no L1NativeTokenVault asset ID is registered yet because the
-# EraVM ZK token has not been deployed on testnet. Populate this once the
-# token is live; PUVT and `ecosystem upgrade-prepare-all --env testnet` will
-# bail without it.
-# zk_token_asset_id = "0x..." # TODO
+# ZK token asset ID, as registered by the testnet L2 NativeTokenVault.
+# L2 ZK token: 0xaE0975Eb851CC49D2C4599174815f16A6aBE1284
+# L1 ZK token representation: 0xd1Ee6cE0A0fDB29793cbDC41DcFE5d356C7d5C7f
+# Round-trips:
+#   L2_NTV.assetId(0xaE0975...) == zk_token_asset_id
+#   L1_NTV.tokenAddress(zk_token_asset_id) == 0xd1Ee6c...
+# Required by `ecosystem upgrade-prepare-all --env testnet` and baked into the
+# CTM upgrade's chain-creation params.
+zk_token_asset_id = "0xefb0794fa43edc760ef9bf5b09af2fc0a667a288453d2d55d48878897dc2f317"
+
+# Split era: the core withdrawal contracts (L1AssetRouter/L1Nullifier/MailboxFacet)
+# carry the LEGACY Era chain id 270 (a placeholder — chain 270 is not registered
+# on the testnet bridgehub, so its eraDiamond is address(0)), preserved by v31.
+# The registered/new Era is 301 (`era_chain_id` in the v31 input; used by the PUH,
+# FixedForceDeployment and CTM resolution). PUVT uses this value only for the
+# core-withdrawal-contract checks.
+legacy_era_chain_id = 270
 
 [permanent_contracts]
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
@@ -14,6 +26,11 @@ create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 
 [core_contracts]
 bridgehub_proxy_addr = "0xc4fd2580c3487bba18d63f50301020132342fdbd"
+# bridgehub.owner() and EraCTM.owner() are the ProtocolUpgradeHandler
+# (0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D) — decentralized governance, same
+# shape as stage/mainnet. Replay short-circuits via anvil impersonation in fork
+# mode.
+governance_kind = "puh"
 
 
 # TODO(EVM-1200): The single-CTM `[ctm_contracts]` block below is for ZKsync OS (Atlas)
@@ -29,6 +46,14 @@ rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 # Testnet is currently pre-v31 (Atlas on v30, Era on v29) — overrides are required
 # because the v31 getters (`ctm.isZKsyncOS()`, `ctm.L1_BYTECODES_SUPPLIER()`) don't
 # exist on either CTM yet.
+# CTM order — KEPT AS Atlas/ZKsyncOS-first. NOTE: stage's permanent-values lists
+# Era first and passes PUVT, so Era-first is the apparent convention; but
+# re-preparing testnet with Era-first regressed PUVT from 3 → 36 errors with a
+# stage-1 cascade ("Too many calls: 24 vs 23", acceptOwnership/setAssetTracker
+# misalignment) — i.e. testnet's stage-1 structure differs from PUVT's
+# expectation in a way that ordering alone doesn't resolve. Left Atlas-first
+# (the cleaner base: only the stage-0 timer-order check + the Atlas-VT owner
+# remain) pending deliberate investigation of the testnet stage-1 difference.
 [[ctm_contracts.ctms]]
 # Atlas (ZKsyncOS) CTM (witness chain: 8022833, v30)
 # rollup_da_manager queried via `chain.getRollupDAManager()` on chain 8022833's
@@ -44,19 +69,37 @@ rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 
 [[ctm_contracts.ctms]]
 # Era CTM (witness chain: 301, v29)
-# rollup_da_manager queried via `chain.getRollupDAManager()` on chain 301.
+# The Era CTM does NOT reuse the pre-v31 RollupDAManager: its legacy
+# `(address,address)` DA-pair API is incompatible with the v31 AdminFacet, which
+# requires the `(address,L2DACommitmentScheme)` API. The v31 CTM prepare
+# (`CTMUpgrade_v31.deployEraRollupDA`) deploys a FRESH RollupDAManager +
+# RollupL1DAValidator and registers the rollup DA pair on it; the freshly
+# deployed manager is what the AdminFacet immutable and the merged ecosystem.toml
+# use, overriding the value below. `rollup_da_manager` is kept here only to skip
+# the pre-v31 on-chain auto-resolution (the v29 chain has no getRollupDAManager()
+# getter); its value is otherwise unused. No `rollup_da_pair` — the DA pair is set
+# at deploy time on the fresh manager, so the deferred acceptOwnership() lands in
+# stage 0 (no stage-1 updateDAPair call).
 # bytecodes_supplier from v0.29.1-interopA-ff/testnet.toml.
 proxy = "0x3Cc81628a14C824057a97C1B4Ab17758E5D18864"
 is_zk_sync_os = false
 bytecodes_supplier = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
-rollup_da_manager = "0x6b7D8FD12eF94485c8E928a055124F94C2B5d411"
+rollup_da_manager = "0x82Ad20F138A46998265Ba75fdf1da4bB2E949934"
 
-# Legacy Gateway configuration for settlement layer validation
-# This section contains historical data about chains that settled on the legacy Gateway
-[legacy_gateway]
-# The chain ID of the legacy Gateway (9075 for mainnet)
-# TODO(EVM-1200): The new ZKsync OS testnet does NOT have a legacy Gateway, so just a random valid chain id
-# is provided here. 
-chain_id = 531050204
+# Contracts that own a CTM / ProxyAdmin and have no private key — ownership
+# transfers routed through them must be *wrapped* (called by their EOA owner via
+# scheduleTransparent+executeInstant), not impersonated. Mirrors stage's
+# `[[ownable_proxies]]`; consumed by protocol-ops via the `OwnerWrap` registry.
+[[ownable_proxies]]
+# Legacy zkOS `Governance.sol` — owns the Atlas (ZKsyncOS) CTM today
+# (AtlasCTM 0x54D55e74….owner() == this). owner() =
+# 0x5555555590930f501c88B73Ea43B3EEb5A71643c (EOA), minDelay() = 0, so
+# scheduleTransparent(op, 0) + executeInstant(op) works in two consecutive txs
+# from that EOA. (Bridgehub, Era CTM and the shared CTM ProxyAdmin are already
+# PUH-owned, so only the Atlas CTM needs a wrap.)
+addr = "0xcf96aAb01347BA96050F39Ff6dcbC6138b462b58"
+kind = "legacy_governance"
 
-chain_intervals = []
+# No `[legacy_gateway]` block: this testnet never had a Gateway, so v31 emits no
+# settlement-layer decommission/blacklist calls. No `[new_gateway]` block: v31
+# deploys/whitelists no new Gateway CTM on testnet.

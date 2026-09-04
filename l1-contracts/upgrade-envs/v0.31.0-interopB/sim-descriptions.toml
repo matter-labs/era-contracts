@@ -45,11 +45,84 @@ era_upgrade_stage_validator         = "0x4499B455aC1507dd651459A4faa0b8eaF5Ee5FF
 atlas_upgrade_stage_validator       = "0x484c0bd3034CAF4AfaCB80a010866E208188Aa2c"  # Atlas (ZKsync OS) UpgradeStageValidator
 era_validator_timelock              = "0x7E38a259C353e72eEd3F5136c6E6534eb15C7199"  # Era ValidatorTimelock
 atlas_validator_timelock            = "0x1E4299F7a19597E09bD8593AB7B68277183e9778"  # Atlas ValidatorTimelock
-l1_zk_token                         = "0xf41D4478F1D6b8A096c0369B05C0b24ae00CC2dF"  # L1 ZK token (BridgedStandardERC20)
+l1_zk_token                         = "0xd1Ee6cE0A0fDB29793cbDC41DcFE5d356C7d5C7f"  # L1 ZK token representation (BeaconProxy)
 gw_l2_bridgehub                     = "0x0000000000000000000000000000000000010002"  # Gateway L2 Bridgehub (system contract on chain 2708)
 gw_l2_settlement_fee_setter         = "0x0000000000000000000000000000000000010010"  # Gateway L2 settlement-layer fee setter
 gw_l2_server_notifier               = "0xBc7dD5BAC8b7afdDCAEB921699acDC54Fc5401F4"  # Gateway L2 ServerNotifier (v31 new GW)
 gw_l2_rollup_da_manager             = "0x1B756bD9aeB52435d3444004f7cdb6aD7931249a"  # Gateway L2 RollupDAManager (v31 new GW)
+
+# ─── Testnet (ZKsync-OS Sepolia) ecosystem — gateway-less, split-era (legacy 270 / registered 301).
+# Distinct address space from stage/mainnet, so these entries never collide
+# (matching is by `(target, selector)`). Two CTM flavors: Era (chain 301) +
+# Atlas (ZKsync OS). All proxies (incl. Atlas CTM/VT) sit under one PUH-owned
+# ecosystem TPA. ───
+tn_bridgehub                        = "0xc4FD2580C3487bba18D63f50301020132342fdbD"  # Testnet Bridgehub proxy
+tn_l1_asset_router                  = "0xB5d9C3F41E434b91295BD7962db5c873cEcCE2be"  # Testnet L1AssetRouter proxy
+tn_ntv                              = "0xF8d4A5195737043f45F998539D5C62Eee02E3426"  # Testnet NativeTokenVault proxy
+tn_l1_nullifier                     = "0x9e24E2c23933d30eF2DEB70A0D977Fb1Ca20AbEa"  # Testnet L1Nullifier proxy
+tn_ctm_deployment_tracker           = "0x6FCe8BB8480feBe1a8f3F5Ed083cF54703975477"  # Testnet CTMDeploymentTracker (L1CtmDeployer)
+tn_chain_asset_handler              = "0xDfA2193b161d7bd45FC81b4E80225eebDc3CF96C"  # Testnet ChainAssetHandler proxy
+tn_l1_asset_tracker                 = "0x150D2F16c621DD7f0cF7C9bB0eC64ccf251655C9"  # Testnet L1AssetTracker proxy (v31)
+tn_message_root                     = "0xe7047cD9979D053ceb6dB637bc0383b87A3C7f58"  # Testnet L1MessageRoot proxy
+tn_chain_registration_sender        = "0xdFf4C5797B2522D8ed9b27b8993cE455e66D5D40"  # Testnet ChainRegistrationSender proxy (v31)
+tn_ecosystem_tpa                    = "0xE00456791Da489418355B0a6b27965A54c7C01d2"  # Testnet ecosystem TransparentProxyAdmin (PUH-owned; also Atlas CTM/VT PA)
+tn_puh                              = "0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D"  # Testnet PUH (ProtocolUpgradeHandler proxy)
+tn_puh_proxy_admin                  = "0xd9dc52a30713c48e6e15696d258489f16c8d9ee0"  # Testnet PUH's ProxyAdmin
+tn_legacy_gov                       = "0xcf96aAb01347BA96050F39Ff6dcbC6138b462b58"  # Testnet legacy Governance (owns Atlas CTM pre-upgrade)
+tn_era_ctm                          = "0x3Cc81628a14C824057a97C1B4Ab17758E5D18864"  # Testnet Era CTM proxy (chain 301)
+tn_atlas_ctm                        = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"  # Testnet Atlas (ZKsync OS) CTM proxy
+tn_era_validator_timelock           = "0x2d259801aC24143b1F01EBF576833B8f685ACc14"  # Testnet Era ValidatorTimelock (postV29)
+tn_atlas_validator_timelock         = "0x73B668d8374DDB42c9e2f46fd5B754Ac215495bc"  # Testnet Atlas ValidatorTimelock (postV29)
+tn_era_gov_upgrade_timer            = "0x254Bbc0198279a503ad400d90dD6b67F1573a9E4"  # Testnet Era GovernanceUpgradeTimer
+tn_atlas_gov_upgrade_timer          = "0x360C49a3E63469846B68F86dB256D8f25B9a54e4"  # Testnet Atlas (ZKsync OS) GovernanceUpgradeTimer
+tn_era_upgrade_stage_validator      = "0xE58470eb2C86CDf7457aEBc5e1182841b00c6fCC"  # Testnet Era UpgradeStageValidator
+tn_atlas_upgrade_stage_validator    = "0x9CB4f7166bF7AD144A658554D6Ea9db976154cB0"  # Testnet Atlas (ZKsync OS) UpgradeStageValidator
+tn_atlas_rollup_da_manager          = "0xC90E4E4897421E9380d734b72221f5485C3fd116"  # Testnet Atlas RollupDAManager
+tn_era_rollup_da_manager            = "0x3B92E09A53573bE654a75Ec0C0e36aD8C803C25E"  # Testnet Era RollupDAManager (v31-redeployed; DA pair set at deploy time)
+tn_atlas_verifier                   = "0x36bdD4226c312d782c218c813129935028139fA1"  # Testnet Atlas ZKsync OS verifier
+tn_chain_admin                      = "0x7cbdDA00285de05a1353803db38770043e359B6d"  # Testnet ChainAdmin (owner 0x5555…643c)
+tn_era_test_chain                   = "0xd3bc4353957bc0f138318384aa207c708a9455c4"  # Testnet Era chain 301 diamond (test_upgrade target)
+tn_zkos_test_chain                  = "0x02b1ac1cf0a592aefd3c2246b2431388365db272"  # Testnet ZKsync OS chain diamond (test_upgrade target)
+
+# ─── Mainnet ecosystem — multi-CTM (Era chain 324 / Atlas ZKsyncOS chain 30715),
+# has a Gateway (legacy GW chain 9075 is decommissioned in stage 2). Distinct
+# address space from stage/testnet, so mainnet [[entries]] never collide
+# (matching is by resolved `(target, selector)`). Unlike stage, the Atlas CTM +
+# its ValidatorTimelock/GovTimer/RollupDAManager are owned by the legacy
+# `Governance.sol` (0xC66f0B45…) pre-upgrade → transferred to PUH via the
+# scheduleTransparent/executeInstant ceremony (bundles 1-13). Era CTM + Bridgehub
+# are already PUH-owned. Atlas CTM keeps its OWN ProxyAdmin (0xff3582a0…, shared
+# with stage), everything else sits under the PUH-owned ecosystem TPA (0xC2a361…). ───
+mn_legacy_gov                       = "0xC66f0B45c05cF654eeC093650FD67865E85E8566"  # Legacy Governance.sol — owns Atlas CTM + aux pre-upgrade
+mn_puh                              = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"  # PUH (ProtocolUpgradeHandler proxy) = owner_address
+mn_puh_proxy_admin                  = "0x1e4c534e7ce1ff5621ea506d99b367d7d8efbe3e"  # PUH's OZ ProxyAdmin (owns the PUH proxy)
+mn_bridgehub                        = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"  # Bridgehub proxy
+mn_l1_asset_router                  = "0x8829AD80E425C646DAB305381ff105169FeEcE56"  # L1AssetRouter proxy
+mn_l1_nullifier                     = "0xD7f9f54194C633F36CCD5F3da84ad4a1c38cB2cB"  # L1Nullifier proxy
+mn_ntv                              = "0xbeD1EB542f9a5aA6419Ff3deb921A372681111f6"  # NativeTokenVault proxy
+mn_message_root                     = "0x5Ce9257755391D1509cD4eC1899d3F88A57BB4aD"  # L1MessageRoot proxy
+mn_ctm_deployment_tracker           = "0x6078F6B379f103de1Aa912dc46bb8Df0c8809860"  # CTMDeploymentTracker (L1CtmDeployer)
+mn_chain_asset_handler              = "0xDd5CB8B9037357B4cD37391A073798f8aaB61076"  # ChainAssetHandler proxy
+mn_l1_asset_tracker                 = "0x8eF17384A157287921E1ebdb0a08a2f102ba4a92"  # L1AssetTracker proxy (v31)
+mn_chain_registration_sender        = "0x7f60f575640E658CC2A400d59307f90fdEa05176"  # ChainRegistrationSender proxy (v31)
+mn_ecosystem_tpa                    = "0xC2a36181fB524a6bEfE639aFEd37A67e77d62cf1"  # Ecosystem TransparentProxyAdmin (PUH-owned)
+mn_atlas_ctm_proxy_admin            = "0xff3582a0310916cd62442A4CA88Bf1C757D68938"  # Atlas CTM's standalone ProxyAdmin (shared addr w/ stage)
+mn_era_chain_admin                  = "0x2cf3bD6a9056b39999F3883955E183F655345063"  # Era ChainAdmin (owner 0x4e4943…); also the v31 new ChainAdmin for test chains
+mn_atlas_chain_admin                = "0x933dEA2C4241B1537fDD6da277eA62841B490172"  # Atlas ChainAdmin (owner 0x4e4943…; shared addr w/ stage)
+mn_era_ctm                          = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"  # Era CTM proxy (chain 324)
+mn_atlas_ctm                        = "0x1adF137F59949c9081157D5de1e002D1C992071F"  # Atlas (ZKsync OS) CTM proxy
+mn_era_gov_timer                    = "0x05ca47fb335f6Af59115B4A460563a0685799005"  # Era GovernanceUpgradeTimer
+mn_atlas_gov_timer                  = "0x61237a5E77CE7c15776ad4d6E5E9Bf2170e73752"  # Atlas (ZKsync OS) GovernanceUpgradeTimer
+mn_era_rollup_da_manager            = "0x75515F39f2fb9F517d66cb2d6AF8bbBF6923874c"  # Era RollupDAManager (v31-redeployed; DA pair set at deploy time)
+mn_atlas_rollup_da_manager          = "0x3F54A35a979Fe576159002B05bE2eDf9b455FAAA"  # Atlas RollupDAManager
+mn_era_upgrade_stage_validator      = "0x8B4DC9a015371Bc9bd7bC38e5dACBA42E842AB92"  # Era UpgradeStageValidator
+mn_atlas_upgrade_stage_validator    = "0x9761e3ec0FBe7377B22091432797f8Bf7bDd3ce0"  # Atlas (ZKsync OS) UpgradeStageValidator
+mn_era_validator_timelock           = "0x2e5110cF18678Ec99818bFAa849B8C881744b776"  # Era ValidatorTimelock
+mn_atlas_validator_timelock         = "0x18cC381705761aa2d2e8ea62888a4029A0fAd3aB"  # Atlas ValidatorTimelock
+mn_atlas_verifier                   = "0x42b93CA04c5D02e12012a06c941EF1416347034D"  # Atlas (ZKsync OS) verifier
+mn_era_serdnotifier_proxy_admin     = "0x257fc0c3eb02f7ba8c0fd3ed57692a9c1ee6d29b"  # Existing Era ServerNotifier's ProxyAdmin (under Era ChainAdmin)
+mn_era_diamond                      = "0x32400084c286cf3e17e7b677ea9583e60a000324"  # Era chain-324 diamond (test_upgrade target)
+mn_zkos_test_chain                  = "0xb6d615084d7a72bf98c2bd35dd6abe824feb2dc7"  # Atlas (ZKsync OS) chain diamond (test_upgrade target)
 
 [[entries]]
 target = "upgrade_handler"
@@ -226,13 +299,13 @@ desc = "PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH proxy 0x8f086275…, newI
 [[entries]]
 target = "chain_registration_sender"  # ChainRegistrationSender
 selector = "0x79ba5097"  # acceptOwnership
-desc = "PUH stage 1: ChainRegistrationSender.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns ChainRegistrationSender."
+desc = "PUH stage 0: ChainRegistrationSender.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns ChainRegistrationSender."
 
 # L1AssetTracker.acceptOwnership — PUH accepts ownership of L1AT that the deployer created+transferred in phase 2.
 [[entries]]
 target = "l1_asset_tracker"  # L1AssetTracker
 selector = "0x79ba5097"  # acceptOwnership
-desc = "PUH stage 1: L1AssetTracker.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns L1AT."
+desc = "PUH stage 0: L1AssetTracker.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns L1AT."
 
 [[entries]]
 target = "ntv"  # NTV
@@ -419,3 +492,675 @@ desc = "Test (post-upgrade smoke): upgrade an existing Era chain to v31 (upgrade
 target = "0x98a0d85435a0e2834142bfd24a30e0c0b6866de2"  # ZKsync OS test chain (admin/diamond)
 selector = "0xfc57565f"  # upgradeChainFromVersion
 desc = "Test (post-upgrade smoke): upgrade an existing ZKsync OS chain to v31 (upgradeChainFromVersion) — verifies the upgrade path for an already-registered ZKsync OS chain."
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TESTNET (ZKsync-OS Sepolia) — gateway-less, split-era (legacy 270 / registered 301).
+# Mirrors the stage entries above with testnet addresses. Two CTM flavors:
+# Era (0x3cc8…, chain 301) and Atlas/ZKsync OS (0x54d5…). No new-Gateway calls
+# in stage 2 (testnet has no Gateway), and all proxies — including the Atlas
+# CTM and both ValidatorTimelocks — are upgraded via the single PUH-owned
+# ecosystem TPA (0xE0045679…), not a separate Atlas ProxyAdmin.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ─── Bundle: legacy Gov ceremony — Atlas CTM ownership → PUH ───
+[[entries]]
+target = "tn_legacy_gov"
+selector = "0x2c431917"  # scheduleTransparent
+inner_target = "tn_atlas_ctm"
+inner_selector = "0xf2fde38b"  # transferOwnership(address)
+desc = "Testnet legacy Gov: scheduleTransparent — queues transferring Atlas (ZKsync OS) CTM ownership (Ownable2Step) to PUH. The Atlas CTM is owned by the legacy Governance pre-upgrade; this hands control to PUH for stage-1 impl/version work."
+
+[[entries]]
+target = "tn_legacy_gov"
+selector = "0x95218ecd"  # executeInstant
+inner_target = "tn_atlas_ctm"
+inner_selector = "0xf2fde38b"  # transferOwnership(address)
+desc = "Testnet legacy Gov: executeInstant — flushes the queued Atlas CTM ownership transfer to PUH now (legacy Gov minDelay = 0). PUH accepts in stage 0 (call 8)."
+
+# ─── Bundle: Atlas ValidatorTimelock ownership → PUH (signed by VT owner 0x5555…) ───
+[[entries]]
+target = "tn_atlas_validator_timelock"
+selector = "0xf2fde38b"  # transferOwnership(address)
+desc = "Testnet: Atlas ValidatorTimelock.transferOwnership(PUH) — queues VT ownership to PUH (Ownable2Step). v31 moves the Atlas VT (still owned by 0x5555…643c) to governance; PUH accepts in stage 0 (call 9)."
+
+# ─── Bundle: ChainAdmin multicall — admin work on chain-owned proxies ───
+[[entries]]
+target = "tn_chain_admin"
+selector = "0x69340beb"  # multicall
+desc = "Testnet ChainAdmin: multicall — administrative work on chain-owned proxies (e.g. ProxyAdmin / ServerNotifier in-place upgrade) signed by the ChainAdmin owner (0x5555…643c) during the v31 upgrade."
+
+# ─── Bundle: legacy Gov ceremony — Atlas auxiliary ownership → PUH ───
+[[entries]]
+target = "tn_legacy_gov"
+selector = "0x2c431917"  # scheduleTransparent
+inner_target = "tn_atlas_gov_upgrade_timer"
+inner_selector = "0xf2fde38b"  # transferOwnership(address)
+desc = "Testnet legacy Gov: scheduleTransparent — queues Atlas GovernanceUpgradeTimer.transferOwnership(PUH). This mirrors the stage cleanup for timer ownership."
+
+[[entries]]
+target = "tn_legacy_gov"
+selector = "0x95218ecd"  # executeInstant
+inner_target = "tn_atlas_gov_upgrade_timer"
+inner_selector = "0xf2fde38b"  # transferOwnership(address)
+desc = "Testnet legacy Gov: executeInstant — flushes Atlas GovernanceUpgradeTimer.transferOwnership(PUH). PUH accepts in stage 0."
+
+[[entries]]
+target = "tn_legacy_gov"
+selector = "0x2c431917"  # scheduleTransparent
+inner_target = "tn_atlas_rollup_da_manager"
+inner_selector = "0xf2fde38b"  # transferOwnership(address)
+desc = "Testnet legacy Gov: scheduleTransparent — queues Atlas RollupDAManager.transferOwnership(PUH). This fixes the same legacy-owner surface found on stage."
+
+[[entries]]
+target = "tn_legacy_gov"
+selector = "0x95218ecd"  # executeInstant
+inner_target = "tn_atlas_rollup_da_manager"
+inner_selector = "0xf2fde38b"  # transferOwnership(address)
+desc = "Testnet legacy Gov: executeInstant — flushes Atlas RollupDAManager.transferOwnership(PUH). PUH accepts in stage 0."
+
+# ─── Stage 0: PUH governance (pause, timers, PUH/Guardians redeploy, acceptOwnership) ───
+[[entries]]
+target = "tn_chain_asset_handler"
+selector = "0xac700e63"  # pauseMigration()
+desc = "Testnet PUH stage 0/1: ChainAssetHandler.pauseMigration() — freezes cross-chain migrations during the upgrade window (re-asserted unconditionally at the head of stage 1)."
+
+[[entries]]
+target = "tn_atlas_gov_upgrade_timer"
+selector = "0xa39f7449"  # startTimer()
+desc = "Testnet PUH stage 0: Atlas (ZKsync OS) GovernanceUpgradeTimer.startTimer() — starts the Atlas-side deadline; stage 1 checkDeadline() asserts against it."
+
+[[entries]]
+target = "tn_era_gov_upgrade_timer"
+selector = "0xa39f7449"  # startTimer()
+desc = "Testnet PUH stage 0: Era GovernanceUpgradeTimer.startTimer() — starts the Era-side deadline."
+
+[[entries]]
+target = "tn_puh_proxy_admin"
+selector = "0x9623609d"  # upgradeAndCall(address,address,bytes)
+arg0_address = "tn_puh"
+desc = "Testnet PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH proxy 0x803e5e7a…, new PUH impl 0x21aa63b9…, empty) — upgrades the ProtocolUpgradeHandler proxy itself (PUH/Guardians redeploy)."
+
+[[entries]]
+target = "tn_puh"
+selector = "0xdbfe3e96"  # updateSecurityCouncil(address)
+desc = "Testnet PUH stage 0: PUH.updateSecurityCouncil(0x98d22faa…) — point PUH at the freshly deployed SecurityCouncil."
+
+[[entries]]
+target = "tn_puh"
+selector = "0x691616c5"  # updateGuardians(address)
+desc = "Testnet PUH stage 0: PUH.updateGuardians(0x21f2372b…) — point PUH at the freshly deployed Guardians."
+
+[[entries]]
+target = "tn_puh"
+selector = "0x7aedf337"  # updateEmergencyUpgradeBoard(address)
+desc = "Testnet PUH stage 0: PUH.updateEmergencyUpgradeBoard(0x639b577e…) — point PUH at the freshly deployed EmergencyUpgradeBoard (embeds the new SecurityCouncil + Guardians)."
+
+[[entries]]
+target = "tn_atlas_ctm"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 0: Atlas CTM.acceptOwnership() — completes the Ownable2Step transfer queued via the legacy-Gov ceremony; PUH now owns the Atlas CTM."
+
+[[entries]]
+target = "tn_atlas_validator_timelock"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 0: Atlas ValidatorTimelock.acceptOwnership() — completes the VT ownership transfer to PUH (queued in the transferOwnership bundle above)."
+
+[[entries]]
+target = "tn_atlas_gov_upgrade_timer"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 0: Atlas GovernanceUpgradeTimer.acceptOwnership() — completes the legacy-Gov transfer to PUH."
+
+[[entries]]
+target = "tn_atlas_rollup_da_manager"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 0: Atlas RollupDAManager.acceptOwnership() — completes the legacy-Gov transfer to PUH."
+
+[[entries]]
+target = "tn_atlas_verifier"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 0: Atlas ZKsync OS verifier.acceptOwnership() — completes the deployer-issued verifier transfer to PUH."
+
+# ─── Stage 1: ecosystem TPA impl swaps (one PA for everything; disambiguated by arg0 proxy) ───
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"  # upgrade(address,address)
+arg0_address = "tn_bridgehub"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(Bridgehub 0xc4fd2580…, newImpl) — swaps Bridgehub impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_l1_nullifier"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(L1Nullifier 0x9e24e2c2…, newImpl) — swaps L1Nullifier impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_l1_asset_router"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(L1AssetRouter 0xb5d9c3f4…, newImpl) — swaps L1AssetRouter impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_ntv"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(NativeTokenVault 0xf8d4a519…, newImpl) — swaps NTV impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x9623609d"  # upgradeAndCall(address,address,bytes)
+arg0_address = "tn_message_root"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgradeAndCall(MessageRoot 0xe7047cd9…, newImpl, initData) — swaps MessageRoot impl + runs the v31 reinitializer."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_ctm_deployment_tracker"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(CTMDeploymentTracker 0x6fce8bb8…, newImpl) — swaps CTMDeploymentTracker impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_chain_asset_handler"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(ChainAssetHandler 0xdfa2193b…, newImpl) — swaps ChainAssetHandler impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_atlas_ctm"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(Atlas CTM 0x54d55e74…, newImpl) — swaps the Atlas (ZKsync OS) CTM impl to v31 (Atlas CTM is under the shared ecosystem TPA on testnet)."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_atlas_validator_timelock"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(Atlas ValidatorTimelock 0x73b668d8…, newImpl) — swaps the Atlas ValidatorTimelock impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_era_ctm"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(Era CTM 0x3cc81628…, newImpl) — swaps the Era CTM impl to v31."
+
+[[entries]]
+target = "tn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "tn_era_validator_timelock"
+desc = "Testnet PUH stage 1: ecosystem TPA.upgrade(Era ValidatorTimelock 0x2d259801…, newImpl) — swaps the Era ValidatorTimelock impl to v31."
+
+# ─── Stage 1: wiring / timer + validator checks / CTM version registration ───
+# (The ChainRegistrationSender / L1AssetTracker acceptOwnership() calls moved to
+#  stage 0 — see the stage-0 deferred-accept block above.)
+[[entries]]
+target = "tn_chain_registration_sender"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 0: ChainRegistrationSender.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns ChainRegistrationSender."
+
+[[entries]]
+target = "tn_l1_asset_tracker"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 0: L1AssetTracker.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns the L1AssetTracker."
+
+[[entries]]
+target = "tn_ntv"
+selector = "0xe26daa7e"  # setAssetTracker(address)
+desc = "Testnet PUH stage 1: NTV.setAssetTracker(L1AssetTracker 0x150d2f16…) — wires NTV to push balance updates to the L1AT."
+
+[[entries]]
+target = "tn_bridgehub"
+selector = "0xa17223b0"  # setAddressesV31(address)
+desc = "Testnet PUH stage 1: Bridgehub.setAddressesV31(ChainRegistrationSender 0xdFf4C579…) — wires Bridgehub to the v31 ChainRegistrationSender."
+
+[[entries]]
+target = "tn_chain_asset_handler"
+selector = "0xbc3a429b"  # setAddresses
+desc = "Testnet PUH stage 1: ChainAssetHandler.setAddresses(...) — post-upgrade pointer fixups (bridgehub / AR / AT / etc.)."
+
+[[entries]]
+target = "tn_era_rollup_da_manager"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Testnet PUH stage 0: Era RollupDAManager.acceptOwnership() — completes the deployer-issued transfer to PUH. The v31-redeployed manager already has the rollup DA pair registered at deploy time, so no governance updateDAPair() call is needed."
+
+[[entries]]
+target = "tn_atlas_gov_upgrade_timer"
+selector = "0x43bf9936"  # checkDeadline()
+desc = "Testnet PUH stage 1: Atlas GovernanceUpgradeTimer.checkDeadline() — asserts the stage-0 deadline window has elapsed (sim injects evm_increaseTime)."
+
+[[entries]]
+target = "tn_atlas_upgrade_stage_validator"
+selector = "0x386584cf"  # checkMigrationsPaused()
+desc = "Testnet PUH stage 1: Atlas UpgradeStageValidator.checkMigrationsPaused() — sanity: stage-0 pauseMigration took effect for Atlas chains."
+
+[[entries]]
+target = "tn_atlas_ctm"
+selector = "0x9b016b8b"  # setChainCreationParams
+desc = "Testnet PUH stage 1: Atlas CTM.setChainCreationParams(...) — sets v31 chain-creation params for Atlas (ZKsync OS) chains."
+
+[[entries]]
+target = "tn_atlas_ctm"
+selector = "0x8265f458"  # setNewVersionUpgrade
+desc = "Testnet PUH stage 1: Atlas CTM.setNewVersionUpgrade(...) — registers the v31 upgrade hash on the Atlas CTM."
+
+[[entries]]
+target = "tn_era_gov_upgrade_timer"
+selector = "0x43bf9936"  # checkDeadline()
+desc = "Testnet PUH stage 1: Era GovernanceUpgradeTimer.checkDeadline() — Era-side deadline check."
+
+[[entries]]
+target = "tn_era_upgrade_stage_validator"
+selector = "0x386584cf"  # checkMigrationsPaused()
+desc = "Testnet PUH stage 1: Era UpgradeStageValidator.checkMigrationsPaused() — sanity check for Era chains."
+
+[[entries]]
+target = "tn_era_ctm"
+selector = "0x9b016b8b"  # setChainCreationParams
+desc = "Testnet PUH stage 1: Era CTM.setChainCreationParams(...) — sets v31 chain-creation params for Era chains."
+
+[[entries]]
+target = "tn_era_ctm"
+selector = "0x8265f458"  # setNewVersionUpgrade
+desc = "Testnet PUH stage 1: Era CTM.setNewVersionUpgrade(...) — registers the v31 upgrade hash on the Era CTM."
+
+# ─── Stage 2: activation (gateway-less testnet → no new-Gateway bring-up calls) ───
+[[entries]]
+target = "tn_chain_asset_handler"
+selector = "0xf7c7eb92"  # unpauseMigration()
+desc = "Testnet PUH stage 2: ChainAssetHandler.unpauseMigration() — re-enables cross-chain migrations now that all impls are swapped."
+
+[[entries]]
+target = "tn_atlas_upgrade_stage_validator"
+selector = "0x37076ce3"  # checkProtocolUpgradePresence()
+desc = "Testnet PUH stage 2: Atlas UpgradeStageValidator.checkProtocolUpgradePresence() — sanity: v31 upgrade hash registered on every Atlas chain."
+
+[[entries]]
+target = "tn_atlas_upgrade_stage_validator"
+selector = "0x407a5a0b"  # checkMigrationsUnpaused()
+desc = "Testnet PUH stage 2: Atlas UpgradeStageValidator.checkMigrationsUnpaused() — sanity: migrations unpaused for Atlas chains."
+
+[[entries]]
+target = "tn_era_upgrade_stage_validator"
+selector = "0x37076ce3"  # checkProtocolUpgradePresence()
+desc = "Testnet PUH stage 2: Era UpgradeStageValidator.checkProtocolUpgradePresence() — sanity for Era chains."
+
+[[entries]]
+target = "tn_era_upgrade_stage_validator"
+selector = "0x407a5a0b"  # checkMigrationsUnpaused()
+desc = "Testnet PUH stage 2: Era UpgradeStageValidator.checkMigrationsUnpaused() — sanity for Era chains."
+
+# ─── Post-upgrade smoke tests (from [test_*]; not part of the governance ceremony) ───
+[[entries]]
+target = "tn_bridgehub"
+selector = "0xf113c88b"  # createNewChain
+arg0_address = "0x000000000000000000000000000000000000022b"  # chainId 555 (Era test chain)
+desc = "Testnet test (post-upgrade smoke): Bridgehub.createNewChain(chainId 555, Era CTM) — verifies a fresh Era chain can be created on v31."
+
+[[entries]]
+target = "tn_bridgehub"
+selector = "0xf113c88b"  # createNewChain
+arg0_address = "0x000000000000000000000000000000000000022c"  # chainId 556 (ZKsync OS test chain)
+desc = "Testnet test (post-upgrade smoke): Bridgehub.createNewChain(chainId 556, Atlas/ZKsync OS CTM) — verifies a fresh ZKsync OS chain can be created on v31."
+
+[[entries]]
+target = "tn_era_test_chain"
+selector = "0xfc57565f"  # upgradeChainFromVersion
+desc = "Testnet test (post-upgrade smoke): upgrade the registered Era chain 301 (upgradeChainFromVersion) — verifies the upgrade path for an existing Era chain."
+
+[[entries]]
+target = "tn_zkos_test_chain"
+selector = "0xfc57565f"  # upgradeChainFromVersion
+desc = "Testnet test (post-upgrade smoke): upgrade an existing ZKsync OS chain (upgradeChainFromVersion) — verifies the upgrade path for an existing ZKsync OS chain."
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MAINNET — multi-CTM (Era chain 324 + Atlas/ZKsync OS chain 30715), Gateway
+# present (legacy GW chain 9075 decommissioned in stage 2). The Atlas CTM and
+# its ValidatorTimelock / GovUpgradeTimer / RollupDAManager are owned by the
+# legacy Governance.sol (0xC66f0B45…) pre-upgrade and handed to PUH via the
+# scheduleTransparent(op,0)+executeInstant ceremony (bundles 1-13, minDelay=0,
+# securityCouncil=0 so executeInstant runs from address 0x0 under the sim).
+# Camp-A (deployer 0xD742…) bundles are dropped by the sim. The 3 txs whose
+# addresses coincide with stage (Atlas CTM ProxyAdmin transfer, Atlas ChainAdmin
+# ServerNotifier upgrade) are already labelled correctly by the earlier stage
+# entries via first-match-wins; the rest are covered below.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ─── Bundles 1-13: legacy Gov ceremony — Atlas CTM + aux ownership → PUH ───
+[[entries]]
+target = "mn_legacy_gov"
+selector = "0x2c431917"  # scheduleTransparent
+inner_target = "mn_atlas_ctm"
+inner_selector = "0xf2fde38b"  # transferOwnership(address)
+desc = "Mainnet legacy Gov: scheduleTransparent — queues Atlas (ZKsync OS) CTM.transferOwnership(PUH). The Atlas CTM is owned by the legacy Governance pre-upgrade; this hands control to PUH (Ownable2Step; PUH accepts in stage 0)."
+
+[[entries]]
+target = "mn_legacy_gov"
+selector = "0x74da756b"  # execute (onlyOwnerOrSecurityCouncil; op ready at delay 0)
+inner_target = "mn_atlas_ctm"
+inner_selector = "0xf2fde38b"
+desc = "Mainnet legacy Gov: execute — runs the scheduled Atlas CTM.transferOwnership(PUH) now, called by the EOA owner (delay 0 → op ready in-block; no security council needed). PUH accepts in stage 0."
+
+[[entries]]
+target = "mn_legacy_gov"
+selector = "0x2c431917"
+inner_target = "mn_atlas_validator_timelock"
+inner_selector = "0xf2fde38b"
+desc = "Mainnet legacy Gov: scheduleTransparent — queues Atlas ValidatorTimelock.transferOwnership(PUH) (Ownable2Step). PUH accepts in stage 0."
+
+[[entries]]
+target = "mn_legacy_gov"
+selector = "0x74da756b"  # execute (onlyOwnerOrSecurityCouncil; op ready at delay 0)
+inner_target = "mn_atlas_validator_timelock"
+inner_selector = "0xf2fde38b"
+desc = "Mainnet legacy Gov: execute — runs the scheduled Atlas ValidatorTimelock.transferOwnership(PUH) now, called by the EOA owner (delay 0). PUH accepts in stage 0."
+
+[[entries]]
+target = "mn_legacy_gov"
+selector = "0x2c431917"
+inner_target = "mn_atlas_ctm_proxy_admin"
+inner_selector = "0xf2fde38b"
+desc = "Mainnet legacy Gov: scheduleTransparent — queues Atlas CTM ProxyAdmin.transferOwnership(PUH). Hands the standalone Atlas PA (single-step Ownable v4) to PUH so PUH can upgrade the Atlas CTM impl in stage 1."
+
+[[entries]]
+target = "mn_legacy_gov"
+selector = "0x74da756b"  # execute (onlyOwnerOrSecurityCouncil; op ready at delay 0)
+inner_target = "mn_atlas_ctm_proxy_admin"
+inner_selector = "0xf2fde38b"
+desc = "Mainnet legacy Gov: execute — runs the scheduled Atlas CTM ProxyAdmin.transferOwnership(PUH) now, called by the EOA owner (delay 0). The Atlas PA is now owned by PUH."
+
+[[entries]]
+target = "mn_legacy_gov"
+selector = "0x2c431917"
+inner_target = "mn_atlas_gov_timer"
+inner_selector = "0xf2fde38b"
+desc = "Mainnet legacy Gov: scheduleTransparent — queues Atlas GovernanceUpgradeTimer.transferOwnership(PUH). PUH accepts in stage 0."
+
+[[entries]]
+target = "mn_legacy_gov"
+selector = "0x74da756b"  # execute (onlyOwnerOrSecurityCouncil; op ready at delay 0)
+inner_target = "mn_atlas_gov_timer"
+inner_selector = "0xf2fde38b"
+desc = "Mainnet legacy Gov: execute — runs the scheduled Atlas GovernanceUpgradeTimer.transferOwnership(PUH) now, called by the EOA owner (delay 0). PUH accepts in stage 0."
+
+[[entries]]
+target = "mn_legacy_gov"
+selector = "0x2c431917"
+inner_target = "mn_atlas_rollup_da_manager"
+inner_selector = "0xf2fde38b"
+desc = "Mainnet legacy Gov: scheduleTransparent — queues Atlas RollupDAManager.transferOwnership(PUH). PUH accepts in stage 0."
+
+[[entries]]
+target = "mn_legacy_gov"
+selector = "0x74da756b"  # execute (onlyOwnerOrSecurityCouncil; op ready at delay 0)
+inner_target = "mn_atlas_rollup_da_manager"
+inner_selector = "0xf2fde38b"
+desc = "Mainnet legacy Gov: execute — runs the scheduled Atlas RollupDAManager.transferOwnership(PUH) now, called by the EOA owner (delay 0). PUH accepts in stage 0."
+
+# ─── ChainAdmin multicalls — in-place ServerNotifier upgrades (signed by 0x4e4943…) ───
+[[entries]]
+target = "mn_era_chain_admin"
+selector = "0x69340beb"  # multicall
+inner_target = "mn_era_serdnotifier_proxy_admin"  # existing Era ServerNotifier's ProxyAdmin
+inner_selector = "0x99a88ec4"  # upgrade(address,address)
+desc = "Mainnet Era ChainAdmin: multicall → ProxyAdmin(0x257fc0c3…).upgrade(existing Era ServerNotifier proxy 0xfca808a7…, newImpl). IN-PLACE ServerNotifier upgrade — proxy address stays stable, off-chain server config doesn't change. (Era ServerNotifier ownership is already the ChainAdmin, so no acceptOwnership is folded in.)"
+
+[[entries]]
+target = "mn_atlas_chain_admin"
+selector = "0x69340beb"  # multicall
+desc = "Mainnet Atlas ChainAdmin: multicall → [ProxyAdmin(0xe5f57E87…).upgrade(existing Atlas ServerNotifier proxy 0xBfaa7332…, newImpl), ServerNotifier.acceptOwnership()]. IN-PLACE ServerNotifier upgrade PLUS completes the dangling Ownable2Step transfer of the Atlas ServerNotifier to this ChainAdmin (its pendingOwner)."
+
+# ─── Stage 0: PUH governance (pause, timers, PUH/Guardians redeploy, acceptOwnership) ───
+[[entries]]
+target = "mn_chain_asset_handler"
+selector = "0xac700e63"  # pauseMigration()
+desc = "Mainnet PUH stage 0/1: ChainAssetHandler.pauseMigration() — freezes cross-chain migrations during the upgrade window (re-asserted unconditionally at the head of stage 1)."
+
+[[entries]]
+target = "mn_era_gov_timer"
+selector = "0xa39f7449"  # startTimer()
+desc = "Mainnet PUH stage 0: Era GovernanceUpgradeTimer.startTimer() — starts the Era-side deadline; stage 1 checkDeadline() asserts against it."
+
+[[entries]]
+target = "mn_atlas_gov_timer"
+selector = "0xa39f7449"  # startTimer()
+desc = "Mainnet PUH stage 0: Atlas (ZKsync OS) GovernanceUpgradeTimer.startTimer() — starts the Atlas-side deadline."
+
+[[entries]]
+target = "mn_puh_proxy_admin"
+selector = "0x9623609d"  # upgradeAndCall(address,address,bytes)
+arg0_address = "mn_puh"
+desc = "Mainnet PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH proxy 0xE30Dca30…, new PUH impl 0x6c0f001c…, empty) — upgrades the ProtocolUpgradeHandler proxy itself (PUH/Guardians redeploy)."
+
+[[entries]]
+target = "mn_puh"
+selector = "0xdbfe3e96"  # updateSecurityCouncil(address)
+desc = "Mainnet PUH stage 0: PUH.updateSecurityCouncil(0x29d2e773…) — point PUH at the freshly deployed SecurityCouncil."
+
+[[entries]]
+target = "mn_puh"
+selector = "0x691616c5"  # updateGuardians(address)
+desc = "Mainnet PUH stage 0: PUH.updateGuardians(0x8f525e55…) — point PUH at the freshly deployed Guardians."
+
+[[entries]]
+target = "mn_puh"
+selector = "0x7aedf337"  # updateEmergencyUpgradeBoard(address)
+desc = "Mainnet PUH stage 0: PUH.updateEmergencyUpgradeBoard(0x91989f9b…) — point PUH at the freshly deployed EmergencyUpgradeBoard (embeds the new SecurityCouncil + Guardians)."
+
+[[entries]]
+target = "mn_atlas_ctm"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Mainnet PUH stage 0: Atlas CTM.acceptOwnership() — completes the Ownable2Step transfer queued via the legacy-Gov ceremony; PUH now owns the Atlas CTM."
+
+[[entries]]
+target = "mn_atlas_validator_timelock"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Mainnet PUH stage 0: Atlas ValidatorTimelock.acceptOwnership() — completes the legacy-Gov transfer to PUH."
+
+[[entries]]
+target = "mn_l1_asset_tracker"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Mainnet PUH stage 0: L1AssetTracker.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns the L1AssetTracker."
+
+[[entries]]
+target = "mn_chain_registration_sender"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Mainnet PUH stage 0: ChainRegistrationSender.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns ChainRegistrationSender."
+
+[[entries]]
+target = "mn_era_rollup_da_manager"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Mainnet PUH stage 0: Era RollupDAManager.acceptOwnership() — completes the deployer-issued transfer to PUH. The v31-redeployed manager already has the rollup DA pair registered at deploy time, so no governance updateDAPair() call is needed."
+
+[[entries]]
+target = "mn_atlas_gov_timer"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Mainnet PUH stage 0: Atlas GovernanceUpgradeTimer.acceptOwnership() — completes the legacy-Gov transfer to PUH."
+
+[[entries]]
+target = "mn_atlas_rollup_da_manager"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Mainnet PUH stage 0: Atlas RollupDAManager.acceptOwnership() — completes the legacy-Gov transfer to PUH."
+
+[[entries]]
+target = "mn_atlas_verifier"
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "Mainnet PUH stage 0: Atlas (ZKsync OS) verifier.acceptOwnership() — completes the deployer-issued verifier transfer to PUH."
+
+# ─── Stage 1: ecosystem TPA impl swaps (disambiguated by arg0 proxy) + Atlas PA swaps + wiring ───
+[[entries]]
+target = "mn_ecosystem_tpa"
+selector = "0x99a88ec4"  # upgrade(address,address)
+arg0_address = "mn_bridgehub"
+desc = "Mainnet PUH stage 1: ecosystem TPA.upgrade(Bridgehub 0x303a465b…, newImpl) — swaps Bridgehub impl to v31."
+
+[[entries]]
+target = "mn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "mn_l1_nullifier"
+desc = "Mainnet PUH stage 1: ecosystem TPA.upgrade(L1Nullifier 0xd7f9f541…, newImpl) — swaps L1Nullifier impl to v31."
+
+[[entries]]
+target = "mn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "mn_l1_asset_router"
+desc = "Mainnet PUH stage 1: ecosystem TPA.upgrade(L1AssetRouter 0x8829ad80…, newImpl) — swaps L1AssetRouter impl to v31."
+
+[[entries]]
+target = "mn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "mn_ntv"
+desc = "Mainnet PUH stage 1: ecosystem TPA.upgrade(NativeTokenVault 0xbed1eb54…, newImpl) — swaps NTV impl to v31."
+
+[[entries]]
+target = "mn_ecosystem_tpa"
+selector = "0x9623609d"  # upgradeAndCall(address,address,bytes)
+arg0_address = "mn_message_root"
+desc = "Mainnet PUH stage 1: ecosystem TPA.upgradeAndCall(MessageRoot 0x5ce92577…, newImpl, initData) — swaps MessageRoot impl + runs the v31 reinitializer."
+
+[[entries]]
+target = "mn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "mn_ctm_deployment_tracker"
+desc = "Mainnet PUH stage 1: ecosystem TPA.upgrade(CTMDeploymentTracker 0x6078f6b3…, newImpl) — swaps CTMDeploymentTracker impl to v31."
+
+[[entries]]
+target = "mn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "mn_chain_asset_handler"
+desc = "Mainnet PUH stage 1: ecosystem TPA.upgrade(ChainAssetHandler 0xdd5cb8b9…, newImpl) — swaps ChainAssetHandler impl to v31."
+
+[[entries]]
+target = "mn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "mn_era_ctm"
+desc = "Mainnet PUH stage 1: ecosystem TPA.upgrade(Era CTM 0xc2ee6b6a…, newImpl) — swaps the Era CTM impl to v31."
+
+[[entries]]
+target = "mn_ecosystem_tpa"
+selector = "0x99a88ec4"
+arg0_address = "mn_era_validator_timelock"
+desc = "Mainnet PUH stage 1: ecosystem TPA.upgrade(Era ValidatorTimelock 0x2e5110cf…, newImpl) — swaps the Era ValidatorTimelock impl to v31."
+
+# Atlas CTM has its OWN ProxyAdmin (0xff3582a0…) — used for both the Atlas CTM diamond and the Atlas ValidatorTimelock.
+[[entries]]
+target = "mn_atlas_ctm_proxy_admin"
+selector = "0x99a88ec4"
+arg0_address = "mn_atlas_ctm"
+desc = "Mainnet PUH stage 1: Atlas CTM ProxyAdmin.upgrade(Atlas CTM 0x1adf137f…, newImpl). PUH owns this PA now (bundle 5 + stage-0 acceptOwnership set it up)."
+
+[[entries]]
+target = "mn_atlas_ctm_proxy_admin"
+selector = "0x99a88ec4"
+arg0_address = "mn_atlas_validator_timelock"
+desc = "Mainnet PUH stage 1: Atlas CTM ProxyAdmin.upgrade(Atlas ValidatorTimelock 0x18cc3817…, newImpl) — swaps the Atlas ValidatorTimelock impl to v31."
+
+[[entries]]
+target = "mn_ntv"
+selector = "0xe26daa7e"  # setAssetTracker(address)
+desc = "Mainnet PUH stage 1: NTV.setAssetTracker(L1AssetTracker 0x8ef17384…) — wires NTV to push balance updates to the L1AT."
+
+[[entries]]
+target = "mn_bridgehub"
+selector = "0xa17223b0"  # setAddressesV31(address)
+desc = "Mainnet PUH stage 1: Bridgehub.setAddressesV31(ChainRegistrationSender 0x7f60f575…) — wires Bridgehub to the v31 ChainRegistrationSender."
+
+[[entries]]
+target = "mn_chain_asset_handler"
+selector = "0xbc3a429b"  # setAddresses
+desc = "Mainnet PUH stage 1: ChainAssetHandler.setAddresses(...) — post-upgrade pointer fixups (bridgehub / AR / AT / etc.)."
+
+[[entries]]
+target = "mn_era_gov_timer"
+selector = "0x43bf9936"  # checkDeadline()
+desc = "Mainnet PUH stage 1: Era GovernanceUpgradeTimer.checkDeadline() — asserts the stage-0 Era deadline window has elapsed (sim injects evm_increaseTime)."
+
+[[entries]]
+target = "mn_atlas_gov_timer"
+selector = "0x43bf9936"  # checkDeadline()
+desc = "Mainnet PUH stage 1: Atlas GovernanceUpgradeTimer.checkDeadline() — Atlas-side deadline check."
+
+[[entries]]
+target = "mn_era_upgrade_stage_validator"
+selector = "0x386584cf"  # checkMigrationsPaused()
+desc = "Mainnet PUH stage 1: Era UpgradeStageValidator.checkMigrationsPaused() — sanity: stage-0 pauseMigration took effect for Era chains."
+
+[[entries]]
+target = "mn_atlas_upgrade_stage_validator"
+selector = "0x386584cf"  # checkMigrationsPaused()
+desc = "Mainnet PUH stage 1: Atlas UpgradeStageValidator.checkMigrationsPaused() — sanity check for Atlas chains."
+
+[[entries]]
+target = "mn_era_ctm"
+selector = "0x9b016b8b"  # setChainCreationParams
+desc = "Mainnet PUH stage 1: Era CTM.setChainCreationParams(...) — sets v31 chain-creation params (bootloader, defaultAA, genesis, evmEmulator) for Era chains."
+
+[[entries]]
+target = "mn_era_ctm"
+selector = "0x8265f458"  # setNewVersionUpgrade
+desc = "Mainnet PUH stage 1: Era CTM.setNewVersionUpgrade(diamondCut, oldVer, oldEnd, newVer) — registers the v31 upgrade hash on the Era CTM."
+
+[[entries]]
+target = "mn_atlas_ctm"
+selector = "0x9b016b8b"  # setChainCreationParams
+desc = "Mainnet PUH stage 1: Atlas CTM.setChainCreationParams(...) — sets v31 chain-creation params for Atlas (ZKsync OS) chains."
+
+[[entries]]
+target = "mn_atlas_ctm"
+selector = "0x8265f458"  # setNewVersionUpgrade
+desc = "Mainnet PUH stage 1: Atlas CTM.setNewVersionUpgrade(...) — registers the v31 upgrade hash on the Atlas CTM."
+
+# ─── Stage 2: activation + legacy Gateway (chain 9075) decommission ───
+[[entries]]
+target = "mn_chain_asset_handler"
+selector = "0xdc1373d6"  # setHistoricalMigrationInterval(uint256,uint256,(...))
+desc = "Mainnet PUH stage 2 (legacy GW decommission): ChainAssetHandler.setHistoricalMigrationInterval(chainId 324, migrationNumber, interval{settlementLayerChainId=9075, ...}) — backfills the historical migration interval for Era chain 324 that round-tripped through the legacy Gateway (chain 9075), so its migration history is retained under the new asset-handler."
+
+[[entries]]
+target = "mn_bridgehub"
+selector = "0x1d016d30"  # setSettlementLayerStatus(uint256,bool)
+desc = "Mainnet PUH stage 2 (legacy GW decommission): Bridgehub.setSettlementLayerStatus(legacy GW chain 9075, false) — blacklists the legacy Gateway chain as a settlement layer so chains can't migrate back to it. Final call of the decommission sequence."
+
+[[entries]]
+target = "mn_chain_asset_handler"
+selector = "0xf7c7eb92"  # unpauseMigration()
+desc = "Mainnet PUH stage 2: ChainAssetHandler.unpauseMigration() — re-enables cross-chain migrations now that all impls are swapped."
+
+[[entries]]
+target = "mn_era_upgrade_stage_validator"
+selector = "0x37076ce3"  # checkProtocolUpgradePresence()
+desc = "Mainnet PUH stage 2: Era UpgradeStageValidator.checkProtocolUpgradePresence() — sanity: v31 upgrade hash registered on every Era chain."
+
+[[entries]]
+target = "mn_era_upgrade_stage_validator"
+selector = "0x407a5a0b"  # checkMigrationsUnpaused()
+desc = "Mainnet PUH stage 2: Era UpgradeStageValidator.checkMigrationsUnpaused() — sanity: migrations unpaused for Era chains."
+
+[[entries]]
+target = "mn_atlas_upgrade_stage_validator"
+selector = "0x37076ce3"  # checkProtocolUpgradePresence()
+desc = "Mainnet PUH stage 2: Atlas UpgradeStageValidator.checkProtocolUpgradePresence() — sanity for Atlas (ZKsync OS) chains."
+
+[[entries]]
+target = "mn_atlas_upgrade_stage_validator"
+selector = "0x407a5a0b"  # checkMigrationsUnpaused()
+desc = "Mainnet PUH stage 2: Atlas UpgradeStageValidator.checkMigrationsUnpaused() — sanity for Atlas chains."
+
+# ─── Post-upgrade smoke tests (from [test_upgrade_calls]; not part of the governance ceremony) ───
+[[entries]]
+target = "mn_bridgehub"
+selector = "0xf113c88b"  # createNewChain
+arg0_address = "0x000000000000000000000000000000000000022b"  # chainId 555 (Era test chain)
+desc = "Mainnet test (post-upgrade smoke): Bridgehub.createNewChain(chainId 555, Era CTM) — verifies a fresh Era chain can be created on the v31 protocol version."
+
+[[entries]]
+target = "mn_bridgehub"
+selector = "0xf113c88b"  # createNewChain
+arg0_address = "0x000000000000000000000000000000000000022c"  # chainId 556 (ZKsync OS test chain)
+desc = "Mainnet test (post-upgrade smoke): Bridgehub.createNewChain(chainId 556, Atlas/ZKsync OS CTM) — verifies a fresh ZKsync OS chain can be created on v31."
+
+[[entries]]
+target = "mn_era_diamond"
+selector = "0xfc57565f"  # upgradeChainFromVersion
+desc = "Mainnet test (post-upgrade smoke): upgrade the real Era chain 324 (upgradeChainFromVersion) — verifies the upgrade path for the existing Era chain."
+
+[[entries]]
+target = "mn_zkos_test_chain"
+selector = "0xfc57565f"  # upgradeChainFromVersion
+desc = "Mainnet test (post-upgrade smoke): upgrade an existing Atlas (ZKsync OS) chain (upgradeChainFromVersion) — verifies the upgrade path for the existing ZKsync OS chain."

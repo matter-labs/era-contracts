@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+use crate::types::L2DACommitmentScheme;
 use crate::upgrade_verification::{
     artifacts::{
         required_address_in_value as required_address, CtmFlavor, EcosystemUpgradeArtifact,
@@ -11,8 +12,8 @@ use crate::upgrade_verification::{
             fee_param_verifier::{FeeParamVerifier, FeeParams},
             network_verifier::{
                 Bridgehub as BridgehubContract, ChainRegistrationSender, ChainTypeManager,
-                L1AssetRouter, L1AssetTracker, Ownable, Ownable2Step, ValidatorTimelock,
-                ZKChainFeeParams,
+                L1AssetRouter, L1AssetTracker, L1NativeTokenVault, Ownable, Ownable2Step,
+                RollupDAManager, ValidatorTimelock, ZKChainFeeParams,
             },
         },
         MAX_PRIORITY_TX_GAS_LIMIT, STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID,
@@ -26,12 +27,47 @@ use alloy::{
 };
 
 const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
+/// AllContractsHashes entry name for the ecosystem TransitionaryOwner.
+const TRANSITIONARY_OWNER_CONTRACT_FILE: &str = "l1-contracts/TransitionaryOwner";
+
+alloy::sol! {
+    #[sol(rpc)]
+    interface ITransitionaryOwner {
+        function GOVERNANCE_ADDRESS() external view returns (address);
+    }
+}
+
+/// The accepted post-aux ownership end-state for an Ownable2Step contract handed
+/// to governance during v31. Either governance already owns it (final, after the
+/// stage-0 acceptOwnership), or an intermediate holder owns it with governance
+/// pending: the ecosystem TransitionaryOwner for deployer-deployed contracts, or
+/// the per-CTM ecosystem admin (the pre-existing owner, e.g. the legacy
+/// Governance) for contracts that reach governance via their existing ceremony.
+/// Notably this rejects `owner == <deployer EOA>` — the property the
+/// TransitionaryOwner rollout is meant to guarantee.
+fn owner_reached_governance(
+    owner: Address,
+    pending: Address,
+    governance: Address,
+    transitionary_owner: Option<Address>,
+    ecosystem_admin: Address,
+) -> bool {
+    owner == governance
+        || (pending == governance
+            && (Some(owner) == transitionary_owner || owner == ecosystem_admin))
+}
 
 // `DiamondInit` writes the default fee params from `Config.sol` into
 // `ZKChainStorage.s.feeParams`; this slot matches the v31 storage layout.
 const FEE_PARAMS_STORAGE_SLOT: u64 = 38;
 const MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 10_800;
 const TESTNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 0;
+// ZKsync OS (Atlas) chains commit through the `MultisigCommitter` rather than
+// the classic ValidatorTimelock flow, and their ValidatorTimelock proxy carries
+// a zero execution delay on every environment (mainnet included) — unlike Era,
+// which uses the env-standard delay. The v31 upgrade reuses the existing VT
+// proxy, preserving this delay.
+const ZKSYNC_OS_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 0;
 
 /// Core proxies whose EIP-1967 admin slot must match the ecosystem
 /// `transparent_proxy_admin`.
@@ -45,6 +81,7 @@ const CORE_PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
     "ctm_deployment_tracker_proxy",
     "chain_asset_handler_proxy",
     "asset_tracker_proxy",
+    "chain_registration_sender_proxy",
 ];
 
 fn expect_address_eq(
@@ -152,11 +189,19 @@ pub(crate) async fn verify_v31_artifact_state(
 
     verify_l1_chain_id(verifiers, result).await;
     result
-        .expect_deployed_bytecode(verifiers, &create2_factory, CREATE2_FACTORY_CONTRACT_NAME)
+        .expect_deployed_bytecode(
+            verifiers,
+            &create2_factory,
+            CREATE2_FACTORY_CONTRACT_NAME,
+            false,
+        )
         .await;
     verify_v31_proxy_admins(artifact, verifiers, result).await?;
     verify_v31_core_wiring(artifact, verifiers, result).await?;
     verify_v31_validator_timelocks(artifact, verifiers, result).await?;
+    verify_v31_rollup_da_managers(artifact, verifiers, result).await?;
+    verify_v31_zksync_os_verifier_ownership(artifact, verifiers, result).await?;
+    verify_v31_transitionary_owner(artifact, verifiers, result).await?;
     verify_v31_era_fee_params(verifiers, result).await;
     verify_v31_timer_admin_state(artifact, verifiers, result).await?;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
@@ -190,8 +235,17 @@ async fn verify_v31_proxy_admins(
         &["upgrade_addresses", "shared", "transparent_proxy_admin"],
     )?;
 
+    // The core `transparent_proxy_admin` is a pre-existing contract that v31
+    // does not redeploy. On split-era/legacy testnets it predates the current
+    // repo, so its bytecode hash won't match the current TransparentProxyAdmin
+    // — tolerate as a warning (its ownership is verified separately below).
     result
-        .expect_deployed_bytecode(verifiers, &expected_core_admin, "TransparentProxyAdmin")
+        .expect_deployed_bytecode(
+            verifiers,
+            &expected_core_admin,
+            "TransparentProxyAdmin",
+            true,
+        )
         .await;
 
     let admin_slot = match FixedBytes::<32>::from_hex(EIP1967_PROXY_ADMIN_SLOT) {
@@ -245,6 +299,11 @@ async fn verify_v31_proxy_admins(
         for (proxy_label, proxy_path) in [
             ("chain_type_manager_proxy", "chain_type_manager_proxy"),
             ("validator_timelock_addr", "validator_timelock_addr"),
+            ("bytecodes_supplier_addr", "bytecodes_supplier_addr"),
+            (
+                "permissionless_validator_addr",
+                "permissionless_validator_addr",
+            ),
         ] {
             let proxy_addr =
                 required_address(&ctm.value, &scope, &["state_transition", proxy_path])?;
@@ -308,6 +367,11 @@ async fn verify_v31_core_wiring(
         &artifact.core,
         "core",
         &["upgrade_addresses", "native_token_vault_addr"],
+    )?;
+    let expected_bridged_token_beacon = required_address(
+        &artifact.core,
+        "core",
+        &["upgrade_addresses", "bridges", "bridged_token_beacon"],
     )?;
     let expected_tracker = required_address(
         &artifact.core,
@@ -384,7 +448,9 @@ async fn verify_v31_core_wiring(
             "Failed to call L1AssetRouter.owner() for core wiring checks: {err}"
         )),
     }
-    let era_chain_id = U256::from(verifiers.era_chain_id);
+    // L1AssetRouter is a core withdrawal contract: its ERA_CHAIN_ID() is the
+    // LEGACY era (270 on split-era testnet), not the registered era (301).
+    let era_chain_id = U256::from(verifiers.legacy_era_chain_id);
     match asset_router.ERA_CHAIN_ID().call().await {
         Ok(actual) => {
             expect_debug_eq(result, "L1AssetRouter.eraChainId()", &actual, &era_chain_id);
@@ -414,6 +480,37 @@ async fn verify_v31_core_wiring(
         ),
         Err(err) => result.report_error(&format!(
             "Failed to call L1AssetRouter.nativeTokenVault() for core wiring checks: {err}"
+        )),
+    }
+
+    let ntv = L1NativeTokenVault::new(expected_ntv, provider.clone());
+    match ntv.bridgedTokenBeacon().call().await {
+        Ok(actual_beacon) => {
+            expect_address_eq(
+                result,
+                "L1NativeTokenVault.bridgedTokenBeacon()",
+                actual_beacon,
+                expected_bridged_token_beacon,
+            );
+            if actual_beacon == Address::ZERO {
+                result.report_error("L1NativeTokenVault.bridgedTokenBeacon() is address(0)");
+            } else {
+                let beacon_owner = Ownable::new(actual_beacon, provider.clone());
+                match beacon_owner.owner().call().await {
+                    Ok(actual_owner) => expect_address_eq(
+                        result,
+                        "L1NativeTokenVault.bridgedTokenBeacon().owner()",
+                        actual_owner,
+                        bridgehub_owner,
+                    ),
+                    Err(err) => result.report_error(&format!(
+                        "Failed to call bridged token beacon owner() for core wiring checks: {err}"
+                    )),
+                }
+            }
+        }
+        Err(err) => result.report_error(&format!(
+            "Failed to call L1NativeTokenVault.bridgedTokenBeacon() for core wiring checks: {err}"
         )),
     }
 
@@ -548,7 +645,12 @@ async fn verify_v31_validator_timelocks(
         )?;
         let expected_owner =
             required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
-        let expected_delay = if ctm.contracts_config.is_testnet {
+        // ZKsync OS CTMs keep a zero VT execution delay on every env; only the
+        // Era CTM uses the env-standard delay (0 on testnet/stage, 10800 on
+        // mainnet).
+        let expected_delay = if ctm.flavor == CtmFlavor::ZksyncOs {
+            ZKSYNC_OS_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS
+        } else if ctm.contracts_config.is_testnet {
             TESTNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS
         } else {
             MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS
@@ -567,15 +669,35 @@ async fn verify_v31_validator_timelocks(
             )),
         }
 
-        let owner_view = Ownable::new(validator_timelock, provider.clone());
-        match owner_view.owner().call().await {
-            Ok(actual) => expect_address_eq(
-                result,
-                &format!("{label}.ValidatorTimelock.owner()"),
-                actual,
-                expected_owner,
-            ),
-            Err(err) => result.report_error(&format!(
+        // v31 transfers the VT to governance via an Ownable2Step handoff whose
+        // acceptOwnership() is a stage-0 governance call — not executed on this
+        // fork. So accept either a completed transfer (owner == governance) or a
+        // pending one (pendingOwner == governance, accept deferred to stage 0).
+        let vt_ownable = Ownable2Step::new(validator_timelock, provider.clone());
+        match (
+            vt_ownable.owner().call().await,
+            vt_ownable.pendingOwner().call().await,
+        ) {
+            (Ok(owner), _) if owner == expected_owner => result.report_ok(&format!(
+                "{label}.ValidatorTimelock.owner() matches governance ({expected_owner})"
+            )),
+            (Ok(owner), Ok(pending))
+                if owner_reached_governance(
+                    owner,
+                    pending,
+                    expected_owner,
+                    artifact.transitionary_owner,
+                    required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?,
+                ) =>
+            {
+                result.report_ok(&format!(
+                    "{label}.ValidatorTimelock owned by TransitionaryOwner/ecosystem-admin ({owner}) with governance ({expected_owner}) pending (acceptOwnership deferred to stage 0)"
+                ))
+            }
+            (Ok(owner), _) => result.report_error(&format!(
+                "{label}.ValidatorTimelock.owner() mismatch: expected governance {expected_owner} (or TransitionaryOwner with governance pending), got {owner}"
+            )),
+            (Err(err), _) => result.report_error(&format!(
                 "Failed to call {label}.ValidatorTimelock.owner(): {err}"
             )),
         }
@@ -593,6 +715,220 @@ async fn verify_v31_validator_timelocks(
             )),
         }
     }
+    Ok(())
+}
+
+async fn verify_v31_rollup_da_managers(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    let provider = verifiers.network_verifier.get_l1_provider();
+    for ctm in &artifact.ctms {
+        let label = ctm.flavor.label();
+        let scope = format!("ctms.{label}");
+        let rollup_da_manager = required_address(
+            &ctm.value,
+            &scope,
+            &["deployed_addresses", "l1_rollup_da_manager"],
+        )?;
+        let governance = required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
+        let ecosystem_admin =
+            required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?;
+
+        let ownable = Ownable2Step::new(rollup_da_manager, provider.clone());
+        match (
+            ownable.owner().call().await,
+            ownable.pendingOwner().call().await,
+        ) {
+            (Ok(owner), _) if owner == governance => result.report_ok(&format!(
+                "{label}.RollupDAManager.owner() matches governance ({governance})"
+            )),
+            (Ok(owner), Ok(pending))
+                if owner_reached_governance(
+                    owner,
+                    pending,
+                    governance,
+                    artifact.transitionary_owner,
+                    ecosystem_admin,
+                ) =>
+            {
+                result.report_ok(&format!(
+                    "{label}.RollupDAManager owned by TransitionaryOwner/ecosystem-admin ({owner}) with governance ({governance}) pending"
+                ))
+            }
+            (Ok(owner), _) => result.report_error(&format!(
+                "{label}.RollupDAManager.owner() mismatch: expected governance {governance} (or TransitionaryOwner with governance pending), got {owner}"
+            )),
+            (Err(err), _) => result.report_error(&format!(
+                "Failed to call {label}.RollupDAManager.owner(): {err}"
+            )),
+        }
+
+        // When v31 deployed a fresh rollup L1 DA validator for this CTM (Era),
+        // verify the freshly deployed manager + validator bytecode and that the
+        // manager has the rollup DA pair registered at deploy time:
+        // (validator, BLOBS_AND_PUBDATA_KECCAK256) must be an allowed
+        // configuration. A zero validator address means the CTM reuses its
+        // existing manager (ZKsync OS) — its bytecode is a prior-version contract
+        // and its pairs were set up in a prior upgrade, both out of scope here, so
+        // skip these checks.
+        let rollup_l1_da_validator = required_address(
+            &ctm.value,
+            &scope,
+            &["deployed_addresses", "rollup_l1_da_validator_addr"],
+        )?;
+        if rollup_l1_da_validator != Address::ZERO {
+            // Neither contract has immutables, so their runtime bytecode is
+            // deterministic and must match the compiled artifact exactly.
+            result
+                .expect_deployed_bytecode(
+                    verifiers,
+                    &rollup_da_manager,
+                    "l1-contracts/RollupDAManager",
+                    false,
+                )
+                .await;
+            result
+                .expect_deployed_bytecode(
+                    verifiers,
+                    &rollup_l1_da_validator,
+                    "da-contracts/RollupL1DAValidator",
+                    false,
+                )
+                .await;
+
+            let scheme = L2DACommitmentScheme::BlobsAndPubdataKeccak256 as u8;
+            let manager = RollupDAManager::new(rollup_da_manager, provider.clone());
+            match manager
+                .isAllowedDAConfiguration(rollup_l1_da_validator, scheme)
+                .call()
+                .await
+            {
+                Ok(true) => result.report_ok(&format!(
+                    "{label}.RollupDAManager allows the rollup DA pair ({rollup_l1_da_validator}, BLOBS_AND_PUBDATA_KECCAK256)"
+                )),
+                Ok(false) => result.report_error(&format!(
+                    "{label}.RollupDAManager does not allow the rollup DA pair ({rollup_l1_da_validator}, BLOBS_AND_PUBDATA_KECCAK256); the v31 deploy-time updateDAPair did not take effect"
+                )),
+                Err(err) => result.report_error(&format!(
+                    "Failed to call {label}.RollupDAManager.isAllowedDAConfiguration(): {err}"
+                )),
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn verify_v31_zksync_os_verifier_ownership(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    let provider = verifiers.network_verifier.get_l1_provider();
+    // The ZKsync OS dual verifier's ownership is routed to governance (PUH) via
+    // the ecosystem TransitionaryOwner: the deployer transfers the freshly
+    // deployed verifier to it, it accepts + forwards to governance, and governance
+    // accepts in stage 0. Accepted end-states: owner == governance (final), or
+    // owner == TransitionaryOwner with pendingOwner == governance.
+    let transitionary_owner = artifact.transitionary_owner;
+    for ctm in &artifact.ctms {
+        if ctm.flavor != CtmFlavor::ZksyncOs {
+            continue;
+        }
+
+        let label = ctm.flavor.label();
+        let scope = format!("ctms.{label}");
+        let verifier =
+            required_address(&ctm.value, &scope, &["state_transition", "verifier_addr"])?;
+        let governance = required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
+        let ecosystem_admin =
+            required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?;
+
+        let ownable = Ownable2Step::new(verifier, provider.clone());
+        match (
+            ownable.owner().call().await,
+            ownable.pendingOwner().call().await,
+        ) {
+            (Ok(owner), _) if owner == governance => result.report_ok(&format!(
+                "{label}.verifier.owner() matches governance ({governance})"
+            )),
+            (Ok(owner), Ok(pending))
+                if owner_reached_governance(
+                    owner,
+                    pending,
+                    governance,
+                    transitionary_owner,
+                    ecosystem_admin,
+                ) =>
+            {
+                result.report_ok(&format!(
+                    "{label}.verifier owned by TransitionaryOwner/ecosystem-admin ({owner}) with governance ({governance}) pending"
+                ))
+            }
+            (Ok(owner), _) => result.report_error(&format!(
+                "{label}.verifier.owner() mismatch: expected governance {governance} (or TransitionaryOwner with governance pending), got {owner}"
+            )),
+            (Err(err), _) => result.report_error(&format!(
+                "Failed to call {label}.verifier.owner(): {err}"
+            )),
+        }
+    }
+
+    Ok(())
+}
+
+/// Verify the ecosystem TransitionaryOwner (when the aux ownership step routed
+/// contracts through it): its deployed bytecode must match
+/// `l1-contracts/TransitionaryOwner`, and its immutable `GOVERNANCE_ADDRESS`
+/// must equal governance (PUH) — the property that makes it safe to hold
+/// ownership, since it can only ever forward to governance.
+async fn verify_v31_transitionary_owner(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    let Some(transitionary_owner) = artifact.transitionary_owner else {
+        return Ok(());
+    };
+    let governance = verifiers.bridgehub_owner;
+    let provider = verifiers.network_verifier.get_l1_provider();
+
+    // The TransitionaryOwner has an immutable GOVERNANCE_ADDRESS baked into its
+    // runtime bytecode, so a runtime-hash match against AllContractsHashes would
+    // fail. Instead rely on the CREATE2 deploy-tracking, which matched the
+    // deployment's *init* bytecode (+ constructor args) to the known contract at
+    // parse time (requires the TransitionaryOwner deploy tx in the transactions log).
+    match verifiers
+        .network_verifier
+        .create2_known_bytecodes
+        .get(&transitionary_owner)
+    {
+        Some(file) if file.as_str() == TRANSITIONARY_OWNER_CONTRACT_FILE => result.report_ok(&format!(
+            "TransitionaryOwner ({transitionary_owner}) is a recognized {TRANSITIONARY_OWNER_CONTRACT_FILE} CREATE2 deployment"
+        )),
+        Some(other) => result.report_error(&format!(
+            "TransitionaryOwner ({transitionary_owner}) deployment is {other}, expected {TRANSITIONARY_OWNER_CONTRACT_FILE}"
+        )),
+        None => result.report_error(&format!(
+            "TransitionaryOwner ({transitionary_owner}) is not a recognized CREATE2 deployment (missing from the transactions log?)"
+        )),
+    }
+
+    let to = ITransitionaryOwner::new(transitionary_owner, provider.clone());
+    match to.GOVERNANCE_ADDRESS().call().await {
+        Ok(actual) if actual == governance => result.report_ok(&format!(
+            "TransitionaryOwner.GOVERNANCE_ADDRESS() matches governance ({governance})"
+        )),
+        Ok(actual) => result.report_error(&format!(
+            "TransitionaryOwner.GOVERNANCE_ADDRESS() mismatch: expected {governance}, got {actual}"
+        )),
+        Err(err) => result.report_error(&format!(
+            "Failed to call TransitionaryOwner.GOVERNANCE_ADDRESS(): {err}"
+        )),
+    }
+
     Ok(())
 }
 

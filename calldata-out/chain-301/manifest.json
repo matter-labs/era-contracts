@@ -1,0 +1,46 @@
+{
+  "bundles": [
+    {
+      "file": "01_chain.upgrade_0x5555555590930f501c88b73ea43b3eeb5a71643c.safe.json",
+      "index": 1,
+      "steps": [
+        "chain.upgrade"
+      ],
+      "target": "0x5555555590930f501c88b73ea43b3eeb5a71643c",
+      "tx_count": 1
+    },
+    {
+      "file": "02_chain.upgrade_0x5555555590930f501c88b73ea43b3eeb5a71643c.safe.json",
+      "index": 2,
+      "steps": [
+        "chain.upgrade"
+      ],
+      "target": "0x5555555590930f501c88b73ea43b3eeb5a71643c",
+      "tx_count": 1
+    }
+  ],
+  "metadata": [
+    {
+      "command": "chain.upgrade",
+      "input": {},
+      "output": {
+        "access_control_restriction": "0x0000000000000000000000000000000000000000",
+        "admin_address": "0x1d22308cd438c3c4e30f3c5d5b3426bab688208c",
+        "chain_address": "0xd3bc4353957bc0f138318384aa207c708a9455c4",
+        "l1_da_validator": "0xcc46b186bd4515fa996adf3c40344ed7d546a65b",
+        "l2_da_commitment_scheme": "BlobsAndPubdataKeccak256"
+      }
+    },
+    {
+      "command": "chain.upgrade",
+      "input": {},
+      "output": {
+        "access_control_restriction": "0x0000000000000000000000000000000000000000",
+        "admin_address": "0x1d22308cd438c3c4e30f3c5d5b3426bab688208c",
+        "chain_address": "0xd3bc4353957bc0f138318384aa207c708a9455c4",
+        "l1_da_validator": "0xc18954bb455de04d31ac0196adc33bc6579d9174",
+        "l2_da_commitment_scheme": "BlobsAndPubdataKeccak256"
+      }
+    }
+  ]
+}

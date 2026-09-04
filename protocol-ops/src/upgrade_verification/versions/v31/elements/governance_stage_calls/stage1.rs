@@ -1,7 +1,7 @@
 //! Stage 1 — the main upgrade ceremony.
 //!
-//! Non-stage call layout: 11 generated ecosystem-wide core calls
-//! (indices 0..=10), then a 6-call block per `[ctms.<flavor>]` entry,
+//! Non-stage call layout: 12 generated ecosystem-wide core calls
+//! (indices 0..=11), then a 6-call block per `[ctms.<flavor>]` entry,
 //! repeated in artifact order. Stage prepends one emergency-path
 //! `pauseMigration()` call, so all generated calls shift by one there.
 //!
@@ -14,11 +14,13 @@
 
 use alloy::{
     hex,
-    primitives::U256,
+    primitives::{Address, U256},
     sol_types::{SolCall, SolValue},
 };
 use anyhow::Context;
+use serde::Deserialize;
 
+use crate::types::L2DACommitmentScheme;
 use crate::upgrade_verification::{
     artifacts::{CtmArtifact, CtmFlavor, EcosystemUpgradeArtifact},
     verifiers::{VerificationResult, Verifiers},
@@ -42,14 +44,15 @@ use super::helpers::{
     required_ctm_address, verify_call_by_address, verify_call_by_name,
 };
 use super::{
-    initializeL1V31UpgradeCall, setAssetTrackerCall, setChainCreationParamsCall,
-    upgradeAndCallCall, upgradeCall, CallList, GovernanceStage1Calls,
+    acceptOwnershipCall, initializeL1V31UpgradeCall, setAddressesV31Call, setAssetTrackerCall,
+    setChainCreationParamsCall, updateDAPairCall, upgradeAndCallCall, upgradeCall, CallList,
+    GovernanceStage1Calls,
 };
 
 /// Number of generated ecosystem-wide stage-1 calls before any per-CTM block.
 /// On stage, PUVT additionally requires one leading `pauseMigration()` call
 /// because stage1 is executed through the emergency-upgrade path.
-const STAGE1_GENERATED_PREFIX_LEN: usize = 11;
+const STAGE1_GENERATED_PREFIX_LEN: usize = 10;
 const STAGE1_PER_CTM_LEN: usize = 6;
 
 /// Index of the per-CTM `ChainTypeManager` proxy upgrade within the
@@ -61,13 +64,257 @@ const PER_CTM_OFFSET_SET_CHAIN_CREATION_PARAMS: usize = 3;
 const PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE: usize = 4;
 const PER_CTM_OFFSET_UPGRADE_VALIDATOR_TIMELOCK: usize = 5;
 
+#[derive(Debug, Clone, Copy)]
+struct RollupDAManagerSetup {
+    flavor: CtmFlavor,
+    rollup_da_manager: Address,
+    l1_da_validator: Address,
+    l2_da_commitment_scheme: u8,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+struct RollupDAPairArtifact {
+    l1_da_validator: Address,
+    l2_da_commitment_scheme: L2DACommitmentScheme,
+}
+
 fn ctm_block_start(ctm_index: usize, call_offset: usize) -> usize {
     call_offset + STAGE1_GENERATED_PREFIX_LEN + ctm_index * STAGE1_PER_CTM_LEN
 }
 
-fn stage1_call_offset(verifiers: &Verifiers) -> usize {
-    usize::from(verifiers.env.is_stage())
+/// Find the stage-1 per-CTM block start for `ctm` by matching its upgrade timer
+/// (offset 0 of each block). The prepare emits per-CTM blocks in env-config CTM
+/// order, which can differ from `artifact.ctms` order, so match by target
+/// rather than asserting a fixed `ctm_index` position (per-CTM upgrade order is
+/// cosmetic — each CTM is upgraded independently).
+fn find_ctm_block_start(
+    ctm: &CtmArtifact,
+    calls: &CallList,
+    call_offset: usize,
+    num_ctms: usize,
+    result: &mut VerificationResult,
+) -> Option<usize> {
+    let timer = required_ctm_address(
+        ctm,
+        &["deployed_addresses", "l1_governance_upgrade_timer"],
+        result,
+    )?;
+    (0..num_ctms)
+        .map(|k| ctm_block_start(k, call_offset))
+        .find(|&block| calls.elems.get(block).is_some_and(|c| c.target == timer))
 }
+
+fn rollup_da_manager_setups(
+    ctms: &[CtmArtifact],
+    result: &mut VerificationResult,
+) -> (Vec<RollupDAManagerSetup>, usize) {
+    let mut setups = Vec::new();
+    let mut errors = 0usize;
+
+    for ctm in ctms {
+        let Some(pair_value) = ctm.value.get("rollup_da_pair") else {
+            continue;
+        };
+        let pair = match pair_value.clone().try_into::<RollupDAPairArtifact>() {
+            Ok(pair) => pair,
+            Err(err) => {
+                result.report_error(&format!(
+                    "[ctms.{}.rollup_da_pair] is invalid: {err}",
+                    ctm.flavor.label()
+                ));
+                errors += 1;
+                continue;
+            }
+        };
+
+        if pair.l1_da_validator == Address::ZERO {
+            result.report_error(&format!(
+                "[ctms.{}.rollup_da_pair.l1_da_validator] must not be zero",
+                ctm.flavor.label()
+            ));
+            errors += 1;
+            continue;
+        }
+        if pair.l2_da_commitment_scheme == L2DACommitmentScheme::None {
+            result.report_error(&format!(
+                "[ctms.{}.rollup_da_pair.l2_da_commitment_scheme] must not be None",
+                ctm.flavor.label()
+            ));
+            errors += 1;
+            continue;
+        }
+
+        let Some(rollup_da_manager) =
+            required_ctm_address(ctm, &["deployed_addresses", "l1_rollup_da_manager"], result)
+        else {
+            errors += 1;
+            continue;
+        };
+        if rollup_da_manager == Address::ZERO {
+            result.report_error(&format!(
+                "[ctms.{}.deployed_addresses.l1_rollup_da_manager] must not be zero when rollup_da_pair is configured",
+                ctm.flavor.label()
+            ));
+            errors += 1;
+            continue;
+        }
+
+        setups.push(RollupDAManagerSetup {
+            flavor: ctm.flavor,
+            rollup_da_manager,
+            l1_da_validator: pair.l1_da_validator,
+            l2_da_commitment_scheme: pair.l2_da_commitment_scheme as u8,
+        });
+    }
+
+    (setups, errors)
+}
+
+fn verify_rollup_da_manager_setup_calls(
+    calls: &CallList,
+    start_index: usize,
+    expected: &[RollupDAManagerSetup],
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> usize {
+    let mut errors = 0usize;
+    let mut seen = vec![false; expected.len()];
+
+    for pair_index in 0..expected.len() {
+        let accept_index = start_index + pair_index * 2;
+        let update_index = accept_index + 1;
+        let Some(accept_call) = calls.elems.get(accept_index) else {
+            result.report_error(&format!(
+                "Missing RollupDAManager acceptOwnership call at stage1 index {accept_index}"
+            ));
+            errors += 1;
+            continue;
+        };
+        let Some(update_call) = calls.elems.get(update_index) else {
+            result.report_error(&format!(
+                "Missing RollupDAManager updateDAPair call at stage1 index {update_index}"
+            ));
+            errors += 1;
+            continue;
+        };
+
+        if accept_call.value != U256::ZERO {
+            result.report_error(&format!(
+                "RollupDAManager acceptOwnership call #{accept_index} must have zero value, got {}",
+                accept_call.value
+            ));
+            errors += 1;
+        }
+        if update_call.value != U256::ZERO {
+            result.report_error(&format!(
+                "RollupDAManager updateDAPair call #{update_index} must have zero value, got {}",
+                update_call.value
+            ));
+            errors += 1;
+        }
+        if accept_call.data.as_ref() != acceptOwnershipCall::SELECTOR.as_slice() {
+            result.report_error(&format!(
+                "RollupDAManager setup call #{accept_index} must be acceptOwnership(), got selector 0x{}",
+                hex::encode(&accept_call.data[0..4.min(accept_call.data.len())])
+            ));
+            errors += 1;
+        }
+        if update_call.target != accept_call.target {
+            result.report_error(&format!(
+                "RollupDAManager setup calls #{accept_index}/#{update_index} target different contracts: {} vs {}",
+                accept_call.target, update_call.target
+            ));
+            errors += 1;
+        }
+
+        let Some(expected_index) = expected.iter().enumerate().position(|(index, setup)| {
+            !seen[index] && setup.rollup_da_manager == accept_call.target
+        }) else {
+            result.report_error(&format!(
+                "RollupDAManager setup call #{accept_index} targets unexpected manager {} ({})",
+                accept_call.target,
+                verifiers
+                    .address_verifier
+                    .name_or_unknown(&accept_call.target)
+            ));
+            errors += 1;
+            continue;
+        };
+        seen[expected_index] = true;
+        let setup = expected[expected_index];
+
+        let decoded = match updateDAPairCall::abi_decode(&update_call.data) {
+            Ok(decoded) => decoded,
+            Err(err) => {
+                result.report_error(&format!(
+                    "Failed to decode RollupDAManager updateDAPair call #{update_index}: {err}"
+                ));
+                errors += 1;
+                continue;
+            }
+        };
+        if decoded.l1DAValidator != setup.l1_da_validator {
+            result.report_error(&format!(
+                "{} RollupDAManager updateDAPair l1DAValidator mismatch: expected {}, got {}",
+                setup.flavor.label(),
+                setup.l1_da_validator,
+                decoded.l1DAValidator
+            ));
+            errors += 1;
+        }
+        if decoded.l2DACommitmentScheme != setup.l2_da_commitment_scheme {
+            result.report_error(&format!(
+                "{} RollupDAManager updateDAPair l2DACommitmentScheme mismatch: expected {}, got {}",
+                setup.flavor.label(),
+                setup.l2_da_commitment_scheme,
+                decoded.l2DACommitmentScheme
+            ));
+            errors += 1;
+        }
+        if !decoded.status {
+            result.report_error(&format!(
+                "{} RollupDAManager updateDAPair status must be true",
+                setup.flavor.label()
+            ));
+            errors += 1;
+        }
+        if decoded.l1DAValidator == setup.l1_da_validator
+            && decoded.l2DACommitmentScheme == setup.l2_da_commitment_scheme
+            && decoded.status
+            && update_call.target == accept_call.target
+        {
+            result.report_ok(&format!(
+                "{} RollupDAManager setup allows ({}, {}) on {}",
+                setup.flavor.label(),
+                setup.l1_da_validator,
+                setup.l2_da_commitment_scheme,
+                setup.rollup_da_manager
+            ));
+        }
+    }
+
+    for setup in expected
+        .iter()
+        .enumerate()
+        .filter_map(|(index, setup)| (!seen[index]).then_some(setup))
+    {
+        result.report_error(&format!(
+            "{} RollupDAManager setup for {} is missing from the stage1 tail",
+            setup.flavor.label(),
+            setup.rollup_da_manager
+        ));
+        errors += 1;
+    }
+
+    errors
+}
+
+/// v31's `DefaultCoreUpgrade.prepareStage1GovernanceCalls` prepends one leading
+/// `pauseMigration()` re-assert to stage-1 in EVERY env: on stage's
+/// EmergencyUpgradeBoard path it counters the board's built-in unpause, and on
+/// the standard governance path (testnet, mainnet) it harmlessly re-asserts the
+/// stage-0 pause. So all generated stage-1 calls are shifted by one in all envs.
+const STAGE1_LEADING_PAUSE_OFFSET: usize = 1;
 
 impl GovernanceStage1Calls {
     /// Stage 1 — proxy impl swaps for the 7 core contracts (incl. MessageRoot
@@ -99,25 +346,24 @@ impl GovernanceStage1Calls {
     ) -> anyhow::Result<()> {
         result.print_info("== Gov stage 1 calls ===");
 
-        const ACCEPT_ASSET_TRACKER_OWNERSHIP: usize = 8;
-        const SET_ASSET_TRACKER: usize = 9;
+        const SET_ASSET_TRACKER: usize = 7;
+        const SET_BRIDGEHUB_ADDRESSES_V31: usize = 8;
 
-        let call_offset = stage1_call_offset(verifiers);
+        let call_offset = STAGE1_LEADING_PAUSE_OFFSET;
         let mut errors = 0;
-        if verifiers.env.is_stage() {
-            // Stage executes stage1 through EmergencyUpgradeBoard, whose
-            // emergency path unpauses migrations before forwarding the calls.
-            // Re-pause first so the later checkMigrationsPaused() calls still
-            // validate the intended stage0 state.
-            errors += verify_call_by_name(
-                &self.calls,
-                0,
-                "chain_asset_handler_proxy",
-                "pauseMigration()",
-                verifiers,
-                result,
-            );
-        }
+        let (rollup_da_setups, rollup_da_setup_errors) = rollup_da_manager_setups(ctms, result);
+        errors += rollup_da_setup_errors;
+        // DefaultCoreUpgrade prepends a leading pauseMigration() re-assert to
+        // stage-1 in every env (see STAGE1_LEADING_PAUSE_OFFSET), so verify it
+        // unconditionally at index 0.
+        errors += verify_call_by_name(
+            &self.calls,
+            0,
+            "chain_asset_handler_proxy",
+            "pauseMigration()",
+            verifiers,
+            result,
+        );
         for (index, target, method) in [
             // Upgrade Bridgehub proxy.
             (0, "transparent_proxy_admin", "upgrade(address,address)"),
@@ -137,14 +383,12 @@ impl GovernanceStage1Calls {
             (5, "transparent_proxy_admin", "upgrade(address,address)"),
             // Upgrade chain asset handler proxy.
             (6, "transparent_proxy_admin", "upgrade(address,address)"),
-            // Accept ChainRegistrationSender ownership.
-            (7, "chain_registration_sender_proxy", "acceptOwnership()"),
-            // Accept AssetTracker ownership.
-            (8, "asset_tracker_proxy", "acceptOwnership()"),
             // Wire AssetTracker into NativeTokenVault.
-            (9, "native_token_vault", "setAssetTracker(address)"),
+            (7, "native_token_vault", "setAssetTracker(address)"),
+            // Wire ChainRegistrationSender into the upgraded Bridgehub implementation.
+            (8, "bridgehub_proxy", "setAddressesV31(address)"),
             // Cache MessageRoot / AssetRouter inside L1ChainAssetHandler.
-            (10, "chain_asset_handler_proxy", "setAddresses()"),
+            (9, "chain_asset_handler_proxy", "setAddresses()"),
         ] {
             errors += verify_call_by_name(
                 &self.calls,
@@ -163,8 +407,17 @@ impl GovernanceStage1Calls {
         //   +3 CTM proxy.setChainCreationParams(...)
         //   +4 CTM proxy.setNewVersionUpgrade(...)
         //   +5 VT proxy admin.upgrade(VT proxy, new impl)
-        for (ctm_index, ctm) in ctms.iter().enumerate() {
-            let block = ctm_block_start(ctm_index, call_offset);
+        for ctm in ctms.iter() {
+            let Some(block) =
+                find_ctm_block_start(ctm, &self.calls, call_offset, ctms.len(), result)
+            else {
+                result.report_error(&format!(
+                    "Stage-1 per-CTM block for {} not found (no block whose first call targets its upgrade timer)",
+                    ctm.flavor.label()
+                ));
+                errors += STAGE1_PER_CTM_LEN;
+                continue;
+            };
             let timer_label = format!("{}.upgrade_timer", ctm.flavor.label());
             let validator_label = format!("{}.upgrade_stage_validator", ctm.flavor.label());
             let ctm_proxy_label = format!("{}.chain_type_manager_proxy", ctm.flavor.label());
@@ -269,8 +522,9 @@ impl GovernanceStage1Calls {
             }
         }
 
-        let expected_call_count =
+        let canonical_call_count =
             call_offset + STAGE1_GENERATED_PREFIX_LEN + ctms.len() * STAGE1_PER_CTM_LEN;
+        let expected_call_count = canonical_call_count + rollup_da_setups.len() * 2;
         match self.calls.elems.len().cmp(&expected_call_count) {
             std::cmp::Ordering::Less => {
                 result.report_error(&format!(
@@ -290,29 +544,52 @@ impl GovernanceStage1Calls {
             }
             std::cmp::Ordering::Equal => {}
         }
+        errors += verify_rollup_da_manager_setup_calls(
+            &self.calls,
+            canonical_call_count,
+            &rollup_da_setups,
+            verifiers,
+            result,
+        );
 
-        // The accepted AssetTracker proxy must be the one wired into NativeTokenVault.
-        if let (Some(accept_call), Some(set_asset_tracker_call)) = (
-            self.calls
-                .elems
-                .get(call_offset + ACCEPT_ASSET_TRACKER_OWNERSHIP),
-            self.calls.elems.get(call_offset + SET_ASSET_TRACKER),
-        ) {
+        // The AssetTracker wired into NativeTokenVault must be the known
+        // asset_tracker_proxy (whose ownership is accepted in stage 0).
+        if let Some(set_asset_tracker_call) = self.calls.elems.get(call_offset + SET_ASSET_TRACKER)
+        {
             match setAssetTrackerCall::abi_decode(&set_asset_tracker_call.data) {
-                Ok(decoded) if decoded._l1AssetTracker == accept_call.target => {
-                    result.report_ok(
-                        "AssetTracker ownership target matches setAssetTracker argument",
-                    );
-                }
                 Ok(decoded) => {
-                    result.report_error(&format!(
-                        "AssetTracker target mismatch: acceptOwnership targets {}, but setAssetTracker uses {}",
-                        accept_call.target, decoded._l1AssetTracker
-                    ));
-                    errors += 1;
+                    errors += expect_named_address(
+                        result,
+                        verifiers,
+                        &decoded._l1AssetTracker,
+                        "asset_tracker_proxy",
+                    );
                 }
                 Err(err) => {
                     result.report_error(&format!("Failed to decode setAssetTracker call: {err}"));
+                    errors += 1;
+                }
+            }
+        }
+
+        // The ChainRegistrationSender wired into Bridgehub must be the known
+        // chain_registration_sender_proxy (ownership accepted in stage 0).
+        if let Some(set_addresses_v31_call) = self
+            .calls
+            .elems
+            .get(call_offset + SET_BRIDGEHUB_ADDRESSES_V31)
+        {
+            match setAddressesV31Call::abi_decode(&set_addresses_v31_call.data) {
+                Ok(decoded) => {
+                    errors += expect_named_address(
+                        result,
+                        verifiers,
+                        &decoded._chainRegistrationSender,
+                        "chain_registration_sender_proxy",
+                    );
+                }
+                Err(err) => {
+                    result.report_error(&format!("Failed to decode setAddressesV31 call: {err}"));
                     errors += 1;
                 }
             }
@@ -340,7 +617,7 @@ impl GovernanceStage1Calls {
         const UPGRADE_CTM_DEPLOYMENT_TRACKER: usize = 5;
         const UPGRADE_CHAIN_ASSET_HANDLER: usize = 6;
 
-        let call_offset = stage1_call_offset(verifiers);
+        let call_offset = STAGE1_LEADING_PAUSE_OFFSET;
         let mut errors = 0;
 
         for (index, proxy_name, implementation_name) in [
@@ -402,10 +679,19 @@ impl GovernanceStage1Calls {
         // Per-CTM block: CTM proxy upgrade, setChainCreationParams,
         // setNewVersionUpgrade. Validated against each CTM's own
         // chain_upgrade_diamond_cut + contracts_config.
-        for (i, ctm) in artifact.ctms.iter().enumerate() {
-            let block = ctm_block_start(i, call_offset);
+        for ctm in artifact.ctms.iter() {
+            let Some(block) =
+                find_ctm_block_start(ctm, &self.calls, call_offset, artifact.ctms.len(), result)
+            else {
+                result.report_error(&format!(
+                    "Stage-1 per-CTM payload block for {} not found",
+                    ctm.flavor.label()
+                ));
+                errors += 1;
+                continue;
+            };
             result.print_info(&format!(
-                "-- CTM[{i}] = {} ----------------------",
+                "-- CTM = {} ----------------------",
                 ctm.flavor.label()
             ));
             errors += verify_ctm_upgrade_call_args(

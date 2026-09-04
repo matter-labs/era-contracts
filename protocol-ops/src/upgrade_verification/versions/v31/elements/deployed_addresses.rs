@@ -502,7 +502,14 @@ pub(crate) async fn verify_v31_provenance(
             panic!("Failed to call Bridgehub.getZKChain({era_chain_id}) for provenance: {err}")
         });
     if era_diamond_proxy == Address::ZERO {
-        panic!("Bridgehub.getZKChain({era_chain_id}) returned address(0) for provenance");
+        // Split-era envs: the legacy core era (e.g. testnet 270) is not a
+        // registered chain on the bridgehub, so its diamond is address(0) —
+        // which is exactly what the preserved core-contract ctors carry. Accept
+        // it; the L1AssetRouter / L1Nullifier ctor checks below compare the
+        // deployed eraDiamondProxy against this same address(0).
+        result.report_ok(&format!(
+            "Legacy era chain {era_chain_id} has no registered diamond (address(0)) — expected for split-era envs"
+        ));
     }
 
     let governance = bridgehub
@@ -543,8 +550,18 @@ pub(crate) async fn verify_v31_provenance(
         .await?;
     }
 
-    verify_v31_new_gateway_ctm_provenance(artifact, verifiers, era_chain_id, l1_chain_id, result)
+    // New-Gateway CTM provenance only applies when the upgrade brings up a
+    // Gateway. Gateway-less envs omit `[new_gateway]` from the artifact.
+    if artifact.new_gateway.is_some() {
+        verify_v31_new_gateway_ctm_provenance(
+            artifact,
+            verifiers,
+            era_chain_id,
+            l1_chain_id,
+            result,
+        )
         .await?;
+    }
 
     let governance_admin = verifiers.network_verifier.get_proxy_admin(governance).await;
     if governance_admin != Address::ZERO {
@@ -1062,6 +1079,15 @@ async fn verify_ctm_provenance(
         CtmFlavor::ZksyncOs => "l1-contracts/ZKsyncOSChainTypeManager",
     };
 
+    // Per-flavor validator implementation. Era keeps plain `ValidatorTimelock`;
+    // ZKsyncOS deploys `MultisigCommitter` (a superset with the same `(bridgehub)`
+    // constructor) so its upgrade does not downgrade proxies already running a
+    // MultisigCommitter. Both share the same constructor, only the bytecode differs.
+    let validator_timelock_file = match ctm.flavor {
+        CtmFlavor::Era => "l1-contracts/ValidatorTimelock",
+        CtmFlavor::ZksyncOs => "l1-contracts/MultisigCommitter",
+    };
+
     // Single dispatch table: (address, encoded ctor args, expected file).
     let checks: Vec<(Address, Vec<u8>, &str)> = vec![
         // CommitterFacet(_l1ChainId).
@@ -1132,14 +1158,15 @@ async fn verify_ctm_provenance(
         ),
         // Validator impl(bridgehub). Deployed once per CTM by `CTMUpgrade_v31`;
         // stage-1 governance swaps this behind the per-CTM ValidatorTimelock
-        // proxy. v31 deploys `MultisigCommitter` (a superset of ValidatorTimelock
-        // with the same `(bridgehub)` constructor) as the default validator impl,
-        // so the upgrade does not downgrade proxies already running a
+        // proxy. The impl is flavor-specific (see `validator_timelock_file`):
+        // Era uses plain `ValidatorTimelock`, ZKsyncOS uses `MultisigCommitter`
+        // (a superset of ValidatorTimelock with the same `(bridgehub)` constructor),
+        // so the ZKsyncOS upgrade does not downgrade proxies already running a
         // MultisigCommitter.
         (
             validator_timelock_impl,
             V31ValidatorTimelock::constructorCall::new((bridgehub_addr,)).abi_encode(),
-            "l1-contracts/MultisigCommitter",
+            validator_timelock_file,
         ),
     ];
     for (addr, args, file) in &checks {
