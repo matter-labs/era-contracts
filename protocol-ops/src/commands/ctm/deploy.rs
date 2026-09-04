@@ -4,7 +4,7 @@ use serde::Serialize;
 
 use crate::common::abi::IDeployCTMAbi;
 use crate::common::forge::scripts::{
-    deploy_ctm::{DeployCTMConfig, DeployCTMOutput},
+    deploy_ctm::{DeployCTMConfig, DeployCTMOutput, MultiProofDeployCTMConfig},
     deploy_ecosystem::InitialDeploymentConfig,
     DEPLOY_CTM_INVOCATION,
 };
@@ -25,6 +25,9 @@ pub struct CtmDeployInput {
     pub with_testnet_verifier: bool,
     pub zk_token_asset_id: Option<B256>,
     pub create2_factory_salt: Option<B256>,
+    pub multi_proof_verifier: bool,
+    pub zisk_plonk_verifier_addr: Option<Address>,
+    pub zisk_range_verifier_addr: Option<Address>,
 }
 
 /// Deploy CTM contracts.
@@ -35,6 +38,12 @@ pub fn deploy(
 ) -> anyhow::Result<DeployCTMOutput> {
     let l1_network = L1Network::from_l1_rpc(&runner.rpc_url)?;
     ensure_testnet_verifier_allowed(l1_network, input.with_testnet_verifier)?;
+    ensure_multi_proof_config(
+        input.vm_type,
+        input.multi_proof_verifier,
+        input.zisk_plonk_verifier_addr,
+        input.zisk_range_verifier_addr,
+    )?;
     let mut initial_deployment_config = InitialDeploymentConfig::default();
 
     // CREATE2 factory address isn't configurable: the Solidity script
@@ -56,6 +65,11 @@ pub fn deploy(
         // The legacy shared-bridge test support this gated was removed.
         false,
         input.vm_type,
+        MultiProofDeployCTMConfig {
+            enabled: input.multi_proof_verifier,
+            zisk_plonk_verifier_addr: input.zisk_plonk_verifier_addr,
+            zisk_range_verifier_addr: input.zisk_range_verifier_addr,
+        },
     );
 
     let input_path = runner.input_path(&DEPLOY_CTM_INVOCATION)?;
@@ -99,6 +113,32 @@ fn ensure_testnet_verifier_allowed(
     Ok(())
 }
 
+fn ensure_multi_proof_config(
+    vm_type: VMOption,
+    multi_proof_verifier: bool,
+    zisk_plonk_verifier_addr: Option<Address>,
+    zisk_range_verifier_addr: Option<Address>,
+) -> anyhow::Result<()> {
+    if !multi_proof_verifier {
+        if zisk_plonk_verifier_addr.is_some() || zisk_range_verifier_addr.is_some() {
+            bail!("ZiSK verifier addresses require multi_proof_verifier=true");
+        }
+        return Ok(());
+    }
+
+    if !vm_type.is_zksync_os() {
+        bail!("multi_proof_verifier is supported only by the ZKsync OS VM");
+    }
+    if zisk_plonk_verifier_addr.is_none_or(|address| address == Address::ZERO) {
+        bail!("multi_proof_verifier requires a non-zero zisk_plonk_verifier_addr");
+    }
+    if zisk_range_verifier_addr.is_some_and(|address| address == Address::ZERO) {
+        bail!("zisk_range_verifier_addr must be non-zero when supplied");
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,5 +160,36 @@ mod tests {
         ensure_testnet_verifier_allowed(L1Network::Sepolia, true).unwrap();
         ensure_testnet_verifier_allowed(L1Network::Holesky, true).unwrap();
         ensure_testnet_verifier_allowed(L1Network::Localhost, true).unwrap();
+    }
+
+    #[test]
+    fn accepts_complete_zksync_os_multiprover_config() {
+        ensure_multi_proof_config(
+            VMOption::ZKSyncOsVM,
+            true,
+            Some(Address::repeat_byte(0x11)),
+            None,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn requires_plonk_verifier_for_multiprover() {
+        let err = ensure_multi_proof_config(VMOption::ZKSyncOsVM, true, None, None).unwrap_err();
+
+        assert!(err.to_string().contains("zisk_plonk_verifier_addr"));
+    }
+
+    #[test]
+    fn rejects_multiprover_for_era_vm() {
+        let err = ensure_multi_proof_config(
+            VMOption::EraVM,
+            true,
+            Some(Address::repeat_byte(0x11)),
+            None,
+        )
+        .unwrap_err();
+
+        assert!(err.to_string().contains("ZKsync OS"));
     }
 }

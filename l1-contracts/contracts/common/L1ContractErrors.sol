@@ -208,6 +208,8 @@ error PubdataContentLockedForPermanentRollup();
 error NonFullPubdataContentForPermanentRollup();
 // 0x4fbe5dba
 error InvalidDelay();
+// 0x1b6712bc
+error InvalidDisabledProofSystemsMask(uint8 disabledProofSystems);
 // 0x3f98a77e
 error InvalidL2DACommitmentScheme(L2DACommitmentScheme);
 // 0xc1780bd6

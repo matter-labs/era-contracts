@@ -105,6 +105,11 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
+    function disabledProofSystems() external view returns (uint8) {
+        return s.disabledProofSystems;
+    }
+
+    /// @inheritdoc IGetters
     function getTotalPriorityTxs() external view returns (uint256) {
         return _getTotalPriorityTxs();
     }

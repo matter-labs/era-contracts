@@ -49,6 +49,9 @@ import {CTMContract, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
+import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+
 import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
@@ -221,17 +224,76 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function deployVerifiers() internal {
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierPlonk);
-        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
-            config.isZKsyncOS,
-            config.testnetVerifier
-        );
 
         if (!config.isZKsyncOS) {
             (, string memory fflonkName) = DeployCTML1OrGateway.resolve(false, CTMContract.VerifierFflonk);
             ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
         }
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
-        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
+
+        if (config.multiProof.enabled) {
+            deployMultiProofVerifiers();
+        } else {
+            (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
+                config.isZKsyncOS,
+                config.testnetVerifier
+            );
+            ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
+        }
+    }
+
+    /// @notice Deploy the multi-proof verifier lane, which requires BOTH an
+    ///         Airbender proof and a ZiSK proof for each state transition.
+    ///         The Airbender side is the ZKsync OS verifier, which holds the
+    ///         PLONK sub-verifier that the deployment and upgrade tooling
+    ///         introspects.
+    function deployMultiProofVerifiers() internal {
+        // The Airbender proof is a ZKsync OS proof, so the lane needs the
+        // ZKsync OS verifiers.
+        require(config.isZKsyncOS, "multi_proof_verifier requires is_zk_sync_os");
+        // ZiskVerifier wraps a pre-deployed standalone snarkJS Plonk verifier
+        // (see verifiers/README.md for its generation and deployment) passed
+        // in by address.
+        require(
+            config.multiProof.ziskPlonkVerifierAddr != address(0),
+            "set zisk_plonk_verifier_addr to the deployed snarkJS Plonk verifier"
+        );
+        // Deploying it is a manual step outside this script, so the address it
+        // leaves behind is checked here rather than at the first settlement.
+        require(
+            config.multiProof.ziskPlonkVerifierAddr.code.length > 0,
+            "zisk_plonk_verifier_addr holds no code: deploy the snarkJS Plonk verifier first"
+        );
+        // Single-VK lane: every proof, single batch or many, verifies through
+        // the range verifier, which reconstructs the ZiSK public values from
+        // its own pinned VKs. It defaults to the ZiskVerifier deployed below;
+        // an operator may override it with a separately deployed aggregator
+        // verifier through zisk_range_verifier_addr, which must already hold
+        // code as well.
+        if (config.multiProof.ziskRangeVerifierAddr != address(0)) {
+            require(
+                config.multiProof.ziskRangeVerifierAddr.code.length > 0,
+                "zisk_range_verifier_addr holds no code: deploy the range verifier first"
+            );
+        }
+        (, string memory airbenderVerifierName) = DeployCTML1OrGateway.resolveMainVerifier(
+            config.isZKsyncOS,
+            config.testnetVerifier
+        );
+        multiProofAddresses.airbenderVerifier = deploySimpleContract(airbenderVerifierName, false);
+        multiProofAddresses.ziskVerifier = deploySimpleContract("ZiskVerifier", false);
+        if (config.testnetVerifier) {
+            multiProofAddresses.ziskTestnetVerifier = deploySimpleContract("ZiskTestnetVerifier", false);
+        }
+        multiProofAddresses.multiProofVerifier = deploySimpleContract("MultiProofVerifier", false);
+
+        if (config.testnetVerifier) {
+            // Testnet: wrap MultiProofVerifier with MultiProofTestnetVerifier for mock proof support.
+            ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract("MultiProofTestnetVerifier", false);
+        } else {
+            // Prod: use MultiProofVerifier directly.
+            ctmAddresses.stateTransition.verifiers.verifier = multiProofAddresses.multiProofVerifier;
+        }
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -343,6 +405,26 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.proxies.chainTypeManager
         );
         vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
+        if (multiProofAddresses.airbenderVerifier != address(0)) {
+            vm.serializeAddress("state_transition", "airbender_verifier_addr", multiProofAddresses.airbenderVerifier);
+        }
+        if (multiProofAddresses.ziskVerifier != address(0)) {
+            vm.serializeAddress("state_transition", "zisk_verifier_addr", multiProofAddresses.ziskVerifier);
+        }
+        if (multiProofAddresses.ziskTestnetVerifier != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "zisk_testnet_verifier_addr",
+                multiProofAddresses.ziskTestnetVerifier
+            );
+        }
+        if (multiProofAddresses.multiProofVerifier != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "multi_proof_verifier_addr",
+                multiProofAddresses.multiProofVerifier
+            );
+        }
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
