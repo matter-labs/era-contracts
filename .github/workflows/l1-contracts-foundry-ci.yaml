@@ -109,8 +109,8 @@ jobs:
   scripts:
     runs-on: ubuntu-latest
     needs: build
-    # The deploy scripts occasionally wedge waiting on a receipt (see the anvil step); a healthy
-    # run finishes well under 15 minutes, so bound the damage instead of holding a runner for 6h.
+    # Keep a stalled receipt wait from holding a runner for 6h; a healthy run finishes well under
+    # 15 minutes.
     timeout-minutes: 30
     steps:
       - name: Checkout the repository
@@ -146,15 +146,7 @@ jobs:
 
       - name: Run anvil
         run: |
-          # 100M block gas limit (same as the anvil-interop harness): forge broadcasts deploy
-          # batches whose combined gas exceeds the 30M default, and anvil's automine only mines
-          # on tx arrival — a tx deferred past a full block is never picked up again while forge
-          # waits on its receipt, deadlocking the job. Mixed mining adds a 1s interval tick that
-          # sweeps up any remainder. Forge's receipt watcher has also been observed wedging on
-          # its own (broadcast stalls after "Script ran successfully" with mining healthy), which
-          # no mining strategy cures — hence the job timeout, and the anvil log kept as an
-          # artifact so a wedged run shows whether blocks were still being produced.
-          anvil --gas-limit 100000000 --mixed-mining --block-time 1 > anvil.log 2>&1 &
+          anvil > anvil.log 2>&1 &
 
           ANVIL_READY=0
           for i in {1..10}; do
@@ -176,7 +168,7 @@ jobs:
       - name: Run DeployL1CoreContracts script
         working-directory: ./l1-contracts
         # First we need to deploy the ecosystem contracts
-        run: forge script ./deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY --skip '*/l1-contracts/contracts/*'
+        run: forge script ./deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --slow --private-key $ANVIL_PRIVATE_KEY --skip '*/l1-contracts/contracts/*'
 
       - name: Read bridgehub proxy address
         id: read-bridgehub
@@ -204,13 +196,14 @@ jobs:
             --ffi \
             --rpc-url $ANVIL_RPC_URL \
             --broadcast \
+            --slow \
             --private-key $ANVIL_PRIVATE_KEY \
             --sig "runWithBridgehub(address,bool)" $BRIDGEHUB "false" \
             --skip '*/l1-contracts/contracts/*'
 
       - name: Run DeployErc20 script
         working-directory: ./l1-contracts
-        run: forge script ./deploy-scripts/tokens/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY
+        run: forge script ./deploy-scripts/tokens/DeployErc20.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --slow --private-key $ANVIL_PRIVATE_KEY
 
       - name: Upload anvil log
         if: failure() || cancelled()
