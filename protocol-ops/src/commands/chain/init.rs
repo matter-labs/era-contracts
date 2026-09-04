@@ -46,6 +46,10 @@ pub struct ChainInitArgs {
     /// L1 batch execute operator (ZKSync OS only)
     #[clap(long, help_heading = "Input")]
     pub execute_operator: Option<Address>,
+    /// Dedicated reverter. Gets REVERTER on the ValidatorTimelock instead of the prove
+    /// operator, so no follow-up role grant is needed
+    #[clap(long, help_heading = "Input")]
+    pub reverter_operator: Option<Address>,
 
     /// Bridgehub proxy address
     #[clap(long, help_heading = "Input")]
@@ -80,6 +84,10 @@ pub struct ChainInitArgs {
         help_heading = "Advanced input"
     )]
     pub token_multiplier_setter: Option<Address>,
+    /// CREATE2 salt for the chain's ChainAdmin and other CREATE2 deployments (random by
+    /// default). Pin it so a re-run reproduces the same addresses and bundle
+    #[clap(long, help_heading = "Advanced input")]
+    pub create2_factory_salt: Option<B256>,
     /// Base token address (default: ETH = 0x0...01)
     #[clap(
         long,
@@ -181,14 +189,22 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         vm_type,
         l2_da_commitment_scheme: args.l2_da_commitment_scheme,
         register_for_interop: args.register_for_interop,
-        create2_factory_salt: None,
+        create2_factory_salt: args.create2_factory_salt,
         pause_deposits: args.pause_deposits,
         evm_emulator: args.evm_emulator,
         deploy_paymaster: args.deploy_paymaster,
         make_permanent_rollup: args.make_permanent_rollup,
         skip_priority_txs: args.skip_priority_txs,
     };
-    let output = chain_init(&mut runner, &deployer, &owner, &bridgehub_admin, &input).await?;
+    let output = chain_init_with_reverter(
+        &mut runner,
+        &deployer,
+        &owner,
+        &bridgehub_admin,
+        &input,
+        args.reverter_operator,
+    )
+    .await?;
 
     write_output_if_requested(
         "chain.init",
@@ -206,13 +222,28 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
 }
 
 /// Initialize a chain: register, accept admin, configure DA/validators, deploy L2 contracts.
+/// REVERTER lands on the prove operator; see [`chain_init_with_reverter`] for a dedicated one.
+/// Kept with this signature because external crates (zksync-os-integration-tests) call it.
 pub async fn chain_init(
+    runner: &mut ForgeRunner,
+    deployer: &Wallet,
+    owner: &Wallet,
+    bridgehub_admin: &Wallet,
+    input: &ChainInitInput,
+) -> anyhow::Result<FullChainInitOutput> {
+    chain_init_with_reverter(runner, deployer, owner, bridgehub_admin, input, None).await
+}
+
+/// [`chain_init`] with an optional dedicated reverter that receives REVERTER instead of the
+/// prove operator.
+pub async fn chain_init_with_reverter(
     runner: &mut ForgeRunner,
     deployer: &Wallet,
     owner: &Wallet,
     // Retained for call-site compatibility; the legacy-bridge setup that used it has been removed.
     _bridgehub_admin: &Wallet,
     input: &ChainInitInput,
+    reverter_operator: Option<Address>,
 ) -> anyhow::Result<FullChainInitOutput> {
     // Register chain on CTM
     logger::step(format!(
@@ -227,7 +258,7 @@ pub async fn chain_init(
     // replay. Admin-gated calls in the script already broadcast explicitly
     // via `vm.broadcast(admin.owner())`, so they don't need `--sender` to
     // be the admin — the deployer EOA works for everything else.
-    let register_output = register_chain(runner, deployer, input)?;
+    let register_output = register_chain(runner, deployer, input, reverter_operator)?;
     let diamond_proxy = register_output.diamond_proxy_addr;
     let chain_admin = register_output.chain_admin_addr;
     let mut full_output = FullChainInitOutput::from_register(&register_output);
@@ -364,6 +395,7 @@ pub fn register_chain(
     runner: &mut ForgeRunner,
     auth: &Wallet,
     input: &ChainInitInput,
+    reverter_operator: Option<Address>,
 ) -> anyhow::Result<RegisterChainOutput> {
     let salt = input
         .create2_factory_salt
@@ -379,6 +411,7 @@ pub fn register_chain(
         // The legacy-bridge setup this gated was removed with legacy bridging.
         false,
         input.evm_emulator,
+        reverter_operator,
     )?;
 
     let input_path = runner.input_path(&REGISTER_CHAIN_INVOCATION)?;

@@ -30,6 +30,8 @@ contract ZKChainDeployer is L1ContractDeployer {
         address validatorSenderOperatorBlobsEth;
         address validatorSenderOperatorProve;
         address validatorSenderOperatorExecute;
+        // Zero means "no dedicated reverter", which is what every existing fixture expects.
+        address validatorSenderOperatorReverter;
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
         bool allowEvmEmulator;
@@ -38,6 +40,7 @@ contract ZKChainDeployer is L1ContractDeployer {
     ChainConfig internal eraConfig;
 
     uint256 currentZKChainId = 10;
+    address internal dedicatedReverterForNextChain;
     uint256 eraZKChainId = 9;
     uint256[] public zkChainIds;
 
@@ -83,6 +86,14 @@ contract ZKChainDeployer is L1ContractDeployer {
         address admin = IZKChain(chainAddress).getAdmin();
         vm.prank(admin);
         IMigrator(chainAddress).unpauseDeposits();
+    }
+
+    /// Same as `_deployZKChain`, with a dedicated reverter in the chain's config. The reverter
+    /// only applies to this one deployment.
+    function _deployZKChainWithReverter(address _baseToken, address _reverter) internal {
+        dedicatedReverterForNextChain = _reverter;
+        _deployZKChain(_baseToken);
+        dedicatedReverterForNextChain = address(0);
     }
 
     function _deployZKChainWithPausedDeposits(address _baseToken, uint256 _chainId) internal {
@@ -152,6 +163,7 @@ contract ZKChainDeployer is L1ContractDeployer {
             validatorSenderOperatorBlobsEth: address(1),
             validatorSenderOperatorProve: address(2),
             validatorSenderOperatorExecute: address(3),
+            validatorSenderOperatorReverter: dedicatedReverterForNextChain,
             baseTokenGasPriceMultiplierNominator: uint128(1),
             baseTokenGasPriceMultiplierDenominator: uint128(1),
             allowEvmEmulator: false
@@ -181,6 +193,13 @@ contract ZKChainDeployer is L1ContractDeployer {
         );
         vm.serializeAddress("chain", "validator_sender_operator_prove", description.validatorSenderOperatorProve);
         vm.serializeAddress("chain", "validator_sender_operator_execute", description.validatorSenderOperatorExecute);
+        if (description.validatorSenderOperatorReverter != address(0)) {
+            vm.serializeAddress(
+                "chain",
+                "validator_sender_operator_reverter",
+                description.validatorSenderOperatorReverter
+            );
+        }
         vm.serializeUint(
             "chain",
             "base_token_gas_price_multiplier_nominator",
