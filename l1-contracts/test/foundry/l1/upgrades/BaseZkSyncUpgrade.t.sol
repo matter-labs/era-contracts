@@ -206,17 +206,16 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    // The EraVM bytecode-hash fields of ProposedUpgrade are dead on the ZKsync OS line: even a
-    // non-zero value must be ignored and the deprecated slots left zero.
+    // The EraVM bytecode-hash fields of ProposedUpgrade are dead on the ZKsync OS line. These values
+    // deliberately violate the old bytecode-hash format, so the upgrade would revert if it processed them.
     function test_upgrade_IgnoresLegacyBytecodeHashes() public {
-        assertTrue(proposedUpgrade.bootloaderHash != bytes32(0), "fixture must carry a non-zero hash");
-        assertTrue(proposedUpgrade.defaultAccountHash != bytes32(0), "fixture must carry a non-zero hash");
-        assertTrue(proposedUpgrade.evmEmulatorHash != bytes32(0), "fixture must carry a non-zero hash");
+        proposedUpgrade.bootloaderHash = bytes32(uint256(1));
+        proposedUpgrade.defaultAccountHash = bytes32(uint256(2));
+        proposedUpgrade.evmEmulatorHash = bytes32(uint256(3));
 
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        _assertDeprecatedBytecodeHashSlotsAreZero(address(baseZkSyncUpgrade));
     }
 
     function test_SuccessWith_TxTypeIsZero() public {

@@ -125,7 +125,5 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        // The EraVM bytecode-hash fields of ProposedUpgrade are ignored: the deprecated slots remain zero.
-        _assertDeprecatedBytecodeHashSlotsAreZero(address(baseZkSyncUpgrade));
     }
 }

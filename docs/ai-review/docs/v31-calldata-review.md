@@ -1,14 +1,5 @@
 # Manual review procedure for v31 calldata
 
-> **Historical (v31 ceremony only).** This procedure reviews the already-executed v31 upgrade,
-> whose world still contained EraVM CTMs and chains. The Era-specific artifacts it references
-> (Era CTM sections, Era force deployments, `era_chain_id` inputs) exist only in that frozen
-> context — nothing in the current release deploys or upgrades EraVM chains, and the
-> verification code it drives is isolated under `protocol-ops/src/upgrade_verification/versions/v31/`.
-> Current protocol-ops rejects `[ctms.era]` sections at parse time, so reviewing the _original_
-> v31 calldata package end-to-end requires protocol-ops checked out at the ceremony commit the
-> package records.
-
 ## Relevant files
 
 - `protocol-ops/src/commands/ecosystem/verify_upgrade.rs` - PUVT entry point.

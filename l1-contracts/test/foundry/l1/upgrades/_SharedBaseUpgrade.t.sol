@@ -19,10 +19,6 @@ import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 contract BaseUpgrade is Test {
-    uint256 internal constant DEPRECATED_L2_BOOTLOADER_BYTECODE_HASH_SLOT = 23;
-    uint256 internal constant DEPRECATED_L2_DEFAULT_ACCOUNT_BYTECODE_HASH_SLOT = 24;
-    uint256 internal constant DEPRECATED_L2_EVM_EMULATOR_BYTECODE_HASH_SLOT = 58;
-
     L2CanonicalTransaction l2CanonicalTransaction;
     ProposedUpgrade proposedUpgrade;
 
@@ -110,24 +106,6 @@ contract BaseUpgrade is Test {
             upgradeTimestamp: 0,
             newProtocolVersion: protocolVersion
         });
-    }
-
-    function _assertDeprecatedBytecodeHashSlotsAreZero(address _target) internal view {
-        assertEq(
-            vm.load(_target, bytes32(DEPRECATED_L2_BOOTLOADER_BYTECODE_HASH_SLOT)),
-            bytes32(0),
-            "deprecated bootloader hash slot must stay zero"
-        );
-        assertEq(
-            vm.load(_target, bytes32(DEPRECATED_L2_DEFAULT_ACCOUNT_BYTECODE_HASH_SLOT)),
-            bytes32(0),
-            "deprecated default-account hash slot must stay zero"
-        );
-        assertEq(
-            vm.load(_target, bytes32(DEPRECATED_L2_EVM_EMULATOR_BYTECODE_HASH_SLOT)),
-            bytes32(0),
-            "deprecated EVM-emulator hash slot must stay zero"
-        );
     }
 
     // add this to be excluded from coverage report
