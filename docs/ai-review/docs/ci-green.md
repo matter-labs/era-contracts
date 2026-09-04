@@ -153,7 +153,7 @@ For Rust:
 
 ```bash
 for dir in protocol-ops tools/{upgrade-readiness-checker,verifier-gen,wallets-gen,zksync-os-genesis-gen}; do
-  (cd "$dir" && cargo +stable fmt --check)  # nightly disagrees with CI on edge cases
+  (cd "$dir" && cargo +1.91.1 fmt --check)  # nightly disagrees with CI on edge cases
 done
 (cd protocol-ops && cargo clippy --all-targets -- -D warnings)
 ```
@@ -281,7 +281,7 @@ yarn lint:ts --fix
 yarn prettier:fix
 yarn l1 errors-lint --check
 for dir in protocol-ops tools/{upgrade-readiness-checker,verifier-gen,wallets-gen,zksync-os-genesis-gen}; do
-  (cd "$dir" && cargo +stable fmt --check)
+  (cd "$dir" && cargo +1.91.1 fmt --check)
 done
 ( cd protocol-ops && cargo clippy --all-targets -- -D warnings )
 

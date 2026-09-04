@@ -52,7 +52,7 @@ jobs:
           components: rustfmt
 
       - name: Check formatting
-        run: cargo fmt --check
+        run: cargo +1.91.1 fmt --check
         working-directory: ${{ matrix.working-directory }}
 
   protocol-ops-clippy:
