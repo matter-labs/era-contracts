@@ -36,6 +36,7 @@ server_notifier_pa        = "0xfa181338785BF9427a367FfcE6bfe2C81586b3d9"  # Serv
 # --- deployed by this upgrade (rotate with the CREATE2 salts) ---
 gov_upgrade_timer         = "0xDc03F39823CbDc7Ed2c465674d84948c81fC6ec0"
 upgrade_stage_validator   = "0x732E664132da25DfCE0Bd2FCf4C180aFF96fF500"
+zkos_chain_admin_8022833  = "0x3b7a24e583867ab85694CF55941734653bdfaB9c"  # chain 8022833 ChainAdmin
 l1_interop_handler        = "0xE24e805EDfDCb4e6DA75A44304d488639F25a159"
 
 # ── Camp-B: CTM admin ceremony ────────────────────────────────────────────────
@@ -195,3 +196,17 @@ desc = "SIM-ONLY smoke test: create a fresh ZKsync OS chain against the new chai
 target = "0x02B1ac1Cf0A592aefD3C2246B2431388365dB272"
 selector = "0x3b6d7534"
 desc = "SIM-ONLY smoke test: apply the v33 diamond cut to chain 8022833 and confirm it reaches protocol version 0x2100000000"
+
+# ── Per-chain upgrade (its own scenario file, from `protocol_ops chain upgrade`) ──────────
+# Both are `ChainAdmin.multicall`, so they are told apart by the inner call's selector.
+[[entries]]
+target = "zkos_chain_admin_8022833"
+selector = "0x69340beb"
+inner_selector = "0xe2a9d554"
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(8022833, …) — announces when the chain may take the cut. Requires stage 1 to have registered the v33 upgrade cut, which is why this file must run after the ecosystem scenario."
+
+[[entries]]
+target = "zkos_chain_admin_8022833"
+selector = "0x69340beb"
+inner_selector = "0x3b6d7534"
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 8022833, 0x1f00000001 -> 0x2100000000) plus its DA setup — THE per-chain diamond cut."

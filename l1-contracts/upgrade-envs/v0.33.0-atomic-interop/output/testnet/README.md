@@ -227,6 +227,13 @@ A reviewer re-running the prepare from a different checkout path will get **diff
 addresses**. Verify the artifact by its contents and by the on-chain deployments listed in
 `transactions.txt`, not by diffing addresses against your own run.
 
+### Emit sim-inputs _before_ the scenarios, or delete it first
+
+`governance-toml-to-simulator` prefers `<env-out>/sim-inputs/manifest.json` over `prepare/` when
+both exist. A stale `sim-inputs/` therefore wins silently: the first scenario emitted after the
+profile switch carried the _previous_ build's ServerNotifier implementation, and only the
+provenance check's byte comparison caught it (one differing word out of 714).
+
 ### Salts must be rotated per regen
 
 `[contracts] create2_factory_salt` and the `[create2_factory_salts]` entry in

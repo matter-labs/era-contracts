@@ -498,6 +498,14 @@ struct SimulatorTransaction {
         skip_serializing_if = "Option::is_none"
     )]
     emulate_all_batches_executed: Option<bool>,
+    /// DiamondProxy whose batch counters the simulator should override. Needed when the diamond
+    /// cut is wrapped — a real per-chain upgrade goes through `ChainAdmin.multicall`, so `to` is
+    /// the ChainAdmin and the counters live somewhere else entirely.
+    #[serde(
+        rename = "emulateAllBatchesExecutedFor",
+        skip_serializing_if = "Option::is_none"
+    )]
+    emulate_all_batches_executed_for: Option<String>,
     tag: String,
 }
 
@@ -698,6 +706,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
             value_to_mint: None,
             time_increase: None,
             emulate_all_batches_executed: None,
+            emulate_all_batches_executed_for: None,
             tag: format!("ack_{tag}"),
         });
     }
@@ -842,6 +851,23 @@ pub struct ManifestToSimulatorArgs {
     #[clap(long, value_delimiter = ',', num_args = 1..)]
     pub camp_a_signers: Vec<Address>,
 
+    /// Path to a `sim-descriptions.toml` giving each emitted transaction a human-readable
+    /// description. Without it every entry reads `[unlabelled] …`, which is exactly what a
+    /// reviewer cannot act on.
+    #[clap(long)]
+    pub descriptions: Option<PathBuf>,
+
+    /// DiamondProxy whose batch counters the simulator should override before each emitted
+    /// transaction.
+    ///
+    /// A per-chain upgrade's diamond cut reverts `NotAllBatchesExecuted()` on a fork of a live
+    /// chain, which normally has a few committed-but-unexecuted batches; a real rollout waits for
+    /// them. The simulator can paper over that, but its helper overrides storage on the
+    /// transaction's `to`, and a real per-chain upgrade is wrapped in `ChainAdmin.multicall` — so
+    /// the diamond has to be named here.
+    #[clap(long)]
+    pub emulate_all_batches_executed_for: Option<Address>,
+
     /// Output JSON path. Printed to stdout when omitted.
     #[clap(long)]
     pub out: Option<PathBuf>,
@@ -855,7 +881,7 @@ pub struct ManifestToSimulatorArgs {
 /// provenance check (there is no TOML to re-derive it from); the ecosystem scenario acknowledges
 /// the gap with an `ack_` marker and the reviewer checks this file on its own terms.
 pub async fn run_manifest_to_simulator(args: ManifestToSimulatorArgs) -> anyhow::Result<()> {
-    let descriptions = SimDescriptionRegistry::default();
+    let descriptions = load_descriptions(args.descriptions.as_deref());
     let mut transactions = Vec::new();
     for manifest in &args.manifest {
         let mut batch = manifest_to_simulator_transactions(
@@ -880,6 +906,10 @@ pub async fn run_manifest_to_simulator(args: ManifestToSimulatorArgs) -> anyhow:
     }
     for tx in &mut transactions {
         tx.tag = args.tag.clone();
+        if let Some(diamond) = args.emulate_all_batches_executed_for {
+            tx.emulate_all_batches_executed = Some(true);
+            tx.emulate_all_batches_executed_for = Some(format!("{diamond:#x}"));
+        }
     }
     let body = serde_json::to_string_pretty(&transactions)?;
     match args.out {
@@ -1024,6 +1054,7 @@ fn manifest_to_simulator_transactions(
                 value_to_mint,
                 time_increase: None,
                 emulate_all_batches_executed: None,
+                emulate_all_batches_executed_for: None,
                 tag: ctm_admin_calls_tags
                     .get(&tx.to)
                     .cloned()
@@ -1106,6 +1137,7 @@ fn governance_toml_to_simulator_transactions(
                 value_to_mint,
                 time_increase,
                 emulate_all_batches_executed: None,
+                emulate_all_batches_executed_for: None,
                 tag: format!("stage{stage}"),
             });
         }
@@ -1159,6 +1191,7 @@ fn append_test_upgrade_calls(
                 value_to_mint: Some("1".to_string()),
                 time_increase: None,
                 emulate_all_batches_executed,
+                emulate_all_batches_executed_for: None,
                 tag: tag.to_string(),
             });
         }
