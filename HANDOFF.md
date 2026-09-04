@@ -99,17 +99,18 @@ after. Design note with rejected alternatives: `protocol-docs/upgrade-scheduling
 
 - `yarn da build:foundry && yarn l1 build:foundry` — clean rebuild, success (run three times over
   the branch's life: initial, frozen-lockfile control, final).
-- `yarn l1 test:foundry` — full suite: 297 suites, **2504 passed, 0 failed, 0 skipped** — run twice
-  (before and after the adversarial-review fix round; 70.7s / 63.1s).
+- `yarn l1 test:foundry` — full suite: 297 suites, **2504 passed, 0 failed, 0 skipped** — run three
+  times (before the adversarial-review rounds and after each contract-touching fix round;
+  70.7s / 63.1s / 62.6s).
 - Targeted: `V33UpgradePreconditionChecker.t.sol` 9/9, `ServerNotifierPreconditions.t.sol` 19/19
   (two contracts: 14 precondition tests + 5 `vm.load` storage-layout locks), pre-existing
   `ServerNotifier.t.sol` 14/14 unmodified,
   `UpgradeChainFromVersion.t.sol` 9/9 untouched, `UpgradeIntegrationTest_Local` +
   `UpgradeIntegrationTest_LocalProductionVerifier` both pass (`--ffi --gas-limit 20000000000`).
-- anvil-interop: `yarn test:v31-to-v32` — full pass, run twice (167s first round; rerun after the
-  harness rework). Per chain (10 and 11): "scheduling blocked with 0x5c25a57b
-  (LowerBoundNotRecorded, read from the on-chain preview) before the prerequisite" and
-  "upgrade scheduled once the prerequisite holds". `yarn test:hardhat:interop` — 9/10 parallel
+- anvil-interop: `yarn test:v31-to-v32` — full pass, run four times (167s first round; after each
+  harness rework, the last with the strict registration guard live). Per chain (10 and 11):
+  "scheduling blocked with 0x5c25a57b (LowerBoundNotRecorded, read from the on-chain preview)
+  before the prerequisite" and "upgrade scheduled once the prerequisite holds". `yarn test:hardhat:interop` — 9/10 parallel
   workers passed; worker 1 (`01-deployment-verification`) was signal-killed under the 10-way
   parallel anvil load ("exit code unknown" = killed by signal, no mocha output), and the same spec
   passes in isolation: 60/60 in 473ms. Treated as local resource pressure, not a regression.
@@ -122,6 +123,20 @@ after. Design note with rejected alternatives: `protocol-docs/upgrade-scheduling
   regenerations agreed on every row).
 - Storage layout: `forge inspect ServerNotifier storage-layout` diffed against a worktree at the
   base commit — slots 0–3 identical, one appended mapping at slot 4.
+
+### Adversarial review loop
+
+The branch went through three rounds of simulated adversarial review by personas modeled on the
+natural reviewers (protocol/security, upgrade-scripts/release, tooling/artifacts), iterating until
+no reviewer had a finding at ≥98% confidence and every lower-confidence finding was either fixed
+or explicitly dispositioned. Material outcomes beyond the diff itself: the chain-states
+regeneration (round-1 blocker), the manifest-at-base decision with the reproducibility
+investigation (§3), the correction of a factually wrong safety argument in the design note (cut
+hashes persist across releases), the discovery of the dangling ServerNotifier ownership transfer
+(§5 follow-up, with the gating pre-merge check), the split-Safe-bundle ordering caveat now stated
+on every operator-facing surface, and a fixture guard that hard-fails if a release stops
+registering its checker through the production executor path. Final verdicts: all three HAPPY,
+zero remaining findings.
 
 ## 5. Follow-up candidates (out of scope)
 
