@@ -10,7 +10,7 @@ import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
 import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManagerForServerNotifier.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IUpgradePreconditionChecker} from "contracts/upgrades/IUpgradePreconditionChecker.sol";
-import {V33UpgradePreconditionChecker} from "contracts/upgrades/V33UpgradePreconditionChecker.sol";
+import {V32UpgradePreconditionChecker} from "contracts/upgrades/V32UpgradePreconditionChecker.sol";
 import {PriorityOpLowerBound} from "contracts/upgrades/PriorityOpLowerBound.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {
@@ -21,21 +21,19 @@ import {
     UpgradePreconditionCheckerMagicMismatch
 } from "contracts/common/L1ContractErrors.sol";
 
-/// @dev A registration candidate that implements the magic getter with the wrong value.
+/// @dev Checker stub with an invalid magic value.
 contract WrongMagicChecker {
     function getSupportsUpgradePreconditionCheckerMagic() external pure returns (bytes32) {
         return keccak256("NotAnUpgradePreconditionChecker");
     }
 }
 
-/// @notice Tests for the precondition-checker registry on ServerNotifier and its effect on
-/// `setUpgradeTimestamp`. The CTM is the same mock the base ServerNotifier tests use; the checker
-/// and its lower-bound registry are real, and the chain is a mocked address whose two `IGetters`
-/// views are stubbed (same isolation as `V33UpgradePreconditionCheckerTest`).
+/// @notice Tests ServerNotifier checker registration and scheduling.
+/// @dev Chain getters are mocked to isolate notifier-to-checker behavior; the checker and registry are real.
 contract ServerNotifierPreconditionsTest is Test {
     ServerNotifier internal serverNotifier;
     DummyChainTypeManager internal chainTypeManager;
-    V33UpgradePreconditionChecker internal checker;
+    V32UpgradePreconditionChecker internal checker;
     PriorityOpLowerBound internal registry;
 
     address internal owner;
@@ -71,9 +69,8 @@ contract ServerNotifierPreconditionsTest is Test {
         serverNotifier.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
 
         registry = new PriorityOpLowerBound();
-        checker = new V33UpgradePreconditionChecker(registry);
+        checker = new V32UpgradePreconditionChecker(registry);
 
-        // The default shape: every precondition satisfied.
         _mockBackfilled(true);
         vm.mockCall(
             chain,
@@ -122,10 +119,12 @@ contract ServerNotifierPreconditionsTest is Test {
 
         assertEq(address(serverNotifier.upgradePreconditionChecker(protocolVersion)), address(0));
 
-        // With the checker gone, scheduling passes again even on a failing chain.
+        uint256 deadline = block.timestamp + 7 days;
         _mockBackfilled(false);
         vm.prank(chainAdmin);
-        serverNotifier.setUpgradeTimestamp(chainId, block.timestamp + 7 days);
+        serverNotifier.setUpgradeTimestamp(chainId, deadline);
+
+        assertEq(serverNotifier.protocolVersionToUpgradeTimestamp(chainId, protocolVersion), deadline);
     }
 
     function test_setCheckerRevertsIfNotOwner() public {
@@ -143,8 +142,6 @@ contract ServerNotifierPreconditionsTest is Test {
     }
 
     function test_setCheckerRevertsOnContractWithoutMagicGetter() public {
-        // Registering a contract that does not implement the interface at all must revert (a plain
-        // call into a missing function), not silently register.
         vm.prank(owner);
         vm.expectRevert();
         serverNotifier.setUpgradePreconditionChecker(
@@ -186,9 +183,8 @@ contract ServerNotifierPreconditionsTest is Test {
     }
 
     function test_setUpgradeTimestampRevertsWhenLowerBoundNotRecorded() public {
-        // A fresh registry with nothing recorded for the chain.
         registry = new PriorityOpLowerBound();
-        checker = new V33UpgradePreconditionChecker(registry);
+        checker = new V32UpgradePreconditionChecker(registry);
         _registerChecker();
 
         vm.prank(chainAdmin);
@@ -210,7 +206,6 @@ contract ServerNotifierPreconditionsTest is Test {
     }
 
     function test_checkerForOtherVersionDoesNotAffectScheduling() public {
-        // A checker registered for a different old version must not run for this chain.
         vm.prank(owner);
         serverNotifier.setUpgradePreconditionChecker(protocolVersion + 1, checker);
         _mockBackfilled(false);
@@ -253,22 +248,17 @@ contract ServerNotifierPreconditionsTest is Test {
     }
 }
 
-/// @notice Locks the ServerNotifier storage layout: it lives behind a long-lived
-/// `TransparentUpgradeableProxy`, so implementation upgrades must only ever append storage. Each
-/// test pins a state variable to its slot by writing through the contract and reading the raw slot.
-/// If one of these tests fails, the layout drifted — reorder the new state variables to append
-/// instead of "fixing" the expected slots.
+/// @notice Guards ServerNotifier's proxy storage layout against reordering.
 contract ServerNotifierStorageLayoutTest is Test {
     /// @dev `Ownable._owner`.
     uint256 internal constant OWNER_SLOT = 0;
-    /// @dev `Ownable2Step._pendingOwner`, packed with `Initializable._initialized` (offset 20)
-    /// and `Initializable._initializing` (offset 21).
+    /// @dev `_pendingOwner`, packed with `_initialized` and `_initializing`.
     uint256 internal constant PENDING_OWNER_SLOT = 1;
     /// @dev `chainTypeManager`.
     uint256 internal constant CHAIN_TYPE_MANAGER_SLOT = 2;
-    /// @dev `protocolVersionToUpgradeTimestamp` (nested mapping base slot).
+    /// @dev `protocolVersionToUpgradeTimestamp` mapping base slot.
     uint256 internal constant UPGRADE_TIMESTAMP_SLOT = 3;
-    /// @dev `upgradePreconditionChecker` (mapping base slot) — appended by this release.
+    /// @dev `upgradePreconditionChecker` mapping base slot.
     uint256 internal constant PRECONDITION_CHECKER_SLOT = 4;
 
     ServerNotifier internal serverNotifier;
@@ -313,7 +303,7 @@ contract ServerNotifierStorageLayoutTest is Test {
         vm.prank(owner);
         serverNotifier.transferOwnership(pendingOwner);
 
-        // pendingOwner in the low 20 bytes, `_initialized = 1` at byte offset 20.
+        // `_pendingOwner` occupies the low 20 bytes; `_initialized = 1` starts at byte 20.
         bytes32 expected = bytes32((uint256(1) << 160) | uint256(uint160(pendingOwner)));
         assertEq(_load(PENDING_OWNER_SLOT), expected);
     }
@@ -334,7 +324,7 @@ contract ServerNotifierStorageLayoutTest is Test {
 
     function test_preconditionCheckerMappingSlot() public {
         PriorityOpLowerBound registry = new PriorityOpLowerBound();
-        V33UpgradePreconditionChecker checker = new V33UpgradePreconditionChecker(registry);
+        V32UpgradePreconditionChecker checker = new V32UpgradePreconditionChecker(registry);
         vm.prank(owner);
         serverNotifier.setUpgradePreconditionChecker(protocolVersion, checker);
 

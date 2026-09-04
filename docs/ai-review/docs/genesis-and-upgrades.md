@@ -54,11 +54,7 @@ the chain completed its base-token backfill on v31: on L1 the upgrade requires
 before its L2 entry point disappears. Chains that never ran the v31 backfill cannot
 take this upgrade.
 
-The same prerequisite triple is also enforced at _scheduling_ time: the release registers
-`V33UpgradePreconditionChecker` on the `ServerNotifier` for the old protocol version, so
-`setUpgradeTimestamp` reverts with the same errors while the prerequisite is missing
-instead of letting the chain schedule an upgrade that would fail at execution. See
-`protocol-docs/upgrade-scheduling.md`.
+Scheduling-time enforcement is described in {protocol-docs/upgrade-scheduling.md}.
 
 Note, that on ZKsync Era, the old version of the ComplexUpgrader is used, which only supports this function:
 

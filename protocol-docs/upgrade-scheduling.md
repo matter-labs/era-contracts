@@ -1,198 +1,99 @@
 # Upgrade scheduling: `ServerNotifier` and on-chain preconditions
 
-This document is the source of truth for how a chain upgrade is _scheduled_ on L1: what the
-`ServerNotifier` contract is, the events the server watches, how the scheduled timestamp gates
-upgrade execution, and how release-specific upgrade preconditions are enforced at scheduling time.
-Contract doc comments reference this file instead of restating the narrative.
+This document describes L1 upgrade scheduling and its release-specific precondition checks. For
+chain migration, see {protocol-docs/chain-lifecycle.md}.
 
-Related documents:
+## Scheduling
 
-- {protocol-docs/chain-lifecycle.md} — chain creation, registration, and migration.
+`ServerNotifier` is a `TransparentUpgradeableProxy` used by chain admins to signal the ZKsync OS
+server. It emits migration events and `UpgradeTimestampUpdated`, which the server watches to inject
+the upgrade transaction at the scheduled time.
 
-## What `ServerNotifier` is
+`setUpgradeTimestamp(chainId, upgradeTimestamp)`:
 
-`ServerNotifier` (`contracts/governance/ServerNotifier.sol`) is a small operational contract that
-chain admins use to signal the ZKsync OS server. It is a `TransparentUpgradeableProxy` with a
-dedicated `ProxyAdmin` owned by the CTM's ecosystem admin (`chainAdmin`), deliberately _outside_
-governance: it can be upgraded operationally without touching the diamond, the CTM, or the
-governance timelock. Its `owner()` is _intended_ to be the CTM admin on L1 — but the fresh-deploy
-flow currently initializes the owner as the deployer and leaves the `Ownable2Step` transfer to the
-chain admin pending (nothing accepts it), so verify `owner()` per ecosystem before relying on any
-owner-gated operation. On Gateway the owner is the aliased L1 governance
-(`GatewayCTMDeployerCTMBase`).
+1. requires the caller to be the chain admin;
+2. resolves the chain's current protocol version;
+3. requires an upgrade cut for that version;
+4. runs its registered precondition checker, if any; and
+5. stores the timestamp under the chain ID and current protocol version.
 
-It emits three events the server watches:
+The timestamp is an execution gate, not only a notification. Once it is non-zero and reached, a
+validator can call `AdminFacet.upgradeChainFromVersion`. Checking prerequisites while scheduling
+therefore catches failures before the scheduled execution.
 
-- `MigrateToGateway(chainId, migrationNumber)` — migration signal (see
-  {protocol-docs/chain-lifecycle.md}).
-- `MigrateFromGateway(chainId, migrationNumber)` — the reverse migration signal.
-- `UpgradeTimestampUpdated(chainId, oldProtocolVersion, upgradeTimestamp)` — emitted by
-  `setUpgradeTimestamp`, the upgrade _scheduling_ call. The `zksync-os-server` L1 watcher reacts to
-  this event by injecting the upgrade transaction into the chain at the scheduled time.
+The proxy has a dedicated `ProxyAdmin`, separate from governance. Its `owner()` is intended to be
+the CTM admin on L1, but fresh deployment currently leaves the transfer from the deployer pending.
+Verify `owner()` before an owner-gated operation. On Gateway, the owner is aliased L1 governance.
 
-## The scheduling call and the execution gate
+## Precondition checker registry
 
-`setUpgradeTimestamp(chainId, upgradeTimestamp)` is callable only by the chain's admin (resolved
-through `chainTypeManager.getChainAdmin`). It resolves the chain's _current_ ("old") protocol
-version, requires that the CTM already has an upgrade cut registered for it
-(`upgradeCutHash(oldProtocolVersion) != 0`), runs the registered precondition checker for that
-version if there is one (see below), and records the timestamp in
-`protocolVersionToUpgradeTimestamp[chainId][oldProtocolVersion]`.
+`ServerNotifier` maps each old protocol version to an `IUpgradePreconditionChecker`. No registered
+checker means the release has no additional scheduling checks.
 
-The stored timestamp is not merely informational. `AdminFacet.upgradeChainFromVersion` lets a
-_validator_ (not only the chain admin or the CTM) execute the diamond cut once
-`block.timestamp >= timestamp` and the timestamp is non-zero. Scheduling is therefore the moment a
-chain commits to the upgrade being executable by its validator — which is exactly why
-release-specific prerequisites should be verified then, not only at execution.
+- `setUpgradePreconditionChecker(oldProtocolVersion, checker)` is owner-only. A non-zero checker
+  must return `UPGRADE_PRECONDITION_CHECKER_MAGIC`; zero deregisters it.
+- `setUpgradeTimestamp` calls `checkUpgradePreconditions` after checking the upgrade cut and before
+  storing the timestamp. A failure uses the same error as the execution-time check.
+- `previewUpgradePreconditions(chainId)` reports expected failures as error selectors and omits
+  caller and timestamp validation. An empty array means only that the checks it evaluated passed.
+  It is not guaranteed to return: CTM, chain, or checker calls can still revert, including for an
+  unknown chain or an incompatible dependency.
 
-## Precondition checkers
+Checkers are stateless views, do not depend on `msg.sender`, and are keyed by the version being
+upgraded from. Registration proves interface intent, not checker health. A checker with a broken
+dependency can block scheduling for that version until the owner deregisters it, so the release
+flow must exercise the deployed checker against a real chain before registration.
 
-Some releases have per-chain prerequisites beyond "the upgrade cut exists". The v32 upgrade of a
-ZKsync OS chain is the canonical example: the chain's pre-v31 base-token total supply must have been
-backfilled, and a priority-op lower bound proving the backfill _executed_ must have been recorded in
-the `PriorityOpLowerBound` registry (`RecordPriorityOpLowerBound.s.sol`, run well before the
-upgrade executes). `V32UpgradeZKsyncOS.upgrade` enforces all of that at _execution_ time — but a
-chain that scheduled a timestamp without the prerequisites would only discover the problem when its
-upgrade transaction reverts at the scheduled moment.
+The release flow registers under the CTM's protocol version at prepare time, while scheduling looks
+up the chain's current version. A chain lagging behind that version finds no checker for this
+release. It can only schedule its earlier version's persistent upgrade cut, whose upgrade contract
+retains its own execution-time checks.
 
-`ServerNotifier` therefore keeps a per-protocol-version registry of precondition checkers:
+## The v32 checker
 
-- `upgradePreconditionChecker(oldProtocolVersion)` — the registered
-  `IUpgradePreconditionChecker`, or zero when the release upgrading _from_ that version has no
-  extra prerequisites (the default).
-- `setUpgradePreconditionChecker(oldProtocolVersion, checker)` — `onlyOwner` (the CTM admin;
-  aliased governance on Gateway). Registering a non-zero checker validates the checker's magic
-  value (`UPGRADE_PRECONDITION_CHECKER_MAGIC`) with a plain call, so registering a contract that
-  does not implement the interface reverts loudly. Registering the zero address deregisters.
-- `previewUpgradePreconditions(chainId)` — a view mirroring `setUpgradeTimestamp`'s upgrade-cut
-  and precondition checks without reverting: it returns the error selectors of the failed checks
-  (missing upgrade cut included), or an empty array when those checks pass. It deliberately does
-  not cover the caller (`onlyChainAdmin`) or zero-timestamp validation, and — like
-  `setUpgradeTimestamp` itself — it still reverts for a chain id the CTM does not know (the
-  protocol-version resolution dereferences the chain). Operators and CI use it to dry-run.
+`V32UpgradePreconditionChecker` mirrors the three prerequisites enforced by
+`V32UpgradeZKsyncOS.upgrade`:
 
-When a checker is registered for the chain's current protocol version, `setUpgradeTimestamp` calls
-`checker.checkUpgradePreconditions(chainId, zkChain)` after the upgrade-cut check and before
-writing the timestamp; the checker reverts with the same specific error the upgrade contract would
-revert with at execution time. The event and mapping semantics are unchanged — a scheduling that
-passes the checker behaves exactly as before.
+1. `baseTokenSupportsTotalSupply()` is true, otherwise `BaseTokenPreV31TotalSupplyNotSet`;
+2. the chain has a recorded `PriorityOpLowerBound`, otherwise `LowerBoundNotRecorded`; and
+3. `getFirstUnprocessedPriorityTx()` has reached that bound, otherwise `PriorityQueueNotReady`.
 
-Checkers are stateless `view` contracts. They must not mutate state, must not depend on
-`msg.sender`, and are keyed by the _old_ protocol version because that is what
-`setUpgradeTimestamp` resolves and what `upgradeCutHash` is keyed by.
+The checker intentionally omits the execution-time requirement that committed and executed batch
+counts match. Batch drain is transient and may change between scheduling and execution. By
+contrast, the priority queue condition is monotonic: the first recorded bound is fixed and the
+processed index only increases. Record the bound early; a chain that has not reached it can keep
+processing and retry scheduling.
 
-Two asymmetries of the registry are deliberate:
+## Release and operator flow
 
-- **Registration key vs lookup key.** The release flow registers under the CTM's own
-  `protocolVersion()` at prepare time, while `setUpgradeTimestamp` looks up the _chain's_ current
-  version. A chain lagging behind the CTM's prepare-time version therefore finds no checker —
-  which is fail-open but safe: `upgradeCutHash` entries persist across releases, so what such a
-  chain can schedule is the _earlier_ release's upgrade (whose cut its version still maps to), and
-  that upgrade carries its own execution-time requirements. This release's checker only guards
-  this release's transition.
-- **The magic check proves intent, not health.** Registration only validates the magic value; a
-  checker whose checks are themselves broken (reverting getters, wrong addresses) registers
-  cleanly and then blocks scheduling for every chain on that version until the owner deregisters
-  it — a transaction from whoever `owner()` currently is (see above). Releases must therefore
-  exercise the checker (its preview, against a real chain) before putting the registration into
-  the call set; the repo's integration tests do this for the shipped checker.
+A release with scheduling prerequisites:
 
-### The v32 checker
+1. deploys the checker and any shared auxiliary registry;
+2. upgrades `ServerNotifier` and registers the checker through
+   `[ctm_admin_calls] server_notifier_upgrade`;
+3. records each chain's priority-op lower bound before scheduling;
+4. registers the upgrade cut; and
+5. lets each chain admin schedule once the checks pass.
 
-`V33UpgradePreconditionChecker` (`contracts/upgrades/V33UpgradePreconditionChecker.sol`) is the
-first concrete checker. It enforces, at scheduling time, exactly the prerequisite triple that
-`V32UpgradeZKsyncOS.upgrade` enforces at execution time, reusing the same errors so the failures
-read identically:
+The v31 prepare flow serializes the implementation upgrade, an `acceptOwnership()` call when the
+notifier owner differs from the proxy-admin owner, and checker registration into one operational
+ChainAdmin sequence. When ownership acceptance is needed, generation requires the notifier's
+pending owner to be that ChainAdmin and otherwise fails. Execute the complete sequence before
+registering the upgrade cut so there is no scheduling window without the checker.
 
-1. `IGetters(zkChain).baseTokenSupportsTotalSupply()` — else `BaseTokenPreV31TotalSupplyNotSet`.
-2. `PRIORITY_OP_LOWER_BOUND.recorded(zkChain)` — else `LowerBoundNotRecorded`.
-3. `IGetters(zkChain).getFirstUnprocessedPriorityTx() >= lowerBound(zkChain)` — else
-   `PriorityQueueNotReady`.
+Fresh ecosystems start at the target version and therefore deploy no checker for this transition.
+This release also does not register a checker on Gateway.
 
-On naming: the in-tree upgrade contracts for this release are `V32Upgrade*` (they take chains _to_
-protocol v32 from v31 in production), while the repo's upgrade-env fixtures deploy a genesis at
-v32.0.0 and exercise the same contracts as a v32 → v33 upgrade. The checker is named after the
-release the fixtures use; its NatSpec points here.
+## Design constraints
 
-`DefaultUpgradeZKsyncOS` also requires `totalBatchesCommitted == totalBatchesExecuted` at execution
-time. The checker deliberately does **not** include that check: batch state is time-sensitive and
-would flap at scheduling time (a chain drains its batches close to the upgrade, not days before,
-and new batches keep committing), producing spurious scheduling failures with no operational value.
+The registry belongs on `ServerNotifier` because requirements vary by release. Hardcoding them in
+the long-lived notifier would require a new implementation for every release, while placing them
+in the diamond or CTM would disturb the audited protocol surface.
 
-The queue check (3) is also time-dependent, but unlike batch drain it is monotone in the right
-direction: the bound is pinned once (first `lowerBoundPriorityOp` call wins, so nobody can raise it
-later) and `getFirstUnprocessedPriorityTx` only grows, so a chain that fails it merely has to keep
-processing its queue and retry — it can never regress from passing to failing. The cost is that a
-third party recording the bound during a deposit burst pins a higher bound and delays the chain's
-ability to _schedule_ (previously only its ability to execute); the runbook therefore records the
-bound well in advance, and the chain processes those ops on its normal cadence either way.
+Scheduling always runs a registered checker. A chain-admin-controlled bypass would defeat the
+protection; deregistration remains an explicit, auditable ecosystem-admin action.
 
-## How a release adds a checker
-
-A release with scheduling-time prerequisites ships the checker in its CTM upgrade script (see
-`CTMUpgrade_v31.s.sol`):
-
-1. Deploy the checker alongside the release's per-chain upgrade contract (both typically embed the
-   same auxiliary registries as immutables, e.g. `PriorityOpLowerBound`).
-2. Append a `setUpgradePreconditionChecker(oldProtocolVersion, checker)` call to the CTM-admin call
-   set (`[ctm_admin_calls] server_notifier_upgrade` in the output TOML), _after_ the
-   `ServerNotifier` implementation upgrade in the same call array — the setter only exists on the
-   new implementation, and the calls execute in order.
-
-Fresh ecosystems deploy no checker and register none: a fresh CTM starts at the release's target
-version with `DefaultUpgradeZKsyncOS`, so there is no from-version with prerequisites to guard.
-
-Gateway is out of scope for checker registration in this release: the setter works there (the
-owner is the aliased governance), but no Gateway release flow registers one, and Gateway is
-soft-deprecated.
-
-## Operator flow (v31 → v32 example)
-
-1. Ecosystem prepare: the CTM-admin bundle deploys the new contracts, upgrades the `ServerNotifier`
-   implementation, and registers the checker for the chains' current version. This bundle must
-   execute **before** the governance stage that registers the upgrade cut
-   (`setNewVersionUpgrade`, a separate signer): scheduling becomes possible the moment
-   `upgradeCutHash(oldVersion)` is set, so a cut registered first would open an unguarded
-   scheduling window (which merely reproduces pre-checker behaviour, but defeats the point). The
-   standard flows _emit_ in this order — protocol-ops executes the CTM-admin calls during prepare,
-   ahead of the governance stages — but the two are signed by different bodies (the ecosystem
-   admin vs governance), so honoring the order at execution time is a runbook obligation, not
-   something the tooling can enforce. The same applies within the CTM-admin call set itself: when
-   the ServerNotifier's `owner()` differs from its ProxyAdmin's owner, the implementation upgrade
-   and the registration land in separately signed bundles, and the registration reverts (harmless,
-   retry after the upgrade) if executed first.
-2. Per chain, record the priority-op lower bound (`RecordPriorityOpLowerBound.s.sol`) — well before
-   the chain schedules, and note the pinned bound includes any priority ops pending at record time,
-   so the chain must have processed past it (its normal operation) before scheduling passes.
-3. Schedule: the chain admin calls `setUpgradeTimestamp(chainId, ts)` (protocol-ops
-   `chain set-upgrade-timestamp`). If step 2 was skipped or the queue has not drained past the
-   bound yet, this reverts with the same error the upgrade would have reverted with — instead of
-   the failure surfacing at execution time. Retry once the queue catches up.
-4. Execute: at `ts`, the server injects the upgrade transaction and the validator (or the admin)
-   calls `upgradeChainFromVersion`.
-
-## Design decisions (and rejected alternatives)
-
-**Where preconditions live.** A per-old-protocol-version registry on `ServerNotifier`, set by its
-owner in the release flow. Rejected: (a) making the per-release upgrade contract itself the checker
-— it is delegate-called into the diamond and reads diamond storage (`s.*`) directly, so a `view`
-entry point callable from outside would need a parallel code path, and the CTM's upgrade pointer is
-not per-version; (b) hardcoding the v32 checks in `ServerNotifier` — it is a long-lived proxy
-shared across releases, and hardcoding one release's rules means re-upgrading it every release; (c)
-putting the checks in `AdminFacet`/CTM — the point of the issue is to stay off the audited
-diamond/CTM surface.
-
-**Always-on, no bypass flag.** `setUpgradeTimestamp` keeps its exact signature and semantics (its
-ABI is consumed by protocol-ops, partner runbooks, and the calldata-review docs) and _always_ runs
-the registered checker. Rejected: a `notify(chainId, bool checkPreconditions)` opt-in flag or a
-`setUpgradeTimestampUnchecked` variant — a per-call, chain-admin-controlled bypass defeats the
-footgun protection for exactly the operator who needs it. The escape hatch is that the CTM admin
-(ecosystem level, the party that registered the checker) can deregister it, which is a distinct,
-auditable on-chain action (`UpgradePreconditionCheckerSet` with checker = 0).
-
-**Reverting check plus non-reverting preview.** The repo forbids `try`/`catch` and `staticcall`
-probing, so a preview cannot be implemented by catching the checker's revert. The checker interface
-carries both a reverting `checkUpgradePreconditions` (specific errors, used in the write path) and
-a `previewUpgradePreconditions` view returning failed error selectors (used by
-`ServerNotifier.previewUpgradePreconditions` for operators and CI). Both build on the same internal
-predicates, so they cannot drift within one checker.
+The checker exposes both a reverting enforcement call and a diagnostic preview because the
+codebase does not use `try`/`catch` or low-level `staticcall` probing. Both functions share internal
+predicates. The preview converts ordinary false predicates into selectors but does not catch
+dependency reverts.

@@ -19,6 +19,7 @@ pub(crate) mod elements;
 pub(crate) mod utils;
 
 use elements::{
+    ctm_admin_calls::verify_ctm_admin_calls,
     deployed_addresses::verify_v31_provenance,
     governance_stage_calls::{verify_governance_stage_calls, verify_per_chain_protocol_versions},
     protocol_version::ProtocolVersion,
@@ -29,14 +30,6 @@ pub(crate) const EXPECTED_NEW_PROTOCOL_VERSION_STR: &str = "0.32.0";
 pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.31.0";
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
 pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
-
-/// Stage Sepolia's Era chain (270) is the single registered chain still
-/// settling on the legacy stage Gateway at v31 upgrade time.
-/// `L1MessageRootStageSepolia._v31InitializeInner` skips it (see
-/// `l1-contracts/contracts/dev-contracts/L1MessageRootStageSepolia.sol`),
-/// so PUVT must apply the same skip when pre-flighting the
-/// `Bridgehub.settlementLayer(chainId) == L1` invariant on stage.
-pub(crate) const STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID: u64 = 270;
 
 pub(crate) fn get_expected_new_protocol_version() -> ProtocolVersion {
     ProtocolVersion::from_str(EXPECTED_NEW_PROTOCOL_VERSION_STR).unwrap()
@@ -73,14 +66,16 @@ pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static
 ///   2. CREATE2 provenance map population — v31-specific prep that must precede
 ///      provenance consumption below.
 ///   3. RPC state checks — chain ids, Create2Factory bytecode, proxy admins,
-///      live core wiring, validator timelocks, settlement layer.
+///      live core wiring, and validator timelocks.
 ///      Subsumes legacy's early chain-id sanity (legacy steps 2–3).
 ///   4. Deployment provenance — every named v31 deploy + the new-GW CTM
 ///      provenance flow (legacy step 4).
-///   5. Per-chain protocol-version sweep — was bundled inside legacy
+///   5. CTM-admin calls — the ServerNotifier upgrade, optional ownership
+///      acceptance, and checker registration.
+///   6. Per-chain protocol-version sweep — was bundled inside legacy
 ///      `deployed_addresses.verify`; sits next to provenance for the same
 ///      reason.
-///   6. Stage 0 / 1 / 2 governance calls (legacy steps 7–9). Last.
+///   7. Stage 0 / 1 / 2 governance calls (legacy steps 7–9). Last.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn verify(
     env: VerifyUpgradeEnv,
@@ -167,6 +162,8 @@ pub(crate) async fn verify(
         result,
     )
     .await?;
+
+    verify_ctm_admin_calls(artifact, &verifiers, result).await?;
 
     verify_per_chain_protocol_versions(artifact, &verifiers, result).await?;
 

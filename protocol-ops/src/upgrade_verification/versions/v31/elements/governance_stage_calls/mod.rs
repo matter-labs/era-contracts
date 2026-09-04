@@ -55,8 +55,10 @@ pub struct GovernanceStage2Calls {
 sol! {
     function upgrade(address proxy, address implementation);
     function upgradeAndCall(address proxy, address implementation, bytes data);
-    function initializeL1V31Upgrade();
     function setAddresses();
+    function setL1InteropHandler(address _handler);
+    function setDefaultUpgrade(address _defaultUpgrade);
+    function checkUpgradePreconditionChecker(uint256 _oldProtocolVersion, address _expectedChecker);
     function updateSecurityCouncil(address _newSecurityCouncil);
     function updateGuardians(address _newGuardians);
     function updateEmergencyUpgradeBoard(address _newEmergencyUpgradeBoard);

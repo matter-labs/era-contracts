@@ -129,6 +129,22 @@ const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
         ],
         "l1_nullifier_implementation_addr",
     ),
+    (
+        &[
+            "upgrade_addresses",
+            "bridges",
+            "l1_interop_handler_proxy_addr",
+        ],
+        "l1_interop_handler_proxy",
+    ),
+    (
+        &[
+            "upgrade_addresses",
+            "bridges",
+            "l1_interop_handler_implementation_addr",
+        ],
+        "l1_interop_handler_implementation_addr",
+    ),
 ];
 
 impl AddressVerifier {

@@ -362,21 +362,14 @@ pub async fn resolve_server_notifier(
 
 /// Dry-run `ServerNotifier.previewUpgradePreconditions(chainId)`.
 ///
-/// Returns the failed checks' error selectors (empty when scheduling would pass), or `None` when
-/// the call reverts with empty data — a pre-v34 implementation without the preview selector, or a
-/// chain id the CTM does not know (the notifier's protocol-version resolution dereferences the
-/// zero chain) — and the caller then falls back to the scheduling call's own revert as the source
-/// of truth. Reverts that carry data are genuine failures inside the view (e.g. a chain whose
-/// facets predate the checker's getters reverts through the diamond's `Error("F")`) and are
-/// propagated, decoded where possible; so are transport failures, including providers that report
-/// a revert with no data field at all — a loud failure beats silently skipping the check.
+/// A notifier that predates both preview and checker registration is treated as legacy. Other
+/// failures are propagated.
 pub async fn preview_upgrade_preconditions(
     l1_rpc_url: &str,
     server_notifier: Address,
     chain_id: u64,
 ) -> anyhow::Result<Option<Vec<[u8; 4]>>> {
     use crate::common::abi::IServerNotifierAbi;
-    use alloy::sol_types::SolError;
 
     let notifier = IServerNotifierAbi::new(server_notifier, provider(l1_rpc_url)?);
     match notifier
@@ -388,22 +381,46 @@ pub async fn preview_upgrade_preconditions(
         Err(err) => {
             if let Some(data) = err.as_revert_data() {
                 if data.is_empty() {
-                    return Ok(None);
+                    return match notifier
+                        .upgradePreconditionChecker(U256::ZERO)
+                        .call()
+                        .await
+                    {
+                        Ok(_) => anyhow::bail!(
+                            "ServerNotifier.previewUpgradePreconditions({chain_id}) reverted without data"
+                        ),
+                        Err(probe_err)
+                            if probe_err
+                                .as_revert_data()
+                                .is_some_and(|probe_data| probe_data.is_empty()) =>
+                        {
+                            Ok(None)
+                        }
+                        Err(probe_err) => Err(probe_err).context(
+                            "probing ServerNotifier.upgradePreconditionChecker() after an empty preview revert",
+                        ),
+                    };
                 }
-                if let Ok(revert) = alloy::sol_types::Revert::abi_decode(&data) {
-                    anyhow::bail!(
-                        "ServerNotifier.previewUpgradePreconditions({chain_id}) reverted: {}",
-                        revert.reason
-                    );
-                }
-                anyhow::bail!(
-                    "ServerNotifier.previewUpgradePreconditions({chain_id}) reverted with 0x{}",
-                    hex::encode(&data)
-                );
+                return decode_preview_revert(chain_id, &data);
             }
             Err(err).context("ServerNotifier.previewUpgradePreconditions() call failed")
         }
     }
+}
+
+fn decode_preview_revert(chain_id: u64, data: &[u8]) -> anyhow::Result<Option<Vec<[u8; 4]>>> {
+    use alloy::sol_types::SolError;
+
+    if let Ok(revert) = alloy::sol_types::Revert::abi_decode(data) {
+        anyhow::bail!(
+            "ServerNotifier.previewUpgradePreconditions({chain_id}) reverted: {}",
+            revert.reason
+        );
+    }
+    anyhow::bail!(
+        "ServerNotifier.previewUpgradePreconditions({chain_id}) reverted with 0x{}",
+        hex::encode(data)
+    );
 }
 
 /// Resolve `zkChain.getRollupDAManager()` → RollupDAManager address.
@@ -477,7 +494,30 @@ pub async fn resolve_is_testnet_verifier(
 
 #[cfg(test)]
 mod tests {
-    // Verify these symbols compile and resolve — actual calls require a live RPC.
+    use alloy::sol_types::{Revert, SolError};
+
+    use super::decode_preview_revert;
     #[allow(unused_imports)]
     use super::{resolve_bytecodes_supplier, resolve_is_testnet_verifier};
+
+    #[test]
+    fn preview_empty_revert_is_not_silently_accepted() {
+        let error = decode_preview_revert(1, &[]).unwrap_err().to_string();
+        assert!(error.contains("reverted with 0x"));
+    }
+
+    #[test]
+    fn preview_reasoned_revert_is_propagated() {
+        let data = Revert::from("broken checker").abi_encode();
+        let error = decode_preview_revert(1, &data).unwrap_err().to_string();
+        assert!(error.contains("broken checker"));
+    }
+
+    #[test]
+    fn preview_custom_revert_is_propagated() {
+        let error = decode_preview_revert(1, &[0xde, 0xad, 0xbe, 0xef])
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("0xdeadbeef"));
+    }
 }

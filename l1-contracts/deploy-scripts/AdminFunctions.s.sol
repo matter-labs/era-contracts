@@ -313,9 +313,21 @@ contract AdminFunctions is Script, IAdminFunctions {
         Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
         for (uint256 i = 0; i < calls.length; i++) {
             require(calls[i].value == 0, "ownable call value not supported");
-            address currentOwner = IOwnableSingleStep(calls[i].target).owner();
-            _issueAsOperationalOwner(currentOwner, calls[i].target, calls[i].data, _wraps);
+            address sender = _operationalCallSender(calls[i]);
+            _issueAsOperationalOwner(sender, calls[i].target, calls[i].data, _wraps);
         }
+    }
+
+    function _operationalCallSender(Call memory _call) internal view returns (address) {
+        if (_call.data.length == 4 && bytes4(_call.data) == Ownable2Step.acceptOwnership.selector) {
+            address proxyAdmin = Utils.getProxyAdminAddress(_call.target);
+            address operationalAdmin = IOwnableSingleStep(proxyAdmin).owner();
+            address pendingOwner = Ownable2Step(_call.target).pendingOwner();
+            require(operationalAdmin != address(0), "proxy admin owner is zero");
+            require(pendingOwner == operationalAdmin, "pending owner does not match proxy admin owner");
+            return pendingOwner;
+        }
+        return IOwnableSingleStep(_call.target).owner();
     }
 
     function _issueAsOperationalOwner(
@@ -616,10 +628,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
         Call[] memory calls = new Call[](1);
-        // ServerNotifier.setUpgradeTimestamp validates upgrade cut data exists (eliminating the
-        // race between timestamp and diamond-cut availability that exists on ChainAdmin alone) and
-        // runs the release's registered upgrade-precondition checker, so a chain that would fail
-        // its upgrade fails here, at scheduling time; see {protocol-docs/upgrade-scheduling.md}.
+        // ServerNotifier eliminates the race between timestamp and diamond-cut availability.
         calls[0] = Call({
             target: chainInfo.serverNotifier,
             value: 0,

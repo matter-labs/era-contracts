@@ -114,7 +114,10 @@ Commit the regenerated `chain-states/` files alongside the contract change. CI c
 
 ### 1c. Upgrade tests (v31→v32)
 
-This exercises the full upgrade flow against the captured v31 chain states. It uses protocol-ops's split flow: `ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, `ecosystem stage3` to register bridged tokens and populate `bridgedOut`, then `chain upgrade` per chain. In production a chain's priority-op lower bound must also be recorded (`RecordPriorityOpLowerBound.s.sol`) well before its `chain upgrade`; the test harness models the draft-v31 backfill prerequisite instead (see `harness-shims.ts`). The prerequisite is also enforced at scheduling time — `ServerNotifier.setUpgradeTimestamp` consults the release's registered `V33UpgradePreconditionChecker` — and the test asserts scheduling is blocked before the prerequisite is modeled and succeeds after (see `protocol-docs/upgrade-scheduling.md`).
+This exercises the split v31→v32 flow against frozen v31 chain states, including ecosystem
+prepare/governance, Stage3, timestamp scheduling, and per-chain upgrades. The harness uses
+`harness-shims.ts` to model historical backfill state and asserts that scheduling fails before the
+model is applied and succeeds afterward. See {protocol-docs/upgrade-scheduling.md}.
 
 ```bash
 cd l1-contracts/test/anvil-interop

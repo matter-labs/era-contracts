@@ -1,4 +1,5 @@
 pub mod call_list;
+pub mod ctm_admin_calls;
 pub mod deployed_addresses;
 pub mod fixed_force_deployment;
 pub mod governance_stage_calls;

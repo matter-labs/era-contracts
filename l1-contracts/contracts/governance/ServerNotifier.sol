@@ -12,10 +12,8 @@ import {
 } from "../common/L1ContractErrors.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IServerNotifier} from "./IServerNotifier.sol";
-import {
-    IUpgradePreconditionChecker,
-    UPGRADE_PRECONDITION_CHECKER_MAGIC
-} from "../upgrades/IUpgradePreconditionChecker.sol";
+import {IUpgradePreconditionChecker} from "../upgrades/IUpgradePreconditionChecker.sol";
+import {UPGRADE_PRECONDITION_CHECKER_MAGIC} from "../upgrades/UpgradePreconditionCheckerConfig.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
@@ -116,18 +114,16 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
         if (_upgradeTimestamp == 0) {
             revert ZeroUpgradeTimestamp();
         }
-        uint256 _oldProtocolVersion = chainTypeManager.getProtocolVersion(_chainId);
-        if (chainTypeManager.upgradeCutHash(_oldProtocolVersion) == bytes32(0)) {
-            revert CutDataForProtocolVersionNotAvailable(_oldProtocolVersion);
+        uint256 oldProtocolVersion = chainTypeManager.getProtocolVersion(_chainId);
+        if (chainTypeManager.upgradeCutHash(oldProtocolVersion) == bytes32(0)) {
+            revert CutDataForProtocolVersionNotAvailable(oldProtocolVersion);
         }
-        // Footgun check, mirrored from the upgrade's own execution-time requirements; see
-        // {protocol-docs/upgrade-scheduling.md}.
-        IUpgradePreconditionChecker checker = upgradePreconditionChecker[_oldProtocolVersion];
+        IUpgradePreconditionChecker checker = upgradePreconditionChecker[oldProtocolVersion];
         if (address(checker) != address(0)) {
             checker.checkUpgradePreconditions(_chainId, chainTypeManager.getZKChain(_chainId));
         }
-        protocolVersionToUpgradeTimestamp[_chainId][_oldProtocolVersion] = _upgradeTimestamp;
-        emit UpgradeTimestampUpdated(_chainId, _oldProtocolVersion, _upgradeTimestamp);
+        protocolVersionToUpgradeTimestamp[_chainId][oldProtocolVersion] = _upgradeTimestamp;
+        emit UpgradeTimestampUpdated(_chainId, oldProtocolVersion, _upgradeTimestamp);
     }
 
     /// @inheritdoc IServerNotifier
@@ -136,11 +132,6 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
         IUpgradePreconditionChecker _checker
     ) external onlyOwner {
         if (address(_checker) != address(0)) {
-            // A plain call, not a probe: a contract that does not expose the magic value reverts
-            // loudly here. This only proves interface intent — a checker whose checks themselves
-            // are broken still bricks scheduling for this version until the owner deregisters it,
-            // so releases must exercise the checker before registering; see
-            // {protocol-docs/upgrade-scheduling.md}.
             if (_checker.getSupportsUpgradePreconditionCheckerMagic() != UPGRADE_PRECONDITION_CHECKER_MAGIC) {
                 revert UpgradePreconditionCheckerMagicMismatch(address(_checker));
             }

@@ -91,12 +91,7 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
             .await
             .context("resolving chain admin from L1")?;
 
-    // Dry-run the on-chain scheduling preconditions and fail fast with a readable message. The
-    // forge simulation below would surface the same failure, but only as a bare revert selector;
-    // the on-chain check in `ServerNotifier.setUpgradeTimestamp` stays the source of truth.
-    // Queried on `runner.rpc_url` (the anvil fork the simulation runs against, like every other
-    // resolver here), so a prepare flow that upgraded the ServerNotifier only on the fork still
-    // gets a real preview.
+    // Use Forge's fork RPC so the preview sees prepare-time notifier upgrades.
     let server_notifier =
         crate::common::l1_contracts::resolve_server_notifier(&runner.rpc_url, bridgehub, chain_id)
             .await
@@ -179,4 +174,41 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
 
     logger::success("Set upgrade timestamp prepared");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::describe_precondition_failure;
+    use crate::common::abi::IUpgradePreconditionErrors as E;
+    use alloy::sol_types::SolError;
+
+    #[test]
+    fn describes_known_precondition_failures() {
+        let cases = [
+            (
+                E::CutDataForProtocolVersionNotAvailable::SELECTOR,
+                "CutDataForProtocolVersionNotAvailable",
+            ),
+            (
+                E::BaseTokenPreV31TotalSupplyNotSet::SELECTOR,
+                "BaseTokenPreV31TotalSupplyNotSet",
+            ),
+            (E::LowerBoundNotRecorded::SELECTOR, "LowerBoundNotRecorded"),
+            (E::PriorityQueueNotReady::SELECTOR, "PriorityQueueNotReady"),
+            (E::ZKChainNotRegistered::SELECTOR, "ZKChainNotRegistered"),
+        ];
+
+        for (selector, name) in cases {
+            assert!(describe_precondition_failure(&selector).starts_with(name));
+        }
+    }
+
+    #[test]
+    fn describes_unknown_precondition_failure() {
+        let selector = [0xde, 0xad, 0xbe, 0xef];
+        assert_eq!(
+            describe_precondition_failure(&selector),
+            "unknown precondition error selector 0xdeadbeef"
+        );
+    }
 }

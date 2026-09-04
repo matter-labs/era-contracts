@@ -482,10 +482,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     function prepareDefaultCTMAdminCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](2);
         allCalls[0] = prepareUpgradeServerNotifierCall();
-        // Merged after the implementation upgrade: version-specific calls may target functions
-        // that only exist on the new implementation, and the merged array executes in order
-        // within one executor run (calls whose targets have different owners split into
-        // separately signed bundles; see {protocol-docs/upgrade-scheduling.md}).
         allCalls[1] = prepareVersionSpecificCTMAdminCalls();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
 
@@ -527,9 +523,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         vm.writeToml(updatedTestCallsToml, upgradeConfig.outputPath);
     }
 
-    /// @notice Release-specific additions to the CTM-admin call set (targets owned by the CTM
-    ///         admin rather than governance), executed after `prepareUpgradeServerNotifierCall`'s
-    ///         implementation upgrade. Empty by default.
+    /// @notice Returns release-specific calls appended to the default CTM-admin call set.
     function prepareVersionSpecificCTMAdminCalls() public virtual returns (Call[] memory calls) {
         calls = new Call[](0);
     }
@@ -920,11 +914,21 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             "bytecodes_supplier_addr",
             ctmAddresses.stateTransition.proxies.bytecodesSupplier
         );
+        vm.serializeAddress(
+            "state_transition",
+            "bytecodes_supplier_implementation_addr",
+            ctmAddresses.stateTransition.implementations.bytecodesSupplier
+        );
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
         vm.serializeAddress(
             "state_transition",
             "permissionless_validator_addr",
             ctmAddresses.stateTransition.proxies.permissionlessValidator
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "permissionless_validator_implementation_addr",
+            ctmAddresses.stateTransition.implementations.permissionlessValidator
         );
         if (ctmAddresses.stateTransition.implementations.serverNotifier != address(0)) {
             vm.serializeAddress(

@@ -14,6 +14,7 @@ import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisFo
 
 import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
 import {IUpgradePreconditionChecker} from "contracts/upgrades/IUpgradePreconditionChecker.sol";
+import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
@@ -156,38 +157,48 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound");
         console.log("Deployed PriorityOpLowerBound at", priorityOpLowerBound);
 
-        // The scheduling-time counterpart of the upgrade's prerequisites, registered on the
-        // ServerNotifier via the CTM-admin call set; see {protocol-docs/upgrade-scheduling.md}.
-        upgradePreconditionChecker = deploySimpleContract("V33UpgradePreconditionChecker");
-        console.log("Deployed V33UpgradePreconditionChecker at", upgradePreconditionChecker);
+        upgradePreconditionChecker = deploySimpleContract("V32UpgradePreconditionChecker");
+        console.log("Deployed V32UpgradePreconditionChecker at", upgradePreconditionChecker);
 
         console.log("Deploying V32UpgradeZKsyncOS");
         return deploySimpleContract("V32UpgradeZKsyncOS");
     }
 
     /// @notice Register the precondition checker for the version this release upgrades chains from.
-    /// @dev Appended after the ServerNotifier implementation upgrade in the same call array — the
-    ///      setter only exists on the new implementation, and the calls execute in order within
-    ///      one executor run. This call needs the proxy's own `onlyOwner`, which may legitimately
-    ///      differ from its ProxyAdmin's owner (fresh ecosystems leave the notifier's Ownable2Step
-    ///      transfer to the chain admin pending, so `owner()` is still the deployer); both
-    ///      executors resolve the signer per target, so a diverged owner splits the two calls into
-    ///      separately signed Safe bundles, whose execution order becomes a runbook obligation —
-    ///      the registration reverts (harmlessly, retry after the upgrade) if executed first; see
-    ///      {protocol-docs/upgrade-scheduling.md}. Log both owners so a rollout operator can see
-    ///      who has to sign.
+    /// @dev Registration must execute after the implementation upgrade. See
+    /// {protocol-docs/upgrade-scheduling.md}.
     function prepareVersionSpecificCTMAdminCalls() public virtual override returns (Call[] memory calls) {
         require(upgradePreconditionChecker != address(0), "v31: precondition checker not deployed");
 
         address serverNotifierProxy = ctmAddresses.stateTransition.proxies.serverNotifier;
-        console.log("ServerNotifier owner (signs the checker registration):", IOwnable(serverNotifierProxy).owner());
-        console.log(
-            "ServerNotifier ProxyAdmin owner (signs the implementation upgrade):",
-            IOwnable(Utils.getProxyAdminAddress(serverNotifierProxy)).owner()
-        );
+        address serverNotifierProxyAdmin = Utils.getProxyAdminAddress(serverNotifierProxy);
+        address operationalAdmin = IOwnable(serverNotifierProxyAdmin).owner();
+        address serverNotifierOwner = IOwnable(serverNotifierProxy).owner();
+        address pendingServerNotifierOwner = IOwnable(serverNotifierProxy).pendingOwner();
 
-        calls = new Call[](1);
-        calls[0] = Call({
+        require(operationalAdmin != address(0), "v31: ServerNotifier ProxyAdmin owner is zero");
+        console.log("ServerNotifier owner (signs the checker registration):", serverNotifierOwner);
+        console.log("ServerNotifier ProxyAdmin owner (signs the implementation upgrade):", operationalAdmin);
+
+        uint256 registrationCallIndex;
+        if (serverNotifierOwner != operationalAdmin) {
+            require(
+                pendingServerNotifierOwner == operationalAdmin,
+                "v31: ServerNotifier pending owner is not the operational admin"
+            );
+            calls = new Call[](2);
+            calls[0] = Call({
+                target: serverNotifierProxy,
+                data: abi.encodeCall(IOwnable.acceptOwnership, ()),
+                value: 0
+            });
+            registrationCallIndex = 1;
+        } else {
+            require(pendingServerNotifierOwner == address(0), "v31: ServerNotifier has a stale pending owner");
+            calls = new Call[](1);
+        }
+
+        calls[registrationCallIndex] = Call({
             target: serverNotifierProxy,
             data: abi.encodeCall(
                 IServerNotifier.setUpgradePreconditionChecker,
@@ -195,6 +206,26 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             ),
             value: 0
         });
+    }
+
+    /// @notice Require checker registration immediately before publishing the upgrade cut.
+    function provideSetNewVersionUpgradeCall() public virtual override returns (Call[] memory calls) {
+        require(upgradePreconditionChecker != address(0), "v31: precondition checker not deployed");
+        require(upgradeAddresses.upgradeStageValidator != address(0), "v31: upgrade stage validator not deployed");
+
+        Call[] memory setNewVersionCalls = super.provideSetNewVersionUpgradeCall();
+        calls = new Call[](setNewVersionCalls.length + 1);
+        calls[0] = Call({
+            target: upgradeAddresses.upgradeStageValidator,
+            data: abi.encodeCall(
+                UpgradeStageValidator.checkUpgradePreconditionChecker,
+                (getOldProtocolVersion(), IUpgradePreconditionChecker(upgradePreconditionChecker))
+            ),
+            value: 0
+        });
+        for (uint256 i = 0; i < setNewVersionCalls.length; i++) {
+            calls[i + 1] = setNewVersionCalls[i];
+        }
     }
 
     function getV31AdditionalFactoryDependencyContracts()

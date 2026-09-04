@@ -95,14 +95,6 @@ inner_target = "server_notifier_proxy_admin"  # ProxyAdmin of existing ServerNot
 inner_selector = "0x99a88ec4"  # upgrade(address,address)
 desc = "Atlas ChainAdmin: multicall → ProxyAdmin(0xe5f57E87…).upgrade(ServerNotifier proxy 0xBfaa7332…, newImpl). IN-PLACE ServerNotifier upgrade — proxy address stays stable, off-chain server config doesn't need to change."
 
-[[entries]]
-target = "atlas_chain_admin"  # Atlas ChainAdmin
-selector = "0x69340beb"  # multicall
-# No inner_target label: the ServerNotifier proxy's full address is not recorded in this file;
-# the selector below only exists on that proxy, so it discriminates on its own.
-inner_selector = "0x0a294855"  # setUpgradePreconditionChecker(uint256,address)
-desc = "Atlas ChainAdmin: multicall → ServerNotifier proxy.setUpgradePreconditionChecker(oldProtocolVersion, V33UpgradePreconditionChecker). Registers the scheduling-time precondition checker; must execute AFTER the in-place implementation upgrade above (the setter only exists on the new implementation). Signer = ServerNotifier.owner() — verify on the live ecosystem: a pending Ownable2Step transfer can leave it with the deployer, in which case this call lands in a separately signed bundle and the ordering is a runbook obligation. See protocol-docs/upgrade-scheduling.md."
-
 # ─── Stage 0: PUH governance (timers + PUH/Guardians redeploy + acceptOwnership) ───
 
 [[entries]]

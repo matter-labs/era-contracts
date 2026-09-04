@@ -472,6 +472,8 @@ error UnsupportedUpgradeType();
 error UpgradeBatchNumberIsNotZero();
 // 0x43d5ef8f
 error UpgradePreconditionCheckerMagicMismatch(address checker);
+// 0xce386e2e
+error UpgradePreconditionCheckerMismatch(address expected, address actual);
 // 0x04d91f9d
 error UpgradeTimestampNotReached(uint256 upgradeTimestamp, uint256 currentTimestamp);
 // 0x47b3b145

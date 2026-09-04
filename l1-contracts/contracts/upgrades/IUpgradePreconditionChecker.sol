@@ -3,26 +3,22 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-/// @dev The magic value that has to be returned by `getSupportsUpgradePreconditionCheckerMagic`.
-bytes32 constant UPGRADE_PRECONDITION_CHECKER_MAGIC = keccak256("UpgradePreconditionChecker");
-
 /// @title Upgrade precondition checker interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Release-specific checks that must hold for a chain before its upgrade may be scheduled
-/// through `ServerNotifier.setUpgradeTimestamp`; see {protocol-docs/upgrade-scheduling.md}.
+/// @notice Release-specific upgrade scheduling checks; see {protocol-docs/upgrade-scheduling.md}.
 interface IUpgradePreconditionChecker {
-    /// @notice A method used to check that the contract supports this interface.
-    /// @return Returns the `UPGRADE_PRECONDITION_CHECKER_MAGIC`.
+    /// @notice Confirms support for this interface.
+    /// @return The canonical upgrade-precondition checker magic value.
     function getSupportsUpgradePreconditionCheckerMagic() external view returns (bytes32);
 
-    /// @notice Ensures the chain can take the upgrade this checker guards; reverts with a
-    /// precondition-specific error otherwise.
+    /// @notice Reverts if the chain cannot take the guarded upgrade.
     /// @param _chainId The id of the chain whose upgrade is being scheduled.
     /// @param _zkChain The chain's DiamondProxy address.
     function checkUpgradePreconditions(uint256 _chainId, address _zkChain) external view;
 
-    /// @notice Non-reverting mirror of `checkUpgradePreconditions`.
+    /// @notice Reports failed precondition predicates without reverting for those failures.
+    /// @dev Calls to external dependencies may still revert.
     /// @param _chainId The id of the chain whose upgrade is being scheduled.
     /// @param _zkChain The chain's DiamondProxy address.
     /// @return failed The error selectors of the failed preconditions; empty when the check passes.

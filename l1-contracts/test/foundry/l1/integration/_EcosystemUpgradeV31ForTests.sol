@@ -14,8 +14,7 @@ import {CTMUpgrade_v31} from "deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 ///         upgrade-prepare-all` with `--core-script-path` / `--ctm-script-path`).
 
 /// @dev CTM upgrade for tests: skips factory-deps validation (the harness puts the L2
-///      bytecodes in place itself) and writes only the minimal output the test harness needs
-///      (`chain_upgrade_diamond_cut` + `state_transition.default_upgrade_addr`)
+///      bytecodes in place itself) and writes only the minimal fields the test harness needs
 ///      so accumulated `vm.serialize*` JSON does not blow forge's 128 MB EVM memory.
 contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
     using stdToml for string;
@@ -64,17 +63,15 @@ contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
         // no-op
     }
 
-    /// @dev Replaces the heavy state_transition section with the two fields the
-    ///      anvil-interop test actually reads (diamond cut data + default upgrade addr).
+    /// @dev Replaces the heavy state_transition section with the fields the
+    ///      anvil-interop test reads.
     function saveOutput(string memory outputPath) internal override {
         bytes memory upgradeCutData = getChainUpgradeDiamondCutData();
         address defaultUpgradeAddr = getAddresses().stateTransition.defaultUpgrade;
 
-        string memory stateTransition = vm.serializeAddress(
-            "state_transition",
-            "default_upgrade_addr",
-            defaultUpgradeAddr
-        );
+        vm.serializeAddress("state_transition", "upgrade_precondition_checker_addr", upgradePreconditionChecker);
+        string memory stateTransition =
+            vm.serializeAddress("state_transition", "default_upgrade_addr", defaultUpgradeAddr);
         vm.serializeBytes("root", "chain_upgrade_diamond_cut", upgradeCutData);
         string memory toml = vm.serializeString("root", "state_transition", stateTransition);
         vm.writeToml(toml, outputPath);

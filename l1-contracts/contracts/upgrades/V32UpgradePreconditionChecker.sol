@@ -2,7 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {IUpgradePreconditionChecker, UPGRADE_PRECONDITION_CHECKER_MAGIC} from "./IUpgradePreconditionChecker.sol";
+import {IUpgradePreconditionChecker} from "./IUpgradePreconditionChecker.sol";
+import {UPGRADE_PRECONDITION_CHECKER_MAGIC} from "./UpgradePreconditionCheckerConfig.sol";
 import {IPriorityOpLowerBound} from "./IPriorityOpLowerBound.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {
@@ -15,18 +16,10 @@ import {ZKChainNotRegistered} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @title V33UpgradePreconditionChecker
-/// @notice Scheduling-time counterpart of the prerequisite triple `V32UpgradeZKsyncOS.upgrade`
-/// enforces at execution time (the v31 base-token backfill flag, a recorded priority-op lower
-/// bound, and a priority queue processed up to that bound), reusing the same errors so a
-/// scheduling failure reads identically to the execution failure it front-runs.
-/// See {protocol-docs/upgrade-scheduling.md}.
-/// @dev Named after the release the repo's upgrade-env fixtures exercise (v32 -> v33), while the
-/// sibling upgrade contract carries the production transition's target version (v31 -> v32);
-/// {protocol-docs/upgrade-scheduling.md} explains the mismatch.
-contract V33UpgradePreconditionChecker is IUpgradePreconditionChecker {
-    /// @notice Standalone registry of per-chain priority-op lower bounds — the same instance the
-    /// release's `V32UpgradeZKsyncOS` embeds.
+/// @title V32UpgradePreconditionChecker
+/// @notice Checks v32 upgrade scheduling prerequisites; see {protocol-docs/upgrade-scheduling.md}.
+contract V32UpgradePreconditionChecker is IUpgradePreconditionChecker {
+    /// @notice Registry of per-chain priority-op lower bounds.
     IPriorityOpLowerBound public immutable PRIORITY_OP_LOWER_BOUND;
 
     constructor(IPriorityOpLowerBound _priorityOpLowerBound) {
@@ -42,7 +35,10 @@ contract V33UpgradePreconditionChecker is IUpgradePreconditionChecker {
     }
 
     /// @inheritdoc IUpgradePreconditionChecker
-    function checkUpgradePreconditions(uint256, address _zkChain) external view {
+    function checkUpgradePreconditions(
+        uint256, // _chainId
+        address _zkChain
+    ) external view {
         if (_zkChain == address(0)) {
             revert ZKChainNotRegistered();
         }
@@ -58,20 +54,19 @@ contract V33UpgradePreconditionChecker is IUpgradePreconditionChecker {
     }
 
     /// @inheritdoc IUpgradePreconditionChecker
-    /// @dev The zero-chain guard is defence-in-depth for direct callers only: `ServerNotifier`
-    /// resolves the chain's protocol version before consulting the checker, which already reverts
-    /// for a chain id the CTM does not know.
-    function previewUpgradePreconditions(uint256, address _zkChain) external view returns (bytes4[] memory failed) {
+    /// @dev Handles zero addresses for direct callers; ServerNotifier resolves registered chains first.
+    function previewUpgradePreconditions(
+        uint256, // _chainId
+        address _zkChain
+    ) external view returns (bytes4[] memory failed) {
         if (_zkChain == address(0)) {
             failed = new bytes4[](1);
             failed[0] = ZKChainNotRegistered.selector;
             return failed;
         }
 
-        // Sized for all three checks, though at most two can fire: an unrecorded bound reads as
-        // zero, which passes the queue check trivially.
         bytes4[] memory collected = new bytes4[](3);
-        uint256 count = 0;
+        uint256 count;
         if (!_baseTokenBackfilled(_zkChain)) {
             collected[count] = BaseTokenPreV31TotalSupplyNotSet.selector;
             ++count;

@@ -3,11 +3,9 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {
-    IUpgradePreconditionChecker,
-    UPGRADE_PRECONDITION_CHECKER_MAGIC
-} from "contracts/upgrades/IUpgradePreconditionChecker.sol";
-import {V33UpgradePreconditionChecker} from "contracts/upgrades/V33UpgradePreconditionChecker.sol";
+import {IUpgradePreconditionChecker} from "contracts/upgrades/IUpgradePreconditionChecker.sol";
+import {UPGRADE_PRECONDITION_CHECKER_MAGIC} from "contracts/upgrades/UpgradePreconditionCheckerConfig.sol";
+import {V32UpgradePreconditionChecker} from "contracts/upgrades/V32UpgradePreconditionChecker.sol";
 import {PriorityOpLowerBound} from "contracts/upgrades/PriorityOpLowerBound.sol";
 import {IPriorityOpLowerBound} from "contracts/upgrades/IPriorityOpLowerBound.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
@@ -19,11 +17,9 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {ZKChainNotRegistered} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
-/// @notice Unit tests for the scheduling-time counterpart of `V32UpgradeZKsyncOS`'s execution-time
-/// prerequisite triple. The chain is a mocked address (same isolation as `PriorityOpLowerBoundTest`):
-/// the checker only reads two `IGetters` views on it, and the registry under test is real.
-contract V33UpgradePreconditionCheckerTest is Test {
-    V33UpgradePreconditionChecker internal checker;
+// The mocked chain isolates checker logic; the registry is real.
+contract V32UpgradePreconditionCheckerTest is Test {
+    V32UpgradePreconditionChecker internal checker;
     PriorityOpLowerBound internal registry;
     address internal chain;
 
@@ -32,10 +28,10 @@ contract V33UpgradePreconditionCheckerTest is Test {
 
     function setUp() public {
         registry = new PriorityOpLowerBound();
-        checker = new V33UpgradePreconditionChecker(registry);
+        checker = new V32UpgradePreconditionChecker(registry);
         chain = makeAddr("chainDiamond");
 
-        // The default shape: backfill flag set, bound recorded, priority ops processed through it.
+        // Passing baseline; individual tests override one predicate.
         _mockBackfilled(true);
         vm.mockCall(
             chain,
@@ -56,7 +52,7 @@ contract V33UpgradePreconditionCheckerTest is Test {
 
     function test_constructorRejectsZeroRegistry() public {
         vm.expectRevert(ZeroAddress.selector);
-        new V33UpgradePreconditionChecker(IPriorityOpLowerBound(address(0)));
+        new V32UpgradePreconditionChecker(IPriorityOpLowerBound(address(0)));
     }
 
     function test_supportsCheckerMagic() public view {
@@ -92,9 +88,8 @@ contract V33UpgradePreconditionCheckerTest is Test {
     }
 
     function test_revertWhen_lowerBoundNotRecorded() public {
-        // Fresh registry and checker: nothing recorded for the chain.
         registry = new PriorityOpLowerBound();
-        checker = new V33UpgradePreconditionChecker(registry);
+        checker = new V32UpgradePreconditionChecker(registry);
 
         vm.expectRevert(LowerBoundNotRecorded.selector);
         checker.checkUpgradePreconditions(CHAIN_ID, chain);
@@ -115,11 +110,10 @@ contract V33UpgradePreconditionCheckerTest is Test {
         assertEq(failed[0], PriorityQueueNotReady.selector);
     }
 
-    /// @notice A chain created on v31 records a legitimate zero bound and passes with zero ops
-    /// processed (0 >= 0) — mirrors `V32UpgradeZKsyncOSTest`'s zero-bound case.
+    // Zero is a valid recorded lower bound.
     function test_passesWithZeroLowerBoundAndNoPriorityOpsProcessed() public {
         registry = new PriorityOpLowerBound();
-        checker = new V33UpgradePreconditionChecker(registry);
+        checker = new V32UpgradePreconditionChecker(registry);
         vm.mockCall(chain, abi.encodeWithSelector(IGetters.getTotalPriorityTxs.selector), abi.encode(uint256(0)));
         registry.lowerBoundPriorityOp(chain);
         _mockFirstUnprocessedPriorityTx(0);
@@ -128,12 +122,10 @@ contract V33UpgradePreconditionCheckerTest is Test {
         assertEq(checker.previewUpgradePreconditions(CHAIN_ID, chain).length, 0);
     }
 
-    /// @notice The preview collects the failed preconditions, while the reverting check stops at
-    /// the first one. An unrecorded bound reads as zero and trivially passes the queue check, so
-    /// `LowerBoundNotRecorded` and `PriorityQueueNotReady` never appear together (max 2 entries).
+    // An unrecorded zero bound passes the queue comparison, so only two predicates fail.
     function test_previewCollectsAllFailures() public {
         registry = new PriorityOpLowerBound();
-        checker = new V33UpgradePreconditionChecker(registry);
+        checker = new V32UpgradePreconditionChecker(registry);
         _mockBackfilled(false);
 
         bytes4[] memory failed = checker.previewUpgradePreconditions(CHAIN_ID, chain);
