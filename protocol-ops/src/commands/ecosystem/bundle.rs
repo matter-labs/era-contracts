@@ -295,6 +295,14 @@ pub fn pack_deploy_bundle(
         .concat(),
         repository_root,
     );
+    match source_status.as_deref() {
+        Some("") => {}
+        Some(dirty) => logger::warn(format!(
+            "contract sources differ from the commit; the bundle is marked dirty:
+{dirty}"
+        )),
+        None => logger::warn("git status failed; the bundle is marked dirty"),
+    }
     let metadata = DeployBundleMetadata {
         schema: DEPLOY_BUNDLE_SCHEMA.to_string(),
         upgrade: V31_UPGRADE_NAME.to_string(),
