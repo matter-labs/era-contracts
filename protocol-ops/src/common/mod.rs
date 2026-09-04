@@ -8,6 +8,7 @@ pub mod ecosystem;
 pub mod env_config;
 pub mod error;
 pub mod ethereum;
+pub mod evm_selectors;
 pub mod files;
 pub mod forge;
 pub mod governance_calls;
@@ -18,6 +19,7 @@ pub mod paths;
 pub mod preflight;
 pub mod private_key;
 pub mod traits;
+pub mod verification_report;
 pub mod wallets;
 
 pub use args::SharedRunArgs;

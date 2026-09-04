@@ -3,6 +3,8 @@ use std::str::FromStr;
 use alloy::network::Ethereum;
 use alloy::primitives::B256;
 use alloy::providers::{Provider, ProviderBuilder, RootProvider};
+use alloy::rpc::client::ClientBuilder;
+use alloy::transports::layers::RetryBackoffLayer;
 use anyhow::Context;
 use tokio::task::block_in_place;
 
@@ -26,6 +28,28 @@ pub fn get_provider(url: &str) -> anyhow::Result<AlloyProvider> {
     Ok(ProviderBuilder::new()
         .disable_recommended_fillers()
         .connect_http(url.parse().context("invalid RPC URL")?))
+}
+
+/// Provider that backs off and retries on HTTP 429 instead of failing the
+/// command. Read-heavy flows (contract discovery, log scans, per-address
+/// `eth_getCode`) run into hosted-RPC rate limits within a few hundred
+/// requests; `compute_units_per_second` also paces the client so it mostly
+/// avoids being throttled in the first place.
+pub fn get_rate_limited_provider(
+    url: &str,
+    compute_units_per_second: u64,
+) -> anyhow::Result<AlloyProvider> {
+    const MAX_RATE_LIMIT_RETRIES: u32 = 10;
+    const INITIAL_BACKOFF_MS: u64 = 500;
+
+    let client = ClientBuilder::default()
+        .layer(RetryBackoffLayer::new(
+            MAX_RATE_LIMIT_RETRIES,
+            INITIAL_BACKOFF_MS,
+            compute_units_per_second,
+        ))
+        .http(url.parse().context("invalid RPC URL")?);
+    Ok(RootProvider::new(client))
 }
 
 pub fn query_chain_id_sync(rpc_url: &str) -> anyhow::Result<u64> {

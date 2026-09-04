@@ -26,6 +26,9 @@ alloy = { version = "2.0.5", features = [
     "consensus",
 ] }
 anyhow = "1.0"
+# blake2s-256 over L2 deployed bytecode, matching `l1-contracts/scripts/blake2s256.js`
+# — the hash form ZKsync OS force deployments carry.
+blake2 = "0.10"
 chrono = { version = "0.4", features = ["serde"] }
 hex = "0.4"
 human-panic = "2.0"
