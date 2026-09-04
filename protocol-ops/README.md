@@ -75,6 +75,63 @@ Commands that support **`--out`** write a **`CommandEnvelope`** snapshot after a
 
 You need a working Foundry toolchain (`forge`, `cast`, etc.) and repo contract artifacts as expected by the scripts this tool wraps. From the repo root, `l1-contracts` must be built (`forge build`).
 
+### Verifying a deployed ecosystem (`ecosystem verify-deployment`)
+
+Where PUVT (below) checks an _upgrade_ against the artifacts that produced it,
+`verify-deployment` checks a _live_ ecosystem against a local contracts build.
+It takes one address — the Bridgehub proxy — and discovers everything else on
+chain, so it works the same against an ecosystem somebody else deployed and
+needs no deployment output file. It is read-only (`eth_call`, `eth_getCode`,
+`eth_getStorageAt`, `eth_getLogs`) and safe to point at mainnet.
+
+Check out the commit the ecosystem was deployed from and build the contracts
+first — the tool compares against `l1-contracts/out` and `da-contracts/out`:
+
+```bash
+yarn da build:foundry && yarn l1 build:foundry
+
+cd protocol-ops
+cargo run --release --bin protocol_ops -- ecosystem verify-deployment \
+  --bridgehub 0xb9415d43c7753ccebaa1ac05c8baba36159ab13f \
+  --l1-rpc-url "$SEPOLIA_RPC_URL" \
+  --from-block 11579085 \
+  --era-chain-id 270 \
+  --weth 0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9 \
+  --zk-token-l1-address 0x… \
+  --expect-testnet-verifier true
+```
+
+`--from-block` should be at or before the ecosystem's first deployment block:
+the chain creation parameters, the pending-admin history and the DA pair
+whitelist all come from logs, and hosted RPCs reject a scan from genesis.
+
+What it checks:
+
+| Section                  | What it proves                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Bytecode**             | Every discovered contract against the local build, with the artifact's own `immutableReferences` masked and CBOR metadata digests blanked. Reports `exact` vs `metadata-only`, and warns when anything is metadata-only — that also means the genesis root and the L2 force-deployment hashes are not independently reproducible.                                        |
+| **Immutables**           | Values read back out of deployed runtime code at the artifact's immutable offsets and checked against what discovery says they should be (bridgehub, chain id, WETH, asset router, verifier, …). Unrecognised ones are printed.                                                                                                                                          |
+| **Wiring**               | Every setter the deploy scripts are supposed to have run: `setNativeTokenVault`, the three `L1Nullifier` setters, `setL1InteropHandler`, `CAH.setAddresses`, `ServerNotifier.setChainTypeManager`, `setDefaultUpgrade`, `registerEthToken`, and the three-call CTM registration.                                                                                         |
+| **Chain creation**       | Recomputes `storedBatchZero`, `initialCutHash` and `initialForceDeploymentHash` from the `NewChainCreationParams` event and binds them to what the CTM stores; then checks the diamond cut (selectors against the deployed facets' dispatchers, freezability, no collisions) and every force-deployments field, including the L2 implementations' blake2s/length/keccak. |
+| **Verifier and genesis** | Which verifier flavour is deployed, and the deployed genesis root and prover VK hash against `configs/genesis/zksync-os/latest.json`.                                                                                                                                                                                                                                    |
+| **Data availability**    | The `RollupDAManager` whitelist, and whether each live chain's DA pair is one `makePermanentRollup()` would accept.                                                                                                                                                                                                                                                      |
+| **Roles**                | `owner` / `pendingOwner` / `admin` / `pendingAdmin` / `securityCouncil` / `tokenMultiplierSetter` across the ecosystem, grouped by holder. Fails on stalled two-step handoffs, warns on `transferOwnership(currentOwner)` no-ops and on roles held by an EOA.                                                                                                            |
+| **Registered chains**    | Each chain's protocol version, verifier, facet set, base token registration, genesis batch and settlement layer against the CTM.                                                                                                                                                                                                                                         |
+
+Expectations the tool cannot derive from chain state are flags:
+`--era-chain-id`, `--weth`, `--max-number-of-zk-chains` (default 100),
+`--expect-testnet-verifier`, `--zk-token-l1-address`. `--env` supplies the
+bridgehub and era chain id from `permanent-values/<env>.toml`.
+
+> **`--zk-token-l1-address` is worth passing.** The ZK token asset id is
+> `keccak(abi.encode(originChainId, L2_NTV, token))`. Copying another
+> ecosystem's value points every chain at an asset nothing in this ecosystem
+> can bridge, and `InteropCenter` writes it once in `initL2` with no setter —
+> so it cannot be fixed on a chain that already exists. Without the flag the
+> tool can only report the value.
+
+Exit code is non-zero when there are errors; warnings do not fail the run.
+
 ### Running the Protocol Upgrade Verification Tool (PUVT)
 
 The PUVT requires we have already run the upgrade scripts that deploy all new protocol contracts. For v31 stage, regenerate the calldata and replay the prepare bundles on a pinned Sepolia fork, then run PUVT against the same fork.
