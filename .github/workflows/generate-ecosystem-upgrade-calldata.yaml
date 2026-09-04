@@ -119,11 +119,21 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 #                                               only, upstream Foundry installed
 #                                               only afterwards); check that order.
 # prepare reverts on owner-gated calls        → the ecosystem is already upgraded;
-#                                               pass `fork_block` = a block BEFORE
-#                                               that deployment (ownership has since
-#                                               moved off the deployer). CREATE2
-#                                               addresses are deterministic, so the
-#                                               output matches a tip run.
+# `old protocol version must be ...`            pin `fork_block` and rotate the
+# `.owner() mismatch: expected governance`      env's salts. See ALREADY-UPGRADED
+#                                               ECOSYSTEMS above — the usable
+#                                               window is narrow and all three
+#                                               symptoms come from picking it
+#                                               wrong.
+# `used salt ... not in the env-declared      → a rotated salt vs. a stale log.
+#  salt set`                                    This run's own log is salt-gated;
+#                                               the committed real-network log is
+#                                               passed as
+#                                               `--reference-transactions-log`
+#                                               and exempt. Seeing this means the
+#                                               PREPARE used an undeclared salt —
+#                                               it fell back to a random one, so
+#                                               the regen is not reproducible.
 # `No deploy bundle was published`            → the prepare died before the pack
 #                                               step; fix the generate job first.
 # deploy job: "bundle was prepared for X but    → the key in CI is not the EOA the
@@ -176,14 +186,38 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify (v31)"
 # below then proves the bundle is sufficient by deploying + PUVT-ing it from
 # nothing but that artifact, with NO contract build at all.
 #
-# ─── ALREADY-DEPLOYED ECOSYSTEMS ───
-# Re-running the prepare against the chain tip of an ecosystem whose v31 upgrade
-# is ALREADY deployed reverts: the deployer no longer owns the ecosystem
-# contracts (ownership was handed to governance / the TransitionaryOwner at
-# deploy time), so the prepare's owner-gated setup calls fail. Pin `fork_block`
-# to a block BEFORE that deployment — the prepare then deploys fresh contracts
-# it owns, and because every address is CREATE2-deterministic the generated
-# calldata is byte-identical to what a tip run would produce.
+# ─── ALREADY-UPGRADED ECOSYSTEMS: PICKING `fork_block` ───
+# An ecosystem whose v31 upgrade has already EXECUTED cannot be rehearsed at the
+# chain tip: its CTMs now report v31, so the calldata's old-protocol-version gate
+# fails ("era CTM old protocol version must be v0.29.4, got v0.31.0"). Pin
+# `fork_block` instead, and pick it from three constraints, not one:
+#
+#   1. AFTER every governance step the v31 prepare treats as a prerequisite.
+#      These are separate proposals, executed shortly before the upgrade itself,
+#      that consolidate ownership under governance. Fork before them and PUVT
+#      reports the pre-consolidation owner, e.g. "zksync_os.ValidatorTimelock
+#      .owner() mismatch: expected governance ..., got 0x5555...643c".
+#   2. BEFORE the block that bumped the CTM protocol versions — that is the
+#      upgrade execution itself, and past it constraint 1's gate flips.
+#   3. Rotate the salts in `upgrade-envs/v0.31.0-interopB/<env>.toml` first (the
+#      config comments say to do this every regen anyway). The previous regen's
+#      CREATE2 addresses are already occupied at any post-deployment block, so a
+#      re-prepare with the old salts can only run at a block before that
+#      deployment — which violates constraint 1.
+#
+# Do NOT simply fork before the deployment. It satisfies constraint 2 and lets
+# the old salts work, but it breaks constraint 1 AND the committed
+# `output/<env>/transactions.txt` is then entirely in the future, so every entry
+# is unresolvable ("N tx(s) not found on the RPC") and the CREATE2 provenance
+# pass over the real broadcast is vacuous.
+#
+# Worked example — Sepolia `testnet`, whose v31 is live:
+#   deployment broadcast   blocks 11147277..11165542
+#   ownership consolidated block 11171956  (via the ProtocolUpgradeHandler)
+#   CTM versions bumped    block 11172145  (v0.29.4→v0.31.0, v0.30.1→v0.31.1)
+#   => usable window       11171956..11172144;  this workflow uses 11172144.
+# Read these off the chain with `eth_call` on `protocolVersion()` / `owner()` at
+# candidate heights (bisect between the deployment and the tip).
 #
 # ─── SECRET HYGIENE (the L1 RPC URL carries an API key) ───
 # The RPC URL can come from EITHER a repo secret (default, fully hidden) OR an

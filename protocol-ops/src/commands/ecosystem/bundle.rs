@@ -48,8 +48,8 @@ const REQUIRED_BUNDLE_FILES: [&str; 2] = [MANIFEST_FILE, "ecosystem.toml"];
 const OPTIONAL_BUNDLE_FILES: [&str; 2] =
     ["extra-verification-logs.txt", "gw-verification-logs.txt"];
 /// The per-env real-network broadcast log, committed under `output/<env>/` and read by PUVT.
+/// A run's own log carries the same basename inside the bundle work dir.
 const TRANSACTIONS_LOG: &str = "transactions.txt";
-const COMBINED_TRANSACTIONS_LOG: &str = "transactions.combined.txt";
 
 /// The reviewed zk-governance commit for v31 (same default as the generate workflow input).
 const DEFAULT_ZK_GOVERNANCE_COMMIT: &str = "9b06a16159cd58add109f25598e79731450d1772";
@@ -577,7 +577,14 @@ async fn broadcast_impersonated(rpc_url: &str, paths: &BundlePaths) -> anyhow::R
 }
 
 /// Run PUVT against `rpc_url`. It resolves CREATE2 deployments from transaction hashes, so
-/// the committed real-network log and this run's own log are fed to it together.
+/// this run's own log is verified and the committed real-network log is passed alongside it
+/// as a reference.
+///
+/// The two logs are kept apart rather than concatenated. Only this run's deploys are
+/// salt-gated: they must carry the salts the env config declares, which is what catches a
+/// prepare that fell back to a random salt. The committed log records a *previous* regen's
+/// broadcast, whose deploys carry that regen's salts — and because every regen rotates
+/// `create2_factory_salt`, gating them would turn the whole committed file into errors.
 async fn verify_upgrade(
     env_cfg: &EnvConfig,
     rpc_url: &str,
@@ -586,18 +593,8 @@ async fn verify_upgrade(
     paths: &BundlePaths,
 ) -> anyhow::Result<()> {
     logger::step("verify-upgrade (PUVT)");
-    let mut combined = Vec::new();
-    for log in [
-        default_protocol_ops_out_dir(&env_cfg.env)?.join(TRANSACTIONS_LOG),
-        paths.work_dir.join(TRANSACTIONS_LOG),
-    ] {
-        if log.is_file() {
-            combined.extend(fs::read(&log)?);
-        }
-    }
     fs::create_dir_all(&paths.work_dir)?;
-    let combined_path = paths.work_dir.join(COMBINED_TRANSACTIONS_LOG);
-    fs::write(&combined_path, combined)?;
+    let reference_log = default_protocol_ops_out_dir(&env_cfg.env)?.join(TRANSACTIONS_LOG);
     let mut args = [
         "verify-upgrade".to_string(),
         "--env".into(),
@@ -607,11 +604,17 @@ async fn verify_upgrade(
         "--l1-rpc-url".into(),
         rpc_url.to_string(),
         "--transactions-log".into(),
-        combined_path.display().to_string(),
+        paths.work_dir.join(TRANSACTIONS_LOG).display().to_string(),
         "--zk-governance-commit".into(),
         zk_governance_commit.to_string(),
     ]
     .to_vec();
+    if reference_log.is_file() {
+        args.extend([
+            "--reference-transactions-log".to_string(),
+            reference_log.display().to_string(),
+        ]);
+    }
     if let Some(url) = gateway_rpc_url {
         args.extend(["--gw-rpc-url".to_string(), url.to_string()]);
     }

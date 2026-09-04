@@ -64,6 +64,16 @@ pub struct VerifyUpgradeArgs {
     #[clap(long)]
     pub transactions_log: Option<PathBuf>,
 
+    /// A prior regen's already-broadcast deployment log for the same env, read
+    /// the same way as `--transactions-log` but exempt from the salt check.
+    /// Its deploys carry that regen's salts, and every regen rotates
+    /// `create2_factory_salt`, so gating them would flag the whole file.
+    /// Feeding it in still lets deployment provenance resolve contracts the
+    /// current prepare reuses rather than redeploys. Optional; a missing file
+    /// is treated as empty.
+    #[clap(long)]
+    pub reference_transactions_log: Option<PathBuf>,
+
     /// Print the ABI-encoded `UpgradeProposal { calls, executor: 0x0, salt: 0x0 }`
     /// for each governance stage (0/1/2) so an operator can byte-compare against
     /// the on-chain submitted governance proposal bytes. When set, the rest of
@@ -241,6 +251,19 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         transactions_log_path.display()
     ));
 
+    let reference_tx_hashes = match args.reference_transactions_log.as_ref() {
+        Some(path) if path.is_file() => {
+            let hashes = transactions_log::read(path)?;
+            logger::info(format!(
+                "Loaded {} reference transaction hash(es) from {} (salt check not applied)",
+                hashes.len(),
+                path.display()
+            ));
+            hashes
+        }
+        _ => Vec::new(),
+    };
+
     let mut result = VerificationResult::default();
 
     let verification_result = crate::upgrade_verification::versions::v31::verify(
@@ -259,6 +282,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         new_gateway_settlement_fee,
         l1_chain_id,
         &tx_hashes,
+        &reference_tx_hashes,
         create2_factory,
         &expected_salts,
         zk_token_asset_id,

@@ -101,6 +101,10 @@ pub(crate) async fn verify(
     new_gateway_settlement_fee: U256,
     l1_chain_id: u64,
     tx_hashes: &[FixedBytes<32>],
+    // A prior regen's already-broadcast deployment log. Only enriches the
+    // address book — exempt from the salt gate, since its deploys carry that
+    // regen's (now-rotated) salts.
+    reference_tx_hashes: &[FixedBytes<32>],
     create2_factory: Address,
     expected_salts: &[FixedBytes<32>],
     zk_token_asset_id: FixedBytes<32>,
@@ -147,12 +151,27 @@ pub(crate) async fn verify(
             network_verifier,
             ..
         } = &mut verifiers;
+        // This run's own log first, salt-gated: a prepare that missed its
+        // config salt and fell back to a random one must fail here.
         network_verifier
             .populate_create2_from_transactions_log(
                 tx_hashes,
                 &create2_factory,
                 &bridgehub_address,
                 expected_salts,
+                true,
+                bytecode_verifier,
+                result,
+            )
+            .await;
+        // Then the reference log, ungated (see `reference_tx_hashes`).
+        network_verifier
+            .populate_create2_from_transactions_log(
+                reference_tx_hashes,
+                &create2_factory,
+                &bridgehub_address,
+                expected_salts,
+                false,
                 bytecode_verifier,
                 result,
             )
