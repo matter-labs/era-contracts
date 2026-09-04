@@ -168,6 +168,17 @@
   },
   {
     "type": "error",
+    "name": "AirbenderBootstrapWitnessCountInvalid",
+    "inputs": [
+      {
+        "name": "provided",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "AirbenderBootstrapWitnessNotExpected",
     "inputs": []
   },
