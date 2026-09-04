@@ -150,7 +150,7 @@ pub struct DevExecuteSafeArgs {
 }
 
 pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
-    execute_one_bundle(
+    execute_one_bundle_with_gas_floor(
         &args.safe_file,
         &args.l1_rpc_url,
         args.private_key.expose(),
@@ -167,6 +167,25 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
 /// Used both by `dev execute-safe` (single bundle) and the multi-bundle
 /// dispatcher in `ecosystem upgrade-broadcast`.
 pub async fn execute_one_bundle(
+    safe_file: &Path,
+    l1_rpc_url: &str,
+    private_key: &str,
+    out_path: Option<&Path>,
+) -> anyhow::Result<()> {
+    execute_one_bundle_with_gas_floor(
+        safe_file,
+        l1_rpc_url,
+        private_key,
+        out_path,
+        GAS_PRICE_FLOOR_WEI,
+    )
+    .await
+}
+
+/// [`execute_one_bundle`] with an explicit gas price floor (wei). The
+/// four-argument form keeps the default so external crates that link
+/// `protocol_ops` (zksync-os-integration-tests' `zk-deployer`) keep compiling.
+pub async fn execute_one_bundle_with_gas_floor(
     safe_file: &Path,
     l1_rpc_url: &str,
     private_key: &str,

@@ -24,7 +24,7 @@ use clap::Parser;
 use serde::Deserialize;
 
 use crate::commands::dev::execute_safe::{
-    execute_one_bundle, execute_one_bundle_unlocked, parse_gwei,
+    execute_one_bundle_unlocked, execute_one_bundle_with_gas_floor, parse_gwei,
 };
 use crate::common::logger;
 
@@ -168,7 +168,7 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
                 .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
         } else {
             let key = &key_map[&bundle.target];
-            execute_one_bundle(
+            execute_one_bundle_with_gas_floor(
                 &bundle_path,
                 &args.l1_rpc_url,
                 key,

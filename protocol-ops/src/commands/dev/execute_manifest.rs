@@ -6,7 +6,7 @@ use alloy::signers::local::PrivateKeySigner;
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 
-use crate::commands::dev::execute_safe::{execute_one_bundle, parse_gwei};
+use crate::commands::dev::execute_safe::{execute_one_bundle_with_gas_floor, parse_gwei};
 use crate::common::{anvil::set_balance, logger, preflight::is_local_rpc, PrivateKey};
 
 /// Apply every bundle listed in a `manifest.json` file, routing each one to the
@@ -179,7 +179,8 @@ pub async fn apply_manifest_from(
             })?;
         }
 
-        execute_one_bundle(&bundle_path, l1_rpc_url, key, None, gas_price_floor_wei).await?;
+        execute_one_bundle_with_gas_floor(&bundle_path, l1_rpc_url, key, None, gas_price_floor_wei)
+            .await?;
     }
 
     logger::success("All bundles applied.");
