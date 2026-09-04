@@ -1,6 +1,5 @@
 # V31 upgrade documentation
 
-
 In the examples below I use `--upgrade-timestamp 1` for both Era and Zksync OS. This can be used to start an immediate upgrade.
 
 ## Transaction format
@@ -22,7 +21,7 @@ ZKsync OS testnet: `0x4332c61541c4aD8ffFB158c51d9C915e8114E845`
 ZKsync OS mainnet TODO.
 
 ```
-cd protocol_ops 
+cd protocol_ops
 
 cargo run --release -- chain set-upgrade-timestamp \
   --env <env> \
@@ -114,7 +113,6 @@ Note, that the server needs the bytecode supplier to be provided manually into t
 Era testnet: `0xB9703133d2A84cebdC2B5D21d01939aE483dbdcE`.
 Era mainnet TODO.
 
-
 The set upgrade timestamp is the same:
 
 ```
@@ -141,7 +139,6 @@ cargo run --release -- \
   --target-minor-version 31 \
   --target-patch-version 0 \
 ```
-
 
 If the server is ready, you can finalize the upgrade.
 
