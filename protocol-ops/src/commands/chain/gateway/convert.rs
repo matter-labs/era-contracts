@@ -250,6 +250,7 @@ create2_factory_salt = "{gw_create2_salt}"
 governance_security_council_address = "{zero_address}"
 governance_min_delay = 0
 validator_timelock_execution_delay = 0
+max_number_of_chains = 100
 "#,
         zero_address = ZERO_ADDRESS,
         default_zk_token_asset_id = DEFAULT_ZK_TOKEN_ASSET_ID,

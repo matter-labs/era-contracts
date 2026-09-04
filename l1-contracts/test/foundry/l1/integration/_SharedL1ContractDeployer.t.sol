@@ -110,20 +110,56 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         addresses.bridgehubOwnerAddress = addresses.bridgehub.owner();
     }
 
+    /// Mirrors the acceptance batches `ecosystem init` issues through Governance /
+    /// ChainAdmin, so the fixture ends in the same ownership state as a real deploy.
     function _acceptOwnershipCore() private {
-        vm.startPrank(addresses.bridgehub.pendingOwner());
-        addresses.bridgehub.acceptOwnership();
-        addresses.sharedBridge.acceptOwnership();
-        IOwnable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).acceptOwnership();
-        addresses.ctmDeploymentTracker.acceptOwnership();
+        address governance = addresses.bridgehub.pendingOwner();
+        address[7] memory governanceOwned = [
+            address(addresses.bridgehub),
+            address(addresses.sharedBridge),
+            address(addresses.l1Nullifier),
+            address(addresses.l1NativeTokenVault),
+            address(addresses.l1InteropHandler),
+            address(addresses.ctmDeploymentTracker),
+            ecosystemAddresses.bridgehub.proxies.chainAssetHandler
+        ];
+        vm.startPrank(governance);
+        for (uint256 i = 0; i < governanceOwned.length; ++i) {
+            IOwnable(governanceOwned[i]).acceptOwnership();
+        }
+        IOwnable(address(addresses.chainRegistrationSender)).acceptOwnership();
         vm.stopPrank();
+        for (uint256 i = 0; i < governanceOwned.length; ++i) {
+            _assertOwnedBy(governanceOwned[i], governance);
+        }
+        _assertOwnedBy(address(addresses.chainRegistrationSender), governance);
     }
 
     function _acceptOwnershipCTM() private {
-        vm.startPrank(IOwnable(address(addresses.chainTypeManager)).pendingOwner());
-        IOwnable(address(addresses.chainTypeManager)).acceptOwnership();
-        IOwnable(address(ctmAddresses.daAddresses.daContracts.rollupDAManager)).acceptOwnership();
+        address governance = IOwnable(address(addresses.chainTypeManager)).pendingOwner();
+        address[3] memory governanceOwned = [
+            address(addresses.chainTypeManager),
+            ctmAddresses.daAddresses.daContracts.rollupDAManager,
+            ctmAddresses.stateTransition.proxies.validatorTimelock
+        ];
+        vm.startPrank(governance);
+        for (uint256 i = 0; i < governanceOwned.length; ++i) {
+            IOwnable(governanceOwned[i]).acceptOwnership();
+        }
         vm.stopPrank();
+        for (uint256 i = 0; i < governanceOwned.length; ++i) {
+            _assertOwnedBy(governanceOwned[i], governance);
+        }
+
+        address serverNotifier = ctmAddresses.stateTransition.proxies.serverNotifier;
+        vm.prank(ctmAddresses.chainAdmin);
+        IOwnable(serverNotifier).acceptOwnership();
+        _assertOwnedBy(serverNotifier, ctmAddresses.chainAdmin);
+    }
+
+    function _assertOwnedBy(address _target, address _owner) private view {
+        assertEq(IOwnable(_target).owner(), _owner, "owner not handed over");
+        assertEq(IOwnable(_target).pendingOwner(), address(0), "pendingOwner not cleared");
     }
 
     function _registerNewToken(address _tokenAddress) internal {
