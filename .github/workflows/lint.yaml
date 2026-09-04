@@ -33,8 +33,16 @@ jobs:
 
       - uses: codespell-project/actions-codespell@8f01853be192eb0f849a5c7d721450e7a467c579 # v2.2
 
-  protocol-ops-fmt:
+  rust-fmt:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        working-directory:
+          - protocol-ops
+          - tools/upgrade-readiness-checker
+          - tools/verifier-gen
+          - tools/wallets-gen
+          - tools/zksync-os-genesis-gen
     steps:
       - uses: actions/checkout@v6
 
@@ -45,7 +53,7 @@ jobs:
 
       - name: Check formatting
         run: cargo fmt --check
-        working-directory: protocol-ops
+        working-directory: ${{ matrix.working-directory }}
 
   protocol-ops-clippy:
     runs-on: ubuntu-latest

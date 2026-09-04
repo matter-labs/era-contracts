@@ -2,7 +2,7 @@
 
 ## Relevant files
 
-- `.github/workflows/lint.yaml` — Solidity / TS lint, codespell, typos, `cargo fmt --check`, `cargo clippy -D warnings` for `protocol-ops`.
+- `.github/workflows/lint.yaml` — Solidity / TS lint, codespell, typos, `cargo fmt --check` for all Rust crates, and `cargo clippy -D warnings` for `protocol-ops`.
 - `.github/workflows/l1-contracts-ci.yaml` — l1-contracts build, `check-zkstack-out`, `check-hashes`, `check-selectors`, `check-legacy-bridge-sol`.
 - `.github/workflows/l1-contracts-foundry-ci.yaml` — foundry test build + contract-size check.
 - `.github/workflows/anvil-interop-ci.yaml` — interop integration test, v31→v32 upgrade test.
@@ -149,12 +149,13 @@ yarn prettier:fix                # All formats — adds trailing newlines, etc.
 yarn l1 errors-lint --check
 ```
 
-For `protocol-ops` (Rust):
+For Rust:
 
 ```bash
-cd protocol-ops
-cargo +stable fmt --check  # nightly disagrees with CI on edge cases
-cargo clippy --all-targets -- -D warnings
+for dir in protocol-ops tools/{upgrade-readiness-checker,verifier-gen,wallets-gen,zksync-os-genesis-gen}; do
+  (cd "$dir" && cargo +stable fmt --check)  # nightly disagrees with CI on edge cases
+done
+(cd protocol-ops && cargo clippy --all-targets -- -D warnings)
 ```
 
 CI also runs `codespell` and `crate-ci/typos` as separate jobs (see `.github/workflows/lint.yaml`). They are easy to forget locally because neither is wired into `yarn lint:check`. Both must pass independently.
@@ -279,7 +280,10 @@ yarn lint:sol --fix --noPrompt
 yarn lint:ts --fix
 yarn prettier:fix
 yarn l1 errors-lint --check
-( cd protocol-ops && cargo +stable fmt --check && cargo clippy --all-targets -- -D warnings )
+for dir in protocol-ops tools/{upgrade-readiness-checker,verifier-gen,wallets-gen,zksync-os-genesis-gen}; do
+  (cd "$dir" && cargo +stable fmt --check)
+done
+( cd protocol-ops && cargo clippy --all-targets -- -D warnings )
 
 # 4. Selectors
 ( cd l1-contracts && yarn selectors --fix )
