@@ -256,7 +256,7 @@ contract UpgradeIntegrationTest_Local is
         console.log("setUp: Internal test complete");
     }
 
-    function test_directCTMUpgradeRejectsEraCTM() public {
+    function test_DefaultUpgradeZKsyncOS_RejectsEraCTM() public {
         address ctm = ctmUpgrade.getCTMAddress();
         uint256 protocolVersion = IChainTypeManager(ctm).protocolVersion();
         // Isolate the source-VM precondition; the fixture otherwise uses the real OS upgrade flow.
