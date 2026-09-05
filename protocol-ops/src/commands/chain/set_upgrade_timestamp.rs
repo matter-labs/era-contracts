@@ -53,7 +53,7 @@ fn describe_precondition_failure(selector: &[u8; 4]) -> String {
     match *selector {
         s if s == E::CutDataForProtocolVersionNotAvailable::SELECTOR => {
             "CutDataForProtocolVersionNotAvailable: the CTM has no upgrade cut registered for the \
-             chain's current protocol version (run the ecosystem upgrade prepare first)"
+             chain's current protocol version (publish the upgrade cut through ecosystem governance)"
                 .to_string()
         }
         s if s == E::BaseTokenPreV31TotalSupplyNotSet::SELECTOR => {

@@ -40,9 +40,8 @@ checker means the release has no additional scheduling checks.
   unknown chain or an incompatible dependency.
 
 Checkers are stateless views, do not depend on `msg.sender`, and are keyed by the version being
-upgraded from. Registration proves interface intent, not checker health. A checker with a broken
-dependency can block scheduling for that version until the owner deregisters it, so the release
-flow must exercise the deployed checker against a real chain before registration.
+upgraded from. The magic value only confirms interface intent; a broken dependency can still block
+scheduling until the owner replaces or deregisters the checker.
 
 The release flow registers under the CTM's protocol version at prepare time, while scheduling looks
 up the chain's current version. A chain lagging behind that version finds no checker for this
@@ -71,8 +70,9 @@ A release with scheduling prerequisites:
 1. deploys the checker and any shared auxiliary registry;
 2. upgrades `ServerNotifier` and registers the checker through
    `[ctm_admin_calls] server_notifier_upgrade`;
-3. records each chain's priority-op lower bound before scheduling;
-4. registers the upgrade cut; and
+3. publishes the upgrade cut through governance, guarded by a check that the expected checker is
+   registered;
+4. records each chain's priority-op lower bound before scheduling; and
 5. lets each chain admin schedule once the checks pass.
 
 The v31 prepare flow serializes the implementation upgrade, an `acceptOwnership()` call when the
@@ -80,6 +80,11 @@ notifier owner differs from the proxy-admin owner, and checker registration into
 ChainAdmin sequence. When ownership acceptance is needed, generation requires the notifier's
 pending owner to be that ChainAdmin and otherwise fails. Execute the complete sequence before
 registering the upgrade cut so there is no scheduling window without the checker.
+
+Run `protocol_ops ecosystem verify-upgrade` after replaying preparation and before governance.
+Preparation already executes the notifier calls, including any ownership acceptance; verification
+checks their original calldata against the resulting notifier state. Stage 1 checks still require
+the state before governance execution.
 
 Fresh ecosystems start at the target version and therefore deploy no checker for this transition.
 This release also does not register a checker on Gateway.

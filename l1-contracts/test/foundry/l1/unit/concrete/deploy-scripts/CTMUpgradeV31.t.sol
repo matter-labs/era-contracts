@@ -5,15 +5,16 @@ import {Test} from "forge-std/Test.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {CTMUpgrade_v31} from "deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
-import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IUpgradePreconditionChecker} from "contracts/upgrades/IUpgradePreconditionChecker.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
+import {PriorityOpLowerBound} from "contracts/upgrades/PriorityOpLowerBound.sol";
+import {V32UpgradePreconditionChecker} from "contracts/upgrades/V32UpgradePreconditionChecker.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 /// @notice Isolates v31 call generation from the full deployment flow.
@@ -43,7 +44,7 @@ contract CTMUpgradeV31Harness is CTMUpgrade_v31 {
 contract CTMUpgradeV31Test is Test {
     CTMUpgradeV31Harness internal harness;
     ProxyAdmin internal proxyAdmin;
-    Ownable2Step internal serverNotifier;
+    ServerNotifier internal serverNotifier;
     address internal operationalAdmin;
     address internal chainTypeManager;
     address internal upgradeStageValidator;
@@ -56,18 +57,18 @@ contract CTMUpgradeV31Test is Test {
         operationalAdmin = makeAddr("operational admin");
         chainTypeManager = makeAddr("chain type manager");
         upgradeStageValidator = makeAddr("upgrade stage validator");
-        upgradePreconditionChecker = makeAddr("upgrade precondition checker");
+        upgradePreconditionChecker = address(new V32UpgradePreconditionChecker(new PriorityOpLowerBound()));
         oldProtocolVersion = uint256(keccak256("old protocol version"));
         newProtocolVersion = uint256(keccak256("new protocol version"));
 
         proxyAdmin = new ProxyAdmin();
-        V31OperationalOwnableMock implementation = new V31OperationalOwnableMock();
+        ServerNotifier implementation = new ServerNotifier();
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(implementation),
             address(proxyAdmin),
-            abi.encodeCall(V31OperationalOwnableMock.initialize, (address(this)))
+            abi.encodeCall(ServerNotifier.initialize, (address(this)))
         );
-        serverNotifier = Ownable2Step(address(proxy));
+        serverNotifier = ServerNotifier(address(proxy));
 
         proxyAdmin.transferOwnership(operationalAdmin);
         serverNotifier.transferOwnership(operationalAdmin);
@@ -83,18 +84,7 @@ contract CTMUpgradeV31Test is Test {
 
     function test_prepareVersionSpecificCTMAdminCalls_acceptsExpectedPendingOwnerBeforeRegistration() public {
         Call[] memory calls = harness.prepareVersionSpecificCTMAdminCalls();
-
-        assertEq(calls.length, 2);
-        assertEq(calls[0].target, address(serverNotifier));
-        assertEq(calls[0].data, abi.encodeCall(IOwnable.acceptOwnership, ()));
-        assertEq(calls[1].target, address(serverNotifier));
-        assertEq(
-            calls[1].data,
-            abi.encodeCall(
-                IServerNotifier.setUpgradePreconditionChecker,
-                (oldProtocolVersion, IUpgradePreconditionChecker(upgradePreconditionChecker))
-            )
-        );
+        _executeRegistrationCalls(calls);
     }
 
     function test_prepareVersionSpecificCTMAdminCalls_skipsAcceptanceWhenAlreadyOwned() public {
@@ -102,15 +92,23 @@ contract CTMUpgradeV31Test is Test {
         serverNotifier.acceptOwnership();
 
         Call[] memory calls = harness.prepareVersionSpecificCTMAdminCalls();
+        _executeRegistrationCalls(calls);
+    }
 
-        assertEq(calls.length, 1);
-        assertEq(
-            calls[0].data,
-            abi.encodeCall(
-                IServerNotifier.setUpgradePreconditionChecker,
-                (oldProtocolVersion, IUpgradePreconditionChecker(upgradePreconditionChecker))
-            )
-        );
+    function _executeRegistrationCalls(Call[] memory _calls) private {
+        vm.startPrank(operationalAdmin);
+        for (uint256 i = 0; i < _calls.length; i++) {
+            if (i == _calls.length - 1) {
+                vm.expectEmit(true, false, false, true, address(serverNotifier));
+                emit IServerNotifier.UpgradePreconditionCheckerSet(oldProtocolVersion, upgradePreconditionChecker);
+            }
+            (bool success, ) = _calls[i].target.call{value: _calls[i].value}(_calls[i].data);
+            assertTrue(success, "generated CTM-admin call failed");
+        }
+        vm.stopPrank();
+        assertEq(serverNotifier.owner(), operationalAdmin);
+        assertEq(serverNotifier.pendingOwner(), address(0));
+        assertEq(address(serverNotifier.upgradePreconditionChecker(oldProtocolVersion)), upgradePreconditionChecker);
     }
 
     function test_prepareVersionSpecificCTMAdminCalls_revertsForUnexpectedPendingOwner() public {
@@ -144,12 +142,5 @@ contract CTMUpgradeV31Test is Test {
         );
         assertEq(calls[1].target, chainTypeManager);
         assertEq(bytes4(calls[1].data), IChainTypeManager.setNewVersionUpgrade.selector);
-    }
-}
-
-contract V31OperationalOwnableMock is Ownable2Step {
-    function initialize(address _owner) external {
-        require(owner() == address(0), "already initialized");
-        _transferOwnership(_owner);
     }
 }

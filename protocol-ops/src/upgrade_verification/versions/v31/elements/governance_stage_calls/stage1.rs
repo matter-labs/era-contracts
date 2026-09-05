@@ -88,27 +88,17 @@ const CTM_COMPONENT_UPGRADES: [CtmComponentUpgrade; 3] = [
     },
 ];
 
-fn ctm_block_start(ctm_index: usize, core_call_count: usize) -> anyhow::Result<usize> {
-    ctm_index
-        .checked_mul(STAGE1_PER_CTM_LEN)
-        .and_then(|ctm_calls| core_call_count.checked_add(ctm_calls))
-        .context("stage-1 CTM block index overflow")
-}
-
-fn expected_stage1_call_count(core_call_count: usize, ctm_count: usize) -> anyhow::Result<usize> {
-    ctm_count
-        .checked_mul(STAGE1_PER_CTM_LEN)
-        .and_then(|ctm_calls| core_call_count.checked_add(ctm_calls))
-        .context("stage-1 call count overflow")
+fn ctm_block_start(ctm_index: usize, core_call_count: usize) -> usize {
+    core_call_count + ctm_index * STAGE1_PER_CTM_LEN
 }
 
 pub(crate) fn infer_l1_interop_handler_preparation_mode(
     stage1_call_count: usize,
     ctm_count: usize,
 ) -> anyhow::Result<L1InteropHandlerPreparationMode> {
-    let reuse_call_count = expected_stage1_call_count(STAGE1_CORE_BASE_LEN, ctm_count)?;
+    let reuse_call_count = ctm_block_start(ctm_count, STAGE1_CORE_BASE_LEN);
     let deploy_and_wire_call_count =
-        expected_stage1_call_count(STAGE1_CORE_WITH_INTEROP_WIRING_LEN, ctm_count)?;
+        ctm_block_start(ctm_count, STAGE1_CORE_WITH_INTEROP_WIRING_LEN);
 
     match stage1_call_count {
         count if count == reuse_call_count => Ok(L1InteropHandlerPreparationMode::Reuse),
@@ -211,7 +201,7 @@ impl GovernanceStage1Calls {
         //   +8 BytecodesSupplier proxy admin.upgrade(proxy, new impl)
         //   +9 PermissionlessValidator proxy admin.upgrade(proxy, new impl)
         for (ctm_index, ctm) in ctms.iter().enumerate() {
-            let block = ctm_block_start(ctm_index, core_call_count)?;
+            let block = ctm_block_start(ctm_index, core_call_count);
             let timer_label = format!("{}.upgrade_timer", ctm.flavor.label());
             let validator_label = format!("{}.upgrade_stage_validator", ctm.flavor.label());
             let ctm_proxy_label = format!("{}.chain_type_manager_proxy", ctm.flavor.label());
@@ -447,7 +437,7 @@ impl GovernanceStage1Calls {
 
         // Validate every per-CTM payload against that CTM's artifact section.
         for (i, ctm) in artifact.ctms.iter().enumerate() {
-            let block = ctm_block_start(i, core_call_count)?;
+            let block = ctm_block_start(i, core_call_count);
             result.print_info(&format!(
                 "-- CTM[{i}] = {} ----------------------",
                 ctm.flavor.label()
@@ -1211,39 +1201,11 @@ mod tests {
     }
 
     #[test]
-    fn stage1_count_and_ctm_indices_are_checked() {
-        assert_eq!(
-            expected_stage1_call_count(STAGE1_CORE_BASE_LEN, 0).unwrap(),
-            STAGE1_CORE_BASE_LEN
-        );
-        assert_eq!(
-            expected_stage1_call_count(STAGE1_CORE_WITH_INTEROP_WIRING_LEN, 2).unwrap(),
-            STAGE1_CORE_WITH_INTEROP_WIRING_LEN + 2 * STAGE1_PER_CTM_LEN
-        );
-        assert_eq!(
-            ctm_block_start(0, STAGE1_CORE_BASE_LEN).unwrap(),
-            STAGE1_CORE_BASE_LEN
-        );
-        assert_eq!(
-            ctm_block_start(2, STAGE1_CORE_WITH_INTEROP_WIRING_LEN).unwrap(),
-            STAGE1_CORE_WITH_INTEROP_WIRING_LEN + 2 * STAGE1_PER_CTM_LEN
-        );
-
-        let multiplication_overflow = usize::MAX / STAGE1_PER_CTM_LEN + 1;
-        assert!(expected_stage1_call_count(0, multiplication_overflow).is_err());
-        assert!(ctm_block_start(multiplication_overflow, 0).is_err());
-
-        let addition_overflow = usize::MAX - (STAGE1_PER_CTM_LEN - 1);
-        assert!(expected_stage1_call_count(addition_overflow, 1).is_err());
-        assert!(ctm_block_start(1, addition_overflow).is_err());
-    }
-
-    #[test]
     fn exact_stage1_layout_determines_interop_handler_preparation_mode() {
         let ctm_count = 2;
-        let reuse_call_count = expected_stage1_call_count(STAGE1_CORE_BASE_LEN, ctm_count).unwrap();
+        let reuse_call_count = ctm_block_start(ctm_count, STAGE1_CORE_BASE_LEN);
         let deploy_and_wire_call_count =
-            expected_stage1_call_count(STAGE1_CORE_WITH_INTEROP_WIRING_LEN, ctm_count).unwrap();
+            ctm_block_start(ctm_count, STAGE1_CORE_WITH_INTEROP_WIRING_LEN);
 
         assert_eq!(
             infer_l1_interop_handler_preparation_mode(reuse_call_count, ctm_count).unwrap(),
@@ -1262,7 +1224,7 @@ mod tests {
     #[test]
     fn reuse_mode_does_not_require_proxy_deployment_provenance() {
         let ctm_count = 1;
-        let reuse_call_count = expected_stage1_call_count(STAGE1_CORE_BASE_LEN, ctm_count).unwrap();
+        let reuse_call_count = ctm_block_start(ctm_count, STAGE1_CORE_BASE_LEN);
         let mode = infer_l1_interop_handler_preparation_mode(reuse_call_count, ctm_count).unwrap();
 
         assert_eq!(mode, L1InteropHandlerPreparationMode::Reuse);

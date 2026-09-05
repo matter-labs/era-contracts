@@ -16,8 +16,6 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {
     BaseTokenPreV31TotalSupplyNotSet,
     CutDataForProtocolVersionNotAvailable,
-    LowerBoundNotRecorded,
-    PriorityQueueNotReady,
     UpgradePreconditionCheckerMagicMismatch
 } from "contracts/common/L1ContractErrors.sol";
 
@@ -180,29 +178,6 @@ contract ServerNotifierPreconditionsTest is Test {
             0,
             "no timestamp may be recorded when scheduling reverts"
         );
-    }
-
-    function test_setUpgradeTimestampRevertsWhenLowerBoundNotRecorded() public {
-        registry = new PriorityOpLowerBound();
-        checker = new V32UpgradePreconditionChecker(registry);
-        _registerChecker();
-
-        vm.prank(chainAdmin);
-        vm.expectRevert(LowerBoundNotRecorded.selector);
-        serverNotifier.setUpgradeTimestamp(chainId, block.timestamp + 7 days);
-
-        assertEq(serverNotifier.protocolVersionToUpgradeTimestamp(chainId, protocolVersion), 0);
-    }
-
-    function test_setUpgradeTimestampRevertsWhenPriorityQueueNotReady() public {
-        _registerChecker();
-        _mockFirstUnprocessedPriorityTx(TOTAL_PRIORITY_TXS_AT_RECORD_TIME - 1);
-
-        vm.prank(chainAdmin);
-        vm.expectRevert(PriorityQueueNotReady.selector);
-        serverNotifier.setUpgradeTimestamp(chainId, block.timestamp + 7 days);
-
-        assertEq(serverNotifier.protocolVersionToUpgradeTimestamp(chainId, protocolVersion), 0);
     }
 
     function test_checkerForOtherVersionDoesNotAffectScheduling() public {

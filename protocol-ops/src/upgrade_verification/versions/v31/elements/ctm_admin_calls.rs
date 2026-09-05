@@ -6,7 +6,10 @@ use alloy::{
 use anyhow::{Context, Result};
 
 use crate::{
-    common::governance_calls::{decode_calls, GovernanceCall},
+    common::{
+        abi::IServerNotifierAbi,
+        governance_calls::{decode_calls, GovernanceCall},
+    },
     upgrade_verification::{
         artifacts::{
             required_address_in_value as required_address, CtmArtifact, EcosystemUpgradeArtifact,
@@ -39,7 +42,6 @@ struct ExpectedServerNotifierUpgrade {
     implementation: Address,
     old_protocol_version: U256,
     checker: Address,
-    accept_ownership_still_required: bool,
 }
 
 pub(crate) async fn verify_ctm_admin_calls(
@@ -136,8 +138,7 @@ async fn verify_server_notifier_upgrade(ctm: &CtmArtifact, verifiers: &Verifiers
         .call()
         .await
         .with_context(|| format!("calling ServerNotifier.pendingOwner() at {server_notifier}"))?;
-    let accept_ownership_still_required =
-        validate_ownership_state(server_notifier_owner, pending_owner, intended_chain_admin)?;
+    validate_ownership_state(server_notifier_owner, pending_owner, intended_chain_admin)?;
 
     let implementation = required_address(
         &ctm.value,
@@ -159,37 +160,63 @@ async fn verify_server_notifier_upgrade(ctm: &CtmArtifact, verifiers: &Verifiers
     );
     let encoded_calls = required_server_notifier_upgrade(ctm)?;
 
-    validate_server_notifier_upgrade(
-        encoded_calls,
-        ExpectedServerNotifierUpgrade {
-            proxy_admin,
-            server_notifier,
-            implementation,
-            old_protocol_version: U256::from(ctm.contracts_config.old_protocol_version),
-            checker,
-            accept_ownership_still_required,
-        },
+    let expected = ExpectedServerNotifierUpgrade {
+        proxy_admin,
+        server_notifier,
+        implementation,
+        old_protocol_version: U256::from(ctm.contracts_config.old_protocol_version),
+        checker,
+    };
+    validate_server_notifier_upgrade(encoded_calls, expected)?;
+    // The prepare phase executes both supported call sequences before verification.
+    let implementation = verifiers
+        .network_verifier
+        .try_get_proxy_implementation(server_notifier)
+        .await?;
+    let checker = IServerNotifierAbi::new(
+        server_notifier,
+        verifiers.network_verifier.get_l1_provider(),
     )
+    .upgradePreconditionChecker(expected.old_protocol_version)
+    .call()
+    .await
+    .context("reading the checker registered by the completed ServerNotifier upgrade")?;
+    validate_completed_upgrade(implementation, checker, expected)?;
+    Ok(())
+}
+
+fn validate_completed_upgrade(
+    implementation: Address,
+    checker: Address,
+    expected: ExpectedServerNotifierUpgrade,
+) -> Result<()> {
+    anyhow::ensure!(
+        implementation == expected.implementation,
+        "completed preparation requires ServerNotifier implementation {}, got {implementation}",
+        expected.implementation
+    );
+    anyhow::ensure!(
+        checker == expected.checker,
+        "completed preparation requires registered checker {}, got {checker}",
+        expected.checker
+    );
+    Ok(())
 }
 
 fn validate_ownership_state(
     owner: Address,
     pending_owner: Address,
     intended_owner: Address,
-) -> Result<bool> {
-    if owner == intended_owner {
-        anyhow::ensure!(
-            pending_owner == Address::ZERO,
-            "ServerNotifier is owned by intended ChainAdmin {intended_owner}, but has stale pending owner {pending_owner}"
-        );
-        Ok(false)
-    } else {
-        anyhow::ensure!(
-            pending_owner == intended_owner,
-            "ServerNotifier owner is {owner}, but pending owner must be intended ChainAdmin {intended_owner}; got {pending_owner}"
-        );
-        Ok(true)
-    }
+) -> Result<()> {
+    anyhow::ensure!(
+        owner == intended_owner,
+        "prepared ServerNotifier owner must be intended ChainAdmin {intended_owner}, got {owner}"
+    );
+    anyhow::ensure!(
+        pending_owner == Address::ZERO,
+        "prepared ServerNotifier has stale pending owner {pending_owner}"
+    );
+    Ok(())
 }
 
 fn validate_chain_admin_owner(live_owner: Address, intended_owner: Address) -> Result<()> {
@@ -226,19 +253,15 @@ fn validate_server_notifier_upgrade(
         "must be a 0x-prefixed ABI-encoded Call[]"
     );
     let calls = decode_calls(encoded_calls).context("decoding ABI-encoded Call[]")?;
-    let (expected_call_count, ownership_state) = if expected.accept_ownership_still_required {
-        (3, "while ServerNotifier ownership acceptance is pending")
-    } else {
-        (2, "while ServerNotifier is already owned by ChainAdmin")
-    };
+    let includes_ownership_acceptance = calls.len() == 3;
     anyhow::ensure!(
-        calls.len() == expected_call_count,
-        "expected exactly {expected_call_count} calls {ownership_state}, got {}",
+        matches!(calls.len(), 2 | 3),
+        "expected 2 or 3 calls, got {}",
         calls.len()
     );
 
     validate_proxy_admin_upgrade(&calls[0], expected)?;
-    let registration_index = if expected.accept_ownership_still_required {
+    let registration_index = if includes_ownership_acceptance {
         validate_accept_ownership(&calls[1], expected)?;
         2
     } else {
@@ -360,18 +383,20 @@ mod tests {
             implementation: address(3),
             old_protocol_version: U256::from(31_u64) << 32,
             checker: address(4),
-            accept_ownership_still_required: false,
         }
     }
 
-    fn valid_calls(expected: ExpectedServerNotifierUpgrade) -> Vec<GovernanceCall> {
+    fn valid_calls(
+        expected: ExpectedServerNotifierUpgrade,
+        accept_ownership: bool,
+    ) -> Vec<GovernanceCall> {
         let mut calls = vec![GovernanceCall {
             target: expected.proxy_admin,
             value: U256::ZERO,
             data: upgradeCall::new((expected.server_notifier, expected.implementation))
                 .abi_encode(),
         }];
-        if expected.accept_ownership_still_required {
+        if accept_ownership {
             calls.push(GovernanceCall {
                 target: expected.server_notifier,
                 value: U256::ZERO,
@@ -413,34 +438,31 @@ mod tests {
     #[test]
     fn accepts_exact_ordered_server_notifier_calls() {
         let expected = expected();
-        validate_server_notifier_upgrade(&encoded(&valid_calls(expected)), expected).unwrap();
+        validate_server_notifier_upgrade(&encoded(&valid_calls(expected, false)), expected)
+            .unwrap();
 
-        let expected = ExpectedServerNotifierUpgrade {
-            accept_ownership_still_required: true,
-            ..expected
-        };
-        validate_server_notifier_upgrade(&encoded(&valid_calls(expected)), expected).unwrap();
+        validate_server_notifier_upgrade(&encoded(&valid_calls(expected, true)), expected).unwrap();
     }
 
     #[test]
     fn rejects_missing_or_too_many_calls() {
         let expected = expected();
-        let mut calls = valid_calls(expected);
+        let mut calls = valid_calls(expected, false);
         calls.pop();
         let err = validate_server_notifier_upgrade(&encoded(&calls), expected).unwrap_err();
-        assert!(format!("{err:#}").contains("expected exactly 2 calls"));
+        assert!(format!("{err:#}").contains("expected 2 or 3 calls"));
 
-        let mut calls = valid_calls(expected);
+        let mut calls = valid_calls(expected, false);
         calls.push(calls[1].clone());
         calls.push(calls[1].clone());
         let err = validate_server_notifier_upgrade(&encoded(&calls), expected).unwrap_err();
-        assert!(format!("{err:#}").contains("expected exactly 2 calls"));
+        assert!(format!("{err:#}").contains("expected 2 or 3 calls"));
     }
 
     #[test]
     fn rejects_reordered_calls() {
         let expected = expected();
-        let mut calls = valid_calls(expected);
+        let mut calls = valid_calls(expected, false);
         calls.swap(0, 1);
         let err = validate_server_notifier_upgrade(&encoded(&calls), expected).unwrap_err();
         assert!(format!("{err:#}").contains("call #0 target must be ServerNotifier ProxyAdmin"));
@@ -469,7 +491,7 @@ mod tests {
                 address(9),
             ),
         ] {
-            let mut calls = valid_calls(expected);
+            let mut calls = valid_calls(expected, false);
             calls[0].target = target;
             calls[0].data = upgradeCall::new((proxy, implementation)).abi_encode();
             assert!(
@@ -478,7 +500,7 @@ mod tests {
             );
         }
 
-        let mut calls = valid_calls(expected);
+        let mut calls = valid_calls(expected, false);
         calls[0].value = U256::from(1);
         assert!(validate_server_notifier_upgrade(&encoded(&calls), expected).is_err());
     }
@@ -506,7 +528,7 @@ mod tests {
                 address(9),
             ),
         ] {
-            let mut calls = valid_calls(expected);
+            let mut calls = valid_calls(expected, false);
             calls[1].target = target;
             calls[1].data = setUpgradePreconditionCheckerCall::new((version, checker)).abi_encode();
             assert!(
@@ -515,17 +537,14 @@ mod tests {
             );
         }
 
-        let mut calls = valid_calls(expected);
+        let mut calls = valid_calls(expected, false);
         calls[1].value = U256::from(1);
         assert!(validate_server_notifier_upgrade(&encoded(&calls), expected).is_err());
     }
 
     #[test]
     fn validates_optional_accept_ownership_call() {
-        let expected = ExpectedServerNotifierUpgrade {
-            accept_ownership_still_required: true,
-            ..expected()
-        };
+        let expected = expected();
 
         for (label, target, value, data) in [
             (
@@ -547,7 +566,7 @@ mod tests {
                 vec![0_u8; 4],
             ),
         ] {
-            let mut calls = valid_calls(expected);
+            let mut calls = valid_calls(expected, true);
             calls[1] = GovernanceCall {
                 target,
                 value,
@@ -558,29 +577,36 @@ mod tests {
                 "wrong acceptOwnership {label} must fail"
             );
         }
-
-        let without_accept = ExpectedServerNotifierUpgrade {
-            accept_ownership_still_required: false,
-            ..expected
-        };
-        assert!(
-            validate_server_notifier_upgrade(&encoded(&valid_calls(without_accept)), expected)
-                .is_err()
-        );
-        let err =
-            validate_server_notifier_upgrade(&encoded(&valid_calls(expected)), without_accept)
-                .unwrap_err();
-        assert!(format!("{err:#}").contains("expected exactly 2 calls"));
     }
 
     #[test]
-    fn validates_ownership_state() {
+    fn verifies_both_call_shapes_after_prepare_executes_them() {
+        let expected = expected();
         let intended_owner = address(5);
-        assert!(validate_ownership_state(address(6), intended_owner, intended_owner).unwrap());
-        assert!(!validate_ownership_state(intended_owner, Address::ZERO, intended_owner).unwrap());
+        validate_ownership_state(intended_owner, Address::ZERO, intended_owner).unwrap();
 
-        let err = validate_ownership_state(address(6), address(7), intended_owner).unwrap_err();
-        assert!(format!("{err:#}").contains("pending owner must be intended ChainAdmin"));
+        for accept_ownership in [false, true] {
+            let prepared_calls = encoded(&valid_calls(expected, accept_ownership));
+            validate_server_notifier_upgrade(&prepared_calls, expected).unwrap();
+            validate_completed_upgrade(expected.implementation, expected.checker, expected)
+                .unwrap();
+
+            let err =
+                validate_completed_upgrade(address(9), expected.checker, expected).unwrap_err();
+            assert!(format!("{err:#}").contains("requires ServerNotifier implementation"));
+            for checker in [Address::ZERO, address(9)] {
+                let err = validate_completed_upgrade(expected.implementation, checker, expected)
+                    .unwrap_err();
+                assert!(format!("{err:#}").contains("requires registered checker"));
+            }
+        }
+    }
+
+    #[test]
+    fn rejects_incomplete_or_stale_ownership_transfers() {
+        let intended_owner = address(5);
+        let err = validate_ownership_state(address(6), intended_owner, intended_owner).unwrap_err();
+        assert!(format!("{err:#}").contains("owner must be intended ChainAdmin"));
 
         let err = validate_ownership_state(intended_owner, address(7), intended_owner).unwrap_err();
         assert!(format!("{err:#}").contains("stale pending owner"));
@@ -601,11 +627,11 @@ mod tests {
     #[test]
     fn rejects_wrong_selectors_and_trailing_calldata() {
         let expected = expected();
-        let mut calls = valid_calls(expected);
+        let mut calls = valid_calls(expected, false);
         calls[0].data = vec![0_u8; 4];
         assert!(validate_server_notifier_upgrade(&encoded(&calls), expected).is_err());
 
-        let mut calls = valid_calls(expected);
+        let mut calls = valid_calls(expected, false);
         calls[1].data.push(0);
         let err = validate_server_notifier_upgrade(&encoded(&calls), expected).unwrap_err();
         assert!(format!("{err:#}").contains("canonical setUpgradePreconditionChecker"));

@@ -153,7 +153,7 @@ pub(crate) async fn verify_v31_artifact_state(
     result
         .expect_deployed_bytecode(verifiers, &create2_factory, CREATE2_FACTORY_CONTRACT_NAME)
         .await;
-    verify_v31_proxy_admins(artifact, verifiers, result).await?;
+    verify_v31_proxy_admins(artifact, verifiers, l1_interop_handler_mode, result).await?;
     verify_v31_core_wiring(artifact, verifiers, l1_interop_handler_mode, result).await?;
     verify_v31_validator_timelocks(artifact, verifiers, result).await?;
     verify_v31_timer_admin_state(artifact, verifiers, result).await?;
@@ -179,6 +179,7 @@ async fn verify_l1_chain_id(verifiers: &Verifiers, result: &mut VerificationResu
 async fn verify_v31_proxy_admins(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
+    l1_interop_handler_mode: L1InteropHandlerPreparationMode,
     result: &mut VerificationResult,
 ) -> Result<()> {
     let expected_core_admin = required_address(
@@ -231,38 +232,41 @@ async fn verify_v31_proxy_admins(
         }
     }
 
-    let interop_handler_proxy = required_address(
-        &artifact.core,
-        "core",
-        &[
-            "upgrade_addresses",
-            "bridges",
-            "l1_interop_handler_proxy_addr",
-        ],
-    )?;
-    let expected_implementation = required_address(
-        &artifact.core,
-        "core",
-        &[
-            "upgrade_addresses",
-            "bridges",
-            "l1_interop_handler_implementation_addr",
-        ],
-    )?;
-    match verifiers
-        .network_verifier
-        .try_get_proxy_implementation(interop_handler_proxy)
-        .await
-    {
-        Ok(actual) => expect_address_eq(
-            result,
-            "L1InteropHandler implementation",
-            actual,
-            expected_implementation,
-        ),
-        Err(err) => result.report_error(&format!(
-            "Failed to read L1InteropHandler implementation: {err}"
-        )),
+    // Stage 1 preserves a reused handler's implementation; the fresh deployment is not installed.
+    if l1_interop_handler_mode == L1InteropHandlerPreparationMode::DeployAndWire {
+        let interop_handler_proxy = required_address(
+            &artifact.core,
+            "core",
+            &[
+                "upgrade_addresses",
+                "bridges",
+                "l1_interop_handler_proxy_addr",
+            ],
+        )?;
+        let expected_implementation = required_address(
+            &artifact.core,
+            "core",
+            &[
+                "upgrade_addresses",
+                "bridges",
+                "l1_interop_handler_implementation_addr",
+            ],
+        )?;
+        match verifiers
+            .network_verifier
+            .try_get_proxy_implementation(interop_handler_proxy)
+            .await
+        {
+            Ok(actual) => expect_address_eq(
+                result,
+                "L1InteropHandler implementation",
+                actual,
+                expected_implementation,
+            ),
+            Err(err) => result.report_error(&format!(
+                "Failed to read L1InteropHandler implementation: {err}"
+            )),
+        }
     }
 
     for ctm in &artifact.ctms {

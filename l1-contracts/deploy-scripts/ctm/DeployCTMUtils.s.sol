@@ -93,9 +93,6 @@ abstract contract DeployCTMUtils is DeployUtils {
     /// @dev Shared by the v32 upgrade and its precondition checker.
     address internal priorityOpLowerBound;
 
-    /// @dev Zero for fresh deployments, which start at the target version.
-    address internal upgradePreconditionChecker;
-
     using stdToml for string;
 
     Config public config;
@@ -282,9 +279,6 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode(priorityOpLowerBound);
         } else if (compareStrings(contractName, "PriorityOpLowerBound")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "V32UpgradePreconditionChecker")) {
-            require(priorityOpLowerBound != address(0), "PriorityOpLowerBound not deployed");
-            return abi.encode(priorityOpLowerBound);
         } else if (compareStrings(contractName, "Governance")) {
             return
                 abi.encode(

@@ -27,6 +27,20 @@ import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.
 
 /// @notice Script used for v31 upgrade flow
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
+    address internal upgradePreconditionChecker;
+
+    function getCreationCalldata(string memory _contractName) internal view override returns (bytes memory) {
+        if (compareStrings(_contractName, "V32UpgradePreconditionChecker")) {
+            require(priorityOpLowerBound != address(0), "PriorityOpLowerBound not deployed");
+            return abi.encode(priorityOpLowerBound);
+        }
+        return super.getCreationCalldata(_contractName);
+    }
+
+    function saveOutputVersionSpecific() internal override {
+        vm.serializeAddress("state_transition", "upgrade_precondition_checker_addr", upgradePreconditionChecker);
+    }
+
     /// @notice Single-call entry point invoked by the protocol-ops CLI's `ecosystem upgrade-prepare-all`.
     ///         Mirrors `CoreUpgrade_v31.noGovernancePrepare`: drives the full CTM-side prepare phase
     ///         (deploy + bytecode publish + upgrade-cut generation + governance/admin call serialization)

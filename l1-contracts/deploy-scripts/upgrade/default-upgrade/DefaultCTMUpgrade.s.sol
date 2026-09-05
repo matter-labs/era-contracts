@@ -940,9 +940,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         if (priorityOpLowerBound != address(0)) {
             vm.serializeAddress("state_transition", "priority_op_lower_bound_addr", priorityOpLowerBound);
         }
-        if (upgradePreconditionChecker != address(0)) {
-            vm.serializeAddress("state_transition", "upgrade_precondition_checker_addr", upgradePreconditionChecker);
-        }
+        saveOutputVersionSpecific();
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
@@ -1001,8 +999,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
 
         vm.writeToml(toml, outputPath);
-
-        saveOutputVersionSpecific();
     }
 
     function saveOutputVersionSpecific() internal virtual {}
