@@ -6,6 +6,7 @@ pragma solidity ^0.8.24;
 import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
@@ -15,6 +16,7 @@ import {IOwnableSingleStep, IChainAdminMulticall} from "../../../../deploy-scrip
 import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 import {ChainUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol";
 import {UpgradeUtils} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeUtils.sol";
+import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {GetDiamondCutData} from "../../../../deploy-scripts/utils/GetDiamondCutData.sol";
@@ -298,7 +300,7 @@ contract UpgradeIntegrationTestBase is Test {
     function executeOwnableCallsAsCurrentOwner(Call[] storage _calls) internal {
         for (uint256 i = 0; i < _calls.length; i++) {
             Call memory call = _calls[i];
-            address owner = getOwnableOwner(call.target);
+            address owner = _operationalCallSender(call);
 
             if (owner.code.length == 0) {
                 vm.startBroadcast(owner);
@@ -315,6 +317,17 @@ contract UpgradeIntegrationTestBase is Test {
                 vm.stopBroadcast();
             }
         }
+    }
+
+    function _operationalCallSender(Call memory _call) private view returns (address) {
+        if (_call.data.length == 4 && bytes4(_call.data) == Ownable2Step.acceptOwnership.selector) {
+            address proxyAdminOwner = getOwnableOwner(Utils.getProxyAdminAddress(_call.target));
+            address pendingOwner = Ownable2Step(_call.target).pendingOwner();
+            require(proxyAdminOwner != address(0), "proxy admin owner is zero");
+            require(pendingOwner == proxyAdminOwner, "pending owner does not match proxy admin owner");
+            return pendingOwner;
+        }
+        return getOwnableOwner(_call.target);
     }
 
     function getOwnableOwner(address _target) internal view returns (address) {

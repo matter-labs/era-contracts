@@ -1,9 +1,8 @@
 //! Stage 1 — the main upgrade ceremony.
 //!
-//! Non-stage call layout: 11 generated ecosystem-wide core calls
-//! (indices 0..=10), then a 6-call block per `[ctms.<flavor>]` entry,
-//! repeated in artifact order. Stage prepends one emergency-path
-//! `pauseMigration()` call, so all generated calls shift by one there.
+//! Call layout: 10 ecosystem-wide core calls, optionally followed by three
+//! L1InteropHandler wiring calls, then a 10-call block per
+//! `[ctms.<flavor>]` entry in artifact order.
 //!
 //! Two passes:
 //! - [`verify_call_shape`] — every call's `(target, selector, value=0)`.
@@ -14,7 +13,7 @@
 
 use alloy::{
     hex,
-    primitives::U256,
+    primitives::{Address, U256},
     sol_types::{SolCall, SolValue},
 };
 use anyhow::Context;
@@ -30,7 +29,7 @@ use super::super::{
 };
 use super::super::{
     fixed_force_deployment::FixedForceDeploymentsData, initialize_data_new_chain,
-    protocol_version::ProtocolVersion, set_new_version_upgrade,
+    protocol_version::ProtocolVersion, set_new_version_upgrade, L1InteropHandlerPreparationMode,
 };
 use super::facets::{
     verify_default_upgrade_payload, verify_v31_chain_creation_facet_cuts,
@@ -38,42 +37,84 @@ use super::facets::{
 };
 use super::helpers::{
     expect_address_equal, expect_hex_equal, expect_named_address, protocol_label,
-    required_ctm_address, verify_call_by_address, verify_call_by_name,
+    required_core_address, required_ctm_address, verify_call_by_address, verify_call_by_name,
 };
 use super::{
-    initializeL1V31UpgradeCall, setChainCreationParamsCall, upgradeAndCallCall, upgradeCall,
-    CallList, GovernanceStage1Calls,
+    acceptOwnershipCall, setChainCreationParamsCall, setDefaultUpgradeCall,
+    setL1InteropHandlerCall, upgradeCall, CallList, GovernanceStage1Calls,
 };
 
-/// Number of generated ecosystem-wide stage-1 calls before any per-CTM block.
-/// On stage, PUVT additionally requires one leading `pauseMigration()` call
-/// because stage1 is executed through the emergency-upgrade path.
-const STAGE1_GENERATED_PREFIX_LEN: usize = 9;
-const STAGE1_PER_CTM_LEN: usize = 6;
+const STAGE1_CORE_BASE_LEN: usize = 10;
+const STAGE1_CORE_WITH_INTEROP_WIRING_LEN: usize = 13;
+const STAGE1_PER_CTM_LEN: usize = 10;
 
-/// Index of the per-CTM `ChainTypeManager` proxy upgrade within the
-/// per-CTM block (offset relative to the start of that block).
 const PER_CTM_OFFSET_CHECK_DEADLINE: usize = 0;
 const PER_CTM_OFFSET_CHECK_MIGRATIONS_PAUSED: usize = 1;
 const PER_CTM_OFFSET_UPGRADE_CTM: usize = 2;
-const PER_CTM_OFFSET_SET_CHAIN_CREATION_PARAMS: usize = 3;
-const PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE: usize = 4;
-const PER_CTM_OFFSET_UPGRADE_VALIDATOR_TIMELOCK: usize = 5;
+const PER_CTM_OFFSET_SET_DEFAULT_UPGRADE: usize = 3;
+const PER_CTM_OFFSET_SET_CHAIN_CREATION_PARAMS: usize = 4;
+const PER_CTM_OFFSET_CHECK_PRECONDITION_CHECKER: usize = 5;
+const PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE: usize = 6;
+const PER_CTM_OFFSET_UPGRADE_VALIDATOR_TIMELOCK: usize = 7;
+const PER_CTM_OFFSET_UPGRADE_BYTECODES_SUPPLIER: usize = 8;
+const PER_CTM_OFFSET_UPGRADE_PERMISSIONLESS_VALIDATOR: usize = 9;
 
-fn ctm_block_start(ctm_index: usize, call_offset: usize) -> usize {
-    call_offset + STAGE1_GENERATED_PREFIX_LEN + ctm_index * STAGE1_PER_CTM_LEN
+#[derive(Clone, Copy)]
+struct CtmComponentUpgrade {
+    offset: usize,
+    proxy_key: &'static str,
+    implementation_key: &'static str,
+    name: &'static str,
 }
 
-fn stage1_call_offset(verifiers: &Verifiers) -> usize {
-    usize::from(verifiers.env.is_stage())
+const CTM_COMPONENT_UPGRADES: [CtmComponentUpgrade; 3] = [
+    CtmComponentUpgrade {
+        offset: PER_CTM_OFFSET_UPGRADE_VALIDATOR_TIMELOCK,
+        proxy_key: "validator_timelock_addr",
+        implementation_key: "validator_timelock_implementation_addr",
+        name: "ValidatorTimelock",
+    },
+    CtmComponentUpgrade {
+        offset: PER_CTM_OFFSET_UPGRADE_BYTECODES_SUPPLIER,
+        proxy_key: "bytecodes_supplier_addr",
+        implementation_key: "bytecodes_supplier_implementation_addr",
+        name: "BytecodesSupplier",
+    },
+    CtmComponentUpgrade {
+        offset: PER_CTM_OFFSET_UPGRADE_PERMISSIONLESS_VALIDATOR,
+        proxy_key: "permissionless_validator_addr",
+        implementation_key: "permissionless_validator_implementation_addr",
+        name: "PermissionlessValidator",
+    },
+];
+
+fn ctm_block_start(ctm_index: usize, core_call_count: usize) -> usize {
+    core_call_count + ctm_index * STAGE1_PER_CTM_LEN
+}
+
+pub(crate) fn infer_l1_interop_handler_preparation_mode(
+    stage1_call_count: usize,
+    ctm_count: usize,
+) -> anyhow::Result<L1InteropHandlerPreparationMode> {
+    let reuse_call_count = ctm_block_start(ctm_count, STAGE1_CORE_BASE_LEN);
+    let deploy_and_wire_call_count =
+        ctm_block_start(ctm_count, STAGE1_CORE_WITH_INTEROP_WIRING_LEN);
+
+    match stage1_call_count {
+        count if count == reuse_call_count => Ok(L1InteropHandlerPreparationMode::Reuse),
+        count if count == deploy_and_wire_call_count => {
+            Ok(L1InteropHandlerPreparationMode::DeployAndWire)
+        }
+        count => anyhow::bail!(
+            "Stage 1 must contain either {reuse_call_count} calls for a reused L1InteropHandler or \
+             {deploy_and_wire_call_count} calls for a newly prepared L1InteropHandler; got {count}"
+        ),
+    }
 }
 
 impl GovernanceStage1Calls {
-    /// Stage 1 — proxy impl swaps for the 7 core contracts (incl. MessageRoot
-    /// reinit), ChainRegistrationSender ownership handoff, ChainAssetHandler
-    /// address refresh, then per-CTM: timer checkDeadline, migrations-paused
-    /// sanity, CTM impl swap, `setChainCreationParams`, `setNewVersionUpgrade`,
-    /// VT impl swap.
+    /// Stage 1 — migration pause, core proxy upgrades and address refresh,
+    /// optional L1InteropHandler wiring, then each CTM's upgrade calls.
     ///
     /// Split into two passes: `verify_call_shape` checks target+selector for
     /// every call; `verify_artifact_payloads` decodes args and cross-checks
@@ -82,81 +123,85 @@ impl GovernanceStage1Calls {
         &self,
         artifact: &EcosystemUpgradeArtifact,
         verifiers: &Verifiers,
+        l1_interop_handler_mode: L1InteropHandlerPreparationMode,
         result: &mut VerificationResult,
     ) -> anyhow::Result<()> {
-        self.verify_call_shape(&artifact.ctms, verifiers, result)
+        let core_call_count = match l1_interop_handler_mode {
+            L1InteropHandlerPreparationMode::DeployAndWire => STAGE1_CORE_WITH_INTEROP_WIRING_LEN,
+            L1InteropHandlerPreparationMode::Reuse => STAGE1_CORE_BASE_LEN,
+        };
+
+        self.verify_call_shape(&artifact.ctms, core_call_count, verifiers, result)
             .await?;
-        self.verify_artifact_payloads(artifact, verifiers, result)
+        self.verify_artifact_payloads(artifact, core_call_count, verifiers, result)
             .await
     }
 
     async fn verify_call_shape(
         &self,
         ctms: &[CtmArtifact],
+        core_call_count: usize,
         verifiers: &Verifiers,
         result: &mut VerificationResult,
     ) -> anyhow::Result<()> {
         result.print_info("== Gov stage 1 calls ===");
 
-        let call_offset = stage1_call_offset(verifiers);
         let mut errors = 0;
-        if verifiers.env.is_stage() {
-            // Stage executes stage1 through EmergencyUpgradeBoard, whose
-            // emergency path unpauses migrations before forwarding the calls.
-            // Re-pause first so the later checkMigrationsPaused() calls still
-            // validate the intended stage0 state.
-            errors += verify_call_by_name(
-                &self.calls,
-                0,
-                "chain_asset_handler_proxy",
-                "pauseMigration()",
-                verifiers,
-                result,
-            );
-        }
+        errors += verify_call_by_name(
+            &self.calls,
+            0,
+            "chain_asset_handler_proxy",
+            "pauseMigration()",
+            verifiers,
+            result,
+        );
         for (index, target, method) in [
             // Upgrade Bridgehub proxy.
-            (0, "transparent_proxy_admin", "upgrade(address,address)"),
-            // Upgrade L1 nullifier proxy.
             (1, "transparent_proxy_admin", "upgrade(address,address)"),
-            // Upgrade L1 asset router proxy.
+            // Upgrade L1 nullifier proxy.
             (2, "transparent_proxy_admin", "upgrade(address,address)"),
-            // Upgrade native token vault proxy.
+            // Upgrade L1 asset router proxy.
             (3, "transparent_proxy_admin", "upgrade(address,address)"),
-            // Upgrade message root proxy and initialize v31 state.
-            (
-                4,
-                "transparent_proxy_admin",
-                "upgradeAndCall(address,address,bytes)",
-            ),
-            // Upgrade CTM deployment tracker proxy.
+            // Upgrade native token vault proxy.
+            (4, "transparent_proxy_admin", "upgrade(address,address)"),
+            // Upgrade message root proxy.
             (5, "transparent_proxy_admin", "upgrade(address,address)"),
-            // Upgrade chain asset handler proxy.
+            // Upgrade CTM deployment tracker proxy.
             (6, "transparent_proxy_admin", "upgrade(address,address)"),
-            // Accept ChainRegistrationSender ownership.
-            (7, "chain_registration_sender_proxy", "acceptOwnership()"),
+            // Upgrade chain asset handler proxy.
+            (7, "transparent_proxy_admin", "upgrade(address,address)"),
+            // Upgrade ChainRegistrationSender proxy.
+            (8, "transparent_proxy_admin", "upgrade(address,address)"),
             // Cache MessageRoot / AssetRouter inside L1ChainAssetHandler.
-            (8, "chain_asset_handler_proxy", "setAddresses()"),
+            (9, "chain_asset_handler_proxy", "setAddresses()"),
         ] {
-            errors += verify_call_by_name(
-                &self.calls,
-                call_offset + index,
-                target,
-                method,
-                verifiers,
-                result,
-            );
+            errors += verify_call_by_name(&self.calls, index, target, method, verifiers, result);
         }
 
-        // Per-CTM block (6 calls per CTM, in artifact order):
+        if core_call_count == STAGE1_CORE_WITH_INTEROP_WIRING_LEN {
+            for (index, target, method) in [
+                (10, "l1_interop_handler_proxy", "acceptOwnership()"),
+                (11, "l1_nullifier_proxy", "setL1InteropHandler(address)"),
+                (12, "l1_asset_router_proxy", "setL1InteropHandler(address)"),
+            ] {
+                errors +=
+                    verify_call_by_name(&self.calls, index, target, method, verifiers, result);
+            }
+        }
+
+        // Per-CTM block (10 calls per CTM, in artifact order):
         //   +0 timer.checkDeadline()
         //   +1 stage-validator.checkMigrationsPaused()
         //   +2 CTM proxy admin.upgrade(CTM proxy, new impl)
-        //   +3 CTM proxy.setChainCreationParams(...)
-        //   +4 CTM proxy.setNewVersionUpgrade(...)
-        //   +5 VT proxy admin.upgrade(VT proxy, new impl)
+        //   +3 CTM proxy.setDefaultUpgrade(...)
+        //   +4 CTM proxy.setChainCreationParams(...)
+        //   +5 stage-validator.checkUpgradePreconditionChecker(...)
+        //   +6 CTM proxy.setNewVersionUpgrade(...)
+        //   +7 VT proxy admin.upgrade(VT proxy, new impl)
+        //   +8 BytecodesSupplier proxy admin.upgrade(proxy, new impl)
+        //   +9 PermissionlessValidator proxy admin.upgrade(proxy, new impl)
         for (ctm_index, ctm) in ctms.iter().enumerate() {
-            let block = ctm_block_start(ctm_index, call_offset);
+            let block = ctm_block_start(ctm_index, core_call_count);
             let timer_label = format!("{}.upgrade_timer", ctm.flavor.label());
             let validator_label = format!("{}.upgrade_stage_validator", ctm.flavor.label());
             let ctm_proxy_label = format!("{}.chain_type_manager_proxy", ctm.flavor.label());
@@ -192,8 +237,17 @@ impl GovernanceStage1Calls {
                     verifiers,
                     result,
                 );
+                errors += verify_call_by_address(
+                    &self.calls,
+                    block + PER_CTM_OFFSET_CHECK_PRECONDITION_CHECKER,
+                    validator,
+                    &validator_label,
+                    "checkUpgradePreconditionChecker(uint256,address)",
+                    verifiers,
+                    result,
+                );
             } else {
-                errors += 1;
+                errors += 2;
             }
 
             if let Some(ctm_proxy) = required_ctm_address(
@@ -201,15 +255,37 @@ impl GovernanceStage1Calls {
                 &["state_transition", "chain_type_manager_proxy"],
                 result,
             ) {
-                let ctm_proxy_admin = verifiers.network_verifier.get_proxy_admin(ctm_proxy).await;
                 let ctm_proxy_admin_label =
                     format!("{}.chain_type_manager_proxy_admin", ctm.flavor.label());
+                match verifiers
+                    .network_verifier
+                    .try_get_proxy_admin(ctm_proxy)
+                    .await
+                {
+                    Ok(ctm_proxy_admin) => {
+                        errors += verify_call_by_address(
+                            &self.calls,
+                            block + PER_CTM_OFFSET_UPGRADE_CTM,
+                            ctm_proxy_admin,
+                            &ctm_proxy_admin_label,
+                            "upgrade(address,address)",
+                            verifiers,
+                            result,
+                        );
+                    }
+                    Err(err) => {
+                        result.report_error(&format!(
+                            "Failed to resolve {ctm_proxy_admin_label} from {ctm_proxy}: {err}"
+                        ));
+                        errors += 1;
+                    }
+                }
                 errors += verify_call_by_address(
                     &self.calls,
-                    block + PER_CTM_OFFSET_UPGRADE_CTM,
-                    ctm_proxy_admin,
-                    &ctm_proxy_admin_label,
-                    "upgrade(address,address)",
+                    block + PER_CTM_OFFSET_SET_DEFAULT_UPGRADE,
+                    ctm_proxy,
+                    &ctm_proxy_label,
+                    "setDefaultUpgrade(address)",
                     verifiers,
                     result,
                 );
@@ -232,57 +308,42 @@ impl GovernanceStage1Calls {
                     result,
                 );
             } else {
-                errors += 3;
+                errors += 4;
             }
 
-            // v31 swaps the per-CTM ValidatorTimelock implementation in-place
-            // (the impl gains UPGRADER_ROLE + upgradeChainFromVersion). The
-            // governance call routes through the same TUPP ProxyAdmin the
-            // CTM proxy uses (they share a transparent proxy admin per CTM).
-            if let Some(vt_proxy) = required_ctm_address(
-                ctm,
-                &["state_transition", "validator_timelock_addr"],
-                result,
-            ) {
-                let vt_proxy_admin = verifiers.network_verifier.get_proxy_admin(vt_proxy).await;
-                let vt_proxy_admin_label =
-                    format!("{}.validator_timelock_proxy_admin", ctm.flavor.label());
-                errors += verify_call_by_address(
-                    &self.calls,
-                    block + PER_CTM_OFFSET_UPGRADE_VALIDATOR_TIMELOCK,
-                    vt_proxy_admin,
-                    &vt_proxy_admin_label,
-                    "upgrade(address,address)",
-                    verifiers,
-                    result,
-                );
-            } else {
-                errors += 1;
+            for component in CTM_COMPONENT_UPGRADES {
+                if let Some(proxy) =
+                    required_ctm_address(ctm, &["state_transition", component.proxy_key], result)
+                {
+                    let proxy_admin_label = format!(
+                        "{}.{}_proxy_admin",
+                        ctm.flavor.label(),
+                        component.proxy_key.trim_end_matches("_addr")
+                    );
+                    match verifiers.network_verifier.try_get_proxy_admin(proxy).await {
+                        Ok(proxy_admin) => {
+                            errors += verify_call_by_address(
+                                &self.calls,
+                                block + component.offset,
+                                proxy_admin,
+                                &proxy_admin_label,
+                                "upgrade(address,address)",
+                                verifiers,
+                                result,
+                            );
+                        }
+                        Err(err) => {
+                            result.report_error(&format!(
+                                "Failed to resolve {proxy_admin_label} from {proxy}: {err}"
+                            ));
+                            errors += 1;
+                        }
+                    }
+                } else {
+                    errors += 1;
+                }
             }
         }
-
-        let expected_call_count =
-            call_offset + STAGE1_GENERATED_PREFIX_LEN + ctms.len() * STAGE1_PER_CTM_LEN;
-        match self.calls.elems.len().cmp(&expected_call_count) {
-            std::cmp::Ordering::Less => {
-                result.report_error(&format!(
-                    "Too few calls: expected {} but got {}.",
-                    expected_call_count,
-                    self.calls.elems.len()
-                ));
-                errors += 1;
-            }
-            std::cmp::Ordering::Greater => {
-                result.report_error(&format!(
-                    "Too many calls: expected {} but got {}.",
-                    expected_call_count,
-                    self.calls.elems.len()
-                ));
-                errors += 1;
-            }
-            std::cmp::Ordering::Equal => {}
-        }
-
         if errors > 0 {
             anyhow::bail!("{} errors", errors);
         }
@@ -292,21 +353,24 @@ impl GovernanceStage1Calls {
     async fn verify_artifact_payloads(
         &self,
         artifact: &EcosystemUpgradeArtifact,
+        core_call_count: usize,
         verifiers: &Verifiers,
         result: &mut VerificationResult,
     ) -> anyhow::Result<()> {
         result.print_info("== Gov stage 1 payloads ===");
 
-        const UPGRADE_BRIDGEHUB: usize = 0;
-        const UPGRADE_L1_NULLIFIER: usize = 1;
-        const UPGRADE_L1_ASSET_ROUTER: usize = 2;
-        const UPGRADE_NATIVE_TOKEN_VAULT: usize = 3;
-        const UPGRADE_MESSAGE_ROOT: usize = 4;
-        const UPGRADE_CTM_DEPLOYMENT_TRACKER: usize = 5;
-        const UPGRADE_CHAIN_ASSET_HANDLER: usize = 6;
+        const UPGRADE_BRIDGEHUB: usize = 1;
+        const UPGRADE_L1_NULLIFIER: usize = 2;
+        const UPGRADE_L1_ASSET_ROUTER: usize = 3;
+        const UPGRADE_NATIVE_TOKEN_VAULT: usize = 4;
+        const UPGRADE_MESSAGE_ROOT: usize = 5;
+        const UPGRADE_CTM_DEPLOYMENT_TRACKER: usize = 6;
+        const UPGRADE_CHAIN_ASSET_HANDLER: usize = 7;
+        const UPGRADE_CHAIN_REGISTRATION_SENDER: usize = 8;
 
-        let call_offset = stage1_call_offset(verifiers);
         let mut errors = 0;
+        errors += verify_no_arg_calldata(&self.calls, 0, "pauseMigration", result);
+        errors += verify_no_arg_calldata(&self.calls, 9, "setAddresses", result);
 
         for (index, proxy_name, implementation_name) in [
             // Verify Bridgehub proxy upgrade payload.
@@ -333,6 +397,11 @@ impl GovernanceStage1Calls {
                 "native_token_vault",
                 "native_token_vault_implementation_addr",
             ),
+            (
+                UPGRADE_MESSAGE_ROOT,
+                "message_root_proxy",
+                "message_root_implementation_addr",
+            ),
             // Verify CTM deployment tracker proxy upgrade payload.
             (
                 UPGRADE_CTM_DEPLOYMENT_TRACKER,
@@ -345,10 +414,15 @@ impl GovernanceStage1Calls {
                 "chain_asset_handler_proxy",
                 "chain_asset_handler_implementation_addr",
             ),
+            (
+                UPGRADE_CHAIN_REGISTRATION_SENDER,
+                "chain_registration_sender_proxy",
+                "chain_registration_sender_implementation_addr",
+            ),
         ] {
             errors += verify_upgrade_call_args(
                 &self.calls,
-                call_offset + index,
+                index,
                 proxy_name,
                 implementation_name,
                 verifiers,
@@ -356,26 +430,40 @@ impl GovernanceStage1Calls {
             );
         }
 
-        // Verify MessageRoot upgradeAndCall payload.
-        errors += verify_message_root_upgrade_call_args(
-            &self.calls,
-            call_offset + UPGRADE_MESSAGE_ROOT,
-            verifiers,
-            result,
-        );
+        if core_call_count == STAGE1_CORE_WITH_INTEROP_WIRING_LEN {
+            errors +=
+                verify_interop_handler_wiring_payloads(&self.calls, artifact, verifiers, result);
+        }
 
-        // Per-CTM block: CTM proxy upgrade, setChainCreationParams,
-        // setNewVersionUpgrade. Validated against each CTM's own
-        // chain_upgrade_diamond_cut + contracts_config.
+        // Validate every per-CTM payload against that CTM's artifact section.
         for (i, ctm) in artifact.ctms.iter().enumerate() {
-            let block = ctm_block_start(i, call_offset);
+            let block = ctm_block_start(i, core_call_count);
             result.print_info(&format!(
                 "-- CTM[{i}] = {} ----------------------",
                 ctm.flavor.label()
             ));
+            errors += verify_no_arg_calldata(
+                &self.calls,
+                block + PER_CTM_OFFSET_CHECK_DEADLINE,
+                "checkDeadline",
+                result,
+            );
+            errors += verify_no_arg_calldata(
+                &self.calls,
+                block + PER_CTM_OFFSET_CHECK_MIGRATIONS_PAUSED,
+                "checkMigrationsPaused",
+                result,
+            );
             errors += verify_ctm_upgrade_call_args(
                 &self.calls,
                 block + PER_CTM_OFFSET_UPGRADE_CTM,
+                ctm,
+                verifiers,
+                result,
+            );
+            errors += verify_set_default_upgrade_payload(
+                &self.calls,
+                block + PER_CTM_OFFSET_SET_DEFAULT_UPGRADE,
                 ctm,
                 verifiers,
                 result,
@@ -388,6 +476,12 @@ impl GovernanceStage1Calls {
                 result,
             )
             .await;
+            errors += verify_upgrade_precondition_checker_payload(
+                &self.calls,
+                block + PER_CTM_OFFSET_CHECK_PRECONDITION_CHECKER,
+                ctm,
+                result,
+            );
             errors += verify_set_new_version_upgrade_payload(
                 &self.calls,
                 block + PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE,
@@ -396,13 +490,16 @@ impl GovernanceStage1Calls {
                 result,
             )
             .await?;
-            errors += verify_validator_timelock_upgrade_call_args(
-                &self.calls,
-                block + PER_CTM_OFFSET_UPGRADE_VALIDATOR_TIMELOCK,
-                ctm,
-                verifiers,
-                result,
-            );
+            for component in CTM_COMPONENT_UPGRADES {
+                errors += verify_ctm_component_upgrade_call_args(
+                    &self.calls,
+                    block + component.offset,
+                    ctm,
+                    component,
+                    verifiers,
+                    result,
+                );
+            }
         }
 
         if errors > 0 {
@@ -410,6 +507,87 @@ impl GovernanceStage1Calls {
         }
         Ok(())
     }
+}
+
+fn verify_no_arg_calldata(
+    calls: &CallList,
+    index: usize,
+    function_name: &str,
+    result: &mut VerificationResult,
+) -> usize {
+    let Some(call) = calls.elems.get(index) else {
+        result.report_error(&format!("Missing {function_name} call"));
+        return 1;
+    };
+    if call.data.len() == 4 {
+        0
+    } else {
+        result.report_error(&format!("{function_name} calldata is not canonical"));
+        1
+    }
+}
+
+fn verify_upgrade_precondition_checker_payload(
+    calls: &CallList,
+    index: usize,
+    ctm: &CtmArtifact,
+    result: &mut VerificationResult,
+) -> usize {
+    let Some(call) = calls.elems.get(index) else {
+        result.report_error("Missing checkUpgradePreconditionChecker call");
+        return 1;
+    };
+
+    let expected_version = U256::from(ctm.contracts_config.old_protocol_version);
+    let Some(expected_checker) = required_ctm_address(
+        ctm,
+        &["state_transition", "upgrade_precondition_checker_addr"],
+        result,
+    ) else {
+        return 1;
+    };
+
+    match validate_upgrade_precondition_checker_call(&call.data, expected_version, expected_checker)
+    {
+        Ok(()) => {
+            result.report_ok(&format!(
+                "{} checker-registration guard matches the reviewed version and checker",
+                ctm.flavor.label()
+            ));
+            0
+        }
+        Err(err) => {
+            result.report_error(&format!(
+                "{} checker-registration guard is invalid: {err}",
+                ctm.flavor.label()
+            ));
+            1
+        }
+    }
+}
+
+fn validate_upgrade_precondition_checker_call(
+    calldata: &[u8],
+    expected_version: U256,
+    expected_checker: Address,
+) -> anyhow::Result<()> {
+    let decoded = super::checkUpgradePreconditionCheckerCall::abi_decode(calldata)
+        .context("failed to decode checkUpgradePreconditionChecker")?;
+    anyhow::ensure!(
+        decoded.abi_encode() == calldata,
+        "checkUpgradePreconditionChecker calldata is not canonical"
+    );
+    anyhow::ensure!(
+        decoded._oldProtocolVersion == expected_version,
+        "old protocol version mismatch: expected {expected_version}, got {}",
+        decoded._oldProtocolVersion
+    );
+    anyhow::ensure!(
+        decoded._expectedChecker == expected_checker,
+        "checker address mismatch: expected {expected_checker}, got {}",
+        decoded._expectedChecker
+    );
+    Ok(())
 }
 
 fn verify_upgrade_call_args(
@@ -435,6 +613,12 @@ fn verify_upgrade_call_args(
                 &decoded.implementation,
                 implementation_name,
             );
+            if decoded.abi_encode() != call.data {
+                result.report_error(&format!(
+                    "Upgrade calldata at stage1 index {index} is not canonical"
+                ));
+                errors += 1;
+            }
             if errors == 0 {
                 result.report_ok(&format!(
                     "Upgrade payload for {proxy_name} uses {implementation_name}"
@@ -451,51 +635,74 @@ fn verify_upgrade_call_args(
     }
 }
 
-fn verify_message_root_upgrade_call_args(
+fn verify_interop_handler_wiring_payloads(
     calls: &CallList,
-    index: usize,
+    artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
 ) -> usize {
-    let Some(call) = calls.elems.get(index) else {
-        result.report_error("Missing MessageRoot upgradeAndCall call");
+    let Some(accept_call) = calls.elems.get(10) else {
+        result.report_error("Missing L1InteropHandler acceptOwnership call");
         return 1;
     };
 
-    match upgradeAndCallCall::abi_decode(&call.data) {
-        Ok(decoded) => {
-            let mut errors = 0;
-            errors += expect_named_address(result, verifiers, &decoded.proxy, "message_root_proxy");
-            errors += expect_named_address(
-                result,
-                verifiers,
-                &decoded.implementation,
-                "message_root_implementation_addr",
-            );
-
-            // `initializeL1V31Upgrade()` takes no args, so the inner payload
-            // must be exactly its 4-byte selector. Decoding-only would accept
-            // trailing bytes that alloy silently ignores.
-            let expected_selector = initializeL1V31UpgradeCall::SELECTOR;
-            if decoded.data.as_ref() == expected_selector.as_slice() {
-                result.report_ok("MessageRoot upgrade payload calls initializeL1V31Upgrade")
-            } else {
-                result.report_error(&format!(
-                    "MessageRoot upgradeAndCall payload must be exactly initializeL1V31Upgrade() selector 0x{}, got 0x{}",
-                    hex::encode(expected_selector),
-                    hex::encode(decoded.data.as_ref()),
-                ));
-                errors += 1;
-            }
-            errors
+    let mut errors = 0;
+    match acceptOwnershipCall::abi_decode(&accept_call.data) {
+        Ok(decoded) if decoded.abi_encode() == accept_call.data => {}
+        Ok(_) => {
+            result.report_error("L1InteropHandler acceptOwnership calldata is not canonical");
+            errors += 1;
         }
         Err(err) => {
             result.report_error(&format!(
-                "Failed to decode MessageRoot upgradeAndCall: {err}"
+                "Failed to decode L1InteropHandler acceptOwnership: {err}"
             ));
-            1
+            errors += 1;
         }
     }
+
+    let Some(expected_handler) = required_core_address(
+        artifact,
+        &[
+            "upgrade_addresses",
+            "bridges",
+            "l1_interop_handler_proxy_addr",
+        ],
+        result,
+    ) else {
+        return errors + 1;
+    };
+    for (index, component) in [(11, "L1Nullifier"), (12, "L1AssetRouter")] {
+        let Some(call) = calls.elems.get(index) else {
+            result.report_error(&format!("Missing {component}.setL1InteropHandler call"));
+            errors += 1;
+            continue;
+        };
+        match setL1InteropHandlerCall::abi_decode(&call.data) {
+            Ok(decoded) => {
+                errors += expect_address_equal(
+                    result,
+                    verifiers,
+                    &decoded._handler,
+                    expected_handler,
+                    "core.upgrade_addresses.bridges.l1_interop_handler_proxy_addr",
+                );
+                if decoded.abi_encode() != call.data {
+                    result.report_error(&format!(
+                        "{component}.setL1InteropHandler calldata is not canonical"
+                    ));
+                    errors += 1;
+                }
+            }
+            Err(err) => {
+                result.report_error(&format!(
+                    "Failed to decode {component}.setL1InteropHandler: {err}"
+                ));
+                errors += 1;
+            }
+        }
+    }
+    errors
 }
 
 fn verify_ctm_upgrade_call_args(
@@ -546,6 +753,10 @@ fn verify_ctm_upgrade_call_args(
             } else {
                 errors += 1;
             }
+            if decoded.abi_encode() != call.data {
+                result.report_error("ChainTypeManager upgrade calldata is not canonical");
+                errors += 1;
+            }
             if errors == 0 {
                 result.report_ok(&format!(
                     "{} ChainTypeManager upgrade payload uses expected proxy and implementation",
@@ -563,39 +774,38 @@ fn verify_ctm_upgrade_call_args(
     }
 }
 
-fn verify_validator_timelock_upgrade_call_args(
+fn verify_ctm_component_upgrade_call_args(
     calls: &CallList,
     index: usize,
     ctm: &CtmArtifact,
+    component: CtmComponentUpgrade,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
 ) -> usize {
     let Some(call) = calls.elems.get(index) else {
-        result.report_error("Missing ValidatorTimelock upgrade call");
+        result.report_error(&format!("Missing {} upgrade call", component.name));
         return 1;
     };
 
     match upgradeCall::abi_decode(&call.data) {
         Ok(decoded) => {
             let mut errors = 0;
-            if let Some(expected_proxy) = required_ctm_address(
-                ctm,
-                &["state_transition", "validator_timelock_addr"],
-                result,
-            ) {
+            if let Some(expected_proxy) =
+                required_ctm_address(ctm, &["state_transition", component.proxy_key], result)
+            {
                 errors += expect_address_equal(
                     result,
                     verifiers,
                     &decoded.proxy,
                     expected_proxy,
-                    &format!("{}.validator_timelock_proxy", ctm.flavor.label()),
+                    &format!("{}.{}", ctm.flavor.label(), component.proxy_key),
                 );
             } else {
                 errors += 1;
             }
             if let Some(expected_impl) = required_ctm_address(
                 ctm,
-                &["state_transition", "validator_timelock_implementation_addr"],
+                &["state_transition", component.implementation_key],
                 result,
             ) {
                 errors += expect_address_equal(
@@ -603,29 +813,75 @@ fn verify_validator_timelock_upgrade_call_args(
                     verifiers,
                     &decoded.implementation,
                     expected_impl,
-                    &format!(
-                        "{}.validator_timelock_implementation_addr",
-                        ctm.flavor.label()
-                    ),
+                    &format!("{}.{}", ctm.flavor.label(), component.implementation_key),
                 );
             } else {
                 errors += 1;
             }
+            if decoded.abi_encode() != call.data {
+                result.report_error(&format!(
+                    "{} upgrade calldata is not canonical",
+                    component.name
+                ));
+                errors += 1;
+            }
             if errors == 0 {
                 result.report_ok(&format!(
-                    "{} ValidatorTimelock upgrade payload uses expected proxy and implementation",
-                    ctm.flavor.label()
+                    "{} {} upgrade payload uses expected proxy and implementation",
+                    ctm.flavor.label(),
+                    component.name
                 ));
             }
             errors
         }
         Err(err) => {
             result.report_error(&format!(
-                "Failed to decode ValidatorTimelock upgrade call: {err}"
+                "Failed to decode {} upgrade call: {err}",
+                component.name
             ));
             1
         }
     }
+}
+
+fn verify_set_default_upgrade_payload(
+    calls: &CallList,
+    index: usize,
+    ctm: &CtmArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> usize {
+    let Some(call) = calls.elems.get(index) else {
+        result.report_error("Missing setDefaultUpgrade call");
+        return 1;
+    };
+    let decoded = match setDefaultUpgradeCall::abi_decode(&call.data) {
+        Ok(decoded) => decoded,
+        Err(err) => {
+            result.report_error(&format!("Failed to decode setDefaultUpgrade: {err}"));
+            return 1;
+        }
+    };
+
+    let mut errors = 0;
+    if let Some(expected) =
+        required_ctm_address(ctm, &["state_transition", "default_upgrade_addr"], result)
+    {
+        errors += expect_address_equal(
+            result,
+            verifiers,
+            &decoded._defaultUpgrade,
+            expected,
+            &format!("{}.default_upgrade_addr", ctm.flavor.label()),
+        );
+    } else {
+        errors += 1;
+    }
+    if decoded.abi_encode() != call.data {
+        result.report_error("setDefaultUpgrade calldata is not canonical");
+        errors += 1;
+    }
+    errors
 }
 
 async fn verify_set_chain_creation_params_payload(
@@ -647,9 +903,13 @@ async fn verify_set_chain_creation_params_payload(
             return 1;
         }
     };
+    let mut errors = 0;
+    if decoded.abi_encode() != call.data {
+        result.report_error("setChainCreationParams calldata is not canonical");
+        errors += 1;
+    }
     let params = decoded._chainCreationParams;
 
-    let mut errors = 0;
     if let Some(expected_genesis_upgrade) =
         required_ctm_address(ctm, &["state_transition", "genesis_upgrade_addr"], result)
     {
@@ -781,6 +1041,10 @@ async fn verify_set_new_version_upgrade_payload(
         .context("decoding setNewVersionUpgrade")?;
 
     let mut errors = 0;
+    if data.abi_encode() != *calldata {
+        result.report_error("setNewVersionUpgrade calldata is not canonical");
+        errors += 1;
+    }
     let artifact_old_protocol_version = U256::from(ctm.contracts_config.old_protocol_version);
     let artifact_new_protocol_version = U256::from(ctm.contracts_config.new_protocol_version);
 
@@ -926,4 +1190,74 @@ async fn verify_set_new_version_upgrade_payload(
     .await?;
 
     Ok(errors)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn checker_call(version: U256, checker: Address) -> Vec<u8> {
+        super::super::checkUpgradePreconditionCheckerCall::new((version, checker)).abi_encode()
+    }
+
+    #[test]
+    fn exact_stage1_layout_determines_interop_handler_preparation_mode() {
+        let ctm_count = 2;
+        let reuse_call_count = ctm_block_start(ctm_count, STAGE1_CORE_BASE_LEN);
+        let deploy_and_wire_call_count =
+            ctm_block_start(ctm_count, STAGE1_CORE_WITH_INTEROP_WIRING_LEN);
+
+        assert_eq!(
+            infer_l1_interop_handler_preparation_mode(reuse_call_count, ctm_count).unwrap(),
+            L1InteropHandlerPreparationMode::Reuse
+        );
+        assert_eq!(
+            infer_l1_interop_handler_preparation_mode(deploy_and_wire_call_count, ctm_count)
+                .unwrap(),
+            L1InteropHandlerPreparationMode::DeployAndWire
+        );
+        assert!(
+            infer_l1_interop_handler_preparation_mode(reuse_call_count + 1, ctm_count).is_err()
+        );
+    }
+
+    #[test]
+    fn reuse_mode_does_not_require_proxy_deployment_provenance() {
+        let ctm_count = 1;
+        let reuse_call_count = ctm_block_start(ctm_count, STAGE1_CORE_BASE_LEN);
+        let mode = infer_l1_interop_handler_preparation_mode(reuse_call_count, ctm_count).unwrap();
+
+        assert_eq!(mode, L1InteropHandlerPreparationMode::Reuse);
+        assert!(!mode.requires_proxy_deployment_provenance());
+    }
+
+    #[test]
+    fn checker_call_must_be_canonical_and_match_expected_values() {
+        let version = U256::from(32);
+        let checker = Address::repeat_byte(0x11);
+        let canonical = checker_call(version, checker);
+        validate_upgrade_precondition_checker_call(&canonical, version, checker).unwrap();
+
+        let mut wrong_selector = canonical.clone();
+        wrong_selector[0] ^= 0xff;
+        let err = validate_upgrade_precondition_checker_call(&wrong_selector, version, checker)
+            .unwrap_err();
+        assert!(format!("{err:#}").contains("failed to decode"));
+
+        let mut trailing_byte = canonical.clone();
+        trailing_byte.push(0);
+        let err = validate_upgrade_precondition_checker_call(&trailing_byte, version, checker)
+            .unwrap_err();
+        assert!(format!("{err:#}").contains("not canonical"));
+
+        let wrong_version = checker_call(version + U256::from(1), checker);
+        let err = validate_upgrade_precondition_checker_call(&wrong_version, version, checker)
+            .unwrap_err();
+        assert!(format!("{err:#}").contains("old protocol version mismatch"));
+
+        let wrong_checker = checker_call(version, Address::repeat_byte(0x22));
+        let err = validate_upgrade_precondition_checker_call(&wrong_checker, version, checker)
+            .unwrap_err();
+        assert!(format!("{err:#}").contains("checker address mismatch"));
+    }
 }

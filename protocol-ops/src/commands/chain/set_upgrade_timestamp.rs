@@ -44,6 +44,40 @@ pub struct ChainSetUpgradeTimestampArgs {
     pub shared: SharedRunArgs,
 }
 
+/// Human-readable rendering of the error selectors
+/// `ServerNotifier.previewUpgradePreconditions` reports.
+fn describe_precondition_failure(selector: &[u8; 4]) -> String {
+    use crate::common::abi::IUpgradePreconditionErrors as E;
+    use alloy::sol_types::SolError;
+
+    match *selector {
+        s if s == E::CutDataForProtocolVersionNotAvailable::SELECTOR => {
+            "CutDataForProtocolVersionNotAvailable: the CTM has no upgrade cut registered for the \
+             chain's current protocol version (publish the upgrade cut through ecosystem governance)"
+                .to_string()
+        }
+        s if s == E::BaseTokenPreV31TotalSupplyNotSet::SELECTOR => {
+            "BaseTokenPreV31TotalSupplyNotSet: the chain's pre-v31 base-token total supply was \
+             never backfilled"
+                .to_string()
+        }
+        s if s == E::LowerBoundNotRecorded::SELECTOR => {
+            "LowerBoundNotRecorded: the chain's priority-op lower bound is not recorded yet (run \
+             RecordPriorityOpLowerBound.s.sol)"
+                .to_string()
+        }
+        s if s == E::PriorityQueueNotReady::SELECTOR => {
+            "PriorityQueueNotReady: priority ops below the recorded lower bound are not fully \
+             processed yet"
+                .to_string()
+        }
+        s if s == E::ZKChainNotRegistered::SELECTOR => {
+            "ZKChainNotRegistered: the CTM has no chain registered under this chain id".to_string()
+        }
+        s => format!("unknown precondition error selector 0x{}", hex::encode(s)),
+    }
+}
+
 pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
@@ -56,6 +90,36 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
             .await
             .context("resolving chain admin from L1")?;
+
+    // Use Forge's fork RPC so the preview sees prepare-time notifier upgrades.
+    let server_notifier =
+        crate::common::l1_contracts::resolve_server_notifier(&runner.rpc_url, bridgehub, chain_id)
+            .await
+            .context("resolving ServerNotifier from L1")?;
+    match crate::common::l1_contracts::preview_upgrade_preconditions(
+        &runner.rpc_url,
+        server_notifier,
+        chain_id,
+    )
+    .await?
+    {
+        Some(failed) if !failed.is_empty() => {
+            let lines: Vec<String> = failed
+                .iter()
+                .map(|s| format!("  - {}", describe_precondition_failure(s)))
+                .collect();
+            anyhow::bail!(
+                "chain {chain_id} is not ready to have its upgrade scheduled \
+                 (ServerNotifier.previewUpgradePreconditions):\n{}",
+                lines.join("\n")
+            );
+        }
+        Some(_) => logger::info("On-chain upgrade-scheduling preconditions: OK"),
+        None => logger::info(
+            "No precondition preview available (the deployed ServerNotifier predates it); relying \
+             on the scheduling call's own checks",
+        ),
+    }
     // The Solidity helper executes through ChainAdmin, but broadcasts from
     // ChainAdmin.owner() or the AccessControlRestriction default admin inside adminExecuteCalls.
     let sender = runner
@@ -110,4 +174,41 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
 
     logger::success("Set upgrade timestamp prepared");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::describe_precondition_failure;
+    use crate::common::abi::IUpgradePreconditionErrors as E;
+    use alloy::sol_types::SolError;
+
+    #[test]
+    fn describes_known_precondition_failures() {
+        let cases = [
+            (
+                E::CutDataForProtocolVersionNotAvailable::SELECTOR,
+                "CutDataForProtocolVersionNotAvailable",
+            ),
+            (
+                E::BaseTokenPreV31TotalSupplyNotSet::SELECTOR,
+                "BaseTokenPreV31TotalSupplyNotSet",
+            ),
+            (E::LowerBoundNotRecorded::SELECTOR, "LowerBoundNotRecorded"),
+            (E::PriorityQueueNotReady::SELECTOR, "PriorityQueueNotReady"),
+            (E::ZKChainNotRegistered::SELECTOR, "ZKChainNotRegistered"),
+        ];
+
+        for (selector, name) in cases {
+            assert!(describe_precondition_failure(&selector).starts_with(name));
+        }
+    }
+
+    #[test]
+    fn describes_unknown_precondition_failure() {
+        let selector = [0xde, 0xad, 0xbe, 0xef];
+        assert_eq!(
+            describe_precondition_failure(&selector),
+            "unknown precondition error selector 0xdeadbeef"
+        );
+    }
 }

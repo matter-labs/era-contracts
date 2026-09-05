@@ -27,6 +27,25 @@
   },
   {
     "type": "function",
+    "name": "previewUpgradePreconditions",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "failed",
+        "type": "bytes4[]",
+        "internalType": "bytes4[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "protocolVersionToUpgradeTimestamp",
     "inputs": [
       {
@@ -64,6 +83,24 @@
   },
   {
     "type": "function",
+    "name": "setUpgradePreconditionChecker",
+    "inputs": [
+      {
+        "name": "_oldProtocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_checker",
+        "type": "address",
+        "internalType": "contract IUpgradePreconditionChecker"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setUpgradeTimestamp",
     "inputs": [
       {
@@ -79,6 +116,25 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "upgradePreconditionChecker",
+    "inputs": [
+      {
+        "name": "_oldProtocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IUpgradePreconditionChecker"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "event",
@@ -114,6 +170,25 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "UpgradePreconditionCheckerSet",
+    "inputs": [
+      {
+        "name": "protocolVersion",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "checker",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
       }
     ],
     "anonymous": false

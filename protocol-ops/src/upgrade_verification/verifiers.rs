@@ -1,5 +1,5 @@
 use alloy::{
-    hex::{self, FromHex},
+    hex,
     primitives::{Address, Bytes, FixedBytes, U256},
     sol,
     sol_types::SolCall,
@@ -434,54 +434,29 @@ impl VerificationResult {
         true
     }
 
-    /// Verifies create2 parameters for a proxy contract that uses a separate implementation.
-    pub(crate) async fn expect_create2_params_proxy_with_bytecode(
+    /// Verifies CREATE2 provenance for a transparent proxy with exact constructor inputs.
+    pub(crate) fn expect_create2_params_transparent_proxy(
         &mut self,
         verifiers: &Verifiers,
         address: &Address,
+        expected_implementation: Address,
         expected_init_params: impl AsRef<[u8]>,
         expected_initial_admin: Address,
-        expected_impl_constructor_params: impl AsRef<[u8]>,
-        expected_file: &str,
     ) {
-        let transparent_proxy_key = FixedBytes::from_hex(
-            "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc",
-        )
-        .expect("Invalid transparent proxy key hex literal");
-
-        let storage = verifiers
-            .network_verifier
-            .storage_at(address, &transparent_proxy_key)
-            .await;
-        // Skip the first 12 bytes to extract the address.
-        let implementation_address = Address::from_slice(&storage[12..]);
-
         let call = transparentProxyConstructorCall::new((
-            implementation_address,
+            expected_implementation,
             expected_initial_admin,
             Bytes::copy_from_slice(expected_init_params.as_ref()),
         ));
         let mut constructor_params = Vec::new();
         call.abi_encode_raw(&mut constructor_params);
 
-        let is_proxy = self.expect_create2_params_internal(
+        self.expect_create2_params_internal(
             verifiers,
             address,
             &constructor_params,
             "l1-contracts/TransparentUpgradeableProxy",
-            false,
-        );
-
-        if !is_proxy {
-            // Error has already been reported.
-            return;
-        }
-
-        self.expect_create2_params(
-            verifiers,
-            &implementation_address,
-            expected_impl_constructor_params,
-            expected_file,
+            true,
         );
     }
 }

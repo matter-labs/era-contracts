@@ -13,7 +13,8 @@ use crate::common::logger;
 use super::bytecode_verifier::BytecodeVerifier;
 use super::{compute_create2_address_evm, compute_create2_address_zk};
 use crate::upgrade_verification::constants::{
-    EIP1967_PROXY_ADMIN_SLOT, L2_CREATE2_FACTORY_ADDR, ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
+    EIP1967_PROXY_ADMIN_SLOT, EIP1967_PROXY_IMPLEMENTATION_SLOT, L2_CREATE2_FACTORY_ADDR,
+    ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
 };
 
 sol! {
@@ -58,6 +59,12 @@ sol! {
         function ERA_CHAIN_ID() public view returns (uint256);
 
         function nativeTokenVault() public view returns (address);
+        function l1InteropHandler() public view returns (address);
+    }
+
+    #[sol(rpc)]
+    contract L1Nullifier {
+        function l1InteropHandler() public view returns (address);
     }
 
     #[sol(rpc)]
@@ -449,13 +456,35 @@ impl NetworkVerifier {
     }
 
     pub async fn get_proxy_admin(&self, addr: Address) -> Address {
-        let addr_as_bytes = self
-            .storage_at(
-                &addr,
-                &FixedBytes::<32>::from_hex(EIP1967_PROXY_ADMIN_SLOT).unwrap(),
-            )
-            .await;
-        Address::from_slice(&addr_as_bytes[12..])
+        self.try_get_proxy_admin(addr).await.unwrap()
+    }
+
+    pub async fn try_get_proxy_admin(&self, addr: Address) -> anyhow::Result<Address> {
+        self.try_get_proxy_address_slot(addr, EIP1967_PROXY_ADMIN_SLOT, "admin")
+            .await
+    }
+
+    pub async fn try_get_proxy_implementation(&self, addr: Address) -> anyhow::Result<Address> {
+        self.try_get_proxy_address_slot(addr, EIP1967_PROXY_IMPLEMENTATION_SLOT, "implementation")
+            .await
+    }
+
+    async fn try_get_proxy_address_slot(
+        &self,
+        addr: Address,
+        slot_literal: &str,
+        slot_name: &str,
+    ) -> anyhow::Result<Address> {
+        let slot = FixedBytes::<32>::from_hex(slot_literal)
+            .with_context(|| format!("invalid EIP-1967 {slot_name} slot literal"))?;
+        let storage = self
+            .l1_provider
+            .get_storage_at(addr, U256::from_be_bytes(slot.0))
+            .await
+            .with_context(|| format!("failed to read L1 proxy {slot_name} slot for {addr}"))?;
+
+        let bytes = FixedBytes::<32>::from_slice(&storage.to_be_bytes_vec());
+        Ok(Address::from_slice(&bytes[12..]))
     }
 
     pub async fn try_get_gateway_proxy_admin(&self, addr: Address) -> anyhow::Result<Address> {

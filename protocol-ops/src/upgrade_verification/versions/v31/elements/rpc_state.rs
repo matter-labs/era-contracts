@@ -4,12 +4,9 @@ use crate::upgrade_verification::{
     artifacts::{required_address_in_value as required_address, EcosystemUpgradeArtifact},
     constants::EIP1967_PROXY_ADMIN_SLOT,
     verifiers::{VerificationResult, Verifiers},
-    versions::v31::{
-        utils::network_verifier::{
-            Bridgehub as BridgehubContract, ChainRegistrationSender, ChainTypeManager,
-            L1AssetRouter, Ownable, Ownable2Step, ValidatorTimelock,
-        },
-        STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID,
+    versions::v31::utils::network_verifier::{
+        Bridgehub as BridgehubContract, ChainRegistrationSender, ChainTypeManager, L1AssetRouter,
+        L1Nullifier, Ownable, Ownable2Step, ValidatorTimelock,
     },
 };
 
@@ -19,6 +16,8 @@ use alloy::{
     providers::Provider,
 };
 
+use super::L1InteropHandlerPreparationMode;
+
 const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
 
 const MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 10_800;
@@ -26,7 +25,6 @@ const TESTNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 0;
 
 /// Core proxies whose EIP-1967 admin slot must match the ecosystem
 /// `transparent_proxy_admin`.
-/// These are the proxies that the v31 governance stage 1 calls upgrade.
 const CORE_PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
     "bridgehub_proxy",
     "l1_nullifier_proxy",
@@ -35,6 +33,8 @@ const CORE_PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
     "message_root_proxy",
     "ctm_deployment_tracker_proxy",
     "chain_asset_handler_proxy",
+    "chain_registration_sender_proxy",
+    "l1_interop_handler_proxy",
 ];
 
 fn expect_address_eq(
@@ -67,6 +67,54 @@ fn expect_debug_eq<T: std::fmt::Debug + PartialEq>(
     }
 }
 
+fn validate_interop_handler_ownership_state(
+    owner: Address,
+    pending_owner: Address,
+    deployer: Address,
+    governance: Address,
+    preparation_mode: L1InteropHandlerPreparationMode,
+) -> Result<()> {
+    match preparation_mode {
+        L1InteropHandlerPreparationMode::DeployAndWire => {
+            anyhow::ensure!(
+                owner == deployer,
+                "owner must be deployer {deployer}, got {owner}"
+            );
+            anyhow::ensure!(
+                pending_owner == governance,
+                "pending owner must be governance {governance}, got {pending_owner}"
+            );
+        }
+        L1InteropHandlerPreparationMode::Reuse => {
+            anyhow::ensure!(
+                owner == governance,
+                "owner must be governance {governance}, got {owner}"
+            );
+            anyhow::ensure!(
+                pending_owner == Address::ZERO,
+                "owner is governance, but stale pending owner is {pending_owner}"
+            );
+        }
+    }
+    Ok(())
+}
+
+fn validate_reused_interop_handler_wiring(
+    nullifier_handler: Address,
+    asset_router_handler: Address,
+    expected_handler: Address,
+) -> Result<()> {
+    anyhow::ensure!(
+        nullifier_handler == expected_handler,
+        "L1Nullifier.l1InteropHandler() must be {expected_handler}, got {nullifier_handler}"
+    );
+    anyhow::ensure!(
+        asset_router_handler == expected_handler,
+        "L1AssetRouter.l1InteropHandler() must be {expected_handler}, got {asset_router_handler}"
+    );
+    Ok(())
+}
+
 /// RPC state checks
 ///
 /// This is intentionally the *non-overlapping* slice of legacy PUVT's
@@ -96,6 +144,7 @@ pub(crate) async fn verify_v31_artifact_state(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     create2_factory: Address,
+    l1_interop_handler_mode: L1InteropHandlerPreparationMode,
     result: &mut VerificationResult,
 ) -> Result<()> {
     result.print_info("== RPC state checks ==");
@@ -104,13 +153,12 @@ pub(crate) async fn verify_v31_artifact_state(
     result
         .expect_deployed_bytecode(verifiers, &create2_factory, CREATE2_FACTORY_CONTRACT_NAME)
         .await;
-    verify_v31_proxy_admins(artifact, verifiers, result).await?;
-    verify_v31_core_wiring(artifact, verifiers, result).await?;
+    verify_v31_proxy_admins(artifact, verifiers, l1_interop_handler_mode, result).await?;
+    verify_v31_core_wiring(artifact, verifiers, l1_interop_handler_mode, result).await?;
     verify_v31_validator_timelocks(artifact, verifiers, result).await?;
     verify_v31_timer_admin_state(artifact, verifiers, result).await?;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
     verify_v31_ctm_flavor(artifact, verifiers, result).await?;
-    verify_v31_chain_settlement_layers(verifiers, result).await;
 
     Ok(())
 }
@@ -131,6 +179,7 @@ async fn verify_l1_chain_id(verifiers: &Verifiers, result: &mut VerificationResu
 async fn verify_v31_proxy_admins(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
+    l1_interop_handler_mode: L1InteropHandlerPreparationMode,
     result: &mut VerificationResult,
 ) -> Result<()> {
     let expected_core_admin = required_address(
@@ -154,8 +203,8 @@ async fn verify_v31_proxy_admins(
     let provider = verifiers.network_verifier.get_l1_provider();
     for proxy_name in CORE_PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN {
         let Some(proxy_addr) = verifiers.address_verifier.name_to_address.get(*proxy_name) else {
-            result.report_warn(&format!(
-                "Skipping proxy-admin check for {proxy_name}: address not present in artifact"
+            result.report_error(&format!(
+                "Cannot check proxy admin for {proxy_name}: address not present in artifact"
             ));
             continue;
         };
@@ -165,8 +214,8 @@ async fn verify_v31_proxy_admins(
         {
             Ok(value) => value.to_be_bytes::<32>(),
             Err(err) => {
-                result.report_warn(&format!(
-                    "Skipping proxy-admin check for {proxy_name}; eth_getStorageAt failed: {err}"
+                result.report_error(&format!(
+                    "Failed to check proxy admin for {proxy_name}; eth_getStorageAt failed: {err}"
                 ));
                 continue;
             }
@@ -183,6 +232,43 @@ async fn verify_v31_proxy_admins(
         }
     }
 
+    // Stage 1 preserves a reused handler's implementation; the fresh deployment is not installed.
+    if l1_interop_handler_mode == L1InteropHandlerPreparationMode::DeployAndWire {
+        let interop_handler_proxy = required_address(
+            &artifact.core,
+            "core",
+            &[
+                "upgrade_addresses",
+                "bridges",
+                "l1_interop_handler_proxy_addr",
+            ],
+        )?;
+        let expected_implementation = required_address(
+            &artifact.core,
+            "core",
+            &[
+                "upgrade_addresses",
+                "bridges",
+                "l1_interop_handler_implementation_addr",
+            ],
+        )?;
+        match verifiers
+            .network_verifier
+            .try_get_proxy_implementation(interop_handler_proxy)
+            .await
+        {
+            Ok(actual) => expect_address_eq(
+                result,
+                "L1InteropHandler implementation",
+                actual,
+                expected_implementation,
+            ),
+            Err(err) => result.report_error(&format!(
+                "Failed to read L1InteropHandler implementation: {err}"
+            )),
+        }
+    }
+
     for ctm in &artifact.ctms {
         let label = ctm.flavor.label();
         let scope = format!("ctms.{label}");
@@ -194,6 +280,11 @@ async fn verify_v31_proxy_admins(
         for (proxy_label, proxy_path) in [
             ("chain_type_manager_proxy", "chain_type_manager_proxy"),
             ("validator_timelock_addr", "validator_timelock_addr"),
+            ("bytecodes_supplier_addr", "bytecodes_supplier_addr"),
+            (
+                "permissionless_validator_addr",
+                "permissionless_validator_addr",
+            ),
         ] {
             let proxy_addr =
                 required_address(&ctm.value, &scope, &["state_transition", proxy_path])?;
@@ -203,8 +294,8 @@ async fn verify_v31_proxy_admins(
             {
                 Ok(value) => value.to_be_bytes::<32>(),
                 Err(err) => {
-                    result.report_warn(&format!(
-                        "Skipping proxy-admin check for {label}.{proxy_label}; eth_getStorageAt failed: {err}"
+                    result.report_error(&format!(
+                        "Failed to check proxy admin for {label}.{proxy_label}; eth_getStorageAt failed: {err}"
                     ));
                     continue;
                 }
@@ -228,6 +319,7 @@ async fn verify_v31_proxy_admins(
 async fn verify_v31_core_wiring(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
+    l1_interop_handler_mode: L1InteropHandlerPreparationMode,
     result: &mut VerificationResult,
 ) -> Result<()> {
     let provider = verifiers.network_verifier.get_l1_provider();
@@ -238,6 +330,11 @@ async fn verify_v31_core_wiring(
         &artifact.core,
         "core",
         &["upgrade_addresses", "bridges", "l1_asset_router_proxy_addr"],
+    )?;
+    let expected_nullifier = required_address(
+        &artifact.core,
+        "core",
+        &["upgrade_addresses", "bridges", "l1_nullifier_proxy_addr"],
     )?;
     let expected_ctm_deployment_tracker = required_address(
         &artifact.core,
@@ -276,11 +373,21 @@ async fn verify_v31_core_wiring(
             "chain_asset_handler_proxy_addr",
         ],
     )?;
+    let expected_interop_handler = required_address(
+        &artifact.core,
+        "core",
+        &[
+            "upgrade_addresses",
+            "bridges",
+            "l1_interop_handler_proxy_addr",
+        ],
+    )?;
     let expected_message_root = required_address(
         &artifact.core,
         "core",
         &["upgrade_addresses", "bridgehub", "message_root_proxy_addr"],
     )?;
+    let expected_deployer = required_address(&artifact.misc, "misc", &["deployer_addr"])?;
 
     let asset_router = L1AssetRouter::new(expected_asset_router, provider.clone());
     let asset_router_owner = Ownable::new(expected_asset_router, provider.clone());
@@ -382,6 +489,60 @@ async fn verify_v31_core_wiring(
         Err(err) => result.report_error(&format!(
             "Failed to call ChainRegistrationSender.pendingOwner() for pre-upgrade ownership checks: {err}"
         )),
+    }
+
+    let interop_handler_ownership = Ownable2Step::new(expected_interop_handler, provider.clone());
+    let interop_handler_owner = interop_handler_ownership.owner().call().await;
+    let interop_handler_pending_owner = interop_handler_ownership.pendingOwner().call().await;
+    match (interop_handler_owner, interop_handler_pending_owner) {
+        (Ok(owner), Ok(pending_owner)) => {
+            match validate_interop_handler_ownership_state(
+                owner,
+                pending_owner,
+                expected_deployer,
+                bridgehub_owner,
+                l1_interop_handler_mode,
+            ) {
+                Ok(()) => result.report_ok("L1InteropHandler ownership state matches Stage 1"),
+                Err(err) => result.report_error(&format!(
+                    "L1InteropHandler ownership state does not match Stage 1: {err}"
+                )),
+            }
+        }
+        (Err(err), _) => result.report_error(&format!(
+            "Failed to call L1InteropHandler.owner() for pre-upgrade ownership checks: {err}"
+        )),
+        (_, Err(err)) => result.report_error(&format!(
+            "Failed to call L1InteropHandler.pendingOwner() for pre-upgrade ownership checks: {err}"
+        )),
+    }
+
+    if l1_interop_handler_mode == L1InteropHandlerPreparationMode::Reuse {
+        let nullifier = L1Nullifier::new(expected_nullifier, provider.clone());
+        let nullifier_handler = nullifier.l1InteropHandler().call().await;
+        let asset_router_handler = asset_router.l1InteropHandler().call().await;
+        match (nullifier_handler, asset_router_handler) {
+            (Ok(nullifier_handler), Ok(asset_router_handler)) => {
+                match validate_reused_interop_handler_wiring(
+                    nullifier_handler,
+                    asset_router_handler,
+                    expected_interop_handler,
+                ) {
+                    Ok(()) => result.report_ok(
+                        "Reused L1InteropHandler is wired into L1Nullifier and L1AssetRouter",
+                    ),
+                    Err(err) => result.report_error(&format!(
+                        "Reused L1InteropHandler wiring does not match Stage 1: {err}"
+                    )),
+                }
+            }
+            (Err(err), _) => result.report_error(&format!(
+                "Failed to call L1Nullifier.l1InteropHandler() for reused-handler wiring checks: {err}"
+            )),
+            (_, Err(err)) => result.report_error(&format!(
+                "Failed to call L1AssetRouter.l1InteropHandler() for reused-handler wiring checks: {err}"
+            )),
+        }
     }
 
     match bridgehub.chainAssetHandler().call().await {
@@ -641,53 +802,104 @@ async fn verify_v31_ctm_flavor(
     Ok(())
 }
 
-/// Stage-1 `MessageRoot.initializeL1V31Upgrade()` iterates
-/// `Bridgehub.getAllZKChainChainIDs()` and `require`s every chain to have
-/// `settlementLayer(chainId) == block.chainid`. Failing that on execution
-/// would revert the governance proposal after signers approve it, so PUVT
-/// pre-flights the same iteration at the review block.
-///
-/// `L1MessageRootStageSepolia` skips chain
-/// `STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID` (270) because it's still
-/// settling on the legacy stage Gateway at v31 upgrade time; PUVT applies
-/// the same skip when `is_stage` is set.
-async fn verify_v31_chain_settlement_layers(
-    verifiers: &Verifiers,
-    result: &mut VerificationResult,
-) {
-    let provider = verifiers.network_verifier.get_l1_provider();
-    let bridgehub = BridgehubContract::new(verifiers.bridgehub_address, provider.clone());
-    let expected_l1 = U256::from(verifiers.expected_l1_chain_id);
-
-    let chain_ids = match bridgehub.getAllZKChainChainIDs().call().await {
-        Ok(ids) => ids,
-        Err(err) => {
-            result.report_error(&format!(
-                "Failed to call Bridgehub.getAllZKChainChainIDs() for settlementLayer pre-flight: {err}"
-            ));
-            return;
-        }
+#[cfg(test)]
+mod tests {
+    use super::{
+        validate_interop_handler_ownership_state, validate_reused_interop_handler_wiring,
+        L1InteropHandlerPreparationMode,
     };
+    use alloy::primitives::Address;
 
-    for chain_id in chain_ids {
-        if verifiers.env.is_stage()
-            && chain_id == U256::from(STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID)
-        {
-            result.report_ok(&format!(
-                "Skipping settlementLayer check for stage chain {chain_id} (L1MessageRootStageSepolia exception)"
-            ));
-            continue;
-        }
-        match bridgehub.settlementLayer(chain_id).call().await {
-            Ok(sl) if sl == expected_l1 => result.report_ok(&format!(
-                "Bridgehub.settlementLayer({chain_id}) == L1 ({expected_l1})"
-            )),
-            Ok(sl) => result.report_error(&format!(
-                "Bridgehub.settlementLayer({chain_id}) mismatch: expected L1 {expected_l1}, got {sl}. Stage-1 MessageRoot.initializeL1V31Upgrade() would revert."
-            )),
-            Err(err) => result.report_error(&format!(
-                "Failed to call Bridgehub.settlementLayer({chain_id}): {err}"
-            )),
-        }
+    fn address(byte: u8) -> Address {
+        Address::repeat_byte(byte)
+    }
+
+    #[test]
+    fn fresh_interop_handler_requires_deployer_owner_and_governance_pending_owner() {
+        let deployer = address(2);
+        let governance = address(1);
+        validate_interop_handler_ownership_state(
+            deployer,
+            governance,
+            deployer,
+            governance,
+            L1InteropHandlerPreparationMode::DeployAndWire,
+        )
+        .unwrap();
+
+        let err = validate_interop_handler_ownership_state(
+            address(3),
+            governance,
+            deployer,
+            governance,
+            L1InteropHandlerPreparationMode::DeployAndWire,
+        )
+        .unwrap_err();
+        assert!(format!("{err:#}").contains("owner must be deployer"));
+
+        let err = validate_interop_handler_ownership_state(
+            deployer,
+            Address::ZERO,
+            deployer,
+            governance,
+            L1InteropHandlerPreparationMode::DeployAndWire,
+        )
+        .unwrap_err();
+        assert!(format!("{err:#}").contains("pending owner must be governance"));
+    }
+
+    #[test]
+    fn reused_interop_handler_requires_settled_governance_ownership() {
+        let governance = address(1);
+        let deployer = address(2);
+        validate_interop_handler_ownership_state(
+            governance,
+            Address::ZERO,
+            deployer,
+            governance,
+            L1InteropHandlerPreparationMode::Reuse,
+        )
+        .unwrap();
+
+        let err = validate_interop_handler_ownership_state(
+            address(3),
+            Address::ZERO,
+            deployer,
+            governance,
+            L1InteropHandlerPreparationMode::Reuse,
+        )
+        .unwrap_err();
+        assert!(format!("{err:#}").contains("owner must be governance"));
+
+        let err = validate_interop_handler_ownership_state(
+            governance,
+            address(3),
+            deployer,
+            governance,
+            L1InteropHandlerPreparationMode::Reuse,
+        )
+        .unwrap_err();
+        assert!(format!("{err:#}").contains("stale pending owner"));
+    }
+
+    #[test]
+    fn reused_interop_handler_requires_both_consumers_wired() {
+        let expected_handler = address(1);
+        validate_reused_interop_handler_wiring(
+            expected_handler,
+            expected_handler,
+            expected_handler,
+        )
+        .unwrap();
+
+        let err =
+            validate_reused_interop_handler_wiring(address(2), expected_handler, expected_handler)
+                .unwrap_err();
+        assert!(format!("{err:#}").contains("L1Nullifier.l1InteropHandler()"));
+
+        let err =
+            validate_reused_interop_handler_wiring(expected_handler, address(2), expected_handler)
+                .unwrap_err();
+        assert!(format!("{err:#}").contains("L1AssetRouter.l1InteropHandler()"));
     }
 }

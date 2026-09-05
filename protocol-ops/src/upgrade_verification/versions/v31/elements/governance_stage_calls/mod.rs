@@ -31,7 +31,10 @@ use crate::upgrade_verification::{
 };
 
 use super::super::get_expected_old_protocol_version_for_ctm_flavor;
-use super::{super::expected_old_protocol_version_label, call_list::CallList};
+use super::{
+    super::expected_old_protocol_version_label, call_list::CallList,
+    L1InteropHandlerPreparationMode,
+};
 
 mod facets;
 mod helpers;
@@ -40,6 +43,13 @@ mod stage1;
 mod stage2;
 
 use helpers::{protocol_label, required_ctm_address};
+
+pub(crate) fn infer_l1_interop_handler_preparation_mode(
+    artifact: &EcosystemUpgradeArtifact,
+) -> anyhow::Result<L1InteropHandlerPreparationMode> {
+    let stage1 = CallList::parse(&artifact.governance_calls.stage1_calls);
+    stage1::infer_l1_interop_handler_preparation_mode(stage1.elems.len(), artifact.ctms.len())
+}
 
 pub struct GovernanceStage0Calls {
     pub calls: CallList,
@@ -55,8 +65,10 @@ pub struct GovernanceStage2Calls {
 sol! {
     function upgrade(address proxy, address implementation);
     function upgradeAndCall(address proxy, address implementation, bytes data);
-    function initializeL1V31Upgrade();
     function setAddresses();
+    function setL1InteropHandler(address _handler);
+    function setDefaultUpgrade(address _defaultUpgrade);
+    function checkUpgradePreconditionChecker(uint256 _oldProtocolVersion, address _expectedChecker);
     function updateSecurityCouncil(address _newSecurityCouncil);
     function updateGuardians(address _newGuardians);
     function updateEmergencyUpgradeBoard(address _newEmergencyUpgradeBoard);
@@ -173,6 +185,7 @@ sol! {
 pub(crate) async fn verify_governance_stage_calls(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
+    l1_interop_handler_mode: L1InteropHandlerPreparationMode,
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
     let stage0 = GovernanceStage0Calls {
@@ -183,7 +196,9 @@ pub(crate) async fn verify_governance_stage_calls(
     let stage1 = GovernanceStage1Calls {
         calls: CallList::parse(&artifact.governance_calls.stage1_calls),
     };
-    stage1.verify_artifact(artifact, verifiers, result).await?;
+    stage1
+        .verify_artifact(artifact, verifiers, l1_interop_handler_mode, result)
+        .await?;
 
     let stage2 = GovernanceStage2Calls {
         calls: CallList::parse(&artifact.governance_calls.stage2_calls),

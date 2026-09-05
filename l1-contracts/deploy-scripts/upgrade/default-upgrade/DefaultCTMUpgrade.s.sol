@@ -480,8 +480,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function prepareDefaultCTMAdminCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](1);
+        Call[][] memory allCalls = new Call[][](2);
         allCalls[0] = prepareUpgradeServerNotifierCall();
+        allCalls[1] = prepareVersionSpecificCTMAdminCalls();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
 
         address chainAdmin = IOwnable(calls[0].target).owner();
@@ -520,6 +521,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             testUpgradeCallsSerialized
         );
         vm.writeToml(updatedTestCallsToml, upgradeConfig.outputPath);
+    }
+
+    /// @notice Returns release-specific calls appended to the default CTM-admin call set.
+    function prepareVersionSpecificCTMAdminCalls() public virtual returns (Call[] memory calls) {
+        calls = new Call[](0);
     }
 
     function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
@@ -908,11 +914,21 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             "bytecodes_supplier_addr",
             ctmAddresses.stateTransition.proxies.bytecodesSupplier
         );
+        vm.serializeAddress(
+            "state_transition",
+            "bytecodes_supplier_implementation_addr",
+            ctmAddresses.stateTransition.implementations.bytecodesSupplier
+        );
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
         vm.serializeAddress(
             "state_transition",
             "permissionless_validator_addr",
             ctmAddresses.stateTransition.proxies.permissionlessValidator
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "permissionless_validator_implementation_addr",
+            ctmAddresses.stateTransition.implementations.permissionlessValidator
         );
         if (ctmAddresses.stateTransition.implementations.serverNotifier != address(0)) {
             vm.serializeAddress(
@@ -924,6 +940,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         if (priorityOpLowerBound != address(0)) {
             vm.serializeAddress("state_transition", "priority_op_lower_bound_addr", priorityOpLowerBound);
         }
+        saveOutputVersionSpecific();
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
@@ -982,8 +999,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
 
         vm.writeToml(toml, outputPath);
-
-        saveOutputVersionSpecific();
     }
 
     function saveOutputVersionSpecific() internal virtual {}

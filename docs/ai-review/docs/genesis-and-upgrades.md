@@ -54,6 +54,8 @@ the chain completed its base-token backfill on v31: on L1 the upgrade requires
 before its L2 entry point disappears. Chains that never ran the v31 backfill cannot
 take this upgrade.
 
+Scheduling-time enforcement is described in {protocol-docs/upgrade-scheduling.md}.
+
 Note, that on ZKsync Era, the old version of the ComplexUpgrader is used, which only supports this function:
 
 ```

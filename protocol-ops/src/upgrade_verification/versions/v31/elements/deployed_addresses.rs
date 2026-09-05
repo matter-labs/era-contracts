@@ -23,6 +23,8 @@ use alloy::{
 };
 use serde::Deserialize;
 
+use super::L1InteropHandlerPreparationMode;
+
 const GOVERNANCE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS: u64 = 14 * 24 * 60 * 60;
 const EXPECTED_GUARDIANS_MEMBER_COUNT: usize = 8;
 /// `SecurityCouncil.sol` requires exactly this many members. The live council
@@ -74,6 +76,9 @@ mod core_signatures {
         }
         contract V31ChainRegistrationSender {
             constructor(address _bridgehub);
+        }
+        contract V31L1InteropHandler {
+            constructor(address _messageRoot, address _l1AssetRouter);
             function initialize(address _owner);
         }
     }
@@ -134,12 +139,6 @@ mod ctm_signatures {
         }
         contract V31ValidatorTimelock {
             constructor(address _bridgehubAddr);
-        }
-        contract V31PermissionlessValidator {
-            function initialize();
-        }
-        contract V31BytecodesSupplier {
-            function initialize();
         }
     }
 }
@@ -418,9 +417,10 @@ pub struct StateTransition {
 /// the right inputs, regardless of how immutables get baked into the
 /// runtime bytecode.
 ///
-/// The per-CTM TUPPs (`BytecodesSupplier` and `PermissionlessValidator`)
-/// are verified with `expect_create2_params_proxy_with_bytecode`, using the
-/// live implementation slot and the executed-bundle CREATE2 provenance.
+/// The existing per-CTM `BytecodesSupplier` and `PermissionlessValidator`
+/// proxies are checked against their expected admins in the RPC-state pass.
+/// Their newly deployed implementations are checked here against the executed
+/// bundle's CREATE2 provenance.
 ///
 /// Larger structural follow-up: unify `EcosystemUpgradeArtifact` and the
 /// legacy `UpgradeOutput` into a single v31 TOML reader. The current
@@ -432,6 +432,7 @@ pub(crate) async fn verify_v31_provenance(
     verifiers: &Verifiers,
     era_chain_id: u64,
     legacy_gateway_chain_id: u64,
+    l1_interop_handler_mode: L1InteropHandlerPreparationMode,
     result: &mut VerificationResult,
 ) -> Result<()> {
     result.print_info("== Deployment provenance ==");
@@ -486,6 +487,7 @@ pub(crate) async fn verify_v31_provenance(
         artifact,
         verifiers,
         legacy_gateway_chain_id,
+        l1_interop_handler_mode,
         result,
         core_context,
     )
@@ -780,6 +782,7 @@ async fn verify_core_provenance(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     legacy_gateway_chain_id: u64,
+    l1_interop_handler_mode: L1InteropHandlerPreparationMode,
     result: &mut VerificationResult,
     context: CoreProvenanceContext,
 ) -> Result<()> {
@@ -809,7 +812,8 @@ async fn verify_core_provenance(
     let nullifier_impl = in_bridges("l1_nullifier_implementation_addr")?;
     let bridgehub_impl = in_bh("bridgehub_implementation_addr")?;
     let crs_impl = in_bh("chain_registration_sender_implementation_addr")?;
-    let crs_proxy = in_bh("chain_registration_sender_proxy_addr")?;
+    let interop_handler_impl = in_bridges("l1_interop_handler_implementation_addr")?;
+    let interop_handler_proxy = in_bridges("l1_interop_handler_proxy_addr")?;
     let deployer = required_address(&artifact.misc, "misc", &["deployer_addr"])?;
     let core_proxy_admin = required_address(
         core,
@@ -822,9 +826,11 @@ async fn verify_core_provenance(
     // stage-1 initializer.
     let message_root_file = "l1-contracts/L1MessageRoot";
 
-    // ChainRegistrationSender impl args are reused for the TUPP impl check below.
     let crs_ctor_args =
         V31ChainRegistrationSender::constructorCall::new((context.bridgehub_addr,)).abi_encode();
+    let interop_handler_ctor_args =
+        V31L1InteropHandler::constructorCall::new((message_root_proxy, context.asset_router_proxy))
+            .abi_encode();
 
     // Single dispatch table: (address, encoded ctor args, expected file).
     let checks: Vec<(Address, Vec<u8>, &str)> = vec![
@@ -839,8 +845,6 @@ async fn verify_core_provenance(
             "l1-contracts/L1ChainAssetHandler",
         ),
         // L1MessageRoot(_bridgehub, _eraGatewayChainId, _chainAssetHandler).
-        // Stage Sepolia uses the `L1MessageRootStageSepolia` variant; same
-        // ctor signature, different runtime bytecode.
         (
             message_root_impl,
             V31L1MessageRoot::constructorCall::new((
@@ -906,28 +910,30 @@ async fn verify_core_provenance(
             "l1-contracts/L1Bridgehub",
         ),
         // ChainRegistrationSender impl(bridgehub).
-        // Args reused below for the TUPP impl check.
         (
             crs_impl,
-            crs_ctor_args.clone(),
+            crs_ctor_args,
             "l1-contracts/ChainRegistrationSender",
+        ),
+        (
+            interop_handler_impl,
+            interop_handler_ctor_args,
+            "l1-contracts/L1InteropHandler",
         ),
     ];
     for (addr, args, file) in &checks {
         result.expect_create2_params(verifiers, addr, args.as_slice(), file);
     }
 
-    // ChainRegistrationSender TransparentUpgradeableProxy(impl, proxyAdmin, initialize(deployer)).
-    result
-        .expect_create2_params_proxy_with_bytecode(
+    if l1_interop_handler_mode.requires_proxy_deployment_provenance() {
+        result.expect_create2_params_transparent_proxy(
             verifiers,
-            &crs_proxy,
-            V31ChainRegistrationSender::initializeCall::new((deployer,)).abi_encode(),
+            &interop_handler_proxy,
+            interop_handler_impl,
+            V31L1InteropHandler::initializeCall::new((deployer,)).abi_encode(),
             core_proxy_admin,
-            crs_ctor_args,
-            "l1-contracts/ChainRegistrationSender",
-        )
-        .await;
+        );
+    }
 
     Ok(())
 }
@@ -964,10 +970,11 @@ async fn verify_ctm_provenance(
         required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
     let ecosystem_admin = required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?;
     let bytecodes_supplier = in_st("bytecodes_supplier_addr")?;
+    let bytecodes_supplier_impl = in_st("bytecodes_supplier_implementation_addr")?;
     let permissionless_validator = in_st("permissionless_validator_addr")?;
+    let permissionless_validator_impl = in_st("permissionless_validator_implementation_addr")?;
     let ctm_impl = in_st("chain_type_manager_implementation_addr")?;
     let validator_timelock_impl = in_st("validator_timelock_implementation_addr")?;
-    let transparent_proxy_admin = in_dep("transparent_proxy_admin")?;
     let chain_asset_handler = required_address(
         &artifact.core,
         "core",
@@ -1059,34 +1066,20 @@ async fn verify_ctm_provenance(
             V31ValidatorTimelock::constructorCall::new((bridgehub_addr,)).abi_encode(),
             "l1-contracts/MultisigCommitter",
         ),
+        (
+            bytecodes_supplier_impl,
+            Vec::new(),
+            "l1-contracts/BytecodesSupplier",
+        ),
+        (
+            permissionless_validator_impl,
+            Vec::new(),
+            "l1-contracts/PermissionlessValidator",
+        ),
     ];
     for (addr, args, file) in &checks {
         result.expect_create2_params(verifiers, addr, args.as_slice(), file);
     }
-
-    // BytecodesSupplier TransparentUpgradeableProxy(impl, proxyAdmin, initialize()).
-    result
-        .expect_create2_params_proxy_with_bytecode(
-            verifiers,
-            &bytecodes_supplier,
-            V31BytecodesSupplier::initializeCall::new(()).abi_encode(),
-            transparent_proxy_admin,
-            Vec::<u8>::new(),
-            "l1-contracts/BytecodesSupplier",
-        )
-        .await;
-
-    // PermissionlessValidator TransparentUpgradeableProxy(impl, proxyAdmin, initialize()).
-    result
-        .expect_create2_params_proxy_with_bytecode(
-            verifiers,
-            &permissionless_validator,
-            V31PermissionlessValidator::initializeCall::new(()).abi_encode(),
-            transparent_proxy_admin,
-            Vec::<u8>::new(),
-            "l1-contracts/PermissionlessValidator",
-        )
-        .await;
 
     Ok(())
 }
@@ -1175,6 +1168,21 @@ fn verify_ctm_base_provenance(
         &default_upgrade,
         default_upgrade_ctor,
         "l1-contracts/V32UpgradeZKsyncOS",
+    );
+
+    // The checker constructor receives the registry deployed above.
+    let upgrade_precondition_checker = required_address(
+        &ctm.value,
+        &scope,
+        &["state_transition", "upgrade_precondition_checker_addr"],
+    )?;
+    let mut checker_ctor = vec![0u8; 32];
+    checker_ctor[12..].copy_from_slice(priority_op_lower_bound.as_slice());
+    result.expect_create2_params(
+        verifiers,
+        &upgrade_precondition_checker,
+        checker_ctor,
+        "l1-contracts/V32UpgradePreconditionChecker",
     );
 
     // DiamondInit(bool _isZKsyncOS) — encoded as a single 32-byte word (true).

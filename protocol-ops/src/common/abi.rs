@@ -190,6 +190,30 @@ pub mod i_register_on_all_chains {
 }
 pub use i_register_on_all_chains::IRegisterOnAllChainsAbi;
 
+pub mod i_server_notifier {
+    alloy::sol!(
+        #[sol(rpc)]
+        IServerNotifierAbi,
+        "../l1-contracts/zkstack-out/IServerNotifier.sol/IServerNotifier.json"
+    );
+}
+pub use i_server_notifier::IServerNotifierAbi;
+
+pub mod upgrade_precondition_errors {
+    // The selectors `ServerNotifier.previewUpgradePreconditions` returns, mirrored here so the
+    // CLI can print which precondition failed instead of a bare 4-byte selector.
+    alloy::sol!(
+        interface IUpgradePreconditionErrors {
+            error CutDataForProtocolVersionNotAvailable(uint256 oldProtocolVersion);
+            error BaseTokenPreV31TotalSupplyNotSet();
+            error LowerBoundNotRecorded();
+            error PriorityQueueNotReady();
+            error ZKChainNotRegistered();
+        }
+    );
+}
+pub use upgrade_precondition_errors::IUpgradePreconditionErrors;
+
 pub mod i_finalize_upgrade {
     alloy::sol!(
         #[sol(rpc)]

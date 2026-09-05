@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 // solhint-disable no-console, gas-custom-errors
 
 import {console2 as console} from "forge-std/Script.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
@@ -30,6 +31,8 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 import {IPriorityOpLowerBound} from "contracts/upgrades/IPriorityOpLowerBound.sol";
+import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
+import {LowerBoundNotRecorded} from "contracts/common/L1ContractErrors.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
 import {Bytes} from "contracts/vendor/Bytes.sol";
@@ -39,6 +42,11 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
     /// @notice Exposes the deployed PriorityOpLowerBound registry for the test's chain-upgrade precondition.
     function exposedPriorityOpLowerBound() external view returns (address) {
         return priorityOpLowerBound;
+    }
+
+    /// @notice Exposes the deployed precondition checker for the test's scheduling assertions.
+    function exposedUpgradePreconditionChecker() external view returns (address) {
+        return upgradePreconditionChecker;
     }
 
     /// @notice Override to skip bytecode publishing which reads large JSON files.
@@ -139,6 +147,7 @@ contract UpgradeIntegrationTest_Local is
     address private _serverNotifierProxy;
     address private _serverNotifierProxyAdmin;
     address private _expectedServerNotifierProxyAdminOwner;
+    address private _expectedServerNotifierOwner;
     bytes32 private _expectedRewrittenUpgradeTxHash;
 
     /// @notice Override to inject the mocked Core upgrade (keeps only the interop-handler wiring in stage 1).
@@ -177,10 +186,40 @@ contract UpgradeIntegrationTest_Local is
         bytes32 v31MappingSlot = keccak256(abi.encode(eraZKChainId, L1_MESSAGE_ROOT_V31_UPGRADE_BATCH_NUMBER_SLOT));
         vm.store(messageRoot, v31MappingSlot, bytes32(V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE));
 
+        IServerNotifier serverNotifier = IServerNotifier(
+            ctmUpgrade.getAddresses().stateTransition.proxies.serverNotifier
+        );
+        uint256 oldProtocolVersion = ctmUpgrade.getOldProtocolVersion();
+        assertEq(
+            address(serverNotifier.upgradePreconditionChecker(oldProtocolVersion)),
+            CTMUpgrade_v31_Test(address(ctmUpgrade)).exposedUpgradePreconditionChecker(),
+            "CTM-admin calls did not register the precondition checker"
+        );
+        address chainAdmin = IChainTypeManager(ctmUpgrade.getCTMAddress()).getChainAdmin(eraZKChainId);
+        uint256 scheduleTimestamp = block.timestamp + 1 days;
+
+        bytes4[] memory failed = serverNotifier.previewUpgradePreconditions(eraZKChainId);
+        assertEq(failed.length, 1, "Preview must report exactly the missing lower bound");
+        assertEq(failed[0], LowerBoundNotRecorded.selector);
+
+        vm.prank(chainAdmin);
+        vm.expectRevert(LowerBoundNotRecorded.selector);
+        serverNotifier.setUpgradeTimestamp(eraZKChainId, scheduleTimestamp);
+
         // v32 upgrade precondition: the chain's priority-op lower bound must be recorded before the
         // upgrade executes (permissionless; production runs RecordPriorityOpLowerBound.s.sol).
         IPriorityOpLowerBound(CTMUpgrade_v31_Test(address(ctmUpgrade)).exposedPriorityOpLowerBound())
             .lowerBoundPriorityOp(sourceChainDiamond);
+
+        // With the bound recorded, scheduling passes and records the timestamp.
+        assertEq(serverNotifier.previewUpgradePreconditions(eraZKChainId).length, 0);
+        vm.prank(chainAdmin);
+        serverNotifier.setUpgradeTimestamp(eraZKChainId, scheduleTimestamp);
+        assertEq(
+            serverNotifier.protocolVersionToUpgradeTimestamp(eraZKChainId, oldProtocolVersion),
+            scheduleTimestamp,
+            "Scheduling after the bound was recorded must store the timestamp"
+        );
     }
 
     function _snapshotExpectedZKsyncOSUpgradeTxHash() private {
@@ -245,6 +284,15 @@ contract UpgradeIntegrationTest_Local is
         if (_serverNotifierProxy != address(0)) {
             _serverNotifierProxyAdmin = address(uint160(uint256(vm.load(_serverNotifierProxy, Utils.ADMIN_SLOT))));
             _expectedServerNotifierProxyAdminOwner = getOwnableOwner(_serverNotifierProxyAdmin);
+            _expectedServerNotifierOwner = _expectedServerNotifierProxyAdminOwner;
+            address currentServerNotifierOwner = getOwnableOwner(_serverNotifierProxy);
+            if (currentServerNotifierOwner != _expectedServerNotifierOwner) {
+                assertEq(
+                    Ownable2Step(_serverNotifierProxy).pendingOwner(),
+                    _expectedServerNotifierOwner,
+                    "ServerNotifier pending owner is not the operational admin"
+                );
+            }
         }
         console.log("setUp: Snapshotted ServerNotifier ProxyAdmin ownership");
 
@@ -356,6 +404,16 @@ contract UpgradeIntegrationTest_Local is
         );
 
         if (_serverNotifierProxy != address(0)) {
+            assertEq(
+                getOwnableOwner(_serverNotifierProxy),
+                _expectedServerNotifierOwner,
+                "ServerNotifier ownership was not accepted"
+            );
+            assertEq(
+                Ownable2Step(_serverNotifierProxy).pendingOwner(),
+                address(0),
+                "ServerNotifier still has a pending owner"
+            );
             assertEq(
                 getOwnableOwner(_serverNotifierProxyAdmin),
                 _expectedServerNotifierProxyAdminOwner,

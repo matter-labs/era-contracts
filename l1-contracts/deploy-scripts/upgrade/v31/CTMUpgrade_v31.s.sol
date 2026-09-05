@@ -13,6 +13,10 @@ import {Utils} from "../../utils/Utils.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 
 import {IL2V32Upgrade} from "contracts/upgrades/IL2V32Upgrade.sol";
+import {IUpgradePreconditionChecker} from "contracts/upgrades/IUpgradePreconditionChecker.sol";
+import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
+import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 
@@ -23,6 +27,20 @@ import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.
 
 /// @notice Script used for v31 upgrade flow
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
+    address internal upgradePreconditionChecker;
+
+    function getCreationCalldata(string memory _contractName) internal view override returns (bytes memory) {
+        if (compareStrings(_contractName, "V32UpgradePreconditionChecker")) {
+            require(priorityOpLowerBound != address(0), "PriorityOpLowerBound not deployed");
+            return abi.encode(priorityOpLowerBound);
+        }
+        return super.getCreationCalldata(_contractName);
+    }
+
+    function saveOutputVersionSpecific() internal override {
+        vm.serializeAddress("state_transition", "upgrade_precondition_checker_addr", upgradePreconditionChecker);
+    }
+
     /// @notice Single-call entry point invoked by the protocol-ops CLI's `ecosystem upgrade-prepare-all`.
     ///         Mirrors `CoreUpgrade_v31.noGovernancePrepare`: drives the full CTM-side prepare phase
     ///         (deploy + bytecode publish + upgrade-cut generation + governance/admin call serialization)
@@ -153,8 +171,75 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound");
         console.log("Deployed PriorityOpLowerBound at", priorityOpLowerBound);
 
+        upgradePreconditionChecker = deploySimpleContract("V32UpgradePreconditionChecker");
+        console.log("Deployed V32UpgradePreconditionChecker at", upgradePreconditionChecker);
+
         console.log("Deploying V32UpgradeZKsyncOS");
         return deploySimpleContract("V32UpgradeZKsyncOS");
+    }
+
+    /// @notice Register the precondition checker for the version this release upgrades chains from.
+    /// @dev Registration must execute after the implementation upgrade. See
+    /// {protocol-docs/upgrade-scheduling.md}.
+    function prepareVersionSpecificCTMAdminCalls() public virtual override returns (Call[] memory calls) {
+        require(upgradePreconditionChecker != address(0), "v31: precondition checker not deployed");
+
+        address serverNotifierProxy = ctmAddresses.stateTransition.proxies.serverNotifier;
+        address serverNotifierProxyAdmin = Utils.getProxyAdminAddress(serverNotifierProxy);
+        address operationalAdmin = IOwnable(serverNotifierProxyAdmin).owner();
+        address serverNotifierOwner = IOwnable(serverNotifierProxy).owner();
+        address pendingServerNotifierOwner = IOwnable(serverNotifierProxy).pendingOwner();
+
+        require(operationalAdmin != address(0), "v31: ServerNotifier ProxyAdmin owner is zero");
+        console.log("ServerNotifier owner (signs the checker registration):", serverNotifierOwner);
+        console.log("ServerNotifier ProxyAdmin owner (signs the implementation upgrade):", operationalAdmin);
+
+        uint256 registrationCallIndex;
+        if (serverNotifierOwner != operationalAdmin) {
+            require(
+                pendingServerNotifierOwner == operationalAdmin,
+                "v31: ServerNotifier pending owner is not the operational admin"
+            );
+            calls = new Call[](2);
+            calls[0] = Call({
+                target: serverNotifierProxy,
+                data: abi.encodeCall(IOwnable.acceptOwnership, ()),
+                value: 0
+            });
+            registrationCallIndex = 1;
+        } else {
+            require(pendingServerNotifierOwner == address(0), "v31: ServerNotifier has a stale pending owner");
+            calls = new Call[](1);
+        }
+
+        calls[registrationCallIndex] = Call({
+            target: serverNotifierProxy,
+            data: abi.encodeCall(
+                IServerNotifier.setUpgradePreconditionChecker,
+                (getOldProtocolVersion(), IUpgradePreconditionChecker(upgradePreconditionChecker))
+            ),
+            value: 0
+        });
+    }
+
+    /// @notice Require checker registration immediately before publishing the upgrade cut.
+    function provideSetNewVersionUpgradeCall() public virtual override returns (Call[] memory calls) {
+        require(upgradePreconditionChecker != address(0), "v31: precondition checker not deployed");
+        require(upgradeAddresses.upgradeStageValidator != address(0), "v31: upgrade stage validator not deployed");
+
+        Call[] memory setNewVersionCalls = super.provideSetNewVersionUpgradeCall();
+        calls = new Call[](setNewVersionCalls.length + 1);
+        calls[0] = Call({
+            target: upgradeAddresses.upgradeStageValidator,
+            data: abi.encodeCall(
+                UpgradeStageValidator.checkUpgradePreconditionChecker,
+                (getOldProtocolVersion(), IUpgradePreconditionChecker(upgradePreconditionChecker))
+            ),
+            value: 0
+        });
+        for (uint256 i = 0; i < setNewVersionCalls.length; i++) {
+            calls[i + 1] = setNewVersionCalls[i];
+        }
     }
 
     function getV31AdditionalFactoryDependencyContracts()
