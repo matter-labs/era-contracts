@@ -33,12 +33,22 @@ export function encodeBridgeBurnData(amount: BigNumber, remoteReceiver: string, 
 }
 
 /**
- * Matches `DataEncoding.encodeAssetRouterBridgehubDepositData(assetId, transferData)`.
+ * Matches `DataEncoding.encodeAssetRouterDepositData(assetId, transferData)`.
  *
- * Used as `secondBridgeCalldata` in `requestL2TransactionTwoBridges`.
+ * Used as `indirectCallData` in `L1InteropCenter.sendMessage` with `indirectCall`.
  */
-export function encodeAssetRouterBridgehubDepositData(assetId: string, transferData: string): string {
+export function encodeAssetRouterDepositData(assetId: string, transferData: string): string {
   return ethers.utils.hexConcat([NEW_ENCODING_VERSION, abiCoder.encode(["bytes32", "bytes"], [assetId, transferData])]);
+}
+
+/** Matches `DataEncoding.encodeTxDataHash(originalCaller, assetId, transferData)`. */
+export function encodeTxDataHash(_originalCaller: string, _assetId: string, _transferData: string): string {
+  return ethers.utils.keccak256(
+    ethers.utils.hexConcat([
+      NEW_ENCODING_VERSION,
+      abiCoder.encode(["address", "bytes32", "bytes"], [_originalCaller, _assetId, _transferData]),
+    ])
+  );
 }
 
 /**

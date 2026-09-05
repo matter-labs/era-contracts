@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import "forge-std/console.sol";
+import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.sol";
 import {Test} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -75,6 +76,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     address internal rollupL1DAValidator;
     L1MessageRoot internal messageRoot;
     DummyBridgehub dummyBridgehub;
+    L1InteropCenter l1InteropCenter;
     L1ChainAssetHandler internal chainAssetHandler;
     RollupDAManager internal rollupDAManager;
     bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
@@ -203,6 +205,16 @@ contract ExecutorTest is UtilsCallMockerTest {
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
         dummyBridgehub = new DummyBridgehub();
+        l1InteropCenter = L1InteropCenter(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1InteropCenter(IL1Bridgehub(address(dummyBridgehub)))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1InteropCenter.initialize, (owner))
+                )
+            )
+        );
+        dummyBridgehub.setInteropCenter(address(l1InteropCenter));
         vm.mockCall(address(dummyBridgehub), abi.encodeWithSelector(IL1Bridgehub.L1_CHAIN_ID.selector), abi.encode(1));
         uint256[] memory allZKChainChainIDsZero = new uint256[](0);
         vm.mockCall(

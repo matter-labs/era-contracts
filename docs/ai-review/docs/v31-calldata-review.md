@@ -1,5 +1,9 @@
 # Manual review procedure for v31 calldata
 
+This guide describes historical artifacts. The full verifier rejects artifacts for
+the [L1 Interop Center migration](../../../protocol-docs/l1-interop-center.md#deployment-and-migration);
+`--display-upgrade-data` can print their calldata without validating it.
+
 ## Relevant files
 
 - `protocol-ops/src/commands/ecosystem/verify_upgrade.rs` - PUVT entry point.

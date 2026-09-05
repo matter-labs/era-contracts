@@ -198,7 +198,7 @@ abstract contract L2InteropCenterL1DestinationTestAbstract is L2InteropTestUtils
     }
 
     /// @notice Interop can never be initiated from L1 itself, regardless of destination.
-    function test_sendBundle_RevertWhen_InitiatedOnL1() public {
+    function test_l2BuiltIn_rejectsL1Initiation_useL1InteropCenter() public {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = _l1CallStarter(L2_ASSET_ROUTER_ADDR, true, 0);
         // Pretend the InteropCenter is running on L1.

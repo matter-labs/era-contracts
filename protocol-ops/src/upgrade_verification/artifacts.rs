@@ -1,4 +1,4 @@
-use std::{fs, path::Path, str::FromStr};
+use std::str::FromStr;
 
 use alloy::primitives::Address;
 use anyhow::Context;
@@ -118,14 +118,6 @@ pub(crate) fn required_address_in_value(
 }
 
 impl EcosystemUpgradeArtifact {
-    pub(crate) fn read(path: &Path) -> anyhow::Result<Self> {
-        let content = fs::read_to_string(path).with_context(|| {
-            format!("Failed to read ecosystem upgrade TOML: {}", path.display())
-        })?;
-        Self::from_toml_str(&content)
-            .with_context(|| format!("parsing ecosystem upgrade TOML: {}", path.display()))
-    }
-
     pub(crate) fn from_toml_str(content: &str) -> anyhow::Result<Self> {
         let mut root: Table =
             toml::from_str(content).context("Failed to parse ecosystem upgrade TOML as table")?;

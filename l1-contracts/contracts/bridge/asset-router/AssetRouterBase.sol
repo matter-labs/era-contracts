@@ -12,10 +12,11 @@ import {IAssetRouterBase, NEW_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {INDIRECT_CALL_MAGIC_VALUE} from "../../common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
+import {IndirectCallRequest} from "../../common/Messaging.sol";
 import {
     AssetHandlerDoesNotExist,
     AssetIdNotSupported,
@@ -80,7 +81,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
                             INITIATE BRIDGE Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Allows the Bridgehub (L1) / InteropCenter (L2) to acquire the destination chain's `mintValue`.
+    /// @notice Allows the Interop Center on this chain to acquire the destination chain's `mintValue`.
     /// @dev Records nothing: if the L2 transaction fails, the base token is refunded to the L2
     /// `refundRecipient` rather than being claimable on L1. See {protocol-docs/bridging.md#deposit-initiation-source-side}.
     /// @param _chainId The chain ID of the ZK chain to which to deposit.
@@ -115,17 +116,17 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         emit BridgehubDepositBaseTokenInitiated(_chainId, _originalCaller, _assetId, _amount);
     }
 
-    function _bridgehubDeposit(
+    function _initiateIndirectCall(
         uint256 _chainId,
         address _originalCaller,
         uint256 _value,
         bytes calldata _data,
         address _nativeTokenVault
-    ) internal virtual whenNotPaused returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal virtual whenNotPaused returns (IndirectCallRequest memory request) {
         bytes1 encodingVersion = _data[0];
         if (encodingVersion == NEW_ENCODING_VERSION) {
             return
-                _bridgehubDepositNonBaseTokenAsset({
+                _initiateIndirectAssetCall({
                     _chainId: _chainId,
                     _originalCaller: _originalCaller,
                     _value: _value,
@@ -137,13 +138,13 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         }
     }
 
-    function _bridgehubDepositNonBaseTokenAsset(
+    function _initiateIndirectAssetCall(
         uint256 _chainId,
         address _originalCaller,
         uint256 _value,
         bytes calldata _data,
         address _nativeTokenVault
-    ) internal returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal returns (IndirectCallRequest memory request) {
         bytes1 encodingVersion = _data[0];
 
         (bytes32 assetId, bytes memory transferData) = _getTransferData(encodingVersion, _data);
@@ -187,7 +188,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         bytes calldata _data
     ) internal virtual returns (bytes32 assetId, bytes memory transferData) {
         // slither-disable-next-line unused-return
-        return DataEncoding.decodeAssetRouterBridgehubDepositData(_data);
+        return DataEncoding.decodeAssetRouterDepositData(_data);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -200,7 +201,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
 
     /// @notice Validates that the interop message sender is the asset-router counterpart on the source chain.
     /// @dev On L2, only this same router (identical address on every ZK chain) may be the sender and the source
-    /// cannot be L1 (interop is only initiated on L2s). On L1, the sender must be the L2 asset router.
+    /// cannot be L1 (handler-delivered bundles originate on L2). On L1, the sender must be the L2 asset router.
     function _isValidInteropSender(uint256 _senderChainId, address _senderAddress) internal view virtual returns (bool);
 
     /// @notice Executes a cross-chain asset-router call following the ERC-7786 standard.
@@ -330,24 +331,24 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         });
     }
 
-    /// @notice Builds the request data that is passed to the bridgehub.
+    /// @notice Builds an indirect request to mint assets on the destination chain.
     /// @param _chainId The chain ID of the destination ZK chain.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _assetId The deposited asset ID.
     /// @param _bridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
-    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify bridge requests.
-    /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
+    /// @param _txDataHash Deposit correlation hash; see {protocol-docs/bridging.md}.
+    /// @return request Destination call and confirmation data returned to the Interop Center.
     function _requestToBridge(
         uint256 _chainId,
         address _originalCaller,
         bytes32 _assetId,
         bytes memory _bridgeMintCalldata,
         bytes32 _txDataHash
-    ) internal view virtual returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal view virtual returns (IndirectCallRequest memory request) {
         bytes memory l2TxCalldata = getDepositCalldata(_originalCaller, _assetId, _bridgeMintCalldata);
 
-        request = L2TransactionRequestTwoBridgesInner({
-            magicValue: TWO_BRIDGES_MAGIC_VALUE,
+        request = IndirectCallRequest({
+            magicValue: INDIRECT_CALL_MAGIC_VALUE,
             l2Contract: _l2AssetRouterAddress(_chainId),
             l2Calldata: l2TxCalldata,
             factoryDeps: new bytes[](0),

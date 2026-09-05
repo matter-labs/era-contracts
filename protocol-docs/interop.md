@@ -4,13 +4,23 @@ This document is the single source of truth for the protocol-level behaviour of 
 
 ## Overview
 
-Interop is ZKsync's mechanism for sending messages and value between chains in the ecosystem. The `InteropCenter` (an L2 contract) is the primary entry point for communication between chains connected to interop, facilitating interactions between end users and bridges. As of v31 the `InteropCenter` is only deployed on L2s, not on L1. Interop was **not activated in v31**; the contracts here target v32+ and are expected to run on ZKsync OS chains only (the EraVM bootloader does not support the timestamp-carrying interop-root import entry points).
+Interop is ZKsync's mechanism for sending messages and value between chains in the ecosystem. The `L2InteropCenter` (an L2 contract) is the primary entry point for communication between chains connected to interop, facilitating interactions between end users and bridges. L1 sends enter through the separate `L1InteropCenter`, described below. Interop was **not activated in v31**; the contracts here target v32+ and are expected to run on ZKsync OS chains only (the EraVM bootloader does not support the timestamp-carrying interop-root import entry points).
 
 The lifecycle of an interop interaction is:
 
-1. **Send** — on the source L2, `InteropCenter.sendMessage` (single call) or `InteropCenter.sendBundle` (multiple calls) forms an `InteropBundle` and publishes it as an L2→L1 message (or, for atomic bundles, appends its commit value to the interop IMT instead).
+1. **Send** — on the source L2, `L2InteropCenter.sendMessage` (single call) or `L2InteropCenter.sendBundle` (multiple calls) forms an `InteropBundle` and publishes it as an L2→L1 message (or, for atomic bundles, appends its commit value to the interop IMT instead).
 2. **Root import** — the destination chain's bootloader imports interop roots from other chains into `L2InteropRootStorage`.
 3. **Receive** — on the destination chain, anyone with the right permissions calls the interop handler (`L2InteropHandler` on L2, `L1InteropHandler` on L1) to `verifyBundle` / `executeBundle` / `unbundleBundle`, proving the bundle's message inclusion against the imported roots.
+
+## Sending from L1
+
+`L1InteropCenter` exposes the same `sendMessage` and `sendBundle` signatures as `L2InteropCenter`;
+L1 bundles contain exactly one call. L1 sends use the destination Mailbox priority queue and
+return its canonical transaction hash. They do not publish an `InteropBundle` through the
+L2 messenger. See [L1 Interop Center](l1-interop-center.md) for the L1 attributes, exact funding,
+indirect-call confirmation, deployment and migration policy.
+
+The remaining sections describe L2-originated interop bundles.
 
 ## Core data structures (`common/Messaging.sol`)
 
@@ -50,7 +60,7 @@ A single call within a bundle:
 
 ## ERC-7786 and ERC-7930 usage
 
-- `InteropCenter` implements `IERC7786GatewaySource` (`sendMessage`, `supportsAttribute`, `MessageSent` event). One `MessageSent` event is emitted per call in a bundle, carrying the original (unparsed) attributes.
+- `L2InteropCenter` implements `IERC7786GatewaySource` (`sendMessage`, `supportsAttribute`, `MessageSent` event). One `MessageSent` event is emitted per call in a bundle, carrying the original (unparsed) attributes.
 - Destination recipients implement `IERC7786Recipient.receiveMessage(receiveId, sender, payload)` and must return its selector. Attributes are not yet supported on the receive side.
 - Addresses cross chains as **ERC-7930 interoperable addresses** (version 2 bytes + chainType 2 bytes + chainReferenceLength 1 byte + addressLength 1 byte = minimum length `ERC7930_V1_MIN_LENGTH = 0x06`), restricted to EVM/EIP-155 encodings (`InteroperableAddress.parseEvmV1`).
 - Encoding conventions enforced at send time:
@@ -61,7 +71,7 @@ A single call within a bundle:
 
 ## Attributes
 
-Attributes are ERC-7786 attribute byte strings (4-byte selector from `IERC7786Attributes` + ABI-encoded arguments, decoded by `AttributesDecoder`). `SUPPORTED_INTEROP_ATTRIBUTES = 7` selectors are supported. Each attribute may be passed at most once (`AttributeAlreadySet`); unknown selectors revert with `UnsupportedAttribute`. `InteropCenter.parseAttributes` enforces positional restrictions (`AttributeParsingRestrictions`): call-level attributes are only valid on calls, bundle-level attributes only on bundles; `sendMessage` accepts both kinds in its single attributes array.
+Attributes are ERC-7786 attribute byte strings (4-byte selector from `IERC7786Attributes` + ABI-encoded arguments, decoded by `AttributesDecoder`). `SUPPORTED_INTEROP_ATTRIBUTES = 7` selectors are supported. Each attribute may be passed at most once (`AttributeAlreadySet`); unknown selectors revert with `UnsupportedAttribute`. `L2InteropCenter.parseAttributes` enforces positional restrictions (`AttributeParsingRestrictions`): call-level attributes are only valid on calls, bundle-level attributes only on bundles; `sendMessage` accepts both kinds in its single attributes array.
 
 ### Call attributes (`CallAttributes`)
 
@@ -71,7 +81,7 @@ Attributes are ERC-7786 attribute byte strings (4-byte selector from `IERC7786At
 ### Bundle attributes (`BundleAttributes`)
 
 - `executionAddress(bytes)` — ERC-7930 address allowed to execute the bundle on the destination. **Empty ⇒ execution is permissionless.**
-- `unbundlerAddress(bytes)` — ERC-7930 address allowed to unbundle the bundle. Unlike `executionAddress`, it is always non-empty in the final bundle: if the sender does not set it, `InteropCenter` defaults it to `(block.chainid, msg.sender)` on the **source** chain, so unbundling stays possible (via the handler's `receiveMessage` rescue path, see below). The default deliberately pins the source chain rather than using the chain wildcard (chainId 0): a wildcard would let a same-address contract on another chain (e.g. a malicious clone) unbundle. Senders that want to unbundle directly on the destination can pass an explicit `unbundlerAddress`.
+- `unbundlerAddress(bytes)` — ERC-7930 address allowed to unbundle the bundle. Unlike `executionAddress`, it is always non-empty in the final bundle: if the sender does not set it, `L2InteropCenter` defaults it to `(block.chainid, msg.sender)` on the **source** chain, so unbundling stays possible (via the handler's `receiveMessage` rescue path, see below). The default deliberately pins the source chain rather than using the chain wildcard (chainId 0): a wildcard would let a same-address contract on another chain (e.g. a malicious clone) unbundle. Senders that want to unbundle directly on the destination can pass an explicit `unbundlerAddress`.
 - `useFixedFee(bool)` — fee mode selector, defaults to `false`. See [Fee model](#fee-model).
 - `interopBundleSalt(bytes32)` — user-provided salt; see [Replay protection](#replay-protection-and-bundle-uniqueness).
 - `atomicBundle(AtomicFlowPreimage, uint256 lowNullifierIndex)` — marks the bundle as an atomic-interop leg; see [Atomic bundles](#atomic-bundles). Its payload is deliberately **not** stored in `BundleAttributes` (i.e. not part of the cross-chain bundle): the bundle hash must not depend on the flowId preimage, because the preimage's `legBundleHashes` include this very bundle's hash — a circular dependency. It is parsed separately (`InteropAttributeParser.parseAtomicSend`) into the send-side-only `AtomicSend` struct.
@@ -79,7 +89,7 @@ Attributes are ERC-7786 attribute byte strings (4-byte selector from `IERC7786At
 ## Direct vs indirect calls
 
 - **Direct call**: the call starter directly becomes the `InteropCall` — `to`/`data` are used as-is, `from` is the original sender.
-- **Indirect call**: the call starter's target is first invoked on the **source** chain via `IL2CrossChainSender.initiateIndirectCall{value: indirectCallMessageValue}(destinationChainId, sender, interopCallValue, data)`, and the _returned_ call starter forms the `InteropCall` (with `from` set to the indirect-call target — the L2 `AssetRouter`, the only allowed target for this release: `IndirectCallOnlyToAssetRouter`, see [Restrictions](#restrictions)). This is how interop token transfers work. The returned starter's `interopCallValue` must equal the requested one (`IndirectCallValueMismatch`). `interopCallValue` is always **zero** for an indirect call — `InteropCenter` rejects a non-zero one before the sender is ever invoked (`IndirectCallCannotCarryValue`, see [Restrictions](#restrictions)), so this is not a per-sender capability. For an indirect asset transfer the token amount rides in the `finalizeDeposit` burn/mint data, and `indirectCallMessageValue` is the separate **source-side** `msg.value` forwarded to the sender.
+- **Indirect call**: the call starter's target is first invoked on the **source** chain via `IL2CrossChainSender.initiateIndirectCall{value: indirectCallMessageValue}(destinationChainId, sender, interopCallValue, data)`, and the _returned_ call starter forms the `InteropCall` (with `from` set to the indirect-call target — the L2 `AssetRouter`, the only allowed target for this release: `IndirectCallOnlyToAssetRouter`, see [Restrictions](#restrictions)). This is how interop token transfers work. The returned starter's `interopCallValue` must equal the requested one (`IndirectCallValueMismatch`). `interopCallValue` is always **zero** for an indirect call — `L2InteropCenter` rejects a non-zero one before the sender is ever invoked (`IndirectCallCannotCarryValue`, see [Restrictions](#restrictions)), so this is not a per-sender capability. For an indirect asset transfer the token amount rides in the `finalizeDeposit` burn/mint data, and `indirectCallMessageValue` is the separate **source-side** `msg.value` forwarded to the sender.
 
 ## Fee model
 
@@ -112,7 +122,7 @@ There is intentionally **no gateway-mode requirement** on the send side: interop
 
 ## Restrictions
 
-- **No interop initiation on L1**: bundles can only be initiated on an L2 (`CannotInitiateInteropOnL1`). The `InteropCenter` never runs on L1.
+- **L2 built-in cannot initiate on L1**: bundles can only be initiated on an L2 (`CannotInitiateInteropOnL1`). The `L2InteropCenter` never runs on L1.
 - **No interop to self** (`InteropToSelfNotSupported`): a chain can end up registered for interop on its own Bridgehub, and a self-destination bundle would burn value into an unsupported self-bridging accounting path.
 - **`sendMessage` is strictly L2→L2** (`NotL2ToL2`); the L2→L1 path goes through `sendBundle` as a single-call bundle.
 - **L1 destinations are restricted to single-call asset withdrawals** (for this release):
@@ -126,7 +136,7 @@ There is intentionally **no gateway-mode requirement** on the send side: interop
 
 ## Replay protection and bundle uniqueness
 
-The bundle hash commits to `interopBundleSalt = keccak256(abi.encodePacked(msg.sender, userProvidedSalt))`, where the user salt comes from the `interopBundleSalt` bundle attribute. `InteropCenter.isInteropBundleSaltUsed` enforces that each (sender, salt) pair is used at most once (`InteropBundleSaltAlreadyUsed`), which makes **every emitted bundle hash unique** even for identical bundle contents. Mixing in `msg.sender` ensures bundles from different senders can never collide; the user-controlled part lets a sender control uniqueness of its own bundles. What the protocol requires is only that the salt be **fresh** for the sender — a counter is as valid as a random value. Nothing about the salt provides confidentiality: the send calldata carries the inputs and `InteropBundleSent` emits the fully resolved `InteropBundle`, so a bundle's contents are public regardless. (Atomic senders must in fact be able to predict their own `bundleHash` before sending, in order to build the flow preimage — see [Atomic bundles](#atomic-bundles).) Omitting the attribute (salt `bytes32(0)`) is allowed but discouraged — it works at most once per sender.
+The bundle hash commits to `interopBundleSalt = keccak256(abi.encodePacked(msg.sender, userProvidedSalt))`, where the user salt comes from the `interopBundleSalt` bundle attribute. `L2InteropCenter.isInteropBundleSaltUsed` enforces that each (sender, salt) pair is used at most once (`InteropBundleSaltAlreadyUsed`), which makes **every emitted bundle hash unique** even for identical bundle contents. Mixing in `msg.sender` ensures bundles from different senders can never collide; the user-controlled part lets a sender control uniqueness of its own bundles. What the protocol requires is only that the salt be **fresh** for the sender — a counter is as valid as a random value. Nothing about the salt provides confidentiality: the send calldata carries the inputs and `InteropBundleSent` emits the fully resolved `InteropBundle`, so a bundle's contents are public regardless. (Atomic senders must in fact be able to predict their own `bundleHash` before sending, in order to build the flow preimage — see [Atomic bundles](#atomic-bundles).) Omitting the attribute (salt `bytes32(0)`) is allowed but discouraged — it works at most once per sender.
 
 (Historical note: the salt used to be derived from a per-sender nonce; the deprecated `__DEPRECATED_interopBundleNonce` mapping slot is retained only to preserve the storage layout.)
 
@@ -193,9 +203,9 @@ An atomic bundle is a leg of an **atomic interop flow** (L2↔L2 only), marked w
 
 ## Initialization and versioning notes
 
-- `InteropCenter.initL2` is a one-shot initializer called by the complex upgrader. Because the `InteropCenter` is introduced in v31, it runs for both new chains (genesis) and chains upgraded to v31; in both cases storage is fresh (the SystemProxy is freshly deployed). After v31 it must never be called again (`reentrancyGuardInitializer` + `_disableInitializers` guards). It sets `L1_CHAIN_ID`, the owner, `ZK_TOKEN_ASSET_ID` (must be non-zero; anyone updating it later must also update the cached `zkToken` address) and the default `ZK_INTEROP_FEE`.
+- `L2InteropCenter.initL2` is a one-shot initializer called by the complex upgrader. Because the `L2InteropCenter` is introduced in v31, it runs for both new chains (genesis) and chains upgraded to v31; in both cases storage is fresh (the SystemProxy is freshly deployed). After v31 it must never be called again (`reentrancyGuardInitializer` + `_disableInitializers` guards). It sets `L1_CHAIN_ID`, the owner, `ZK_TOKEN_ASSET_ID` (must be non-zero; anyone updating it later must also update the cached `zkToken` address) and the default `ZK_INTEROP_FEE`.
 - `L2InteropHandler.initL2` only locks the reentrancy guard (the handler holds no configurable state); `L1InteropHandler` is initialized behind its proxy with an owner for pause control, and its implementation is locked in the constructor.
 - `L1_CHAIN_ID` always refers to the base-most L1, on whichever layer the contract is deployed.
-- `InteropCenter.forwardTransactionOnGateway` is a Gateway-relay function (callable only by `SETTLEMENT_LAYER_RELAY_SENDER`) forwarding an L1-originated transaction to a chain's mailbox; `_canonicalTxHash` is chain-provided and must not be trusted to be unique, while the other fields are populated by the Gateway's `Mailbox`. Its `_expirationTimestamp` parameter is deprecated (always 0).
-- Deprecated storage slots retained for layout compatibility: `InteropCenter.__DEPRECATED_interopBundleNonce`, `InteropHandlerBase.__DEPRECATED_L1_CHAIN_ID` (the handler now operates on `block.chainid`).
-- `InteropCenter` is pausable by its owner (`pause`/`unpause` gate both send entry points).
+- `L2InteropCenter.forwardTransactionOnGateway` is a Gateway-relay function (callable only by `SETTLEMENT_LAYER_RELAY_SENDER`) forwarding an L1-originated transaction to a chain's mailbox; `_canonicalTxHash` is chain-provided and must not be trusted to be unique, while the other fields are populated by the Gateway's `Mailbox`. Its `_expirationTimestamp` parameter is deprecated (always 0).
+- Deprecated storage slots retained for layout compatibility: `L2InteropCenter.__DEPRECATED_interopBundleNonce`, `InteropHandlerBase.__DEPRECATED_L1_CHAIN_ID` (the handler now operates on `block.chainid`).
+- `L2InteropCenter` is pausable by its owner (`pause`/`unpause` gate both send entry points).

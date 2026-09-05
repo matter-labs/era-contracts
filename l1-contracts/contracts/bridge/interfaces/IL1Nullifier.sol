@@ -28,9 +28,9 @@ interface IL1Nullifier {
     function depositHappened(uint256 _chainId, bytes32 _l2TxHash) external view returns (bytes32);
 
     /// @notice Records an initiated deposit (`depositHappened`), forwarded by the asset router as part of
-    /// the Bridgehub's `requestL2TransactionTwoBridges` flow. Rejects duplicates.
+    /// the L1 Interop Center's indirect send flow. Rejects duplicates.
     /// @param _chainId The chain ID of the ZK chain to which to confirm the deposit.
-    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
+    /// @param _txDataHash Deposit correlation hash; see {protocol-docs/bridging.md}.
     /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
     function bridgehubConfirmL2TransactionForwarded(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 

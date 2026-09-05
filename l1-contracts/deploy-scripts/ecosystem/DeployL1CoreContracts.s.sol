@@ -124,6 +124,10 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridges.implementations.l1InteropHandler,
             coreAddresses.bridges.proxies.l1InteropHandler
         ) = deployTuppWithContract("L1InteropHandler");
+        (
+            coreAddresses.bridgehub.implementations.interopCenter,
+            coreAddresses.bridgehub.proxies.interopCenter
+        ) = deployTuppWithContract("L1InteropCenter");
         setL1NativeTokenVaultParams();
 
         updateSharedBridge();
@@ -154,6 +158,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             coreAddresses.bridgehub.proxies.chainRegistrationSender
         );
+        bridgehub.setInteropCenter(coreAddresses.bridgehub.proxies.interopCenter);
         chainAssetHandler.setAddresses();
         vm.stopBroadcast();
         console.log("SharedBridge registered");
@@ -183,6 +188,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         vm.startBroadcast(getDeployerAddress());
 
         IL1Bridgehub bridgehub = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
+        IOwnable(coreAddresses.bridgehub.proxies.interopCenter).transferOwnership(coreAddresses.shared.governance);
         IOwnable(address(bridgehub)).transferOwnership(coreAddresses.shared.governance);
         bridgehub.setPendingAdmin(coreAddresses.shared.bridgehubAdmin);
 
@@ -248,6 +254,12 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             "ctm_deployment_tracker_implementation_addr",
             coreAddresses.bridgehub.implementations.ctmDeploymentTracker
         );
+        vm.serializeAddress(
+            "bridgehub",
+            "l1_interop_center_implementation_addr",
+            coreAddresses.bridgehub.implementations.interopCenter
+        );
+        vm.serializeAddress("bridgehub", "l1_interop_center_proxy_addr", coreAddresses.bridgehub.proxies.interopCenter);
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", coreAddresses.bridgehub.proxies.messageRoot);
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",

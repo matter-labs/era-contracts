@@ -12,8 +12,14 @@ import {
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
 
+import {IERC7786GatewaySource} from "../interop/IERC7786GatewaySource.sol";
+import {IERC7786Attributes} from "../interop/IERC7786Attributes.sol";
+import {IInteropCenterBase} from "../interop/IInteropCenterBase.sol";
+import {InteropCallStarter} from "../common/Messaging.sol";
+import {ERC7786_UINT256_ATTRIBUTE_LENGTH} from "../interop/InteropConstants.sol";
+import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
-import {BridgehubBurnCTMAssetData, L2TransactionRequestTwoBridgesOuter} from "../core/bridgehub/IBridgehubBase.sol";
+import {BridgehubBurnCTMAssetData} from "../core/bridgehub/IBridgehubBase.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "../bridge/asset-router/IAssetRouterBase.sol";
@@ -288,49 +294,57 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
     /// @dev If any other error is returned, it is assumed to be out of gas or some other unexpected
     /// error that should be bubbled up by the caller.
     function _getNewAdminFromMigration(Call calldata _call) internal view returns (address, bool) {
-        if (_call.target != address(BRIDGE_HUB)) {
+        if (_call.target != BRIDGE_HUB.interopCenter() || _call.data.length < 4) {
             return (address(0), false);
         }
 
-        if (_call.data.length < 4) {
+        bytes memory recipient;
+        bytes memory indirectCallData;
+        bytes[] memory attributes;
+        bytes4 selector = bytes4(_call.data[:4]);
+        if (selector == IERC7786GatewaySource.sendMessage.selector) {
+            (recipient, indirectCallData, attributes) = abi.decode(_call.data[4:], (bytes, bytes, bytes[]));
+        } else if (selector == IInteropCenterBase.sendBundle.selector) {
+            (, InteropCallStarter[] memory calls, ) = abi.decode(
+                _call.data[4:],
+                (bytes, InteropCallStarter[], bytes[])
+            );
+            if (calls.length != 1) {
+                return (address(0), false);
+            }
+            recipient = calls[0].to;
+            indirectCallData = calls[0].data;
+            attributes = calls[0].callAttributes;
+        } else {
             return (address(0), false);
         }
-
-        if (bytes4(_call.data[:4]) != IL1Bridgehub.requestL2TransactionTwoBridges.selector) {
+        if (!_hasIndirectCallAttribute(attributes)) {
             return (address(0), false);
         }
-
         address sharedBridge = address(BRIDGE_HUB.assetRouter());
-
-        // Assuming that correctly encoded calldata is provided, the following line must never fail,
-        // since the correct selector was checked before.
-        L2TransactionRequestTwoBridgesOuter memory request = abi.decode(
-            _call.data[4:],
-            (L2TransactionRequestTwoBridgesOuter)
-        );
-
-        if (request.secondBridgeAddress != sharedBridge) {
+        // slither-disable-next-line unused-return
+        (, address recipientAddress) = InteroperableAddress.parseEvmV1(recipient);
+        if (recipientAddress != sharedBridge) {
             return (address(0), false);
         }
 
-        bytes memory secondBridgeData = request.secondBridgeCalldata;
-        if (secondBridgeData.length == 0) {
+        if (indirectCallData.length == 0) {
             return (address(0), false);
         }
 
-        if (secondBridgeData[0] != NEW_ENCODING_VERSION) {
+        if (indirectCallData[0] != NEW_ENCODING_VERSION) {
             return (address(0), false);
         }
-        bytes memory encodedData = new bytes(secondBridgeData.length - 1);
+        bytes memory encodedData = new bytes(indirectCallData.length - 1);
         assembly {
-            mcopy(add(encodedData, 0x20), add(secondBridgeData, 0x21), mload(encodedData))
+            mcopy(add(encodedData, 0x20), add(indirectCallData, 0x21), mload(encodedData))
         }
 
         // From now on, we know that the used encoding version is `NEW_ENCODING_VERSION` that is
         // supported only in the new protocol version with Gateway support, so we can assume
         // that the methods like e.g. Bridgehub.ctmAssetIdToAddress must exist.
 
-        // This is the format of the `secondBridgeData` under the `NEW_ENCODING_VERSION`.
+        // This is the format of the `indirectCallData` under the `NEW_ENCODING_VERSION`.
         // If it fails, it would mean that the data is not correct and the call would eventually fail anyway.
         (bytes32 chainAssetId, bytes memory bridgehubData) = abi.decode(encodedData, (bytes32, bytes));
 
@@ -342,17 +356,27 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return (address(0), false);
         }
 
-        // Almost certainly it will be Bridgehub, but we add this check just in case we have circumstances
-        // that require us to use a different asset handler.
+        // Match the registered chain asset handler before decoding its migration payload.
         address assetHandlerAddress = IAssetRouterBase(sharedBridge).assetHandlerAddress(chainAssetId);
-        if (assetHandlerAddress != address(BRIDGE_HUB)) {
+        if (assetHandlerAddress != BRIDGE_HUB.chainAssetHandler()) {
             return (address(0), false);
         }
 
-        // The asset handler of CTM is the bridgehub and so the following decoding should work
         BridgehubBurnCTMAssetData memory burnData = abi.decode(bridgehubData, (BridgehubBurnCTMAssetData));
         (address l2Admin, ) = abi.decode(burnData.ctmData, (address, bytes));
 
         return (l2Admin, true);
+    }
+    function _hasIndirectCallAttribute(bytes[] memory _attributes) private pure returns (bool) {
+        uint256 attributesLength = _attributes.length;
+        for (uint256 i = 0; i < attributesLength; ++i) {
+            if (
+                _attributes[i].length >= ERC7786_UINT256_ATTRIBUTE_LENGTH &&
+                bytes4(_attributes[i]) == IERC7786Attributes.indirectCall.selector
+            ) {
+                return true;
+            }
+        }
+        return false;
     }
 }

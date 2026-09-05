@@ -87,7 +87,7 @@ abstract contract GatewayGovernanceUtils is Script {
 
             calls = Utils.mergeCalls(
                 calls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
+                Utils.prepareGovernanceL1L2Message(
                     prepareGWGovCallsStruct._l1GasPrice,
                     data,
                     Utils.MAX_PRIORITY_TX_GAS,
@@ -95,7 +95,6 @@ abstract contract GatewayGovernanceUtils is Script {
                     L2_BRIDGEHUB_ADDR,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
                     prepareGWGovCallsStruct._refundRecipient
                 )
             );
@@ -141,22 +140,21 @@ abstract contract GatewayGovernanceUtils is Script {
                 _gatewayGovernanceConfig.ctmDeploymentTrackerProxy
             );
 
-            bytes memory secondBridgeData = abi.encodePacked(
+            bytes memory indirectCallData = abi.encodePacked(
                 SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
                 abi.encode(chainAssetId, L2_CHAIN_ASSET_HANDLER_ADDR)
             );
 
             calls = Utils.mergeCalls(
                 calls,
-                Utils.prepareGovernanceL1L2TwoBridgesTransaction(
+                Utils.prepareGovernanceL1L2IndirectMessage(
                     prepareGWGovCallsStruct._l1GasPrice,
                     Utils.MAX_PRIORITY_TX_GAS,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
                     _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
                     0,
-                    secondBridgeData,
+                    indirectCallData,
                     prepareGWGovCallsStruct._refundRecipient
                 )
             );
@@ -165,22 +163,21 @@ abstract contract GatewayGovernanceUtils is Script {
         // Setting the address of the GW ChainTypeManager as the correct ChainTypeManager to handle
         // chains that migrate from L1.
         {
-            bytes memory secondBridgeData = abi.encodePacked(
+            bytes memory indirectCallData = abi.encodePacked(
                 NEW_ENCODING_VERSION,
                 abi.encode(_gatewayGovernanceConfig.chainTypeManagerProxy, prepareGWGovCallsStruct._gatewayCTMAddress)
             );
 
             calls = Utils.mergeCalls(
                 calls,
-                Utils.prepareGovernanceL1L2TwoBridgesTransaction(
+                Utils.prepareGovernanceL1L2IndirectMessage(
                     prepareGWGovCallsStruct._l1GasPrice,
                     Utils.MAX_PRIORITY_TX_GAS,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
                     _gatewayGovernanceConfig.ctmDeploymentTrackerProxy,
                     0,
-                    secondBridgeData,
+                    indirectCallData,
                     prepareGWGovCallsStruct._refundRecipient
                 )
             );
@@ -192,7 +189,7 @@ abstract contract GatewayGovernanceUtils is Script {
 
             calls = Utils.mergeCalls(
                 calls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
+                Utils.prepareGovernanceL1L2Message(
                     prepareGWGovCallsStruct._l1GasPrice,
                     data,
                     Utils.MAX_PRIORITY_TX_GAS,
@@ -200,14 +197,13 @@ abstract contract GatewayGovernanceUtils is Script {
                     prepareGWGovCallsStruct._gatewayRollupDAManager,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
                     prepareGWGovCallsStruct._refundRecipient
                 )
             );
             // Todo: can probably delete since ValidatorTimelock is now TUPP.
             // calls = Utils.mergeCalls(
             //     calls,
-            //     Utils.prepareGovernanceL1L2DirectTransaction(
+            //     Utils.prepareGovernanceL1L2Message(
             //         prepareGWGovCallsStruct._l1GasPrice,
             //         data,
             //         Utils.MAX_PRIORITY_TX_GAS,
@@ -215,13 +211,12 @@ abstract contract GatewayGovernanceUtils is Script {
             //         prepareGWGovCallsStruct._gatewayValidatorTimelock,
             //         _gatewayGovernanceConfig.gatewayChainId,
             //         _gatewayGovernanceConfig.bridgehubProxy,
-            //         _gatewayGovernanceConfig.l1AssetRouterProxy,
             //         prepareGWGovCallsStruct._refundRecipient
             //     )
             // );
             calls = Utils.mergeCalls(
                 calls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
+                Utils.prepareGovernanceL1L2Message(
                     prepareGWGovCallsStruct._l1GasPrice,
                     data,
                     Utils.MAX_PRIORITY_TX_GAS,
@@ -229,7 +224,6 @@ abstract contract GatewayGovernanceUtils is Script {
                     prepareGWGovCallsStruct._gatewayServerNotifier,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
                     prepareGWGovCallsStruct._refundRecipient
                 )
             );

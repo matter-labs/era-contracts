@@ -10,7 +10,7 @@ interface IAssetRouterShared {
     /// See {AssetRouterBase-finalizeDeposit}.
     function finalizeDeposit(uint256 _sourceChainId, bytes32 _assetId, bytes calldata _transferData) external payable;
 
-    /// @notice Allows bridgehub to acquire mintValue for L1->L2 and L2->L2 transactions.
+    /// @notice Allows the Interop Centers to fund the destination transaction with its base token.
     /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
     /// @param _chainId The chain ID of the ZK chain that receives the bridge request.
     /// @param _assetId The deposited asset ID.

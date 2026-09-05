@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {L1InteropRequests} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
@@ -13,9 +14,9 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {
     IBridgehubBase,
     BridgehubBurnCTMAssetData,
-    BridgehubMintCTMAssetData,
-    L2TransactionRequestDirect
+    BridgehubMintCTMAssetData
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L1L2MessageParams} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
@@ -252,7 +253,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
     }
 
-    function test_requestL2TransactionDirect() public {
+    function test_sendDirect() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
         _confirmMigration(TxStatus.Success);
@@ -265,7 +266,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         );
 
         uint256 expectedValue = 1000 ether;
-        L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
+        L1L2MessageParams memory request = _createL1L2MessageParams(
             migratingChainId,
             expectedValue,
             0, // l2Value
@@ -277,7 +278,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         uint256 senderBalanceBefore = address(this).balance;
 
         vm.recordLogs();
-        bytes32 canonicalTxHash = addresses.bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
+        bytes32 canonicalTxHash = L1InteropRequests.requestDirect(addresses.interopCenter, expectedValue, request);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Verify transaction was created
@@ -640,8 +641,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     }
 
     function _setDepositHappened(uint256 _chainId, bytes32 _txHash, bytes32 _txDataHash) internal {
-        vm.startBroadcast(address(addresses.bridgehub));
-        IL1AssetRouter(address(addresses.bridgehub.assetRouter())).bridgehubConfirmL2Transaction({
+        vm.startBroadcast(address(addresses.interopCenter));
+        IL1AssetRouter(address(addresses.bridgehub.assetRouter())).confirmL2Transaction({
             _chainId: _chainId,
             _txDataHash: _txDataHash,
             _txHash: _txHash

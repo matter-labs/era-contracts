@@ -20,6 +20,7 @@ import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAss
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 
@@ -117,11 +118,29 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         } else {
             coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler");
         }
+        super.deployNewEcosystemContractsL1();
+        if (coreAddresses.bridgehub.proxies.interopCenter == address(0)) {
+            coreAddresses.bridgehub.proxies.interopCenter = deployViaCreate2AndNotify(
+                type(TransparentUpgradeableProxy).creationCode,
+                abi.encode(
+                    coreAddresses.bridgehub.implementations.interopCenter,
+                    transparentProxyAdmin(),
+                    getInitializeCalldata("L1InteropCenter")
+                ),
+                "TransparentUpgradeableProxy",
+                "L1InteropCenter Proxy"
+            );
+            deployedL1InteropCenter = true;
+        }
     }
 
     /// @notice Configure contract connections after deployment
     function updateContractConnections() internal {
         address properOwner = getOwnerAddress();
+        if (deployedL1InteropCenter) {
+            vm.broadcast(getBroadcasterAddress());
+            Ownable2StepUpgradeable(coreAddresses.bridgehub.proxies.interopCenter).transferOwnership(properOwner);
+        }
 
         if (deployedL1InteropHandler) {
             console.log("Transferring L1InteropHandler ownership to governance:", properOwner);
@@ -162,7 +181,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         require(chainAssetHandlerProxy != address(0), "ChainAssetHandler proxy address not found");
         console.log("ChainAssetHandler address:", chainAssetHandlerProxy);
 
-        Call[][] memory allCalls = new Call[][](2);
+        Call[][] memory allCalls = new Call[][](3);
 
         allCalls[0] = new Call[](2);
 
@@ -181,8 +200,25 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         });
 
         allCalls[1] = _buildL1InteropHandlerWiringCalls();
+        allCalls[2] = _buildL1InteropCenterWiringCalls();
 
         return UpgradeUtils.mergeCallsArray(allCalls);
+    }
+
+    /// @notice Wires the new send surface after the Bridgehub implementation is upgraded.
+    function _buildL1InteropCenterWiringCalls() internal returns (Call[] memory calls) {
+        address center = coreAddresses.bridgehub.proxies.interopCenter;
+        require(center != address(0), "L1InteropCenter proxy not deployed");
+        if (!deployedL1InteropCenter) {
+            return calls;
+        }
+        calls = new Call[](2);
+        calls[0] = Call({target: center, value: 0, data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())});
+        calls[1] = Call({
+            target: coreAddresses.bridgehub.proxies.bridgehub,
+            value: 0,
+            data: abi.encodeCall(IL1Bridgehub.setInteropCenter, (center))
+        });
     }
 
     /// @notice Stage-1 calls that wire a freshly deployed `L1InteropHandler` into the bridges.

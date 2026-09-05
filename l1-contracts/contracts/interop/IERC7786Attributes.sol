@@ -9,6 +9,22 @@ import {AtomicFlowPreimage} from "../atomic-interop/IAtomicInterop.sol";
 /// @dev When adding/removing a function here the InteropCenter must be updated to reflect the changes.
 /// https://github.com/ethereum/ERCs/blob/023a7d657666308568d3d1391c578d5972636093/ERCS/erc-7786.md
 interface IERC7786Attributes {
+    /// @notice Supplies the priority-transaction parameters for an L1 send.
+    /// @param _mintValue Total destination base-token amount to mint.
+    /// @param _l2GasLimit Destination execution gas limit.
+    /// @param _l2GasPerPubdataByteLimit Maximum gas charged per pubdata byte.
+    /// @param _refundRecipient Destination fee-refund recipient.
+    function l1ToL2TransactionParams(
+        uint256 _mintValue,
+        uint256 _l2GasLimit,
+        uint256 _l2GasPerPubdataByteLimit,
+        address _refundRecipient
+    ) external pure;
+
+    /// @notice Supplies factory dependencies for direct L1 sends.
+    /// @param _factoryDeps Bytecodes to publish with the transaction.
+    function factoryDeps(bytes[] calldata _factoryDeps) external pure;
+
     function indirectCall(uint256 _indirectCallMessageValue) external pure;
 
     function interopCallValue(uint256 _interopCallValue) external pure;

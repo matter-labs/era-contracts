@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {L1InteropRequests} from "../../../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
@@ -16,7 +17,7 @@ import {
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
 import {PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L1L2MessageParams} from "../../../../../../deploy-scripts/utils/L1InteropRequests.sol";
 
 contract PriorityModeExecutorTest is ExecutorTest {
     function isZKsyncOS() internal pure override returns (bool) {
@@ -141,8 +142,10 @@ contract PriorityModeExecutorTest is ExecutorTest {
         vm.deal(prioritySender, baseCost);
         requestTimestamp = block.timestamp;
         vm.prank(prioritySender);
-        dummyBridgehub.requestL2TransactionDirect{value: baseCost}(
-            L2TransactionRequestDirect({
+        L1InteropRequests.requestDirect(
+            l1InteropCenter,
+            baseCost,
+            L1L2MessageParams({
                 chainId: l2ChainId,
                 mintValue: baseCost,
                 l2Contract: makeAddr("l2Contract"),

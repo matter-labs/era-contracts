@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use alloy::primitives::{keccak256, Address, FixedBytes};
+use anyhow::Context;
 use clap::{Parser, ValueEnum};
 
 use crate::common::env_config::{default_protocol_ops_out_dir, EnvConfig, GovernanceKind};
@@ -97,6 +98,34 @@ impl VerifyUpgradeEnv {
 }
 
 pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
+    let input = std::fs::read_to_string(&args.ecosystem_toml).with_context(|| {
+        format!(
+            "read ecosystem upgrade TOML: {}",
+            args.ecosystem_toml.display()
+        )
+    })?;
+    let raw: toml::Value = toml::from_str(&input).with_context(|| {
+        format!(
+            "parse ecosystem upgrade TOML: {}",
+            args.ecosystem_toml.display()
+        )
+    })?;
+    if args.display_upgrade_data {
+        let calls: crate::upgrade_verification::artifacts::GovernanceCalls = raw
+            .get("governance_calls")
+            .context("Missing governance_calls")?
+            .clone()
+            .try_into()?;
+        logger::info("Displaying encoded governance proposals only; no verification performed.");
+        print_encoded_upgrade_data("Stage0", &calls.stage0_calls);
+        print_encoded_upgrade_data("Stage1", &calls.stage1_calls);
+        print_encoded_upgrade_data("Stage2", &calls.stage2_calls);
+        return Ok(());
+    }
+    ensure_supported_ceremony(&raw)?;
+    let artifact = EcosystemUpgradeArtifact::from_toml_str(&input)?;
+    artifact_shape::verify(&artifact)?;
+
     let env = args.env.as_str();
     let env_cfg = EnvConfig::load(env)?;
     let era_chain_id = env_cfg.era_chain_id().ok_or_else(|| {
@@ -198,16 +227,6 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     logger::info(format!("CREATE2 factory: {create2_factory}"));
     logger::info(format!("ZK token asset ID: {zk_token_asset_id}"));
 
-    let artifact = EcosystemUpgradeArtifact::read(&args.ecosystem_toml)?;
-    artifact_shape::verify(&artifact)?;
-
-    if args.display_upgrade_data {
-        print_encoded_upgrade_data("Stage0", &artifact.governance_calls.stage0_calls);
-        print_encoded_upgrade_data("Stage1", &artifact.governance_calls.stage1_calls);
-        print_encoded_upgrade_data("Stage2", &artifact.governance_calls.stage2_calls);
-        return Ok(());
-    }
-
     let tx_hashes = transactions_log::read(&transactions_log_path)?;
     logger::info(format!(
         "Loaded {} transaction hash(es) from {}",
@@ -256,6 +275,30 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     result.ensure_success()
 }
 
+fn ensure_supported_ceremony(artifact: &toml::Value) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        !contains_center_output(artifact),
+        "L1InteropCenter upgrade ceremonies are not supported by the historical v31 verifier. \
+         --display-upgrade-data can print their governance proposals, but does not validate them."
+    );
+    Ok(())
+}
+
+fn contains_center_output(value: &toml::Value) -> bool {
+    match value {
+        toml::Value::Table(table) => table.iter().any(|(key, value)| {
+            matches!(
+                key.as_str(),
+                "l1_interop_center_proxy_addr"
+                    | "l1_interop_center_implementation_addr"
+                    | "l1_interop_center_new_proxy"
+            ) || contains_center_output(value)
+        }),
+        toml::Value::Array(values) => values.iter().any(contains_center_output),
+        _ => false,
+    }
+}
+
 fn print_encoded_upgrade_data(label: &str, stage_calls_hex: &str) {
     use crate::upgrade_verification::versions::v31::elements::call_list::{
         CallList, UpgradeProposal,
@@ -272,4 +315,68 @@ fn print_encoded_upgrade_data(label: &str, stage_calls_hex: &str) {
         "{label} encoded upgrade data = 0x{}",
         alloy::hex::encode(proposal.abi_encode())
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_partial_and_malformed_center_markers_without_affecting_historical_artifacts() {
+        let historical: toml::Value = toml::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml"
+        )))
+        .unwrap();
+        assert!(ensure_supported_ceremony(&historical).is_ok());
+        for field in [
+            "l1_interop_center_proxy_addr",
+            "l1_interop_center_implementation_addr",
+            "l1_interop_center_new_proxy",
+        ] {
+            for value in [
+                toml::Value::String(String::new()),
+                toml::Value::Boolean(false),
+            ] {
+                let mut current = historical.clone();
+                current["core"]["upgrade_addresses"]["bridgehub"]
+                    .as_table_mut()
+                    .unwrap()
+                    .insert(field.into(), value);
+                assert!(ensure_supported_ceremony(&current).is_err());
+            }
+            let partial = toml::from_str(&format!("{field} = false")).unwrap();
+            assert!(ensure_supported_ceremony(&partial).is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn current_proposals_can_be_displayed_but_not_verified() {
+        use crate::upgrade_verification::versions::v31::elements::call_list::CallList;
+        use alloy::sol_types::SolValue;
+
+        let calls = alloy::hex::encode(CallList { elems: vec![] }.abi_encode_sequence());
+        let input = format!(
+            "[core.upgrade_addresses.bridgehub]\nl1_interop_center_new_proxy = true\n\
+             [governance_calls]\nstage0_calls = '0x{calls}'\nstage1_calls = '0x{calls}'\nstage2_calls = '0x{calls}'"
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("current.toml");
+        std::fs::write(&path, input).unwrap();
+        let args = |display_upgrade_data| VerifyUpgradeArgs {
+            env: VerifyUpgradeEnv::Stage,
+            l1_rpc_url: "invalid RPC URL".into(),
+            gw_rpc_url: "invalid RPC URL".into(),
+            ecosystem_toml: path.clone(),
+            contracts_commit: None,
+            zk_governance_commit: String::new(),
+            transactions_log: None,
+            display_upgrade_data,
+        };
+        assert!(run(args(true)).await.is_ok());
+        let error = run(args(false)).await.unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("not supported by the historical v31 verifier"));
+    }
 }

@@ -9,7 +9,7 @@ import "forge-std/console.sol";
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
-import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {IInteropCenter, L2InteropCenter} from "contracts/interop/interop-center/L2InteropCenter.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION} from "contracts/atomic-interop/IAtomicInterop.sol";
@@ -32,7 +32,7 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 /// @title L2InteropFeesTestAbstract
-/// @notice Covers InteropCenter fee configuration and fee collection/claiming (base-token and fixed ZK fees)
+/// @notice Covers L2InteropCenter fee configuration and fee collection/claiming (base-token and fixed ZK fees)
 /// during sendBundle. See {protocol-docs/interop.md#fee-model}.
 abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
     using stdStorage for StdStorage;
@@ -351,7 +351,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
             abi.encode(address(zkToken))
         );
 
-        // Set ZK_TOKEN_ASSET_ID in InteropCenter storage (slot varies, use stdStorage)
+        // Set ZK_TOKEN_ASSET_ID in L2InteropCenter storage (slot varies, use stdStorage)
         stdstore.target(L2_INTEROP_CENTER_ADDR).sig("ZK_TOKEN_ASSET_ID()").checked_write(zkTokenAssetId);
 
         address sender = makeAddr("zkFeeSender");
@@ -721,7 +721,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         assertEq(
             zkToken.balanceOf(L2_INTEROP_CENTER_ADDR),
             zkFeePerCall,
-            "InteropCenter should hold accumulated ZK tokens"
+            "L2InteropCenter should hold accumulated ZK tokens"
         );
     }
 
@@ -1200,7 +1200,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
         assertEq(
             zkToken.balanceOf(L2_INTEROP_CENTER_ADDR),
             totalExpectedZKFee,
-            "InteropCenter should hold exact fee amount"
+            "L2InteropCenter should hold exact fee amount"
         );
     }
 
@@ -1220,7 +1220,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
 
         InteropCallStarter[] memory calls = _buildSimpleCall();
 
-        // Distinct salt per bundle: InteropCenter rejects re-sending a bundle with an already-used hash.
+        // Distinct salt per bundle: L2InteropCenter rejects re-sending a bundle with an already-used hash.
         for (uint256 i = 0; i < 3; i++) {
             bytes[] memory bundleAttributes = InteropLibrary.withInteropBundleSalt(
                 InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false, bytes32(0)),

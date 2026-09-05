@@ -146,7 +146,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.UpgradeableBeaconDeployer) return "UpgradeableBeaconDeployer";
         if (_c == CoreContract.BaseTokenHolder) return "BaseTokenHolder";
         if (_c == CoreContract.L2ChainAssetHandler) return "L2ChainAssetHandler";
-        if (_c == CoreContract.InteropCenter) return "InteropCenter";
+        if (_c == CoreContract.L2InteropCenter) return "L2InteropCenter";
         if (_c == CoreContract.InteropAttributeParser) return "InteropAttributeParser";
         if (_c == CoreContract.L2InteropCommitmentTree) return "L2InteropCommitmentTree";
         if (_c == CoreContract.AtomicFlowManager) return "AtomicFlowManager";
@@ -181,7 +181,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2InteropRootStorage) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.BaseTokenHolder) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2AssetTracker) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.InteropCenter) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.L2InteropCenter) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.InteropAttributeParser) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2InteropCommitmentTree) {
@@ -209,7 +209,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2InteropRootStorage) return address(L2_INTEROP_ROOT_STORAGE);
         if (_c == CoreContract.BaseTokenHolder) return L2_BASE_TOKEN_HOLDER_ADDR;
         if (_c == CoreContract.L2AssetTracker) return L2_ASSET_TRACKER_ADDR;
-        if (_c == CoreContract.InteropCenter) return L2_INTEROP_CENTER_ADDR;
+        if (_c == CoreContract.L2InteropCenter) return L2_INTEROP_CENTER_ADDR;
         if (_c == CoreContract.InteropAttributeParser) return L2_INTEROP_ATTRIBUTE_PARSER_ADDR;
         if (_c == CoreContract.L2InteropHandler) return L2_INTEROP_HANDLER_ADDR;
         if (_c == CoreContract.UpgradeableBeaconDeployer) return L2_NTV_BEACON_DEPLOYER_ADDR;

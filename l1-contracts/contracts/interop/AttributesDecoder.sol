@@ -8,6 +8,20 @@ import {AtomicFlowPreimage} from "../atomic-interop/IAtomicInterop.sol";
 /// @notice Library for decoding ERC7786 attribute payloads
 /// https://github.com/ethereum/ERCs/blob/023a7d657666308568d3d1391c578d5972636093/ERCS/erc-7786.md
 library AttributesDecoder {
+    function decodeL1ToL2TransactionParams(
+        bytes calldata _data
+    )
+        internal
+        pure
+        returns (uint256 mintValue, uint256 l2GasLimit, uint256 l2GasPerPubdataByteLimit, address refundRecipient)
+    {
+        return abi.decode(_data[4:], (uint256, uint256, uint256, address));
+    }
+
+    function decodeBytesArray(bytes calldata _data) internal pure returns (bytes[] memory) {
+        return abi.decode(_data[4:], (bytes[]));
+    }
+
     function decodeUint256(bytes calldata _data) internal pure returns (uint256) {
         return abi.decode(_data[4:], (uint256));
     }

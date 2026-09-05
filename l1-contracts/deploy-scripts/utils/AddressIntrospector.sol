@@ -56,13 +56,15 @@ library AddressIntrospector {
         if (address(_bridgehub) == L2_BRIDGEHUB_ADDR) {
             return _getL2BridgehubAddresses();
         }
-        return _getL1BridgehubAddressesInternal(_bridgehub);
+        return _getL1BridgehubAddressesInternal(_bridgehub, true);
     }
 
     function _getL1BridgehubAddressesInternal(
-        IL1Bridgehub _bridgehub
+        IL1Bridgehub _bridgehub,
+        bool _hasL1InteropCenter
     ) private view returns (BridgehubAddresses memory info) {
         address bridgehubProxy = address(_bridgehub);
+        address interopCenter = _hasL1InteropCenter ? _bridgehub.interopCenter() : address(0);
         address messageRoot = address(_bridgehub.messageRoot());
         address ctmDeploymentTrackerProxy = address(_bridgehub.l1CtmDeployer());
         address chainAssetHandler = _bridgehub.chainAssetHandler();
@@ -71,6 +73,7 @@ library AddressIntrospector {
         address chainRegistrationSenderAddr = IBridgehubBase(bridgehubProxy).chainRegistrationSender();
 
         BridgehubContracts memory proxies = BridgehubContracts({
+            interopCenter: interopCenter,
             bridgehub: bridgehubProxy,
             messageRoot: messageRoot,
             ctmDeploymentTracker: ctmDeploymentTrackerProxy,
@@ -78,6 +81,7 @@ library AddressIntrospector {
             chainRegistrationSender: chainRegistrationSenderAddr
         });
         BridgehubContracts memory implementations = BridgehubContracts({
+            interopCenter: interopCenter == address(0) ? address(0) : Utils.getImplementation(interopCenter),
             bridgehub: Utils.getImplementation(bridgehubProxy),
             messageRoot: Utils.getImplementation(messageRoot),
             ctmDeploymentTracker: Utils.getImplementation(ctmDeploymentTrackerProxy),
@@ -92,6 +96,7 @@ library AddressIntrospector {
         address ctmDeploymentTrackerProxy = address(_bridgehub.l1CtmDeployer());
 
         BridgehubContracts memory proxies = BridgehubContracts({
+            interopCenter: address(0),
             bridgehub: L2_BRIDGEHUB_ADDR,
             messageRoot: L2_MESSAGE_ROOT_ADDR,
             ctmDeploymentTracker: ctmDeploymentTrackerProxy,
@@ -177,6 +182,17 @@ library AddressIntrospector {
         coreAddresses.shared.governance = IOwnable(_bridgehubProxy).owner();
     }
 
+    /// @notice Discovers a v32/v33 ecosystem before the L1 Interop Center registry getter exists.
+    function getCoreDeployedAddressesPreL1InteropCenter(
+        address _bridgehubProxy
+    ) public view returns (CoreDeployedAddresses memory coreAddresses) {
+        coreAddresses.bridgehub = _getL1BridgehubAddressesInternal(IL1Bridgehub(_bridgehubProxy), false);
+        coreAddresses.bridges = getBridgesDeployedAddresses(address(IL1Bridgehub(_bridgehubProxy).assetRouter()));
+        coreAddresses.shared.transparentProxyAdmin = Utils.getProxyAdminAddress(_bridgehubProxy);
+        coreAddresses.shared.bridgehubAdmin = IL1Bridgehub(_bridgehubProxy).admin();
+        coreAddresses.shared.governance = IOwnable(_bridgehubProxy).owner();
+    }
+
     /// @notice Discovery for a v31 ecosystem: the bridgehub already exposes `chainRegistrationSender`,
     /// but the nullifier has no `l1InteropHandler` yet — that arrives with the v32 implementations.
     /// @dev Calling `getCoreDeployedAddresses` on a v31 ecosystem reverts on the missing nullifier getter.
@@ -186,7 +202,7 @@ library AddressIntrospector {
         require(_bridgehubProxy != address(0), "Bridgehub address is zero");
         require(_bridgehubProxy.code.length > 0, "Bridgehub has no code");
 
-        coreAddresses.bridgehub = getBridgehubAddresses(IL1Bridgehub(_bridgehubProxy));
+        coreAddresses.bridgehub = _getL1BridgehubAddressesInternal(IL1Bridgehub(_bridgehubProxy), false);
 
         address assetRouter = address(IL1Bridgehub(_bridgehubProxy).assetRouter());
         require(assetRouter != address(0), "AssetRouter address is zero");

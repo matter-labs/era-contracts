@@ -4,19 +4,20 @@ pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
-import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
+import {IndirectCallRequest} from "../../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
 
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "../../bridge/asset-router/AssetRouterBase.sol";
-import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {INDIRECT_CALL_MAGIC_VALUE} from "../../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {
     NoEthAllowed,
     NotOwner,
     NotOwnerViaRouter,
-    OnlyBridgehub,
+    OnlyL1InteropCenter,
     WrongCounterPart
 } from "../bridgehub/L1BridgehubErrors.sol";
 import {CTMNotRegistered, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
@@ -34,10 +35,10 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
     /// @dev L1AssetRouter smart contract that is used to bridge assets (including chains) between L1 and L2.
     IAssetRouterBase public immutable override L1_ASSET_ROUTER;
 
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB)) {
-            revert OnlyBridgehub(msg.sender, address(BRIDGE_HUB));
+    /// @notice Checks that the caller is the registered L1 Interop Center.
+    modifier onlyL1InteropCenter() {
+        if (msg.sender != BRIDGE_HUB.interopCenter()) {
+            revert OnlyL1InteropCenter(msg.sender, BRIDGE_HUB.interopCenter());
         }
         _;
     }
@@ -90,26 +91,15 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
         );
     }
 
-    /// @notice The function responsible for registering the L2 counterpart of an CTM asset on the L2 Bridgehub.
-    /// @dev The function is called by the Bridgehub contract during the `Bridgehub.requestL2TransactionTwoBridges`.
-    /// @dev Since the L2 settlement layers `_chainId` might potentially have ERC20 tokens as native assets,
-    /// there are two ways to perform the L1->L2 transaction:
-    /// - via the `Bridgehub.requestL2TransactionDirect`. However, this would require the CTMDeploymentTracker to
-    /// handle the ERC20 balances to be used in the transaction.
-    /// - via the `Bridgehub.requestL2TransactionTwoBridges`. This way it will be the sender that provides the funds
-    /// for the L2 transaction.
-    /// The second approach is used due to its simplicity even though it gives the sender slightly more control over the call:
-    /// `gasLimit`, etc.
-    /// @param _chainId the chainId of the chain
-    /// @param _originalCaller the previous message sender
-    /// @param _data the data of the transaction
+    /// @inheritdoc IL1CrossChainSender
+    // Payable for interface compatibility; every nonzero msg.value reverts below.
     // slither-disable-next-line locked-ether
-    function bridgehubDeposit(
+    function initiateIndirectCall(
         uint256 _chainId,
         address _originalCaller,
         uint256,
         bytes calldata _data
-    ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) external payable override onlyL1InteropCenter returns (IndirectCallRequest memory request) {
         if (msg.value != 0) {
             revert NoEthAllowed();
         }
@@ -126,13 +116,13 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
         request = _registerCTMAssetOnL2Bridgehub(_chainId, _ctmL1Address, _ctmL2Address);
     }
 
-    /// @notice The function called by the Bridgehub after the L2 transaction has been initiated.
+    /// @inheritdoc IL1CrossChainSender
     /// @dev Not used in this contract. In case the transaction fails, we can just re-try it.
-    function bridgehubConfirmL2Transaction(
+    function confirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash
-    ) external override onlyBridgehub {}
+    ) external override onlyL1InteropCenter {}
 
     /// @notice Used to register the ctm asset in L2 AssetRouter.
     /// @param _originalCaller the address that called the Router
@@ -159,20 +149,20 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
         uint256 _chainId,
         address _ctmL1Address,
         address _ctmL2Address
-    ) internal pure returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal pure returns (IndirectCallRequest memory request) {
         bytes memory l2TxCalldata = abi.encodeCall(
             IBridgehubBase.setCTMAssetAddress,
             (bytes32(uint256(uint160(_ctmL1Address))), _ctmL2Address)
         );
 
-        request = L2TransactionRequestTwoBridgesInner({
-            magicValue: TWO_BRIDGES_MAGIC_VALUE,
+        request = IndirectCallRequest({
+            magicValue: INDIRECT_CALL_MAGIC_VALUE,
             l2Contract: L2_BRIDGEHUB_ADDR,
             l2Calldata: l2TxCalldata,
             factoryDeps: new bytes[](0),
             // The `txDataHash` is typically used in usual ERC20 bridges to commit to the transaction data
             // so that the user can recover funds in case the bridging fails on L2.
-            // However, this contract uses the `requestL2TransactionTwoBridges` method just to perform an L1->L2 transaction.
+            // However, this sender builds an indirect L1-to-L2 transaction.
             // We do not need to recover anything and so `bytes32(0)` here is okay.
             txDataHash: bytes32(0)
         });
