@@ -113,24 +113,21 @@ contract ValidatorTimelock is
     function removeValidatorRoles(
         address _chainAddress,
         address _validator,
-        ValidatorRotationParams memory params
+        ValidatorRotationParams memory _params
     ) public {
-        if (params.rotatePrecommitterRole) {
-            revokeRole(_chainAddress, PRECOMMITTER_ROLE, _validator);
-        }
-        if (params.rotateCommitterRole) {
+        if (_params.rotateCommitterRole) {
             revokeRole(_chainAddress, COMMITTER_ROLE, _validator);
         }
-        if (params.rotateReverterRole) {
+        if (_params.rotateReverterRole) {
             revokeRole(_chainAddress, REVERTER_ROLE, _validator);
         }
-        if (params.rotateProverRole) {
+        if (_params.rotateProverRole) {
             revokeRole(_chainAddress, PROVER_ROLE, _validator);
         }
-        if (params.rotateExecutorRole) {
+        if (_params.rotateExecutorRole) {
             revokeRole(_chainAddress, EXECUTOR_ROLE, _validator);
         }
-        if (params.rotateUpgraderRole) {
+        if (_params.rotateUpgraderRole) {
             revokeRole(_chainAddress, UPGRADER_ROLE, _validator);
         }
     }
@@ -141,7 +138,7 @@ contract ValidatorTimelock is
             _chainAddress,
             _validator,
             ValidatorRotationParams({
-                rotatePrecommitterRole: true,
+                rotatePrecommitterRole: false,
                 rotateCommitterRole: true,
                 rotateReverterRole: true,
                 rotateProverRole: true,
@@ -160,24 +157,21 @@ contract ValidatorTimelock is
     function addValidatorRoles(
         address _chainAddress,
         address _validator,
-        ValidatorRotationParams memory params
+        ValidatorRotationParams memory _params
     ) public {
-        if (params.rotatePrecommitterRole) {
-            grantRole(_chainAddress, PRECOMMITTER_ROLE, _validator);
-        }
-        if (params.rotateCommitterRole) {
+        if (_params.rotateCommitterRole) {
             grantRole(_chainAddress, COMMITTER_ROLE, _validator);
         }
-        if (params.rotateReverterRole) {
+        if (_params.rotateReverterRole) {
             grantRole(_chainAddress, REVERTER_ROLE, _validator);
         }
-        if (params.rotateProverRole) {
+        if (_params.rotateProverRole) {
             grantRole(_chainAddress, PROVER_ROLE, _validator);
         }
-        if (params.rotateExecutorRole) {
+        if (_params.rotateExecutorRole) {
             grantRole(_chainAddress, EXECUTOR_ROLE, _validator);
         }
-        if (params.rotateUpgraderRole) {
+        if (_params.rotateUpgraderRole) {
             grantRole(_chainAddress, UPGRADER_ROLE, _validator);
         }
     }
@@ -188,7 +182,7 @@ contract ValidatorTimelock is
             _chainAddress,
             _validator,
             ValidatorRotationParams({
-                rotatePrecommitterRole: true,
+                rotatePrecommitterRole: false,
                 rotateCommitterRole: true,
                 rotateReverterRole: true,
                 rotateProverRole: true,
@@ -209,15 +203,6 @@ contract ValidatorTimelock is
     }
 
     /// @inheritdoc IValidatorTimelock
-    function precommitSharedBridge(
-        address _chainAddress,
-        uint256, // _l2BlockNumber (unused in this specific implementation)
-        bytes calldata // _l2Block (unused in this specific implementation)
-    ) public virtual onlyRole(_chainAddress, PRECOMMITTER_ROLE) {
-        _propagateToAddress(_getPropagationAddress(_chainAddress));
-    }
-
-    /// @inheritdoc IValidatorTimelock
     function commitBatchesSharedBridge(
         address _chainAddress,
         uint256 _processBatchFrom,
@@ -225,7 +210,7 @@ contract ValidatorTimelock is
         bytes calldata // _batchData (unused in this specific implementation)
     ) public virtual onlyRole(_chainAddress, COMMITTER_ROLE) {
         _recordBatchCommitment(_chainAddress, _processBatchFrom, _processBatchTo);
-        _propagateToAddress(_getPropagationAddress(_chainAddress));
+        _propagateToAddress(_chainAddress);
     }
 
     /// @dev Records the timestamp of batch commitment for the given chain address.
@@ -250,7 +235,7 @@ contract ValidatorTimelock is
         address _chainAddress,
         uint256 /*_newLastBatch*/
     ) public virtual onlyRole(_chainAddress, REVERTER_ROLE) {
-        _propagateToAddress(_getPropagationAddress(_chainAddress));
+        _propagateToAddress(_chainAddress);
     }
 
     /// @inheritdoc IValidatorTimelock
@@ -260,7 +245,7 @@ contract ValidatorTimelock is
         uint256, // _processBatchTo (unused in this specific implementation)
         bytes calldata // _proofData (unused in this specific implementation)
     ) public virtual onlyRole(_chainAddress, PROVER_ROLE) {
-        _propagateToAddress(_getPropagationAddress(_chainAddress));
+        _propagateToAddress(_chainAddress);
     }
 
     /// @inheritdoc IValidatorTimelock
@@ -285,7 +270,7 @@ contract ValidatorTimelock is
                 }
             }
         }
-        _propagateToAddress(_getPropagationAddress(_chainAddress));
+        _propagateToAddress(_chainAddress);
     }
 
     /// @inheritdoc IChainUpgrader
@@ -294,14 +279,7 @@ contract ValidatorTimelock is
         uint256, // _oldProtocolVersion (unused in this specific implementation)
         Diamond.DiamondCutData calldata // _diamondCut (unused in this specific implementation)
     ) external onlyRole(_chainAddress, UPGRADER_ROLE) {
-        _propagateToAddress(_getPropagationAddress(_chainAddress));
-    }
-
-    /// @dev Returns the address to which calldata should be forwarded.
-    /// In `ValidatorTimelock` this is the ZK chain diamond itself; subclasses may override
-    /// (e.g. `EraMultisigValidator` forwards to a downstream `ValidatorTimelock`).
-    function _getPropagationAddress(address _chainAddress) internal view virtual returns (address) {
-        return _chainAddress;
+        _propagateToAddress(_chainAddress);
     }
 
     /// @dev Forwards the current calldata to `_target`.

@@ -64,6 +64,17 @@ contract PrepareChainCommitmentTest is MigratorTest {
         assertEq(commitment.l2SystemContractsUpgradeTxHash, upgradeTxHash);
     }
 
+    function test_prepareChainCommitment_ZeroesDeprecatedPrecommitmentWithoutClearingSlot() public {
+        bytes32 historicalSentinel = bytes32(uint256(1));
+        utilsFacet.util_setDeprecatedPrecommitmentForTheLatestBatch(historicalSentinel);
+
+        ZKChainCommitment memory commitment = migratorFacet.prepareChainCommitment();
+
+        assertEq(commitment.precommitmentForTheLatestBatch, bytes32(0));
+        assertEq(utilsFacet.util_getDeprecatedPrecommitmentForTheLatestBatch(), historicalSentinel);
+        assertEq(vm.load(address(migratorFacet), bytes32(uint256(59))), historicalSentinel);
+    }
+
     // add this to be excluded from coverage report
     function test() internal override {}
 }

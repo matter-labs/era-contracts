@@ -87,10 +87,6 @@ pub struct ChainInitArgs {
     /// Keep deposits paused after init
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub pause_deposits: bool,
-    /// Enable EVM emulator on the chain (forwarded to the register-chain
-    /// script config as `allow_evm_emulator`)
-    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
-    pub evm_emulator: bool,
     /// Make the chain a permanent rollup (irreversible)
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub make_permanent_rollup: bool,
@@ -118,15 +114,9 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
             .context("Failed to discover CTM proxy from L1")?;
     logger::info(format!("CTM proxy (from L1): {:#x}", ctm_proxy));
 
-    // This tooling only provisions ZKsync OS chains — refuse EraVM CTMs.
-    let is_zksync_os =
-        crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
-            .await
-            .context("Failed to resolve isZKsyncOS from CTM")?;
-    anyhow::ensure!(
-        is_zksync_os,
-        "CTM {ctm_proxy:#x} is not a ZKsync OS CTM; this tooling only supports ZKsync OS chains"
-    );
+    crate::common::l1_contracts::ensure_supported_os_ctm(&runner.rpc_url, ctm_proxy)
+        .await
+        .context("Failed to verify the CTM is a supported ZKsync OS CTM")?;
 
     let chain_params = NewChainParams {
         chain_id: L2ChainId::new(args.chain_id)
@@ -151,7 +141,6 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         register_for_interop: args.register_for_interop,
         create2_factory_salt: None,
         pause_deposits: args.pause_deposits,
-        evm_emulator: args.evm_emulator,
         make_permanent_rollup: args.make_permanent_rollup,
     };
     let output = chain_init(&mut runner, &deployer, &owner, &input).await?;
@@ -265,12 +254,7 @@ pub fn register_chain(
     // script hardcodes `Utils.DETERMINISTIC_CREATE2_ADDRESS` and ignores
     // this config field. Passing zero to make that dead-code nature
     // explicit.
-    let deploy_config = RegisterChainL1Config::new(
-        &input.chain_params,
-        Address::ZERO,
-        Some(salt),
-        input.evm_emulator,
-    )?;
+    let deploy_config = RegisterChainL1Config::new(&input.chain_params, Address::ZERO, Some(salt))?;
 
     let input_path = runner.input_path(&REGISTER_CHAIN_INVOCATION)?;
     deploy_config.save(input_path)?;
@@ -353,7 +337,6 @@ pub struct ChainInitInput {
     pub register_for_interop: bool,
     pub create2_factory_salt: Option<B256>,
     pub pause_deposits: bool,
-    pub evm_emulator: bool,
     pub make_permanent_rollup: bool,
 }
 

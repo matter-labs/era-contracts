@@ -5,12 +5,12 @@ import {
     L2_COMPLEX_UPGRADER_ADDR,
     SET_BYTECODE_ON_ADDRESS_HOOK
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IZKOSContractDeployer} from "./interfaces/IZKOSContractDeployer.sol";
-import {SetBytecodeOnAddressHookFailed, Unauthorized} from "./errors/ZKOSContractErrors.sol";
+import {ISystemContractDeployer} from "./interfaces/ISystemContractDeployer.sol";
+import {SetBytecodeOnAddressHookFailed, Unauthorized} from "./errors/SystemContractErrors.sol";
 
-/// @title ZKOSContractDeployer
+/// @title ContractDeployer
 /// @notice Minimal wrapper that forwards to the set bytecode on address system hook at a hardcoded address.
-contract ZKOSContractDeployer is IZKOSContractDeployer {
+contract ContractDeployer is ISystemContractDeployer {
     /// @notice Checks that the message sender is the complex upgrader.
     modifier onlyComplexUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -19,7 +19,7 @@ contract ZKOSContractDeployer is IZKOSContractDeployer {
         _;
     }
 
-    /// @inheritdoc IZKOSContractDeployer
+    /// @inheritdoc ISystemContractDeployer
     function setBytecodeDetailsEVM(
         address _addr,
         bytes32 _bytecodeHash,

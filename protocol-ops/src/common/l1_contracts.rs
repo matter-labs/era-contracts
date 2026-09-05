@@ -142,7 +142,7 @@ pub async fn discover_all_ctms(
 
 /// Resolve `ctm.L1_BYTECODES_SUPPLIER()` → bytecodes supplier address.
 ///
-/// This getter is on the concrete `ChainTypeManagerBase` but not in the
+/// This getter is on the concrete `ChainTypeManager` but not in the
 /// `IChainTypeManager` interface; we use a minimal inline sol! binding.
 pub async fn resolve_bytecodes_supplier(
     l1_rpc_url: &str,
@@ -358,13 +358,16 @@ pub async fn resolve_rollup_da_manager(
     ensure_nonzero(manager, "zkChain.getRollupDAManager()")
 }
 
-/// Resolve `ctm.isZKsyncOS()` → bool.
-pub async fn resolve_is_zksync_os(l1_rpc_url: &str, ctm_proxy: Address) -> anyhow::Result<bool> {
+/// Assert that the CTM at `ctm_proxy` is a supported ZKsync OS CTM.
+pub async fn ensure_supported_os_ctm(l1_rpc_url: &str, ctm_proxy: Address) -> anyhow::Result<()> {
     let ctm = IChainTypeManagerAbi::new(ctm_proxy, provider(l1_rpc_url)?);
-    ctm.isZKsyncOS()
+    let is_zksync_os = ctm
+        .isZKsyncOS()
         .call()
         .await
-        .context("ctm.isZKsyncOS() call failed")
+        .context("ctm.isZKsyncOS() call failed")?;
+    anyhow::ensure!(is_zksync_os, "CTM {ctm_proxy:#x} is not a ZKsync OS CTM");
+    Ok(())
 }
 
 /// Resolve whether the current verifier is a testnet verifier by querying

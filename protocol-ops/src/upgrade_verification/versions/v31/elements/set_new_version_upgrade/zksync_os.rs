@@ -1,6 +1,6 @@
 //! ZKsync OS `forceDeployAndUpgradeUniversal` payload verification.
 //!
-//! Owns the expected `UniversalContractUpgradeInfo[]` list (18 fixed-address
+//! Owns the expected `UniversalContractUpgradeInfo[]` list (19 fixed-address
 //! entries, all proxy-upgrade shapes; the only unsafe force deployment is the
 //! L2V32Upgrade delegate target, validated separately), the
 //! deployed-bytecode-info decoder (96-byte triple or 320-byte impl/proxy
@@ -15,11 +15,12 @@ use crate::upgrade_verification::{
     constants::{
         L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_ATOMIC_FLOW_MANAGER_ADDR,
         L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR,
-        L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_ATTRIBUTE_PARSER_ADDR, L2_INTEROP_CENTER_ADDR,
-        L2_INTEROP_COMMITMENT_TREE_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR,
-        L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR,
-        L2_REMOVED_GW_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_V32_UPGRADE_CONTRACT,
+        L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
+        L2_INTEROP_CENTER_ADDR, L2_INTEROP_COMMITMENT_TREE_ADDR, L2_INTEROP_HANDLER_ADDR,
+        L2_INTEROP_ROOT_STORAGE_ADDR, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION_ADDR,
+        L2_NATIVE_TOKEN_VAULT_ADDR, L2_REMOVED_GW_ASSET_TRACKER_ADDR,
+        L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+        L2_V32_UPGRADE_CONTRACT,
     },
     verifiers::{VerificationResult, Verifiers},
 };
@@ -60,7 +61,7 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
         proxy!("l1-contracts/L2Bridgehub", L2_BRIDGEHUB_ADDR),
         proxy!("l1-contracts/L2AssetRouter", L2_ASSET_ROUTER_ADDR),
         proxy!(
-            "l1-contracts/L2NativeTokenVaultZKOS",
+            "l1-contracts/L2NativeTokenVault",
             L2_NATIVE_TOKEN_VAULT_ADDR
         ),
         proxy!("l1-contracts/L2MessageRoot", L2_MESSAGE_ROOT_ADDR),
@@ -85,7 +86,6 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
             "l1-contracts/InteropAttributeParser",
             L2_INTEROP_ATTRIBUTE_PARSER_ADDR
         ),
-        // ── ZKsync-OS-only atomic-interop built-ins (getZKsyncOSOnlyContracts, 2 entries) ──
         proxy!(
             "l1-contracts/L2InteropCommitmentTree",
             L2_INTEROP_COMMITMENT_TREE_ADDR
@@ -94,19 +94,20 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
             "l1-contracts/AtomicFlowManager",
             L2_ATOMIC_FLOW_MANAGER_ADDR
         ),
-        // ── ZKsync-OS system contracts (getZKsyncOSExtraSystemContracts, 3 entries) ──
+        // ── System-contract proxy upgrades (getSystemProxyUpgradeContracts, 4 entries) ──
         proxy!(
-            "l1-contracts/L2BaseTokenZKOS",
+            "l1-contracts/L2BaseToken",
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
         ),
         proxy!(
-            "l1-contracts/L1MessengerZKOS",
+            "l1-contracts/L1Messenger",
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
         ),
         proxy!(
             "l1-contracts/SystemContext",
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR
         ),
+        proxy!("l1-contracts/L2ComplexUpgrader", L2_COMPLEX_UPGRADER_ADDR),
         // ── Removed-tracker neutralizations (getRemovedTrackerNeutralizations, 1 entry):
         //    the v31 GWAssetTracker's proxy gets its implementation swapped for EmptyContract. ──
         proxy!(
@@ -344,7 +345,7 @@ pub(super) const EXPECTED_V31_ZKSYNC_OS_BYTECODES: &[&str] = &[
     "l1-contracts/EmptyContract",
     "l1-contracts/L2Bridgehub",
     "l1-contracts/L2AssetRouter",
-    "l1-contracts/L2NativeTokenVaultZKOS",
+    "l1-contracts/L2NativeTokenVault",
     "l1-contracts/L2MessageRoot",
     "l1-contracts/L2MessageVerification",
     "l1-contracts/L2ChainAssetHandler",
@@ -358,9 +359,10 @@ pub(super) const EXPECTED_V31_ZKSYNC_OS_BYTECODES: &[&str] = &[
     "l1-contracts/AtomicFlowManager",
     "l1-contracts/UpgradeableBeaconDeployer",
     "l1-contracts/L2V32Upgrade",
-    "l1-contracts/L2BaseTokenZKOS",
-    "l1-contracts/L1MessengerZKOS",
+    "l1-contracts/L2BaseToken",
+    "l1-contracts/L1Messenger",
     "l1-contracts/SystemContext",
+    "l1-contracts/L2ComplexUpgrader",
 ];
 
 /// ZKsync OS orchestrator: walks the `UniversalContractUpgradeInfo[]`, validates the
@@ -372,7 +374,7 @@ pub(super) async fn verify_zksync_os_force_deploy_and_upgrade(
     decoded: &IComplexUpgrader::forceDeployAndUpgradeUniversalCall,
     expected_fixed_force_deployments_data: &str,
 ) -> anyhow::Result<()> {
-    // Validate all expected force deployments (18 fixed entries; L2V32Upgrade delegate validated below).
+    // Validate all expected force deployments (19 fixed entries; L2V32Upgrade delegate validated below).
     verify_v31_zksync_os_force_deployments(
         verifiers,
         result,
@@ -403,7 +405,6 @@ pub(super) async fn verify_zksync_os_force_deploy_and_upgrade(
         verifiers,
         result,
         &decoded._calldata,
-        true,
         expected_fixed_force_deployments_data,
     )
     .await
@@ -488,6 +489,31 @@ fn evm_deployed_bytecode_hash_matches_file(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn l2_complex_upgrader_is_pinned_in_deployments_and_factory_deps() {
+        let matching_deployments: Vec<_> = expected_v31_zksync_os_force_deployments()
+            .into_iter()
+            .filter(|deployment| deployment.address == L2_COMPLEX_UPGRADER_ADDR)
+            .collect();
+
+        assert_eq!(matching_deployments.len(), 1);
+        assert_eq!(
+            matching_deployments[0].file,
+            "l1-contracts/L2ComplexUpgrader"
+        );
+        assert_eq!(
+            matching_deployments[0].upgrade_type,
+            ZksyncOSUpgradeType::SystemProxyUpgrade
+        );
+        assert_eq!(
+            EXPECTED_V31_ZKSYNC_OS_BYTECODES
+                .iter()
+                .filter(|file| **file == "l1-contracts/L2ComplexUpgrader")
+                .count(),
+            1
+        );
+    }
 
     #[test]
     fn zksync_os_random_address_matches_helper_preimage_shape() {

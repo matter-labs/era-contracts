@@ -33,7 +33,7 @@ struct ProposedUpgrade {
 }
 
 /// @notice Helpers for constructing zero-initialised upgrade structs.
-/// @dev Shared between runtime contracts (ChainTypeManagerBase) and deploy scripts (CTMUpgradeBase)
+/// @dev Shared between runtime contracts (ChainTypeManager) and deploy scripts (CTMUpgradeBase)
 /// to avoid manual zero-struct assembly that can desync when fields change.
 library ProposedUpgradeLib {
     function emptyL2CanonicalTransaction() internal pure returns (L2CanonicalTransaction memory) {

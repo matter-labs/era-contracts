@@ -37,7 +37,6 @@ struct ZKChainSpecificForceDeploymentsData {
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
     address l1AssetRouter;
-    bytes32 l2TokenProxyBytecodeHash;
     address aliasedL1Governance;
     uint256 maxNumberOfZKChains;
     bytes bridgehubBytecodeInfo;
@@ -66,7 +65,6 @@ interface IL2GenesisUpgrade {
     event UpgradeComplete(uint256 _chainId);
 
     function genesisUpgrade(
-        bool _isZKsyncOS,
         uint256 _chainId,
         address _ctmDeployer,
         bytes calldata _fixedForceDeploymentsData,

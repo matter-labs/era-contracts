@@ -9,7 +9,7 @@ import {
     L2_CHAIN_ASSET_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SystemContext} from "contracts/l2-system/zksync-os/SystemContext.sol";
-import {Unauthorized} from "contracts/l2-system/zksync-os/errors/ZKOSContractErrors.sol";
+import {Unauthorized} from "contracts/l2-system/zksync-os/errors/SystemContractErrors.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {IL2ChainAssetHandler} from "contracts/core/chain-asset-handler/IL2ChainAssetHandler.sol";
 

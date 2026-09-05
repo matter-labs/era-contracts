@@ -129,14 +129,6 @@ contract UtilsFacet is ZKChainBase {
         s.baseTokenGasPriceMultiplierDenominator = _denominator;
     }
 
-    function util_setZkPorterAvailability(bool _available) external {
-        s.zkPorterIsAvailable = _available;
-    }
-
-    function util_getZkPorterAvailability() external view returns (bool) {
-        return s.zkPorterIsAvailable;
-    }
-
     function util_setChainTypeManager(address _chainTypeManager) external {
         s.chainTypeManager = _chainTypeManager;
     }
@@ -207,6 +199,10 @@ contract UtilsFacet is ZKChainBase {
         return s.l2DACommitmentScheme;
     }
 
+    function util_setL2DACommitmentScheme(L2DACommitmentScheme _l2DACommitmentScheme) external {
+        s.l2DACommitmentScheme = _l2DACommitmentScheme;
+    }
+
     function util_setSettlementLayer(address _settlementLayer) external {
         s.settlementLayer = _settlementLayer;
     }
@@ -271,10 +267,6 @@ contract UtilsFacet is ZKChainBase {
         s.priorityOpsRequestTimestamp[_txIndex] = _timestamp;
     }
 
-    function util_setZksyncOS(bool _zksyncOS) external {
-        s.zksyncOS = _zksyncOS;
-    }
-
     function util_setZKsyncOSMaxTxGasLimit(uint64 _maxTxGasLimit) external {
         s.zksyncOSMaxTxGasLimit = _maxTxGasLimit;
     }
@@ -285,6 +277,14 @@ contract UtilsFacet is ZKChainBase {
 
     function util_setBaseTokenHasTotalSupply(bool _hasTotalSupply) external {
         s.baseTokenHasTotalSupply = _hasTotalSupply;
+    }
+
+    function util_setDeprecatedPrecommitmentForTheLatestBatch(bytes32 _precommitment) external {
+        s.__DEPRECATED_precommitmentForTheLatestBatch = _precommitment;
+    }
+
+    function util_getDeprecatedPrecommitmentForTheLatestBatch() external view returns (bytes32) {
+        return s.__DEPRECATED_precommitmentForTheLatestBatch;
     }
 
     // add this to be excluded from coverage report

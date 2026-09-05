@@ -4,9 +4,9 @@
 //!   look the bridgehub up in `upgrade-envs/permanent-values/<env>.toml`).
 //! - `--bridgehub <addr> --chain-id <u64>` for chain-targeted commands.
 //!
-//! When `--env` is passed, every other env-derived arg (CTM list, deployer,
-//! era chain id, output dir, …) is auto-filled from the env's permanent-values
-//! TOML + the v31 upgrade input TOML, unless an explicit CLI flag overrides.
+//! When `--env` is passed, each command fills the inputs it supports from the
+//! env's permanent-values TOML and, for version-scoped operations, the v31
+//! upgrade input TOML. Explicit CLI flags override those defaults.
 
 use alloy::primitives::Address;
 use clap::Args;

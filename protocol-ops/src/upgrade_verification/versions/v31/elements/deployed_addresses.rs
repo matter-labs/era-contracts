@@ -52,13 +52,7 @@ mod core_signatures {
             constructor(address _wethToken, address _assetRouter, address _l1Nullifier);
         }
         contract V31L1AssetRouter {
-            constructor(
-                address _l1WethToken,
-                address _bridgehub,
-                address _l1Nullifier,
-                uint256 _eraChainId,
-                address _eraDiamondProxy
-            );
+            constructor(address _l1WethToken, address _bridgehub, address _l1Nullifier);
         }
         contract V31L1Nullifier {
             constructor(address _bridgehub, address _messageRoot);
@@ -86,7 +80,7 @@ mod core_signatures {
 /// `V31ChainTypeManager._interopCenter` is intentionally the L2 built-in
 /// `INTEROP_CENTER` address — the contract stores it in an L1-side
 /// `immutable` but uses it only when constructing L2-aliased messages
-/// (see `ChainTypeManagerBase.sol`). Pass `L2_INTEROP_CENTER_ADDR` here.
+/// (see `ChainTypeManager.sol`). Pass `L2_INTEROP_CENTER_ADDR` here.
 mod ctm_signatures {
     alloy::sol! {
         contract V31AdminFacet {
@@ -99,13 +93,7 @@ mod ctm_signatures {
             constructor(uint256 _l1ChainId);
         }
         contract V31MailboxFacet {
-            constructor(
-                uint256 _eraChainId,
-                uint256 _l1ChainId,
-                address _chainAssetHandler,
-                address _eip7702Checker,
-                bool _isTestnet
-            );
+            constructor(uint256 _l1ChainId, address _chainAssetHandler, address _eip7702Checker, bool _isTestnet);
         }
         contract V31MigratorFacet {
             constructor(uint256 _l1ChainId, bool _isTestnet);
@@ -194,7 +182,6 @@ mod gateway_signatures {
             bytes32 salt;
             address aliasedGovernanceAddress;
             bool testnetVerifier;
-            bool isZKsyncOS;
         }
 
         #[derive(Debug)]
@@ -203,7 +190,6 @@ mod gateway_signatures {
             bytes32 salt;
             uint256 l1ChainId;
             bool testnetVerifier;
-            bool isZKsyncOS;
             bytes4[] adminSelectors;
             bytes4[] executorSelectors;
             bytes4[] mailboxSelectors;
@@ -430,7 +416,6 @@ pub struct StateTransition {
 pub(crate) async fn verify_v31_provenance(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
-    era_chain_id: u64,
     legacy_gateway_chain_id: u64,
     result: &mut VerificationResult,
 ) -> Result<()> {
@@ -492,20 +477,10 @@ pub(crate) async fn verify_v31_provenance(
     .await?;
 
     for ctm in &artifact.ctms {
-        verify_ctm_provenance(
-            artifact,
-            ctm,
-            verifiers,
-            era_chain_id,
-            l1_chain_id,
-            result,
-            core_context,
-        )
-        .await?;
+        verify_ctm_provenance(artifact, ctm, verifiers, l1_chain_id, result, core_context).await?;
     }
 
-    verify_v31_new_gateway_ctm_provenance(artifact, verifiers, era_chain_id, l1_chain_id, result)
-        .await?;
+    verify_v31_new_gateway_ctm_provenance(artifact, verifiers, l1_chain_id, result).await?;
 
     let governance_admin = verifiers.network_verifier.get_proxy_admin(governance).await;
     if governance_admin != Address::ZERO {
@@ -872,18 +847,13 @@ async fn verify_core_provenance(
             .abi_encode(),
             "l1-contracts/CTMDeploymentTracker",
         ),
-        // L1AssetRouter impl(weth, bridgehub, nullifier, eraChainId, eraDiamondProxy).
+        // L1AssetRouter impl(weth, bridgehub, nullifier).
         (
             asset_router_impl,
             V31L1AssetRouter::constructorCall::new((
                 context.weth,
                 context.bridgehub_addr,
                 context.nullifier,
-                // The deploy scripts pass ERA_CHAIN_ID_UNUSED / ERA_DIAMOND_PROXY_UNUSED
-                // (deploy-scripts/utils/Types.sol): nothing this release line deploys has an
-                // Era chain, so generated packages record zero for both words.
-                U256::ZERO,
-                Address::ZERO,
             ))
             .abi_encode(),
             "l1-contracts/L1AssetRouter",
@@ -936,7 +906,6 @@ async fn verify_ctm_provenance(
     artifact: &EcosystemUpgradeArtifact,
     ctm: &CtmArtifact,
     verifiers: &Verifiers,
-    era_chain_id: u64,
     l1_chain_id: u64,
     result: &mut VerificationResult,
     context: CoreProvenanceContext,
@@ -978,7 +947,7 @@ async fn verify_ctm_provenance(
         ],
     )?;
 
-    let ctm_file = "l1-contracts/ZKsyncOSChainTypeManager";
+    let ctm_file = "l1-contracts/ChainTypeManager";
 
     // Single dispatch table: (address, encoded ctor args, expected file).
     let checks: Vec<(Address, Vec<u8>, &str)> = vec![
@@ -988,11 +957,10 @@ async fn verify_ctm_provenance(
             V31CommitterFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
             "l1-contracts/CommitterFacet",
         ),
-        // MailboxFacet(eraChainId, l1ChainId, chainAssetHandler, eip7702Checker, isTestnet).
+        // MailboxFacet(l1ChainId, chainAssetHandler, eip7702Checker, isTestnet).
         (
             mailbox,
             V31MailboxFacet::constructorCall::new((
-                U256::from(era_chain_id),
                 U256::from(l1_chain_id),
                 chain_asset_handler,
                 eip7702,
@@ -1036,7 +1004,7 @@ async fn verify_ctm_provenance(
         // ChainTypeManager impl(bridgehub, interopCenter, bytecodesSupplier, permissionlessValidator).
         // `L2_INTEROP_CENTER_ADDR` is the L2 built-in address, intentionally
         // embedded in an L1-side immutable — the CTM only ever uses it when
-        // constructing L2-aliased messages (see ChainTypeManagerBase.sol).
+        // constructing L2-aliased messages (see ChainTypeManager.sol).
         (
             ctm_impl,
             V31ChainTypeManager::constructorCall::new((
@@ -1177,14 +1145,13 @@ fn verify_ctm_base_provenance(
         "l1-contracts/V32UpgradeZKsyncOS",
     );
 
-    // DiamondInit(bool _isZKsyncOS) — encoded as a single 32-byte word (true).
+    // DiamondInit() — no constructor arguments.
     let diamond_init = required_address(
         &ctm.value,
         &scope,
         &["state_transition", "diamond_init_addr"],
     )?;
-    let mut encoded = vec![0u8; 32];
-    encoded[31] = 1;
+    let encoded = vec![];
     result.expect_create2_params(
         verifiers,
         &diamond_init,
@@ -1246,7 +1213,6 @@ fn verify_ctm_base_provenance(
 async fn verify_v31_new_gateway_ctm_provenance(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
-    era_chain_id: u64,
     l1_chain_id: u64,
     result: &mut VerificationResult,
 ) -> Result<()> {
@@ -1339,9 +1305,8 @@ async fn verify_v31_new_gateway_ctm_provenance(
 
     // Direct Gateway L1->L2 CREATE2 deployments. These are present as raw
     // priority tx calldata and therefore can be checked by address.
-    // DiamondInit(bool _isZKsyncOS = true).
-    let mut diamond_init_args = vec![0u8; 32];
-    diamond_init_args[31] = 1;
+    // DiamondInit() — no constructor arguments.
+    let diamond_init_args = vec![];
     let direct_checks: Vec<(Address, Vec<u8>, &str)> = vec![
         (
             admin,
@@ -1352,7 +1317,6 @@ async fn verify_v31_new_gateway_ctm_provenance(
         (
             mailbox,
             V31MailboxFacet::constructorCall::new((
-                U256::from(era_chain_id),
                 U256::from(l1_chain_id),
                 L2_CHAIN_ASSET_HANDLER_ADDR,
                 Address::ZERO,
@@ -1479,7 +1443,7 @@ async fn verify_v31_new_gateway_ctm_provenance(
         );
     }
 
-    let verifiers_file = "l1-contracts/GatewayCTMDeployerVerifiersZKsyncOS";
+    let verifiers_file = "l1-contracts/GatewayCTMDeployerVerifiers";
     let verifiers_deployer = expect_create2_params_by_file(
         verifiers,
         result,
@@ -1489,7 +1453,6 @@ async fn verify_v31_new_gateway_ctm_provenance(
             salt: gateway_salt,
             aliasedGovernanceAddress: aliased_governance,
             testnetVerifier: source_ctm.contracts_config.is_testnet,
-            isZKsyncOS: true,
         }
         .abi_encode(),
     );
@@ -1508,14 +1471,13 @@ async fn verify_v31_new_gateway_ctm_provenance(
         );
     }
 
-    let ctm_deployer_file = "l1-contracts/GatewayCTMDeployerCTMZKsyncOS";
+    let ctm_deployer_file = "l1-contracts/GatewayCTMDeployerCTM";
     let gateway_ctm_config = GatewayCTMFinalConfig {
         baseConfig: GatewayCTMDeployerConfig {
             aliasedGovernanceAddress: aliased_governance,
             salt: gateway_salt,
             l1ChainId: U256::from(l1_chain_id),
             testnetVerifier: source_ctm.contracts_config.is_testnet,
-            isZKsyncOS: true,
             adminSelectors: admin_cut.selectors.clone(),
             executorSelectors: executor_cut.selectors.clone(),
             mailboxSelectors: mailbox_cut.selectors.clone(),

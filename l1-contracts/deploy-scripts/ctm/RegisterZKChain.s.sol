@@ -24,7 +24,7 @@ import {ADDRESS_ONE} from "../utils/Utils.sol";
 import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -206,14 +206,10 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         config.l1SharedBridgeProxy = coreAddresses.bridges.proxies.l1AssetRouter;
 
         (config.create2FactoryAddress, config.create2Salt) = getCreate2FactoryParams();
-
-        if (vm.keyExistsToml(toml, "$.chain.allow_evm_emulator")) {
-            config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
-        }
     }
 
     function initializeConfigFromOnChain(address _ctmAddress) internal {
-        ChainTypeManagerBase ctm = ChainTypeManagerBase(_ctmAddress);
+        ChainTypeManager ctm = ChainTypeManager(_ctmAddress);
         ctmAddresses = AddressIntrospector.getCTMAddresses(ctm);
         IL1Bridgehub bridgehub = IL1Bridgehub(ctm.BRIDGE_HUB());
         coreAddresses = AddressIntrospector.getCoreDeployedAddresses(address(bridgehub));
@@ -259,7 +255,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         ChainAdminOwnable admin = ChainAdminOwnable(payable(coreAddresses.shared.bridgehubAdmin));
         INativeTokenVaultBase ntv = INativeTokenVaultBase(coreAddresses.bridges.proxies.l1NativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
-        uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
 
         if (baseTokenAssetId == bytes32(0)) {
             baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
@@ -284,7 +279,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
     function registerTokenOnNTV() internal {
         INativeTokenVaultBase ntv = INativeTokenVaultBase(coreAddresses.bridges.proxies.l1NativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
-        uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
 
         // If it hasn't been registered already with ntv
         if (baseTokenAssetId == bytes32(0)) {
@@ -387,15 +381,15 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
 
         vm.startBroadcast(getDeployerAddress());
 
-        // Eth-path operator (ZKsync Era): precommit / revert / upgrader. When dedicated ZKsync OS prove
-        // and execute operators are set, they receive PROVER / EXECUTOR instead (see below).
+        // Eth-path operator: revert / upgrader. When dedicated ZKsync OS prove and execute
+        // operators are set, they receive PROVER / EXECUTOR instead (see below).
         bool zkSyncOsValidatorSplit = config.validatorSenderOperatorProve != address(0) &&
             config.validatorSenderOperatorExecute != address(0);
         validatorTimelock.addValidatorRoles(
             chainAddress,
             config.validatorSenderOperatorEth,
             IValidatorTimelock.ValidatorRotationParams({
-                rotatePrecommitterRole: true,
+                rotatePrecommitterRole: false,
                 rotateCommitterRole: false,
                 rotateReverterRole: true,
                 rotateProverRole: !zkSyncOsValidatorSplit,
@@ -498,7 +492,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         vm.serializeString("root", "chain", chain);
 
         string memory toml = vm.serializeAddress("root", "governance_addr", output.governance);
-        string memory root = vm.projectRoot();
         vm.writeToml(toml, outputPath);
         console.log("Output saved at:", outputPath);
     }

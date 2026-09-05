@@ -122,7 +122,7 @@ address constant L2_MESSAGE_VERIFICATION_ADDR = address(BUILT_IN_CONTRACTS_OFFSE
 address constant L2_CHAIN_ASSET_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0a);
 
 /// @dev UpgradeableBeaconDeployer that's responsible for deploying the upgradeable beacons for the bridged standard ERC20 tokens
-/// @dev Besides separation of concerns, we need it as a separate contract to ensure that L2NativeTokenVaultZKOS
+/// @dev Besides separation of concerns, we need it as a separate contract to ensure that L2NativeTokenVault
 /// does not have to include BridgedStandardERC20 and UpgradeableBeacon and so can fit into the code size limit.
 address constant L2_NTV_BEACON_DEPLOYER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0b);
 

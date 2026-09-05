@@ -48,7 +48,6 @@ contract MockAcceptAll {
 contract MockV32UpgradeNativeTokenVault {
     bytes32 public immutable BASE_TOKEN_ASSET_ID;
     uint256 public immutable L1_CHAIN_ID;
-    bytes32 public immutable L2_TOKEN_PROXY_BYTECODE_HASH;
     address public immutable WETH_TOKEN;
 
     address public BASE_TOKEN_ORIGIN_TOKEN;
@@ -61,10 +60,9 @@ contract MockV32UpgradeNativeTokenVault {
 
     mapping(bytes32 assetId => uint256 originChainIdValue) private _originChainId;
 
-    constructor(bytes32 _assetId, uint256 _l1ChainId, bytes32 _proxyBytecodeHash, address _wethToken) {
+    constructor(bytes32 _assetId, uint256 _l1ChainId, address _wethToken) {
         BASE_TOKEN_ASSET_ID = _assetId;
         L1_CHAIN_ID = _l1ChainId;
-        L2_TOKEN_PROXY_BYTECODE_HASH = _proxyBytecodeHash;
         WETH_TOKEN = _wethToken;
         BASE_TOKEN_NAME = "Ether";
         BASE_TOKEN_SYMBOL = "ETH";
@@ -89,7 +87,6 @@ contract MockV32UpgradeNativeTokenVault {
     function updateL2(
         uint256 _l1ChainId,
         address /* _aliasedOwner */,
-        bytes32 _l2TokenProxyBytecodeHash,
         address _wethToken,
         TokenBridgingData calldata _baseTokenBridgingData,
         TokenMetadata calldata _baseTokenMetadata
@@ -99,7 +96,6 @@ contract MockV32UpgradeNativeTokenVault {
         }
 
         require(_l1ChainId == L1_CHAIN_ID, "unexpected L1 chain id");
-        require(_l2TokenProxyBytecodeHash == L2_TOKEN_PROXY_BYTECODE_HASH, "unexpected proxy bytecode hash");
         require(_wethToken == WETH_TOKEN, "unexpected weth token");
         require(_baseTokenBridgingData.assetId == BASE_TOKEN_ASSET_ID, "unexpected base token asset id");
 
@@ -159,7 +155,6 @@ contract L2V32UpgradeUnitTest is Test {
     address internal constant ALIASED_CHAIN_REGISTRATION_SENDER = address(0xAA03);
     address internal constant CTM_DEPLOYER = address(0xAA04);
     address internal constant PREDEPLOYED_WETH = address(0xdead);
-    bytes32 internal constant L2_TOKEN_PROXY_BYTECODE_HASH = keccak256("proxy");
 
     L2V32Upgrade internal testUpgrade;
 
@@ -186,14 +181,7 @@ contract L2V32UpgradeUnitTest is Test {
         // Specific mocks for contracts we verify
         _etchCode(
             L2_NATIVE_TOKEN_VAULT_ADDR,
-            address(
-                new MockV32UpgradeNativeTokenVault(
-                    BASE_TOKEN_ASSET_ID,
-                    L1_CHAIN_ID,
-                    L2_TOKEN_PROXY_BYTECODE_HASH,
-                    PREDEPLOYED_WETH
-                )
-            )
+            address(new MockV32UpgradeNativeTokenVault(BASE_TOKEN_ASSET_ID, L1_CHAIN_ID, PREDEPLOYED_WETH))
         );
         _etchCode(L2_ASSET_TRACKER_ADDR, address(new MockV32UpgradeAssetTracker()));
         _etchCode(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(new MockV32UpgradeBaseToken()));
@@ -206,13 +194,17 @@ contract L2V32UpgradeUnitTest is Test {
     /// This upgrade therefore leaves the asset tracker and the base token alone; what it does run for them
     /// is covered by `L2GenesisForceDeploymentHelper.t.sol`.
     function test_UpgradeViaComplexUpgrader_LeavesPreV32ContractsAlone() public {
+        // The upgrade always initializes the atomic-interop built-ins, so they need real code here.
+        vm.etch(L2_INTEROP_COMMITMENT_TREE_ADDR, address(new L2InteropCommitmentTree()).code);
+        vm.etch(L2_ATOMIC_FLOW_MANAGER_ADDR, address(new AtomicFlowManager()).code);
+
         bytes memory fixedData = abi.encode(_buildFixedForceDeploymentsData());
         bytes memory additionalData = abi.encode(_buildZKChainSpecificData());
 
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
         L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(
             address(testUpgrade),
-            abi.encodeCall(IL2V32Upgrade.upgrade, (false, CTM_DEPLOYER, fixedData, additionalData))
+            abi.encodeCall(IL2V32Upgrade.upgrade, (CTM_DEPLOYER, fixedData, additionalData))
         );
 
         // AssetTracker: not re-initialized.
@@ -230,9 +222,9 @@ contract L2V32UpgradeUnitTest is Test {
         assertEq(baseToken.initCalls(), 0, "base token must not be re-initialized on an upgrade");
     }
 
-    /// @dev The ZKsync OS path must forward `_isZKsyncOS == true` to the helper: the atomic-interop
-    /// built-ins arrive with the upgrade's force deployments and are initialized here for the first
-    /// time (the tree gets its sentinel leaf, the flow manager the L1 chain id).
+    /// @dev The atomic-interop built-ins arrive with the upgrade's force deployments and are
+    /// initialized here for the first time (the tree gets its sentinel leaf, the flow manager the
+    /// L1 chain id).
     function test_UpgradeViaComplexUpgrader_ZKOSInitializesAtomicInteropBuiltIns() public {
         vm.etch(L2_INTEROP_COMMITMENT_TREE_ADDR, address(new L2InteropCommitmentTree()).code);
         vm.etch(L2_ATOMIC_FLOW_MANAGER_ADDR, address(new AtomicFlowManager()).code);
@@ -243,7 +235,7 @@ contract L2V32UpgradeUnitTest is Test {
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
         L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(
             address(testUpgrade),
-            abi.encodeCall(IL2V32Upgrade.upgrade, (true, CTM_DEPLOYER, fixedData, additionalData))
+            abi.encodeCall(IL2V32Upgrade.upgrade, (CTM_DEPLOYER, fixedData, additionalData))
         );
 
         assertEq(
@@ -269,7 +261,6 @@ contract L2V32UpgradeUnitTest is Test {
             FixedForceDeploymentsData({
                 l1ChainId: L1_CHAIN_ID,
                 l1AssetRouter: L1_ASSET_ROUTER,
-                l2TokenProxyBytecodeHash: L2_TOKEN_PROXY_BYTECODE_HASH,
                 aliasedL1Governance: ALIASED_L1_GOVERNANCE,
                 maxNumberOfZKChains: MAX_NUMBER_OF_ZKCHAINS,
                 bridgehubBytecodeInfo: dummyBytecodeInfo,

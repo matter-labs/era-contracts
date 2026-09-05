@@ -1,9 +1,8 @@
 l1_chain_id = 11155111
 
-# TODO(testnet): no L1NativeTokenVault asset ID is registered yet because the
-# EraVM ZK token has not been deployed on testnet. Populate this once the
-# token is live; PUVT and `ecosystem upgrade-prepare-all --env testnet` will
-# bail without it.
+# TODO(testnet): no L1NativeTokenVault asset ID is registered yet. Populate this
+# once the token is live; PUVT and `ecosystem upgrade-prepare-all --env testnet`
+# will bail without it.
 # zk_token_asset_id = "0x..." # TODO
 
 [permanent_contracts]
@@ -16,40 +15,23 @@ create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 bridgehub_proxy_addr = "0xc4fd2580c3487bba18d63f50301020132342fdbd"
 
 
-# TODO(EVM-1200): The single-CTM `[ctm_contracts]` block below is for ZKsync OS (Atlas)
-# and NOT Era — this is due to no canonical Era chain being present on testnet historically.
-# The newer `[[ctm_contracts.ctms]]` array reflects both CTMs that are actually registered
-# on the testnet bridgehub today.
+# TODO(EVM-1200): Retained for consumers of the legacy single-CTM shape; points to Atlas.
 [ctm_contracts]
 ctm_proxy_addr = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
 l1_bytecodes_supplier_addr = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
 rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 
-# v31 multi-CTM list — consumed by `scripts/v31-simulate-upgrade.ts`.
-# Testnet is currently pre-v31 (Atlas on v30, Era on v29) — overrides are required
-# because the v31 getters (`ctm.isZKsyncOS()`, `ctm.L1_BYTECODES_SUPPLIER()`) don't
-# exist on either CTM yet.
+# Multi-CTM list for `protocol-ops ecosystem upgrade-prepare-all`. Only
+# ZKsync OS CTMs may be listed; the prepare flow fails on anything else.
 [[ctm_contracts.ctms]]
 # Atlas (ZKsyncOS) CTM (witness chain: 8022833, v30)
 # rollup_da_manager queried via `chain.getRollupDAManager()` on chain 8022833's
 # diamond (pv=0x1e00000001). Chain 8022832 is the legacy v29 outlier on this
 # CTM and still points at the old RollupDAManager `0x2732eA4D...`; the v31
 # upgrade flow targets the current v30 state, so we pin the v30 value.
-# bytecodes_supplier shared with Era on testnet (per
-# v0.30.0-zksync-os-blobs/testnet.toml `l1_bytecodes_supplier_addr`).
 proxy = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
-is_zk_sync_os = true
 bytecodes_supplier = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
 rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
-
-[[ctm_contracts.ctms]]
-# Era CTM (witness chain: 301, v29)
-# rollup_da_manager queried via `chain.getRollupDAManager()` on chain 301.
-# bytecodes_supplier from v0.29.1-interopA-ff/testnet.toml.
-proxy = "0x3Cc81628a14C824057a97C1B4Ab17758E5D18864"
-is_zk_sync_os = false
-bytecodes_supplier = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
-rollup_da_manager = "0x6b7D8FD12eF94485c8E928a055124F94C2B5d411"
 
 # Legacy Gateway configuration for settlement layer validation
 # This section contains historical data about chains that settled on the legacy Gateway

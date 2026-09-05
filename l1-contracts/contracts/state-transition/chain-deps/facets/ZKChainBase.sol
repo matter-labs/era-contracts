@@ -6,14 +6,13 @@ import {FeeParams, PriorityModeInformation, PubdataPricingMode, ZKChainStorage} 
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {NotSettlementLayer, NotZKsyncOS} from "../../L1StateTransitionErrors.sol";
+import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {
     BatchHashMismatch,
     BaseTokenGasPriceDenominatorNotSet,
     Unauthorized,
     OnlyNormalMode,
-    OnlyPriorityMode,
-    MustBeEraChain
+    OnlyPriorityMode
 } from "../../../common/L1ContractErrors.sol";
 import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
@@ -21,13 +20,10 @@ import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 import {
     L1_GAS_PER_PUBDATA_BYTE,
-    PRIORITY_OPERATION_L2_TX_TYPE,
-    SYSTEM_UPGRADE_L2_TX_TYPE,
     ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
-    L2DACommitmentScheme,
-    DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH
+    L2DACommitmentScheme
 } from "../../../common/Config.sol";
 import {CantRevertExecutedBatch, RevertedBatchNotAfterNewLastBatch} from "../../../common/L1ContractErrors.sol";
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
@@ -69,18 +65,6 @@ contract ZKChainBase is ReentrancyGuard {
     /// @notice Ensures Priority Mode is active.
     modifier onlyPriorityMode() {
         require(s.priorityModeInfo.activated, OnlyPriorityMode());
-        _;
-    }
-
-    /// @notice Ensures that the chain uses EraVM
-    modifier onlyEra() {
-        require(!s.zksyncOS, MustBeEraChain());
-        _;
-    }
-
-    /// @notice Ensures that the chain uses ZKsync OS
-    modifier onlyZKsyncOS() {
-        require(s.zksyncOS, NotZKsyncOS());
         _;
     }
 
@@ -205,12 +189,12 @@ contract ZKChainBase is ReentrancyGuard {
         return s.priorityTree.getTotalPriorityTxs();
     }
 
-    function _getPriorityTxType() internal view returns (uint256) {
-        return s.zksyncOS ? ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE : PRIORITY_OPERATION_L2_TX_TYPE;
+    function _getPriorityTxType() internal pure returns (uint256) {
+        return ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE;
     }
 
-    function _getUpgradeTxType() internal view returns (uint256) {
-        return s.zksyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+    function _getUpgradeTxType() internal pure returns (uint256) {
+        return ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
     }
 
     /// @notice Returns the effective ZKsync OS single-transaction gas limit (EIP-7825).
@@ -309,7 +293,7 @@ contract ZKChainBase is ReentrancyGuard {
         s.l2DACommitmentScheme = _l2DACommitmentScheme;
     }
 
-    /// @notice Reverts uncommitted batches
+    /// @notice Reverts committed, unexecuted batches.
     /// @param _newLastBatch The batch number after which batches should be reverted.
     function _revertBatches(uint256 _newLastBatch) internal {
         if (s.totalBatchesCommitted < _newLastBatch) {
@@ -318,8 +302,6 @@ contract ZKChainBase is ReentrancyGuard {
         if (_newLastBatch < s.totalBatchesExecuted) {
             revert CantRevertExecutedBatch();
         }
-
-        s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
 
         if (_newLastBatch < s.totalBatchesVerified) {
             s.totalBatchesVerified = _newLastBatch;

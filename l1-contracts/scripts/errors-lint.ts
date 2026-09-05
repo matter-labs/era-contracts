@@ -15,7 +15,7 @@ const CONTRACTS_DIRECTORIES: Record<string, string[]> = {
     "state-transition/L1StateTransitionErrors.sol",
     "upgrades/ZkSyncUpgradeErrors.sol",
   ],
-  "./deploy-scripts": ["utils/ZkSyncScriptErrors.sol"],
+  "./deploy-scripts": ["utils/ZkSyncScriptErrors.sol", "ecosystem/DeployScriptErrors.sol"],
   "../da-contracts/contracts": ["DAContractsErrors.sol"],
 };
 
@@ -195,8 +195,6 @@ async function processFile(
       if (
         trimmedItem === "L2DACommitmentScheme" ||
         trimmedItem === "PubdataPricingMode" ||
-        trimmedItem === "SharedBridgeKey" ||
-        trimmedItem === "BytecodeError" ||
         trimmedItem === "UpgradeTxVerifyParam" ||
         /^[A-Z][a-zA-Z]*(?:Scheme|Mode|Type|Status|State|Kind|Level|Priority|Error|Key)$/.test(trimmedItem) ||
         /^[A-Z][a-z]*[A-Z][a-zA-Z]*$/.test(trimmedItem)
@@ -446,33 +444,7 @@ async function main() {
       }
       collectErrorUsages(searchPaths, usedErrors, declaredNames);
 
-      // Declarations whose only consumers were Era-only contracts removed from this
-      // branch. The declarations themselves must stay: the contract set is audited
-      // and frozen, and deleting even an unused file-level error shifts solc's
-      // internal code ordering in every importing compilation unit (same-length,
-      // different-bytes bytecode drift across ~93 contracts — measured, not
-      // hypothetical). Remove entries here only together with a re-audit.
-      //
-      // TODO: drop this allowlist, and the nine declarations it covers, in the next
-      // release. It is cheapest to do together with the rest of the audited Era cut
-      // rather than on its own: touching `L1ContractErrors.sol` alone already moves
-      // 93 of 157 frozen hash rows, while the entire 33-file cut moves 95 — the churn
-      // unions rather than adds, so splitting it out multiplies the regeneration and
-      // re-audit work without making any single change cheaper.
-      const FROZEN_UNUSED_ERRORS = new Set([
-        "GenesisBatchCommitmentZero()",
-        "GenesisIndexStorageZero()",
-        "InsufficientFunds(uint256,uint256)",
-        "AlreadySigned()",
-        "InitializeNotAvailable()",
-        "MemberAlreadyExists(address)",
-        "MemberDoesNotExist(address)",
-        "NotEnoughSignatures()",
-        "NotSigner()",
-      ]);
-      const unusedErrors = [...declaredErrors].filter(
-        ([errorSig, [errorName]]) => !usedErrors.has(errorName) && !FROZEN_UNUSED_ERRORS.has(errorSig)
-      );
+      const unusedErrors = [...declaredErrors].filter(([, [errorName]]) => !usedErrors.has(errorName));
       if (unusedErrors.length > 0) {
         for (const [errorSig, [, filePath]] of unusedErrors) {
           console.error(`Error "${errorSig}" from ${filePath} is declared but never used.`);

@@ -34,7 +34,6 @@ import {
   L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
   NTV_WETH_TOKEN_SLOT,
   NTV_L1_CHAIN_ID_SLOT,
-  NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT,
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
 import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
@@ -56,7 +55,6 @@ const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6
 const EIP1967_IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
 // ContractUpgradeType enum values from IComplexUpgrader.sol
-const UPGRADE_TYPE_ERA_FORCE_DEPLOYMENT = 0;
 const UPGRADE_TYPE_ZKOS_SYSTEM_PROXY = 1;
 const UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY = 2;
 
@@ -70,12 +68,10 @@ const contractsRootDir = path.resolve(l1ContractsDir, "..");
 const CORE_UPGRADE_TEST_SCRIPT = "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:CoreUpgradeV31ForTests";
 const CTM_UPGRADE_TEST_SCRIPT = "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:CTMUpgradeV31ForTests";
 
-// Function selectors for the ComplexUpgrader entry points.
+// Function selector for the ComplexUpgrader entry point.
 // Used to decode the final L2 upgrade tx data (output of getL2UpgradeTxData).
 const SELECTORS = {
-  // forceDeployAndUpgrade((bytes32,address,bool,uint256,bytes)[],address,bytes) — Era
-  eraForceDeployAndUpgrade: "0x480d1185",
-  // forceDeployAndUpgradeUniversal((uint8,bytes,address)[],address,bytes) — ZKsyncOS
+  // forceDeployAndUpgradeUniversal((uint8,bytes,address)[],address,bytes)
   zkosForceDeployAndUpgradeUniversal: "0xd8cfca80",
 } as const;
 
@@ -724,12 +720,9 @@ export async function runChainUpgradesAndRelayL2(params: {
     const originalUpgradeTxData = originalUpgradeTx.data as string;
 
     // Rewrite the L2 upgrade tx with per-chain data, the same way the per-chain upgrade contract does.
-    const rewrittenUpgradeTxData = await settlementLayerUpgrade.getL2UpgradeTxData(
+    const rewrittenUpgradeTxData = await settlementLayerUpgrade["getL2UpgradeTxData(address,uint256,bytes)"](
       bridgehubAddr,
       chain.chainId,
-      // `DefaultUpgradeZKsyncOS.getL2UpgradeTxData(..., bool isZKsyncOS, ...)` is audited; this
-      // release only upgrades ZKsync OS chains.
-      true,
       originalUpgradeTxData
     );
 
@@ -763,10 +756,8 @@ export async function runChainUpgradesAndRelayL2(params: {
 
 /**
  * Multi-CTM aware variant of `runChainUpgradesAndRelayL2`. Used by env-preset
- * fork tests (e.g. stage) where the bridgehub has both an Era CTM and an
- * Atlas (zkOS) CTM, each with its own per-chain upgrade contract address. This release only produces one
- * for the ZKsync OS CTM (`CTMUpgrade_v31.deployUsedUpgradeContract` refuses Era), so the Era half of the
- * grouping stays empty here and is exercised only by fork runs against older ecosystems.
+ * fork tests where target chains can belong to different CTMs. This release
+ * produces per-chain upgrades only for ZKsync OS CTMs.
  *
  * Groups chains by their on-chain CTM, looks up the per-CTM
  * `script-out/v31-upgrade-ctm-<ctm>.toml` (written by
@@ -791,7 +782,7 @@ export async function runChainUpgradesPerCtm(params: {
 
   const bridgehub = new ethers.Contract(bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
 
-  // Group chains by their CTM. On stage / mainnet there are 2 (Era + Atlas).
+  // Group the selected ZKsync OS chains by their on-chain CTM.
   const groups = new Map<string, Array<{ chainId: number; diamondProxy: string }>>();
   for (const chain of upgradeChainAddresses) {
     const ctm: string = await bridgehub.chainTypeManager(chain.chainId);
@@ -860,8 +851,7 @@ export async function runChainUpgradesPerCtm(params: {
 /**
  * Deploy all L2 system contracts, then relay the upgrade tx.
  *
- * On Anvil EVM, neither the Era ContractDeployer nor ZKsyncOS bytecode deployer
- * infrastructure works. Instead we:
+ * The ZKsync OS bytecode-deployer infrastructure does not run on Anvil EVM. Instead we:
  *   1. Pre-deploy all known contracts via anvil_setCode
  *   2. Place a MockContractDeployer at 0x8006
  */
@@ -870,16 +860,14 @@ async function prepareAndRelayL2Upgrade(
   upgradeTxData: string
 ): Promise<string> {
   // Decode to extract addresses for pre-deployment, then send the ORIGINAL calldata.
-  // MockContractDeployer (no-op) handles the force deployment calls from both the outer
-  // ComplexUpgrader iteration and the inner performForceDeployedContractsInit calls.
+  // MockContractDeployer handles the outer ComplexUpgrader force-deployment calls.
   const { forceDeployEntries, delegateTo } = decodeUpgradeTxData(upgradeTxData);
 
   // Pre-deploy all L2 contracts via anvil_setCode
   await deployL2Contracts(l2Provider, forceDeployEntries, delegateTo);
 
-  // Send the original upgrade calldata to ComplexUpgrader.
-  // The outer force deployments no-op (MockContractDeployer), then upgrade() delegatecalls
-  // to L2V32Upgrade which runs performForceDeployedContractsInit (inner deploys also no-op).
+  // Send the original upgrade calldata to ComplexUpgrader. The outer force deployments no-op
+  // through MockContractDeployer, then upgrade() delegatecalls to L2V32Upgrade for initialization.
   const txHash = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
     const tx = await signer.sendTransaction({
       to: L2_COMPLEX_UPGRADER_ADDR,
@@ -906,7 +894,7 @@ async function prepareAndRelayL2Upgrade(
  * production upgrade deploys to. We place EVM bytecodes at those addresses
  * (and a few extra addresses called during the upgrade but not in the force
  * deployment list). A MockContractDeployer at 0x8006 no-ops the actual
- * force-deploy calls from both ComplexUpgrader and performForceDeployedContractsInit.
+ * force-deploy calls from ComplexUpgrader.
  *
  * For ZKsyncOS chains, contracts with ZKsyncOSSystemProxyUpgrade type are deployed
  * behind SystemContractProxy (matching production genesis layout):
@@ -921,13 +909,12 @@ async function deployL2Contracts(
   delegateTo: string
 ): Promise<void> {
   // MockContractDeployer: typed no-op `setBytecodeDetailsEVM` at the ContractDeployer address so
-  // conductContractUpgrade() calls succeed. It implements the production IZKOSContractDeployer
+  // conductContractUpgrade() calls succeed. It implements the production ISystemContractDeployer
   // interface and has no fallback, so any call with a stale or unexpected selector reverts loudly.
   await l2Provider.send("anvil_setCode", [L2_CONTRACT_DEPLOYER_ADDR, getBytecode("MockContractDeployer")]);
 
-  // SystemContractProxyAdmin: _setupProxyAdmin() calls owner() and forceSetOwner().
-  // For ZKsyncOS: use real SystemContractProxyAdmin — proper proxy setup means upgrade() works.
-  // For Era: use real SystemContractProxyAdmin (upgrade() is not called by outer loop).
+  // SystemContractProxyAdmin: _setupProxyAdmin() calls owner() and forceSetOwner(). Use the real
+  // contract because the system proxies below rely on its upgrade path.
   await l2Provider.send("anvil_setCode", [
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
     getBytecode("SystemContractProxyAdmin"),
@@ -952,14 +939,6 @@ async function deployL2Contracts(
 
     const contractName = contractMap.get(entry.address.toLowerCase());
     if (!contractName) {
-      // Era force deployments include the EmptyContract placeholder (0x0000), the EraVM
-      // precompiles (0x0001..0x0008), and the system contracts at 0x800x (AccountCodeStorage,
-      // NonceHolder, etc.). These are either not exercised by the anvil harness (precompiles)
-      // or are already present in the loaded chain state, so we do not need to deploy
-      // their bytecode via anvil_setCode. Skip silently for entries we do not know about.
-      if (entry.upgradeType === UPGRADE_TYPE_ERA_FORCE_DEPLOYMENT) {
-        continue;
-      }
       throw new Error(`No contract mapping for ZKsyncOS force deploy address ${entry.address}`);
     }
 
@@ -987,8 +966,8 @@ async function deployL2Contracts(
   // Seed critical storage values on L2 contracts that were deployed via anvil_setCode
   // but never initialized. performForceDeployedContractsInit reads these before calling
   // updateL2, which reverts if WETH_TOKEN is zero.
-  // Storage slots found via forge: NTV.WETH_TOKEN=251, NTV.L2_TOKEN_PROXY_BYTECODE_HASH=255,
-  // NTV.L2_LEGACY_SHARED_BRIDGE=254, NTV.L1_CHAIN_ID=253, AR.L2_LEGACY_SHARED_BRIDGE=255.
+  // Storage slots found via forge: NTV.WETH_TOKEN=251, NTV.L2_LEGACY_SHARED_BRIDGE=254,
+  // NTV.L1_CHAIN_ID=253, AR.L2_LEGACY_SHARED_BRIDGE=255.
   //
   // For ZKsyncOS, these contracts live behind SystemContractProxy, so storage writes go to the
   // proxy address (which delegates to the implementation). The storage layout is the same because
@@ -1007,12 +986,6 @@ async function deployL2Contracts(
     L2_NATIVE_TOKEN_VAULT_ADDR,
     toSlot(NTV_L1_CHAIN_ID_SLOT),
     ethers.utils.hexZeroPad(ethers.utils.hexlify(runtimeConfig.l1ChainId), 32),
-  ]);
-  // NTV: set L2_TOKEN_PROXY_BYTECODE_HASH to a non-zero placeholder
-  await l2Provider.send("anvil_setStorageAt", [
-    L2_NATIVE_TOKEN_VAULT_ADDR,
-    toSlot(NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT),
-    ethers.utils.hexZeroPad("0x01", 32),
   ]);
   // AR: L2_LEGACY_SHARED_BRIDGE is zero (no legacy bridge) — no need to set
 }
@@ -1092,22 +1065,6 @@ function decodeUpgradeTxData(upgradeTxData: string): {
   const selector = upgradeTxData.slice(0, 10);
   const payload = "0x" + upgradeTxData.slice(10);
   const abiCoder = ethers.utils.defaultAbiCoder;
-
-  if (selector === SELECTORS.eraForceDeployAndUpgrade) {
-    const [deployments, delegateTo, innerCalldata] = abiCoder.decode(
-      ["tuple(bytes32,address,bool,uint256,bytes)[]", "address", "bytes"],
-      payload
-    );
-    const entries: ForceDeployEntry[] = deployments.map((fd: { 1: string }) => ({
-      address: fd[1],
-      upgradeType: UPGRADE_TYPE_ERA_FORCE_DEPLOYMENT,
-    }));
-    return {
-      forceDeployEntries: entries,
-      delegateTo,
-      innerCalldata,
-    };
-  }
 
   if (selector === SELECTORS.zkosForceDeployAndUpgradeUniversal) {
     const [deployments, delegateTo, innerCalldata] = abiCoder.decode(
@@ -1501,7 +1458,7 @@ function buildAddressToContract(): ReadonlyMap<string, ContractName> {
     [L2_MESSAGE_ROOT_ADDR.toLowerCase(), "L2MessageRoot"],
     [L2_BRIDGEHUB_ADDR.toLowerCase(), "L2Bridgehub"],
     [L2_ASSET_ROUTER_ADDR.toLowerCase(), "L2AssetRouter"],
-    [L2_NATIVE_TOKEN_VAULT_ADDR.toLowerCase(), "L2NativeTokenVaultZKOS"],
+    [L2_NATIVE_TOKEN_VAULT_ADDR.toLowerCase(), "L2NativeTokenVault"],
     [L2_CHAIN_ASSET_HANDLER_ADDR.toLowerCase(), "L2ChainAssetHandler"],
     [L2_ASSET_TRACKER_ADDR.toLowerCase(), "L2AssetTracker"],
     [INTEROP_CENTER_ADDR.toLowerCase(), "InteropCenter"],
@@ -1516,10 +1473,11 @@ function buildAddressToContract(): ReadonlyMap<string, ContractName> {
     // Atomic-interop built-ins: force-deployed by this release's upgrade on ZKsync OS chains.
     [L2_INTEROP_COMMITMENT_TREE_ADDR.toLowerCase(), "L2InteropCommitmentTree"],
     [L2_ATOMIC_FLOW_MANAGER_ADDR.toLowerCase(), "AtomicFlowManager"],
-    [L2_BASE_TOKEN_ADDR.toLowerCase(), "L2BaseTokenZKOS"],
-    [L2_TO_L1_MESSENGER_ADDR.toLowerCase(), "L1MessengerZKOS"],
+    [L2_BASE_TOKEN_ADDR.toLowerCase(), "L2BaseToken"],
+    [L2_TO_L1_MESSENGER_ADDR.toLowerCase(), "L1Messenger"],
     [SYSTEM_CONTEXT_ADDR.toLowerCase(), "SystemContext"],
-    [L2_CONTRACT_DEPLOYER_ADDR.toLowerCase(), "ZKOSContractDeployer"],
+    [L2_COMPLEX_UPGRADER_ADDR.toLowerCase(), "L2ComplexUpgrader"],
+    [L2_CONTRACT_DEPLOYER_ADDR.toLowerCase(), "ContractDeployer"],
     // The removed v31 GWAssetTracker: the upgrade swaps its proxy's implementation for EmptyContract.
     [L2_REMOVED_GW_ASSET_TRACKER_ADDR.toLowerCase(), "EmptyContract"]
   );

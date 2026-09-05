@@ -4,7 +4,8 @@
 //!   1. Resolve the chain's ChainTypeManager on the settlement layer (L1 or gateway).
 //!   2. Scan for `NewUpgradeCutData(target_protocol_version, ...)` on the CTM and
 //!      extract the embedded `L2CanonicalTransaction`.
-//!   3. Compute `keccak256(tx.abi_encode())` — the canonical L2 upgrade-tx hash.
+//!   3. Replay its v31+ per-chain data rewrite and compute
+//!      `keccak256(tx.abi_encode())` — the canonical L2 upgrade-tx hash.
 //!   4. Poll the chain's L2 RPC for a receipt; once present, the server processed
 //!      the upgrade in L2 block N.
 //!   5. Poll `eth_getBlockByNumber("finalized")` until the finalized block is
@@ -71,9 +72,8 @@ struct Cli {
     #[arg(long, env = "TARGET_PATCH_VERSION", default_value_t = 0)]
     target_patch_version: u32,
 
-    /// Deprecated no-op, kept for CLI compatibility: every chain served by this
-    /// tooling is a ZKsync OS chain, so the v31 upgrade contract's
-    /// `getL2UpgradeTxData(_, _, zksyncOS, _)` parameter is always `true`.
+    /// Deprecated no-op kept for CLI compatibility. Every live chain served by this
+    /// tooling is a ZKsync OS chain; legacy upgrade ABI calls supply that value internally.
     #[arg(long, env = "ZKSYNC_OS", action = clap::ArgAction::SetTrue, hide = true)]
     #[allow(dead_code)]
     zksync_os: bool,

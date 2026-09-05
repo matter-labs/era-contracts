@@ -22,7 +22,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
-import {CoreDeployedAddresses, ERA_CHAIN_ID_UNUSED, ERA_DIAMOND_PROXY_UNUSED} from "../utils/Types.sol";
+import {CoreDeployedAddresses} from "../utils/Types.sol";
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 
 // solhint-disable-next-line gas-struct-packing
@@ -126,9 +126,7 @@ contract DeployL1CoreUtils is DeployUtils {
                 abi.encode(
                     config.tokens.tokenWethAddress,
                     coreAddresses.bridgehub.proxies.bridgehub,
-                    coreAddresses.bridges.proxies.l1Nullifier,
-                    ERA_CHAIN_ID_UNUSED,
-                    ERA_DIAMOND_PROXY_UNUSED
+                    coreAddresses.bridges.proxies.l1Nullifier
                 );
         } else if (compareStrings(contractName, "L1NativeTokenVault")) {
             return

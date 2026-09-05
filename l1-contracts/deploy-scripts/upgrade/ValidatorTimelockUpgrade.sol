@@ -4,7 +4,7 @@ pragma solidity ^0.8.10;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {Create2FactoryUtils} from "deploy-scripts/utils/deploy/Create2FactoryUtils.s.sol";
 import {MultisigCommitter} from "contracts/state-transition/validators/MultisigCommitter.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -25,7 +25,7 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
     }
 
     function runInner(address ctm) internal returns (Call[] memory calls) {
-        ZKsyncOSChainTypeManager chainTypeManager = ZKsyncOSChainTypeManager(ctm);
+        ChainTypeManager chainTypeManager = ChainTypeManager(ctm);
         console.logAddress(msg.sender);
         address validatorTimelock = chainTypeManager.validatorTimelockPostV29();
         address bridgehub = chainTypeManager.BRIDGE_HUB();
@@ -54,7 +54,7 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
     }
 
     function addSharedValidators(address[] memory validators, address ctm) public {
-        ZKsyncOSChainTypeManager chainTypeManager = ZKsyncOSChainTypeManager(ctm);
+        ChainTypeManager chainTypeManager = ChainTypeManager(ctm);
         address validatorTimelock = chainTypeManager.validatorTimelockPostV29();
         Call[] memory calls = new Call[](0);
         for (uint256 i = 0; i < validators.length; i++) {
@@ -65,7 +65,7 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
     }
 
     function removeSharedValidators(address[] memory validators, address ctm) public {
-        ZKsyncOSChainTypeManager chainTypeManager = ZKsyncOSChainTypeManager(ctm);
+        ChainTypeManager chainTypeManager = ChainTypeManager(ctm);
         address validatorTimelock = chainTypeManager.validatorTimelockPostV29();
         Call[] memory calls = new Call[](0);
         for (uint256 i = 0; i < validators.length; i++) {
@@ -97,7 +97,7 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
     }
 
     function getValidatorAndChainAddress(address ctm, uint256 chainId) internal view returns (address, address) {
-        ZKsyncOSChainTypeManager chainTypeManager = ZKsyncOSChainTypeManager(ctm);
+        ChainTypeManager chainTypeManager = ChainTypeManager(ctm);
         address validatorTimelock = chainTypeManager.validatorTimelockPostV29();
         address chain = chainTypeManager.getZKChain(chainId);
         return (validatorTimelock, chain);

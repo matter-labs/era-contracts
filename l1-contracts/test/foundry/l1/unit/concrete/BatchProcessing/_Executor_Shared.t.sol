@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import "forge-std/console.sol";
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -14,7 +14,7 @@ import {
     TEST_ROLLUP_DA_MANAGER_OWNER
 } from "../Utils/Utils.sol";
 import {ETH_TOKEN_ADDRESS, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
-import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
+import {DummyBaseTokenBridge} from "contracts/dev-contracts/test/DummyBaseTokenBridge.sol";
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
 import {DummyChainTypeManagerForValidatorTimelock as DummyCTM} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -31,7 +31,9 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {CommitBatchInfoZKsyncOS, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
+import {TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {AcceptingVerifier} from "contracts/dev-contracts/test/AcceptingVerifier.sol";
@@ -66,10 +68,9 @@ contract ExecutorTest is UtilsCallMockerTest {
     bytes32 internal newCommittedBlockBatchHash;
     bytes32 internal newCommittedBlockCommitment;
     uint256 internal currentTimestamp;
-    CommitBatchInfo internal newCommitBatchInfo;
     CommitBatchInfoZKsyncOS internal newCommitBatchInfoZKsyncOS;
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
-    DummyEraBaseTokenBridge internal sharedBridge;
+    DummyBaseTokenBridge internal sharedBridge;
     ValidatorTimelock internal validatorTimelock;
     PermissionlessValidator internal permissionlessValidator;
     address internal rollupL1DAValidator;
@@ -85,12 +86,11 @@ contract ExecutorTest is UtilsCallMockerTest {
     uint256[] internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](15);
+        bytes4[] memory selectors = new bytes4[](14);
         uint256 i = 0;
         selectors[i++] = admin.setPendingAdmin.selector;
         selectors[i++] = admin.acceptAdmin.selector;
         selectors[i++] = admin.setValidator.selector;
-        selectors[i++] = admin.setPorterAvailability.selector;
         selectors[i++] = admin.setPriorityTxMaxGasLimit.selector;
         selectors[i++] = admin.changeFeeParams.selector;
         selectors[i++] = admin.setTokenMultiplier.selector;
@@ -118,10 +118,9 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getCommitterSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](2);
+        bytes4[] memory selectors = new bytes4[](1);
         uint256 i = 0;
         selectors[i++] = committer.commitBatchesSharedBridge.selector;
-        selectors[i++] = committer.precommitSharedBridge.selector;
         return selectors;
     }
 
@@ -240,9 +239,8 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector),
             abi.encode(makeAddr("chainTypeManager"))
         );
-        address interopCenter = makeAddr("interopCenter");
         dummyBridgehub.setMessageRoot(address(messageRoot));
-        sharedBridge = new DummyEraBaseTokenBridge();
+        sharedBridge = new DummyBaseTokenBridge();
         // dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
 
         dummyBridgehub.setSharedBridge(address(sharedBridge));
@@ -279,7 +277,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
             abi.encode(bool(true))
         );
-        DiamondInit diamondInit = new DiamondInit(isZKsyncOS());
+        DiamondInit diamondInit = new DiamondInit();
         AcceptingVerifier testnetVerifier = new AcceptingVerifier();
         // Mock the CTM to return a verifier for protocol version 0
         vm.mockCall(
@@ -305,7 +303,6 @@ contract ExecutorTest is UtilsCallMockerTest {
             // TODO REVIEW
             chainId: l2ChainId,
             bridgehub: address(dummyBridgehub),
-            interopCenter: interopCenter,
             chainTypeManager: address(chainTypeManager),
             protocolVersion: 0,
             admin: owner,
@@ -393,19 +390,6 @@ contract ExecutorTest is UtilsCallMockerTest {
         vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
 
-        bytes memory l2Logs = Utils.encodePacked(Utils.createSystemLogs(bytes32(0)));
-        newCommitBatchInfo = CommitBatchInfo({
-            batchNumber: 1,
-            timestamp: uint64(currentTimestamp),
-            indexRepeatedStorageChanges: 0,
-            newStateRoot: Utils.randomBytes32("newStateRoot"),
-            numberOfLayer1Txs: 0,
-            priorityOperationsHash: keccak256(""),
-            bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
-            eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
-            systemLogs: l2Logs,
-            operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
-        });
         newCommitBatchInfoZKsyncOS = CommitBatchInfoZKsyncOS({
             batchNumber: 1,
             newStateCommitment: Utils.randomBytes32("newStateCommitment"),
@@ -437,8 +421,67 @@ contract ExecutorTest is UtilsCallMockerTest {
         );
     }
 
-    function isZKsyncOS() internal pure virtual returns (bool) {
-        return false;
+    /// @dev Mocks the rollup L1 DA validator's `checkDA` for the given batch: an all-zero blob
+    /// output, which the ZKsync OS commit path accepts (it verifies DA out of band).
+    function _mockDAForCommit(uint256 batchNumber) internal {
+        bytes32[] memory blobHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        bytes32[] memory blobCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        L1DAValidatorOutput memory daOutput = L1DAValidatorOutput({
+            stateDiffHash: bytes32(0),
+            blobsLinearHashes: blobHashes,
+            blobsOpeningCommitments: blobCommitments
+        });
+        // Match any checkDA call for this batch regardless of DA input encoding
+        vm.mockCall(
+            rollupL1DAValidator,
+            abi.encodeWithSelector(IL1DAValidator.checkDA.selector, l2ChainId, batchNumber),
+            abi.encode(daOutput)
+        );
+    }
+
+    /// @dev Commits one ZKsync OS batch through the real committer (DA mocked via
+    /// {_mockDAForCommit}) and reconstructs the resulting `StoredBatchInfo`. The cryptographic
+    /// fields (`batchHash`, `commitment`) are read back from the emitted `BlockCommit` event; the
+    /// reconstruction is self-checking because any later prove/execute recomputes the stored hash.
+    function _commitOSBatchGetStored(
+        IExecutor.StoredBatchInfo memory prev,
+        CommitBatchInfoZKsyncOS memory info
+    ) internal returns (IExecutor.StoredBatchInfo memory stored) {
+        _mockDAForCommit(info.batchNumber);
+
+        CommitBatchInfoZKsyncOS[] memory arr = new CommitBatchInfoZKsyncOS[](1);
+        arr[0] = info;
+        (uint256 commitFrom, uint256 commitTo, bytes memory commitData) = Utils.encodeCommitBatchesDataZKsyncOS(
+            prev,
+            arr
+        );
+        vm.recordLogs();
+        vm.prank(validator);
+        committer.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+
+        bytes32 batchHash;
+        bytes32 commitment;
+        for (uint256 i = 0; i < entries.length; ++i) {
+            if (entries[i].topics[0] == ICommitter.BlockCommit.selector) {
+                batchHash = entries[i].topics[2];
+                commitment = entries[i].topics[3];
+                break;
+            }
+        }
+        require(commitment != bytes32(0), "BlockCommit event not found");
+
+        stored = IExecutor.StoredBatchInfo({
+            batchNumber: info.batchNumber,
+            batchHash: batchHash,
+            indexRepeatedStorageChanges: 0,
+            numberOfLayer1Txs: info.numberOfLayer1Txs,
+            priorityOperationsHash: info.priorityOperationsHash,
+            dependencyRootsRollingHash: info.dependencyRootsRollingHash,
+            l2LogsTreeRoot: info.l2LogsTreeRoot,
+            timestamp: 0,
+            commitment: commitment
+        });
     }
 
     // add this to be excluded from coverage report

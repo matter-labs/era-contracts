@@ -121,7 +121,6 @@ export const L2_BOOTLOADER_ADDR = "0x0000000000000000000000000000000000008001";
 // Obtained via: forge inspect L2NativeTokenVault storageLayout
 export const NTV_WETH_TOKEN_SLOT = 251;
 export const NTV_L1_CHAIN_ID_SLOT = 253;
-export const NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT = 255;
 
 // Event signatures
 // GenesisUpgrade(address indexed, L2CanonicalTransaction, uint256 indexed, bytes[])

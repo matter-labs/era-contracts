@@ -2,93 +2,657 @@
 pragma solidity 0.8.28;
 
 import "forge-std/console.sol";
-import {Vm} from "forge-std/Test.sol";
-import {EVENT_INDEX, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../Utils/Utils.sol";
-import {
-    EMPTY_PREPUBLISHED_COMMITMENT,
-    ExecutorTest,
-    POINT_EVALUATION_PRECOMPILE_RESULT
-} from "./_Executor_Shared.t.sol";
 
-import {
-    IExecutor,
-    SystemLogKey,
-    TOTAL_BLOBS_IN_COMMITMENT
-} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
+import {Utils} from "../Utils/Utils.sol";
+import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
-import {BLOB_DATA_OFFSET} from "../../../da-contracts-imports/CalldataDA.sol";
-import {
-    BlobHashCommitmentError,
-    EmptyBlobVersionHash,
-    InvalidPubdataCommitmentsSize,
-    NonEmptyBlobVersionHash,
-    OperatorDAInputTooSmall
-} from "../../../da-contracts-imports/DAContractsErrors.sol";
-import {
-    BatchHashMismatch,
-    BatchNumberMismatch,
-    BatchTimestampGreaterThanLastL2BlockTimestamp,
-    CanOnlyProcessOneBatch,
-    HashMismatch,
-    InvalidLogSender,
-    L2TimestampTooBig,
-    LogAlreadyProcessed,
-    MissingSystemLogs,
-    TimeNotReached,
-    TimestampError,
-    UnexpectedSystemLog,
-    ValueMismatch
-} from "contracts/common/L1ContractErrors.sol";
+import {CommitBatchInfoZKsyncOS, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {BatchHashMismatch} from "contracts/common/L1ContractErrors.sol";
 import {InteropRoot} from "contracts/common/Messaging.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {MismatchL2DACommitmentScheme} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
+import {
+    InvalidPubdataHash,
+    InvalidBlobsPublished,
+    BlobNotPublished
+} from "../../../da-contracts-imports/DAContractsErrors.sol";
+import {BlobsL1DAValidatorZKsyncOS} from "../../../da-contracts-imports/BlobsL1DAValidatorZKsyncOS.sol";
 
 contract CommittingTest is ExecutorTest {
-    bytes32[] defaultBlobVersionedHashes;
-    bytes32 l2DAValidatorOutputHash;
-    bytes operatorDAInput;
-    bytes defaultBlobCommitment;
-    bytes16 defaultBlobOpeningPoint = 0x7142c5851421a2dc03dde0aabdb0ffdb;
-    bytes32 defaultBlobClaimedValue = 0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0;
+    function setUp() public {}
 
-    function setUp() public {
-        // the values below are taken from the actual blob used by Era
-        bytes1 source = bytes1(0x01);
-        defaultBlobCommitment = Utils.getDefaultBlobCommitment();
-
-        bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
-        bytes32 totalL2PubdataHash = Utils.randomBytes32("totalL2PubdataHash");
+    function test_SuccessfullyCommitBatchWithCalldata() public {
+        // Calldata DA
+        // With calldata zksync os always produces 1 blob with linear hash equals to zero
+        // Generating similar values here
+        bytes1 source = bytes1(0);
+        bytes32 blobCommitment = bytes32(0);
+        bytes32 uncompressedStateDiffHash = bytes32(0);
+        bytes memory pubdata = abi.encodePacked((Utils.randomBytes32("pubdata")));
+        bytes32 totalL2PubdataHash = keccak256(pubdata);
         uint8 numberOfBlobs = 1;
         bytes32[] memory blobsLinearHashes = new bytes32[](1);
-        blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes");
 
-        operatorDAInput = abi.encodePacked(
+        bytes memory operatorDAInput = abi.encodePacked(
             uncompressedStateDiffHash,
             totalL2PubdataHash,
             numberOfBlobs,
             blobsLinearHashes,
             source,
-            defaultBlobCommitment,
-            EMPTY_PREPUBLISHED_COMMITMENT
+            pubdata,
+            blobCommitment
         );
 
-        l2DAValidatorOutputHash = Utils.constructRollupL2DAValidatorOutputHash(
+        bytes32 daCommitment = Utils.constructRollupL2DAValidatorOutputHash(
             uncompressedStateDiffHash,
             totalL2PubdataHash,
             uint8(numberOfBlobs),
             blobsLinearHashes
         );
 
-        defaultBlobVersionedHashes = new bytes32[](1);
-        defaultBlobVersionedHashes[0] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5;
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+        correctNewCommitBatchInfo.daCommitment = daCommitment;
 
-        bytes memory precompileInput = Utils.defaultPointEvaluationPrecompileInput(defaultBlobVersionedHashes[0]);
-        vm.mockCall(POINT_EVALUATION_PRECOMPILE_ADDR, precompileInput, POINT_EVALUATION_PRECOMPILE_RESULT);
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
+        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
+        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        vm.prank(validator);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_SuccessfullyCommitBatchWithBlobs() public {
+        bytes32[] memory blobVersionedHashes = new bytes32[](2);
+        blobVersionedHashes[0] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5;
+        blobVersionedHashes[1] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d6;
+
+        // 2 blobs, which we didn't prepublish
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0), bytes32(0));
+
+        bytes32 daCommitment = keccak256(
+            abi.encodePacked(
+                bytes32(0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5),
+                bytes32(0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d6)
+            )
+        );
+
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+        correctNewCommitBatchInfo.daCommitment = daCommitment;
+        correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.BLOBS_ZKSYNC_OS;
+
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
+        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
+        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+
+        // with ZKsync OS we have separate pair for blobs
+        address blobsl1DaValidatorZKsyncOS = Utils.deployBlobsL1DAValidatorZKsyncOSBytecode();
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(blobsl1DaValidatorZKsyncOS, L2DACommitmentScheme.BLOBS_ZKSYNC_OS);
+
+        vm.prank(validator);
+        vm.blobhashes(blobVersionedHashes);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_SuccessfullyCommitBatchWithBlobsPrepublished() public {
+        bytes32[] memory blobVersionedHashes = new bytes32[](2);
+        blobVersionedHashes[0] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5;
+        blobVersionedHashes[1] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d6;
+
+        // 2 prepublished blobs
+        bytes memory operatorDAInput = abi.encodePacked(blobVersionedHashes[0], blobVersionedHashes[1]);
+
+        bytes32 daCommitment = keccak256(
+            abi.encodePacked(
+                bytes32(0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5),
+                bytes32(0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d6)
+            )
+        );
+
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+        correctNewCommitBatchInfo.daCommitment = daCommitment;
+        correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.BLOBS_ZKSYNC_OS;
+
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
+        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
+        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+
+        // with ZKsync OS we have separate pair for blobs
+        address blobsl1DaValidatorZKsyncOS = Utils.deployBlobsL1DAValidatorZKsyncOSBytecode();
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(blobsl1DaValidatorZKsyncOS, L2DACommitmentScheme.BLOBS_ZKSYNC_OS);
+
+        vm.blobhashes(blobVersionedHashes);
+        BlobsL1DAValidatorZKsyncOS(blobsl1DaValidatorZKsyncOS).publishBlobs();
+
+        vm.prank(validator);
+        vm.blobhashes(new bytes32[](0));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_SuccessfullyCommitBatchValidium() public {
+        bytes memory operatorDAInput = abi.encodePacked(
+            bytes32(0) // just put zero with zksync os, no need to verify it
+        );
+
+        bytes32 daCommitment = bytes32(0); // empty
+
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+        correctNewCommitBatchInfo.daCommitment = daCommitment;
+        correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
+        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
+        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+
+        // with ZKsync OS we have separate pair for blobs
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_CommittingWithWrongL2DACommitmentScheme() public {
+        bytes32[] memory blobVersionedHashes = new bytes32[](2);
+        blobVersionedHashes[0] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5;
+        blobVersionedHashes[1] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d6;
+
+        // 2 blobs, which we didn't prepublish
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0), bytes32(0));
+
+        bytes32 daCommitment = keccak256(
+            abi.encodePacked(
+                bytes32(0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5),
+                bytes32(0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d6)
+            )
+        );
+
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+        correctNewCommitBatchInfo.daCommitment = daCommitment;
+        correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256;
+
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
+        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
+        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+
+        // with ZKsync OS we have separate pair for blobs
+        address blobsl1DaValidatorZKsyncOS = Utils.deployBlobsL1DAValidatorZKsyncOSBytecode();
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(blobsl1DaValidatorZKsyncOS, L2DACommitmentScheme.BLOBS_ZKSYNC_OS);
+
+        vm.prank(validator);
+        vm.blobhashes(blobVersionedHashes);
+        vm.expectRevert(abi.encodeWithSelector(MismatchL2DACommitmentScheme.selector, 3, 4));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_CommittingWithWrongCalldata() public {
+        // Calldata DA
+        // With calldata zksync os always produces 1 blob with linear hash equals to zero
+        // Generating similar values here
+        bytes1 source = bytes1(0);
+        bytes32 blobCommitment = bytes32(0);
+        bytes32 uncompressedStateDiffHash = bytes32(0);
+        bytes memory pubdata = abi.encodePacked((Utils.randomBytes32("pubdata")));
+        bytes32 totalL2PubdataHash = bytes32(hex"0123456789012345678901234567890123456789012345678901234567890123"); // hash doesn't correspond to pubdata
+        uint8 numberOfBlobs = 1;
+        bytes32[] memory blobsLinearHashes = new bytes32[](1);
+
+        bytes memory operatorDAInput = abi.encodePacked(
+            uncompressedStateDiffHash,
+            totalL2PubdataHash,
+            numberOfBlobs,
+            blobsLinearHashes,
+            source,
+            pubdata,
+            blobCommitment
+        );
+
+        bytes32 daCommitment = Utils.constructRollupL2DAValidatorOutputHash(
+            uncompressedStateDiffHash,
+            totalL2PubdataHash,
+            uint8(numberOfBlobs),
+            blobsLinearHashes
+        );
+
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+        correctNewCommitBatchInfo.daCommitment = daCommitment;
+
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
+        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
+        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSelector(InvalidPubdataHash.selector, totalL2PubdataHash, keccak256(pubdata)));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_CommittingWithWrongBlobs() public {
+        bytes32[] memory blobVersionedHashes = new bytes32[](2);
+        blobVersionedHashes[0] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5;
+        blobVersionedHashes[1] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d7;
+
+        // 2 blobs, which we didn't prepublish
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0), bytes32(0));
+
+        bytes32 daCommitment = keccak256(
+            abi.encodePacked(
+                bytes32(0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5),
+                bytes32(0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d6)
+            )
+        );
+
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+        correctNewCommitBatchInfo.daCommitment = daCommitment;
+        correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.BLOBS_ZKSYNC_OS;
+
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
+        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
+        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+
+        // with ZKsync OS we have separate pair for blobs
+        address blobsl1DaValidatorZKsyncOS = Utils.deployBlobsL1DAValidatorZKsyncOSBytecode();
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(blobsl1DaValidatorZKsyncOS, L2DACommitmentScheme.BLOBS_ZKSYNC_OS);
+
+        vm.prank(validator);
+        vm.blobhashes(blobVersionedHashes);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                InvalidBlobsPublished.selector,
+                keccak256(abi.encodePacked(blobVersionedHashes)),
+                daCommitment
+            )
+        );
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_CommittingWithNotPrepublishedBlobs() public {
+        bytes32[] memory blobVersionedHashes = new bytes32[](2);
+        blobVersionedHashes[0] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5;
+        blobVersionedHashes[1] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d6;
+
+        // 2 prepublished blobs
+        bytes memory operatorDAInput = abi.encodePacked(blobVersionedHashes[0], blobVersionedHashes[1]);
+
+        bytes32 daCommitment = keccak256(
+            abi.encodePacked(
+                bytes32(0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5),
+                bytes32(0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d6)
+            )
+        );
+
+        CommitBatchInfoZKsyncOS memory correctNewCommitBatchInfo = newCommitBatchInfoZKsyncOS;
+        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+        correctNewCommitBatchInfo.daCommitment = daCommitment;
+        correctNewCommitBatchInfo.daCommitmentScheme = L2DACommitmentScheme.BLOBS_ZKSYNC_OS;
+
+        CommitBatchInfoZKsyncOS[] memory correctCommitBatchInfoArray = new CommitBatchInfoZKsyncOS[](1);
+        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
+        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, correctCommitBatchInfoArray);
+
+        // with ZKsync OS we have separate pair for blobs
+        address blobsl1DaValidatorZKsyncOS = Utils.deployBlobsL1DAValidatorZKsyncOSBytecode();
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(blobsl1DaValidatorZKsyncOS, L2DACommitmentScheme.BLOBS_ZKSYNC_OS);
+
+        vm.prank(validator);
+        vm.expectRevert(BlobNotPublished.selector);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_BatchNumberMismatch() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        CommitBatchInfoZKsyncOS memory wrongBatchInfo = newCommitBatchInfoZKsyncOS;
+        wrongBatchInfo.operatorDAInput = operatorDAInput;
+        wrongBatchInfo.daCommitment = daCommitment;
+        wrongBatchInfo.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        wrongBatchInfo.batchNumber = 5; // Wrong batch number, should be 1
+
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = wrongBatchInfo;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSignature("BatchNumberMismatch(uint256,uint256)", 1, 5));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_IncorrectBatchChainId() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        CommitBatchInfoZKsyncOS memory wrongChainBatch = newCommitBatchInfoZKsyncOS;
+        wrongChainBatch.operatorDAInput = operatorDAInput;
+        wrongChainBatch.daCommitment = daCommitment;
+        wrongChainBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        wrongChainBatch.chainId = 999; // Wrong chain ID
+
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = wrongChainBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSignature("IncorrectBatchChainId(uint256,uint256)", 999, l2ChainId));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_IncorrectBatchSLChainId() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        CommitBatchInfoZKsyncOS memory wrongChainBatch = newCommitBatchInfoZKsyncOS;
+        wrongChainBatch.operatorDAInput = operatorDAInput;
+        wrongChainBatch.daCommitment = daCommitment;
+        wrongChainBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        wrongChainBatch.slChainId = 999; // Wrong SL chain ID
+
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = wrongChainBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSignature("SettlementLayerChainIdMismatch()"));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_InvalidBlockRange() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        CommitBatchInfoZKsyncOS memory invalidBlockBatch = newCommitBatchInfoZKsyncOS;
+        invalidBlockBatch.operatorDAInput = operatorDAInput;
+        invalidBlockBatch.daCommitment = daCommitment;
+        invalidBlockBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        invalidBlockBatch.firstBlockNumber = 10; // firstBlockNumber > lastBlockNumber
+        invalidBlockBatch.lastBlockNumber = 5;
+
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = invalidBlockBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSignature("InvalidBlockRange(uint64,uint64,uint64)", 1, 10, 5));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_L2TimestampTooBig() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        CommitBatchInfoZKsyncOS memory futureTimestampBatch = newCommitBatchInfoZKsyncOS;
+        futureTimestampBatch.operatorDAInput = operatorDAInput;
+        futureTimestampBatch.daCommitment = daCommitment;
+        futureTimestampBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        // Set lastBlockTimestamp far in the future
+        futureTimestampBatch.lastBlockTimestamp = uint64(block.timestamp + 365 days);
+
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = futureTimestampBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSignature("L2TimestampTooBig()"));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_TimeNotReached() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        CommitBatchInfoZKsyncOS memory pastTimestampBatch = newCommitBatchInfoZKsyncOS;
+        pastTimestampBatch.operatorDAInput = operatorDAInput;
+        pastTimestampBatch.daCommitment = daCommitment;
+        pastTimestampBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        // Set firstBlockTimestamp far in the past
+        pastTimestampBatch.firstBlockTimestamp = 1;
+
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = pastTimestampBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(); // TimeNotReached error
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    /// @notice Reverts when the batch-level `firstBlockTimestamp` exceeds `lastBlockTimestamp`.
+    /// @dev Both timestamps stay inside the [block.timestamp - NOT_OLDER, block.timestamp + DELTA] window
+    ///      so that the earlier `TimeNotReached` and `L2TimestampTooBig` checks do not trigger first.
+    function test_RevertWhen_FirstBlockTimestampGreaterThanLastBlockTimestamp() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        CommitBatchInfoZKsyncOS memory invertedTimestampBatch = newCommitBatchInfoZKsyncOS;
+        invertedTimestampBatch.operatorDAInput = operatorDAInput;
+        invertedTimestampBatch.daCommitment = daCommitment;
+        invertedTimestampBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        // firstBlockTimestamp > lastBlockTimestamp triggers the new invariant.
+        invertedTimestampBatch.firstBlockTimestamp = uint64(currentTimestamp);
+        invertedTimestampBatch.lastBlockTimestamp = uint64(currentTimestamp - 1);
+
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = invertedTimestampBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSignature("BatchTimestampGreaterThanLastL2BlockTimestamp()"));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    /// @notice Boundary case: `firstBlockTimestamp == lastBlockTimestamp` must still commit successfully,
+    ///         because the guard uses a strict `>` comparison.
+    function test_SuccessfullyCommit_WhenFirstEqualsLastBlockTimestamp() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        CommitBatchInfoZKsyncOS memory equalTimestampBatch = newCommitBatchInfoZKsyncOS;
+        equalTimestampBatch.operatorDAInput = operatorDAInput;
+        equalTimestampBatch.daCommitment = daCommitment;
+        equalTimestampBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        // Pick a value strictly inside the valid window and set both bounds equal.
+        uint64 equalTs = uint64(currentTimestamp - 5);
+        equalTimestampBatch.firstBlockTimestamp = equalTs;
+        equalTimestampBatch.lastBlockTimestamp = equalTs;
+
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = equalTimestampBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    /// @dev Switches the chain to the validium (no-DA) scheme so a protocol-version test can commit without pubdata.
+    function _enableValidiumDA() internal {
+        // Deploy on its own line: vm.prank applies to the next call, so it must land on setDAValidatorPair.
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(owner);
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+    }
+
+    /// @notice A non-upgrade batch reports the chain's protocol version (0 in the harness) and a zero upgrade hash.
+    function test_emitsProtocolVersionWithZeroUpgradeTxHash() public {
+        _enableValidiumDA();
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = _encodeValidiumCommit(
+            _validiumBatch(1)
+        );
+
+        vm.prank(validator);
+        vm.expectEmit(true, true, true, true, address(committer));
+        emit ICommitter.ReportCommittedBatchProtocolVersion(1, 0, bytes32(0));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    /// @notice The emitted protocol version equals the chain's protocol version at commit time, so it stays
+    /// correct for a batch even after later upgrades change the chain's current protocol version.
+    function test_emittedProtocolVersionReflectsConfiguredVersion() public {
+        _enableValidiumDA();
+        // A semver-like packed value (minor = 27, patch = 7); any non-zero value demonstrates the point.
+        uint256 protocolVersion = (uint256(27) << 32) | uint256(7);
+        utilsFacet.util_setProtocolVersion(protocolVersion);
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = _encodeValidiumCommit(
+            _validiumBatch(1)
+        );
+
+        vm.prank(validator);
+        vm.expectEmit(true, true, true, true, address(committer));
+        emit ICommitter.ReportCommittedBatchProtocolVersion(1, protocolVersion, bytes32(0));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    /// @notice For the first batch committed after a protocol upgrade, the event reports the upgrade transaction
+    /// hash, and that hash is exactly the one folded into the batch commitment (so an external observer can
+    /// independently recompute the commitment).
+    function test_emitsUpgradeTxHashFoldedIntoCommitment() public {
+        _enableValidiumDA();
+        bytes32 upgradeTxHash = Utils.randomBytes32("upgradeTx");
+        utilsFacet.util_setL2SystemContractsUpgradeTxHash(upgradeTxHash);
+        assertEq(utilsFacet.util_getL2SystemContractsUpgradeBatchNumber(), 0, "no upgrade batch recorded yet");
+
+        CommitBatchInfoZKsyncOS memory batch = _validiumBatch(1);
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = _encodeValidiumCommit(batch);
+
+        vm.prank(validator);
+        vm.expectEmit(true, true, true, true, address(committer));
+        emit ICommitter.BlockCommit(1, batch.newStateCommitment, _batchOutputHash(batch, upgradeTxHash));
+        vm.expectEmit(true, true, true, true, address(committer));
+        emit ICommitter.ReportCommittedBatchProtocolVersion(1, 0, upgradeTxHash);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+
+        assertEq(utilsFacet.util_getL2SystemContractsUpgradeBatchNumber(), 1, "upgrade batch number recorded");
+    }
+
+    /// @dev Builds a minimal validium ZKsync OS commit batch with the given number.
+    function _validiumBatch(uint64 _batchNumber) internal view returns (CommitBatchInfoZKsyncOS memory batch) {
+        batch = newCommitBatchInfoZKsyncOS;
+        batch.batchNumber = _batchNumber;
+        batch.operatorDAInput = abi.encodePacked(bytes32(0));
+        batch.daCommitment = bytes32(0);
+        batch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+    }
+
+    function _encodeValidiumCommit(
+        CommitBatchInfoZKsyncOS memory _batch
+    ) internal view returns (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) {
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = _batch;
+        (commitBatchFrom, commitBatchTo, commitData) = Utils.encodeCommitBatchesDataZKsyncOS(
+            genesisStoredBatchInfo,
+            batchArray
+        );
+    }
+
+    /// @dev Mirrors the `batchOutputHash` formula from Committer._commitOneBatch.
+    function _batchOutputHash(
+        CommitBatchInfoZKsyncOS memory _batch,
+        bytes32 _upgradeTxHash
+    ) internal pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    _batch.firstBlockTimestamp,
+                    _batch.lastBlockTimestamp,
+                    uint256(_batch.daCommitmentScheme),
+                    _batch.daCommitment,
+                    _batch.numberOfLayer1Txs,
+                    _batch.numberOfLayer2Txs,
+                    _batch.priorityOperationsHash,
+                    _batch.l2LogsTreeRoot,
+                    _upgradeTxHash,
+                    _batch.dependencyRootsRollingHash,
+                    _batch.slChainId
+                )
+            );
     }
 
     function test_RevertWhen_CommittingWithWrongLastCommittedBatchData() public {
-        CommitBatchInfo[] memory newCommitBatchInfoArray = new CommitBatchInfo[](1);
-        newCommitBatchInfoArray[0] = newCommitBatchInfo;
+        CommitBatchInfoZKsyncOS[] memory commitInfos = new CommitBatchInfoZKsyncOS[](1);
+        commitInfos[0] = newCommitBatchInfoZKsyncOS;
 
         IExecutor.StoredBatchInfo memory wrongGenesisStoredBatchInfo = genesisStoredBatchInfo;
         wrongGenesisStoredBatchInfo.timestamp = 1000;
@@ -102,1075 +666,14 @@ contract CommittingTest is ExecutorTest {
                 keccak256(abi.encode(wrongGenesisStoredBatchInfo))
             )
         );
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            wrongGenesisStoredBatchInfo,
-            newCommitBatchInfoArray
-        );
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(wrongGenesisStoredBatchInfo, commitInfos);
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
-    function test_RevertWhen_CommittingWithWrongOrderOfBatches() public {
-        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.batchNumber = 2; // wrong batch number
-
-        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
-        wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
-
-        vm.prank(validator);
-
-        vm.expectRevert(abi.encodeWithSelector(BatchNumberMismatch.selector, uint256(1), uint256(2)));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            wrongNewCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_CommittingWithWrongNewBatchTimestamp() public {
-        bytes32 wrongNewBatchTimestamp = Utils.randomBytes32("wrongNewBatchTimestamp");
-        bytes[] memory wrongL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-
-        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            wrongNewBatchTimestamp
-        );
-
-        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
-        wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
-        wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
-
-        vm.prank(validator);
-        vm.blobhashes(defaultBlobVersionedHashes);
-
-        vm.expectRevert(TimestampError.selector);
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            wrongNewCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_CommittingWithTooSmallNewBatchTimestamp() public {
-        uint256 wrongNewBatchTimestamp = 1;
-        bytes[] memory wrongL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(1, 1)
-        );
-
-        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
-        wrongNewCommitBatchInfo.timestamp = uint64(wrongNewBatchTimestamp);
-        wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
-        wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
-
-        vm.prank(validator);
-        vm.blobhashes(defaultBlobVersionedHashes);
-
-        vm.expectRevert(abi.encodeWithSelector(TimeNotReached.selector, 1, 2));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            wrongNewCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    /// @notice Reverts when the packed (batchTimestamp, lastL2BlockTimestamp) pair has
-    ///         batchTimestamp strictly greater than lastL2BlockTimestamp. Both values are kept inside
-    ///         the valid commit window so the earlier TimeNotReached / L2TimestampTooBig guards do
-    ///         not fire first — we are specifically testing the new invariant in `_verifyBatchTimestamp`.
-    function test_RevertWhen_CommittingWithBatchTimestampGreaterThanLastL2BlockTimestamp() public {
-        uint64 batchTimestamp = uint64(currentTimestamp);
-        uint64 lastL2BlockTimestamp = uint64(currentTimestamp - 1);
-
-        bytes[] memory wrongL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(batchTimestamp, lastL2BlockTimestamp)
-        );
-
-        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
-        wrongNewCommitBatchInfo.timestamp = batchTimestamp; // must equal the packed batchTimestamp
-        wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
-        wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
-
-        vm.prank(validator);
-        vm.blobhashes(defaultBlobVersionedHashes);
-
-        vm.expectRevert(abi.encodeWithSelector(BatchTimestampGreaterThanLastL2BlockTimestamp.selector));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            wrongNewCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_CommittingTooBigLastL2BatchTimestamp() public {
-        uint64 wrongNewBatchTimestamp = 0xffffffff;
-        bytes[] memory wrongL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(wrongNewBatchTimestamp, wrongNewBatchTimestamp)
-        );
-
-        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
-        wrongNewCommitBatchInfo.timestamp = wrongNewBatchTimestamp;
-        wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
-        wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
-
-        vm.prank(validator);
-        vm.blobhashes(defaultBlobVersionedHashes);
-
-        vm.expectRevert(abi.encodeWithSelector(L2TimestampTooBig.selector));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            wrongNewCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_CommittingWithWrongPreviousBatchHash() public {
-        bytes32 wrongPreviousBatchHash = Utils.randomBytes32("wrongPreviousBatchHash");
-        bytes[] memory wrongL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        wrongL2Logs[uint256(uint256(SystemLogKey.PREV_BATCH_HASH_KEY))] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
-            wrongPreviousBatchHash
-        );
-
-        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
-        wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
-        wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
-
-        vm.prank(validator);
-        vm.blobhashes(defaultBlobVersionedHashes);
-
-        vm.expectRevert(abi.encodeWithSelector(HashMismatch.selector, wrongPreviousBatchHash, bytes32(0)));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            wrongNewCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_CommittingWithoutProcessingSystemContextLog() public {
-        bytes[] memory wrongL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        delete wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))];
-
-        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
-        wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
-        wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
-
-        vm.prank(validator);
-        vm.blobhashes(defaultBlobVersionedHashes);
-
-        vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 1023, 1021));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            wrongNewCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_CommittingWithProcessingSystemContextLogTwice() public {
-        bytes[] memory l2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-
-        bytes memory wrongL2Logs = abi.encodePacked(
-            Utils.encodePacked(l2Logs),
-            // solhint-disable-next-line func-named-parameters
-            Utils.constructL2Log(
-                true,
-                L2_SYSTEM_CONTEXT_ADDRESS,
-                uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-                bytes32("")
-            )
-        );
-
-        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = wrongL2Logs;
-        wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
-        wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
-
-        vm.prank(validator);
-        vm.blobhashes(defaultBlobVersionedHashes);
-
-        vm.expectRevert(abi.encodeWithSelector(LogAlreadyProcessed.selector, 1));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            wrongNewCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_UnexpectedL2ToL1Log() public {
-        address unexpectedAddress = address(0);
-        bytes[] memory wrongL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
-            true,
-            unexpectedAddress,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            bytes32("")
-        );
-
-        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
-
-        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
-        wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
-
-        vm.prank(validator);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                InvalidLogSender.selector,
-                address(0),
-                uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)
-            )
-        );
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            wrongNewCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_CommittingWithWrongCanonicalTxHash() public {
-        bytes32 wrongChainedPriorityHash = Utils.randomBytes32("canonicalTxHash");
-        bytes[] memory wrongL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        wrongL2Logs[uint256(uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY))] = Utils.constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
-            wrongChainedPriorityHash
-        );
-
-        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
-        wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
-        wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
-
-        vm.blobhashes(defaultBlobVersionedHashes);
-        vm.prank(validator);
-
-        vm.expectRevert(abi.encodeWithSelector(HashMismatch.selector, wrongChainedPriorityHash, keccak256("")));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            wrongNewCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_CommittingWithWrongNumberOfLayer1txs() public {
-        bytes[] memory wrongL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        wrongL2Logs[uint256(uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY))] = Utils.constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
-            bytes32(uint256(type(uint96).max))
-        );
-
-        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
-        wrongNewCommitBatchInfo.numberOfLayer1Txs = 2;
-        wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
-        wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
-
-        vm.blobhashes(defaultBlobVersionedHashes);
-        vm.prank(validator);
-
-        vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, type(uint96).max, uint256(2)));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            wrongNewCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_CommittingWithUnknownSystemLogKey() public {
-        bytes[] memory l2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        bytes memory wrongL2Logs = abi.encodePacked(
-            Utils.encodePacked(l2Logs),
-            // solhint-disable-next-line func-named-parameters
-            abi.encodePacked(bytes2(0x0001), bytes2(0x0000), L2_SYSTEM_CONTEXT_ADDRESS, uint256(1234), bytes32(""))
-        );
-
-        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-        wrongNewCommitBatchInfo.systemLogs = abi.encodePacked(wrongL2Logs);
-
-        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
-        wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
-
-        vm.prank(validator);
-
-        vm.expectRevert(abi.encodeWithSelector(UnexpectedSystemLog.selector, uint256(1234)));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            wrongNewCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_SystemLogIsFromIncorrectAddress() public {
-        bytes32[7] memory values = [
-            bytes32(""),
-            bytes32(""),
-            bytes32(""),
-            bytes32(""),
-            bytes32(""),
-            bytes32(""),
-            bytes32("")
-        ];
-
-        for (uint256 i = 0; i < values.length; i++) {
-            bytes[] memory wrongL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-            address wrongAddress = makeAddr("randomAddress");
-            wrongL2Logs[i] = Utils.constructL2Log(true, wrongAddress, i, values[i]);
-
-            CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-            wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
-
-            CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
-            wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
-
-            vm.prank(validator);
-
-            vm.expectRevert(abi.encodeWithSelector(InvalidLogSender.selector, wrongAddress, i));
-            (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-                genesisStoredBatchInfo,
-                wrongNewCommitBatchInfoArray
-            );
-            committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-        }
-    }
-
-    function test_RevertWhen_SystemLogIsMissing() public {
-        for (uint256 i = 0; i < 8; i++) {
-            bytes[] memory l2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-            delete l2Logs[i];
-
-            CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
-            wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(l2Logs);
-
-            CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
-            wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
-
-            vm.prank(validator);
-
-            uint256 allLogsProcessed = uint256(1023);
-            vm.expectRevert(
-                abi.encodeWithSelector(MissingSystemLogs.selector, allLogsProcessed, allLogsProcessed ^ (1 << i))
-            );
-            (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-                genesisStoredBatchInfo,
-                wrongNewCommitBatchInfoArray
-            );
-            committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-        }
-    }
-
-    function test_SuccessfullyCommitBatch() public {
-        bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
-        bytes32 totalL2PubdataHash = Utils.randomBytes32("totalL2PubdataHash");
-        uint8 numberOfBlobs = 1;
-        bytes32[] memory blobsLinearHashes = new bytes32[](1);
-        blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes");
-
-        operatorDAInput = abi.encodePacked(
-            uncompressedStateDiffHash,
-            totalL2PubdataHash,
-            numberOfBlobs,
-            blobsLinearHashes,
-            bytes1(0x01),
-            defaultBlobCommitment,
-            EMPTY_PREPUBLISHED_COMMITMENT
-        );
-
-        l2DAValidatorOutputHash = Utils.constructRollupL2DAValidatorOutputHash(
-            uncompressedStateDiffHash,
-            totalL2PubdataHash,
-            uint8(numberOfBlobs),
-            blobsLinearHashes
-        );
-
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        bytes32[] memory blobHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
-        blobHashes[0] = blobsLinearHashes[0];
-
-        bytes32[] memory blobCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
-        blobCommitments[0] = keccak256(
-            abi.encodePacked(
-                defaultBlobVersionedHashes[0],
-                abi.encodePacked(defaultBlobOpeningPoint, defaultBlobClaimedValue)
-            )
-        );
-
-        bytes32 expectedBatchCommitment = Utils.createBatchCommitment(
-            correctNewCommitBatchInfo,
-            uncompressedStateDiffHash,
-            blobCommitments,
-            blobHashes
-        );
-
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
-
-        vm.prank(validator);
-        vm.blobhashes(defaultBlobVersionedHashes);
-        vm.recordLogs();
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-
-        // A ReportCommittedBatchProtocolVersion event follows BlockCommit (see test_emitsProtocolVersionEvent).
-        assertEq(entries.length, 2 + EVENT_INDEX);
-        assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
-        assertEq(entries[EVENT_INDEX].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
-        assertEq(entries[EVENT_INDEX].topics[3], expectedBatchCommitment); // commitment
-
-        uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
-        assertEq(totalBatchesCommitted, 1);
-    }
-
-    /// @notice A committed Era batch emits ReportCommittedBatchProtocolVersion carrying the chain's protocol
-    /// version (0 in the harness) and a zero upgrade transaction hash when there is no pending protocol upgrade.
-    function test_emitsProtocolVersionEvent() public {
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-
-        vm.prank(validator);
-        vm.blobhashes(defaultBlobVersionedHashes);
-        vm.expectEmit(true, true, true, true, address(committer));
-        emit ICommitter.ReportCommittedBatchProtocolVersion(1, 0, bytes32(0));
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    /// @notice For the first Era batch committed after a protocol upgrade, the event reports the system upgrade
-    /// transaction hash (which the commit verifies against the L2 system logs), and the batch is recorded as the
-    /// upgrade batch. This exercises the non-zero upgrade-tx-hash path, which Era explicitly supports.
-    function test_emitsProtocolVersionEventForUpgradeBatch() public {
-        bytes32 upgradeTxHash = Utils.randomBytes32("upgradeTx");
-        utilsFacet.util_setL2SystemContractsUpgradeTxHash(upgradeTxHash);
-
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-        // The first batch after an upgrade must additionally carry the expected system-contract upgrade tx hash log.
-        bytes[] memory logsWithUpgrade = new bytes[](correctL2Logs.length + 1);
-        for (uint256 i = 0; i < correctL2Logs.length; ++i) {
-            logsWithUpgrade[i] = correctL2Logs[i];
-        }
-        logsWithUpgrade[correctL2Logs.length] = Utils.constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY),
-            upgradeTxHash
-        );
-
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(logsWithUpgrade);
-        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-
-        vm.prank(validator);
-        vm.blobhashes(defaultBlobVersionedHashes);
-        vm.expectEmit(true, true, true, true, address(committer));
-        emit ICommitter.ReportCommittedBatchProtocolVersion(1, 0, upgradeTxHash);
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-
-        assertEq(utilsFacet.util_getL2SystemContractsUpgradeBatchNumber(), 1, "upgrade batch number recorded");
-    }
-
-    function test_SuccessfullyCommitBatchWithOneBlob() public {
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
-
-        vm.prank(validator);
-        vm.blobhashes(defaultBlobVersionedHashes);
-
-        vm.recordLogs();
-
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-
-        // A ReportCommittedBatchProtocolVersion event follows BlockCommit (see test_emitsProtocolVersionEvent).
-        assertEq(entries.length, 2 + EVENT_INDEX);
-        assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
-
-        uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
-        assertEq(totalBatchesCommitted, 1);
-
-        vm.clearMockedCalls();
-    }
-
-    function test_SuccessfullyCommitBatchWithTwoBlob() public {
-        bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
-        bytes32 totalL2PubdataHash = Utils.randomBytes32("totalL2PubdataHash");
-        uint8 numberOfBlobs = 2;
-        bytes32[] memory blobsLinearHashes = new bytes32[](2);
-        blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes1");
-        blobsLinearHashes[1] = Utils.randomBytes32("blobsLinearHashes2");
-
-        bytes memory daInput = abi.encodePacked(
-            uncompressedStateDiffHash,
-            totalL2PubdataHash,
-            numberOfBlobs,
-            blobsLinearHashes,
-            bytes1(0x01),
-            defaultBlobCommitment,
-            EMPTY_PREPUBLISHED_COMMITMENT,
-            defaultBlobCommitment,
-            EMPTY_PREPUBLISHED_COMMITMENT
-        );
-
-        bytes32[] memory blobVersionedHashes = new bytes32[](2);
-        blobVersionedHashes[0] = defaultBlobVersionedHashes[0];
-        blobVersionedHashes[1] = defaultBlobVersionedHashes[0];
-
-        bytes32 outputHash = Utils.constructRollupL2DAValidatorOutputHash(
-            uncompressedStateDiffHash,
-            totalL2PubdataHash,
-            uint8(numberOfBlobs),
-            blobsLinearHashes
-        );
-
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(outputHash);
-        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-        correctNewCommitBatchInfo.operatorDAInput = daInput;
-
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-
-        vm.prank(validator);
-        vm.blobhashes(blobVersionedHashes);
-
-        vm.recordLogs();
-
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-
-        // A ReportCommittedBatchProtocolVersion event follows BlockCommit (see test_emitsProtocolVersionEvent).
-        assertEq(entries.length, 2 + EVENT_INDEX);
-        assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
-
-        uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
-        assertEq(totalBatchesCommitted, 1);
-
-        vm.clearMockedCalls();
-    }
-
-    function test_RevertWhen_CommittingBatchMoreThanOneBatch() public {
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](2);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[1] = correctNewCommitBatchInfo;
-
-        vm.prank(validator);
-
-        vm.expectRevert(abi.encodeWithSelector(CanOnlyProcessOneBatch.selector));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_EmptyPubdataCommitments() public {
-        bytes memory operatorDAInput = "\x01";
-
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
-
-        vm.prank(validator);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(OperatorDAInputTooSmall.selector, operatorDAInput.length, BLOB_DATA_OFFSET)
-        );
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_PartialPubdataCommitment() public {
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        bytes32[] memory blobsLinearHashes = new bytes32[](1);
-        blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes");
-
-        bytes memory daInput = abi.encodePacked(
-            Utils.randomBytes32("uncompressedStateDiffHash"),
-            Utils.randomBytes32("totalL2PubdataHash"),
-            uint8(1),
-            blobsLinearHashes,
-            bytes1(0x01),
-            bytes("")
-        );
-
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].operatorDAInput = daInput;
-
-        vm.prank(validator);
-        vm.blobhashes(defaultBlobVersionedHashes);
-
-        vm.expectRevert(InvalidPubdataCommitmentsSize.selector);
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_TooManyPubdataCommitments() public {
-        bytes32[] memory blobsLinearHashes = new bytes32[](1);
-        blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes");
-
-        bytes memory daInput = abi.encodePacked(
-            Utils.randomBytes32("uncompressedStateDiffHash"),
-            Utils.randomBytes32("totalL2PubdataHash"),
-            uint8(1),
-            blobsLinearHashes,
-            bytes1(0x01),
-            defaultBlobCommitment,
-            EMPTY_PREPUBLISHED_COMMITMENT,
-            defaultBlobCommitment,
-            EMPTY_PREPUBLISHED_COMMITMENT
-        );
-
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].operatorDAInput = daInput;
-
-        vm.prank(validator);
-
-        vm.expectRevert(InvalidPubdataCommitmentsSize.selector);
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_NotEnoughPubdataCommitments() public {
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
-
-        bytes32[] memory versionedHashes = new bytes32[](2);
-        versionedHashes[0] = defaultBlobVersionedHashes[0];
-        versionedHashes[1] = 0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563;
-
-        vm.prank(validator);
-        vm.blobhashes(versionedHashes);
-
-        vm.expectRevert(abi.encodeWithSelector(NonEmptyBlobVersionHash.selector, uint256(1)));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-
-        vm.clearMockedCalls();
-    }
-
-    function test_RevertWhen_BlobDoesNotExist() public {
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
-
-        vm.prank(validator);
-
-        vm.expectRevert(abi.encodeWithSelector(EmptyBlobVersionHash.selector, 0));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-
-        vm.clearMockedCalls();
-    }
-
-    function test_RevertWhen_SecondBlobSentWithoutCommitmentData() public {
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
-
-        bytes32[] memory blobVersionedHashes = new bytes32[](2);
-        blobVersionedHashes[0] = defaultBlobVersionedHashes[0];
-        blobVersionedHashes[1] = defaultBlobVersionedHashes[0];
-
-        vm.prank(validator);
-        vm.blobhashes(blobVersionedHashes);
-
-        vm.expectRevert(abi.encodeWithSelector(NonEmptyBlobVersionHash.selector, uint256(1)));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-
-        vm.clearMockedCalls();
-    }
-
-    function test_RevertWhen_SecondBlobLinearHashZeroWithCommitment() public {
-        bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
-        bytes32 totalL2PubdataHash = Utils.randomBytes32("totalL2PubdataHash");
-        uint8 numberOfBlobs = 2;
-        bytes32[] memory blobsLinearHashes = new bytes32[](2);
-        blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes1");
-        blobsLinearHashes[1] = bytes32(0);
-
-        bytes memory operatorDAInput = abi.encodePacked(
-            uncompressedStateDiffHash,
-            totalL2PubdataHash,
-            numberOfBlobs,
-            blobsLinearHashes,
-            bytes1(0x01),
-            defaultBlobCommitment,
-            EMPTY_PREPUBLISHED_COMMITMENT,
-            defaultBlobCommitment,
-            EMPTY_PREPUBLISHED_COMMITMENT
-        );
-
-        bytes32[] memory blobVersionedHashes = new bytes32[](2);
-        blobVersionedHashes[0] = defaultBlobVersionedHashes[0];
-        blobVersionedHashes[1] = defaultBlobVersionedHashes[0];
-
-        bytes32 outputHash = Utils.constructRollupL2DAValidatorOutputHash(
-            uncompressedStateDiffHash,
-            totalL2PubdataHash,
-            uint8(numberOfBlobs),
-            blobsLinearHashes
-        );
-
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(outputHash);
-        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
-
-        vm.blobhashes(blobVersionedHashes);
-        vm.prank(validator);
-
-        vm.expectRevert(abi.encodeWithSelector(BlobHashCommitmentError.selector, uint256(1), true, false));
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_SecondBlobLinearHashNotZeroWithEmptyCommitment() public {
-        bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
-        bytes32 totalL2PubdataHash = Utils.randomBytes32("totalL2PubdataHash");
-        uint8 numberOfBlobs = 2;
-        bytes32[] memory blobsLinearHashes = new bytes32[](2);
-        blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes1");
-        blobsLinearHashes[1] = Utils.randomBytes32("blobsLinearHashes2");
-
-        bytes memory operatorDAInput = abi.encodePacked(
-            uncompressedStateDiffHash,
-            totalL2PubdataHash,
-            numberOfBlobs,
-            blobsLinearHashes,
-            bytes1(0x01),
-            defaultBlobCommitment,
-            EMPTY_PREPUBLISHED_COMMITMENT
-        );
-
-        bytes32[] memory blobVersionedHashes = new bytes32[](2);
-        blobVersionedHashes[0] = defaultBlobVersionedHashes[0];
-        blobVersionedHashes[1] = defaultBlobVersionedHashes[0];
-
-        bytes32 outputHash = Utils.constructRollupL2DAValidatorOutputHash(
-            uncompressedStateDiffHash,
-            totalL2PubdataHash,
-            uint8(numberOfBlobs),
-            blobsLinearHashes
-        );
-
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(outputHash);
-        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
-
-        vm.blobhashes(blobVersionedHashes);
-        vm.prank(validator);
-
-        // It will just panic with array out of bounds
-        vm.expectRevert();
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    // For accurate measuring of gas usage via snapshot cheatcodes,
-    // isolation mode has to be enabled via `forge-config: default.isolate = true`.
-    // Unfortunately, it makes this test fail with no revert reason,
-    // so the gas estimation in this test is not accurate.
-    function test_MeasureGas() public {
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
-
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
-
-        vm.prank(validator);
-        vm.blobhashes(defaultBlobVersionedHashes);
-
-        vm.recordLogs();
-
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-        validatorTimelock.commitBatchesSharedBridge(address(executor), commitBatchFrom, commitBatchTo, commitData);
-        vm.snapshotGasLastCall("Executor", "commit");
-    }
-
-    function test_commitBlockRealData() public {
-        vm.prank(validator);
-        vm.expectRevert();
-        committer.commitBatchesSharedBridge(
-            address(0),
-            1,
-            1,
-            hex"000000000000000000000000000000000000000000000000000000000000000000ecc950f901cc7c79c2b9460b9884d90a495f9950c61c8df844595e76ff5a982500000000000000000000000000000000000000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000000c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a4700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000098216171d0efa92c5af0b521f1c8188b4b4f980fbf37bb3a8114772fd0fc783b00000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000067ea8081000000000000000000000000000000000000000000000000000000000000023992c6e30833aa00cdec07d4899aac400b55ae8af98d77a6e370ba0958b963fb5c00000000000000000000000000000000000000000000000000000000000000220aabc5da5fd2baa4d0ffbee1e350ce12f85591627fa428041ee74fd98365f13f4072228977d613dc19887413678ff9f3a0d01c00701c26a9bd219006b231fe4dd5231eeb0b5b24962bcc3022286b5cf0c300326bb3b3475c47de7809354dbd1b00000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000480000000000000000000000000000000000000000000000000000000000000031800000000000000000000000000000000000000000000800b0000000000000000000000000000000000000000000000000000000000000004ecc950f901cc7c79c2b9460b9884d90a495f9950c61c8df844595e76ff5a9825000100000000000000000000000000000000000000008001000000000000000000000000000000000000000000000000000000000000000702fa5779ecc950f901cc7c79c2b9460b9884d90a495f9950c61c8df844595e7600010000000000000000000000000000000000000000800100000000000000000000000000000000000000000000000000000000000000087f7de4f9583f59f9c8a522c0f8c531bfd52a7a3c7bba51b28966e248d237c4e000000023000000000000000000000000000000000000800b000000000000000000000000000000000000000000000000000000000000000100000000000000000000000067ea808100000000000000000000000067ea808300010023000000000000000000000000000000000000800100000000000000000000000000000000000000000000000000000000000000020aabc5da5fd2baa4d0ffbee1e350ce12f85591627fa428041ee74fd98365f13f0001002300000000000000000000000000000000000080010000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000002200010023000000000000000000000000000000000000800800000000000000000000000000000000000000000000000000000000000000000acb709490e52a0fc5d2f6115dcad4c8502a7e54365142d2ba5ff52f9c500ee1000100230000000000000000000000000000000000008008000000000000000000000000000000000000000000000000000000000000000600000000000000000000000044450ff37fbbd29b705514e9d0252a43f5ab634c00010023000000000000000000000000000000000000800800000000000000000000000000000000000000000000000000000000000000059fb6ac12df71db797feb14ecaa1ac80339ddd2fb2a1dd9aeb3805b155ce816a00000000000000000000000000000000000000000000000000000000000000000000000000000011246eaf4e667922fee348e97876ca432267fb47477b1c6b930561d721b0baa71fa2343945cf5ac8f075f40820f8f954f5ee666a876049f9487be2a92855162cf5301842dcce91ec6118a0dbb0f5a705259ff2568bca31ce2ef0ca266cbe94c28315c01b62ad393bb2e716263eeda2fcc4e584e11dec82cd891698e74d33eb625be3c8196dbba112ae89e8a95b4d22dff1dcb4ead08bf80b156c6b47f6bd05b296f9f95f5b300bb5083ba86ab5f0910a7aa25d101647620215a73a5761cd5f119590ec5931e6689e5c7b6ebe1e56557dffeee3f485c13370830d290a834b41a5afac232b751a7bd8e88a9918e16ae83af2b307500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-        );
-    }
-
-    function test_executeBlockRealData() public {
-        vm.prank(validator);
-        vm.expectRevert();
-        executor.executeBatchesSharedBridge(
-            address(executor),
-            2,
-            2,
-            hex"00000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000003c000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002822adb9638d944da651929c483888f295dad6ba6d82be35ab865879bac59fefa00000000000000000000000000000000000000000000000000000000000000b900000000000000000000000000000000000000000000000000000000000000014a28c82cdd2bef8f821192e9c04ca360b8049442be34212f04a90b9f8de7b4d5aa783b0b0588911ff8f1bf467d4b1e6e5f0e4ba7396bb44f3ce5424b685e213a19d10213710ce71e87ce9ec4bd24dd5557f372fd30fe375fbaafe3bd5969f0030000000000000000000000000000000000000000000000000000000067ec4f76bec2d13e01da35e6047ab3ec736d8098087a1431e64aab6d99c6580c4da6a4a6000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001a00000000000000000000000000000000000000000000000000000000000000004ae848202ab08b6303b34fe671aa187102485987c81a5623eea86bc531dc8ad7306a23e438ce807cd551f5d126dd9c48273c07ad26e9fa988329d10901626c68062f784161a84f8977c3f8fa83ced9efae70bc7eef93d29d06940084f00c73b9500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000454a4be7e94ec018be27bb1fbfe5db17f64aff25e93f359ea69ba53c845b1c5000000000000000000000000000000000000000000000000000000000000000014c8c59e7d5ff4d21e7a28317224c5784b0cf0369fef063900d7a7f573ccc8f57000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000104000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001fb2eb93318710c98f501f6ff6b11c373baccd0ffcaefe15f97debe09cb7939e100000000000000000000000000000000000000000000000000000000000001fa000000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001f83b13aa476ef3253e6acff5779276da7924fabaec9a8c39274cf021efe1255a"
-        );
-    }
-
-    function test_proveBlockRealData() public {
-        vm.prank(validator);
-        vm.expectRevert();
-        executor.proveBatchesSharedBridge(
-            address(executor),
-            1,
-            1,
-            hex"01000000000000000000000000000000000000000000000000000000000000000085fa0abaa93032259defb7bc3d060f1fcce909600a71841e9a578db386723966000000000000000000000000000000000000000000000000000000000000004e0000000000000000000000000000000000000000000000000000000000000000c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c66918c8860c607e73892cb3e686bfba6185f7a49f8c7ec21fb1cce3c4f353cd000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000002a000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001b9fd8972d0d3880b32ab7fcc87681d2f47fe9fddbfe290b09c3c540f54e48da600000000000000000000000000000000000000000000000000000000000000b300000000000000000000000000000000000000000000000000000000000000089185389b19a34a7fbd7d9ad3d29f53e70b1c5dde493c458877bc481b1d77642be82fa5f70e8caaa47ce1373b58deb61eae2d94e7d9783d3e73fecdf8054bc1c0915622cfba25d74d20768e0dddd45e3b0d505b7e7ea0ff841995ef3f9a11b4460000000000000000000000000000000000000000000000000000000068206d0ec3da1e0eeba2896d0e779b35c4aed19732f34760cf2825f4582b35b90bf8760d0000000000000000000000000000000000000000000000000000000000000000"
-        );
-    }
-
-    function test_recalculateinteropRootRollingHash() public {
+    /// @dev Not a behavioral test: recomputes the interop-root rolling hash encoding used by the
+    /// server, kept as an executable reference for the packed layout.
+    function test_recalculateinteropRootRollingHash() public pure {
         InteropRoot[] memory interopRoots = new InteropRoot[](2);
         InteropRoot memory interopRoot1 = InteropRoot({
             chainId: 260,
@@ -1193,17 +696,6 @@ contract CommittingTest is ExecutorTest {
             InteropRoot memory interopRoot = interopRoots[i];
             // The `uint256(128)` is the ABI head offset of `sides` inside `abi.encode(InteropRoot)`
             // (4 fields: chainId, blockOrBatchNumber, timestamp, sides pointer).
-            console.logBytes(
-                abi.encodePacked(
-                    rollingHash,
-                    interopRoot.chainId,
-                    interopRoot.blockOrBatchNumber,
-                    interopRoot.timestamp,
-                    uint256(128),
-                    interopRoot.sides.length,
-                    interopRoot.sides
-                )
-            );
             rollingHash = keccak256(
                 abi.encodePacked(
                     rollingHash,
@@ -1216,6 +708,6 @@ contract CommittingTest is ExecutorTest {
                 )
             );
         }
-        console.logBytes32(rollingHash);
+        assert(rollingHash != bytes32(0));
     }
 }

@@ -7,7 +7,6 @@ pragma solidity 0.8.28;
 import {console2 as console} from "forge-std/Script.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
-import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {
@@ -107,7 +106,7 @@ library GatewayCTMDeployerHelper {
     /// @notice Calculates all addresses for the deployment.
     /// @dev Uses 5 deployers + direct contract deployments.
     /// @param _create2Salt Salt used for CREATE2 when deploying the deployers.
-    /// @param config The full deployment configuration (ZKsyncOS only).
+    /// @param config The full deployment configuration.
     /// @return contracts The complete set of deployed contracts.
     /// @return deployerCalldata The CREATE2 calldata for each deployer.
     /// @return deployers The addresses of each deployer.
@@ -265,8 +264,7 @@ library GatewayCTMDeployerHelper {
         GatewayVerifiersDeployerConfig memory verifiersConfig = GatewayVerifiersDeployerConfig({
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress,
-            testnetVerifier: config.testnetVerifier,
-            isZKsyncOS: config.isZKsyncOS
+            testnetVerifier: config.testnetVerifier
         });
 
         (string memory vdFile, string memory vdName) = DeployCTML1OrGateway.resolve(
@@ -346,8 +344,8 @@ library GatewayCTMDeployerHelper {
             committerFacetArgs
         );
 
-        // DiamondInit — `DiamondInit(bool _isZKOS)`, always ZKsync OS.
-        bytes memory diamondInitArgs = abi.encode(true);
+        // DiamondInit has no constructor arguments.
+        bytes memory diamondInitArgs = abi.encode();
         (addresses.facets.diamondInit, data.diamondInitCalldata) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
             "DiamondInit.sol",
@@ -735,7 +733,7 @@ library GatewayCTMDeployerHelper {
     // ============ Factory Dependencies ============
 
     /// @notice Returns all factory dependencies for deployment.
-    /// @dev ZKsyncOS gateway deployments are EVM-equivalent and need no EraVM factory dependencies.
+    /// @dev Gateway CTM deployment needs no additional factory dependencies.
     function getListOfFactoryDeps(
         GatewayCTMDeployerConfig memory // config
     ) external returns (bytes[] memory dependencies) {

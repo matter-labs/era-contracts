@@ -35,8 +35,8 @@ export interface SystemContractPredeploy {
 // Source of truth for the Anvil interop harness predeploy layout.
 export const PREDEPLOY_SYSTEM_CONTRACTS: readonly SystemContractPredeploy[] = [
   { address: SYSTEM_CONTEXT_ADDR, contractName: "SystemContext" },
-  { address: L2_TO_L1_MESSENGER_ADDR, contractName: "L1MessengerZKOS" },
-  { address: L2_BASE_TOKEN_ADDR, contractName: "L2BaseTokenZKOS" },
+  { address: L2_TO_L1_MESSENGER_ADDR, contractName: "L1Messenger" },
+  { address: L2_BASE_TOKEN_ADDR, contractName: "L2BaseToken" },
   { address: L2_MESSAGE_VERIFICATION_ADDR, contractName: "MockL2MessageVerification" },
   { address: L1_MESSENGER_HOOK_ADDR, contractName: "MockL1MessengerHook" },
   { address: MINT_BASE_TOKEN_HOOK_ADDR, contractName: "MockMintBaseTokenHook" },
@@ -50,7 +50,7 @@ export const PREDEPLOY_SYSTEM_CONTRACTS: readonly SystemContractPredeploy[] = [
   { address: L2_INTEROP_ROOT_STORAGE_ADDR, contractName: "L2InteropRootStorage" },
   { address: L2_BRIDGEHUB_ADDR, contractName: "L2Bridgehub" },
   { address: L2_ASSET_ROUTER_ADDR, contractName: "L2AssetRouter" },
-  { address: L2_NATIVE_TOKEN_VAULT_ADDR, contractName: "L2NativeTokenVaultZKOS" },
+  { address: L2_NATIVE_TOKEN_VAULT_ADDR, contractName: "L2NativeTokenVault" },
   { address: L2_ASSET_TRACKER_ADDR, contractName: "L2AssetTracker" },
   { address: L2_CHAIN_ASSET_HANDLER_ADDR, contractName: "L2ChainAssetHandler" },
   { address: L2_BASE_TOKEN_HOLDER_ADDR, contractName: "BaseTokenHolder" },

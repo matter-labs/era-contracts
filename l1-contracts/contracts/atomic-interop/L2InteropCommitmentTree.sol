@@ -9,7 +9,7 @@ import {
     INTEROP_COMMITMENT_LEAF_HOOK
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {L1MessageGasLib} from "../l2-system/zksync-os/L1MessageGasLib.sol";
-import {Unauthorized, NotSelfCall, NotEnoughGasSupplied} from "../l2-system/zksync-os/errors/ZKOSContractErrors.sol";
+import {Unauthorized, NotSelfCall, NotEnoughGasSupplied} from "../l2-system/zksync-os/errors/SystemContractErrors.sol";
 import {CommitmentTreeNotAppender, InteropCommitmentLeafHookFailed} from "./AtomicInteropErrors.sol";
 
 /// @author Matter Labs

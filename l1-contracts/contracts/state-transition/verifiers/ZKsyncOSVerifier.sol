@@ -58,12 +58,12 @@ contract ZKsyncOSVerifier is IVerifier, IZKsyncOSVerifier {
             uint256[] memory args = new uint256[](1);
             args[0] = computeZKsyncOSHash(_proof[1], _publicInputs);
 
-            return PLONK_VERIFIER.verify(args, _extractZKsyncOSProof(_proof));
+            return PLONK_VERIFIER.verify(args, _extractProof(_proof));
         } else if (verifierType == ZKSYNC_OS_MOCK_VERIFICATION_TYPE) {
             uint256[] memory args = new uint256[](1);
             args[0] = computeZKsyncOSHash(_proof[1], _publicInputs);
 
-            return mockVerify(args, _extractZKsyncOSProof(_proof));
+            return mockVerify(args, _extractProof(_proof));
         }
         // If the verifier type is unknown, revert with an error.
         else {
@@ -100,7 +100,7 @@ contract ZKsyncOSVerifier is IVerifier, IZKsyncOSVerifier {
         }
     }
 
-    function _extractZKsyncOSProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
+    function _extractProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
         uint256 resultLength = _proof.length - ZKSYNC_OS_PROOF_METADATA_LENGTH;
 
         // Allocate memory for the underlying proof after removing its type and initial hash.

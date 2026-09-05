@@ -13,7 +13,7 @@ import {
     ManagerMissingLegIndexOutOfRange,
     ManagerSettlementLayerNotL1
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
-import {Unauthorized} from "contracts/l2-system/zksync-os/errors/ZKOSContractErrors.sol";
+import {Unauthorized} from "contracts/l2-system/zksync-os/errors/SystemContractErrors.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @notice Covers the AtomicFlowManager's L2 initialization (`initL2`) and the settlement-layer

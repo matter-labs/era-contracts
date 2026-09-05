@@ -10,12 +10,19 @@ use tracing::{debug, info};
 
 use crate::abi::{
     IBridgehub::IBridgehubInstance, IChainTypeManager::NewUpgradeCutData,
+    ILegacySettlementLayerUpgrade::ILegacySettlementLayerUpgradeInstance,
     ISettlementLayerUpgrade::ISettlementLayerUpgradeInstance, L2CanonicalTransaction,
 };
 
 /// How many settlement-layer blocks to scan per `eth_getLogs` request. Keeps us under
 /// typical provider limits while still terminating in a reasonable number of round trips.
 const MAX_BLOCKS_PER_QUERY: u64 = 50_000;
+
+/// Bit offset of the minor component in the packed protocol version.
+const PACKED_SEMVER_MINOR_OFFSET: usize = 32;
+
+/// First protocol minor whose upgrade transaction data is rewritten per chain.
+const FIRST_PER_CHAIN_REWRITE_PROTOCOL_MINOR: u64 = 31;
 
 /// Resolve the chain's ChainTypeManager by calling `Bridgehub.chainTypeManager(chainId)`
 /// on whatever layer the bridgehub lives on (L1 for direct chains, gateway for
@@ -43,12 +50,12 @@ pub async fn resolve_ctm(
 /// `protocol_version` and compute the canonical tx hash of the embedded
 /// L2 upgrade transaction.
 ///
-/// For v31+ upgrades, `SettlementLayerV31UpgradeBase.upgrade()` mutates
-/// `l2ProtocolUpgradeTx.data` per-chain before hashing (to splice in
-/// `ZKChainSpecificForceDeploymentsData` queried from the bridgehub/NTV). We
-/// replicate that by calling the upgrade contract's `getL2UpgradeTxData` view
-/// directly — single source of truth. Pre-v31 upgrade contracts don't expose
-/// that selector; the eth_call reverts and we fall back to the unmutated data.
+/// For v31+ upgrades, the upgrade contract mutates `l2ProtocolUpgradeTx.data`
+/// per-chain before hashing (to splice in `ZKChainSpecificForceDeploymentsData`
+/// queried from the bridgehub/NTV). We replicate that by calling the upgrade
+/// contract's `getL2UpgradeTxData` view directly — single source of truth. The
+/// current three-argument ABI is tried first, followed by the legacy four-argument
+/// ABI. Pre-v31 upgrades did not mutate the data and use it unchanged.
 ///
 /// `lookback_blocks` caps how far back we scan; scans are performed newest-first
 /// so recent upgrades are found quickly.
@@ -91,6 +98,7 @@ pub async fn find_upgrade_tx_hash(
                 diamond_cut.initAddress,
                 bridgehub_address,
                 chain_id,
+                protocol_version,
                 &diamond_cut.initCalldata,
             )
             .await;
@@ -116,6 +124,7 @@ async fn tx_hash_from_init_calldata(
     init_address: Address,
     bridgehub_address: Address,
     chain_id: u64,
+    protocol_version: U256,
     init_calldata: &[u8],
 ) -> anyhow::Result<B256> {
     if init_calldata.len() < 4 {
@@ -131,37 +140,47 @@ async fn tx_hash_from_init_calldata(
     .context("ProposedUpgrade decode from initCalldata")?;
 
     let mut tx = proposed.l2ProtocolUpgradeTx;
+    if tx.txType == U256::ZERO {
+        anyhow::bail!(
+            "upgrade has no L2 protocol transaction (txType is zero); receipt-based readiness does not apply"
+        );
+    }
     tx.data = rebuild_tx_data_if_v31plus(
         provider,
         init_address,
         bridgehub_address,
         chain_id,
+        protocol_version,
         tx.data.clone(),
     )
-    .await;
+    .await?;
 
     Ok(canonical_tx_hash(&tx))
 }
 
-/// For v31+ upgrade contracts, call `initAddress.getL2UpgradeTxData(bridgehub, chainId,
-/// originalData)` and return the rebuilt data. For pre-v31 contracts (or any other failure),
-/// fall back to `original_data` — the older hashing path didn't mutate per-chain.
+/// For v31+ upgrade contracts, return the per-chain transaction data produced by the
+/// current rewrite ABI, falling back to the legacy ABI used by already-published upgrades.
+/// Pre-v31 upgrades did not rewrite the transaction data. A failure of both v31+ ABIs is
+/// fatal: silently hashing the placeholder data would make the checker wait for a transaction
+/// that can never exist.
 async fn rebuild_tx_data_if_v31plus(
     provider: &DynProvider,
     init_address: Address,
     bridgehub_address: Address,
     chain_id: u64,
+    protocol_version: U256,
     original_data: Bytes,
-) -> Bytes {
+) -> anyhow::Result<Bytes> {
+    let protocol_minor = (protocol_version >> PACKED_SEMVER_MINOR_OFFSET) & U256::from(u32::MAX);
+    if protocol_minor < U256::from(FIRST_PER_CHAIN_REWRITE_PROTOCOL_MINOR) {
+        return Ok(original_data);
+    }
+
     let upgrade = ISettlementLayerUpgradeInstance::new(init_address, provider.clone());
-    // The `zksyncOS` bool stays in the call to preserve the upgrade
-    // contract's ABI tuple shape; every chain this tooling serves is a
-    // ZKsync OS chain, so it is unconditionally `true`.
     match upgrade
         .getL2UpgradeTxData(
             bridgehub_address,
             U256::from(chain_id),
-            true,
             original_data.clone(),
         )
         .call()
@@ -172,19 +191,42 @@ async fn rebuild_tx_data_if_v31plus(
                 %init_address,
                 original_len = original_data.len(),
                 rebuilt_len = rebuilt.len(),
-                "applied v31+ per-chain tx-data mutation via getL2UpgradeTxData"
+                "applied per-chain tx-data mutation via current getL2UpgradeTxData ABI"
             );
-            rebuilt
+            Ok(rebuilt)
         }
-        Err(err) => {
-            // Pre-v31 upgrade contract, or selector genuinely missing — caller's hash
-            // is computed from the original data, matching pre-v31 behavior.
+        Err(current_err) => {
             debug!(
                 %init_address,
-                error = %err,
-                "getL2UpgradeTxData not available on upgrade contract; using original tx data"
+                error = %current_err,
+                "current getL2UpgradeTxData ABI failed; trying legacy ABI"
             );
-            original_data
+
+            let legacy_upgrade =
+                ILegacySettlementLayerUpgradeInstance::new(init_address, provider.clone());
+            match legacy_upgrade
+                .getL2UpgradeTxData(
+                    bridgehub_address,
+                    U256::from(chain_id),
+                    true,
+                    original_data.clone(),
+                )
+                .call()
+                .await
+            {
+                Ok(rebuilt) => {
+                    info!(
+                        %init_address,
+                        original_len = original_data.len(),
+                        rebuilt_len = rebuilt.len(),
+                        "applied per-chain tx-data mutation via legacy getL2UpgradeTxData ABI"
+                    );
+                    Ok(rebuilt)
+                }
+                Err(legacy_err) => Err(anyhow!(
+                    "getL2UpgradeTxData failed with both current and legacy ABIs on v31+ upgrade contract {init_address}: current ABI: {current_err}; legacy ABI: {legacy_err}"
+                )),
+            }
         }
     }
 }
@@ -192,4 +234,209 @@ async fn rebuild_tx_data_if_v31plus(
 /// The canonical L2 priority-op hash: `keccak256(abi_encode(L2CanonicalTransaction))`.
 pub fn canonical_tx_hash(tx: &L2CanonicalTransaction) -> B256 {
     keccak256(tx.abi_encode())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use alloy::providers::ProviderBuilder;
+    use alloy::sol_types::SolCall;
+    use alloy::transports::mock::Asserter;
+
+    use crate::abi::{
+        ILegacySettlementLayerUpgrade::getL2UpgradeTxDataCall as LegacyGetL2UpgradeTxDataCall,
+        ISettlementLayerUpgrade::getL2UpgradeTxDataCall as CurrentGetL2UpgradeTxDataCall,
+    };
+
+    fn protocol_version(minor: u64) -> U256 {
+        // Keep both adjacent SemVer lanes nonzero so the tests also pin extraction to the
+        // 32-bit minor component rather than accepting an unmasked right shift.
+        (U256::from(1_u64) << 64)
+            | (U256::from(minor) << PACKED_SEMVER_MINOR_OFFSET)
+            | U256::from(9_u64)
+    }
+
+    fn push_rewrite_success(asserter: &Asserter, rewritten: &Bytes) {
+        let encoded_return =
+            Bytes::from(CurrentGetL2UpgradeTxDataCall::abi_encode_returns(rewritten));
+        asserter.push_success(&encoded_return);
+    }
+
+    #[tokio::test]
+    async fn rewrite_uses_current_abi_when_available() {
+        assert_eq!(
+            CurrentGetL2UpgradeTxDataCall::SELECTOR,
+            [0xb1, 0x70, 0x1f, 0xb0]
+        );
+
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new()
+            .connect_mocked_client(asserter.clone())
+            .erased();
+        let original = Bytes::from_static(b"placeholder");
+        let rewritten = Bytes::from_static(b"current");
+        push_rewrite_success(&asserter, &rewritten);
+
+        let actual = rebuild_tx_data_if_v31plus(
+            &provider,
+            Address::repeat_byte(0x11),
+            Address::repeat_byte(0x22),
+            270,
+            protocol_version(31),
+            original,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(actual, rewritten);
+        assert!(
+            asserter.read_q().is_empty(),
+            "current ABI should be called exactly once"
+        );
+    }
+
+    #[tokio::test]
+    async fn rewrite_falls_back_to_legacy_abi() {
+        assert_eq!(
+            LegacyGetL2UpgradeTxDataCall::SELECTOR,
+            [0x1c, 0x98, 0x76, 0xff]
+        );
+
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new()
+            .connect_mocked_client(asserter.clone())
+            .erased();
+        let original = Bytes::from_static(b"placeholder");
+        let rewritten = Bytes::from_static(b"legacy");
+        asserter.push_failure_msg("current selector missing");
+        push_rewrite_success(&asserter, &rewritten);
+
+        let actual = rebuild_tx_data_if_v31plus(
+            &provider,
+            Address::repeat_byte(0x11),
+            Address::repeat_byte(0x22),
+            270,
+            protocol_version(31),
+            original,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(actual, rewritten);
+        assert!(
+            asserter.read_q().is_empty(),
+            "current failure and legacy success should consume exactly two calls"
+        );
+    }
+
+    #[tokio::test]
+    async fn rewrite_fails_when_both_abis_fail() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new()
+            .connect_mocked_client(asserter.clone())
+            .erased();
+        asserter.push_failure_msg("current call failed");
+        asserter.push_failure_msg("legacy call failed");
+
+        let err = rebuild_tx_data_if_v31plus(
+            &provider,
+            Address::repeat_byte(0x11),
+            Address::repeat_byte(0x22),
+            270,
+            protocol_version(31),
+            Bytes::from_static(b"placeholder"),
+        )
+        .await
+        .unwrap_err();
+
+        let message = err.to_string();
+        assert!(message.contains("both current and legacy ABIs"));
+        assert!(message.contains("current call failed"));
+        assert!(message.contains("legacy call failed"));
+        assert!(
+            asserter.read_q().is_empty(),
+            "dual failure should consume the current and legacy responses in order"
+        );
+    }
+
+    #[tokio::test]
+    async fn pre_v31_upgrade_uses_original_data_without_calling() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new()
+            .connect_mocked_client(asserter.clone())
+            .erased();
+        let original = Bytes::from_static(b"unchanged");
+
+        let actual = rebuild_tx_data_if_v31plus(
+            &provider,
+            Address::repeat_byte(0x11),
+            Address::repeat_byte(0x22),
+            270,
+            protocol_version(30),
+            original.clone(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(actual, original);
+        assert!(asserter.read_q().is_empty());
+    }
+
+    #[tokio::test]
+    async fn verifier_only_upgrade_fails_with_explicit_diagnostic() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new()
+            .connect_mocked_client(asserter.clone())
+            .erased();
+        let proposed = crate::abi::IChainTypeManager::ProposedUpgrade {
+            l2ProtocolUpgradeTx: L2CanonicalTransaction {
+                txType: U256::ZERO,
+                from: U256::ZERO,
+                to: U256::ZERO,
+                gasLimit: U256::ZERO,
+                gasPerPubdataByteLimit: U256::ZERO,
+                maxFeePerGas: U256::ZERO,
+                maxPriorityFeePerGas: U256::ZERO,
+                paymaster: U256::ZERO,
+                nonce: U256::ZERO,
+                value: U256::ZERO,
+                reserved: [U256::ZERO; 4],
+                data: Bytes::new(),
+                signature: Bytes::new(),
+                factoryDeps: Vec::new(),
+                paymasterInput: Bytes::new(),
+                reservedDynamic: Bytes::new(),
+            },
+            bootloaderHash: B256::ZERO,
+            defaultAccountHash: B256::ZERO,
+            evmEmulatorHash: B256::ZERO,
+            verifier: Address::ZERO,
+            verifierParams: crate::abi::IChainTypeManager::VerifierParams {
+                recursionNodeLevelVkHash: B256::ZERO,
+                recursionLeafLevelVkHash: B256::ZERO,
+                recursionCircuitsSetVksHash: B256::ZERO,
+            },
+            l1ContractsUpgradeCalldata: Bytes::new(),
+            postUpgradeCalldata: Bytes::new(),
+            upgradeTimestamp: U256::ZERO,
+            newProtocolVersion: U256::ZERO,
+        };
+        let mut init_calldata = vec![0_u8; 4];
+        init_calldata.extend(proposed.abi_encode());
+
+        let err = tx_hash_from_init_calldata(
+            &provider,
+            Address::repeat_byte(0x11),
+            Address::repeat_byte(0x22),
+            270,
+            protocol_version(31),
+            &init_calldata,
+        )
+        .await
+        .unwrap_err();
+
+        assert!(err.to_string().contains("txType is zero"));
+        assert!(asserter.read_q().is_empty());
+    }
 }

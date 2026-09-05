@@ -88,7 +88,7 @@
         "internalType": "bytes32"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "pure"
   },
   {
     "type": "function",
@@ -352,11 +352,6 @@
         "name": "_aliasedOwner",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "_l2TokenProxyBytecodeHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
       },
       {
         "name": "_bridgedTokenBeacon",
@@ -654,11 +649,6 @@
         "name": "_aliasedOwner",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "_l2TokenProxyBytecodeHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
       },
       {
         "name": "_wethToken",
@@ -1035,22 +1025,12 @@
   },
   {
     "type": "error",
-    "name": "DeployFailed",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "DeployingBridgedTokenForNativeToken",
     "inputs": []
   },
   {
     "type": "error",
     "name": "EmptyAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "EmptyBytes32",
     "inputs": []
   },
   {
@@ -1113,11 +1093,6 @@
   {
     "type": "error",
     "name": "TokensWithFeesNotSupported",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "U32CastOverflow",
     "inputs": []
   },
   {

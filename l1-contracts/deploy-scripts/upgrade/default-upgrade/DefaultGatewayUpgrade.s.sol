@@ -14,7 +14,6 @@ import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {
     StateTransitionDeployedAddresses,
     ChainCreationParamsConfig,
-    StateTransitionDeployedAddresses,
     ZkChainAddresses,
     L1SpecificStateTransitionAddresses
 } from "../../utils/Types.sol";
@@ -25,7 +24,7 @@ import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
@@ -47,12 +46,10 @@ import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {DefaultL2UpgradeStrategy} from "./DefaultL2UpgradeStrategy.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
-import {Utils} from "../../utils/Utils.sol";
 import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
-// FIXME: consider deleting this file it is not used.
-// FIXME: if it is used however, it is not compatible with zksync os as it uses era bytecodes directly.
+// FIXME: consider deleting this file; it is not used.
 /// @notice Script used for default CTM on gateway upgrade flow, should be run after L1 CTM upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
 contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
@@ -97,15 +94,16 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     Gateway internal gatewayConfig;
     ZkChainAddresses internal discoveredRepresentativeZkChain;
     L1Bridgehub internal bridgehub;
-    CTMDeployedAddresses internal ctmDeployedAddresses;
 
-    // TODO We need for composing upgrade transaction. but seems we don't need an upgrade transaction on gateway
+    /// @dev Gateway preparation does not publish factory dependencies. The referenced bytecodes are
+    /// already published by the L1 preparation flow, so the composed upgrade transaction carries an
+    /// empty `factoryDeps` array.
     PublishFactoryDepsResult internal factoryDepsResult;
 
     /// @dev Gateway upgrades don't cache FixedForceDeploymentsData — returns empty so
-    /// buildZKsyncOSForceDeployments falls through to loading from disk.
+    /// the force-deployment builder falls through to loading from disk.
     function getFixedForceDeploymentsData() internal virtual override returns (FixedForceDeploymentsData memory) {
-        // Return empty struct — buildZKsyncOSForceDeployments will load bytecodes from disk.
+        // Return an empty struct so the force-deployment builder loads bytecodes from disk.
     }
 
     EcosystemUpgradeConfig internal upgradeConfig;
@@ -115,6 +113,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     uint256 internal representativeChainId;
 
     function initializeWithArgs(
+        address _bridgehub,
         bytes32 _create2FactorySalt,
         uint256 _representativeChainId,
         uint256 _priorityTxsL2GasLimit,
@@ -128,6 +127,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         newConfigPath = string.concat(root, newConfigPath);
 
         initializeConfig(
+            _bridgehub,
             _create2FactorySalt,
             getChainCreationParamsConfig(Utils.genesisConfigPath()),
             _representativeChainId,
@@ -143,6 +143,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function initializeConfig(
+        address _bridgehub,
         bytes32 _create2FactorySalt,
         ChainCreationParamsConfig memory _chainCreationParams,
         uint256 _representativeChainId,
@@ -152,6 +153,8 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         // Optional
         address _governance
     ) public {
+        require(_bridgehub.code.length > 0, "Bridgehub contract does not exist at specified address");
+        bridgehub = L1Bridgehub(_bridgehub);
         if (_create2FactorySalt != bytes32(0)) {
             setCreate2Salt(_create2FactorySalt);
         }
@@ -163,21 +166,21 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         if (_governance != address(0)) {
             config.ownerAddress = _governance;
         } else {
-            config.ownerAddress = ctmDeployedAddresses.admin.governance;
+            config.ownerAddress = ctmAddresses.admin.governance;
         }
-        newConfig.ecosystemAdminAddress = ctmDeployedAddresses.admin.governance;
+        newConfig.ecosystemAdminAddress = ctmAddresses.admin.governance;
         newConfig.priorityTxsL2GasLimit = _priorityTxsL2GasLimit;
         newConfig.maxExpectedL1GasPrice = _maxExpectedL1GasPrice;
         gatewayConfig = _gatewayConfig;
 
-        config.contracts.governanceSecurityCouncilAddress = Governance(payable(ctmDeployedAddresses.admin.governance))
+        config.contracts.governanceSecurityCouncilAddress = Governance(payable(ctmAddresses.admin.governance))
             .securityCouncil();
-        // config.contracts.governanceMinDelay = Governance(payable(ctmDeployedAddresses.admin.governance)).minDelay();
+        // config.contracts.governanceMinDelay = Governance(payable(ctmAddresses.admin.governance)).minDelay();
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
-            ctmDeployedAddresses.stateTransition.proxies.validatorTimelock
+            ctmAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
         config.testnetVerifier = UpgradeUtils.resolveTestnetVerifier(
-            IChainTypeManager(ctmDeployedAddresses.stateTransition.proxies.chainTypeManager)
+            IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager)
         );
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
@@ -241,13 +244,12 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         coreAddresses = AddressIntrospector.getCoreDeployedAddresses(address(bridgehub));
         config.ownerAddress = coreAddresses.shared.governance;
         address ctm = bridgehub.chainTypeManager(representativeChainId);
-        ctmDeployedAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
+        ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManager(ctm));
         discoveredRepresentativeZkChain = AddressIntrospector.getZkChainAddresses(
             IZKChain(bridgehub.getZKChain(representativeChainId))
         );
 
-        ctmDeployedAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredRepresentativeZkChain
-            .l1DAValidator;
+        ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredRepresentativeZkChain.l1DAValidator;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         newConfig.oldProtocolVersion = ctmProtocolVersion;
         require(
@@ -255,7 +257,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             "The new protocol version is already present on the ChainTypeManager"
         );
 
-        newConfig.oldValidatorTimelock = ctmDeployedAddresses.stateTransition.proxies.validatorTimelock;
+        newConfig.oldValidatorTimelock = ctmAddresses.stateTransition.proxies.validatorTimelock;
         newConfig.ecosystemAdminAddress = coreAddresses.shared.bridgehubAdmin;
     }
 
@@ -607,7 +609,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     function getAddresses() public view virtual override returns (CTMDeployedAddresses memory) {
-        return ctmDeployedAddresses;
+        return ctmAddresses;
     }
 
     function saveOutputVersionSpecific() internal virtual {}

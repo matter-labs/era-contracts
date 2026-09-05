@@ -88,7 +88,7 @@
         "internalType": "bytes32"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "pure"
   },
   {
     "type": "function",
@@ -277,12 +277,12 @@
     "name": "calculateCreate2TokenAddress",
     "inputs": [
       {
-        "name": "_originChainId",
+        "name": "_tokenOriginChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "_l1Token",
+        "name": "_nonNativeToken",
         "type": "address",
         "internalType": "address"
       }
@@ -365,11 +365,6 @@
         "name": "_aliasedOwner",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "_l2TokenProxyBytecodeHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
       },
       {
         "name": "_bridgedTokenBeacon",
@@ -674,11 +669,6 @@
         "name": "_aliasedOwner",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "_l2TokenProxyBytecodeHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
       },
       {
         "name": "_wethToken",
@@ -1061,11 +1051,6 @@
   {
     "type": "error",
     "name": "EmptyAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "EmptyBytes32",
     "inputs": []
   },
   {

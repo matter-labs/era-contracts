@@ -85,10 +85,7 @@ library DeployCTML1OrGateway {
         } else if (_contractName == CTMContract.CommitterFacet) {
             return abi.encode(_config.l1ChainId);
         } else if (_contractName == CTMContract.DiamondInit) {
-            // `DiamondInit(bool _isZKOS)` — always ZKsync OS.
-            // TODO: drop the `_isZKOS` constructor input in the next release; it cannot change here
-            // without re-auditing the frozen contract.
-            return abi.encode(true);
+            return abi.encode();
         } else if (_contractName == CTMContract.DualVerifier || _contractName == CTMContract.TestnetVerifier) {
             return abi.encode(_config.verifierPlonk);
         } else if (_contractName == CTMContract.ChainTypeManager) {
@@ -123,7 +120,7 @@ library DeployCTML1OrGateway {
             return CTMContract.CommitterFacet;
         } else if (_compareStrings(_contractName, "ValidatorTimelock")) {
             return CTMContract.ValidatorTimelock;
-        } else if (_compareStrings(_contractName, "ZKsyncOSChainTypeManager")) {
+        } else if (_compareStrings(_contractName, "ChainTypeManager")) {
             return CTMContract.ChainTypeManager;
         } else if (_compareStrings(_contractName, "BlobsL1DAValidatorZKsyncOS")) {
             return CTMContract.BlobsL1DAValidatorZKsyncOS;
@@ -154,13 +151,13 @@ library DeployCTML1OrGateway {
     /// @notice Resolve a CTMContract enum to its contract name.
     // solhint-disable-next-line code-complexity
     function _resolveCTMContractName(CTMContract _c) private view returns (string memory) {
-        if (_c == CTMContract.ChainTypeManager) return "ZKsyncOSChainTypeManager";
+        if (_c == CTMContract.ChainTypeManager) return "ChainTypeManager";
         if (_c == CTMContract.DefaultUpgrade) return "DefaultUpgradeZKsyncOS";
         if (_c == CTMContract.VerifierPlonk) return "ZKsyncOSVerifierPlonk";
         if (_c == CTMContract.DualVerifier) return "ZKsyncOSVerifier";
         if (_c == CTMContract.TestnetVerifier) return "ZKsyncOSTestnetVerifier";
-        if (_c == CTMContract.GatewayCTMDeployerCTM) return "GatewayCTMDeployerCTMZKsyncOS";
-        if (_c == CTMContract.GatewayCTMDeployerVerifiers) return "GatewayCTMDeployerVerifiersZKsyncOS";
+        if (_c == CTMContract.GatewayCTMDeployerCTM) return "GatewayCTMDeployerCTM";
+        if (_c == CTMContract.GatewayCTMDeployerVerifiers) return "GatewayCTMDeployerVerifiers";
 
         if (_c == CTMContract.AdminFacet) return "AdminFacet";
         if (_c == CTMContract.MailboxFacet) return "MailboxFacet";

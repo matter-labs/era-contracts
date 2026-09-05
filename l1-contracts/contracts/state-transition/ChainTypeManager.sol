@@ -30,6 +30,9 @@ import {
 import {
     AddressHasNoCode,
     ChainAlreadyLive,
+    GenesisBatchCommitmentIncorrect,
+    GenesisBatchHashZero,
+    GenesisUpgradeZero,
     HashMismatch,
     MigrationsNotPaused,
     Unauthorized,
@@ -44,11 +47,10 @@ import {TxStatus} from "../common/Messaging.sol";
 
 import {IDefaultUpgrade} from "../upgrades/IDefaultUpgrade.sol";
 
-/// @title Chain Type Manager Base contract
+/// @title Chain Type Manager contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Base contract for Chain Type Managers with common functionality
-abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
+contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /// @notice Address of the bridgehub
@@ -172,9 +174,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         _;
     }
 
-    /// @return flag whether CTM is for ZKsync OS or Era VM.
-    /// @dev To be defined in derived contracts.
-    function isZKsyncOS() external pure virtual returns (bool);
+    /// @inheritdoc IChainTypeManager
+    function isZKsyncOS() external pure returns (bool) {
+        return true;
+    }
 
     /// @return The tuple of (major, minor, patch) protocol version.
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
@@ -230,8 +233,15 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters
-    /// @dev To be overridden in derived contracts for custom validation
-    function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal virtual;
+    function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal {
+        _validateChainCreationParams(_chainCreationParams);
+
+        if (_chainCreationParams.genesisBatchCommitment != bytes32(uint256(1))) {
+            revert GenesisBatchCommitmentIncorrect();
+        }
+
+        _processValidatedChainCreationParams(_chainCreationParams);
+    }
 
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters
@@ -239,9 +249,16 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         _setChainCreationParams(_chainCreationParams);
     }
 
-    /// @notice Validates chain creation parameters common to all chain types
+    /// @notice Validates chain creation parameters
     /// @param _chainCreationParams The chain creation parameters to validate
-    function _validateChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal pure virtual;
+    function _validateChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal pure {
+        if (_chainCreationParams.genesisUpgrade == address(0)) {
+            revert GenesisUpgradeZero();
+        }
+        if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
+            revert GenesisBatchHashZero();
+        }
+    }
 
     /// @notice Sets chain creation parameters after validation
     /// @param _chainCreationParams The chain creation parameters
@@ -579,13 +596,6 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         IZKChain(getZKChain(_chainId)).setValidator(_validator, _active);
     }
 
-    /// @dev setPorterAvailability for the specified chain
-    /// @param _chainId the chainId of the chain
-    /// @param _zkPorterIsAvailable whether the zkPorter mode is available
-    function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
-        IZKChain(getZKChain(_chainId)).setPorterAvailability(_zkPorterIsAvailable);
-    }
-
     /// @notice Deactivates Priority Mode for the specified chain.
     /// The chain will return to normal operation with whitelisted validators.
     /// @param _chainId the chainId of the chain
@@ -621,13 +631,12 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
         // construct init data
         bytes memory initData;
-        /// all together 4+9*32=292 bytes for the selector + mandatory data
+        /// all together 4+8*32=260 bytes for the selector + mandatory data
         // solhint-disable-next-line func-named-parameters
         initData = bytes.concat(
             IDiamondInit.initialize.selector,
             bytes32(_chainId),
             bytes32(uint256(uint160(BRIDGE_HUB))),
-            bytes32(uint256(uint160(INTEROP_CENTER))),
             bytes32(uint256(uint160(address(this)))),
             bytes32(protocolVersion),
             bytes32(uint256(uint160(_admin))),
@@ -750,10 +759,14 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// param _depositSender the address of that sent the deposit
     /// param _ctmData the data of the migration
     function forwardedBridgeConfirmTransferResult(
-        uint256 /* _chainId */,
-        TxStatus /* _txStatus */,
-        bytes32 /* _assetInfo */,
-        address /* _depositSender */,
+        uint256,
+        /* _chainId */
+        TxStatus,
+        /* _txStatus */
+        bytes32,
+        /* _assetInfo */
+        address,
+        /* _depositSender */
         bytes calldata /* _ctmData */
     ) external onlyChainAssetHandler {
         // Function is empty due to the fact that when calling `forwardedBridgeBurn` there are no

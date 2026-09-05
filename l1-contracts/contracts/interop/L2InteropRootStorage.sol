@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Unauthorized} from "contracts/l2-system/zksync-os/errors/ZKOSContractErrors.sol";
+import {Unauthorized} from "contracts/l2-system/zksync-os/errors/SystemContractErrors.sol";
 import {IL2InteropRootStorage} from "./IL2InteropRootStorage.sol";
 import {InteropRootAlreadyExists, InteropRootTimestampIsZero, SidesLengthNotOne} from "./InteropErrors.sol";
 import {MessageRootIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";

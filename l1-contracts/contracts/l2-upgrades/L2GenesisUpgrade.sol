@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {ISystemContext} from "../common/interfaces/ISystemContext.sol";
 import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper.sol";
@@ -22,7 +20,6 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
     /// @param _additionalForceDeploymentsData the additional force deployments data
     // slither-disable-next-line locked-ether
     function genesisUpgrade(
-        bool _isZKsyncOS,
         uint256 _chainId,
         address _ctmDeployer,
         bytes calldata _fixedForceDeploymentsData,
@@ -32,15 +29,11 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
             revert InvalidChainId();
         }
 
-        // On ZKsyncOS, the chain Id is a part of implicit block properties
-        // and so does not need to set inside the genesis upgrade.
-        if (!_isZKsyncOS) {
-            ISystemContext(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR).setChainId(_chainId);
-        }
+        // Note: on ZKsync OS the chain id is an implicit block property, so unlike the historical
+        // EraVM genesis there is nothing to write into the system context here.
 
         // solhint-disable-next-line func-named-parameters
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
-            _isZKsyncOS,
             _ctmDeployer,
             _fixedForceDeploymentsData,
             _additionalForceDeploymentsData,

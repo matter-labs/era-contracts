@@ -71,7 +71,7 @@ pub fn decode_calls(hex_str: &str) -> anyhow::Result<Vec<GovernanceCall>> {
 
 /// Concatenated re-encoding of multiple `Call[]` hex strings, in the order
 /// supplied. Used to merge per-script (core + per-CTM + gov-upgrade) TOMLs
-/// into one merged `<out>/prepare/governance.toml`.
+/// into one merged `<env-out>/ecosystem.toml`.
 pub fn merge_call_array_hex(stages: &[&str]) -> anyhow::Result<String> {
     let mut merged: Vec<GovernanceCall> = Vec::new();
     for stage in stages {

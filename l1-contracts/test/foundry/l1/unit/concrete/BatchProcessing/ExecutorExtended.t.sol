@@ -6,18 +6,12 @@ import "./_Executor_Shared.t.sol";
 
 import {Utils} from "../Utils/Utils.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {
     BatchNumberMismatch,
     CanOnlyProcessOneBatch,
-    InvalidSystemLogsLength,
-    EmptyPrecommitData,
-    InvalidBatchNumber,
     RevertedBatchNotAfterNewLastBatch,
     CantRevertExecutedBatch,
-    CantExecuteUnprovenBatches,
-    VerifiedBatchesExceedsCommittedBatches,
-    InvalidProof,
     InvalidProtocolVersion
 } from "contracts/common/L1ContractErrors.sol";
 
@@ -28,14 +22,14 @@ import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.so
 contract ExecutorExtendedTest is ExecutorTest {
     function test_CommitBatches_BatchNumberMismatch() public {
         // Try to commit a batch with wrong batch number (should be 1, but we'll send 5)
-        CommitBatchInfo memory wrongBatchInfo = newCommitBatchInfo;
+        CommitBatchInfoZKsyncOS memory wrongBatchInfo = newCommitBatchInfoZKsyncOS;
         wrongBatchInfo.batchNumber = 5;
 
-        CommitBatchInfo[] memory newBatchesData = new CommitBatchInfo[](1);
+        CommitBatchInfoZKsyncOS[] memory newBatchesData = new CommitBatchInfoZKsyncOS[](1);
         newBatchesData[0] = wrongBatchInfo;
 
         bytes memory commitData = bytes.concat(
-            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
+            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT),
             abi.encode(genesisStoredBatchInfo, newBatchesData)
         );
 
@@ -46,17 +40,17 @@ contract ExecutorExtendedTest is ExecutorTest {
 
     function test_CommitBatches_MultipleBatches_Fails() public {
         // Try to commit multiple batches at once (only 1 is allowed)
-        CommitBatchInfo[] memory newBatchesData = new CommitBatchInfo[](2);
+        CommitBatchInfoZKsyncOS[] memory newBatchesData = new CommitBatchInfoZKsyncOS[](2);
 
-        CommitBatchInfo memory batch1 = newCommitBatchInfo;
-        CommitBatchInfo memory batch2 = newCommitBatchInfo;
+        CommitBatchInfoZKsyncOS memory batch1 = newCommitBatchInfoZKsyncOS;
+        CommitBatchInfoZKsyncOS memory batch2 = newCommitBatchInfoZKsyncOS;
         batch2.batchNumber = 2;
 
         newBatchesData[0] = batch1;
         newBatchesData[1] = batch2;
 
         bytes memory commitData = bytes.concat(
-            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
+            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT),
             abi.encode(genesisStoredBatchInfo, newBatchesData)
         );
 
@@ -65,52 +59,11 @@ contract ExecutorExtendedTest is ExecutorTest {
         committer.commitBatchesSharedBridge(address(0), 1, 2, commitData);
     }
 
-    function test_CommitBatches_SystemLogsLengthInvalid() public {
-        CommitBatchInfo memory invalidBatch = newCommitBatchInfo;
-        // Set invalid system logs length (not multiple of L2_TO_L1_LOG_SERIALIZE_SIZE)
-        invalidBatch.systemLogs = hex"0102030405";
-
-        CommitBatchInfo[] memory newBatchesData = new CommitBatchInfo[](1);
-        newBatchesData[0] = invalidBatch;
-
-        (uint256 processFrom, uint256 processTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            newBatchesData
-        );
-
-        vm.prank(validator);
-        vm.expectRevert(InvalidSystemLogsLength.selector);
-        committer.commitBatchesSharedBridge(address(0), processFrom, processTo, commitData);
-    }
-
-    function test_PrecommitSharedBridge_InvalidBatchNumber() public {
-        // Try to precommit with wrong batch number
-        bytes memory precommitData = bytes.concat(
-            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
-            abi.encode(uint256(0), abi.encodePacked(bytes32(uint256(1))))
-        );
-
-        vm.prank(validator);
-        vm.expectRevert(abi.encodeWithSelector(InvalidBatchNumber.selector, 5, 1));
-        committer.precommitSharedBridge(address(0), 5, precommitData);
-    }
-
-    function test_PrecommitSharedBridge_EmptyPrecommitData() public {
-        bytes memory precommitData = bytes.concat(
-            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
-            abi.encode(uint256(0), bytes(""))
-        );
-
-        vm.prank(validator);
-        vm.expectRevert(abi.encodeWithSelector(EmptyPrecommitData.selector, 1));
-        committer.precommitSharedBridge(address(0), 1, precommitData);
-    }
-
     function test_CommitBatches_UnauthorizedValidator() public {
-        CommitBatchInfo[] memory newBatchesData = new CommitBatchInfo[](1);
-        newBatchesData[0] = newCommitBatchInfo;
+        CommitBatchInfoZKsyncOS[] memory newBatchesData = new CommitBatchInfoZKsyncOS[](1);
+        newBatchesData[0] = newCommitBatchInfoZKsyncOS;
 
-        (uint256 processFrom, uint256 processTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+        (uint256 processFrom, uint256 processTo, bytes memory commitData) = Utils.encodeCommitBatchesDataZKsyncOS(
             genesisStoredBatchInfo,
             newBatchesData
         );
@@ -118,26 +71,6 @@ contract ExecutorExtendedTest is ExecutorTest {
         vm.prank(randomSigner);
         vm.expectRevert();
         committer.commitBatchesSharedBridge(address(0), processFrom, processTo, commitData);
-    }
-
-    function testFuzz_CommitBatches_DifferentTimestamps(uint64 timestamp) public {
-        vm.assume(timestamp > currentTimestamp);
-        vm.assume(timestamp < type(uint64).max / 2);
-
-        // Warp to a time that allows this timestamp
-        vm.warp(timestamp + 1);
-
-        CommitBatchInfo memory batchInfo = newCommitBatchInfo;
-        batchInfo.timestamp = timestamp;
-
-        // Need to recreate system logs with the new timestamp
-        bytes memory l2Logs = Utils.encodePacked(Utils.createSystemLogs(bytes32(0)));
-        batchInfo.systemLogs = l2Logs;
-
-        CommitBatchInfo[] memory newBatchesData = new CommitBatchInfo[](1);
-        newBatchesData[0] = batchInfo;
-
-        // This will likely fail due to timestamp validation, but we're testing the path
     }
 }
 
@@ -217,36 +150,12 @@ contract ExecutorRevertBatchesTest is ExecutorTest {
         address ctm = utilsFacet.util_getChainTypeManager();
         vm.mockCall(ctm, abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector), abi.encode(false));
 
-        CommitBatchInfo[] memory newBatchesData = new CommitBatchInfo[](1);
-        newBatchesData[0] = CommitBatchInfo({
-            batchNumber: 1,
-            timestamp: uint64(block.timestamp),
-            indexRepeatedStorageChanges: 0,
-            newStateRoot: bytes32(0),
-            numberOfLayer1Txs: 0,
-            priorityOperationsHash: keccak256(""),
-            bootloaderHeapInitialContentsHash: bytes32(0),
-            eventsQueueStateHash: bytes32(0),
-            systemLogs: new bytes(0),
-            operatorDAInput: new bytes(0)
-        });
+        CommitBatchInfoZKsyncOS[] memory newBatchesData = new CommitBatchInfoZKsyncOS[](1);
+        newBatchesData[0] = newCommitBatchInfoZKsyncOS;
 
         bytes memory commitData = bytes.concat(
-            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
-            abi.encode(
-                IExecutor.StoredBatchInfo({
-                    batchNumber: 0,
-                    batchHash: bytes32(0),
-                    indexRepeatedStorageChanges: 0,
-                    numberOfLayer1Txs: 0,
-                    priorityOperationsHash: bytes32(0),
-                    l2LogsTreeRoot: bytes32(0),
-                    dependencyRootsRollingHash: bytes32(0),
-                    timestamp: 0,
-                    commitment: bytes32(0)
-                }),
-                newBatchesData
-            )
+            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT),
+            abi.encode(genesisStoredBatchInfo, newBatchesData)
         );
 
         vm.prank(validator);

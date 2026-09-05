@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {DefaultUpgrade} from "./DefaultUpgrade.sol";
 import {ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {L2UpgradeTxLib} from "./L2UpgradeTxLib.sol";
+import {UnexpectedZKsyncOSFlag} from "./ZkSyncUpgradeErrors.sol";
 import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
 
 /// @author Matter Labs
@@ -26,12 +27,11 @@ contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
         require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 
         // Upgrades that carry no L2 upgrade transaction, e.g. the verifier-only ones created by
-        // {ChainTypeManagerBase.createNewVerifierOnlyUpgrade}, have nothing to substitute.
+        // {ChainTypeManager.createNewVerifierOnlyUpgrade}, have nothing to substitute.
         if (_proposedUpgrade.l2ProtocolUpgradeTx.txType != 0) {
             _proposedUpgrade.l2ProtocolUpgradeTx.data = getL2UpgradeTxData(
                 s.bridgehub,
                 s.chainId,
-                s.zksyncOS,
                 _proposedUpgrade.l2ProtocolUpgradeTx.data
             );
         }
@@ -43,14 +43,25 @@ contract DefaultUpgradeZKsyncOS is DefaultUpgrade {
     /// @dev Also called directly by the server, hence `public` and free of diamond-storage reads.
     /// @param _bridgehub The bridgehub of the ecosystem.
     /// @param _chainId The chain being upgraded.
-    /// @param _zksyncOS Whether the chain runs ZKsync OS, taken from diamond storage by the caller.
     /// @param _existingTxData The L2 upgrade tx data the CTM upgrade produced.
+    function getL2UpgradeTxData(
+        address _bridgehub,
+        uint256 _chainId,
+        bytes memory _existingTxData
+    ) public view returns (bytes memory) {
+        return L2UpgradeTxLib.rewriteUpgradeTxData(_bridgehub, _chainId, _existingTxData);
+    }
+
+    /// @notice Legacy overload retained for deployed server and automation clients.
+    /// @dev The retired discriminator must still identify a ZKsync OS chain; successful calls
+    /// delegate to the canonical three-argument implementation.
     function getL2UpgradeTxData(
         address _bridgehub,
         uint256 _chainId,
         bool _zksyncOS,
         bytes memory _existingTxData
     ) public view returns (bytes memory) {
-        return L2UpgradeTxLib.rewriteZKsyncOSUpgradeTxData(_bridgehub, _chainId, _zksyncOS, _existingTxData);
+        require(_zksyncOS, UnexpectedZKsyncOSFlag(true, _zksyncOS));
+        return getL2UpgradeTxData(_bridgehub, _chainId, _existingTxData);
     }
 }

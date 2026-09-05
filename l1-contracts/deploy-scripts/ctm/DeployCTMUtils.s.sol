@@ -37,8 +37,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -115,7 +114,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         ctmAddresses.stateTransition.facets.diamondInit = deploySimpleContract("DiamondInit");
     }
 
-    function initializeConfig(string memory configPath, address bridgehub) internal virtual {
+    function initializeConfig(string memory configPath) internal virtual {
         string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;
@@ -336,10 +335,10 @@ abstract contract DeployCTMUtils is DeployUtils {
     }
 
     function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
+        if (compareStrings(contractName, "ChainTypeManager")) {
             return
                 abi.encodeCall(
-                    ChainTypeManagerBase.initialize,
+                    ChainTypeManager.initialize,
                     getChainTypeManagerInitializeData(ctmAddresses.stateTransition)
                 );
         } else if (compareStrings(contractName, "ServerNotifier")) {

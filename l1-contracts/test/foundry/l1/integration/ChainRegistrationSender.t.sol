@@ -79,20 +79,6 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
-
-        _settleFirstBatchRoot(zkChainIds[0]);
-    }
-
-    /// @dev Freshly created EraVM chains have an empty tree in the MessageRoot (only ZKsync OS
-    /// chains get a seeded genesis batch leaf), so they only become registrable for interop after
-    /// their first settled batch. Settle one batch root through the real executor entry point.
-    function _settleFirstBatchRoot(uint256 _chainId) internal {
-        vm.prank(getZKChainAddress(_chainId));
-        IMessageRootBase(address(ecosystemAddresses.bridgehub.proxies.messageRoot)).addChainBatchRootV32(
-            _chainId,
-            1,
-            keccak256("first-settled-chain-batch-root")
-        );
     }
 
     /// @notice Freshly deployed chains settle directly on L1. Registration must succeed in this real
@@ -198,7 +184,8 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
     }
 
     /// @notice A chain with an empty tree in the MessageRoot cannot be registered for interop (see
-    /// {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}). The happy path settles a batch first; here the empty tree is mocked.
+    /// {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}). Fresh chains
+    /// have a seeded genesis leaf; this test mocks the invalid empty-tree state.
     function test_chainRegistrationSender_revertWhen_chainHasNoBatchesInMessageRoot() public {
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.messageRoot),

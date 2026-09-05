@@ -160,6 +160,10 @@ contract GettersFacetWrapper is GettersFacet, Test {
         s.chainId = _chainId;
     }
 
+    function util_setZKsyncOS(bool _zksyncOS) external {
+        s.zksyncOS = _zksyncOS;
+    }
+
     function util_setPriorityTreeStartIndex(uint256 _startIndex) external {
         s.priorityTree.startIndex = _startIndex;
     }

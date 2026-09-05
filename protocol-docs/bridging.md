@@ -6,15 +6,15 @@ narrative. For the atomic interop flow itself, see {protocol-docs/atomicity/READ
 
 ## Contract map
 
-| Contract                                                                                          | Chain                      | Role                                                                                                                                                         |
-| ------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `AssetRouterBase` / `L1AssetRouter` / `L2AssetRouter`                                             | L1 + every ZK chain        | Routes asset transfers (L1 <-> ZK chain bridging and L2 <-> L2 interop) to per-asset handlers.                                                               |
-| `NativeTokenVaultBase` / `L1NativeTokenVault` / `L2NativeTokenVault` (+ `L2NativeTokenVaultZKOS`) | L1 + every ZK chain        | The default asset handler for ETH and ERC20 tokens: escrows native tokens, mints/burns bridged representations.                                              |
-| `L2AssetTracker`                                                                                  | every ZK chain             | Chain-local token bookkeeping: outbound/inbound amounts, pre-v31 total-supply snapshots, L1-deposit/withdrawal counters used by the L1 -> Gateway migration. |
-| `L1Nullifier`                                                                                     | L1                         | Tracks initiated L1 -> L2 deposits (`depositHappened`) and verifies/clears them when a failed deposit is claimed back on L1.                                 |
-| `BaseTokenHolder` (`l2-system/`)                                                                  | every ZK chain             | Escrow of the chain's base-token reserves; replaces mint/burn with transfers for EVM compatibility.                                                          |
-| `BridgedStandardERC20`                                                                            | ZK chains (beacon-proxied) | The standard bridged-token implementation, deployed per token behind the NTV's beacon.                                                                       |
-| `L2WrappedBaseToken`                                                                              | ZK chains                  | The canonical wrapped-base-token (WETH-style) implementation. An `ERC20PermitUpgradeable`, deployed behind its own proxy — **not** the bridged-token beacon. |
+| Contract                                                             | Chain                      | Role                                                                                                                                                         |
+| -------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `AssetRouterBase` / `L1AssetRouter` / `L2AssetRouter`                | L1 + every ZK chain        | Routes asset transfers (L1 <-> ZK chain bridging and L2 <-> L2 interop) to per-asset handlers.                                                               |
+| `NativeTokenVaultBase` / `L1NativeTokenVault` / `L2NativeTokenVault` | L1 + every ZK chain        | The default asset handler for ETH and ERC20 tokens: escrows native tokens, mints/burns bridged representations.                                              |
+| `L2AssetTracker`                                                     | every ZK chain             | Chain-local token bookkeeping: outbound/inbound amounts, pre-v31 total-supply snapshots, L1-deposit/withdrawal counters used by the L1 -> Gateway migration. |
+| `L1Nullifier`                                                        | L1                         | Tracks initiated L1 -> L2 deposits (`depositHappened`) and verifies/clears them when a failed deposit is claimed back on L1.                                 |
+| `BaseTokenHolder` (`l2-system/`)                                     | every ZK chain             | Escrow of the chain's base-token reserves; replaces mint/burn with transfers for EVM compatibility.                                                          |
+| `BridgedStandardERC20`                                               | ZK chains (beacon-proxied) | The standard bridged-token implementation, deployed per token behind the NTV's beacon.                                                                       |
+| `L2WrappedBaseToken`                                                 | ZK chains                  | The canonical wrapped-base-token (WETH-style) implementation. An `ERC20PermitUpgradeable`, deployed behind its own proxy — **not** the bridged-token beacon. |
 
 The `L2AssetRouter`, `L2NativeTokenVault`, `L2AssetTracker`, `BaseTokenHolder`, interop center/handler and
 atomic-flow manager are genesis-deployed built-ins at fixed, identical addresses on every ZK chain
@@ -74,8 +74,8 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
   calldata is identical. The bridged amount travels inside that calldata, not as call value: the returned
   starter merely echoes the requested `interopCallValue` (always zero for an indirect call) so the
   InteropCenter's `IndirectCallValueMismatch` check passes.
-- `bridgehubDepositBaseToken` lets the Bridgehub (L1; or the Era diamond proxy for `ERA_CHAIN_ID`) /
-  `InteropCenter` (L2) acquire the destination chain's `mintValue`: it burns the base token through the
+- `bridgehubDepositBaseToken` lets the Bridgehub (L1) / `InteropCenter` (L2) acquire the destination
+  chain's `mintValue`: it burns the base token through the
   handler but records nothing, because a failed transaction refunds the base token to the L2
   `refundRecipient` rather than being claimable on L1.
 
@@ -159,10 +159,10 @@ tokens) and rejects fee-on-transfer tokens (`TokensWithFeesNotSupported`).
 - Bridged tokens are `BridgedStandardERC20` beacon proxies deployed via CREATE2 at a deterministic address
   (`calculateCreate2TokenAddress`); the deployed address is checked against the expectation. The salt is
   `keccak256(abi.encode(originChainId, originToken))`, except on L2 for L1-origin tokens where it is the
-  plain L1 token address (legacy compatibility). On L2 the deployment goes through the `ContractDeployer`
-  system contract with the pinned `L2_TOKEN_PROXY_BYTECODE_HASH`; `L2NativeTokenVaultZKOS` uses plain
-  CREATE2 (zkOS-first chains have no legacy shared bridge, so the NTV is the sole deployer of bridged
-  tokens) and must hold no storage of its own.
+  plain L1 token address (legacy compatibility). On L2 the NTV uses plain CREATE2 over the canonical
+  `BeaconProxy` creation code and the current beacon constructor argument. The compatibility getter
+  `L2_TOKEN_PROXY_BYTECODE_HASH()` derives the deployed-code hash from that same contract; governance no
+  longer supplies or stores an independent hash.
 - **L1 accounting**: `L1NativeTokenVault.bridgedOut[assetId]` is the net amount of each L1-native token
   currently bridged out of L1. It increases on outbound flows and decreases on inbound ones, so unlike raw
   `balanceOf` it cannot be skewed by direct transfers into the vault, and it is bounded by the actually
@@ -217,11 +217,9 @@ is nothing to fold in for them, now or later).
   bridging accounting.
   - The operator must keep the base-token total supply below `2^127`, otherwise the holder's balance
     could underflow; overflow is impossible since users can only gain what the holder loses.
-  - On ZKsync OS the holder's initial balance is minted by `L2BaseTokenZKOS.initL2()` via a raw call to
+  - On ZKsync OS the holder's initial balance is minted by `L2BaseToken.initL2()` via a raw call to
     `MINT_BASE_TOKEN_HOOK` with the amount abi-encoded as a `uint256`; the hook credits the caller and
     only accepts calls from the L2 base-token address.
-  - On Era, all ETH transfers route through the `MsgValueSimulator` (which emits `Transfer` events), so
-    a single holder implementation works uniformly on both VMs.
 - In `NativeTokenVaultBase._getTokenAndBridgeToChain`, a base-token burn requires `amount == msg.value`.
   If the base token is bridged (always the case on L2), the value goes through
   `BaseTokenHolder.burnAndStartBridging`; the native branch (plain accounting) only occurs on L1 for ETH.
@@ -271,7 +269,7 @@ to preserve the deployed storage layout.
   `registerNewTokenIfNeeded` get `MAX_TOKEN_BALANCE` (native) or `0` (first-time bridged). Legacy tokens are
   registered lazily on their first bridge operation, or eagerly by anyone via `registerLegacyToken`.
 - **ZKsync OS base token**: the pre-v31 supply of an upgraded ZKsync OS chain lives in
-  `L2BaseTokenZKOS.zkosPreV31TotalSupply`, populated while the chain ran v31 (via the since-removed backfill
+  `L2BaseToken.zkosPreV31TotalSupply`, populated while the chain ran v31 (via the since-removed backfill
   service transaction), so `totalSupply()` is always available here. This release carries no backfill path:
   the v32 upgrade of a ZKsync OS chain is forbidden on L1 (`V32UpgradeZKsyncOS`) unless
   `baseTokenHasTotalSupply` was set by the v31 backfill _and_ its L2 execution is proven — a

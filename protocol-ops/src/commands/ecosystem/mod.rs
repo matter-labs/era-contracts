@@ -40,14 +40,14 @@ pub enum EcosystemCommands {
     /// Phase 1 of the ecosystem upgrade: deploys all new ecosystem contracts
     /// (core + per-CTM impls + new zk-governance set) on
     /// a single anvil fork, emits operational admin bundles for CTM-owned
-    /// surfaces, and writes the merged `<out>/prepare/governance.toml` for
+    /// surfaces, and writes the merged `<env-out>/ecosystem.toml` for
     /// Phase 2 to replay.
     #[command(name = "upgrade-prepare-all")]
     UpgradePrepareAll(UpgradePrepareAllArgs),
     /// Phase 2 of the ecosystem upgrade: replays governance stages 0+1+2 on
     /// a single anvil fork (governance owner signs). Emits one Safe bundle
     /// containing all three governance calls. Auto-discovers
-    /// `<env>/prepare/governance.toml` when `--env` is set, or pass
+    /// `<env-out>/ecosystem.toml` when `--env` is set, or pass
     /// `--governance-toml` explicitly.
     #[command(name = "upgrade-governance")]
     UpgradeGovernance(UpgradeGovernanceArgs),

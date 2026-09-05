@@ -402,28 +402,6 @@
   },
   {
     "type": "error",
-    "name": "LengthIsNotDivisibleBy32",
-    "inputs": [
-      {
-        "name": "length",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "MalformedBytecode",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "enum BytecodeError"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "MsgValueTooLow",
     "inputs": [
       {
@@ -498,11 +476,6 @@
   {
     "type": "error",
     "name": "TransactionNotAllowed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "TxnBodyGasLimitNotEnoughGas",
     "inputs": []
   },
   {

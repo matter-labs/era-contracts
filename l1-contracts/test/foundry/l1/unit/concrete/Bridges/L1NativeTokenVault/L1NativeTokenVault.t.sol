@@ -88,10 +88,8 @@ contract L1NativeTokenVaultTest is Test {
     address public tokenBeacon;
 
     uint256 public chainId;
-    uint256 public eraChainId;
     /// @dev A second chain, used to check that per-chain legacy amounts accumulate.
     uint256 public constant SECOND_CHAIN_ID = 271;
-    address public eraDiamondProxy;
 
     bytes32 public tokenAssetId;
     bytes32 public ETH_TOKEN_ASSET_ID;
@@ -107,8 +105,6 @@ contract L1NativeTokenVaultTest is Test {
         tokenBeacon = makeAddr("tokenBeacon");
 
         chainId = 1;
-        eraChainId = 9;
-        eraDiamondProxy = makeAddr("eraDiamondProxy");
 
         // Deploy L1Nullifier
         L1NullifierDev l1NullifierImpl = new L1NullifierDev({
@@ -126,9 +122,7 @@ contract L1NativeTokenVaultTest is Test {
         L1AssetRouter assetRouterImpl = new L1AssetRouter({
             _l1WethToken: l1WethAddress,
             _bridgehub: bridgehubAddress,
-            _l1Nullifier: address(l1Nullifier),
-            _eraChainId: eraChainId,
-            _eraDiamondProxy: eraDiamondProxy
+            _l1Nullifier: address(l1Nullifier)
         });
         TransparentUpgradeableProxy assetRouterProxy = new TransparentUpgradeableProxy(
             address(assetRouterImpl),

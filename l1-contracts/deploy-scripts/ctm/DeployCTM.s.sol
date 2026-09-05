@@ -74,25 +74,24 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "/script-config/config-deploy-ctm.toml",
             "/script-out/output-deploy-ctm.toml",
             bridgehub,
-            reuseGovAndAdmin,
-            false
+            reuseGovAndAdmin
         );
     }
 
-    function runForTest(address bridgehub, bool skipL1Deployments) public {
-        _runConfiguredTest(bridgehub, skipL1Deployments, true);
+    function runForTest(address bridgehub) public {
+        _runConfiguredTest(bridgehub, true);
     }
 
     /// @notice Like runForTest but skips saveDiamondSelectors().
-    function runForAnvilTest(address bridgehub, bool skipL1Deployments) public {
-        _runConfiguredTest(bridgehub, skipL1Deployments, false);
+    function runForAnvilTest(address bridgehub) public {
+        _runConfiguredTest(bridgehub, false);
     }
 
-    function _runConfiguredTest(address bridgehub, bool skipL1Deployments, bool shouldSaveSelectors) internal {
+    function _runConfiguredTest(address bridgehub, bool shouldSaveSelectors) internal {
         if (shouldSaveSelectors) {
             saveDiamondSelectors();
         }
-        runInner(vm.envString("CTM_CONFIG"), vm.envString("CTM_OUTPUT"), bridgehub, false, skipL1Deployments);
+        runInner(vm.envString("CTM_CONFIG"), vm.envString("CTM_OUTPUT"), bridgehub, false);
     }
 
     function getAddresses() public view virtual returns (CTMDeployedAddresses memory) {
@@ -112,8 +111,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         string memory inputPath,
         string memory outputPath,
         address bridgehub,
-        bool reuseGovAndAdmin,
-        bool skipL1Deployments
+        bool reuseGovAndAdmin
     ) public {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
@@ -123,7 +121,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         // clobber each other's batches.
         _blakeBatchTmpFile = string.concat(outputPath, ".blake-batch.txt");
 
-        initializeConfig(inputPath, bridgehub);
+        initializeConfig(inputPath);
 
         console.log("Initializing core contracts from BH");
         // Populate discovered addresses via inspector
@@ -529,7 +527,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: CoreOnGatewayHelper.getDeployedBytecodeHash(CoreContract.BeaconProxy),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(_governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeInfo: _getBytecodeInfo(CoreContract.L2Bridgehub),

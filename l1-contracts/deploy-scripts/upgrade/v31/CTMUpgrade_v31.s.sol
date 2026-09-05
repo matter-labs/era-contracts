@@ -147,7 +147,6 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     }
 
     /// @notice Override to deploy the per-chain upgrade contract.
-    /// @dev Only ZKsync OS chains can be upgraded onto this release (enforced in `initializeConfig`).
     function deployUsedUpgradeContract() internal virtual override returns (address) {
         // The registry must exist first: the v32 upgrade contract embeds its address as an immutable.
         priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound");
@@ -179,7 +178,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         override
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
     {
-        return getV31AdditionalZKsyncOSUniversalForceDeployments();
+        return getV31AdditionalUniversalForceDeployments();
     }
 
     function getV31L2UpgradeCalldata() internal returns (bytes memory) {
@@ -189,7 +188,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         return
             abi.encodeCall(
                 IL2V32Upgrade.upgrade,
-                (true, coreAddresses.bridgehub.proxies.ctmDeploymentTracker, generatedData.forceDeploymentsData, "")
+                (coreAddresses.bridgehub.proxies.ctmDeploymentTracker, generatedData.forceDeploymentsData, "")
             );
     }
 
@@ -197,7 +196,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     /// @dev L2V32Upgrade is deployed as a standalone contract at the derived random address used as
     /// the delegate target in `forceDeployAndUpgradeUniversal`, so it uses `ZKsyncOSUnsafeForceDeployment`
     /// rather than `ZKsyncOSSystemProxyUpgrade`.
-    function getV31AdditionalZKsyncOSUniversalForceDeployments()
+    function getV31AdditionalUniversalForceDeployments()
         internal
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
     {
@@ -215,7 +214,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     ) internal virtual override returns (address, bytes memory) {
         // For ZKsyncOS, the delegateTo address is a derived address (not the constant
         // L2_VERSION_SPECIFIC_UPGRADER_ADDR) to avoid overwriting existing bytecode.
-        // Must match the newAddress in getV31AdditionalZKsyncOSUniversalForceDeployments.
+        // Must match the newAddress in getV31AdditionalUniversalForceDeployments.
         bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V32Upgrade.sol", "L2V32Upgrade");
         address delegateTo = L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo);
 

@@ -28,17 +28,14 @@ use crate::common::{forge::ForgeRunner, logger};
 // ── inputs / outputs ───────────────────────────────────────────────────────
 
 /// Per-CTM inputs. One entry per `--ctm-proxy` (or per `[[ctm]]` row in a
-/// `--ctm-config` TOML). All overrides are optional: when `None`, prepare_ctm
-/// auto-resolves via on-chain getters (works on v31+ ecosystems; pre-v31
-/// ecosystems must pass them explicitly because the getters don't exist).
+/// `--ctm-config` TOML). The overrides are optional: when `None`, prepare_ctm
+/// auto-resolves via the CTM's on-chain getters.
 pub struct CtmInputs {
     /// CTM proxy address.
     pub proxy: Address,
-    /// Override for `isZKsyncOS`. Required on pre-v31 ecosystems.
-    pub is_zk_sync_os: Option<bool>,
-    /// Override for the bytecodes supplier address. Required on pre-v31.
+    /// Override for the bytecodes supplier address.
     pub bytecodes_supplier: Option<Address>,
-    /// Override for the rollup DA manager address. Required on pre-v31.
+    /// Override for the rollup DA manager address.
     pub rollup_da_manager: Option<Address>,
 }
 
@@ -85,14 +82,12 @@ pub struct V31PrepareOutput {
     pub new_gateway_tomls: Vec<PathBuf>,
 }
 
-/// Per-CTM prepare result: where the script wrote its TOML, and the resolved
-/// `is_zk_sync_os` flag. Only ZKsyncOS CTMs reach this point (Era CTMs are
-/// skipped in `prepare`), so the merged ecosystem TOML labels the section
-/// `[ctms.zksync_os]`.
+/// Per-CTM prepare result: where the script wrote its TOML. `prepare` rejects
+/// anything that is not a ZKsync OS CTM, so the merged ecosystem TOML labels
+/// every section `[ctms.zksync_os]`.
 pub struct CtmPrepareEntry {
     pub proxy: Address,
     pub toml: PathBuf,
-    pub is_zk_sync_os: bool,
 }
 
 // ── struct ────────────────────────────────────────────────────────────────
@@ -132,6 +127,12 @@ impl<'a> V31UpgradeInner<'a> {
             anyhow::bail!("V31UpgradeInner::prepare requires at least one CTM");
         }
 
+        for ctm in &inputs.ctms {
+            crate::common::l1_contracts::ensure_supported_os_ctm(&runner.rpc_url, ctm.proxy)
+                .await
+                .with_context(|| format!("Unsupported upgrade target ({:#x})", ctm.proxy))?;
+        }
+
         let core_toml = self
             .prepare_core(runner, deployer, inputs)
             .await
@@ -139,41 +140,14 @@ impl<'a> V31UpgradeInner<'a> {
 
         let mut ctm_tomls = Vec::with_capacity(inputs.ctms.len());
         for ctm in &inputs.ctms {
-            // Only ZKsync OS chains can be upgraded onto this release: `CTMUpgrade_v31`'s
-            // `deployUsedUpgradeContract` rejects Era CTMs outright. The flavor is always
-            // resolved from L1; the optional config hint (`list-ctms` deliberately leaves it
-            // unset) is treated as an assertion only — a wrong hint must never be able to select
-            // an incompatible CTM implementation for governance calldata.
-            let ctm_is_zk_sync_os =
-                crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm.proxy)
-                    .await
-                    .context("Failed to resolve isZKsyncOS from CTM")?;
-            if let Some(hint) = ctm.is_zk_sync_os {
-                anyhow::ensure!(
-                    hint == ctm_is_zk_sync_os,
-                    "CTM {:#x}: config marks is_zk_sync_os = {hint} but the CTM reports {ctm_is_zk_sync_os}",
-                    ctm.proxy
-                );
-            }
-            if !ctm_is_zk_sync_os {
-                logger::info(format!(
-                    "skipping Era CTM {:#x}: only ZKsync OS chains can be upgraded onto this release",
-                    ctm.proxy
-                ));
-                continue;
-            }
-            let (path, is_zk_sync_os) = self
+            let path = self
                 .prepare_ctm(runner, deployer, inputs, ctm)
                 .await
                 .with_context(|| format!("ctm prepare ({:#x})", ctm.proxy))?;
             ctm_tomls.push(CtmPrepareEntry {
                 proxy: ctm.proxy,
                 toml: path,
-                is_zk_sync_os,
             });
-        }
-        if ctm_tomls.is_empty() {
-            anyhow::bail!("no ZKsync OS CTMs to prepare — every configured CTM is Era");
         }
 
         Ok(V31PrepareOutput {
@@ -243,7 +217,7 @@ impl<'a> V31UpgradeInner<'a> {
         deployer: &Wallet,
         inputs: &V31PrepareInputs,
         ctm: &CtmInputs,
-    ) -> anyhow::Result<(PathBuf, bool)> {
+    ) -> anyhow::Result<PathBuf> {
         ensure_script_exists(self.contracts_path, &inputs.ctm_script_path)?;
 
         let ctm_proxy = ctm.proxy;
@@ -296,21 +270,6 @@ impl<'a> V31UpgradeInner<'a> {
             }
         };
 
-        let is_zk_sync_os = match ctm.is_zk_sync_os {
-            Some(v) => {
-                logger::info(format!("ZKsync OS (override): {v}"));
-                v
-            }
-            None => {
-                let resolved =
-                    crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
-                        .await
-                        .context("Failed to resolve isZKsyncOS from CTM")?;
-                logger::info(format!("ZKsync OS (auto-resolved): {resolved}"));
-                resolved
-            }
-        };
-
         let rollup_da_manager = match ctm.rollup_da_manager {
             Some(addr) => {
                 logger::info(format!("RollupDAManager (override): {addr:#x}"));
@@ -353,17 +312,9 @@ impl<'a> V31UpgradeInner<'a> {
             "ChainRegistrationSender (core prepare): {chain_registration_sender:#x}"
         ));
 
-        // Per-CTM CREATE2 salt. Each CTM prepare deploys a few contracts
-        // whose constructor args are env-wide constants — notably
-        // `GovernanceUpgradeTimer(initialDelay, 2 weeks, ownerAddress,
-        // ecosystemAdminAddress)` — so without per-CTM differentiation
-        // Era's and Atlas's CTM-prepare CREATE2 calls would land at the
-        // same address. The downstream gov-replay then calls
-        // `startTimer()` twice on the same contract and the second one
-        // reverts. The CLI / env config plumbs a distinct salt per CTM
-        // proxy from `upgrade-envs/v0.31.0-interopB/<env>.toml
-        // [create2_salts.per_ctm]`; if not provided we fall back to a
-        // fresh random (legacy local-fixture path).
+        // Named environments keep CREATE2 salts keyed by registered CTM so the
+        // selected target gets its ceremony-specific salt. Legacy local
+        // fixtures fall back to a fresh random salt.
         let create2_salt = inputs
             .create2_factory_salt_per_ctm
             .as_ref()
@@ -412,7 +363,7 @@ impl<'a> V31UpgradeInner<'a> {
             .run(script)
             .context("Failed to execute CTMUpgrade_v31.noGovernancePrepare")?;
 
-        Ok((ctm_output_path, is_zk_sync_os))
+        Ok(ctm_output_path)
     }
 }
 

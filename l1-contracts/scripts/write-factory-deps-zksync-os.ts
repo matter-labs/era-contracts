@@ -44,7 +44,7 @@ async function main() {
         "L2MessageRoot",
         "L2Bridgehub",
         "L2AssetRouter",
-        "L2NativeTokenVaultZKOS",
+        "L2NativeTokenVault",
         "L2ChainAssetHandler",
         "UpgradeableBeaconDeployer",
       ];

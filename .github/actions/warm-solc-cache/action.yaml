@@ -7,13 +7,13 @@ description: >
   of runner time per PR) and each saves to its own cache key. This shares one cross-commit cache
   between them.
 
-  zksolc output is deliberately excluded: it is not reproducible across builds, so reusing a
-  cached `zkout` changes zkBytecodeHash and fails check-hashes. Only the solc side is reused;
-  every zkout is rebuilt.
+  Historically zksolc output was deliberately excluded (not reproducible across builds, so a
+  cached `zkout` changed zkBytecodeHash and failed check-hashes); the toolchain is solc-only
+  since the zksolc cut, so everything the build produces is cacheable.
 
   On trusting a cache: this action only ever READS. The single writer is verify-merged-commit.yaml,
-  which builds with the cache disabled and saves only after the hash, selector and zkstack-out
-  checks pass. Nothing a `pull_request` run produces is ever offered to a later run.
+  which builds with the cache disabled and saves the artifacts produced by that clean build. Nothing
+  a `pull_request` run produces is ever offered to a later run.
 
   That asymmetry is deliberate, and per-ref scoping alone is not enough to replace it. GitHub does
   stop a fork PR from writing the base scope, but it lets a PR's later runs restore what its own
@@ -54,9 +54,7 @@ runs:
     # contracts). A basename comparison keeps such a directory alive and its stale artifacts with
     # it.
     #
-    # Only the directories this action actually restores are scanned. zkout is never restored
-    # here — zksolc output is not reproducible across builds — and zksolc artifacts carry no
-    # compilationTarget to match on anyway.
+    # Only the directories this action actually restores are scanned.
     - name: Drop artifacts whose source is gone or has changed
       shell: bash
       run: |

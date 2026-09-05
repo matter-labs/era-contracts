@@ -11,9 +11,3 @@ error MintFailed();
 error ProxyAdminIncorrect(address expectedProxyAdmin, address proxyAdmin);
 // 0x565fae63
 error ProxyAdminIncorrectOwner(address proxyAdmin, address governance);
-
-enum ZksyncContract {
-    Create2Factory,
-    DiamondProxy,
-    BaseToken
-}

@@ -193,7 +193,6 @@ library L2UtilsBase {
             L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
                 _args.l1ChainId,
                 _args.aliasedOwner,
-                _args.l2TokenProxyBytecodeHash,
                 _args.l2TokenBeacon,
                 wethToken,
                 TokenBridgingData({
@@ -202,12 +201,6 @@ library L2UtilsBase {
                     originToken: ETH_TOKEN_ADDRESS
                 }),
                 TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
-            );
-
-            vm.store(
-                L2_NATIVE_TOKEN_VAULT_ADDR,
-                bytes32(uint256(251)),
-                bytes32(uint256(_args.l2TokenProxyBytecodeHash))
             );
             L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
 

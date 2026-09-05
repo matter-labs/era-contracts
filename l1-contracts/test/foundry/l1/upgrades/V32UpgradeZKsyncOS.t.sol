@@ -35,10 +35,6 @@ contract DummyV32UpgradeZKsyncOS is V32UpgradeZKsyncOS, BaseUpgradeUtils {
         s.chainId = _chainId;
     }
 
-    function setZKsyncOS(bool _zksyncOS) public {
-        s.zksyncOS = _zksyncOS;
-    }
-
     function setBatchCounters(uint256 _committed, uint256 _executed) public {
         s.totalBatchesCommitted = _committed;
         s.totalBatchesExecuted = _executed;
@@ -91,7 +87,6 @@ contract V32UpgradeZKsyncOSTest is BaseUpgrade {
 
         upgradeContract.setBridgehub(mockBridgehub);
         upgradeContract.setChainId(CHAIN_ID);
-        upgradeContract.setZKsyncOS(true);
         // The default shape: every committed batch processed, backfill prerequisite satisfied
         // (flag set on v31, bound recorded, priority ops processed through it).
         upgradeContract.setBatchCounters(7, 7);
@@ -182,7 +177,6 @@ contract V32UpgradeZKsyncOSTest is BaseUpgrade {
         upgradeContract.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
         upgradeContract.setBridgehub(mockBridgehub);
         upgradeContract.setChainId(CHAIN_ID);
-        upgradeContract.setZKsyncOS(true);
         upgradeContract.setBatchCounters(7, 7);
         upgradeContract.setBaseTokenHasTotalSupply(true);
 
@@ -229,7 +223,7 @@ contract V32UpgradeZKsyncOSTest is BaseUpgrade {
     function _placeholderUpgradeTxData() internal view returns (bytes memory) {
         bytes memory innerCalldata = abi.encodeCall(
             IL2V32Upgrade.upgrade,
-            (true, ctmDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, hex"00")
+            (ctmDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, hex"00")
         );
         return
             abi.encodeCall(

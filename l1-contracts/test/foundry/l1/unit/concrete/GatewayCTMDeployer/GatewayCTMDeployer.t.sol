@@ -17,8 +17,8 @@ import {
 import {GatewayCTMDeployerDA} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerDA.sol";
 import {GatewayCTMDeployerProxyAdmin} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerProxyAdmin.sol";
 import {GatewayCTMDeployerValidatorTimelock} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerValidatorTimelock.sol";
-import {GatewayCTMDeployerVerifiersZKsyncOS} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerVerifiersZKsyncOS.sol";
-import {GatewayCTMDeployerCTMZKsyncOS} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerCTMZKsyncOS.sol";
+import {GatewayCTMDeployerVerifiers} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerVerifiers.sol";
+import {GatewayCTMDeployerCTM} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerCTM.sol";
 
 import {
     GatewayCTMDeployerHelper,
@@ -36,7 +36,7 @@ import {
 } from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
 
 /// @notice Tester contract that deploys via the deterministic CREATE2 factory (Arachnid's)
-contract GatewayCTMDeployerTesterZKsyncOS {
+contract GatewayCTMDeployerTester {
     address constant DETERMINISTIC_CREATE2_ADDRESS = Utils.DETERMINISTIC_CREATE2_ADDRESS;
 
     /// @notice Converts raw 20-byte return data to address
@@ -79,22 +79,22 @@ contract GatewayCTMDeployerTesterZKsyncOS {
         result = GatewayCTMDeployerValidatorTimelock(deployerAddr).getResult();
     }
 
-    /// @notice Deploys Verifiers (ZKsyncOS version)
+    /// @notice Deploys verifiers.
     function deployVerifiers(bytes memory data) external returns (Verifiers memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = DETERMINISTIC_CREATE2_ADDRESS.call(data);
         require(success, "Verifiers deployment failed");
 
         deployerAddr = _bytesToAddress(returnData);
-        result = GatewayCTMDeployerVerifiersZKsyncOS(deployerAddr).getResult();
+        result = GatewayCTMDeployerVerifiers(deployerAddr).getResult();
     }
 
-    /// @notice Deploys CTM and ServerNotifier (ZKsyncOS version)
+    /// @notice Deploys the CTM and ServerNotifier.
     function deployCTM(bytes memory data) external returns (GatewayCTMFinalResult memory result, address deployerAddr) {
         (bool success, bytes memory returnData) = DETERMINISTIC_CREATE2_ADDRESS.call(data);
         require(success, "CTM deployment failed");
 
         deployerAddr = _bytesToAddress(returnData);
-        result = GatewayCTMDeployerCTMZKsyncOS(deployerAddr).getResult();
+        result = GatewayCTMDeployerCTM(deployerAddr).getResult();
     }
 
     /// @notice Deploys a contract directly via the deterministic CREATE2 factory
@@ -105,22 +105,20 @@ contract GatewayCTMDeployerTesterZKsyncOS {
     }
 }
 
-/// @notice Test for GatewayCTMDeployer in ZKsyncOS (EVM) mode
-/// @dev This test verifies that the deployment logic works correctly for standard EVM systems
-contract GatewayCTMDeployerZKsyncOSTest is Test {
+/// @notice Tests the Gateway CTM deployment flow.
+contract GatewayCTMDeployerTest is Test {
     GatewayCTMDeployerConfig deployerConfig;
 
     function setUp() external {
         // Deploy the deterministic CREATE2 factory at the expected address
         vm.etch(Utils.DETERMINISTIC_CREATE2_ADDRESS, Utils.CREATE2_FACTORY_RUNTIME_BYTECODE);
 
-        // Initialize the configuration with sample data for ZKsyncOS mode
+        // Initialize the configuration with sample data.
         GatewayCTMDeployerConfig memory config = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: address(0x123),
             salt: keccak256("test-salt"),
             l1ChainId: 1,
             testnetVerifier: true,
-            isZKsyncOS: true, // ZKsyncOS mode enabled
             adminSelectors: new bytes4[](2),
             executorSelectors: new bytes4[](2),
             mailboxSelectors: new bytes4[](2),
@@ -129,7 +127,7 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
             committerSelectors: new bytes4[](2),
             genesisRoot: bytes32(uint256(0x123)),
             genesisRollupLeafIndex: 10,
-            // For ZKsyncOS mode, the genesis batch commitment must be equal to 1
+            // The genesis batch commitment must be equal to 1.
             genesisBatchCommitment: bytes32(uint256(1)),
             forceDeploymentsData: hex"deadbeef",
             protocolVersion: 1
@@ -152,8 +150,8 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         deployerConfig = config;
     }
 
-    /// @notice Smoke test that verifies the deployment works correctly in ZKsyncOS mode
-    function testGatewayCTMDeployerZKsyncOS() external {
+    /// @notice Smoke test that verifies the deployment works correctly.
+    function testGatewayCTMDeployer() external {
         // Calculate expected addresses using the helper FIRST
         // This is needed because some deployer constructors need addresses from earlier deployers
         (
@@ -171,7 +169,7 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
             "Should use deterministic CREATE2 factory"
         );
 
-        GatewayCTMDeployerTesterZKsyncOS tester = new GatewayCTMDeployerTesterZKsyncOS();
+        GatewayCTMDeployerTester tester = new GatewayCTMDeployerTester();
 
         // Deploy all deployers and collect results
         AllDeployerResults memory results = _deployAllDeployers(
@@ -209,7 +207,7 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
     }
 
     function _deployAllDeployers(
-        GatewayCTMDeployerTesterZKsyncOS tester,
+        GatewayCTMDeployerTester tester,
         DeployerCreate2Calldata memory deployerCalldata,
         DeployerAddresses memory expectedDeployers,
         DeployedContracts memory calculatedContracts,
@@ -246,7 +244,7 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
     }
 
     function _deployDirectContracts(
-        GatewayCTMDeployerTesterZKsyncOS tester,
+        GatewayCTMDeployerTester tester,
         DirectCreate2Calldata memory directCalldata,
         DeployedContracts memory calculatedContracts
     ) internal {

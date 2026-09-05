@@ -115,27 +115,21 @@ contract MessageRootTest is Test {
     /// the genesis root pulled from it — the same two steps `L1Bridgehub.createNewChain` performs in
     /// one transaction.
     function _registerFreshChainAndSeedGenesis(uint256 _chainId, address _sender) internal {
-        _mockZkChainGenesisGetters(_chainId, _sender, true, ChainBatchRootTree.genesisChainBatchRoot());
+        _mockZkChainGenesisGetters(_chainId, _sender, ChainBatchRootTree.genesisChainBatchRoot());
         vm.prank(bridgeHub);
         messageRoot.addNewChain(_chainId, 0);
         vm.prank(bridgeHub);
         messageRoot.seedGenesisRoot(_chainId);
     }
 
-    /// @dev Mocks the chain getters `seedGenesisRoot` pulls from: the chain address, its VM flag and
-    /// its stored genesis (batch 0) root.
-    function _mockZkChainGenesisGetters(
-        uint256 _chainId,
-        address _zkChain,
-        bool _isZKsyncOS,
-        bytes32 _genesisRoot
-    ) internal {
+    /// @dev Mocks the chain getters `seedGenesisRoot` pulls from: the chain address and its stored
+    /// genesis (batch 0) root.
+    function _mockZkChainGenesisGetters(uint256 _chainId, address _zkChain, bytes32 _genesisRoot) internal {
         vm.mockCall(
             bridgeHub,
             abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, _chainId),
             abi.encode(_zkChain)
         );
-        vm.mockCall(_zkChain, abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(_isZKsyncOS));
         vm.mockCall(
             _zkChain,
             abi.encodeWithSelector(IGetters.l2LogsRootHash.selector, uint256(0)),
@@ -155,7 +149,7 @@ contract MessageRootTest is Test {
     function test_seedGenesisRoot_seedsGenesisBatchLeaf() public {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
-        _mockZkChainGenesisGetters(alphaChainId, alphaChainSender, true, ChainBatchRootTree.genesisChainBatchRoot());
+        _mockZkChainGenesisGetters(alphaChainId, alphaChainSender, ChainBatchRootTree.genesisChainBatchRoot());
         vm.prank(bridgeHub);
         messageRoot.addNewChain(alphaChainId, 0);
         assertEq(messageRoot.chainTreeLeafCount(alphaChainId), 0);
@@ -187,12 +181,12 @@ contract MessageRootTest is Test {
         messageRoot.seedGenesisRoot(alphaChainId);
     }
 
-    /// @notice Seeding is Bridgehub-only, skips EraVM chains (no genesis root stored), and is
+    /// @notice Seeding is Bridgehub-only, rejects a zero reported genesis root, and is
     /// rejected for chains onboarded at a non-zero starting batch number.
     function test_seedGenesisRoot_gates() public {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
-        _mockZkChainGenesisGetters(alphaChainId, alphaChainSender, false, bytes32(0));
+        _mockZkChainGenesisGetters(alphaChainId, alphaChainSender, bytes32(0));
         vm.prank(bridgeHub);
         messageRoot.addNewChain(alphaChainId, 0);
 
@@ -200,15 +194,9 @@ contract MessageRootTest is Test {
         vm.expectRevert(abi.encodeWithSelector(OnlyBridgehub.selector, address(this), bridgeHub));
         messageRoot.seedGenesisRoot(alphaChainId);
 
-        // EraVM chain: no-op, nothing seeded.
-        vm.prank(bridgeHub);
-        messageRoot.seedGenesisRoot(alphaChainId);
-        assertEq(messageRoot.chainTreeLeafCount(alphaChainId), 0);
-        assertEq(messageRoot.chainBatchRoots(alphaChainId, 0), bytes32(0));
-
         // Onboarded chain (non-zero starting batch number): rejected.
         uint256 betaChainId = uint256(uint160(makeAddr("betaChainId")));
-        _mockZkChainGenesisGetters(betaChainId, makeAddr("betaChainSender"), true, keccak256("beta-genesis"));
+        _mockZkChainGenesisGetters(betaChainId, makeAddr("betaChainSender"), keccak256("beta-genesis"));
         vm.prank(bridgeHub);
         messageRoot.addNewChain(betaChainId, 7);
         vm.prank(bridgeHub);
@@ -217,7 +205,7 @@ contract MessageRootTest is Test {
 
         // A ZKsync OS chain reading a zero genesis root is a bug, not a no-op.
         uint256 gammaChainId = uint256(uint160(makeAddr("gammaChainId")));
-        _mockZkChainGenesisGetters(gammaChainId, makeAddr("gammaChainSender"), true, bytes32(0));
+        _mockZkChainGenesisGetters(gammaChainId, makeAddr("gammaChainSender"), bytes32(0));
         vm.prank(bridgeHub);
         messageRoot.addNewChain(gammaChainId, 0);
         vm.prank(bridgeHub);
@@ -383,7 +371,6 @@ contract MessageRootTest is Test {
         l2MessageRoot.addNewChain(alphaChainId, 0);
         // Seed the genesis leaf the way createNewChain does: the chain reports it right after
         // registration.
-        vm.mockCall(alphaChainSender, abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(true));
         vm.mockCall(
             alphaChainSender,
             abi.encodeWithSelector(IGetters.l2LogsRootHash.selector, uint256(0)),
@@ -454,7 +441,6 @@ contract MessageRootTest is Test {
 
         // The chain reports its genesis root right after registration (as createNewChain does); the
         // chain root then holds the genesis batch leaf.
-        vm.mockCall(alphaChainSender, abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(true));
         vm.mockCall(
             alphaChainSender,
             abi.encodeWithSelector(IGetters.l2LogsRootHash.selector, uint256(0)),

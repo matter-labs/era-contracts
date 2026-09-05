@@ -26,7 +26,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
 import {CTMDeployedAddresses, StateTransitionDeployedAddresses} from "../utils/Types.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
@@ -72,8 +72,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     /// getter, so we fall back to a raw storage load. Temporary shim: once
     /// every active CTM is upgraded past v31 this branch can be deleted.
     uint256 constant MIN_V31_PROTOCOL_VERSION = 0x1F00000000;
-    /// Storage slot of `ChainTypeManagerBase.serverNotifierAddress`. Confirmed
-    /// via `forge inspect ChainTypeManagerBase storage-layout`. Stays at the
+    /// Storage slot of `ChainTypeManager.serverNotifierAddress`. Confirmed
+    /// via `forge inspect ChainTypeManager storage-layout`. Stays at the
     /// same slot across v30 → v31 (verified by reading the slot on both Atlas
     /// (v30.1) and Era (older) CTM on Sepolia). Drop with the version branch.
     bytes32 constant SERVER_NOTIFIER_ADDRESS_SLOT = bytes32(uint256(164));
@@ -92,7 +92,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         address bridgehubProxy,
         uint256 ctmRepresentativeChainId
     ) internal virtual {
-        super.initializeConfig(configPath, bridgehubProxy);
+        super.initializeConfig(configPath);
         string memory toml = vm.readFile(configPath);
 
         refundRecipient = toml.readAddress("$.refund_recipient");
@@ -103,17 +103,11 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         setAddressesBasedOnBridgehub(ctmRepresentativeChainId, bridgehubProxy);
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
-        // TODO: drop `isZKsyncOS` from `GatewayCTMDeployerConfig` in the next release — this
-        // OS-only line no longer needs the flag, but the deployed gateway deployers still assert
-        // it (`GatewayCTMDeployerVerifiersZKsyncOS` / `GatewayCTMDeployerCTMZKsyncOS`), so
-        // removing it means touching those contracts.
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: aliasedGovernor,
             salt: toml.readBytes32("$.contracts.create2_factory_salt"),
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
-            // Only ZKsync-OS-based gateway CTMs are supported on this release.
-            isZKsyncOS: true,
             adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
@@ -142,7 +136,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             "CTM protocol version mismatch"
         );
         // Get full CTM addresses including stateTransition info
-        addresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
+        addresses = AddressIntrospector.getCTMAddresses(ChainTypeManager(ctm));
         // Override chainAdmin with the bridgehub admin (ecosystem admin)
         addresses.chainAdmin = L1Bridgehub(bridgehubProxy).admin();
     }
@@ -158,8 +152,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
         // Deploy all factory dependencies
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps(gatewayCTMDeployerConfig);
-        address l1AssetRouter = address(IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).assetRouter());
-
         for (uint i = 0; i < deps.length; i++) {
             bytes[] memory localDeps = new bytes[](1);
             localDeps[0] = deps[i];
@@ -310,7 +302,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             ecosystemAdminCalls[0] = Call({
                 target: addresses.stateTransition.proxies.chainTypeManager,
                 value: 0,
-                data: abi.encodeCall(ChainTypeManagerBase.setServerNotifier, (serverNotifier))
+                data: abi.encodeCall(ChainTypeManager.setServerNotifier, (serverNotifier))
             });
             ecosystemAdminCalls[1] = Call({
                 target: serverNotifier,

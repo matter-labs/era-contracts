@@ -178,7 +178,6 @@ abstract contract AtomicInteropProofBuilder is AtomicPredeployFixture {
             abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, _sourceChainId),
             abi.encode(chainSender)
         );
-        vm.mockCall(chainSender, abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(true));
         vm.mockCall(
             chainSender,
             abi.encodeWithSelector(IGetters.l2LogsRootHash.selector, uint256(0)),

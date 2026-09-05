@@ -109,7 +109,8 @@ pub(crate) async fn verify_v31_artifact_state(
     verify_v31_validator_timelocks(artifact, verifiers, result).await?;
     verify_v31_timer_admin_state(artifact, verifiers, result).await?;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
-    verify_v31_ctm_flavor(artifact, verifiers, result).await?;
+    // The exact ChainTypeManager creation bytecode and constructor arguments are verified
+    // by deployment provenance, so no additional runtime flavor probe is needed here.
     verify_v31_chain_settlement_layers(verifiers, result).await;
 
     Ok(())
@@ -595,46 +596,6 @@ async fn verify_v31_ctm_permissionless_validator(
             )),
             Err(err) => result.report_error(&format!(
                 "Failed to call {label}.chain_type_manager_implementation PERMISSIONLESS_VALIDATOR(): {err}"
-            )),
-        }
-    }
-    Ok(())
-}
-
-/// `isZKsyncOS()` is `external pure` on the v31 CTM impl so it's safe to call
-/// directly on the implementation contract (no proxy, no init required). This
-/// guards against the artifact pointing at a non-ZKsync-OS (e.g. Era) CTM
-/// implementation — an artifact-side swap that all other per-CTM checks would
-/// happily pass through.
-async fn verify_v31_ctm_flavor(
-    artifact: &EcosystemUpgradeArtifact,
-    verifiers: &Verifiers,
-    result: &mut VerificationResult,
-) -> Result<()> {
-    let provider = verifiers.network_verifier.get_l1_provider();
-    for ctm in &artifact.ctms {
-        let label = ctm.flavor.label();
-        let scope = format!("ctms.{label}");
-        let ctm_impl = required_address(
-            &ctm.value,
-            &scope,
-            &["state_transition", "chain_type_manager_implementation_addr"],
-        )?;
-        // Only the zksync_os flavor exists on this build.
-        let expected = true;
-        match ChainTypeManager::new(ctm_impl, provider.clone())
-            .isZKsyncOS()
-            .call()
-            .await
-        {
-            Ok(actual) if actual == expected => result.report_ok(&format!(
-                "{label}.chain_type_manager_implementation.isZKsyncOS() = {actual} matches artifact flavor"
-            )),
-            Ok(actual) => result.report_error(&format!(
-                "{label}.chain_type_manager_implementation.isZKsyncOS() = {actual} disagrees with artifact flavor (expected {expected})"
-            )),
-            Err(err) => result.report_error(&format!(
-                "Failed to call {label}.chain_type_manager_implementation.isZKsyncOS(): {err}"
             )),
         }
     }

@@ -19,19 +19,17 @@ import {
     PubdataContentLockedForPermanentRollup,
     NonFullPubdataContentForPermanentRollup
 } from "contracts/common/L1ContractErrors.sol";
-import {NotZKsyncOS} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract MakePermanentRollupTest is AdminTest {
     RollupDAManager internal rollupDAManager;
     address internal l1DAValidator;
 
     function getExtendedAdminSelectors() internal pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](17);
+        bytes4[] memory selectors = new bytes4[](16);
         uint256 i = 0;
         selectors[i++] = IAdmin.setPendingAdmin.selector;
         selectors[i++] = IAdmin.acceptAdmin.selector;
         selectors[i++] = IAdmin.setValidator.selector;
-        selectors[i++] = IAdmin.setPorterAvailability.selector;
         selectors[i++] = IAdmin.setPriorityTxMaxGasLimit.selector;
         selectors[i++] = IAdmin.changeFeeParams.selector;
         selectors[i++] = IAdmin.setTokenMultiplier.selector;
@@ -173,8 +171,6 @@ contract MakePermanentRollupTest is AdminTest {
 
     function test_RevertWhen_MakePermanentRollupWithNonFullPubdataContent() public {
         address admin = utilsFacet.util_getAdmin();
-        // `setPubdataContent` is ZKsync OS only.
-        utilsFacet.util_setZksyncOS(true);
 
         // Set a valid DA pair, but switch the chain to LOGS_ONLY mode.
         vm.prank(admin);
@@ -191,8 +187,6 @@ contract MakePermanentRollupTest is AdminTest {
 
     function test_MakePermanentRollupAfterRevertingToFullPubdata() public {
         address admin = utilsFacet.util_getAdmin();
-        // `setPubdataContent` is ZKsync OS only.
-        utilsFacet.util_setZksyncOS(true);
 
         vm.prank(admin);
         adminFacet.setDAValidatorPair(l1DAValidator, L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256);
@@ -213,8 +207,6 @@ contract MakePermanentRollupTest is AdminTest {
 
     function test_RevertWhen_SetPubdataContentOnPermanentRollup() public {
         address admin = utilsFacet.util_getAdmin();
-        // `setPubdataContent` is ZKsync OS only.
-        utilsFacet.util_setZksyncOS(true);
 
         // Set a valid DA pair and make the chain a permanent rollup.
         vm.prank(admin);
@@ -235,8 +227,6 @@ contract MakePermanentRollupTest is AdminTest {
 
     function test_SetPubdataContentSuccessWhenNotPermanentRollup() public {
         address admin = utilsFacet.util_getAdmin();
-        // `setPubdataContent` is ZKsync OS only.
-        utilsFacet.util_setZksyncOS(true);
 
         vm.prank(admin);
         vm.expectEmit(true, true, false, true, address(adminFacet));
@@ -257,14 +247,5 @@ contract MakePermanentRollupTest is AdminTest {
             uint8(PubdataContent.FULL_PUBDATA),
             "pubdata content not set back to FULL_PUBDATA"
         );
-    }
-
-    function test_RevertWhen_SetPubdataContentOnNonZKsyncOSChain() public {
-        address admin = utilsFacet.util_getAdmin();
-
-        // The pubdata content has no meaning on Era-VM chains, so the setter is ZKsync OS only.
-        vm.prank(admin);
-        vm.expectRevert(NotZKsyncOS.selector);
-        adminFacet.setPubdataContent(PubdataContent.LOGS_ONLY);
     }
 }

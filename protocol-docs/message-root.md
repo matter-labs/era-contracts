@@ -72,9 +72,8 @@ The IMT snapshots (leaves 2 and 3) are what make a chain's interop-commitment-tr
 
 `ChainBatchRootTree.genesisChainBatchRoot()` is the chain batch root of batch 0: zero logs root, zero multichain root, and `EMPTY_IMT_ROOT` (the root of a freshly seeded IMT — the hash of the `{0,0,0}` sentinel leaf, i.e. keccak256 of 96 zero bytes) at both batch boundaries.
 
-Freshly created ZKsync OS chains get this genesis root into the aggregation structure at creation time: the chain stores it as `l2LogsRootHash(0)` in its DiamondInit, and the Bridgehub calls `MessageRootBase.seedGenesisRoot(chainId)` right after registration within the same `createNewChain` transaction. `seedGenesisRoot`:
+Freshly created chains get this genesis root into the aggregation structure at creation time: the chain stores it as `l2LogsRootHash(0)` in its DiamondInit, and the Bridgehub calls `MessageRootBase.seedGenesisRoot(chainId)` right after registration within the same `createNewChain` transaction. `seedGenesisRoot`:
 
-- is a no-op for EraVM chains;
 - requires the chain to be registered with `currentChainBatchNumber == 0` and no batch-0 root recorded — this rules out chains onboarded at a non-zero starting batch and chains that already pushed real batches;
 - records the root under batch 0 and pushes it into the interop trees via the v32 push path, while `currentChainBatchNumber` stays 0 so the first real batch continues at 1.
 

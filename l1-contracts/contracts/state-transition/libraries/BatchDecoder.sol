@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {IExecutor} from "../chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo, CommitBatchInfoZKsyncOS, PrecommitInfo} from "../chain-interfaces/ICommitter.sol";
+import {CommitBatchInfoZKsyncOS} from "../chain-interfaces/ICommitter.sol";
 import {PriorityOpsBatchInfo} from "./PriorityTree.sol";
 import {
     EmptyData,
@@ -20,46 +20,21 @@ import {InteropRoot} from "../../common/Messaging.sol";
 /// @dev This library decodes commit, proof, and execution batch data and verifies batch number bounds.
 ///      It reverts with custom errors when the data is invalid or unsupported encoding is used.
 library BatchDecoder {
-    /// @notice The supported encoding version for EraVM commit data, precommit data, and prove data
-    /// (prove encoding is shared by EraVM and ZKsync OS chains).
+    /// @notice The supported encoding version for prove data.
+    /// @dev Version 1 was also the EraVM commit/precommit encoding; those paths are gone, but
+    /// the prove wire keeps the byte, so the value must never be reused for a new commit encoding.
     uint8 internal constant SUPPORTED_ENCODING_VERSION = 1;
     /// @notice The currently supported encoding version for execute data.
     /// @dev A breaking re-encoding of the execute wire must bump this version, never reuse an old byte.
     uint8 internal constant SUPPORTED_ENCODING_VERSION_EXECUTE = 2;
     /// @notice The currently supported encoding version for ZKSync OS commit data.
-    /// We use different encoding only for commit, while prove/execute are common for Era VM and ZKsync OS chains.
-    uint8 internal constant SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 4;
+    /// @dev Only commit has an OS-specific encoding; the prove/execute wire formats predate
+    /// ZKsync OS and their version bytes stay reserved — never reuse a retired byte.
+    uint8 internal constant SUPPORTED_ENCODING_VERSION_COMMIT = 4;
 
-    /// @notice Decodes commit data from a calldata bytes into the last committed batch data and an array of new batch data.
-    /// @param _commitData The calldata byte array containing the data for committing batches.
-    /// @return lastCommittedBatchData The data for the batch before newly committed batches.
-    /// @return newBatchesData An array containing the newly committed batches.
+    /// @notice Decodes commit data from a calldata bytes into the last committed batch data and an
+    /// array of new batch data.
     function _decodeCommitData(
-        bytes calldata _commitData
-    )
-        private
-        pure
-        returns (IExecutor.StoredBatchInfo memory lastCommittedBatchData, CommitBatchInfo[] memory newBatchesData)
-    {
-        if (_commitData.length == 0) {
-            revert EmptyData();
-        }
-
-        uint8 encodingVersion = uint8(_commitData[0]);
-        if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
-            (lastCommittedBatchData, newBatchesData) = abi.decode(
-                _commitData[1:],
-                (IExecutor.StoredBatchInfo, CommitBatchInfo[])
-            );
-        } else {
-            revert UnsupportedCommitBatchEncoding(encodingVersion);
-        }
-    }
-
-    // exactly the same as regular `_decodeCommitData`, except for 2 differences:
-    // - encoding version is different
-    // - uses different structure for the commit batch info
-    function _decodeCommitDataZKsyncOS(
         bytes calldata _commitData
     )
         private
@@ -74,7 +49,7 @@ library BatchDecoder {
         }
 
         uint8 encodingVersion = uint8(_commitData[0]);
-        if (encodingVersion == SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS) {
+        if (encodingVersion == SUPPORTED_ENCODING_VERSION_COMMIT) {
             (lastCommittedBatchData, newBatchesData) = abi.decode(
                 _commitData[1:],
                 (IExecutor.StoredBatchInfo, CommitBatchInfoZKsyncOS[])
@@ -84,64 +59,11 @@ library BatchDecoder {
         }
     }
 
-    /// @notice Decodes and validates precommit data for a batch, ensuring the encoding version is supported.
-    /// @dev The first byte of `_precommitData` is interpreted as the encoding version and must equal `SUPPORTED_ENCODING_VERSION`.
-    ///      If it does, the remainder of the data is decoded into an `PrecommitInfo` struct. Otherwise, this call reverts.
-    /// @param _precommitData ABI-encoded bytes where the first byte is the encoding version, followed by the encoded `PrecommitInfo`.
-    /// @return precommitInfo The decoded `PrecommitInfo` containing transaction status commitments.
-    function decodeAndCheckPrecommitData(
-        bytes calldata _precommitData
-    ) internal pure returns (PrecommitInfo memory precommitInfo) {
-        if (_precommitData.length == 0) {
-            revert EmptyData();
-        }
-        uint8 encodingVersion = uint8(_precommitData[0]);
-        if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
-            (precommitInfo) = abi.decode(_precommitData[1:], (PrecommitInfo));
-        } else {
-            revert UnsupportedCommitBatchEncoding(encodingVersion);
-        }
-    }
-
     /// @notice Decodes the commit data and checks that the provided batch bounds are correct.
-    /// @dev Note that it only checks that the last and the first batches in the array correspond to the provided bounds.
-    /// The fact that the batches inside the array are provided in the correct order should be checked by the caller.
-    /// @param _commitData The calldata byte array containing the data for committing batches.
-    /// @param _processBatchFrom The expected batch number of the first commit batch in the array.
-    /// @param _processBatchTo The expected batch number of the last commit batch in the array.
-    /// @return lastCommittedBatchData The data for the batch before newly committed batches.
-    /// @return newBatchesData An array containing the newly committed batches.
+    /// @dev Note that it only checks that the last and the first batches in the array correspond to
+    /// the provided bounds. The fact that the batches inside the array are provided in the correct
+    /// order should be checked by the caller.
     function decodeAndCheckCommitData(
-        bytes calldata _commitData,
-        uint256 _processBatchFrom,
-        uint256 _processBatchTo
-    )
-        internal
-        pure
-        returns (IExecutor.StoredBatchInfo memory lastCommittedBatchData, CommitBatchInfo[] memory newBatchesData)
-    {
-        (lastCommittedBatchData, newBatchesData) = _decodeCommitData(_commitData);
-
-        if (newBatchesData.length == 0) {
-            revert EmptyData();
-        }
-
-        if (
-            newBatchesData[0].batchNumber != _processBatchFrom ||
-            newBatchesData[newBatchesData.length - 1].batchNumber != _processBatchTo
-        ) {
-            revert IncorrectBatchBounds(
-                _processBatchFrom,
-                _processBatchTo,
-                newBatchesData[0].batchNumber,
-                newBatchesData[newBatchesData.length - 1].batchNumber
-            );
-        }
-    }
-
-    // exactly the same as regular `decodeAndCheckCommitData`, except for one difference:
-    // uses different structure for the commit batch info
-    function decodeAndCheckCommitDataZKsyncOS(
         bytes calldata _commitData,
         uint256 _processBatchFrom,
         uint256 _processBatchTo
@@ -153,7 +75,7 @@ library BatchDecoder {
             CommitBatchInfoZKsyncOS[] memory newBatchesData
         )
     {
-        (lastCommittedBatchData, newBatchesData) = _decodeCommitDataZKsyncOS(_commitData);
+        (lastCommittedBatchData, newBatchesData) = _decodeCommitData(_commitData);
 
         if (newBatchesData.length == 0) {
             revert EmptyData();

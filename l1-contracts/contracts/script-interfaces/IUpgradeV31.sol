@@ -16,8 +16,7 @@ interface ICoreUpgradeV31 {
     function stage3(address bridgehubProxy) external;
 }
 
-/// @notice Standalone CTM upgrade entry point. Invoked once per CTM proxy when the
-///         ecosystem hosts multiple CTMs (e.g. ZKsyncOS + EraVM).
+/// @notice Standalone CTM upgrade entry point. Invoked once per target CTM proxy.
 interface ICTMUpgradeV31 {
     function noGovernancePrepare(CTMUpgradeParams memory _params) external;
 }
