@@ -18,10 +18,7 @@ import {
     L2_REMOVED_GW_ASSET_TRACKER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-/// @notice Additional fixed-address contracts are force-deployed from their own list, so their bytecodes
-/// have to be merged into the factory dependencies separately. A force deployment whose preimage is not
-/// published makes the L2 upgrade transaction panic on the first access to the missing code, which no
-/// fixture that installs bytecode itself (`vm.etch`, `anvil_setCode`) would notice.
+/// @notice Force deployments must carry the right bytecode and publish their implementation preimages.
 contract SystemContractsProcessingTest is Test {
     function test_forceDeploymentsCarryTheRightBytecodeForEachAddress() public {
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = SystemContractsProcessing
@@ -144,30 +141,10 @@ contract SystemContractsProcessingTest is Test {
     function test_factoryDependenciesIncludeTheNewBuiltInImplementations() public {
         bytes[] memory factoryDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(new CoreContract[](0));
 
-        // The implementation preimages of the two new built-ins, which is what this release adds to the
-        // list. Their `SystemContractProxy` preimage is shared with every other force deployment
-        // and is published by the same list builder, so it is not re-checked here.
-        CoreContract[] memory additionalCoreContracts = SystemContractsProcessing
-            .getAdditionalFixedAddressCoreContracts();
-        for (uint256 i = 0; i < additionalCoreContracts.length; ++i) {
-            bytes32 expected = keccak256(_deployedBytecode(additionalCoreContracts[i]));
+        CoreContract[2] memory builtIns = [CoreContract.L2InteropCommitmentTree, CoreContract.AtomicFlowManager];
+        for (uint256 i = 0; i < builtIns.length; ++i) {
+            bytes32 expected = keccak256(_deployedBytecode(builtIns[i]));
             assertEq(_countBytecode(factoryDeps, expected), 1, "bytecode not published exactly once");
-        }
-    }
-
-    function test_fixedAddressAndAdditionalContractListsDoNotOverlap() public {
-        // Both lists are concatenated into one force-deployment array, so duplicates are invalid.
-        CoreContract[] memory fixedAddressCoreContracts = SystemContractsProcessing.getFixedAddressCoreContracts();
-        CoreContract[] memory additionalCoreContracts = SystemContractsProcessing
-            .getAdditionalFixedAddressCoreContracts();
-
-        for (uint256 i = 0; i < fixedAddressCoreContracts.length; ++i) {
-            for (uint256 j = 0; j < additionalCoreContracts.length; ++j) {
-                assertTrue(
-                    fixedAddressCoreContracts[i] != additionalCoreContracts[j],
-                    "contract appears in both force-deployment lists"
-                );
-            }
         }
     }
 

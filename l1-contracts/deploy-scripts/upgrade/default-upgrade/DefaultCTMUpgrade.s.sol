@@ -21,7 +21,6 @@ import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 
@@ -157,6 +156,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         // Optional
         address governance
     ) public {
+        require(IChainTypeManager(permanentConfig.ctmProxy).isZKsyncOS(), "CTM is not ZKsync OS");
         // Only override the salt when explicitly provided (non-zero).
         // When zero, the script falls back to the CREATE2_FACTORY_SALT env var or built-in default.
         if (permanentConfig.create2FactorySalt != bytes32(0)) {

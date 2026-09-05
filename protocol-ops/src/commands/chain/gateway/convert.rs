@@ -207,8 +207,6 @@ pub async fn stage_vote_prepare(
     .context("Failed to resolve CTM proxy from bridgehub")?;
     logger::info(format!("CTM proxy (from L1): {:#x}", ctm_proxy));
 
-    // Fail closed if the CTM is not a supported ZKsync OS CTM (resolved from its
-    // reported protocol version).
     crate::common::l1_contracts::ensure_supported_os_ctm(&runner.rpc_url, ctm_proxy)
         .await
         .context("Failed to verify the CTM is a supported ZKsync OS CTM")?;

@@ -6,6 +6,7 @@ pragma solidity ^0.8.24;
 import {console2 as console} from "forge-std/Script.sol";
 
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
+import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
@@ -253,6 +254,22 @@ contract UpgradeIntegrationTest_Local is
         console.log("setUp: Mock call setup");
         internalTest();
         console.log("setUp: Internal test complete");
+    }
+
+    function test_directCTMUpgradeRejectsEraCTM() public {
+        address ctm = ctmUpgrade.getCTMAddress();
+        uint256 protocolVersion = IChainTypeManager(ctm).protocolVersion();
+        // Isolate the source-VM precondition; the fixture otherwise uses the real OS upgrade flow.
+        vm.mockCall(ctm, abi.encodeCall(IChainTypeManager.isZKsyncOS, ()), abi.encode(false));
+
+        ChainCreationParamsConfig memory chainCreationParams;
+        DefaultCTMUpgrade.PermanentCTMConfig memory permanentConfig;
+        permanentConfig.ctmProxy = ctm;
+        vm.expectRevert(bytes("CTM is not ZKsync OS"));
+        ctmUpgrade.initializeConfig(chainCreationParams, permanentConfig, address(0));
+
+        assertEq(IChainTypeManager(ctm).protocolVersion(), protocolVersion);
+        assertEq(ctmUpgrade.getCTMAddress(), ctm);
     }
 
     function test_DefaultUpgradeZKsyncOS_Local() public {

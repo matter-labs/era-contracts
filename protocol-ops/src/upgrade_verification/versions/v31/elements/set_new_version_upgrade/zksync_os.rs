@@ -86,7 +86,6 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
             "l1-contracts/InteropAttributeParser",
             L2_INTEROP_ATTRIBUTE_PARSER_ADDR
         ),
-        // ── Additional atomic-interop built-ins (getAdditionalFixedAddressCoreContracts, 2 entries) ──
         proxy!(
             "l1-contracts/L2InteropCommitmentTree",
             L2_INTEROP_COMMITMENT_TREE_ADDR

@@ -18,7 +18,6 @@ import {
     L2_REMOVED_GW_ASSET_TRACKER_ADDR,
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {CoreContract, L2SystemContract} from "../ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
@@ -27,12 +26,9 @@ import {DeduplicateBytecodesCountMismatch} from "../ecosystem/DeployScriptErrors
 // solhint-disable no-console
 
 /// @dev Fixed-address CoreContract entries backed by l1-contracts bytecodes.
-uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 12;
+uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 14;
 /// @dev System contracts (0x800x) with l1-contracts EVM bytecodes for proxy upgrades.
 uint256 constant SYSTEM_PROXY_UPGRADE_CONTRACTS_COUNT = 4;
-
-/// @dev Additional fixed-address core contracts outside the baseline list.
-uint256 constant ADDITIONAL_FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 2;
 
 library SystemContractsProcessing {
     /// @notice Deduplicates the array of bytecodes.
@@ -78,13 +74,7 @@ library SystemContractsProcessing {
     /// @notice CoreContract entries with canonical fixed L2 addresses.
     function getFixedAddressCoreContracts() internal pure returns (CoreContract[] memory ids) {
         ids = new CoreContract[](FIXED_ADDRESS_CORE_CONTRACTS_COUNT);
-        _fillFixedAddressCoreContracts(ids);
-    }
-
-    function _fillFixedAddressCoreContracts(CoreContract[] memory ids) private pure {
-        // NOTE: L2WrappedBaseToken is intentionally NOT in this list. v31 must not touch the
-        // WrappedBaseToken impl on either VM, so it is excluded from both the force-deployment list
-        // and the factory deps.
+        // L2WrappedBaseToken must retain its implementation across the upgrade.
         uint256 i = 0;
         ids[i++] = CoreContract.L2Bridgehub;
         ids[i++] = CoreContract.L2AssetRouter;
@@ -99,20 +89,11 @@ library SystemContractsProcessing {
         // Stateless parser called by the InteropCenter on every send; must be co-deployed with it.
         ids[i++] = CoreContract.InteropAttributeParser;
         ids[i++] = CoreContract.L2InteropHandler;
+        ids[i++] = CoreContract.L2InteropCommitmentTree;
+        ids[i++] = CoreContract.AtomicFlowManager;
         // Under-filling would silently leave `CoreContract(0)` entries; over-filling
         // already reverts with an out-of-bounds access on the fixed-length array.
         require(i == FIXED_ADDRESS_CORE_CONTRACTS_COUNT, "fixed-address core contract count mismatch");
-    }
-
-    /// @notice Additional fixed-address core contracts. Currently the atomic-interop built-ins, see
-    /// {protocol-docs/chain-lifecycle.md#zksync-os-genesis-force-deployments-atomic-interop-built-ins}.
-    function getAdditionalFixedAddressCoreContracts() internal pure returns (CoreContract[] memory ids) {
-        ids = new CoreContract[](ADDITIONAL_FIXED_ADDRESS_CORE_CONTRACTS_COUNT);
-        uint256 i;
-        ids[i++] = CoreContract.L2InteropCommitmentTree;
-        ids[i++] = CoreContract.AtomicFlowManager;
-        // Same guard as `getFixedAddressCoreContracts`: under-filling would leave `CoreContract(0)` entries.
-        require(i == ADDITIONAL_FIXED_ADDRESS_CORE_CONTRACTS_COUNT, "additional core contract count mismatch");
     }
 
     /// @notice System contracts that have l1-contracts EVM bytecodes and need proxy upgrades.
@@ -166,7 +147,6 @@ library SystemContractsProcessing {
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
     {
         CoreContract[] memory fixedAddressCoreContracts = getFixedAddressCoreContracts();
-        CoreContract[] memory additionalCoreContracts = getAdditionalFixedAddressCoreContracts();
         L2SystemContract[] memory systemProxyUpgradeContracts = getSystemProxyUpgradeContracts();
 
         // SystemContractProxyAdmin is intentionally NOT force-deployed here: it's a direct-deployed
@@ -180,7 +160,6 @@ library SystemContractsProcessing {
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory neutralizations = getRemovedTrackerNeutralizations();
 
         uint256 totalBase = fixedAddressCoreContracts.length +
-            additionalCoreContracts.length +
             systemProxyUpgradeContracts.length +
             neutralizations.length;
 
@@ -190,13 +169,6 @@ library SystemContractsProcessing {
         // Fixed-address core contracts (0x10000+)
         for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
             deployments[index++] = _buildCoreContractProxyUpgrade(fixedAddressCoreContracts[i]);
-        }
-        // Additional contracts (currently the atomic-interop built-ins at 0x10012 / 0x10014).
-        // Predeployed in the ZKsync OS genesis, so a from-scratch chain already has them; a chain that
-        // predates the release gets them here, which is what lets `_initializeV32Contracts` initialize
-        // them on the upgrade path too.
-        for (uint256 i = 0; i < additionalCoreContracts.length; i++) {
-            deployments[index++] = _buildCoreContractProxyUpgrade(additionalCoreContracts[i]);
         }
         // System contracts with l1-contracts EVM bytecodes (0x800x)
         for (uint256 i = 0; i < systemProxyUpgradeContracts.length; i++) {

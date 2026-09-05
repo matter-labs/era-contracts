@@ -14,7 +14,7 @@ use crate::common::abi::{BridgehubAbi, IChainTypeManagerAbi, ZkChainAbi};
 
 type AlloyProvider = RootProvider<Ethereum>;
 
-pub(crate) fn provider(rpc_url: &str) -> anyhow::Result<AlloyProvider> {
+fn provider(rpc_url: &str) -> anyhow::Result<AlloyProvider> {
     Ok(ProviderBuilder::default().connect_http(rpc_url.parse()?))
 }
 

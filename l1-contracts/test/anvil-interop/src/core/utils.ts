@@ -361,7 +361,8 @@ export async function relayTx(
         gasLimit: 30_000_000,
         ...(value && !value.isZero() ? { value } : {}),
       });
-      const receipt = await waitForAnvilTransaction(provider, tx.hash);
+      // Avoid ethers' replacement-detection poller, which can outlive the receipt and race RPC shutdown.
+      const receipt = await provider.waitForTransaction(tx.hash, 1);
       return { txHash: receipt.transactionHash, success: receipt.status === 1, receipt };
     });
   } catch (error) {
@@ -370,17 +371,6 @@ export async function relayTx(
     console.warn(`   relayTx reverted: ${msg.slice(0, 200)}`);
     return { txHash: "", success: false };
   }
-}
-
-/**
- * Wait for an impersonated Anvil transaction without ethers' replacement-detection poller.
- * The poller can outlive the receipt and race the harness shutting down the local RPC.
- */
-export function waitForAnvilTransaction(
-  _provider: providers.JsonRpcProvider,
-  _transactionHash: string
-): Promise<ethers.providers.TransactionReceipt> {
-  return _provider.waitForTransaction(_transactionHash, 1);
 }
 
 interface PriorityRelayChainTarget {

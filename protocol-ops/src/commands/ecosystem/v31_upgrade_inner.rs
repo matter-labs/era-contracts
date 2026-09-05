@@ -18,36 +18,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use alloy::primitives::{Address, Bytes, B256};
-use alloy::providers::Provider;
 use alloy::sol_types::SolCall;
 use anyhow::Context;
 
-use crate::common::abi::{ICTMUpgradeV31Abi, IChainTypeManagerAbi, ICoreUpgradeV31Abi};
+use crate::common::abi::{ICTMUpgradeV31Abi, ICoreUpgradeV31Abi};
 use crate::common::wallets::Wallet;
 use crate::common::{forge::ForgeRunner, logger};
-
-/// Resolve the dual-VM flag from a deployed **v31** CTM (typed, version-directed call).
-async fn resolve_v31_ctm_is_zksync_os(
-    l1_rpc_url: &str,
-    ctm_proxy: Address,
-) -> anyhow::Result<bool> {
-    resolve_v31_ctm_is_zksync_os_with_provider(
-        crate::common::l1_contracts::provider(l1_rpc_url)?,
-        ctm_proxy,
-    )
-    .await
-}
-
-async fn resolve_v31_ctm_is_zksync_os_with_provider<P: Provider>(
-    provider: P,
-    ctm_proxy: Address,
-) -> anyhow::Result<bool> {
-    let ctm = IChainTypeManagerAbi::new(ctm_proxy, provider);
-    ctm.isZKsyncOS()
-        .call()
-        .await
-        .context("v31 ctm.isZKsyncOS() call failed")
-}
 
 // ── inputs / outputs ───────────────────────────────────────────────────────
 
@@ -151,6 +127,12 @@ impl<'a> V31UpgradeInner<'a> {
             anyhow::bail!("V31UpgradeInner::prepare requires at least one CTM");
         }
 
+        for ctm in &inputs.ctms {
+            crate::common::l1_contracts::ensure_supported_os_ctm(&runner.rpc_url, ctm.proxy)
+                .await
+                .with_context(|| format!("Unsupported upgrade target ({:#x})", ctm.proxy))?;
+        }
+
         let core_toml = self
             .prepare_core(runner, deployer, inputs)
             .await
@@ -158,19 +140,6 @@ impl<'a> V31UpgradeInner<'a> {
 
         let mut ctm_tomls = Vec::with_capacity(inputs.ctms.len());
         for ctm in &inputs.ctms {
-            // Only ZKsync OS CTMs can be upgraded onto this release. The flavor is resolved
-            // from L1 (never from config) so a mislabelled entry can't select an incompatible
-            // CTM implementation for governance calldata, and a non-OS CTM in the input is a
-            // configuration error that must fail the whole prepare rather than be skipped.
-            let ctm_is_zk_sync_os = resolve_v31_ctm_is_zksync_os(&runner.rpc_url, ctm.proxy)
-                .await
-                .context("Failed to resolve isZKsyncOS from the v31 CTM")?;
-            anyhow::ensure!(
-                ctm_is_zk_sync_os,
-                "CTM {:#x} is not a ZKsync OS CTM: only ZKsync OS chains can be upgraded onto \
-                 this release — remove the entry from the CTM inputs",
-                ctm.proxy
-            );
             let path = self
                 .prepare_ctm(runner, deployer, inputs, ctm)
                 .await
@@ -435,57 +404,4 @@ fn ensure_script_exists(contracts_path: &Path, script_path: &str) -> anyhow::Res
         anyhow::bail!("Script not found: {}", script_full_path.display());
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use alloy::providers::ProviderBuilder;
-    use alloy::sol_types::SolValue;
-    use alloy::transports::mock::Asserter;
-
-    const CTM_PROXY: Address = Address::repeat_byte(0x11);
-
-    #[tokio::test]
-    async fn resolve_v31_ctm_is_zksync_os_returns_true() {
-        let asserter = Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        asserter.push_success(&Bytes::from(true.abi_encode()));
-
-        assert!(
-            resolve_v31_ctm_is_zksync_os_with_provider(provider, CTM_PROXY)
-                .await
-                .unwrap()
-        );
-        assert!(asserter.read_q().is_empty());
-    }
-
-    #[tokio::test]
-    async fn resolve_v31_ctm_is_zksync_os_returns_false() {
-        let asserter = Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        asserter.push_success(&Bytes::from(false.abi_encode()));
-
-        assert!(
-            !resolve_v31_ctm_is_zksync_os_with_provider(provider, CTM_PROXY)
-                .await
-                .unwrap()
-        );
-        assert!(asserter.read_q().is_empty());
-    }
-
-    #[tokio::test]
-    async fn resolve_v31_ctm_is_zksync_os_fails_closed_on_rpc_error() {
-        let asserter = Asserter::new();
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        asserter.push_failure_msg("RPC unavailable");
-
-        let error = resolve_v31_ctm_is_zksync_os_with_provider(provider, CTM_PROXY)
-            .await
-            .unwrap_err();
-
-        assert_eq!(error.to_string(), "v31 ctm.isZKsyncOS() call failed");
-        assert!(format!("{error:#}").contains("RPC unavailable"));
-        assert!(asserter.read_q().is_empty());
-    }
 }

@@ -15,7 +15,7 @@ const CONTRACTS_DIRECTORIES: Record<string, string[]> = {
     "state-transition/L1StateTransitionErrors.sol",
     "upgrades/ZkSyncUpgradeErrors.sol",
   ],
-  "./deploy-scripts": ["utils/ZkSyncScriptErrors.sol"],
+  "./deploy-scripts": ["utils/ZkSyncScriptErrors.sol", "ecosystem/DeployScriptErrors.sol"],
   "../da-contracts/contracts": ["DAContractsErrors.sol"],
 };
 

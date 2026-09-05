@@ -2,7 +2,6 @@
 pragma solidity 0.8.28;
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
@@ -55,7 +54,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         PublishFactoryDepsResult memory _factoryDepsResult,
         uint256 _protocolUpgradeNonce
     ) internal returns (L2CanonicalTransaction memory transaction) {
-        validateUniversalForceDeployments(_deployments, _factoryDepsResult);
+        validateUniversalForceDeployments(_deployments);
         (address target, bytes memory data) = getL2UpgradeTargetAndData(_deployments);
 
         transaction = L2CanonicalTransaction({
@@ -83,8 +82,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     }
 
     function validateUniversalForceDeployments(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments,
-        PublishFactoryDepsResult memory // _factoryDepsResult
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual {
         // The retired EraVM ordinal must never appear in a generated upgrade: on chain it would
         // revert only at execution time, so fail the preparation loudly here instead.

@@ -228,11 +228,10 @@ addresses, so there are no wiring parameters, and the manager never custodies fu
 flow through the normal interop path; destination mints go through the `InteropHandler`).
 
 Pre-existing ZKsync OS chains receive the same two built-ins through the upgrade's force deployments
-(`SystemContractsProcessing.getAdditionalFixedAddressCoreContracts`), so they end up with atomic interop
+(`SystemContractsProcessing.getFixedAddressCoreContracts`), so they end up with atomic interop
 as well. Both `initL2`s therefore run on the upgrade path too, unconditionally: neither the built-ins
 nor their addresses existed in v31, so no chain can arrive at this upgrade with them already seeded,
-and the force deployments in the same transaction install their code before the `initL2`s run. Era
-chains never receive them — this release upgrades ZKsync OS chains only.
+and the force deployments in the same transaction install their code before the `initL2`s run.
 
 The same upgrade list also neutralizes the tracker this release removes
 (`SystemContractsProcessing.getRemovedTrackerNeutralizations`): v31 deployed the `GWAssetTracker` as a

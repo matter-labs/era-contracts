@@ -19,46 +19,10 @@ contract L2ContractHelperExtendedTest is Test {
         assertEq(L2ContractHelper.computeCreateAddress(sender, 0xffff), 0xE23074ddC86CFc8B145359AB5BA3f10a2c7Df3Dd);
         assertEq(L2ContractHelper.computeCreateAddress(sender, 0x10000), 0x57E44db246f8C377C7923969B4067223dE875B1C);
         assertEq(L2ContractHelper.computeCreateAddress(sender, 1 << 48), 0x4917b2b032e5911c46cC8118e193DecF40303F41);
-    }
-
-    function test_computeCreateAddress_differentForDifferentNonces() public pure {
-        address sender = address(0x1234);
-
-        address addr1 = L2ContractHelper.computeCreateAddress(sender, 0);
-        address addr2 = L2ContractHelper.computeCreateAddress(sender, 1);
-        address addr3 = L2ContractHelper.computeCreateAddress(sender, 2);
-
-        assertTrue(addr1 != addr2);
-        assertTrue(addr2 != addr3);
-        assertTrue(addr1 != addr3);
-    }
-
-    function test_computeCreateAddress_differentForDifferentSenders() public pure {
-        uint256 nonce = 0;
-
-        address addr1 = L2ContractHelper.computeCreateAddress(address(0x1), nonce);
-        address addr2 = L2ContractHelper.computeCreateAddress(address(0x2), nonce);
-
-        assertTrue(addr1 != addr2);
-    }
-
-    function test_computeCreateAddress_zeroSenderAndNonce() public pure {
-        address addr = L2ContractHelper.computeCreateAddress(address(0), 0);
-
-        assertTrue(addr != address(0));
-    }
-
-    function test_computeCreateAddress_largeNonce() public pure {
-        address sender = address(0x1234);
-        address addr = L2ContractHelper.computeCreateAddress(sender, type(uint256).max);
-
-        assertTrue(addr != address(0));
-    }
-
-    function testFuzz_computeCreateAddress_isDeterministic(address _sender, uint256 _nonce) public pure {
-        address first = L2ContractHelper.computeCreateAddress(_sender, _nonce);
-        address second = L2ContractHelper.computeCreateAddress(_sender, _nonce);
-
-        assertEq(first, second);
+        assertEq(
+            L2ContractHelper.computeCreateAddress(sender, type(uint256).max),
+            0xCCC3628fF8Af383753A6446481Dc7c82C760dcFf
+        );
+        assertEq(L2ContractHelper.computeCreateAddress(address(0), 0), 0xBd770416a3345F91E4B34576cb804a576fa48EB1);
     }
 }

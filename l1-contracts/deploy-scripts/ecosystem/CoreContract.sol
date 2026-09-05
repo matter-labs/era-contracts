@@ -26,8 +26,7 @@ enum CoreContract {
     DiamondProxy,
     ProxyAdmin,
     TransparentUpgradeableProxy,
-    // Atomic-interop built-ins, part of `getAdditionalFixedAddressCoreContracts`: the tree's storage is read
-    // by the ZKsync OS bootloader.
+    // Atomic-interop built-ins; the bootloader reads the commitment tree's storage.
     L2InteropCommitmentTree,
     AtomicFlowManager
 }

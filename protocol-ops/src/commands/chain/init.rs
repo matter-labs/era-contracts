@@ -114,8 +114,6 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
             .context("Failed to discover CTM proxy from L1")?;
     logger::info(format!("CTM proxy (from L1): {:#x}", ctm_proxy));
 
-    // This tooling only provisions ZKsync OS chains — refuse anything older, resolved
-    // from the CTM's reported protocol version (fail closed).
     crate::common::l1_contracts::ensure_supported_os_ctm(&runner.rpc_url, ctm_proxy)
         .await
         .context("Failed to verify the CTM is a supported ZKsync OS CTM")?;

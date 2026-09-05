@@ -147,7 +147,6 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     }
 
     /// @notice Override to deploy the per-chain upgrade contract.
-    /// @dev Only ZKsync OS chains can be upgraded onto this release (enforced in `initializeConfig`).
     function deployUsedUpgradeContract() internal virtual override returns (address) {
         // The registry must exist first: the v32 upgrade contract embeds its address as an immutable.
         priorityOpLowerBound = deploySimpleContract("PriorityOpLowerBound");

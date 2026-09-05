@@ -194,7 +194,7 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         console.log("Upgrade data generated!");
     }
 
-    function deployGWContract(string memory contractName) internal virtual returns (address contractAddress) {
+    function deployGWContract(string memory contractName) internal returns (address contractAddress) {
         bytes memory creationCalldata = getCreationCalldata(contractName);
         contractAddress = Utils.deployThroughL1ViaDeterministicCreate2({
             bytecode: getCreationCode(contractName),
