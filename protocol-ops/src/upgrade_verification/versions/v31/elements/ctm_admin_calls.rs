@@ -113,6 +113,18 @@ async fn verify_server_notifier_upgrade(ctm: &CtmArtifact, verifiers: &Verifiers
         "ServerNotifier ProxyAdmin owner must be intended ChainAdmin {intended_chain_admin}, got {live_chain_admin}"
     );
 
+    let intended_chain_admin_owner = required_address(
+        &ctm.value,
+        &scope,
+        &["ctm_admin_calls", "chain_admin_owner"],
+    )?;
+    let live_chain_admin_owner = OwnableView::new(live_chain_admin, provider.clone())
+        .owner()
+        .call()
+        .await
+        .with_context(|| format!("calling ChainAdmin.owner() at {live_chain_admin}"))?;
+    validate_chain_admin_owner(live_chain_admin_owner, intended_chain_admin_owner)?;
+
     let server_notifier_ownable = OwnableView::new(server_notifier, provider);
     let server_notifier_owner = server_notifier_ownable
         .owner()
@@ -180,6 +192,18 @@ fn validate_ownership_state(
     }
 }
 
+fn validate_chain_admin_owner(live_owner: Address, intended_owner: Address) -> Result<()> {
+    anyhow::ensure!(
+        intended_owner != Address::ZERO,
+        "ctm_admin_calls.chain_admin_owner must not be address(0)"
+    );
+    anyhow::ensure!(
+        live_owner == intended_owner,
+        "ChainAdmin owner must be intended signer {intended_owner}, got {live_owner}"
+    );
+    Ok(())
+}
+
 fn required_server_notifier_upgrade(ctm: &CtmArtifact) -> Result<&str> {
     let path = format!(
         "ctms.{}.ctm_admin_calls.server_notifier_upgrade",
@@ -202,22 +226,19 @@ fn validate_server_notifier_upgrade(
         "must be a 0x-prefixed ABI-encoded Call[]"
     );
     let calls = decode_calls(encoded_calls).context("decoding ABI-encoded Call[]")?;
-    if expected.accept_ownership_still_required {
-        anyhow::ensure!(
-            calls.len() == 3,
-            "expected exactly 3 calls while ServerNotifier ownership acceptance is pending, got {}",
-            calls.len()
-        );
+    let (expected_call_count, ownership_state) = if expected.accept_ownership_still_required {
+        (3, "while ServerNotifier ownership acceptance is pending")
     } else {
-        anyhow::ensure!(
-            matches!(calls.len(), 2 | 3),
-            "expected exactly 2 or 3 calls after ServerNotifier ownership acceptance, got {}",
-            calls.len()
-        );
-    }
+        (2, "while ServerNotifier is already owned by ChainAdmin")
+    };
+    anyhow::ensure!(
+        calls.len() == expected_call_count,
+        "expected exactly {expected_call_count} calls {ownership_state}, got {}",
+        calls.len()
+    );
 
     validate_proxy_admin_upgrade(&calls[0], expected)?;
-    let registration_index = if calls.len() == 3 {
+    let registration_index = if expected.accept_ownership_still_required {
         validate_accept_ownership(&calls[1], expected)?;
         2
     } else {
@@ -407,13 +428,13 @@ mod tests {
         let mut calls = valid_calls(expected);
         calls.pop();
         let err = validate_server_notifier_upgrade(&encoded(&calls), expected).unwrap_err();
-        assert!(format!("{err:#}").contains("expected exactly 2 or 3 calls"));
+        assert!(format!("{err:#}").contains("expected exactly 2 calls"));
 
         let mut calls = valid_calls(expected);
         calls.push(calls[1].clone());
         calls.push(calls[1].clone());
         let err = validate_server_notifier_upgrade(&encoded(&calls), expected).unwrap_err();
-        assert!(format!("{err:#}").contains("expected exactly 2 or 3 calls"));
+        assert!(format!("{err:#}").contains("expected exactly 2 calls"));
     }
 
     #[test]
@@ -546,7 +567,10 @@ mod tests {
             validate_server_notifier_upgrade(&encoded(&valid_calls(without_accept)), expected)
                 .is_err()
         );
-        validate_server_notifier_upgrade(&encoded(&valid_calls(expected)), without_accept).unwrap();
+        let err =
+            validate_server_notifier_upgrade(&encoded(&valid_calls(expected)), without_accept)
+                .unwrap_err();
+        assert!(format!("{err:#}").contains("expected exactly 2 calls"));
     }
 
     #[test]
@@ -560,6 +584,18 @@ mod tests {
 
         let err = validate_ownership_state(intended_owner, address(7), intended_owner).unwrap_err();
         assert!(format!("{err:#}").contains("stale pending owner"));
+    }
+
+    #[test]
+    fn validates_chain_admin_owner() {
+        let intended_owner = address(5);
+        validate_chain_admin_owner(intended_owner, intended_owner).unwrap();
+
+        let err = validate_chain_admin_owner(address(6), intended_owner).unwrap_err();
+        assert!(format!("{err:#}").contains("must be intended signer"));
+
+        let err = validate_chain_admin_owner(Address::ZERO, Address::ZERO).unwrap_err();
+        assert!(format!("{err:#}").contains("must not be address(0)"));
     }
 
     #[test]

@@ -29,7 +29,7 @@ use super::super::{
 };
 use super::super::{
     fixed_force_deployment::FixedForceDeploymentsData, initialize_data_new_chain,
-    protocol_version::ProtocolVersion, set_new_version_upgrade,
+    protocol_version::ProtocolVersion, set_new_version_upgrade, L1InteropHandlerPreparationMode,
 };
 use super::facets::{
     verify_default_upgrade_payload, verify_v31_chain_creation_facet_cuts,
@@ -102,6 +102,26 @@ fn expected_stage1_call_count(core_call_count: usize, ctm_count: usize) -> anyho
         .context("stage-1 call count overflow")
 }
 
+pub(crate) fn infer_l1_interop_handler_preparation_mode(
+    stage1_call_count: usize,
+    ctm_count: usize,
+) -> anyhow::Result<L1InteropHandlerPreparationMode> {
+    let reuse_call_count = expected_stage1_call_count(STAGE1_CORE_BASE_LEN, ctm_count)?;
+    let deploy_and_wire_call_count =
+        expected_stage1_call_count(STAGE1_CORE_WITH_INTEROP_WIRING_LEN, ctm_count)?;
+
+    match stage1_call_count {
+        count if count == reuse_call_count => Ok(L1InteropHandlerPreparationMode::Reuse),
+        count if count == deploy_and_wire_call_count => {
+            Ok(L1InteropHandlerPreparationMode::DeployAndWire)
+        }
+        count => anyhow::bail!(
+            "Stage 1 must contain either {reuse_call_count} calls for a reused L1InteropHandler or \
+             {deploy_and_wire_call_count} calls for a newly prepared L1InteropHandler; got {count}"
+        ),
+    }
+}
+
 impl GovernanceStage1Calls {
     /// Stage 1 — migration pause, core proxy upgrades and address refresh,
     /// optional L1InteropHandler wiring, then each CTM's upgrade calls.
@@ -113,34 +133,13 @@ impl GovernanceStage1Calls {
         &self,
         artifact: &EcosystemUpgradeArtifact,
         verifiers: &Verifiers,
+        l1_interop_handler_mode: L1InteropHandlerPreparationMode,
         result: &mut VerificationResult,
     ) -> anyhow::Result<()> {
-        let interop_handler = required_core_address(
-            artifact,
-            &[
-                "upgrade_addresses",
-                "bridges",
-                "l1_interop_handler_proxy_addr",
-            ],
-            result,
-        )
-        .context("missing L1InteropHandler proxy")?;
-        let core_call_count = if verifiers
-            .network_verifier
-            .was_deployed_this_run(&interop_handler)
-        {
-            STAGE1_CORE_WITH_INTEROP_WIRING_LEN
-        } else {
-            STAGE1_CORE_BASE_LEN
+        let core_call_count = match l1_interop_handler_mode {
+            L1InteropHandlerPreparationMode::DeployAndWire => STAGE1_CORE_WITH_INTEROP_WIRING_LEN,
+            L1InteropHandlerPreparationMode::Reuse => STAGE1_CORE_BASE_LEN,
         };
-        let expected_call_count = expected_stage1_call_count(core_call_count, artifact.ctms.len())?;
-        if self.calls.elems.len() != expected_call_count {
-            result.report_error(&format!(
-                "Stage 1 requires {core_call_count} core calls and {STAGE1_PER_CTM_LEN} calls per CTM: expected {expected_call_count}, got {}",
-                self.calls.elems.len()
-            ));
-            anyhow::bail!("invalid stage-1 call count");
-        }
 
         self.verify_call_shape(&artifact.ctms, core_call_count, verifiers, result)
             .await?;
@@ -1237,6 +1236,37 @@ mod tests {
         let addition_overflow = usize::MAX - (STAGE1_PER_CTM_LEN - 1);
         assert!(expected_stage1_call_count(addition_overflow, 1).is_err());
         assert!(ctm_block_start(1, addition_overflow).is_err());
+    }
+
+    #[test]
+    fn exact_stage1_layout_determines_interop_handler_preparation_mode() {
+        let ctm_count = 2;
+        let reuse_call_count = expected_stage1_call_count(STAGE1_CORE_BASE_LEN, ctm_count).unwrap();
+        let deploy_and_wire_call_count =
+            expected_stage1_call_count(STAGE1_CORE_WITH_INTEROP_WIRING_LEN, ctm_count).unwrap();
+
+        assert_eq!(
+            infer_l1_interop_handler_preparation_mode(reuse_call_count, ctm_count).unwrap(),
+            L1InteropHandlerPreparationMode::Reuse
+        );
+        assert_eq!(
+            infer_l1_interop_handler_preparation_mode(deploy_and_wire_call_count, ctm_count)
+                .unwrap(),
+            L1InteropHandlerPreparationMode::DeployAndWire
+        );
+        assert!(
+            infer_l1_interop_handler_preparation_mode(reuse_call_count + 1, ctm_count).is_err()
+        );
+    }
+
+    #[test]
+    fn reuse_mode_does_not_require_proxy_deployment_provenance() {
+        let ctm_count = 1;
+        let reuse_call_count = expected_stage1_call_count(STAGE1_CORE_BASE_LEN, ctm_count).unwrap();
+        let mode = infer_l1_interop_handler_preparation_mode(reuse_call_count, ctm_count).unwrap();
+
+        assert_eq!(mode, L1InteropHandlerPreparationMode::Reuse);
+        assert!(!mode.requires_proxy_deployment_provenance());
     }
 
     #[test]

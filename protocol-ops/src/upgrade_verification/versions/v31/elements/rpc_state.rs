@@ -16,6 +16,8 @@ use alloy::{
     providers::Provider,
 };
 
+use super::L1InteropHandlerPreparationMode;
+
 const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
 
 const MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 10_800;
@@ -70,26 +72,29 @@ fn validate_interop_handler_ownership_state(
     pending_owner: Address,
     deployer: Address,
     governance: Address,
-    accept_ownership_required: bool,
+    preparation_mode: L1InteropHandlerPreparationMode,
 ) -> Result<()> {
-    if accept_ownership_required {
-        anyhow::ensure!(
-            owner == deployer,
-            "owner must be deployer {deployer}, got {owner}"
-        );
-        anyhow::ensure!(
-            pending_owner == governance,
-            "pending owner must be governance {governance}, got {pending_owner}"
-        );
-    } else {
-        anyhow::ensure!(
-            owner == governance,
-            "owner must be governance {governance}, got {owner}"
-        );
-        anyhow::ensure!(
-            pending_owner == Address::ZERO,
-            "owner is governance, but stale pending owner is {pending_owner}"
-        );
+    match preparation_mode {
+        L1InteropHandlerPreparationMode::DeployAndWire => {
+            anyhow::ensure!(
+                owner == deployer,
+                "owner must be deployer {deployer}, got {owner}"
+            );
+            anyhow::ensure!(
+                pending_owner == governance,
+                "pending owner must be governance {governance}, got {pending_owner}"
+            );
+        }
+        L1InteropHandlerPreparationMode::Reuse => {
+            anyhow::ensure!(
+                owner == governance,
+                "owner must be governance {governance}, got {owner}"
+            );
+            anyhow::ensure!(
+                pending_owner == Address::ZERO,
+                "owner is governance, but stale pending owner is {pending_owner}"
+            );
+        }
     }
     Ok(())
 }
@@ -139,6 +144,7 @@ pub(crate) async fn verify_v31_artifact_state(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     create2_factory: Address,
+    l1_interop_handler_mode: L1InteropHandlerPreparationMode,
     result: &mut VerificationResult,
 ) -> Result<()> {
     result.print_info("== RPC state checks ==");
@@ -148,7 +154,7 @@ pub(crate) async fn verify_v31_artifact_state(
         .expect_deployed_bytecode(verifiers, &create2_factory, CREATE2_FACTORY_CONTRACT_NAME)
         .await;
     verify_v31_proxy_admins(artifact, verifiers, result).await?;
-    verify_v31_core_wiring(artifact, verifiers, result).await?;
+    verify_v31_core_wiring(artifact, verifiers, l1_interop_handler_mode, result).await?;
     verify_v31_validator_timelocks(artifact, verifiers, result).await?;
     verify_v31_timer_admin_state(artifact, verifiers, result).await?;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
@@ -234,34 +240,29 @@ async fn verify_v31_proxy_admins(
             "l1_interop_handler_proxy_addr",
         ],
     )?;
-    if !verifiers
+    let expected_implementation = required_address(
+        &artifact.core,
+        "core",
+        &[
+            "upgrade_addresses",
+            "bridges",
+            "l1_interop_handler_implementation_addr",
+        ],
+    )?;
+    match verifiers
         .network_verifier
-        .was_deployed_this_run(&interop_handler_proxy)
+        .try_get_proxy_implementation(interop_handler_proxy)
+        .await
     {
-        let expected_implementation = required_address(
-            &artifact.core,
-            "core",
-            &[
-                "upgrade_addresses",
-                "bridges",
-                "l1_interop_handler_implementation_addr",
-            ],
-        )?;
-        match verifiers
-            .network_verifier
-            .try_get_proxy_implementation(interop_handler_proxy)
-            .await
-        {
-            Ok(actual) => expect_address_eq(
-                result,
-                "Reused L1InteropHandler implementation",
-                actual,
-                expected_implementation,
-            ),
-            Err(err) => result.report_error(&format!(
-                "Failed to read reused L1InteropHandler implementation: {err}"
-            )),
-        }
+        Ok(actual) => expect_address_eq(
+            result,
+            "L1InteropHandler implementation",
+            actual,
+            expected_implementation,
+        ),
+        Err(err) => result.report_error(&format!(
+            "Failed to read L1InteropHandler implementation: {err}"
+        )),
     }
 
     for ctm in &artifact.ctms {
@@ -314,6 +315,7 @@ async fn verify_v31_proxy_admins(
 async fn verify_v31_core_wiring(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
+    l1_interop_handler_mode: L1InteropHandlerPreparationMode,
     result: &mut VerificationResult,
 ) -> Result<()> {
     let provider = verifiers.network_verifier.get_l1_provider();
@@ -485,9 +487,6 @@ async fn verify_v31_core_wiring(
         )),
     }
 
-    let interop_handler_deployed_this_run = verifiers
-        .network_verifier
-        .was_deployed_this_run(&expected_interop_handler);
     let interop_handler_ownership = Ownable2Step::new(expected_interop_handler, provider.clone());
     let interop_handler_owner = interop_handler_ownership.owner().call().await;
     let interop_handler_pending_owner = interop_handler_ownership.pendingOwner().call().await;
@@ -498,7 +497,7 @@ async fn verify_v31_core_wiring(
                 pending_owner,
                 expected_deployer,
                 bridgehub_owner,
-                interop_handler_deployed_this_run,
+                l1_interop_handler_mode,
             ) {
                 Ok(()) => result.report_ok("L1InteropHandler ownership state matches Stage 1"),
                 Err(err) => result.report_error(&format!(
@@ -514,7 +513,7 @@ async fn verify_v31_core_wiring(
         )),
     }
 
-    if !interop_handler_deployed_this_run {
+    if l1_interop_handler_mode == L1InteropHandlerPreparationMode::Reuse {
         let nullifier = L1Nullifier::new(expected_nullifier, provider.clone());
         let nullifier_handler = nullifier.l1InteropHandler().call().await;
         let asset_router_handler = asset_router.l1InteropHandler().call().await;
@@ -801,7 +800,10 @@ async fn verify_v31_ctm_flavor(
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_interop_handler_ownership_state, validate_reused_interop_handler_wiring};
+    use super::{
+        validate_interop_handler_ownership_state, validate_reused_interop_handler_wiring,
+        L1InteropHandlerPreparationMode,
+    };
     use alloy::primitives::Address;
 
     fn address(byte: u8) -> Address {
@@ -812,15 +814,21 @@ mod tests {
     fn fresh_interop_handler_requires_deployer_owner_and_governance_pending_owner() {
         let deployer = address(2);
         let governance = address(1);
-        validate_interop_handler_ownership_state(deployer, governance, deployer, governance, true)
-            .unwrap();
+        validate_interop_handler_ownership_state(
+            deployer,
+            governance,
+            deployer,
+            governance,
+            L1InteropHandlerPreparationMode::DeployAndWire,
+        )
+        .unwrap();
 
         let err = validate_interop_handler_ownership_state(
             address(3),
             governance,
             deployer,
             governance,
-            true,
+            L1InteropHandlerPreparationMode::DeployAndWire,
         )
         .unwrap_err();
         assert!(format!("{err:#}").contains("owner must be deployer"));
@@ -830,7 +838,7 @@ mod tests {
             Address::ZERO,
             deployer,
             governance,
-            true,
+            L1InteropHandlerPreparationMode::DeployAndWire,
         )
         .unwrap_err();
         assert!(format!("{err:#}").contains("pending owner must be governance"));
@@ -845,7 +853,7 @@ mod tests {
             Address::ZERO,
             deployer,
             governance,
-            false,
+            L1InteropHandlerPreparationMode::Reuse,
         )
         .unwrap();
 
@@ -854,7 +862,7 @@ mod tests {
             Address::ZERO,
             deployer,
             governance,
-            false,
+            L1InteropHandlerPreparationMode::Reuse,
         )
         .unwrap_err();
         assert!(format!("{err:#}").contains("owner must be governance"));
@@ -864,7 +872,7 @@ mod tests {
             address(3),
             deployer,
             governance,
-            false,
+            L1InteropHandlerPreparationMode::Reuse,
         )
         .unwrap_err();
         assert!(format!("{err:#}").contains("stale pending owner"));

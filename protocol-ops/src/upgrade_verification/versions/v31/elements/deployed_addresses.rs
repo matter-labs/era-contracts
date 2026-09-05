@@ -23,6 +23,8 @@ use alloy::{
 };
 use serde::Deserialize;
 
+use super::L1InteropHandlerPreparationMode;
+
 const GOVERNANCE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS: u64 = 14 * 24 * 60 * 60;
 const EXPECTED_GUARDIANS_MEMBER_COUNT: usize = 8;
 /// `SecurityCouncil.sol` requires exactly this many members. The live council
@@ -430,6 +432,7 @@ pub(crate) async fn verify_v31_provenance(
     verifiers: &Verifiers,
     era_chain_id: u64,
     legacy_gateway_chain_id: u64,
+    l1_interop_handler_mode: L1InteropHandlerPreparationMode,
     result: &mut VerificationResult,
 ) -> Result<()> {
     result.print_info("== Deployment provenance ==");
@@ -484,6 +487,7 @@ pub(crate) async fn verify_v31_provenance(
         artifact,
         verifiers,
         legacy_gateway_chain_id,
+        l1_interop_handler_mode,
         result,
         core_context,
     )
@@ -778,6 +782,7 @@ async fn verify_core_provenance(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     legacy_gateway_chain_id: u64,
+    l1_interop_handler_mode: L1InteropHandlerPreparationMode,
     result: &mut VerificationResult,
     context: CoreProvenanceContext,
 ) -> Result<()> {
@@ -920,10 +925,7 @@ async fn verify_core_provenance(
         result.expect_create2_params(verifiers, addr, args.as_slice(), file);
     }
 
-    if verifiers
-        .network_verifier
-        .was_deployed_this_run(&interop_handler_proxy)
-    {
+    if l1_interop_handler_mode.requires_proxy_deployment_provenance() {
         result.expect_create2_params_transparent_proxy(
             verifiers,
             &interop_handler_proxy,

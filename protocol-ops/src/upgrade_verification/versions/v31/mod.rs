@@ -21,7 +21,10 @@ pub(crate) mod utils;
 use elements::{
     ctm_admin_calls::verify_ctm_admin_calls,
     deployed_addresses::verify_v31_provenance,
-    governance_stage_calls::{verify_governance_stage_calls, verify_per_chain_protocol_versions},
+    governance_stage_calls::{
+        infer_l1_interop_handler_preparation_mode, verify_governance_stage_calls,
+        verify_per_chain_protocol_versions,
+    },
     protocol_version::ProtocolVersion,
     rpc_state::verify_v31_artifact_state,
 };
@@ -122,6 +125,14 @@ pub(crate) async fn verify(
         verifiers.network_verifier.get_gateway_chain_id()
     ));
 
+    let l1_interop_handler_mode = match infer_l1_interop_handler_preparation_mode(artifact) {
+        Ok(mode) => mode,
+        Err(err) => {
+            result.report_error(&err.to_string());
+            return Err(err);
+        }
+    };
+
     // Populate the create2 maps so deployment provenance can match
     // deployed addresses against expected init bytecode + constructor args.
     // Each tx is fetched from L1 RPC; stale entries (whose bytecode no longer
@@ -152,13 +163,21 @@ pub(crate) async fn verify(
         count,
     ));
 
-    verify_v31_artifact_state(artifact, &verifiers, create2_factory, result).await?;
+    verify_v31_artifact_state(
+        artifact,
+        &verifiers,
+        create2_factory,
+        l1_interop_handler_mode,
+        result,
+    )
+    .await?;
 
     verify_v31_provenance(
         artifact,
         &verifiers,
         era_chain_id,
         legacy_gateway_chain_id,
+        l1_interop_handler_mode,
         result,
     )
     .await?;
@@ -167,7 +186,7 @@ pub(crate) async fn verify(
 
     verify_per_chain_protocol_versions(artifact, &verifiers, result).await?;
 
-    verify_governance_stage_calls(artifact, &verifiers, result).await?;
+    verify_governance_stage_calls(artifact, &verifiers, l1_interop_handler_mode, result).await?;
 
     Ok(())
 }

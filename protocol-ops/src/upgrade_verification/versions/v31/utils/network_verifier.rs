@@ -382,10 +382,6 @@ impl NetworkVerifier {
         self.gw_provider.clone()
     }
 
-    pub(crate) fn was_deployed_this_run(&self, address: &Address) -> bool {
-        self.create2_known_bytecodes.contains_key(address)
-    }
-
     pub async fn try_get_l1_chain_id(&self) -> anyhow::Result<u64> {
         self.l1_provider
             .get_chain_id()

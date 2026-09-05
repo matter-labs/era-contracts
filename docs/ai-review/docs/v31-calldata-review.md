@@ -268,6 +268,11 @@ package when possible. This verifies provided calldata and replay logs. If the
 package does not include an executed-bundles log, generate one by replaying the
 prepare bundle on a fork, the same way the PUVT stage script does.
 
+The tool's CTM-admin and Stage 1 readiness checks are pre-execution checks. Run
+it against the state after preparation but before those governance calls. For a
+post-execution sign-off, use the original calldata, successful receipts, and
+the post-state checks in Step 13; the tool has no post-execution mode.
+
 The replay path is supporting evidence, not a replacement for reviewing the
 provided bytes:
 
@@ -404,13 +409,17 @@ The array must contain exactly these ordered, zero-value calls:
 | `1`        | ServerNotifier owner differs from proxy-admin owner | ServerNotifier proxy       | canonical `acceptOwnership()`                                              |
 | `1` or `2` | always                                              | ServerNotifier proxy       | `setUpgradePreconditionChecker(0.31.0, upgrade_precondition_checker_addr)` |
 
-Before execution, an already-correct ServerNotifier owner requires a two-call
-array. Otherwise, the pending owner must equal the proxy-admin owner and the
-array has three calls, with `acceptOwnership()` in the middle. When reviewing an
-artifact after that three-call sequence has executed, the live owner is already
-correct and the original three-call array remains valid. Any other owner state,
+At the pre-execution state point, an already-correct ServerNotifier owner
+requires a two-call array. Otherwise, the pending owner must equal the
+proxy-admin owner and the array has three calls, with `acceptOwnership()` in
+the middle. The call count must match that pre-state. Any other owner state,
 count, target, order, value, selector, trailing calldata, implementation,
 version, or checker is a blocker.
+
+For a post-execution sign-off, verify the original call array against its
+successful receipt, then perform the implementation, owner, and checker
+post-state checks below. Do not use the post-state as input to the tool's
+pre-execution readiness check.
 
 After this sequence executes, verify that the ServerNotifier owner equals the
 proxy-admin owner and
@@ -477,8 +486,11 @@ Prefix:
 
 Calls 10–12 are present when the prepare phase creates the L1InteropHandler,
 which is the expected v0.31→v0.32 path. They may be absent only for a reviewed
-idempotent rerun whose pre-state already contains that proxy; in that case
-`core_prefix_len = 10`. Otherwise `core_prefix_len = 13`.
+idempotent rerun whose pre-state already has the expected implementation,
+governance owner, zero pending owner, and both consumers wired to that proxy; in
+that case `core_prefix_len = 10`. Otherwise `core_prefix_len = 13`. Infer this
+choice from the Stage 1 artifact and live state, never from the append-only
+prepare transaction history, which proves deployment provenance only.
 
 For each CTM `i`,
 `block_start = core_prefix_len + 10 * i`:
@@ -836,8 +848,8 @@ integration chain, also verify execution evidence at a post-state point:
 - every Safe or EOA transaction hash has a successful L1 receipt;
 - Safe nonce progression matches the signed order, when a real Safe execution
   was used;
-- the ServerNotifier owner and checker mapping match the CTM-admin checks in
-  Step 5;
+- the ServerNotifier implementation, owner, and checker mapping match the
+  CTM-admin checks in Step 5;
 - Stage 0 leaves `ChainAssetHandler.migrationPaused() == true` and each CTM
   timer with nonzero `deadline()` and `maxDeadline()`;
 - Stage 1 leaves proxy implementations/admins and CTM upgrade params at the

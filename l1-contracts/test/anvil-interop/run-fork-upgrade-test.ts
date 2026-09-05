@@ -378,6 +378,7 @@ async function main(): Promise<void> {
           upgradeChainAddresses,
           protocolOpsOutDir: chainsOutDir,
           expectedCheckerAddress,
+          frozenV31Fixture: false,
         });
       }
     }

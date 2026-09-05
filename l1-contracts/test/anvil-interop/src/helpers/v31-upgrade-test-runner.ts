@@ -209,6 +209,7 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       upgradeChainAddresses,
       protocolOpsOutDir: path.join(upgradeHarnessInputs.protocolOpsOutDir, "chains"),
       expectedCheckerAddress: upgradePreconditionCheckerAddr,
+      frozenV31Fixture: true,
     });
     console.log("\n── Chain upgrades complete, verifying final protocol versions ──");
     await verifyProtocolVersions(l1Provider, upgradeChainAddresses, scenario.expectedProtocolVersion);
@@ -708,6 +709,7 @@ async function assertSchedulingBlockedOnMissingPrerequisite(params: {
   chainId: number;
   scheduleTimestamp: number;
   expectedCheckerAddress: string;
+  expectedFailure?: string;
 }): Promise<{ serverNotifier: ethers.Contract; chainAdmin: string; oldProtocolVersion: ethers.BigNumber }> {
   const { l1Provider, ctmAddr, chainId, scheduleTimestamp } = params;
 
@@ -728,13 +730,20 @@ async function assertSchedulingBlockedOnMissingPrerequisite(params: {
   const chainAdmin: string = await ctm.getChainAdmin(chainId);
   const failed: string[] = await serverNotifier.previewUpgradePreconditions(chainId);
 
-  if (failed.length === 0) {
-    throw new Error(`chain ${chainId}: expected an unsatisfied upgrade prerequisite before the backfill shim`);
+  if (params.expectedFailure) {
+    if (failed.length !== 1 || failed[0].toLowerCase() !== params.expectedFailure.toLowerCase()) {
+      throw new Error(
+        `chain ${chainId}: expected only ${describePreconditionSelector(params.expectedFailure)}, got ` +
+          `[${failed.map(describePreconditionSelector).join(", ")}]`
+      );
+    }
+  } else if (failed.length === 0) {
+    throw new Error(`chain ${chainId}: expected an unsatisfied upgrade prerequisite`);
   }
 
   await expectRevert(
     () => serverNotifier.callStatic.setUpgradeTimestamp(chainId, scheduleTimestamp, { from: chainAdmin }),
-    `chain ${chainId}: scheduling before the backfill prerequisite`,
+    `chain ${chainId}: scheduling before satisfying upgrade prerequisites`,
     failed[0],
     l1Provider
   );
@@ -763,6 +772,90 @@ async function assertSchedulingBlockedOnMissingPrerequisite(params: {
   }
 
   return { serverNotifier, chainAdmin, oldProtocolVersion };
+}
+
+async function assertFrozenV31BatchesReady(params: {
+  l1Provider: ethers.providers.JsonRpcProvider;
+  chainId: number;
+  diamondProxy: string;
+}): Promise<void> {
+  const getters = new ethers.Contract(params.diamondProxy, getAbi("GettersFacet"), params.l1Provider);
+  const [executed, committed]: ethers.BigNumber[] = await Promise.all([
+    getters.getTotalBatchesExecuted(),
+    getters.getTotalBatchesCommitted(),
+  ]);
+  if (!executed.eq(committed)) {
+    throw new Error(
+      `chain ${params.chainId}: frozen v31 fixture has ${executed.toString()} executed batches and ` +
+        `${committed.toString()} committed batches`
+    );
+  }
+}
+
+async function recordFrozenV31LowerBound(params: {
+  l1Provider: ethers.providers.JsonRpcProvider;
+  chainId: number;
+  diamondProxy: string;
+  settlementLayerUpgradeAddr: string;
+}): Promise<void> {
+  const getters = new ethers.Contract(params.diamondProxy, getAbi("GettersFacet"), params.l1Provider);
+  if (!(await getters.baseTokenSupportsTotalSupply())) {
+    throw new Error(`chain ${params.chainId}: frozen v31 fixture does not have the base-token backfill flag`);
+  }
+
+  const [totalPriorityTxs, firstUnprocessed]: ethers.BigNumber[] = await Promise.all([
+    getters.getTotalPriorityTxs(),
+    getters.getFirstUnprocessedPriorityTx(),
+  ]);
+  if (!firstUnprocessed.eq(totalPriorityTxs)) {
+    throw new Error(
+      `chain ${params.chainId}: frozen v31 fixture has first-unprocessed index ${firstUnprocessed.toString()} ` +
+        `and total priority-operation count ${totalPriorityTxs.toString()}`
+    );
+  }
+
+  const settlementLayerUpgrade = new ethers.Contract(
+    params.settlementLayerUpgradeAddr,
+    getAbi("V32UpgradeZKsyncOS"),
+    params.l1Provider
+  );
+  const registryAddress: string = await settlementLayerUpgrade.PRIORITY_OP_LOWER_BOUND();
+  const registry = new ethers.Contract(registryAddress, getAbi("PriorityOpLowerBound"), params.l1Provider);
+  if (await registry.recorded(params.diamondProxy)) {
+    throw new Error(`chain ${params.chainId}: frozen v31 fixture already has a recorded priority-op lower bound`);
+  }
+
+  const caller = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, params.l1Provider);
+  const receipt = await (
+    await registry.connect(caller).lowerBoundPriorityOp(params.diamondProxy, { gasLimit: 500_000 })
+  ).wait();
+
+  const eventTopic = registry.interface.getEventTopic("LowerBoundRecorded").toLowerCase();
+  const logs = receipt.logs.filter(
+    (log: ethers.providers.Log) =>
+      log.address.toLowerCase() === registryAddress.toLowerCase() && log.topics[0]?.toLowerCase() === eventTopic
+  );
+  if (logs.length !== 1) {
+    throw new Error(`chain ${params.chainId}: expected one LowerBoundRecorded event, found ${logs.length}`);
+  }
+  const event = registry.interface.parseLog(logs[0]);
+  if (
+    ethers.utils.getAddress(event.args.chain) !== ethers.utils.getAddress(params.diamondProxy) ||
+    !event.args.lowerBound.eq(totalPriorityTxs)
+  ) {
+    throw new Error(`chain ${params.chainId}: LowerBoundRecorded event arguments do not match the fixture state`);
+  }
+
+  const [recorded, storedBound]: [boolean, ethers.BigNumber] = await Promise.all([
+    registry.recorded(params.diamondProxy),
+    registry.lowerBound(params.diamondProxy),
+  ]);
+  if (!recorded || !storedBound.eq(totalPriorityTxs)) {
+    throw new Error(
+      `chain ${params.chainId}: lower-bound registry stored recorded=${recorded}, bound=${storedBound.toString()}; ` +
+        `expected recorded=true, bound=${totalPriorityTxs.toString()}`
+    );
+  }
 }
 
 async function assertSchedulingSafeBundle(params: {
@@ -839,24 +932,34 @@ async function exerciseUpgradeScheduling(params: {
   diamondProxy: string;
   settlementLayerUpgradeAddr: string;
   expectedCheckerAddress: string;
+  frozenV31Fixture: boolean;
 }): Promise<void> {
   const scheduleTimestamp = (await params.l1Provider.getBlock("latest")).timestamp + UPGRADE_SCHEDULE_DELAY_SECONDS;
   fs.rmSync(params.outDir, { recursive: true, force: true });
+  const lowerBoundNotRecorded = new ethers.utils.Interface(getAbi("V32UpgradePreconditionChecker")).getSighash(
+    "LowerBoundNotRecorded"
+  );
   const { serverNotifier, chainAdmin, oldProtocolVersion } = await assertSchedulingBlockedOnMissingPrerequisite({
     ...params,
     scheduleTimestamp,
+    expectedFailure: params.frozenV31Fixture ? lowerBoundNotRecorded : undefined,
   });
 
-  await modelV31BackfillPrerequisite({
-    l1Provider: params.l1Provider,
-    diamondProxyAddr: params.diamondProxy,
-    settlementLayerUpgradeAddr: params.settlementLayerUpgradeAddr,
-  });
+  if (params.frozenV31Fixture) {
+    await recordFrozenV31LowerBound(params);
+  } else {
+    await modelV31BackfillPrerequisite({
+      l1Provider: params.l1Provider,
+      diamondProxyAddr: params.diamondProxy,
+      settlementLayerUpgradeAddr: params.settlementLayerUpgradeAddr,
+    });
+  }
 
   const stillFailing: string[] = await serverNotifier.previewUpgradePreconditions(params.chainId);
   if (stillFailing.length !== 0) {
     throw new Error(
-      `chain ${params.chainId}: preview still reports failed preconditions after the shim: ${stillFailing.join(", ")}`
+      `chain ${params.chainId}: preview still reports failed preconditions after recording the lower bound: ` +
+        stillFailing.map(describePreconditionSelector).join(", ")
     );
   }
   fs.rmSync(params.outDir, { recursive: true, force: true });
@@ -924,6 +1027,7 @@ export async function runChainUpgradesAndRelayL2(params: {
   upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>;
   protocolOpsOutDir: string;
   expectedCheckerAddress: string;
+  frozenV31Fixture: boolean;
 }): Promise<void> {
   const {
     l1Provider,
@@ -948,11 +1052,17 @@ export async function runChainUpgradesAndRelayL2(params: {
     const scheduleOutDir = path.join(protocolOpsOutDir, `chain-${chain.chainId}-schedule`);
     fs.rmSync(chainOutDir, { recursive: true, force: true });
 
-    // The v31 per-chain upgrade required `totalBatchesCommitted ==
-    // totalBatchesExecuted`. On a forked chain that has uncommitted-but-pending
-    // batches at fork time, copy committed onto executed to model the
-    // "all batches executed" prerequisite without running the executor.
-    await forceBatchExecutedEqualsCommitted(l1Provider, chain.diamondProxy);
+    if (params.frozenV31Fixture) {
+      await assertFrozenV31BatchesReady({
+        l1Provider,
+        chainId: chain.chainId,
+        diamondProxy: chain.diamondProxy,
+      });
+    } else {
+      // Fork runs may stop at a block with committed-but-pending batches and need to model the
+      // production batch-drain prerequisite without replaying the executor history.
+      await forceBatchExecutedEqualsCommitted(l1Provider, chain.diamondProxy);
+    }
 
     await exerciseUpgradeScheduling({
       l1Provider,
@@ -964,6 +1074,7 @@ export async function runChainUpgradesAndRelayL2(params: {
       diamondProxy: chain.diamondProxy,
       settlementLayerUpgradeAddr,
       expectedCheckerAddress,
+      frozenV31Fixture: params.frozenV31Fixture,
     });
 
     runProtocolOps([
@@ -1094,6 +1205,7 @@ export async function runChainUpgradesPerCtm(params: {
             diamondProxy: chain.diamondProxy,
             settlementLayerUpgradeAddr: ctmUpgradeAddresses.settlementLayerUpgradeAddr,
             expectedCheckerAddress: ctmUpgradeAddresses.upgradePreconditionCheckerAddr,
+            frozenV31Fixture: false,
           });
         } else {
           console.log(`  chain ${chain.chainId}: scheduling check does not apply to the Era CTM`);
@@ -1129,6 +1241,7 @@ export async function runChainUpgradesPerCtm(params: {
       upgradeChainAddresses: chains,
       protocolOpsOutDir,
       expectedCheckerAddress: ctmUpgradeAddresses.upgradePreconditionCheckerAddr,
+      frozenV31Fixture: false,
     });
   }
 }

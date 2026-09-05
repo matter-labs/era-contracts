@@ -115,9 +115,15 @@ Commit the regenerated `chain-states/` files alongside the contract change. CI c
 ### 1c. Upgrade tests (v31→v32)
 
 This exercises the split v31→v32 flow against frozen v31 chain states, including ecosystem
-prepare/governance, Stage3, timestamp scheduling, and per-chain upgrades. The harness uses
-`harness-shims.ts` to model historical backfill state and asserts that scheduling fails before the
-model is applied and succeeds afterward. See {protocol-docs/upgrade-scheduling.md}.
+prepare/governance, Stage3, timestamp scheduling, and per-chain upgrades. The selected fixtures
+already have the base-token backfill flag and a caught-up priority queue. The test proves that
+scheduling initially fails with `LowerBoundNotRecorded`, records the bound through the real
+`PriorityOpLowerBound` entry point, and then proves that preview and scheduling succeed. It does not
+execute the historical L2 backfill service transaction or simulate priority-queue processing. See
+{protocol-docs/upgrade-scheduling.md}.
+
+The targets are chain 10 and the Gateway itself (chain 11), both L1-settled. Gateway-settled chains
+are intentionally excluded because this release does not support their upgrade route.
 
 ```bash
 cd l1-contracts/test/anvil-interop
