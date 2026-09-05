@@ -1,4 +1,4 @@
-use std::{fs, path::Path, str::FromStr};
+use std::str::FromStr;
 
 use alloy::primitives::Address;
 use anyhow::Context;
@@ -28,14 +28,6 @@ pub(crate) struct EcosystemUpgradeArtifact {
     /// Raw top-level `[misc]` table for shared metadata that does not belong to
     /// core or a particular CTM.
     pub(crate) misc: toml::Value,
-}
-
-pub(crate) fn l1_interop_center_new_proxy(core: &toml::Value) -> anyhow::Result<bool> {
-    core.get("upgrade_addresses")
-        .and_then(|value| value.get("bridgehub"))
-        .and_then(|value| value.get("l1_interop_center_new_proxy"))
-        .and_then(toml::Value::as_bool)
-        .context("current core artifact requires boolean bridgehub.l1_interop_center_new_proxy")
 }
 
 #[derive(Debug)]
@@ -126,14 +118,6 @@ pub(crate) fn required_address_in_value(
 }
 
 impl EcosystemUpgradeArtifact {
-    pub(crate) fn read(path: &Path) -> anyhow::Result<Self> {
-        let content = fs::read_to_string(path).with_context(|| {
-            format!("Failed to read ecosystem upgrade TOML: {}", path.display())
-        })?;
-        Self::from_toml_str(&content)
-            .with_context(|| format!("parsing ecosystem upgrade TOML: {}", path.display()))
-    }
-
     pub(crate) fn from_toml_str(content: &str) -> anyhow::Result<Self> {
         let mut root: Table =
             toml::from_str(content).context("Failed to parse ecosystem upgrade TOML as table")?;

@@ -41,6 +41,16 @@ export function encodeAssetRouterDepositData(assetId: string, transferData: stri
   return ethers.utils.hexConcat([NEW_ENCODING_VERSION, abiCoder.encode(["bytes32", "bytes"], [assetId, transferData])]);
 }
 
+/** Matches `DataEncoding.encodeTxDataHash(originalCaller, assetId, transferData)`. */
+export function encodeTxDataHash(_originalCaller: string, _assetId: string, _transferData: string): string {
+  return ethers.utils.keccak256(
+    ethers.utils.hexConcat([
+      NEW_ENCODING_VERSION,
+      abiCoder.encode(["address", "bytes32", "bytes"], [_originalCaller, _assetId, _transferData]),
+    ])
+  );
+}
+
 /**
  * Matches `DataEncoding.encodeTokenData(chainId, name, symbol, decimals)`.
  *

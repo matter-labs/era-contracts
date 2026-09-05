@@ -70,7 +70,7 @@ sol! {
     function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress);
 
     // Outer `requestL2TransactionDirect((...))` priority-tx struct. Layout
-    // matches the historical `L2TransactionRequestDirect` in `IBridgehubBase.sol`.
+    // matches `L2TransactionRequestDirect` in `IBridgehubBase.sol`.
     struct L2TransactionRequestDirect {
         uint256 chainId;
         uint256 mintValue;
@@ -85,7 +85,7 @@ sol! {
     function requestL2TransactionDirect(L2TransactionRequestDirect _request);
 
     // Outer `requestL2TransactionTwoBridges((...))` priority-tx struct.
-    // Layout matches the historical `L2TransactionRequestTwoBridgesOuter` in
+    // Layout matches `L2TransactionRequestTwoBridgesOuter` in
     // `IBridgehubBase.sol`.
     struct L2TransactionRequestTwoBridgesOuter {
         uint256 chainId;

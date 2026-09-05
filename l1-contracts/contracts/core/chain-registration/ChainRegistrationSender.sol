@@ -86,7 +86,7 @@ contract ChainRegistrationSender is
     /// L1 Interop Center), but the caller provides the base tokens.
     // slither-disable-next-line locked-ether
     function initiateIndirectCall(
-        uint256 chainRegisteredOn,
+        uint256 _chainRegisteredOn,
         address,
         uint256,
         bytes calldata _data
@@ -104,7 +104,7 @@ contract ChainRegistrationSender is
         if (chainToBeRegisteredAddress == address(0)) {
             revert ZKChainNotRegistered();
         }
-        _checkSettlementLayers(chainToBeRegistered, chainRegisteredOn);
+        _checkSettlementLayers(chainToBeRegistered, _chainRegisteredOn);
 
         request = IndirectCallRequest({
             magicValue: INDIRECT_CALL_MAGIC_VALUE,

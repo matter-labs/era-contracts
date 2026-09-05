@@ -90,10 +90,6 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
 
 /// @notice Test-only Core upgrade that skips governance calls the local fixture cannot satisfy.
 contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
-    function _hasExistingL1InteropCenter() internal pure override returns (bool) {
-        return true;
-    }
-
     /// @notice Override to skip the ownership-acceptance and `setAddresses` calls, which need ownership
     ///         hand-offs the fixture does not perform.
     /// @dev The interop-handler wiring is kept: it is what makes a v31 ecosystem match a from-scratch v32

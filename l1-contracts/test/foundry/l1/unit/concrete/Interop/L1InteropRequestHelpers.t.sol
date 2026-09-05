@@ -6,7 +6,6 @@ import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
-import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {L1InteropCenter} from "contracts/interop/interop-center/L1InteropCenter.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";

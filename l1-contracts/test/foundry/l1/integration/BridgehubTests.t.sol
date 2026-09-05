@@ -229,10 +229,6 @@ contract BridgehubInvariantTests is SharedBridgehubWithdrawal {
 
     /// @notice Deposits an ERC20 token to a ZK chain that uses ETH as its base token,
     /// using the indirect path.
-    /// @dev ETH is sent as `msg.value` to cover the base token gas cost (`mintValue`).
-    /// The ERC20 token is transferred via the cross-chain sender by approving the shared bridge
-    /// and encoding the token address and amount in `indirectCallData`.
-    /// Updates per-user, per-chain, and global deposit tracking for both ETH and the ERC20.
     function depositERC20ToEthChain(uint256 l2Value, address tokenAddress) private useGivenToken(tokenAddress) {
         uint256 gasPrice = 10000000;
         vm.txGasPrice(gasPrice);

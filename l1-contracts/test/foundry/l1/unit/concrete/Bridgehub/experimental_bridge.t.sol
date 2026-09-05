@@ -5,55 +5,16 @@ pragma solidity 0.8.28;
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {console2 as console} from "forge-std/Script.sol";
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-import {IInteropCenter, L2InteropCenter} from "contracts/interop/interop-center/L2InteropCenter.sol";
-import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {IndirectCallRequest} from "contracts/common/Messaging.sol";
-import {
-    L1L2MessageParams,
-    L1L2IndirectMessageParams
-} from "../../../../../../deploy-scripts/utils/L1InteropRequests.sol";
-import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
-import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
-import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubSetter.sol";
-import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
-
-import {IL1CrossChainSender} from "contracts/bridge/interfaces/IL1CrossChainSender.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-
-import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
-import {
-    L2_COMPLEX_UPGRADER_ADDR,
-    L2_NATIVE_TOKEN_VAULT_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {Utils} from "../Utils/Utils.sol";
 
-import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
-import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
-import {
-    MIN_CROSS_CHAIN_SENDER_ADDRESS,
-    ETH_TOKEN_ADDRESS,
-    HARD_CODED_CHAIN_ID,
-    MAINNET_CHAIN_ID,
-    MAX_NEW_FACTORY_DEPS,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    SEPOLIA_CHAIN_ID,
-    INDIRECT_CALL_MAGIC_VALUE
-} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, HARD_CODED_CHAIN_ID, MAINNET_CHAIN_ID, SEPOLIA_CHAIN_ID} from "contracts/common/Config.sol";
 
-import {CrossChainSenderAddressTooLow} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {
     AssetIdAlreadyRegistered,
     AssetIdNotSupported,
@@ -62,19 +23,14 @@ import {
     CTMNotRegistered,
     ChainIdIsHardcoded,
     ChainIdTooBig,
-    MsgValueMismatch,
     SharedBridgeNotSet,
-    SlotOccupied,
     Unauthorized,
-    WrongMagicValue,
     ZeroChainId
 } from "contracts/common/L1ContractErrors.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {ExperimentalBridgeTestBase} from "./_ExperimentalBridge_Shared.t.sol";
 
 contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
-    using stdStorage for StdStorage;
     uint256 newChainId;
     address admin;
     function test_newPendingAdminReplacesPrevious(address randomDeployer, address otherRandomDeployer) public {
@@ -588,9 +544,7 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
 
         chainId = bound(chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
-        stdstore.target(address(bridgehub)).sig("chainTypeManager(uint256)").with_key(chainId).checked_write(
-            address(mockCTM)
-        );
+        chainId = _setUpZKChainForChainId(chainId, address(testToken));
 
         vm.expectRevert(BridgeHubAlreadyRegistered.selector);
         vm.prank(deployerAddress);
@@ -693,7 +647,9 @@ contract ExperimentalBridgeTest is ExperimentalBridgeTestBase {
         uint256 mockL2GasPerPubdataByteLimit,
         uint256 mockL2TxnCost
     ) public {
-        mockChainId = _setUpZKChainForChainId(mockChainId);
+        _useMockSharedBridge();
+        _initializeBridgehub();
+        mockChainId = _setUpZKChainForChainId(mockChainId, ETH_TOKEN_ADDRESS);
 
         vm.mockCall(
             address(mockChainContract),

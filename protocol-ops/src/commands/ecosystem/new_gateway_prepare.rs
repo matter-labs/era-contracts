@@ -83,6 +83,8 @@ pub async fn prepare_new_gateway(
     zk_token_asset_id: B256,
     gw_create2_salt: Option<B256>,
 ) -> anyhow::Result<PathBuf> {
+    let core_output: toml::Value = toml::from_str(&std::fs::read_to_string(core_toml)?)?;
+    ensure_gateway_can_be_prepared(&core_output)?;
     let refund_recipient = new_gw.refund_recipient.unwrap_or(deployer.address);
 
     // Resolve which CTM the new GW will host (the deployed GW CTM is a
@@ -232,6 +234,22 @@ pub async fn prepare_new_gateway(
         abs_path.display()
     );
     Ok(abs_path)
+}
+
+fn ensure_gateway_can_be_prepared(core_output: &toml::Value) -> anyhow::Result<()> {
+    let new_center = core_output
+        .get("upgrade_addresses")
+        .and_then(|value| value.get("bridgehub"))
+        .and_then(|value| value.get("l1_interop_center_new_proxy"));
+    if let Some(new_center) = new_center {
+        anyhow::ensure!(
+            !new_center.as_bool().context("l1_interop_center_new_proxy must be a boolean")?,
+            "Cannot combine new-Gateway preparation with the upgrade introducing L1InteropCenter. \
+             Remove [new_gateway] from this ecosystem preparation; complete the ecosystem upgrade \
+             and the gateway chain's Mailbox upgrade, then run `protocol-ops chain gateway convert` separately."
+        );
+    }
+    Ok(())
 }
 
 // ── helpers ────────────────────────────────────────────────────────────
@@ -501,3 +519,21 @@ fn read_ctm_force_deployments_data(path: &Path) -> anyhow::Result<Bytes> {
 // addresses + diamond cut data) under `[new_gateway]` for reviewability, so
 // splitting the read out into a separate helper here would be more code, not
 // less.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gateway_preparation_requires_the_center_migration_to_be_complete() {
+        for (value, allowed) in [("true", false), ("false", true), ("'false'", false)] {
+            let output = toml::from_str(&format!(
+                "[upgrade_addresses.bridgehub]\nl1_interop_center_new_proxy = {value}"
+            ))
+            .unwrap();
+            assert_eq!(ensure_gateway_can_be_prepared(&output).is_ok(), allowed);
+        }
+        let historical = toml::from_str("[upgrade_addresses.bridgehub]").unwrap();
+        assert!(ensure_gateway_can_be_prepared(&historical).is_ok());
+    }
+}

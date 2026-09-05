@@ -2,8 +2,8 @@ use anyhow::{Context, Result};
 
 use crate::upgrade_verification::{
     artifacts::{
-        l1_interop_center_new_proxy, required_address_in_value as required_address, CtmArtifact,
-        CtmFlavor, EcosystemUpgradeArtifact,
+        required_address_in_value as required_address, CtmArtifact, CtmFlavor,
+        EcosystemUpgradeArtifact,
     },
     constants::{L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR},
     verifiers::{VerificationResult, Verifiers},
@@ -915,60 +915,6 @@ async fn verify_core_provenance(
     ];
     for (addr, args, file) in &checks {
         result.expect_create2_params(verifiers, addr, args.as_slice(), file);
-    }
-
-    if core
-        .get("upgrade_addresses")
-        .and_then(|value| value.get("bridgehub"))
-        .and_then(|value| value.get("l1_interop_center_proxy_addr"))
-        .is_some()
-    {
-        let center_impl = in_bh("l1_interop_center_implementation_addr")?;
-        let center_proxy = in_bh("l1_interop_center_proxy_addr")?;
-        let ctor_args = (context.bridgehub_addr,).abi_encode();
-        result.expect_create2_params(
-            verifiers,
-            &center_impl,
-            &ctor_args,
-            "l1-contracts/L1InteropCenter",
-        );
-        let new_proxy = l1_interop_center_new_proxy(core)?;
-        if new_proxy {
-            result
-                .expect_create2_params_proxy_with_bytecode(
-                    verifiers,
-                    &center_proxy,
-                    crate::common::l1_interop::initializeCall::new((deployer,)).abi_encode(),
-                    core_proxy_admin,
-                    ctor_args,
-                    "l1-contracts/L1InteropCenter",
-                )
-                .await;
-        } else {
-            let registered_center = BridgehubContract::new(
-                context.bridgehub_addr,
-                &verifiers.network_verifier.l1_provider,
-            )
-            .interopCenter()
-            .call()
-            .await
-            .context("read existing L1 Interop Center from source Bridgehub")?;
-            result.expect_address(verifiers, &registered_center, "l1_interop_center_proxy");
-            // Existing proxies retain their original CREATE2 constructor and initializer.
-            // Stage 1 independently binds the upgraded implementation to this proxy.
-            result
-                .expect_deployed_bytecode(
-                    verifiers,
-                    &center_proxy,
-                    "l1-contracts/TransparentUpgradeableProxy",
-                )
-                .await;
-            let admin = verifiers
-                .network_verifier
-                .get_proxy_admin(center_proxy)
-                .await;
-            result.expect_address(verifiers, &admin, "transparent_proxy_admin");
-        }
     }
 
     // ChainRegistrationSender TransparentUpgradeableProxy(impl, proxyAdmin, initialize(deployer)).

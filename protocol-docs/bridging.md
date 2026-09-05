@@ -99,15 +99,12 @@ with any gas refund). Resolution is split between two helpers in `AddressAliasHe
   indistinguishable from an EOA and is likewise left unaliased (such callers must pass their aliased
   address themselves).
 
-The legacy `Mailbox.requestL2Transaction` path composes both helpers in one place, so the
-`aliasingFinalized` flag fully protects it from double aliasing. On the L1InteropCenter / L1AssetRouter paths
-the default is resolved early (the Mailbox never sees the original caller) and the flag is deliberately
-dropped — carrying it would require extending `BridgehubL2TransactionRequest` and the center <-> chain
-interface. The theoretical double-alias caveat — a contract deployed at exactly the alias of a
-constructor caller would be aliased a second time by the Mailbox — therefore applies to those paths
-only. Triggering it requires any contract to exist at exactly the alias of the constructor caller (a
-~2^160 grind unless one party deliberately deploys both); stealing the refund additionally requires
-controlling the doubly-aliased address on L2.
+The L1InteropCenter resolves the default early because the Mailbox never sees the original caller.
+It does not forward `aliasingFinalized`: carrying the flag would require extending
+`BridgehubL2TransactionRequest` and the center <-> chain interface. A contract deployed at exactly the
+alias of a constructor caller would therefore be aliased a second time by the Mailbox. Such a
+deployment requires a ~2^160 grind unless one party deliberately deploys both; stealing the refund
+additionally requires controlling the doubly-aliased address on L2.
 
 ### Finalization (destination side)
 
@@ -126,8 +123,8 @@ Authorization:
   while executing an interop bundle. `receiveMessage` re-invokes the payload via a self-call and enforces:
   - the ERC-7930 sender is the asset-router counterpart on the source chain
     (`_isValidInteropSender`): on L1, any non-L1 chain with sender `L2_ASSET_ROUTER_ADDR`; on L2, any
-    non-L1 chain with sender equal to this router's own address (identical on all ZK chains; interop is
-    only initiated on L2s, never on L1);
+    non-L1 chain with sender equal to this router's own address (identical on all ZK chains; handler-delivered
+    interop bundles originate on L2);
   - the payload selector is exactly `finalizeDeposit` and the payload is long enough;
   - the message sender's chain ID equals the payload's `_sourceChainId`. Under the honest-proof trust
     model these are always equal, but the check guarantees a payload can never finalize a deposit under a

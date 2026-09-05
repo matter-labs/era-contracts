@@ -16,7 +16,6 @@ import {
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-    L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_CENTER_ADDR,
@@ -66,9 +65,6 @@ import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
 
-    // Function selector for the L1 ERC-7786 send surface
-    bytes4 private constant REQUEST_L2_TX_DIRECT_SELECTOR = 0xd52471c1;
-
     /// @dev Interop is atomic: execution/verification is gated by the AtomicFlowManager's IMT-based
     /// finality proof rather than an L1-message inclusion proof. The proof machinery itself is exercised
     /// end-to-end in the anvil-interop atomic-swap spec; here we mock the (view) gate to succeed so these
@@ -80,48 +76,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encodeWithSelector(IAtomicFlowManager.requireFlowFinalized.selector),
             ""
         );
-    }
-
-    function test_sendDirectWithCalldata() public {
-        uint256 chainId = 505;
-        uint256 mintValue = 20000000000000000000; // 20 ETH
-        address l2Contract = 0x9Ca26d77cDe9CFf9145D06725b400b2Ec4Bbc616;
-        uint256 l2Value = 10000000000000000000; // 10 ETH
-        bytes memory l2Calldata = "";
-        uint256 l2GasLimit = 600000000;
-        uint256 l2GasPerPubdataByteLimit = 800;
-        bytes[] memory factoryDeps = new bytes[](0);
-        address refundRecipient = 0x9Ca26d77cDe9CFf9145D06725b400b2Ec4Bbc616;
-
-        bytes memory data = abi.encodeWithSelector(
-            REQUEST_L2_TX_DIRECT_SELECTOR,
-            chainId,
-            mintValue,
-            l2Contract,
-            l2Value,
-            l2Calldata,
-            l2GasLimit,
-            l2GasPerPubdataByteLimit,
-            factoryDeps,
-            refundRecipient
-        );
-
-        vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-            abi.encode(bytes32(0))
-        );
-
-        // In L1 context the L2 Bridgehub isn't fully set up, so the response is mocked.
-        bytes32 mockedTxHash = bytes32(uint256(1));
-        vm.mockCall(L2_BRIDGEHUB_ADDR, abi.encodeWithSelector(REQUEST_L2_TX_DIRECT_SELECTOR), abi.encode(mockedTxHash));
-
-        vm.expectCall(L2_BRIDGEHUB_ADDR, data);
-        (bool success, bytes memory result) = L2_BRIDGEHUB_ADDR.call(data);
-        assertTrue(success, "Call to L2_BRIDGEHUB should succeed");
-
-        // Catches regressions where the return value is silently dropped.
-        assertEq(abi.decode(result, (bytes32)), mockedTxHash, "Returned tx hash should match the mocked value");
     }
 
     function test_l2MessageVerification() public {

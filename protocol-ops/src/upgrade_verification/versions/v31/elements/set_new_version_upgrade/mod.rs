@@ -362,7 +362,7 @@ impl ProposedUpgrade {
                     verifiers,
                     result,
                     &tx.factoryDeps,
-                    &zksync_os::expected_bytecodes(verifiers),
+                    zksync_os::EXPECTED_V31_ZKSYNC_OS_BYTECODES,
                     "ZKsync OS",
                     bytecodes_supplier_addr,
                 )

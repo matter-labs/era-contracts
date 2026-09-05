@@ -7,7 +7,6 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {L1L2MessageParams, L1L2IndirectMessageParams} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 

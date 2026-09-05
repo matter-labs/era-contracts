@@ -80,6 +80,7 @@ export const ANVIL_INTEROP_INDIRECT_PRIORITY_REQUEST_COUNT = 2;
 // Default TestnetERC20Token deployment parameters for interop test helpers
 export const TEST_TOKEN_DECIMALS = 18;
 export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
+export const POST_UPGRADE_DEPOSIT_AMOUNT = utils.parseEther("1");
 
 // Mirrors the InteropBundle struct in contracts/common/Messaging.sol; the trailing tuple is
 // BundleAttributes (executionAddress, unbundlerAddress, useFixedFee, salt). Atomic-send params do

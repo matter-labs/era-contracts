@@ -14,11 +14,13 @@ The lifecycle of an interop interaction is:
 
 ## Sending from L1
 
-`L1InteropCenter` exposes the same ERC-7786 `sendMessage` and `sendBundle` signatures;
+`L1InteropCenter` exposes the same `sendMessage` and `sendBundle` signatures as `L2InteropCenter`;
 L1 bundles contain exactly one call. L1 sends use the destination Mailbox priority queue and
 return its canonical transaction hash. They do not publish an `InteropBundle` through the
 L2 messenger. See [L1 Interop Center](l1-interop-center.md) for the L1 attributes, exact funding,
 indirect-call confirmation, deployment and migration policy.
+
+The remaining sections describe L2-originated interop bundles.
 
 ## Core data structures (`common/Messaging.sol`)
 

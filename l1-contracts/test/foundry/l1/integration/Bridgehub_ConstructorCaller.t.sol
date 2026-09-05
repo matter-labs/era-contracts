@@ -2,7 +2,6 @@
 pragma solidity 0.8.28;
 
 import {L1InteropRequests} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L1L2MessageParams} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 
 import {ConstructorForwarder} from "contracts/dev-contracts/ConstructorForwarder.sol";
@@ -70,7 +69,7 @@ contract Bridgehub_ConstructorCaller is BridgehubInvariantTests {
 
         vm.deal(address(this), mintValue);
         vm.recordLogs();
-        // The forwarder performs the Bridgehub call inside its own constructor.
+        // The forwarder performs the center call inside its own constructor.
         ConstructorForwarder forwarder = new ConstructorForwarder{value: mintValue}(
             address(addresses.interopCenter),
             bridgehubCalldata

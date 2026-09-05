@@ -1,6 +1,6 @@
 use alloy::consensus::Transaction;
 use alloy::hex::{self, FromHex};
-use alloy::primitives::{keccak256, Address, Bytes, FixedBytes, TxHash, U256};
+use alloy::primitives::{keccak256, Address, FixedBytes, TxHash, U256};
 use alloy::providers::{Provider, RootProvider};
 use alloy::sol;
 use alloy::sol_types::SolCall;
@@ -8,7 +8,7 @@ use anyhow::Context;
 use std::collections::HashMap;
 use Bridgehub::requestL2TransactionDirectCall;
 
-use crate::common::{l1_interop, logger};
+use crate::common::logger;
 
 use super::bytecode_verifier::BytecodeVerifier;
 use super::{compute_create2_address_evm, compute_create2_address_zk};
@@ -43,7 +43,6 @@ sol! {
         function l1CtmDeployer() external view returns (address);
         function messageRoot() external view returns (address);
         function chainAssetHandler() external view returns (address);
-        function interopCenter() external view returns (address);
         function getZKChain(uint256 _chainId) external view returns (address chainAddress);
         function baseToken(uint256 _chainId) external view returns (address);
         function requestL2TransactionDirect(
@@ -182,7 +181,7 @@ impl NetworkVerifier {
         &mut self,
         tx_hashes: &[FixedBytes<32>],
         create2_factory: &Address,
-        priority_request_targets: &[Address],
+        bridgehub_addr: &Address,
         expected_salts: &[FixedBytes<32>],
         bytecode_verifier: &BytecodeVerifier,
         result: &mut crate::upgrade_verification::verifiers::VerificationResult,
@@ -213,11 +212,11 @@ impl NetworkVerifier {
 
             let deployment = if to == *create2_factory {
                 parse_l1_create2_deploy_from_input(to, tx.input(), bytecode_verifier)
-            } else if priority_request_targets.contains(&to) {
+            } else if to == *bridgehub_addr {
                 check_gw_create2_deploy_from_input(
                     to,
                     tx.input(),
-                    priority_request_targets,
+                    bridgehub_addr,
                     bytecode_verifier,
                 )
             } else {
@@ -250,7 +249,7 @@ impl NetworkVerifier {
                 }
             }
 
-            if priority_request_targets.contains(&to) {
+            if to == *bridgehub_addr {
                 parsed_gateway_deployments += 1;
                 if !expected_salts.contains(&deployment.salt) {
                     result.report_error(&format!(
@@ -543,11 +542,16 @@ fn parse_l1_create2_deploy_from_input(
 fn check_gw_create2_deploy_from_input(
     to: Address,
     input: &[u8],
-    priority_request_targets: &[Address],
+    bridgehub_addr: &Address,
     bytecode_verifier: &BytecodeVerifier,
 ) -> Option<ParsedCreate2Deployment> {
-    let (l2_contract, l2_calldata) =
-        decode_gateway_direct_call(to, input, priority_request_targets)?;
+    if to != *bridgehub_addr {
+        return None;
+    }
+
+    let l2_call = requestL2TransactionDirectCall::abi_decode(input).ok()?;
+    let l2_contract = l2_call._request.l2Contract;
+    let l2_calldata = l2_call._request.l2Calldata;
 
     if l2_contract == ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR {
         // ZKsync OS uses the standard EVM deterministic factory whose calldata
@@ -589,84 +593,4 @@ fn check_gw_create2_deploy_from_input(
     }
 
     None
-}
-
-fn decode_gateway_direct_call(
-    to: Address,
-    input: &[u8],
-    priority_request_targets: &[Address],
-) -> Option<(Address, Bytes)> {
-    if !priority_request_targets.contains(&to) {
-        return None;
-    }
-    if l1_interop::is_send_message(input) {
-        let message = l1_interop::decode(input).ok()?;
-        if message.indirect_value.is_some() {
-            return None;
-        }
-        Some((message.recipient, message.payload))
-    } else {
-        let call = requestL2TransactionDirectCall::abi_decode(input).ok()?;
-        Some((call._request.l2Contract, call._request.l2Calldata))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn gateway_deployment_decoder_accepts_both_generations_and_checks_target_and_mode() {
-        let bridgehub = Address::repeat_byte(0x11);
-        let center = Address::repeat_byte(0x22);
-        let targets = [bridgehub, center];
-        let payload = Bytes::from_static(b"salt and init code");
-        let legacy = requestL2TransactionDirectCall::new((L2TransactionRequestDirect {
-            chainId: U256::from(506),
-            mintValue: U256::from(100),
-            l2Contract: ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
-            l2Value: U256::ZERO,
-            l2Calldata: payload.clone(),
-            l2GasLimit: U256::from(1_000_000),
-            l2GasPerPubdataByteLimit: U256::from(800),
-            factoryDeps: vec![],
-            refundRecipient: Address::ZERO,
-        },));
-        let expected = Some((ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR, payload.clone()));
-        assert_eq!(
-            decode_gateway_direct_call(bridgehub, &legacy.abi_encode(), &targets),
-            expected
-        );
-        let mut recipient = vec![0, 1, 0, 0, 2, 1, 250, 20];
-        recipient.extend_from_slice(ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR.as_slice());
-        let mut current = l1_interop::sendMessageCall::new((
-            recipient.into(),
-            payload,
-            vec![l1_interop::l1ToL2TransactionParamsCall::new((
-                U256::from(100),
-                U256::from(1_000_000),
-                U256::from(800),
-                Address::ZERO,
-            ))
-            .abi_encode()
-            .into()],
-        ));
-        assert_eq!(
-            decode_gateway_direct_call(center, &current.abi_encode(), &targets),
-            expected
-        );
-        assert_eq!(
-            decode_gateway_direct_call(Address::ZERO, &current.abi_encode(), &targets),
-            None
-        );
-        current.attributes.push(
-            l1_interop::indirectCallCall::new((U256::ZERO,))
-                .abi_encode()
-                .into(),
-        );
-        assert_eq!(
-            decode_gateway_direct_call(center, &current.abi_encode(), &targets),
-            None
-        );
-    }
 }

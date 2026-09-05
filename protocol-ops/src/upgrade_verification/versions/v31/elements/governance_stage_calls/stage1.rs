@@ -14,20 +14,19 @@
 
 use alloy::{
     hex,
-    primitives::{Address, U256},
-    sol,
+    primitives::U256,
     sol_types::{SolCall, SolValue},
 };
 use anyhow::Context;
 
 use crate::upgrade_verification::{
-    artifacts::{l1_interop_center_new_proxy, CtmArtifact, EcosystemUpgradeArtifact},
+    artifacts::{CtmArtifact, EcosystemUpgradeArtifact},
     verifiers::{VerificationResult, Verifiers},
 };
 
 use super::super::{
     super::expected_old_protocol_version_label, super::get_expected_new_protocol_version,
-    super::get_expected_old_protocol_version_for_ctm_flavor, call_list::Call,
+    super::get_expected_old_protocol_version_for_ctm_flavor,
 };
 use super::super::{
     fixed_force_deployment::FixedForceDeploymentsData, initialize_data_new_chain,
@@ -42,69 +41,9 @@ use super::helpers::{
     required_ctm_address, verify_call_by_address, verify_call_by_name,
 };
 use super::{
-    acceptOwnershipCall, initializeL1V31UpgradeCall, setChainCreationParamsCall,
-    upgradeAndCallCall, upgradeCall, CallList, GovernanceStage1Calls,
+    initializeL1V31UpgradeCall, setChainCreationParamsCall, upgradeAndCallCall, upgradeCall,
+    CallList, GovernanceStage1Calls,
 };
-
-sol! {
-    function setInteropCenter(address center);
-    function setL1InteropHandler(address handler);
-}
-
-fn has_l1_interop_center(verifiers: &Verifiers) -> bool {
-    verifiers
-        .address_verifier
-        .get_by_name("l1_interop_center_proxy")
-        .is_some()
-}
-
-fn validate_center_wiring_call(
-    call: &Call,
-    new_proxy: bool,
-    center: Address,
-    implementation: Address,
-    proxy_admin: Address,
-) -> anyhow::Result<()> {
-    anyhow::ensure!(
-        call.value == U256::ZERO,
-        "center wiring must have zero value"
-    );
-    if new_proxy {
-        anyhow::ensure!(
-            call.target == center,
-            "ownership acceptance must target the new center"
-        );
-        anyhow::ensure!(
-            call.data.as_ref() == acceptOwnershipCall::SELECTOR,
-            "new center requires acceptOwnership()"
-        );
-    } else {
-        anyhow::ensure!(
-            call.target == proxy_admin,
-            "existing center upgrade must target ProxyAdmin"
-        );
-        let upgrade = upgradeCall::abi_decode(&call.data)
-            .context("existing center requires upgrade(address,address)")?;
-        anyhow::ensure!(
-            upgrade.proxy == center && upgrade.implementation == implementation,
-            "existing center upgrade must bind the registered proxy to its verified implementation"
-        );
-    }
-    Ok(())
-}
-
-// Current artifacts include either three handler-wiring calls (a pre-v32 source)
-// or none (the handler already exists), plus two center-wiring calls.
-fn current_prefix_len(total: usize, ctms: usize) -> anyhow::Result<usize> {
-    let prefix = total
-        .checked_sub(1 + ctms * STAGE1_PER_CTM_LEN)
-        .context("Stage 1 call list is shorter than its CTM blocks")?;
-    anyhow::ensure!(
-        matches!(prefix, 11 | 14),
-        "Unexpected current stage 1 prefix length: {prefix}"
-    );
-    Ok(prefix)
-}
 
 /// Number of generated ecosystem-wide stage-1 calls before any per-CTM block.
 /// On stage, PUVT additionally requires one leading `pauseMigration()` call
@@ -121,12 +60,12 @@ const PER_CTM_OFFSET_SET_CHAIN_CREATION_PARAMS: usize = 3;
 const PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE: usize = 4;
 const PER_CTM_OFFSET_UPGRADE_VALIDATOR_TIMELOCK: usize = 5;
 
-fn ctm_block_start(ctm_index: usize, call_offset: usize, prefix_len: usize) -> usize {
-    call_offset + prefix_len + ctm_index * STAGE1_PER_CTM_LEN
+fn ctm_block_start(ctm_index: usize, call_offset: usize) -> usize {
+    call_offset + STAGE1_GENERATED_PREFIX_LEN + ctm_index * STAGE1_PER_CTM_LEN
 }
 
 fn stage1_call_offset(verifiers: &Verifiers) -> usize {
-    usize::from(has_l1_interop_center(verifiers) || verifiers.env.is_stage())
+    usize::from(verifiers.env.is_stage())
 }
 
 impl GovernanceStage1Calls {
@@ -145,29 +84,23 @@ impl GovernanceStage1Calls {
         verifiers: &Verifiers,
         result: &mut VerificationResult,
     ) -> anyhow::Result<()> {
-        self.verify_call_shape(artifact, verifiers, result).await?;
+        self.verify_call_shape(&artifact.ctms, verifiers, result)
+            .await?;
         self.verify_artifact_payloads(artifact, verifiers, result)
             .await
     }
 
     async fn verify_call_shape(
         &self,
-        artifact: &EcosystemUpgradeArtifact,
+        ctms: &[CtmArtifact],
         verifiers: &Verifiers,
         result: &mut VerificationResult,
     ) -> anyhow::Result<()> {
         result.print_info("== Gov stage 1 calls ===");
-        let ctms = &artifact.ctms;
 
-        let current = has_l1_interop_center(verifiers);
-        let prefix_len = if current {
-            current_prefix_len(self.calls.elems.len(), ctms.len())?
-        } else {
-            STAGE1_GENERATED_PREFIX_LEN
-        };
         let call_offset = stage1_call_offset(verifiers);
         let mut errors = 0;
-        if call_offset == 1 {
+        if verifiers.env.is_stage() {
             // Stage executes stage1 through EmergencyUpgradeBoard, whose
             // emergency path unpauses migrations before forwarding the calls.
             // Re-pause first so the later checkMigrationsPaused() calls still
@@ -205,11 +138,6 @@ impl GovernanceStage1Calls {
             // Cache MessageRoot / AssetRouter inside L1ChainAssetHandler.
             (8, "chain_asset_handler_proxy", "setAddresses()"),
         ] {
-            let (target, method) = if current && (index == 4 || index == 7) {
-                ("transparent_proxy_admin", "upgrade(address,address)")
-            } else {
-                (target, method)
-            };
             errors += verify_call_by_name(
                 &self.calls,
                 call_offset + index,
@@ -220,16 +148,6 @@ impl GovernanceStage1Calls {
             );
         }
 
-        if current {
-            errors += self.verify_center_wiring(
-                call_offset,
-                prefix_len,
-                l1_interop_center_new_proxy(&artifact.core)?,
-                verifiers,
-                result,
-            )?;
-        }
-
         // Per-CTM block (6 calls per CTM, in artifact order):
         //   +0 timer.checkDeadline()
         //   +1 stage-validator.checkMigrationsPaused()
@@ -238,7 +156,7 @@ impl GovernanceStage1Calls {
         //   +4 CTM proxy.setNewVersionUpgrade(...)
         //   +5 VT proxy admin.upgrade(VT proxy, new impl)
         for (ctm_index, ctm) in ctms.iter().enumerate() {
-            let block = ctm_block_start(ctm_index, call_offset, prefix_len);
+            let block = ctm_block_start(ctm_index, call_offset);
             let timer_label = format!("{}.upgrade_timer", ctm.flavor.label());
             let validator_label = format!("{}.upgrade_stage_validator", ctm.flavor.label());
             let ctm_proxy_label = format!("{}.chain_type_manager_proxy", ctm.flavor.label());
@@ -343,7 +261,8 @@ impl GovernanceStage1Calls {
             }
         }
 
-        let expected_call_count = call_offset + prefix_len + ctms.len() * STAGE1_PER_CTM_LEN;
+        let expected_call_count =
+            call_offset + STAGE1_GENERATED_PREFIX_LEN + ctms.len() * STAGE1_PER_CTM_LEN;
         match self.calls.elems.len().cmp(&expected_call_count) {
             std::cmp::Ordering::Less => {
                 result.report_error(&format!(
@@ -370,90 +289,6 @@ impl GovernanceStage1Calls {
         Ok(())
     }
 
-    fn verify_center_wiring(
-        &self,
-        offset: usize,
-        prefix_len: usize,
-        new_proxy: bool,
-        verifiers: &Verifiers,
-        result: &mut VerificationResult,
-    ) -> anyhow::Result<usize> {
-        let mut errors = 0;
-        if prefix_len == 14 {
-            errors += verify_call_by_name(
-                &self.calls,
-                offset + 9,
-                "l1_interop_handler_proxy_addr",
-                "acceptOwnership()",
-                verifiers,
-                result,
-            );
-            for (index, target) in [
-                (offset + 10, "l1_nullifier_proxy"),
-                (offset + 11, "l1_asset_router_proxy"),
-            ] {
-                errors += verify_call_by_name(
-                    &self.calls,
-                    index,
-                    target,
-                    "setL1InteropHandler(address)",
-                    verifiers,
-                    result,
-                );
-                match setL1InteropHandlerCall::abi_decode(&self.calls.elems[index].data) {
-                    Ok(call) => {
-                        errors += expect_named_address(
-                            result,
-                            verifiers,
-                            &call.handler,
-                            "l1_interop_handler_proxy_addr",
-                        )
-                    }
-                    Err(error) => {
-                        result.report_error(&format!("Invalid handler wiring: {error}"));
-                        errors += 1;
-                    }
-                }
-            }
-        }
-        let index = offset + prefix_len - 2;
-        let address = |name| {
-            verifiers
-                .address_verifier
-                .get_by_name(name)
-                .with_context(|| format!("Missing center wiring address: {name}"))
-        };
-        if let Err(error) = validate_center_wiring_call(
-            &self.calls.elems[index],
-            new_proxy,
-            address("l1_interop_center_proxy")?,
-            address("l1_interop_center_implementation")?,
-            address("transparent_proxy_admin")?,
-        ) {
-            result.report_error(&format!("Invalid center wiring: {error}"));
-            errors += 1;
-        }
-        errors += verify_call_by_name(
-            &self.calls,
-            index + 1,
-            "bridgehub_proxy",
-            "setInteropCenter(address)",
-            verifiers,
-            result,
-        );
-        match setInteropCenterCall::abi_decode(&self.calls.elems[index + 1].data) {
-            Ok(call) => {
-                errors +=
-                    expect_named_address(result, verifiers, &call.center, "l1_interop_center_proxy")
-            }
-            Err(error) => {
-                result.report_error(&format!("Invalid center wiring: {error}"));
-                errors += 1;
-            }
-        }
-        Ok(errors)
-    }
-
     async fn verify_artifact_payloads(
         &self,
         artifact: &EcosystemUpgradeArtifact,
@@ -470,12 +305,6 @@ impl GovernanceStage1Calls {
         const UPGRADE_CTM_DEPLOYMENT_TRACKER: usize = 5;
         const UPGRADE_CHAIN_ASSET_HANDLER: usize = 6;
 
-        let current = has_l1_interop_center(verifiers);
-        let prefix_len = if current {
-            current_prefix_len(self.calls.elems.len(), artifact.ctms.len())?
-        } else {
-            STAGE1_GENERATED_PREFIX_LEN
-        };
         let call_offset = stage1_call_offset(verifiers);
         let mut errors = 0;
 
@@ -528,37 +357,18 @@ impl GovernanceStage1Calls {
         }
 
         // Verify MessageRoot upgradeAndCall payload.
-        if current {
-            errors += verify_upgrade_call_args(
-                &self.calls,
-                call_offset + UPGRADE_MESSAGE_ROOT,
-                "message_root_proxy",
-                "message_root_implementation_addr",
-                verifiers,
-                result,
-            );
-            errors += verify_upgrade_call_args(
-                &self.calls,
-                call_offset + 7,
-                "chain_registration_sender_proxy",
-                "chain_registration_sender_implementation_addr",
-                verifiers,
-                result,
-            );
-        } else {
-            errors += verify_message_root_upgrade_call_args(
-                &self.calls,
-                call_offset + UPGRADE_MESSAGE_ROOT,
-                verifiers,
-                result,
-            );
-        }
+        errors += verify_message_root_upgrade_call_args(
+            &self.calls,
+            call_offset + UPGRADE_MESSAGE_ROOT,
+            verifiers,
+            result,
+        );
 
         // Per-CTM block: CTM proxy upgrade, setChainCreationParams,
         // setNewVersionUpgrade. Validated against each CTM's own
         // chain_upgrade_diamond_cut + contracts_config.
         for (i, ctm) in artifact.ctms.iter().enumerate() {
-            let block = ctm_block_start(i, call_offset, prefix_len);
+            let block = ctm_block_start(i, call_offset);
             result.print_info(&format!(
                 "-- CTM[{i}] = {} ----------------------",
                 ctm.flavor.label()
@@ -1116,77 +926,4 @@ async fn verify_set_new_version_upgrade_payload(
     .await?;
 
     Ok(errors)
-}
-
-#[cfg(test)]
-mod center_tests {
-    use super::*;
-    #[test]
-    fn current_layout_accepts_only_complete_wiring_blocks() {
-        assert_eq!(current_prefix_len(1 + 11 + 12, 2).unwrap(), 11);
-        assert_eq!(current_prefix_len(1 + 14 + 12, 2).unwrap(), 14);
-        for count in [0, 10, 11, 13, 14, 16, 18] {
-            assert!(current_prefix_len(count, 0).is_err());
-        }
-    }
-
-    #[test]
-    fn center_wiring_is_bound_to_artifact_provenance_and_implementation() {
-        let center = Address::repeat_byte(0x11);
-        let implementation = Address::repeat_byte(0x22);
-        let proxy_admin = Address::repeat_byte(0x33);
-        let accept = Call {
-            target: center,
-            value: U256::ZERO,
-            data: acceptOwnershipCall {}.abi_encode().into(),
-        };
-        let mut upgrade = Call {
-            target: proxy_admin,
-            value: U256::ZERO,
-            data: upgradeCall::new((center, implementation))
-                .abi_encode()
-                .into(),
-        };
-        let validate = |call: &Call, new_proxy| {
-            validate_center_wiring_call(call, new_proxy, center, implementation, proxy_admin)
-        };
-        assert!(validate(&accept, true).is_ok());
-        assert!(validate(&upgrade, false).is_ok());
-        assert!(validate(&accept, false).is_err());
-        assert!(validate(&upgrade, true).is_err());
-
-        upgrade.data = upgradeCall::new((center, Address::ZERO))
-            .abi_encode()
-            .into();
-        assert!(validate(&upgrade, false).is_err());
-        upgrade.data = upgradeCall::new((Address::ZERO, implementation))
-            .abi_encode()
-            .into();
-        assert!(validate(&upgrade, false).is_err());
-        upgrade.data = upgradeCall::new((center, implementation))
-            .abi_encode()
-            .into();
-        upgrade.target = center;
-        assert!(validate(&upgrade, false).is_err());
-        upgrade.target = proxy_admin;
-        upgrade.value = U256::from(1);
-        assert!(validate(&upgrade, false).is_err());
-    }
-
-    #[test]
-    fn current_artifacts_require_explicit_proxy_provenance() {
-        for flag in ["true", "false"] {
-            let core = toml::from_str::<toml::Value>(&format!(
-                "[upgrade_addresses.bridgehub]\nl1_interop_center_new_proxy = {flag}"
-            ))
-            .unwrap();
-            assert_eq!(l1_interop_center_new_proxy(&core).unwrap(), flag == "true");
-        }
-        for value in ["", "l1_interop_center_new_proxy = 'false'"] {
-            let core =
-                toml::from_str::<toml::Value>(&format!("[upgrade_addresses.bridgehub]\n{value}"))
-                    .unwrap();
-            assert!(l1_interop_center_new_proxy(&core).is_err());
-        }
-    }
 }

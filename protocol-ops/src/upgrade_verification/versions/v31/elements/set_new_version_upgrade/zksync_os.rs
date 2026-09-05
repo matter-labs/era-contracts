@@ -42,7 +42,7 @@ struct ZksyncOSExpectedFd {
 /// Expected v31 ZKsyncOS `UniversalContractUpgradeInfo[]` passed to
 /// `ComplexUpgrader.forceDeployAndUpgradeUniversal` — excludes the L2V32Upgrade delegate-target
 /// entry, which is validated separately by `verify_zksync_os_l2_v31_deployment`.
-fn expected_v31_zksync_os_force_deployments(verifiers: &Verifiers) -> Vec<ZksyncOSExpectedFd> {
+fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
     macro_rules! proxy {
         ($file:expr, $addr:expr) => {
             ZksyncOSExpectedFd {
@@ -79,7 +79,7 @@ fn expected_v31_zksync_os_force_deployments(verifiers: &Verifiers) -> Vec<Zksync
         ),
         proxy!("l1-contracts/BaseTokenHolder", L2_BASE_TOKEN_HOLDER_ADDR),
         proxy!("l1-contracts/L2AssetTracker", L2_ASSET_TRACKER_ADDR),
-        proxy!(verifiers.l2_interop_center_file(), L2_INTEROP_CENTER_ADDR),
+        proxy!("l1-contracts/InteropCenter", L2_INTEROP_CENTER_ADDR),
         proxy!("l1-contracts/L2InteropHandler", L2_INTEROP_HANDLER_ADDR),
         proxy!(
             "l1-contracts/InteropAttributeParser",
@@ -126,7 +126,7 @@ fn verify_v31_zksync_os_force_deployments(
     deployments: &[IComplexUpgrader::UniversalContractUpgradeInfo],
     delegate_to: Address,
 ) {
-    let expected = expected_v31_zksync_os_force_deployments(verifiers);
+    let expected = expected_v31_zksync_os_force_deployments();
     let mut expected_map: HashMap<Address, ZksyncOSExpectedFd> =
         expected.into_iter().map(|e| (e.address, e)).collect();
 
@@ -362,19 +362,6 @@ pub(super) const EXPECTED_V31_ZKSYNC_OS_BYTECODES: &[&str] = &[
     "l1-contracts/L1MessengerZKOS",
     "l1-contracts/SystemContext",
 ];
-
-pub(super) fn expected_bytecodes(verifiers: &Verifiers) -> Vec<&'static str> {
-    EXPECTED_V31_ZKSYNC_OS_BYTECODES
-        .iter()
-        .map(|file| {
-            if *file == "l1-contracts/InteropCenter" {
-                verifiers.l2_interop_center_file()
-            } else {
-                *file
-            }
-        })
-        .collect()
-}
 
 /// ZKsync OS orchestrator: walks the `UniversalContractUpgradeInfo[]`, validates the
 /// L2V32Upgrade delegate-target entry (derived address + bytecode info), then decodes

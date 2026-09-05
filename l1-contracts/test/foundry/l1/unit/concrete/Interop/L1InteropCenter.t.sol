@@ -29,7 +29,7 @@ import {L1InteropRequests} from "../../../../../../deploy-scripts/utils/L1Intero
 import {
     MIN_CROSS_CHAIN_SENDER_ADDRESS,
     ETH_TOKEN_ADDRESS,
-    MAX_NEW_FACTORY_DEPS,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     INDIRECT_CALL_MAGIC_VALUE
 } from "contracts/common/Config.sol";
 import {CrossChainSenderAddressTooLow} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
@@ -41,6 +41,7 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {BridgehubL2TransactionRequest, InteropCallStarter} from "contracts/common/Messaging.sol";
 import {IAssetRouterShared} from "contracts/bridge/asset-router/IAssetRouterShared.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 contract ReentrantL1CrossChainSender is IL1CrossChainSender {
     IL1InteropCenter internal immutable CENTER;
@@ -135,83 +136,57 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         assertTrue(resultantHash == hash);
     }
 
-    // This is an example how to test behaviour of 7702. Keeping it, so the logic can be reused in the future
+    // Isolate delegated-account funding from Mailbox transaction validation.
     function test_sendMessage_direct_NonETHCase7702(
-        uint256 mockChainId,
-        uint256 mockMintValue,
-        address mockL2Contract,
-        uint256 mockL2Value,
-        bytes memory mockL2Calldata,
-        uint256 mockL2GasLimit,
-        uint256 mockL2GasPerPubdataByteLimit,
-        bytes[] memory mockFactoryDeps,
-        uint256 gasPrice,
-        uint256 randomValue
-    ) public useRandomToken(randomValue) {
+        uint96 _mintValue,
+        uint8 _tokenIndex
+    ) public useRandomToken(_tokenIndex) {
         _useFullSharedBridge();
         _initializeBridgehub();
 
         uint256 randomCallerPk = uint256(keccak256("RANDOM_CALLER"));
         address payable randomCaller = payable(vm.addr(randomCallerPk));
-        mockChainId = bound(mockChainId, 1, type(uint48).max);
-
-        vm.assume(mockFactoryDeps.length <= MAX_NEW_FACTORY_DEPS);
-        vm.assume(mockMintValue > 0);
-
-        L1L2MessageParams memory l2TxnReqDirect = _createMockL2TransactionRequestDirect({
-            mockChainId: mockChainId,
-            mockMintValue: mockMintValue,
-            mockL2Contract: mockL2Contract,
-            mockL2Value: mockL2Value,
-            mockL2Calldata: mockL2Calldata,
-            mockL2GasLimit: mockL2GasLimit,
-            mockL2GasPerPubdataByteLimit: mockL2GasPerPubdataByteLimit,
-            mockFactoryDeps: mockFactoryDeps,
-            mockRefundRecipient: randomCaller
+        uint256 mintValue = uint256(_mintValue) + 1;
+        L1L2MessageParams memory request = L1L2MessageParams({
+            chainId: _setUpZKChainForChainId(501, address(testToken)),
+            mintValue: mintValue,
+            l2Contract: mockL2Contract,
+            l2Value: 0,
+            l2Calldata: hex"",
+            l2GasLimit: 1_000_000,
+            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            factoryDeps: new bytes[](0),
+            refundRecipient: randomCaller
         });
-
-        l2TxnReqDirect.chainId = _setUpZKChainForChainId(l2TxnReqDirect.chainId);
-
-        _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, false, address(testToken));
-
-        assertTrue(bridgehub.getZKChain(l2TxnReqDirect.chainId) == address(mockChainContract));
-        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
-
+        bytes32 canonicalHash = keccak256("CANONICAL_TX_HASH");
         vm.mockCall(
             address(mockChainContract),
             abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
             abi.encode(canonicalHash)
         );
-
-        mockChainContract.setFeeParams();
-        mockChainContract.setBaseTokenGasMultiplierPrice(uint128(1), uint128(1));
-        mockChainContract.setBridgeHubAddress(address(bridgehub));
-        assertTrue(mockChainContract.getBridgeHubAddress() == address(bridgehub));
-
-        gasPrice = bound(gasPrice, 1_000, 50_000_000);
-        vm.txGasPrice(gasPrice * 1 gwei);
-
-        vm.deal(randomCaller, 1 ether);
-
-        // Now, let's call the same function with zero msg.value
-        testToken.mint(randomCaller, l2TxnReqDirect.mintValue);
-        assertEq(testToken.balanceOf(randomCaller), l2TxnReqDirect.mintValue);
-
-        bytes memory calldataForExecutor;
-        {
-            (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = L1InteropRequests.encodeDirect(
-                l2TxnReqDirect
-            );
-            calldataForExecutor = abi.encodeCall(IERC7786GatewaySource.sendMessage, (recipient, payload, attributes));
-        }
-
-        vm.recordLogs(); // start recording all logs
-
+        testToken.mint(randomCaller, mintValue);
         vm.prank(randomCaller);
-        testToken.approve(sharedBridgeAddress, l2TxnReqDirect.mintValue);
-        assertEq(testToken.allowance(randomCaller, sharedBridgeAddress), l2TxnReqDirect.mintValue);
+        testToken.approve(address(ntv), mintValue);
         vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
-        SimpleExecutor(randomCaller).execute(address(l1InteropCenter), 0, calldataForExecutor);
+        vm.expectEmit(true, true, false, true, sharedBridgeAddress);
+        emit IAssetRouterBase.BridgehubDepositBaseTokenInitiated(
+            request.chainId,
+            randomCaller,
+            tokenAssetId,
+            mintValue
+        );
+        bytes memory callData = L1InteropRequests.encodeDirectCalldata(request);
+        vm.prank(randomCaller);
+        (bool success, bytes memory result) = SimpleExecutor(randomCaller).execute(
+            address(l1InteropCenter),
+            0,
+            callData
+        );
+        assertTrue(success);
+        assertEq(abi.decode(result, (bytes32)), canonicalHash);
+        assertEq(testToken.balanceOf(randomCaller), 0);
+        assertEq(testToken.balanceOf(address(ntv)), mintValue);
+        assertEq(ntv.bridgedOut(tokenAssetId), mintValue);
     }
 
     function test_requestTransactionIndirectChecksMagicValue(
@@ -245,9 +220,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             indirectCallData: indirectCallData
         });
 
-        l2TxnReq2BridgeOut.chainId = _setUpZKChainForChainId(l2TxnReq2BridgeOut.chainId);
-
-        _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true, address(0));
+        l2TxnReq2BridgeOut.chainId = _setUpZKChainForChainId(l2TxnReq2BridgeOut.chainId, ETH_TOKEN_ADDRESS);
         assertTrue(bridgehub.baseToken(l2TxnReq2BridgeOut.chainId) == ETH_TOKEN_ADDRESS);
 
         assertTrue(bridgehub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
@@ -282,7 +255,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
 
         address caller = makeAddr("INDIRECT_CALLER");
         L1L2IndirectMessageParams memory request = L1L2IndirectMessageParams({
-            chainId: _setUpZKChainForChainId(501),
+            chainId: _setUpZKChainForChainId(501, ETH_TOKEN_ADDRESS),
             mintValue: 1 ether,
             l2Value: 0.25 ether,
             l2GasLimit: 1_000_000,
@@ -292,7 +265,6 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             indirectCallValue: 0.1 ether,
             indirectCallData: abi.encode("deposit data")
         });
-        _setUpBaseTokenForChainId(request.chainId, true, address(0));
 
         IndirectCallRequest memory outputRequest = IndirectCallRequest({
             magicValue: INDIRECT_CALL_MAGIC_VALUE,
@@ -339,7 +311,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
 
         address caller = makeAddr("INDIRECT_BUNDLE_CALLER");
         L1L2IndirectMessageParams memory request = L1L2IndirectMessageParams({
-            chainId: _setUpZKChainForChainId(502),
+            chainId: _setUpZKChainForChainId(502, ETH_TOKEN_ADDRESS),
             mintValue: 1 ether,
             l2Value: 0.25 ether,
             l2GasLimit: 1_000_000,
@@ -349,7 +321,6 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             indirectCallValue: 0.1 ether,
             indirectCallData: abi.encode("deposit data")
         });
-        _setUpBaseTokenForChainId(request.chainId, true, address(0));
 
         IndirectCallRequest memory outputRequest = IndirectCallRequest({
             magicValue: INDIRECT_CALL_MAGIC_VALUE,
@@ -514,9 +485,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
             indirectCallData: indirectCallData
         });
 
-        l2TxnReq2BridgeOut.chainId = _setUpZKChainForChainId(l2TxnReq2BridgeOut.chainId);
-
-        _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true, address(0));
+        l2TxnReq2BridgeOut.chainId = _setUpZKChainForChainId(l2TxnReq2BridgeOut.chainId, ETH_TOKEN_ADDRESS);
         assertTrue(bridgehub.baseToken(l2TxnReq2BridgeOut.chainId) == ETH_TOKEN_ADDRESS);
 
         assertTrue(bridgehub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
@@ -720,7 +689,6 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         vm.assume(randomCaller != address(l1InteropCenter));
 
         // The asset router authorizes the L1InteropCenter dynamically through the Bridgehub.
-        // A non-Era chain id is used so that the Era-diamond-proxy legacy path can not be hit by the fuzzer.
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
         vm.prank(randomCaller);
         sharedBridge.bridgehubDepositBaseToken(eraChainId + 1, ETH_TOKEN_ASSET_ID, randomCaller, 1 ether);
@@ -903,8 +871,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
         _initializeBridgehub();
 
         chainId = bound(chainId, 1, type(uint48).max);
-        chainId = _setUpZKChainForChainId(chainId);
-        _setUpBaseTokenForChainId(chainId, true, address(0));
+        chainId = _setUpZKChainForChainId(chainId, ETH_TOKEN_ADDRESS);
 
         uint256 expectedBaseCost = 12345;
         vm.mockCall(
@@ -930,8 +897,7 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
     function test_reentrancyGuardCoversBothSendSurfaces() public {
         _useMockSharedBridge();
         _initializeBridgehub();
-        uint256 chainId = _setUpZKChainForChainId(501);
-        _setUpBaseTokenForChainId(chainId, true, address(0));
+        uint256 chainId = _setUpZKChainForChainId(501, ETH_TOKEN_ADDRESS);
         ReentrantL1CrossChainSender hook = new ReentrantL1CrossChainSender(l1InteropCenter);
         // Isolate reentrancy protection from custody and destination validation.
         vm.mockCall(
@@ -967,8 +933,10 @@ contract L1InteropCenterTest is ExperimentalBridgeTestBase {
     function testFuzz_exactFunding(bool _ethBase, bool _indirect, uint96 _mintValue, uint96 _indirectValue) public {
         _useMockSharedBridge();
         _initializeBridgehub();
-        uint256 chainId = _setUpZKChainForChainId(501);
-        _setUpBaseTokenForChainId(chainId, _ethBase, address(new TestnetERC20Token("Custom base", "CB", 18)));
+        uint256 chainId = _setUpZKChainForChainId(
+            501,
+            _ethBase ? ETH_TOKEN_ADDRESS : address(new TestnetERC20Token("Custom base", "CB", 18))
+        );
         address caller = makeAddr("exactFundingCaller");
         uint256 mintValue = uint256(_mintValue) + 1;
         uint256 indirectValue = _indirect ? uint256(_indirectValue) : 0;

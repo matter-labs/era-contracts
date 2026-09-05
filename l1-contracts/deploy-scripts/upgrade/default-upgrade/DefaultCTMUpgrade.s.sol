@@ -207,6 +207,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         bytes32 zkTokenAssetId
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
+        require(toml.keyExists("$.has_l1_interop_center"), "Set has_l1_interop_center explicitly");
+        newConfig.hasL1InteropCenter = toml.readBool("$.has_l1_interop_center");
 
         // No `era_chain_id` read: `setAddressesBasedOnCTM` resolves it from the live asset router,
         // which is authoritative for the ecosystems this flow upgrades.
@@ -224,10 +226,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             newConfig.hasPreV32IntrospectionOverride = true;
             newConfig.usePreV32IntrospectionOverride = toml.readBool("$.pre_v32_introspection");
         }
-        if (toml.keyExists("$.has_l1_interop_center")) {
-            newConfig.hasL1InteropCenter = toml.readBool("$.has_l1_interop_center");
-        }
-
         initializeConfig(chainCreationParams, permanentConfig, governance);
 
         // Read governance upgrade timer initial delay from config
@@ -415,12 +413,12 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
     /// @notice Uses the source ecosystem's registry ABI during CTM preparation.
     function _discoverCoreAddresses(address _bridgehub, bool _preV32Ecosystem) internal {
-        if (_preV32Ecosystem) {
-            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(_bridgehub);
-        } else if (!newConfig.hasL1InteropCenter) {
-            coreAddresses = AddressIntrospector.getCoreDeployedAddressesPreL1InteropCenter(_bridgehub);
-        } else {
+        if (newConfig.hasL1InteropCenter) {
             coreAddresses = AddressIntrospector.getCoreDeployedAddresses(_bridgehub);
+        } else if (_preV32Ecosystem) {
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(_bridgehub);
+        } else {
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesPreL1InteropCenter(_bridgehub);
         }
     }
 

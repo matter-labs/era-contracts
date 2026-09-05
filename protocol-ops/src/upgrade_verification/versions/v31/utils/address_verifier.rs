@@ -235,33 +235,6 @@ fn add_v31_address_aliases(
         add_v31_address_alias(address_verifier, "core", &artifact.core, path, alias)?;
     }
 
-    let bridgehub = artifact
-        .core
-        .get("upgrade_addresses")
-        .and_then(|addresses| addresses.get("bridgehub"));
-    if bridgehub.is_some_and(|addresses| {
-        addresses.get("l1_interop_center_proxy_addr").is_some()
-            || addresses
-                .get("l1_interop_center_implementation_addr")
-                .is_some()
-    }) {
-        for (field, alias) in [
-            ("l1_interop_center_proxy_addr", "l1_interop_center_proxy"),
-            (
-                "l1_interop_center_implementation_addr",
-                "l1_interop_center_implementation",
-            ),
-        ] {
-            add_v31_address_alias(
-                address_verifier,
-                "core",
-                &artifact.core,
-                &["upgrade_addresses", "bridgehub", field],
-                alias,
-            )?;
-        }
-    }
-
     Ok(())
 }
 
@@ -289,67 +262,4 @@ fn optional_nested_string_field<'a>(value: &'a toml::Value, path: &[&str]) -> Op
 
 fn parse_alloy_address(field: &str, address: &str) -> anyhow::Result<Address> {
     Address::from_hex(address).with_context(|| format!("{field} is not a valid address"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn historical_artifact() -> EcosystemUpgradeArtifact {
-        let mut fixture: toml::Value = toml::from_str(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml"
-        )))
-        .unwrap();
-        // The frozen artifact predates the OS-only tooling; retain its original core addresses.
-        fixture["ctms"].as_table_mut().unwrap().remove("era");
-        EcosystemUpgradeArtifact::from_toml_str(&toml::to_string(&fixture).unwrap()).unwrap()
-    }
-
-    #[test]
-    fn historical_artifact_has_no_l1_interop_center_aliases() {
-        let verifier = AddressVerifier::new_v31_from_artifact(&historical_artifact()).unwrap();
-        assert_eq!(verifier.get_by_name("l1_interop_center_proxy"), None);
-        assert_eq!(
-            verifier.get_by_name("l1_interop_center_implementation"),
-            None
-        );
-        assert_eq!(
-            verifier.get_by_name("bridgehub_proxy"),
-            Some(
-                "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
-                    .parse()
-                    .unwrap()
-            )
-        );
-    }
-
-    #[test]
-    fn current_artifact_requires_both_l1_interop_center_addresses() {
-        let fields = [
-            ("l1_interop_center_proxy_addr", "l1_interop_center_proxy"),
-            (
-                "l1_interop_center_implementation_addr",
-                "l1_interop_center_implementation",
-            ),
-        ];
-        let addresses = [Address::repeat_byte(0x11), Address::repeat_byte(0x22)];
-        let mut artifact = historical_artifact();
-        for (index, (field, _)) in fields.iter().enumerate() {
-            let mut incomplete = historical_artifact();
-            incomplete.core["upgrade_addresses"]["bridgehub"]
-                .as_table_mut()
-                .unwrap()
-                .insert((*field).into(), addresses[index].to_string().into());
-            assert!(AddressVerifier::new_v31_from_artifact(&incomplete).is_err());
-            artifact.core["upgrade_addresses"]["bridgehub"]
-                .as_table_mut()
-                .unwrap()
-                .insert((*field).into(), addresses[index].to_string().into());
-        }
-        let verifier = AddressVerifier::new_v31_from_artifact(&artifact).unwrap();
-        for (index, (_, alias)) in fields.iter().enumerate() {
-            assert_eq!(verifier.get_by_name(alias), Some(addresses[index]));
-        }
-    }
 }

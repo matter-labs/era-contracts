@@ -9,9 +9,6 @@ import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Common message-sending surface exposed by the L1 and L2 Interop Centers.
-/// @dev Transport semantics are layer-specific: L2 sends interop bundles through the L2-to-L1 messenger,
-/// while L1 accepts only single-call bundles and delivers them as priority transactions through the
-/// destination chain's Mailbox.
 interface IInteropCenterBase is IERC7786GatewaySource {
     /// @notice Sends a collection of calls to one destination chain.
     /// @param _destinationChainId ERC-7930 destination with an empty address field.

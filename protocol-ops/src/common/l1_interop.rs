@@ -13,7 +13,6 @@ sol! {
     function interopCallValue(uint256 value);
     function indirectCall(uint256 value);
     function factoryDeps(bytes[] dependencies);
-    function initialize(address owner);
 }
 
 #[derive(Debug)]

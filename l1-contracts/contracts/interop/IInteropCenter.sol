@@ -10,7 +10,7 @@ import {AtomicFlowPreimage} from "../atomic-interop/IAtomicInterop.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Interface of the {InteropCenter}. See {protocol-docs/interop.md#zksync-interop-protocol}.
+/// @notice Interface of the {L2InteropCenter}. See {protocol-docs/interop.md#zksync-interop-protocol}.
 interface IInteropCenter is IInteropCenterBase {
     /// @notice Send-side metadata for an atomic bundle, parsed from the `atomicBundle` attribute.
     /// Deliberately NOT part of the cross-chain {InteropBundle}: `bundleHash` must not depend on the

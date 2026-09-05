@@ -46,9 +46,7 @@ import {L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractInterf
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev The Bridgehub contract serves as the primary entry point for L1->L2 communication,
-/// facilitating interactions between end user and bridges.
-/// It also manages state transition managers, base tokens, and chain registrations.
+/// @notice Shared registry and settlement-layer coordination for ZK chains.
 abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 

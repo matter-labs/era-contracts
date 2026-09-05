@@ -8,14 +8,10 @@ import {InteropCallStarter} from "../../common/Messaging.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL2CrossChainSender {
-    /// @notice Function that returns an InteropCallStarter corresponding to the interop call. Effectively this initiates a two step call,
-    ///         where there is a middleman in the InteropCall. The expected usage is as follows:
-    ///         We call initiateIndirectCall on contract A on source chain. It returns an interopCallStarter which will be used to pass the call
-    ///         to the destination chain. In this second call the sender is contract A on source chain. This "indirect" call mechanism could be used for complex
-    ///         Interop scenarios, such as bridging.
+    /// @notice Builds the destination call for an indirect interop send.
     /// @param _chainId Destination chain ID.
-    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
-    /// @param _value The `msg.value` to be deposited on the target chain.
+    /// @param _originalCaller Sender of the initiating Interop Center call.
+    /// @param _value Base-token value delivered to the destination call.
     /// @param _data The calldata for the cross-chain sender deposit.
     /// @return interopCallStarter InteropCallStarter corresponding to the cross-chain sender call.
     function initiateIndirectCall(

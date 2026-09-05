@@ -1241,6 +1241,11 @@
   },
   {
     "type": "error",
+    "name": "InteropCenterNotPaused",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NoCTMForAssetId",
     "inputs": [
       {

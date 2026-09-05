@@ -1,137 +1,115 @@
 # L1 Interop Center
 
-## Design
+## Sending requests
 
-L1 sends use ERC-7786 `sendMessage` and ERC-7930 recipients. The required
-`l1ToL2TransactionParams(mintValue, l2GasLimit, l2GasPerPubdataByteLimit, refundRecipient)`
-attribute supplies priority-transaction parameters. Optional `interopCallValue`
-sets destination value; `factoryDeps(bytes[])` supplies direct-call dependencies.
-`indirectCall(uint256)` selects a source-side cross-chain sender and its ETH value.
-The returned send ID is the canonical Mailbox priority-transaction hash.
+L1InteropCenter replaces Bridgehub's public priority-request entry points with
+`sendMessage` and an exactly-one-call `sendBundle`. Recipients use ERC-7930 EVM
+addresses. Both paths submit a Mailbox priority transaction and return its canonical
+hash; fee calculation, refund aliasing and failed-deposit recovery retain their
+existing behavior.
 
-- **Keep: priority-queue transport.** Deposit the base token, build the destination
-  call, submit it to the Mailbox, then confirm the canonical hash with the sender.
-  This preserves failed-deposit recovery. Replacing the queue with message-root
-  transport is a separate release.
-- **Keep: one-call bundles.** `sendBundle` accepts exactly one call and shares the
-  send implementation. Transaction parameters and dependencies are bundle
-  attributes; indirect-call and destination value are call attributes. Rejecting
-  all bundles would lose the interface parity requested in PR #2271.
-- **Change: minimize L2 sharing.** Put the contracts in `interop/interop-center/`
-  and rename the current built-in to `L2InteropCenter`. Keep its implementation
-  and storage-bearing inheritance unchanged. A common interface describes both layers; the L1
-  base owns its pause and reentrancy wrappers. Moving L2 into the old PR's base
-  risks changing storage, preview behavior and code size. L2 keeps its existing
-  parser built-in and rejects the new L1-only attributes.
-- **Keep: governance-owned L1 proxy.** Deploy with the existing TUPP mechanism,
-  initialize with the deployer, then transfer ownership to ecosystem governance.
-  Reject zero owners and lock the implementation against initialization. A
-  built-in deployment is inappropriate for an L1 contract.
-- **Keep: remove the Bridgehub request entry points.** This assumes the fresh
-  v34 OS-only line has no external request consumers or external
-  `IL1CrossChainSender` implementers. The repository contains three production
-  implementers: L1AssetRouter, CTMDeploymentTracker and ChainRegistrationSender.
-  Repository search cannot prove absence of external implementations; the
-  assumption requires reviewer confirmation. One-release forwarding shims are
-  the alternative if that assumption is overturned.
-- **Keep: Bridgehub registry authorization.** Append `interopCenter` without
-  moving existing storage. Mailbox and L1 senders resolve the authorized caller
-  from this registry. Per-chain diamond storage would save a registry lookup
-  but require another migration and introduce duplicated configuration.
-  Measurements are recorded in `HANDOFF.md`.
-- **Keep: interop vocabulary.** Use `initiateIndirectCall`,
-  `confirmL2Transaction`, `IndirectCallRequest`, `INDIRECT_CALL_MAGIC_VALUE` and
-  `MIN_CROSS_CHAIN_SENDER_ADDRESS`. Preserve the internal nullifier confirmation
-  selector and historical protocol-ops decoding. Retaining the old user-facing
-  vocabulary would leave two competing descriptions of the same send flow.
-- **Change: recognize both send entry points in PermanentRestriction.** An
-  asset-router recipient only identifies a migration when an actual
-  `indirectCall` attribute is present. Apply this to `sendMessage` and one-call
-  `sendBundle`; checking only `sendMessage`, as the old PR did, would leave the
-  equivalent bundle entry point outside migration-admin protection. The expected
-  asset handler is the registered `chainAssetHandler`, not Bridgehub; the current
-  chain-migration payload is handled there.
-- **Keep: exact funding and caller identity.** ETH base-token direct sends use
-  exactly `mintValue`; indirect sends use `mintValue + indirectCallMessageValue`.
-  Other base tokens require zero ETH for direct sends and exactly the indirect
-  call's ETH value for indirect sends. The indirect priority sender remains the
-  cross-chain sender, preserving Prividium's asset-router filtering.
+The center uses the ERC-7786 send interface, with a priority-transport extension:
+`l1ToL2TransactionParams` is required. It does not implement the standard's
+empty-attribute send behavior. Callers must choose and fund the destination gas
+budget; the interface does not infer these parameters.
 
-`l2TransactionBaseCost` is available on L1InteropCenter. Existing internal
-Bridgehub cost queries can remain as registry convenience methods. MessageSent
-identifies the resolved destination-side recipient, including indirect sends.
+| Attribute                                                                                   | Purpose                                                                   | Bundle placement |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------- |
+| `l1ToL2TransactionParams(mintValue, l2GasLimit, l2GasPerPubdataByteLimit, refundRecipient)` | Required priority-transaction funding and gas parameters                  | Bundle           |
+| `interopCallValue(uint256)`                                                                 | Value delivered on the destination chain                                  | Call             |
+| `indirectCall(uint256)`                                                                     | Select a source-side cross-chain sender and the ETH value forwarded to it | Call             |
+| `factoryDeps(bytes[])`                                                                      | Bytecode dependencies for a direct call                                   | Bundle           |
 
-Out of scope: the Era-only `Mailbox.requestL2Transaction` path (EVM-1668),
-L2-to-L1 execution in L1InteropHandler, priority-queue replacement, fee-model
-changes, and same-base-token funding changes (EVM-1395).
+`sendMessage` accepts these attributes in one list. `sendBundle` separates call and
+bundle attributes and requires exactly one call because the transport delivers one
+priority transaction. Duplicate, unknown, misplaced and truncated attributes revert.
+Factory dependencies are rejected on indirect sends, even when the array is empty;
+the cross-chain sender supplies the dependencies in that case. L1-only attributes
+are unsupported by the L2 parser, and L2-only attributes are unsupported on L1.
 
-## Discovery against the current branch
+Direct sends fund the base token and submit the destination call. For indirect sends,
+the recipient identifies an L1 cross-chain sender. The center funds the base token,
+calls `initiateIndirectCall` to construct the destination call, submits it to the
+Mailbox, then calls `confirmL2Transaction` with the canonical hash. The priority
+transaction's sender remains the cross-chain sender, including the asset-router
+identity used by Prividium. `MessageSent` records the initiating caller and the resolved destination recipient.
 
-Base: `cfbfd9231ed7033e8bb765650f9d8f83c37d679c`, a fresh full clone of
-`draft/v0.34.0` (`--is-shallow-repository` is `false`). Prior implementation:
-`630297df0e387a0bf1427941459611954bee74b3`; merge base:
-`348eb744af5f678d6af35538d69fabecb4cfe1a5`. The current base has 511 commits since
-that merge base, rather than the plan's 480. Separate historical diffs for
-contracts, deployment scripts, tests and protocol-ops were produced for review;
-the old L1InteropCenter implementation and its 22-test suite are the design and
-test reference, not a branch to merge.
+ETH funding must be exact:
 
-The L1 entry points, missing L1 attributes, Bridgehub split, dynamically resolved
-refund handling, and three sender implementations match the plan. The current
-refund helper returns both an address and a finality flag; the migration must
-preserve the existing treatment of that flag. The Bridgehub base ends with a
-36-slot reserved gap. No existing live slot may move.
+| Destination base token | Direct send | Indirect send                    |
+| ---------------------- | ----------- | -------------------------------- |
+| ETH                    | `mintValue` | `mintValue + indirectCall` value |
+| ERC20                  | Zero        | `indirectCall` value             |
 
-PR #2454 is merged. The current genesis still declares protocol `0.32.0` and
-execution version 5; `release/v0.33.0-atomic-interop` is not an ancestor. Upgrade
-scripts currently have `default-upgrade/` and `v31/`, without a `v34/` directory.
-The restored `v0.32.2` harness state is the protocol-v31 baseline, not v33.
-Foundry v1.5.1, commit `b0a9dd9ce`, matches the installed upstream toolchain.
+ERC20 base-token approvals target the NativeTokenVault discovered through the asset
+router, which pulls the funding. Governance and chain-admin helpers use the same
+caller for approval and message submission.
 
-## Prior PR decisions
+## Authorization and storage
 
-The design bullets above record the retained decisions and alternatives.
-Additional dispositions: **drop** the attempted Era entry-point removal (the
-prior PR reverted it); **drop** edits to removed EraVM workspaces and legacy
-bridges; **change** deployment wiring to the current split Bridgehub and handler
-precedent; **keep** canonical-hash confirmation and ChainRegistrationSender's
-confirmation access check; **keep** historical ABI decoders for past upgrades;
-**change** the old L2 refactor to a rename that preserves current atomic and
-preview logic. Runtime size, storage-layout comparisons, gas measurements and
-validation outcomes belong in `HANDOFF.md` once measured.
+The L1 center is a transparent upgradeable proxy owned by ecosystem governance.
+Sends are permissionless, pausable by the owner and protected against reentry.
+The implementation is locked against initialization and initialization rejects a
+zero owner.
+
+Bridgehub stores `interopCenter` in the first slot of its reserved gap. Mailbox and
+the L1 senders resolve authorization through this registry. The extra lookup avoids
+duplicating configuration in every chain's diamond storage. Existing live storage
+fields retain their positions.
+
+PermanentRestriction recognizes chain migrations through indirect `sendMessage`
+and one-call `sendBundle`, validates the registered chain asset handler and enforces
+the migration-admin restriction. A direct message to the asset router is not a
+migration. Existing chain-admin restrictions must use this implementation before
+chain migrations are re-enabled.
+
+The L2 built-in is renamed to `interop-center/L2InteropCenter`. Its storage-bearing
+inheritance and executable runtime are unchanged. L1 and L2 share the send interface;
+the L1 implementation keeps its own wrappers and parsing.
 
 ## Deployment and migration
 
-Fresh ecosystems deploy a transparent upgradeable proxy, initialize it with the deployer,
-transfer ownership to governance and register it with `Bridgehub.setInteropCenter`.
-The ecosystem ownership-acceptance step completes the pending transfer to governance.
-Deployment and upgrade TOML uses
-`bridgehub.l1_interop_center_{implementation,proxy}_addr`.
+Fresh ecosystems deploy and initialize the center, transfer its ownership to
+governance, and register it through `Bridgehub.setInteropCenter`. Governance's
+ownership-acceptance step completes the pending transfer.
 
-The shared core upgrade flow (also exposed as `CoreUpgrade_v34`) deploys the proxy when
-absent. Stage 1 upgrades Bridgehub, then accepts the center's ownership and sets the registry
-before stage 2 can submit priority requests. The CTM upgrade regenerates the Mailbox facet.
-For an ecosystem already using this surface, set `has_l1_interop_center = true` in the upgrade
-inputs for both core and CTM preparation: discovery then reads the existing proxy and stage 1 upgrades its implementation.
-The default is false for historical source chains whose Bridgehub has no getter; discovery
-does not probe a missing method or suppress its revert.
+The core upgrade deploys the proxy when absent. Stage 1 upgrades Bridgehub, accepts
+the center's ownership and sets the registry before stage 2 submits priority
+requests. If Bridgehub is paused when the center is first registered, registration
+requires the center to be paused too. Pause the new center before stage 1 in this case;
+its owner must explicitly unpause it to resume sends. This check runs at activation,
+so a pause imposed after preparation cannot silently be lost.
+The per-chain upgrade installs the new Mailbox facet. Sends to an existing chain
+are unavailable between the ecosystem upgrade and that chain's Mailbox upgrade.
+The current upgrade CLI supports ZKsync OS chains; retained Era chains require a
+separately supported Mailbox migration.
+A center-introducing upgrade cannot combine `[new_gateway]` preparation: complete
+the ecosystem and gateway-chain upgrades, then run
+`protocol-ops chain gateway convert` separately.
 
-ERC20 base-token approvals target the NativeTokenVault discovered through the asset router;
-it pulls the request funding. Governance and chain-admin helpers retain the same caller
-for approval and message submission.
+Core and CTM upgrade inputs must explicitly set `has_l1_interop_center`: use `true` when
+the core already has a center, even if its chains have not upgraded yet, and `false`
+for historical Bridgehubs without the getter. Discovery retains an existing proxy,
+and stage 1 upgrades its implementation.
 
-No prior request selectors are forwarded. Integrators discover `interopCenter()` and migrate
-to the attributes above. The original `BridgehubDepositFinalized` event remains the gateway
-migration confirmation signal. The nullifier confirmation ABI and recovery data are unchanged.
-Historical Rust decoders and hash-manifest labels remain supported; artifacts that contain
-the center select the current message and governance-call layout.
+Deployment and upgrade output records
+`bridgehub.l1_interop_center_{implementation,proxy}_addr`; upgrade output also records
+`bridgehub.l1_interop_center_new_proxy` to identify an upgrade that introduces the
+center. Rust request decoding and simulation recognize the current send format.
 
-`factoryDeps` is rejected on indirect sends even when its array is empty. Duplicate,
-unknown and misplaced attributes revert. L2-only attributes remain unsupported on L1;
-L1-only attributes remain unsupported by the L2 parser.
+The full `ecosystem verify-upgrade` CLI remains scoped to the historical combined
+v31 gateway ceremony. It rejects center-bearing artifacts before loading gateway
+configuration or contacting RPCs; `--display-upgrade-data` can still print their
+calldata without validating it. End-to-end verification of the center migration
+requires a separately supported ceremony and is not provided by that legacy CLI.
 
-The handshake marker retains its original value:
+This migration intentionally breaks the old Bridgehub request and cross-chain sender
+APIs. Integrators must discover `interopCenter()` and encode the attributes above;
+there are no forwarding shims. L1 senders implement `initiateIndirectCall` and
+`confirmL2Transaction`. The nullifier confirmation ABI, failed-transfer recovery data
+and `BridgehubDepositFinalized` gateway confirmation event remain unchanged.
+`INDIRECT_CALL_MAGIC_VALUE` retains the numeric value
 `bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1)`.
-Only its Solidity identifier changes to `INDIRECT_CALL_MAGIC_VALUE`.
-The upgrade output also records `bridgehub.l1_interop_center_new_proxy` so verification
-can distinguish new CREATE2 provenance from an existing proxy's unchanged constructor.
+
+L2-to-L1 execution, replacement of priority-queue transport, fee-model changes and
+same-base-token funding changes are outside this migration.

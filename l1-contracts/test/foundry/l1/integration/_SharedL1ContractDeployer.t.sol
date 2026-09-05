@@ -8,7 +8,6 @@ import {DeployCTMIntegrationScript} from "./deploy-scripts/DeployCTMIntegration.
 import {RegisterCTM} from "../../../../deploy-scripts/ecosystem/RegisterCTM.s.sol";
 import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {IL1InteropCenter} from "contracts/interop/IL1InteropCenter.sol";
-import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";

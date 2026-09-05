@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -15,7 +15,6 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IInteropCenter, L2InteropCenter} from "contracts/interop/interop-center/L2InteropCenter.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {IndirectCallRequest} from "contracts/common/Messaging.sol";
 import {
     L1L2MessageParams,
     L1L2IndirectMessageParams
@@ -25,7 +24,6 @@ import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
 import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubSetter.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
-import {IL1CrossChainSender} from "contracts/bridge/interfaces/IL1CrossChainSender.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -43,37 +41,18 @@ import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymen
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {
-    MIN_CROSS_CHAIN_SENDER_ADDRESS,
     ETH_TOKEN_ADDRESS,
     HARD_CODED_CHAIN_ID,
     MAINNET_CHAIN_ID,
     MAX_NEW_FACTORY_DEPS,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-    SEPOLIA_CHAIN_ID,
-    INDIRECT_CALL_MAGIC_VALUE
+    SEPOLIA_CHAIN_ID
 } from "contracts/common/Config.sol";
 
-import {CrossChainSenderAddressTooLow} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
-import {
-    AssetIdAlreadyRegistered,
-    AssetIdNotSupported,
-    BridgeHubAlreadyRegistered,
-    CTMAlreadyRegistered,
-    CTMNotRegistered,
-    ChainIdIsHardcoded,
-    ChainIdTooBig,
-    MsgValueMismatch,
-    SharedBridgeNotSet,
-    SlotOccupied,
-    Unauthorized,
-    WrongMagicValue,
-    ZeroChainId
-} from "contracts/common/L1ContractErrors.sol";
+import {SlotOccupied} from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 abstract contract ExperimentalBridgeTestBase is Test {
-    using stdStorage for StdStorage;
-
     address weth;
     L1Bridgehub bridgehub;
     IInteropCenter interopCenter;
@@ -99,8 +78,6 @@ abstract contract ExperimentalBridgeTestBase is Test {
     SimpleExecutor simpleExecutor;
 
     bytes32 tokenAssetId;
-
-    bytes32 private constant LOCK_FLAG_ADDRESS = 0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4;
 
     bytes32 ETH_TOKEN_ASSET_ID =
         keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(uint160(ETH_TOKEN_ADDRESS)))));
@@ -224,13 +201,7 @@ abstract contract ExperimentalBridgeTestBase is Test {
         vm.expectRevert(SlotOccupied.selector);
         bridgehub.initialize(bridgeOwner);
 
-        vm.store(address(mockChainContract), LOCK_FLAG_ADDRESS, bytes32(uint256(1)));
-        bytes32 bridgehubLocation = bytes32(uint256(36));
-        vm.store(address(mockChainContract), bridgehubLocation, bytes32(uint256(uint160(address(bridgehub)))));
-        bytes32 baseTokenGasPriceNominatorLocation = bytes32(uint256(40));
-        vm.store(address(mockChainContract), baseTokenGasPriceNominatorLocation, bytes32(uint256(1)));
-        bytes32 baseTokenGasPriceDenominatorLocation = bytes32(uint256(41));
-        vm.store(address(mockChainContract), baseTokenGasPriceDenominatorLocation, bytes32(uint256(1)));
+        mockChainContract.setBaseTokenGasMultiplierPrice(1, 1);
         // The ownership can only be transferred by the current owner to a new owner via the two-step approach
 
         // Default owner calls transferOwnership
@@ -346,10 +317,7 @@ abstract contract ExperimentalBridgeTestBase is Test {
             mockRefundRecipient: address(0)
         });
 
-        l2TxnReqDirect.chainId = _setUpZKChainForChainId(l2TxnReqDirect.chainId);
-
-        assertTrue(bridgehub.baseTokenAssetId(l2TxnReqDirect.chainId) != ETH_TOKEN_ASSET_ID);
-        _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, true, address(0));
+        l2TxnReqDirect.chainId = _setUpZKChainForChainId(l2TxnReqDirect.chainId, ETH_TOKEN_ADDRESS);
 
         assertTrue(bridgehub.baseTokenAssetId(l2TxnReqDirect.chainId) == ETH_TOKEN_ASSET_ID);
         console.log(bridgehub.assetRouter().assetHandlerAddress(ETH_TOKEN_ASSET_ID));
@@ -382,7 +350,7 @@ abstract contract ExperimentalBridgeTestBase is Test {
     ) internal view returns (L1L2IndirectMessageParams memory) {
         L1L2IndirectMessageParams memory l2Req;
 
-        // Don't let the mintValue + indirectCallValue go beyond type(uint256).max since that calculation is required to be done by our test: test_requestL2TransactionTwoBridges_ETHCase
+        // Keep the total ETH funding within uint256.
 
         mintValue = bound(mintValue, 0, (type(uint256).max) / 2);
         indirectCallValue = bound(indirectCallValue, 0, (type(uint256).max) / 2);
@@ -442,36 +410,34 @@ abstract contract ExperimentalBridgeTestBase is Test {
         return abi.encode(abi.encode(diamondCutData), bytes(""));
     }
 
-    function _setUpZKChainForChainId(uint256 mockChainId) internal returns (uint256 mockChainIdInRange) {
-        mockChainId = bound(mockChainId, 1, type(uint48).max);
-        mockChainIdInRange = mockChainId;
-
-        if (!bridgehub.chainTypeManagerIsRegistered(address(mockCTM))) {
+    function _setUpZKChainForChainId(uint256 _chainId, address _baseToken) internal returns (uint256 chainId) {
+        chainId = bound(_chainId, 1, type(uint48).max);
+        vm.assume(chainId != block.chainid);
+        if (block.chainid == MAINNET_CHAIN_ID || block.chainid == SEPOLIA_CHAIN_ID) {
+            vm.assume(chainId != HARD_CODED_CHAIN_ID);
+        }
+        if (_baseToken != ETH_TOKEN_ADDRESS) {
+            ntv.registerToken(_baseToken);
+        }
+        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _baseToken);
+        if (!bridgehub.assetIdIsRegistered(baseTokenAssetId)) {
             vm.prank(bridgeOwner);
-            bridgehub.addChainTypeManager(address(mockCTM));
+            bridgehub.addTokenAssetId(baseTokenAssetId);
         }
 
-        // We need to set the chainTypeManager of the mockChainId to mockCTM
-        // There is no function to do that in the bridgehub
-        // So, perhaps we will have to manually set the values in the chainTypeManager mapping via a foundry cheatcode
-        assertTrue(!(bridgehub.chainTypeManager(mockChainId) == address(mockCTM)));
-
-        dummyBridgehub.setCTM(mockChainId, address(mockCTM));
-        dummyBridgehub.setZKChain(mockChainId, address(mockChainContract));
-    }
-
-    function _setUpBaseTokenForChainId(uint256 mockChainId, bool tokenIsETH, address token) internal {
-        if (tokenIsETH) {
-            token = ETH_TOKEN_ADDRESS;
-        } else {
-            ntv.registerToken(token);
-        }
-
-        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, token);
-
-        stdstore.target(address(bridgehub)).sig("baseTokenAssetId(uint256)").with_key(mockChainId).checked_write(
-            baseTokenAssetId
+        // Registry and custody tests isolate CTM deployment and genesis; requests use a mocked Mailbox.
+        vm.mockCall(
+            address(mockCTM),
+            abi.encodeWithSelector(mockCTM.createNewChain.selector),
+            abi.encode(address(mockChainContract))
         );
+        vm.mockCall(
+            address(mockChainContract),
+            abi.encodeWithSelector(IGetters.getZKsyncOS.selector),
+            abi.encode(false)
+        );
+        vm.prank(bridgeOwner);
+        bridgehub.createNewChain(chainId, address(mockCTM), baseTokenAssetId, 0, bridgeOwner, hex"", new bytes[](0));
     }
 
     function _createMockL2TransactionRequestDirect(

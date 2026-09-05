@@ -198,7 +198,6 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         );
         bytes memory indirectCallData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
 
-        // Compute required value (baseCost * 2 as in Utils.prepareL1L2IndirectMessage)
         uint256 l1GasPrice = _getL1GasPrice();
         uint256 requiredValue = bridgehub.l2TransactionBaseCost(
             _gatewayGovernanceConfig.gatewayChainId,

@@ -254,6 +254,12 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             "ctm_deployment_tracker_implementation_addr",
             coreAddresses.bridgehub.implementations.ctmDeploymentTracker
         );
+        vm.serializeAddress(
+            "bridgehub",
+            "l1_interop_center_implementation_addr",
+            coreAddresses.bridgehub.implementations.interopCenter
+        );
+        vm.serializeAddress("bridgehub", "l1_interop_center_proxy_addr", coreAddresses.bridgehub.proxies.interopCenter);
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", coreAddresses.bridgehub.proxies.messageRoot);
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",
@@ -273,12 +279,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridges.implementations.l1InteropHandler
         );
         vm.serializeAddress("bridges", "l1_interop_handler_proxy_addr", coreAddresses.bridges.proxies.l1InteropHandler);
-        vm.serializeAddress(
-            "bridgehub",
-            "l1_interop_center_implementation_addr",
-            coreAddresses.bridgehub.implementations.interopCenter
-        );
-        vm.serializeAddress("bridgehub", "l1_interop_center_proxy_addr", coreAddresses.bridgehub.proxies.interopCenter);
         vm.serializeAddress(
             "bridges",
             "shared_bridge_implementation_addr",

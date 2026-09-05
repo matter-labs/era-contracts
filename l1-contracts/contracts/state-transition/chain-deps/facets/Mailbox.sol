@@ -268,7 +268,7 @@ contract MailboxFacet is ZKChainBase, IMailbox {
         bool is7702AccountSender = false;
 
         if (block.chainid == L1_CHAIN_ID) {
-            is7702AccountSender = EIP_7702_CHECKER.isEIP7702Account(request.sender); // This is not the same as refundRecipient, because indirect calls use the asset router as sender.
+            is7702AccountSender = EIP_7702_CHECKER.isEIP7702Account(request.sender); // This is not the same as refundRecipient, because indirect calls use the cross-chain sender.
             if (!refundAliasingFinalized) {
                 // The recipient resolves to the sender when the recipient was unset — reuse the sender check.
                 is7702AccountRefundRecipient = refundRecipient == request.sender

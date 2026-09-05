@@ -20,6 +20,7 @@ import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAss
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 
@@ -117,14 +118,19 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         } else {
             coreAddresses.bridges.implementations.l1InteropHandler = deploySimpleContract("L1InteropHandler");
         }
+        super.deployNewEcosystemContractsL1();
         if (coreAddresses.bridgehub.proxies.interopCenter == address(0)) {
-            (
-                coreAddresses.bridgehub.implementations.interopCenter,
-                coreAddresses.bridgehub.proxies.interopCenter
-            ) = deployTuppWithContract("L1InteropCenter");
+            coreAddresses.bridgehub.proxies.interopCenter = deployViaCreate2AndNotify(
+                type(TransparentUpgradeableProxy).creationCode,
+                abi.encode(
+                    coreAddresses.bridgehub.implementations.interopCenter,
+                    transparentProxyAdmin(),
+                    getInitializeCalldata("L1InteropCenter")
+                ),
+                "TransparentUpgradeableProxy",
+                "L1InteropCenter Proxy"
+            );
             deployedL1InteropCenter = true;
-        } else {
-            coreAddresses.bridgehub.implementations.interopCenter = deploySimpleContract("L1InteropCenter");
         }
     }
 
@@ -203,10 +209,11 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     function _buildL1InteropCenterWiringCalls() internal returns (Call[] memory calls) {
         address center = coreAddresses.bridgehub.proxies.interopCenter;
         require(center != address(0), "L1InteropCenter proxy not deployed");
+        if (!deployedL1InteropCenter) {
+            return calls;
+        }
         calls = new Call[](2);
-        calls[0] = deployedL1InteropCenter
-            ? Call({target: center, value: 0, data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())})
-            : _buildCallProxyUpgrade(center, coreAddresses.bridgehub.implementations.interopCenter);
+        calls[0] = Call({target: center, value: 0, data: abi.encodeCall(Ownable2StepUpgradeable.acceptOwnership, ())});
         calls[1] = Call({
             target: coreAddresses.bridgehub.proxies.bridgehub,
             value: 0,

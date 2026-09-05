@@ -25,8 +25,14 @@ import {AttributesDecoder} from "../AttributesDecoder.sol";
 import {IERC7786Attributes} from "../IERC7786Attributes.sol";
 import {IERC7786GatewaySource} from "../IERC7786GatewaySource.sol";
 import {IL1InteropCenter, L1MessageAttributes} from "../IL1InteropCenter.sol";
-import {InteropCenterBase} from "./InteropCenterBase.sol";
+import {IInteropCenterBase} from "../IInteropCenterBase.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
+import {ERC7930_V1_MIN_LENGTH} from "../InteropConstants.sol";
 import {
+    InteroperableAddressChainReferenceNotEmpty,
+    InteroperableAddressNotEmpty,
     AttributeAlreadySet,
     AttributeViolatesRestriction,
     FactoryDepsNotAllowedForIndirectCall,
@@ -38,7 +44,7 @@ import {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Sends L1 messages through the Mailbox; see {protocol-docs/l1-interop-center.md}.
-contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
+contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     enum L1AttributeParsingRestrictions {
         OnlyCallAttributes,
         OnlyBundleAttributes,
@@ -72,11 +78,12 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
                     L1InteropCenter entry points
     //////////////////////////////////////////////////////////////*/
 
-    function _sendMessage(
+    /// @inheritdoc IERC7786GatewaySource
+    function sendMessage(
         bytes calldata _recipient,
         bytes calldata _payload,
         bytes[] calldata _attributes
-    ) internal override returns (bytes32 sendId) {
+    ) external payable override whenNotPaused nonReentrant returns (bytes32 sendId) {
         (uint256 destinationChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_recipient);
 
         L1MessageAttributes memory attributes = parseL1Attributes(_attributes);
@@ -89,12 +96,12 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
         });
     }
 
-    /// @dev L1 accepts the shared bundle interface but delivers exactly one call as one priority transaction.
-    function _sendBundle(
+    /// @inheritdoc IInteropCenterBase
+    function sendBundle(
         bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
-    ) internal override returns (bytes32 sendId) {
+    ) external payable override whenNotPaused nonReentrant returns (bytes32 bundleHash) {
         uint256 callCount = _callStarters.length;
         require(callCount == 1, SingleCallBundleRequired(callCount));
 
@@ -119,7 +126,7 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
         attributes.indirectCall = callAttributes.indirectCall;
         attributes.indirectCallMessageValue = callAttributes.indirectCallMessageValue;
 
-        sendId = _sendSingleCall({
+        bundleHash = _sendSingleCall({
             _destinationChainId: destinationChainId,
             _recipientAddress: recipientAddress,
             _payload: callStarter.data,
@@ -343,10 +350,6 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
     ) private pure returns (L1MessageAttributes memory l1MessageAttributes) {
         bool[SUPPORTED_L1_INTEROP_ATTRIBUTES] memory attributeUsed;
 
-        // The `l1ToL2TransactionParams` attribute is required, since without it the L1->L2 priority
-        // transaction that delivers the message can not be formed.
-        bool hasL1ToL2TransactionParams = false;
-
         uint256 attributesLength = _attributes.length;
         for (uint256 i = 0; i < attributesLength; ++i) {
             bytes4 selector = bytes4(_attributes[i]);
@@ -375,7 +378,6 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
                 );
                 require(!attributeUsed[2], AttributeAlreadySet(selector));
                 attributeUsed[2] = true;
-                hasL1ToL2TransactionParams = true;
                 (
                     l1MessageAttributes.mintValue,
                     l1MessageAttributes.l2GasLimit,
@@ -397,7 +399,7 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
         }
 
         require(
-            _restriction == L1AttributeParsingRestrictions.OnlyCallAttributes || hasL1ToL2TransactionParams,
+            _restriction == L1AttributeParsingRestrictions.OnlyCallAttributes || attributeUsed[2],
             L1ToL2TransactionParamsMissing()
         );
     }
@@ -424,5 +426,40 @@ contract L1InteropCenter is IL1InteropCenter, InteropCenterBase {
                 IERC7786Attributes.l1ToL2TransactionParams.selector,
                 IERC7786Attributes.factoryDeps.selector
             ];
+    }
+
+    /// @notice Verifies that an ERC-7930 address has an empty chain-reference field.
+    function _ensureEmptyChainReference(bytes calldata _interoperableAddress) private pure {
+        require(
+            _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH,
+            InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
+        );
+        uint8 chainReferenceLength = uint8(_interoperableAddress[0x04]);
+        require(chainReferenceLength == 0, InteroperableAddressChainReferenceNotEmpty(_interoperableAddress));
+    }
+
+    /// @notice Verifies that an ERC-7930 address has an empty address field.
+    function _ensureEmptyAddress(bytes calldata _interoperableAddress) private pure {
+        require(
+            _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH,
+            InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
+        );
+        uint8 chainReferenceLength = uint8(_interoperableAddress[0x04]);
+        require(
+            _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH + chainReferenceLength,
+            InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
+        );
+        uint8 addressLength = uint8(_interoperableAddress[0x05 + chainReferenceLength]);
+        require(addressLength == 0, InteroperableAddressNotEmpty(_interoperableAddress));
+    }
+
+    /// @inheritdoc IInteropCenterBase
+    function pause() external override onlyOwner {
+        _pause();
+    }
+
+    /// @inheritdoc IInteropCenterBase
+    function unpause() external override onlyOwner {
+        _unpause();
     }
 }

@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.28;
 
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
+import {InteropCenterNotPaused} from "./L1BridgehubErrors.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
@@ -133,6 +135,9 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// @inheritdoc IL1Bridgehub
     function setInteropCenter(address _interopCenter) external override onlyOwnerOrUpgrader {
         require(_interopCenter != address(0), ZeroAddress());
+        if (interopCenter == address(0) && paused()) {
+            require(PausableUpgradeable(_interopCenter).paused(), InteropCenterNotPaused());
+        }
         interopCenter = _interopCenter;
         emit InteropCenterSet(_interopCenter);
     }

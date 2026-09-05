@@ -17,9 +17,7 @@ import {NotInGatewayMode, NotRelayedSender} from "./L1BridgehubErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev The Bridgehub contract serves as the primary entry point for L1->L2 communication,
-/// facilitating interactions between end user and bridges.
-/// It also manages state transition managers, base tokens, and chain registrations.
+/// @notice Tracks registered chains and settlement layers on L2.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     using EnumerableMap for EnumerableMap.UintToAddressMap;

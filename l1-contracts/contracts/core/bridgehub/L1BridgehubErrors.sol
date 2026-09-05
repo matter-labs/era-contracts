@@ -36,6 +36,8 @@ error HistoricalSettlementLayerMismatch(uint256 expectedSettlementLayer, uint256
 error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
 // 0xf5e39c1f
 error IncorrectSender(address prevMsgSender, address chainAdmin);
+// 0xb82d5a0e
+error InteropCenterNotPaused();
 // 0x896555dc
 error InvalidSettlementLayerForBatch(uint256 chainId, uint256 batchNumber, uint256 claimedSettlementLayer);
 // 0x47d42b1b

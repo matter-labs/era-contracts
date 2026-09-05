@@ -99,14 +99,4 @@ contract L1InteropCenterIntegrationTest is BridgehubInvariantTests {
             depositERC20ToBridgeSuccess(0, chain, 1, 1 ether);
         }
     }
-
-    function test_directEthPriorityTransaction() public {
-        for (uint256 i = 0; i < zkChainIds.length; ++i) {
-            if (getZKChainBaseToken(zkChainIds[i]) == ETH_TOKEN_ADDRESS) {
-                depositEthToBridgeSuccess(0, i, 1 ether);
-                return;
-            }
-        }
-        assertTrue(false, "ETH-base chain missing from integration harness");
-    }
 }

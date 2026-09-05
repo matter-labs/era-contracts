@@ -44,7 +44,7 @@ import {TxStatus} from "../../common/Messaging.sol";
 contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    /// @dev Bridgehub smart contract used for asynchronous cross-chain requests, including deposits and interop-related routing.
+    /// @notice The L1 registry used to resolve chains and the authorized Interop Center.
     IL1Bridgehub public immutable BRIDGE_HUB;
 
     /// @dev Chain ID of Era for legacy reasons
