@@ -2,6 +2,13 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {
+    SERVER_NOTIFIER_OWNER_SLOT,
+    SERVER_NOTIFIER_PENDING_OWNER_SLOT,
+    SERVER_NOTIFIER_CHAIN_TYPE_MANAGER_SLOT,
+    SERVER_NOTIFIER_UPGRADE_TIMESTAMP_SLOT,
+    SERVER_NOTIFIER_PRECONDITION_CHECKER_SLOT
+} from "foundry-test/TestConstants.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
@@ -11,21 +18,51 @@ import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainType
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DummyChainAssetHandler} from "contracts/dev-contracts/test/DummyChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IUpgradePreconditionChecker} from "contracts/upgrades/IUpgradePreconditionChecker.sol";
+import {UPGRADE_PRECONDITION_CHECKER_MAGIC} from "contracts/upgrades/UpgradePreconditionCheckerConfig.sol";
 import {
     CutDataForProtocolVersionNotAvailable,
     InvalidProtocolVersion,
     Unauthorized,
+    UpgradePreconditionCheckerMagicMismatch,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
+
+// Isolates notifier behavior from any release-specific prerequisites.
+contract UpgradePreconditionCheckerStub is IUpgradePreconditionChecker {
+    bool public ready = true;
+
+    function setReady(bool _ready) external {
+        ready = _ready;
+    }
+
+    /// @inheritdoc IUpgradePreconditionChecker
+    function getSupportsUpgradePreconditionCheckerMagic() external pure returns (bytes32) {
+        return UPGRADE_PRECONDITION_CHECKER_MAGIC;
+    }
+
+    /// @inheritdoc IUpgradePreconditionChecker
+    function checkUpgradePreconditions(uint256, address) external view {
+        require(ready, "Upgrade not ready");
+    }
+}
+
+contract WrongMagicChecker {
+    function getSupportsUpgradePreconditionCheckerMagic() external pure returns (bytes32) {
+        return keccak256("NotAnUpgradePreconditionChecker");
+    }
+}
 
 contract ServerNotifierTest is Test {
     ServerNotifier internal serverNotifier;
     DummyChainTypeManager internal chainTypeManager;
     DummyBridgehub internal bridgehub;
     DummyChainAssetHandler internal chainAssetHandler;
+    UpgradePreconditionCheckerStub internal checker;
 
     address internal owner;
     address internal chainAdmin;
+    address internal chain;
     uint256 internal chainId;
     uint256 internal protocolVersion;
 
@@ -34,6 +71,8 @@ contract ServerNotifierTest is Test {
         protocolVersion = 42;
         owner = makeAddr("owner");
         chainAdmin = makeAddr("chainAdmin");
+        chain = makeAddr("chainDiamond");
+        checker = new UpgradePreconditionCheckerStub();
 
         // Set up mock bridgehub and chain asset handler
         bridgehub = new DummyBridgehub();
@@ -45,6 +84,8 @@ contract ServerNotifierTest is Test {
 
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
         chainTypeManager._setChainProtocolVersion(chainId, protocolVersion);
+        chainTypeManager.setZKChain(chainId, chain);
+        chainTypeManager.setUpgradeCutHash(protocolVersion, keccak256("upgradeCutHash"));
 
         ServerNotifier implementation = new ServerNotifier();
 
@@ -59,7 +100,7 @@ contract ServerNotifierTest is Test {
 
         serverNotifier = ServerNotifier(address(proxy));
 
-        vm.startPrank(owner);
+        vm.prank(owner);
         serverNotifier.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
     }
 
@@ -78,6 +119,7 @@ contract ServerNotifierTest is Test {
     }
 
     function test_setUpgradeTimestampCutDataForProtocolVersionNotAvailableReverts() public {
+        chainTypeManager.setUpgradeCutHash(protocolVersion, bytes32(0));
         uint deadline = block.timestamp + 7 days;
 
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
@@ -206,5 +248,168 @@ contract ServerNotifierTest is Test {
         // OZ's initializer modifier runs before reentrancyGuardInitializer and rejects re-initialization
         vm.expectRevert("Initializable: contract is already initialized");
         serverNotifier.initialize(owner);
+    }
+
+    function _registerChecker() internal {
+        vm.prank(owner);
+        serverNotifier.setUpgradePreconditionChecker(protocolVersion, checker);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        setUpgradePreconditionChecker
+    //////////////////////////////////////////////////////////////*/
+
+    function test_setCheckerRegistersAndEmits() public {
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        emit IServerNotifier.UpgradePreconditionCheckerSet(protocolVersion, address(checker));
+
+        vm.prank(owner);
+        serverNotifier.setUpgradePreconditionChecker(protocolVersion, checker);
+
+        assertEq(address(serverNotifier.upgradePreconditionChecker(protocolVersion)), address(checker));
+    }
+
+    function test_setCheckerCanDeregister() public {
+        _registerChecker();
+
+        vm.expectEmit(true, false, false, true, address(serverNotifier));
+        emit IServerNotifier.UpgradePreconditionCheckerSet(protocolVersion, address(0));
+
+        vm.prank(owner);
+        serverNotifier.setUpgradePreconditionChecker(protocolVersion, IUpgradePreconditionChecker(address(0)));
+
+        assertEq(address(serverNotifier.upgradePreconditionChecker(protocolVersion)), address(0));
+
+        uint256 deadline = block.timestamp + 7 days;
+        checker.setReady(false);
+        vm.prank(chainAdmin);
+        serverNotifier.setUpgradeTimestamp(chainId, deadline);
+
+        assertEq(serverNotifier.protocolVersionToUpgradeTimestamp(chainId, protocolVersion), deadline);
+    }
+
+    function test_setCheckerRevertsIfNotOwner() public {
+        vm.prank(chainAdmin);
+        vm.expectRevert("Ownable: caller is not the owner");
+        serverNotifier.setUpgradePreconditionChecker(protocolVersion, checker);
+    }
+
+    function test_setCheckerRevertsOnWrongMagic() public {
+        _registerChecker();
+        WrongMagicChecker wrongMagic = new WrongMagicChecker();
+
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(UpgradePreconditionCheckerMagicMismatch.selector, address(wrongMagic)));
+        serverNotifier.setUpgradePreconditionChecker(protocolVersion, IUpgradePreconditionChecker(address(wrongMagic)));
+
+        assertEq(address(serverNotifier.upgradePreconditionChecker(protocolVersion)), address(checker));
+    }
+
+    function test_setCheckerRevertsOnContractWithoutMagicGetter() public {
+        vm.prank(owner);
+        vm.expectRevert();
+        serverNotifier.setUpgradePreconditionChecker(
+            protocolVersion,
+            IUpgradePreconditionChecker(address(chainTypeManager))
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    setUpgradeTimestamp with a checker
+    //////////////////////////////////////////////////////////////*/
+
+    function test_setUpgradeTimestampPassesWhenPreconditionsHold() public {
+        _registerChecker();
+        uint256 deadline = block.timestamp + 7 days;
+
+        vm.expectCall(address(checker), abi.encodeCall(checker.checkUpgradePreconditions, (chainId, chain)));
+        vm.expectEmit(true, true, true, true, address(serverNotifier));
+        emit IServerNotifier.UpgradeTimestampUpdated(chainId, protocolVersion, deadline);
+
+        vm.prank(chainAdmin);
+        serverNotifier.setUpgradeTimestamp(chainId, deadline);
+
+        assertEq(serverNotifier.protocolVersionToUpgradeTimestamp(chainId, protocolVersion), deadline);
+    }
+
+    function test_setUpgradeTimestampRevertsWhenPreconditionsFail() public {
+        _registerChecker();
+        checker.setReady(false);
+
+        vm.prank(chainAdmin);
+        vm.expectRevert("Upgrade not ready");
+        serverNotifier.setUpgradeTimestamp(chainId, block.timestamp + 7 days);
+
+        assertEq(
+            serverNotifier.protocolVersionToUpgradeTimestamp(chainId, protocolVersion),
+            0,
+            "no timestamp may be recorded when scheduling reverts"
+        );
+    }
+
+    function test_checkerForOtherVersionDoesNotAffectScheduling() public {
+        vm.prank(owner);
+        serverNotifier.setUpgradePreconditionChecker(protocolVersion + 1, checker);
+        checker.setReady(false);
+
+        uint256 deadline = block.timestamp + 7 days;
+        vm.prank(chainAdmin);
+        serverNotifier.setUpgradeTimestamp(chainId, deadline);
+
+        assertEq(serverNotifier.protocolVersionToUpgradeTimestamp(chainId, protocolVersion), deadline);
+    }
+
+    function test_failedReschedulingPreservesTimestamp() public {
+        _registerChecker();
+        uint256 deadline = block.timestamp + 7 days;
+        vm.prank(chainAdmin);
+        serverNotifier.setUpgradeTimestamp(chainId, deadline);
+
+        checker.setReady(false);
+        vm.prank(chainAdmin);
+        vm.expectRevert("Upgrade not ready");
+        serverNotifier.setUpgradeTimestamp(chainId, deadline + 1 days);
+
+        assertEq(serverNotifier.protocolVersionToUpgradeTimestamp(chainId, protocolVersion), deadline);
+    }
+
+    function _load(uint256 _slot) internal view returns (bytes32) {
+        return vm.load(address(serverNotifier), bytes32(_slot));
+    }
+
+    function test_ownerSlot() public view {
+        assertEq(_load(SERVER_NOTIFIER_OWNER_SLOT), bytes32(uint256(uint160(owner))));
+    }
+
+    function test_pendingOwnerAndInitializedSlot() public {
+        address pendingOwner = makeAddr("pendingOwner");
+        vm.prank(owner);
+        serverNotifier.transferOwnership(pendingOwner);
+
+        // `_pendingOwner` occupies the low 20 bytes; `_initialized = 1` starts at byte 20.
+        bytes32 expected = bytes32((uint256(1) << 160) | uint256(uint160(pendingOwner)));
+        assertEq(_load(SERVER_NOTIFIER_PENDING_OWNER_SLOT), expected);
+    }
+
+    function test_chainTypeManagerSlot() public view {
+        assertEq(_load(SERVER_NOTIFIER_CHAIN_TYPE_MANAGER_SLOT), bytes32(uint256(uint160(address(chainTypeManager)))));
+    }
+
+    function test_upgradeTimestampMappingSlot() public {
+        uint256 deadline = block.timestamp + 7 days;
+        vm.prank(chainAdmin);
+        serverNotifier.setUpgradeTimestamp(chainId, deadline);
+
+        bytes32 innerSlot = keccak256(abi.encode(chainId, SERVER_NOTIFIER_UPGRADE_TIMESTAMP_SLOT));
+        bytes32 valueSlot = keccak256(abi.encode(protocolVersion, innerSlot));
+        assertEq(uint256(_load(uint256(valueSlot))), deadline);
+    }
+
+    function test_preconditionCheckerMappingSlot() public {
+        vm.prank(owner);
+        serverNotifier.setUpgradePreconditionChecker(protocolVersion, checker);
+
+        bytes32 valueSlot = keccak256(abi.encode(protocolVersion, SERVER_NOTIFIER_PRECONDITION_CHECKER_SLOT));
+        assertEq(uint256(_load(uint256(valueSlot))), uint256(uint160(address(checker))));
     }
 }

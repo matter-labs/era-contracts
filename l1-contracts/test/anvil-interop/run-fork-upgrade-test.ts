@@ -49,8 +49,8 @@ import {
   decodeGovernanceCalls,
   executeGovernanceCalls,
   prepareUpgradeHarnessInputs,
-  readCtmUpgradeAddresses,
   readEcosystemOutput,
+  readNestedString,
   runChainUpgradesAndRelayL2,
   runChainUpgradesPerCtm,
   runEcosystemUpgradeScripts,
@@ -367,8 +367,12 @@ async function main(): Promise<void> {
           "script-out",
           `v31-upgrade-ctm-${chainTypeManager.toLowerCase()}.toml`
         );
-        const { settlementLayerUpgradeAddr, upgradePreconditionCheckerAddr: expectedCheckerAddress } =
-          readCtmUpgradeAddresses(ctmTomlPath);
+        const ctmOutputToml = readEcosystemOutput(ctmTomlPath);
+        const settlementLayerUpgradeAddr = readNestedString(
+          ctmOutputToml,
+          ["state_transition", "default_upgrade_addr"],
+          "per-chain upgrade contract address"
+        );
         await runChainUpgradesAndRelayL2({
           l1Provider,
           anvilManager,
@@ -377,8 +381,6 @@ async function main(): Promise<void> {
           ctmAddr: chainTypeManager,
           upgradeChainAddresses,
           protocolOpsOutDir: chainsOutDir,
-          expectedCheckerAddress,
-          frozenV31Fixture: false,
         });
       }
     }

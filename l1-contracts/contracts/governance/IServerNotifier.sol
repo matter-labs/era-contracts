@@ -55,10 +55,4 @@ interface IServerNotifier {
     /// @param _oldProtocolVersion The protocol version chains upgrade *from*.
     /// @param _checker The checker to consult in `setUpgradeTimestamp`; zero to deregister.
     function setUpgradePreconditionChecker(uint256 _oldProtocolVersion, IUpgradePreconditionChecker _checker) external;
-
-    /// @notice Reports failed upgrade-cut and precondition checks for scheduling.
-    /// @dev Dependency calls may still revert and caller or timestamp validation is not evaluated.
-    /// @param _chainId The ID of the chain to dry-run scheduling for.
-    /// @return failed The error selectors of the failed checks; empty when the checks pass.
-    function previewUpgradePreconditions(uint256 _chainId) external view returns (bytes4[] memory failed);
 }

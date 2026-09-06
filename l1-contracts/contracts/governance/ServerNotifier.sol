@@ -139,19 +139,4 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
         upgradePreconditionChecker[_oldProtocolVersion] = _checker;
         emit UpgradePreconditionCheckerSet(_oldProtocolVersion, address(_checker));
     }
-
-    /// @inheritdoc IServerNotifier
-    function previewUpgradePreconditions(uint256 _chainId) external view returns (bytes4[] memory failed) {
-        uint256 oldProtocolVersion = chainTypeManager.getProtocolVersion(_chainId);
-        if (chainTypeManager.upgradeCutHash(oldProtocolVersion) == bytes32(0)) {
-            failed = new bytes4[](1);
-            failed[0] = CutDataForProtocolVersionNotAvailable.selector;
-            return failed;
-        }
-        IUpgradePreconditionChecker checker = upgradePreconditionChecker[oldProtocolVersion];
-        if (address(checker) == address(0)) {
-            return failed;
-        }
-        failed = checker.previewUpgradePreconditions(_chainId, chainTypeManager.getZKChain(_chainId));
-    }
 }

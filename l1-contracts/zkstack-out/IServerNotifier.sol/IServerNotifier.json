@@ -27,25 +27,6 @@
   },
   {
     "type": "function",
-    "name": "previewUpgradePreconditions",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "failed",
-        "type": "bytes4[]",
-        "internalType": "bytes4[]"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "protocolVersionToUpgradeTimestamp",
     "inputs": [
       {
