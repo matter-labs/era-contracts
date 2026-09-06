@@ -1,4 +1,4 @@
-import { encodeDirectInteropRequest, encodeIndirectInteropRequest } from "../core/interop-requests";
+import { encodeDirectInteropRequest } from "../core/interop-requests";
 import type { BigNumber } from "ethers";
 import { Contract, Wallet, ethers } from "ethers";
 import type { CoreDeployedAddresses } from "../core/types";
@@ -9,10 +9,9 @@ import {
   ANVIL_INTEROP_BASE_TOKEN_PRIORITY_TX_GAS_LIMIT,
   ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI,
   ANVIL_INTEROP_REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-  ETH_TOKEN_ADDRESS,
+  ERC20_DEPOSIT_L2_GAS_LIMIT,
 } from "../core/const";
-import { runtimeConfig } from "../core/runtime-config";
-import { encodeAssetRouterDepositData, encodeBridgeBurnData, encodeNtvAssetId } from "../core/data-encoding";
+import { submitERC20Deposit } from "./l1-deposit-submission";
 
 export interface DepositETHParams {
   l1RpcUrl: string;
@@ -124,79 +123,29 @@ export async function depositETHToL2(params: DepositETHParams): Promise<DepositE
   };
 }
 
-/**
- * Deposit an L1 ERC20 token to an L2 chain via L1InteropCenter.sendMessage with indirectCall.
- *
- * This uses L1AssetRouter as the cross-chain sender and relays the emitted priority requests
- * to the target chain (or L1 -> GW -> L2 for GW-settled chains).
- *
- * Only ETH-base-token chains are supported here, since mintValue is currently paid in ETH.
- */
+/** Submits an ERC20 deposit and relays its priority requests through the Anvil fixture. */
 export async function depositERC20ToL2(params: DepositERC20Params): Promise<DepositERC20Result> {
   const { l1RpcUrl, l2RpcUrl, chainId, l1Addresses, tokenAddress, amount } = params;
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
   const l1Provider = createProvider(l1RpcUrl);
   const l1Wallet = new Wallet(privateKey, l1Provider);
-  const recipient = params.recipient || l1Wallet.address;
-
-  const bridgehub = new Contract(l1Addresses.bridgehub, getAbi("L1Bridgehub"), l1Wallet);
-  const interopCenter = new Contract(await bridgehub.interopCenter(), getAbi("L1InteropCenter"), l1Wallet);
-  const assetRouter = new Contract(l1Addresses.l1SharedBridge, getAbi("L1AssetRouter"), l1Wallet);
-  const nativeTokenVault = new Contract(l1Addresses.l1NativeTokenVault, getAbi("L1NativeTokenVault"), l1Wallet);
-  const token = new Contract(tokenAddress, getAbi("TestnetERC20Token"), l1Wallet);
-
-  const ethAssetId = encodeNtvAssetId(runtimeConfig.l1ChainId, ETH_TOKEN_ADDRESS);
-  const chainBaseTokenAssetId: string = await bridgehub.baseTokenAssetId(chainId);
-  if (chainBaseTokenAssetId !== ethAssetId) {
-    throw new Error(
-      `depositERC20ToL2 only supports ETH-base-token chains; chain ${chainId} uses ${chainBaseTokenAssetId}`
-    );
-  }
-
-  let assetId: string = await nativeTokenVault.assetId(tokenAddress);
-  if (assetId === ethers.constants.HashZero) {
-    const registerTx = await nativeTokenVault.registerToken(tokenAddress, { gasLimit: 500_000 });
-    await registerTx.wait();
-    assetId = await nativeTokenVault.assetId(tokenAddress);
-  }
-
-  // The NativeTokenVault pulls the tokens directly via `safeTransferFrom` during
-  // `initiateIndirectCall` (see `NativeTokenVaultBase._depositFunds`), so the caller
-  // must approve the NTV — not the asset router. (Legacy removal deleted the
-  // shared-bridge token-pull path that used to require an asset-router approval.)
-  const currentAllowance = await token.allowance(l1Wallet.address, l1Addresses.l1NativeTokenVault);
-  if (currentAllowance.lt(amount)) {
-    const approveTx = await token.approve(l1Addresses.l1NativeTokenVault, amount);
-    await approveTx.wait();
-  }
-
-  const l2GasLimit = 2_000_000;
-  const l2GasPerPubdataByteLimit = ANVIL_INTEROP_REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
-  const gasPrice = ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI;
-  const mintValue = await interopCenter.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, l2GasPerPubdataByteLimit);
-
-  const indirectCallData = encodeAssetRouterDepositData(assetId, encodeBridgeBurnData(amount, recipient, tokenAddress));
-
-  const message = encodeIndirectInteropRequest({
-    chainId,
+  const {
+    receipt: l1Receipt,
     mintValue,
-    l2Value: 0,
-    l2GasLimit,
-    l2GasPerPubdataByteLimit,
-    refundRecipient: recipient,
-    crossChainSender: assetRouter.address,
-    indirectCallValue: 0,
-    indirectCallData,
+    assetId,
+  } = await submitERC20Deposit(l1Wallet, {
+    bridgehubAddress: l1Addresses.bridgehub,
+    chainId,
+    tokenAddress,
+    amount,
+    l2GasLimit: ERC20_DEPOSIT_L2_GAS_LIMIT,
+    recipient: params.recipient,
+    gasPrice: ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI,
   });
-  const tx = await interopCenter.sendMessage(message.recipient, message.payload, message.attributes, {
-    value: mintValue,
-    gasLimit: 5_000_000,
-  });
-  const l1Receipt = await tx.wait();
 
   console.log(`   Depositing ${ethers.utils.formatUnits(amount, 18)} ERC20 to chain ${chainId} via indirectCall...`);
-  console.log(`   L1 tx: cast run ${tx.hash} -r ${l1RpcUrl}`);
+  console.log(`   L1 tx: cast run ${l1Receipt.transactionHash} -r ${l1RpcUrl}`);
 
   const txHashes = await extractAndRelayNewPriorityRequests(
     l1Receipt,
@@ -212,7 +161,7 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
   const l2TxHash = txHashes.length > 0 ? txHashes[txHashes.length - 1] : null;
 
   return {
-    l1TxHash: tx.hash,
+    l1TxHash: l1Receipt.transactionHash,
     l2TxHash,
     amount,
     mintValue,

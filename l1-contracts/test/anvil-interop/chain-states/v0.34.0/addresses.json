@@ -2,7 +2,7 @@
   "l1Addresses": {
     "bridgehub": "0x86DE0EdaF63F90F29E18b2D39C1d07aBc89A823b",
     "l1SharedBridge": "0x94c5ddc6421f6Ec17F5c0c8a5fd39E2AF03e3552",
-    "l1InteropCenter": "0x345dE1Fbaf52a6Ecc2CC3d86FAFb5AcEF8Db91Aa",
+    "l1InteropCenter": "0x971E2678053F84aB4FC641308053846b409614DD",
     "l1NullifierProxy": "0xa747415686555E2209f73bC52141B7e979d73831",
     "l1NativeTokenVault": "0xAaFd9d577109C9b564f826278A30ea2f2b60d8a7",
     "governance": "0xa60F07cAaFA0aE451296c0ca5C261578A390105e",

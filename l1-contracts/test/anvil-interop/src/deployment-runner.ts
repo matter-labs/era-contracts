@@ -24,6 +24,7 @@ import { getInteropSourcePrivateKey, isLiveInteropMode } from "./core/accounts";
 import { encodeNtvAssetId } from "./core/data-encoding";
 import { deployTestTokens } from "./helpers/deploy-test-token";
 import { depositERC20ToL2 } from "./helpers/l1-deposit-helper";
+import { submitERC20Deposit } from "./helpers/l1-deposit-submission";
 import { asViemAddress, createLiveZksyncSdk } from "./helpers/temp-sdk";
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;
@@ -173,6 +174,11 @@ export class DeploymentRunner {
   async setupLiveState(): Promise<DeploymentState> {
     console.log("\n=== Live Interop State Setup ===\n");
 
+    const l2GasLimit = ethers.BigNumber.from(this.getRequiredEnv("LIVE_DEPOSIT_L2_GAS_LIMIT"));
+    if (l2GasLimit.lte(0) || l2GasLimit.gt(ethers.constants.MaxUint256)) {
+      throw new Error("LIVE_DEPOSIT_L2_GAS_LIMIT must be a positive uint256");
+    }
+
     const gwRpcUrl = this.getRequiredEnv("LIVE_GW_RPC");
     const chainARpcUrl = this.getRequiredEnv("LIVE_CHAIN_A_RPC");
     const chainBRpcUrl = this.getRequiredEnv("LIVE_CHAIN_B_RPC");
@@ -221,7 +227,6 @@ export class DeploymentRunner {
         process.env.LIVE_TEST_TOKEN_AMOUNT || "1000",
         LIVE_TEST_TOKEN_DECIMALS
       );
-      const mintAmountBigInt = BigInt(mintAmount.toString());
       const mintTx = await token.mint(sourceAddress, mintAmount);
       await mintTx.wait();
 
@@ -236,12 +241,16 @@ export class DeploymentRunner {
       const l1TokenAddress = asViemAddress(token.address, "L1 test token");
       const assetId = encodeNtvAssetId(l1ChainId, token.address);
       console.log(`  Depositing L1 test token ${token.address} to chain ${chainId}...`);
-      const deposit = await targetLiveSdk.sdk.deposits.create({
-        token: l1TokenAddress,
-        amount: mintAmountBigInt,
-        to: targetLiveSdk.account.address,
+      const deposit = await submitERC20Deposit(sourceL1Wallet, {
+        bridgehubAddress: liveAddresses.bridgehub,
+        chainId,
+        tokenAddress: token.address,
+        amount: mintAmount,
+        l2GasLimit,
       });
-      const depositReceipt = await targetLiveSdk.sdk.deposits.wait(deposit, { for: "l2" });
+      const depositReceipt = await targetLiveSdk.sdk.deposits.wait(deposit.receipt.transactionHash as `0x${string}`, {
+        for: "l2",
+      });
       if (!depositReceipt) {
         throw new Error(`Live token deposit to chain ${chainId} did not produce an L2 receipt`);
       }

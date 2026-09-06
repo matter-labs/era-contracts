@@ -1,10 +1,6 @@
-//! Current L1 ERC-7786 request decoding. Historical Bridgehub decoders remain at their call sites.
+//! Validate L1 ERC-7786 requests and identify recipients for simulation descriptions.
 
-use alloy::{
-    primitives::{Address, Bytes, U256},
-    sol,
-    sol_types::SolCall,
-};
+use alloy::{primitives::Address, sol, sol_types::SolCall};
 use std::collections::HashSet;
 
 sol! {
@@ -17,16 +13,8 @@ sol! {
 
 #[derive(Debug)]
 pub struct L1Message {
-    pub chain_id: U256,
     pub recipient: Address,
-    pub payload: Bytes,
-    pub mint_value: U256,
-    pub gas_limit: U256,
-    pub gas_per_pubdata: U256,
-    pub refund_recipient: Address,
-    pub call_value: U256,
-    pub indirect_value: Option<U256>,
-    pub factory_deps: Vec<Bytes>,
+    pub is_indirect: bool,
 }
 
 pub fn is_send_message(data: &[u8]) -> bool {
@@ -47,21 +35,10 @@ pub fn decode(data: &[u8]) -> Result<L1Message, String> {
     if ![0, 20].contains(&address_len) || recipient.len() != 6 + chain_len + address_len {
         return Err("invalid ERC-7930 address length".into());
     }
-    let mut message = L1Message {
-        chain_id: U256::from_be_slice(&recipient[5..5 + chain_len]),
-        recipient: if address_len == 0 {
-            Address::ZERO
-        } else {
-            Address::from_slice(&recipient[6 + chain_len..])
-        },
-        payload: call.payload,
-        mint_value: U256::ZERO,
-        gas_limit: U256::ZERO,
-        gas_per_pubdata: U256::ZERO,
-        refund_recipient: Address::ZERO,
-        call_value: U256::ZERO,
-        indirect_value: None,
-        factory_deps: Vec::new(),
+    let recipient = if address_len == 0 {
+        Address::ZERO
+    } else {
+        Address::from_slice(&recipient[6 + chain_len..])
     };
     let mut seen = HashSet::new();
     for attribute in call.attributes {
@@ -75,29 +52,17 @@ pub fn decode(data: &[u8]) -> Result<L1Message, String> {
         }
         match selector {
             l1ToL2TransactionParamsCall::SELECTOR => {
-                let params = l1ToL2TransactionParamsCall::abi_decode(&attribute)
+                l1ToL2TransactionParamsCall::abi_decode(&attribute)
                     .map_err(|err| err.to_string())?;
-                message.mint_value = params.mintValue;
-                message.gas_limit = params.l2GasLimit;
-                message.gas_per_pubdata = params.l2GasPerPubdataByteLimit;
-                message.refund_recipient = params.refundRecipient;
             }
             interopCallValueCall::SELECTOR => {
-                message.call_value = interopCallValueCall::abi_decode(&attribute)
-                    .map_err(|err| err.to_string())?
-                    .value
+                interopCallValueCall::abi_decode(&attribute).map_err(|err| err.to_string())?;
             }
             indirectCallCall::SELECTOR => {
-                message.indirect_value = Some(
-                    indirectCallCall::abi_decode(&attribute)
-                        .map_err(|err| err.to_string())?
-                        .value,
-                )
+                indirectCallCall::abi_decode(&attribute).map_err(|err| err.to_string())?;
             }
             factoryDepsCall::SELECTOR => {
-                message.factory_deps = factoryDepsCall::abi_decode(&attribute)
-                    .map_err(|err| err.to_string())?
-                    .dependencies
+                factoryDepsCall::abi_decode(&attribute).map_err(|err| err.to_string())?;
             }
             _ => return Err("unsupported L1 attribute".into()),
         }
@@ -105,15 +70,20 @@ pub fn decode(data: &[u8]) -> Result<L1Message, String> {
     if !seen.contains(&l1ToL2TransactionParamsCall::SELECTOR) {
         return Err("missing L1 transaction parameters".into());
     }
-    if message.indirect_value.is_some() && seen.contains(&factoryDepsCall::SELECTOR) {
+    let is_indirect = seen.contains(&indirectCallCall::SELECTOR);
+    if is_indirect && seen.contains(&factoryDepsCall::SELECTOR) {
         return Err("factory dependencies are only valid for direct messages".into());
     }
-    Ok(message)
+    Ok(L1Message {
+        recipient,
+        is_indirect,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy::primitives::{Bytes, U256};
 
     fn message(indirect: bool) -> sendMessageCall {
         let recipient =
@@ -127,25 +97,20 @@ mod tests {
         .abi_encode()
         .into()];
         if indirect {
-            attributes.push(indirectCallCall::new((U256::from(7),)).abi_encode().into());
+            attributes.push(indirectCallCall::new((U256::ZERO,)).abi_encode().into());
         }
         sendMessageCall::new((recipient.into(), Bytes::from_static(b"payload"), attributes))
     }
 
     #[test]
-    fn direct_and_indirect_preserve_parameters() {
+    fn identifies_direct_and_zero_value_indirect_recipients() {
         for indirect in [false, true] {
             let parsed = decode(&message(indirect).abi_encode()).unwrap();
-            assert_eq!(parsed.chain_id, U256::from(506));
             assert_eq!(
                 parsed.recipient,
                 Address::from_word(U256::from(0x12345).into())
             );
-            assert_eq!(parsed.payload.as_ref(), b"payload");
-            assert_eq!(parsed.mint_value, U256::from(100));
-            assert_eq!(parsed.gas_limit, U256::from(1_000_000));
-            assert_eq!(parsed.gas_per_pubdata, U256::from(800));
-            assert_eq!(parsed.indirect_value, indirect.then_some(U256::from(7)));
+            assert_eq!(parsed.is_indirect, indirect);
         }
     }
 

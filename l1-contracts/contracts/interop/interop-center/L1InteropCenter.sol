@@ -51,7 +51,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
         CallAndBundleAttributes
     }
 
-    /// @notice The L1 Bridgehub, used as the registry of chains, base tokens and ZK chain addresses.
+    /// @inheritdoc IL1InteropCenter
     IL1Bridgehub public immutable override BRIDGE_HUB;
 
     /// @notice The asset id of Eth, used for base token value accounting.
@@ -191,26 +191,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
         bytes calldata _payload,
         L1MessageAttributes memory _attributes
     ) private returns (bytes32 canonicalTxHash) {
-        {
-            bytes32 tokenAssetId = BRIDGE_HUB.baseTokenAssetId(_destinationChainId);
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
-                if (msg.value != _attributes.mintValue) {
-                    revert MsgValueMismatch(_attributes.mintValue, msg.value);
-                }
-            } else {
-                if (msg.value != 0) {
-                    revert MsgValueMismatch(0, msg.value);
-                }
-            }
-
-            // slither-disable-next-line arbitrary-send-eth
-            IAssetRouterShared(address(BRIDGE_HUB.assetRouter())).bridgehubDepositBaseToken{value: msg.value}(
-                _destinationChainId,
-                tokenAssetId,
-                msg.sender,
-                _attributes.mintValue
-            );
-        }
+        _depositBaseToken(_destinationChainId, _attributes);
 
         canonicalTxHash = _sendRequest(
             _zkChain,
@@ -242,30 +223,7 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
             revert CrossChainSenderAddressTooLow(_crossChainSender, MIN_CROSS_CHAIN_SENDER_ADDRESS);
         }
 
-        {
-            bytes32 tokenAssetId = BRIDGE_HUB.baseTokenAssetId(_destinationChainId);
-            uint256 baseTokenMsgValue;
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
-                uint256 expectedValue = _attributes.mintValue + _attributes.indirectCallMessageValue;
-                if (msg.value != expectedValue) {
-                    revert MsgValueMismatch(expectedValue, msg.value);
-                }
-                baseTokenMsgValue = _attributes.mintValue;
-            } else {
-                if (msg.value != _attributes.indirectCallMessageValue) {
-                    revert MsgValueMismatch(_attributes.indirectCallMessageValue, msg.value);
-                }
-                baseTokenMsgValue = 0;
-            }
-
-            // slither-disable-next-line arbitrary-send-eth
-            IAssetRouterShared(address(BRIDGE_HUB.assetRouter())).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
-                _destinationChainId,
-                tokenAssetId,
-                msg.sender,
-                _attributes.mintValue
-            );
-        }
+        _depositBaseToken(_destinationChainId, _attributes);
 
         // slither-disable-next-line arbitrary-send-eth
         IndirectCallRequest memory outputRequest = IL1CrossChainSender(_crossChainSender).initiateIndirectCall{
@@ -297,6 +255,23 @@ contract L1InteropCenter is IL1InteropCenter, ReentrancyGuard, Ownable2StepUpgra
             _destinationChainId,
             outputRequest.txDataHash,
             canonicalTxHash
+        );
+    }
+
+    function _depositBaseToken(uint256 _destinationChainId, L1MessageAttributes memory _attributes) private {
+        bytes32 tokenAssetId = BRIDGE_HUB.baseTokenAssetId(_destinationChainId);
+        uint256 baseTokenMsgValue = tokenAssetId == ETH_TOKEN_ASSET_ID ? _attributes.mintValue : 0;
+        uint256 expectedValue = baseTokenMsgValue + _attributes.indirectCallMessageValue;
+        if (msg.value != expectedValue) {
+            revert MsgValueMismatch(expectedValue, msg.value);
+        }
+
+        // slither-disable-next-line arbitrary-send-eth
+        IAssetRouterShared(address(BRIDGE_HUB.assetRouter())).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
+            _destinationChainId,
+            tokenAssetId,
+            msg.sender,
+            _attributes.mintValue
         );
     }
 

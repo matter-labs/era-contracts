@@ -164,7 +164,7 @@ impl SimDescriptionRegistry {
             // requestL2TransactionDirect: l2Contract at word 3 after the selector.
             if let Some(want) = entry.l2_contract {
                 let parsed = if let Some(message) = &l1_message {
-                    if message.indirect_value.is_some() {
+                    if message.is_indirect {
                         continue;
                     }
                     message.recipient
@@ -180,7 +180,7 @@ impl SimDescriptionRegistry {
             // requestL2TransactionTwoBridges: secondBridgeAddress at word 7.
             if let Some(want) = entry.second_bridge_address {
                 let parsed = if let Some(message) = &l1_message {
-                    if message.indirect_value.is_none() {
+                    if !message.is_indirect {
                         continue;
                     }
                     message.recipient

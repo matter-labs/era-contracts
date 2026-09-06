@@ -490,10 +490,10 @@
   {
     "contractName": "l1-contracts/L1InteropCenter",
     "evmBytecodePath": "/l1-contracts/out/L1InteropCenter.sol/L1InteropCenter.json",
-    "evmBytecodeHash": "0xfe6011ab6826e81340cb599f6766251bfd021c4ec6ca3f60f615fc75dd361c17",
-    "evmDeployedBytecodeHash": "0x9898b122b99b456329839c0555c23cfb07d5d4d9291546adb2039e503782e39d",
-    "evmDeployedBytecodeBlakeHash": "0x15325189f300c78a8cdba2871f7be1d3ddd444436317d2a3fc10881423f6aba2",
-    "evmDeployedBytecodeLength": 14411
+    "evmBytecodeHash": "0x0f8ff8088ca9c7170f4199344dc6a400fe59601c73c597b0975ce9e37d28a55a",
+    "evmDeployedBytecodeHash": "0x5ae6a3e68e4e424d5082fb6088510c926acc3d09c75c717530c2dc68820adebe",
+    "evmDeployedBytecodeBlakeHash": "0x5ebecbc573af691e546aadb12de130fc4d43662ca8d702673fd0c34d75cfd34c",
+    "evmDeployedBytecodeLength": 13697
   },
   {
     "contractName": "l1-contracts/L1InteropHandler",
