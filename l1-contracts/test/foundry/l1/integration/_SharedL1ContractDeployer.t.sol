@@ -7,7 +7,7 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {DeployCTMIntegrationScript} from "./deploy-scripts/DeployCTMIntegration.s.sol";
 import {RegisterCTM} from "../../../../deploy-scripts/ecosystem/RegisterCTM.s.sol";
 import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
-import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {IL1InteropCenter} from "contracts/interop/IL1InteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
@@ -32,7 +32,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         address bridgehubProxyAddress;
         address bridgehubOwnerAddress;
         L1Bridgehub bridgehub;
-        IInteropCenter interopCenter;
+        IL1InteropCenter interopCenter;
         CTMDeploymentTracker ctmDeploymentTracker;
         L1AssetRouter sharedBridge;
         L1Nullifier l1Nullifier;
@@ -93,6 +93,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
 
         // Get bridgehub from the CTM script's discovered addresses
         addresses.bridgehub = L1Bridgehub(ecosystemAddresses.bridgehub.proxies.bridgehub);
+        addresses.interopCenter = IL1InteropCenter(addresses.bridgehub.interopCenter());
         addresses.chainTypeManager = IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager);
         addresses.ctmDeploymentTracker = CTMDeploymentTracker(address(addresses.bridgehub.l1CtmDeployer()));
 
@@ -113,6 +114,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
     function _acceptOwnershipCore() private {
         vm.startPrank(addresses.bridgehub.pendingOwner());
         addresses.bridgehub.acceptOwnership();
+        IOwnable(address(addresses.interopCenter)).acceptOwnership();
         addresses.sharedBridge.acceptOwnership();
         IOwnable(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).acceptOwnership();
         addresses.ctmDeploymentTracker.acceptOwnership();

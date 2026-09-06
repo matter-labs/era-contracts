@@ -73,6 +73,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         uint256 governanceUpgradeTimerInitialDelay;
         bool hasPreV32IntrospectionOverride;
         bool usePreV32IntrospectionOverride;
+        bool hasL1InteropCenter;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -206,6 +207,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         bytes32 zkTokenAssetId
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
+        require(toml.keyExists("$.has_l1_interop_center"), "Set has_l1_interop_center explicitly");
+        newConfig.hasL1InteropCenter = toml.readBool("$.has_l1_interop_center");
 
         // No `era_chain_id` read: `setAddressesBasedOnCTM` resolves it from the live asset router,
         // which is authoritative for the ecosystems this flow upgrades.
@@ -223,7 +226,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             newConfig.hasPreV32IntrospectionOverride = true;
             newConfig.usePreV32IntrospectionOverride = toml.readBool("$.pre_v32_introspection");
         }
-
         initializeConfig(chainCreationParams, permanentConfig, governance);
 
         // Read governance upgrade timer initial delay from config
@@ -383,11 +385,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
         if (preV32Ecosystem) {
             ctmAddresses = AddressIntrospector.getCTMAddressesV31(ctm);
-            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubAddr);
         } else {
             ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
-            coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
         }
+        _discoverCoreAddresses(bridgehubAddr, preV32Ecosystem);
 
         config.ownerAddress = ctmAddresses.admin.governance;
 
@@ -408,6 +409,17 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             ctmProtocolVersion != getNewProtocolVersion(),
             "The new protocol version is already present on the ChainTypeManager"
         );
+    }
+
+    /// @notice Uses the source ecosystem's registry ABI during CTM preparation.
+    function _discoverCoreAddresses(address _bridgehub, bool _preV32Ecosystem) internal {
+        if (newConfig.hasL1InteropCenter) {
+            coreAddresses = AddressIntrospector.getCoreDeployedAddresses(_bridgehub);
+        } else if (_preV32Ecosystem) {
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(_bridgehub);
+        } else {
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesPreL1InteropCenter(_bridgehub);
+        }
     }
 
     function getFixedForceDeploymentsData() internal override returns (FixedForceDeploymentsData memory data) {

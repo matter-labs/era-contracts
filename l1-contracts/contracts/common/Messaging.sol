@@ -380,3 +380,11 @@ struct TokenBridgingData {
     /// The address of the base token on the origin chain.
     address originToken;
 }
+
+struct IndirectCallRequest {
+    bytes32 magicValue;
+    address l2Contract;
+    bytes l2Calldata;
+    bytes[] factoryDeps;
+    bytes32 txDataHash;
+}

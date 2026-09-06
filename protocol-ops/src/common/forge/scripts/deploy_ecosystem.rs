@@ -112,6 +112,10 @@ pub struct DeployL1CoreContractsDeployedAddressesOutput {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct L1BridgehubOutput {
+    #[serde(default)]
+    pub l1_interop_center_implementation_addr: Option<Address>,
+    #[serde(default)]
+    pub l1_interop_center_proxy_addr: Option<Address>,
     pub bridgehub_implementation_addr: Address,
     pub bridgehub_proxy_addr: Address,
     pub ctm_deployment_tracker_proxy_addr: Address,

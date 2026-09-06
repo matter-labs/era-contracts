@@ -5,3 +5,6 @@ pragma solidity ^0.8.21;
 /// @dev Minimum byte length of an ERC-7930 v1 address:
 /// version (2) + chainType (2) + chainReferenceLength (1) + addressLength (1).
 uint256 constant ERC7930_V1_MIN_LENGTH = 0x06;
+
+// Selector plus one ABI-encoded uint256.
+uint256 constant ERC7786_UINT256_ATTRIBUTE_LENGTH = 4 + 32;

@@ -53,13 +53,13 @@ contract DataEncodingTest is Test {
         assertEq(decodedToken, tokenAddress);
     }
 
-    // ============ encodeAssetRouterBridgehubDepositData / decodeAssetRouterBridgehubDepositData Tests ============
+    // ============ encodeAssetRouterDepositData / decodeAssetRouterDepositData Tests ============
 
     function test_encodeAssetRouterBridgehubDepositData_basicValues() public pure {
         bytes32 assetId = bytes32(uint256(0x12345));
         bytes memory transferData = hex"abcdef";
 
-        bytes memory encoded = DataEncoding.encodeAssetRouterBridgehubDepositData(assetId, transferData);
+        bytes memory encoded = DataEncoding.encodeAssetRouterDepositData(assetId, transferData);
 
         // Should start with NEW_ENCODING_VERSION
         assertEq(encoded[0], NEW_ENCODING_VERSION);
@@ -85,7 +85,7 @@ contract DataEncodingTest is Test {
     function externalDecodeAssetRouterBridgehubDepositData(
         bytes calldata _data
     ) external pure returns (bytes32, bytes memory) {
-        return DataEncoding.decodeAssetRouterBridgehubDepositData(_data);
+        return DataEncoding.decodeAssetRouterDepositData(_data);
     }
 
     // ============ encodeBridgeMintData / decodeBridgeMintData Tests ============
@@ -282,7 +282,7 @@ contract DataEncodingTest is Test {
         );
         assertEq(
             starter.data,
-            DataEncoding.encodeAssetRouterBridgehubDepositData(assetId, transferData),
+            DataEncoding.encodeAssetRouterDepositData(assetId, transferData),
             "call data must be the bridgehub-deposit payload"
         );
 
@@ -323,7 +323,7 @@ contract DataEncodingTest is Test {
         );
         assertEq(
             starter.data,
-            DataEncoding.encodeAssetRouterBridgehubDepositData(assetId, transferData),
+            DataEncoding.encodeAssetRouterDepositData(assetId, transferData),
             "call data must be the bridgehub-deposit payload"
         );
 

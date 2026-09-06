@@ -440,7 +440,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             CoreContract.L2MessageRoot,
             CoreContract.UpgradeableBeaconDeployer,
             CoreContract.L2ChainAssetHandler,
-            CoreContract.InteropCenter,
+            CoreContract.L2InteropCenter,
             CoreContract.L2InteropHandler,
             CoreContract.L2AssetTracker,
             CoreContract.BaseTokenHolder
@@ -539,7 +539,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             beaconDeployerInfo: _getBytecodeInfo(CoreContract.UpgradeableBeaconDeployer),
             baseTokenHolderBytecodeInfo: _getBytecodeInfo(CoreContract.BaseTokenHolder),
             chainAssetHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2ChainAssetHandler),
-            interopCenterBytecodeInfo: _getBytecodeInfo(CoreContract.InteropCenter),
+            interopCenterBytecodeInfo: _getBytecodeInfo(CoreContract.L2InteropCenter),
             interopHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2InteropHandler),
             assetTrackerBytecodeInfo: _getBytecodeInfo(CoreContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),

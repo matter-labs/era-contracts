@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {L1InteropRequests} from "../../../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {ExecutorTest} from "../BatchProcessing/_Executor_Shared.t.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -9,7 +10,7 @@ import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/Priorit
 import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L1L2MessageParams} from "../../../../../../deploy-scripts/utils/L1InteropRequests.sol";
 
 contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
     function isZKsyncOS() internal pure override returns (bool) {
@@ -28,8 +29,10 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
         uint256 baseCost = mailbox.l2TransactionBaseCost(10_000_000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
         vm.deal(prioritySender, baseCost);
         vm.prank(prioritySender);
-        dummyBridgehub.requestL2TransactionDirect{value: baseCost}(
-            L2TransactionRequestDirect({
+        L1InteropRequests.requestDirect(
+            l1InteropCenter,
+            baseCost,
+            L1L2MessageParams({
                 chainId: l2ChainId,
                 mintValue: baseCost,
                 l2Contract: makeAddr("l2Contract"),

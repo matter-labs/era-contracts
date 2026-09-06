@@ -9,7 +9,7 @@ import "forge-std/console.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {CallAttributes} from "contracts/common/Messaging.sol";
 import {AttributesDecoder} from "contracts/interop/AttributesDecoder.sol";
-import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {L2InteropCenter} from "contracts/interop/interop-center/L2InteropCenter.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -56,7 +56,7 @@ contract L2AssetRouterAttributesEncodingRegressionL1Test is Test, SharedL2Contra
         // - Buggy: [28 bytes zeros][first 4 bytes of value] -> decodes to wrong value
     }
 
-    /// @notice Test that InteropCenter.parseAttributes correctly decodes the attributes from L2AssetRouter
+    /// @notice Test that L2InteropCenter.parseAttributes correctly decodes the attributes from L2AssetRouter
     /// @dev This verifies the fix works end-to-end with parseAttributes
     function test_regression_parseAttributesDecodesCorrectly() public view {
         uint256 testValue = 1 ether;
@@ -66,7 +66,7 @@ contract L2AssetRouterAttributesEncodingRegressionL1Test is Test, SharedL2Contra
         attributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, testValue);
 
         // Call parseAttributes to decode
-        (CallAttributes memory callAttributes, ) = InteropCenter(L2_INTEROP_CENTER_ADDR).parseAttributes(
+        (CallAttributes memory callAttributes, ) = L2InteropCenter(L2_INTEROP_CENTER_ADDR).parseAttributes(
             attributes,
             IInteropCenter.AttributeParsingRestrictions.OnlyInteropCallValue
         );
@@ -90,7 +90,7 @@ contract L2AssetRouterAttributesEncodingRegressionL1Test is Test, SharedL2Contra
         buggyAttributes[0] = abi.encode(selector, testValue);
 
         // Call parseAttributes to decode - this will return a wrong value
-        (CallAttributes memory callAttributes, ) = InteropCenter(L2_INTEROP_CENTER_ADDR).parseAttributes(
+        (CallAttributes memory callAttributes, ) = L2InteropCenter(L2_INTEROP_CENTER_ADDR).parseAttributes(
             buggyAttributes,
             IInteropCenter.AttributeParsingRestrictions.OnlyInteropCallValue
         );
@@ -112,7 +112,7 @@ contract L2AssetRouterAttributesEncodingRegressionL1Test is Test, SharedL2Contra
         attributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, testValue);
 
         // Verify parseAttributes decodes correctly
-        (CallAttributes memory callAttributes, ) = InteropCenter(L2_INTEROP_CENTER_ADDR).parseAttributes(
+        (CallAttributes memory callAttributes, ) = L2InteropCenter(L2_INTEROP_CENTER_ADDR).parseAttributes(
             attributes,
             IInteropCenter.AttributeParsingRestrictions.OnlyInteropCallValue
         );
@@ -127,7 +127,7 @@ contract L2AssetRouterAttributesEncodingRegressionL1Test is Test, SharedL2Contra
         vm.expectRevert(
             abi.encodeWithSelector(InteroperableAddress.InteroperableAddressParsingError.selector, hex"0001")
         );
-        InteropCenter(L2_INTEROP_CENTER_ADDR).parseAttributes(
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).parseAttributes(
             attributes,
             IInteropCenter.AttributeParsingRestrictions.OnlyBundleAttributes
         );
@@ -140,7 +140,7 @@ contract L2AssetRouterAttributesEncodingRegressionL1Test is Test, SharedL2Contra
         vm.expectRevert(
             abi.encodeWithSelector(InteroperableAddress.InteroperableAddressParsingError.selector, hex"00010000000100")
         );
-        InteropCenter(L2_INTEROP_CENTER_ADDR).parseAttributes(
+        L2InteropCenter(L2_INTEROP_CENTER_ADDR).parseAttributes(
             attributes,
             IInteropCenter.AttributeParsingRestrictions.OnlyBundleAttributes
         );

@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {L1InteropRequests} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {Test, console2} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-import {IBridgehubBase, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L1L2IndirectMessageParams} from "../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {
     CHAIN_REGISTRATION_SENDER_ENCODING_VERSION,
     ChainRegistrationSender
@@ -41,6 +44,19 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
     uint256 constant GATEWAY_CHAIN_ID = 506;
     address[] public users;
     address[] public l2ContractAddresses;
+
+    function test_crossChainSender_rejectsUnauthorizedCalls() public {
+        ChainRegistrationSender sender = ChainRegistrationSender(
+            ecosystemAddresses.bridgehub.proxies.chainRegistrationSender
+        );
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+        sender.initiateIndirectCall(zkChainIds[0], address(this), 0, hex"");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+        sender.confirmL2Transaction(zkChainIds[0], bytes32(0), bytes32(0));
+        vm.prank(address(addresses.interopCenter));
+        sender.confirmL2Transaction(zkChainIds[0], bytes32(0), bytes32(0));
+        assertFalse(sender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[0]));
+    }
 
     function _generateUserAddresses() internal {
         if (users.length != 0) {
@@ -126,7 +142,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
     }
 
-    /// @dev Runs requestL2TransactionTwoBridges through ChainRegistrationSender; only ETH for base-token gas.
+    /// @dev Sends an indirect message through ChainRegistrationSender; only ETH for base-token gas.
     function _chainRegistrationSenderDeposit() private returns (bytes32, Vm.Log[] memory) {
         uint256 currentChainId = zkChainIds[0];
         address currentUser = users[0];
@@ -152,20 +168,20 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             CHAIN_REGISTRATION_SENDER_ENCODING_VERSION,
             abi.encode(currentChainId)
         );
-        L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
+        L1L2IndirectMessageParams memory requestTx = _createL1L2IndirectMessageParams({
             _chainId: currentChainId,
             _mintValue: mintValue,
-            _secondBridgeValue: 0,
-            _secondBridgeAddress: address(addresses.chainRegistrationSender),
+            _indirectCallValue: 0,
+            _crossChainSender: address(addresses.chainRegistrationSender),
             _l2Value: 0,
             _l2GasLimit: l2GasLimit,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _secondBridgeCalldata: secondBridgeCallData
+            _indirectCallData: secondBridgeCallData
         });
 
         vm.recordLogs();
         vm.prank(currentUser);
-        bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
+        bytes32 resultantHash = L1InteropRequests.requestIndirect(addresses.interopCenter, mintValue, requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         console2.log("balance before", userEthBefore);

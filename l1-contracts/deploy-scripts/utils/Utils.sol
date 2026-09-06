@@ -3,6 +3,9 @@ pragma solidity ^0.8.24;
 
 // solhint-disable gas-custom-errors, reason-string
 
+import {IL1InteropCenter} from "contracts/interop/IL1InteropCenter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {L1InteropRequests} from "./L1InteropRequests.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
 import {BytecodeUtils} from "./bytecode/BytecodeUtils.s.sol";
@@ -12,11 +15,8 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {IAccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access/IAccessControlDefaultAdminRules.sol";
 
-import {
-    IL1Bridgehub,
-    L2TransactionRequestDirect,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {L1L2MessageParams, L1L2IndirectMessageParams} from "./L1InteropRequests.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -67,7 +67,7 @@ address constant L2_WRAPPED_BASE_TOKEN_IMPL_ADDRESS = address(USER_CONTRACTS_OFF
 uint256 constant SECURITY_COUNCIL_SIZE = 12;
 
 /// @dev We need to use a struct instead of list of params to prevent stack too deep error
-struct PrepareL1L2TransactionParams {
+struct PrepareL1L2MessageParams {
     uint256 l1GasPrice;
     bytes l2Calldata;
     uint256 l2GasLimit;
@@ -76,7 +76,6 @@ struct PrepareL1L2TransactionParams {
     address dstAddress;
     uint256 chainId;
     address bridgehubAddress;
-    address l1SharedBridgeProxy;
     address refundRecipient;
 }
 
@@ -352,13 +351,12 @@ library Utils {
         bytes32 create2Salt,
         uint256 l2GasLimit,
         uint256 chainId,
-        address bridgehubAddress,
-        address l1SharedBridgeProxy
+        address bridgehubAddress
     ) internal returns (address) {
         bytes memory initCode = abi.encodePacked(bytecode, constructorArgs);
         address contractAddress = getL2AddressViaDeterministicCreate2(create2Salt, initCode);
 
-        runL1L2Transaction({
+        runL1L2Message({
             l2Calldata: getDeterministicCreate2FactoryCalldata(create2Salt, initCode),
             l2GasLimit: l2GasLimit,
             l2Value: 0,
@@ -366,19 +364,14 @@ library Utils {
             dstAddress: DETERMINISTIC_CREATE2_ADDRESS,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy,
             refundRecipient: msg.sender
         });
         return contractAddress;
     }
 
-    function prepareL1L2Transaction(
-        PrepareL1L2TransactionParams memory params
-    )
-        internal
-        view
-        returns (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy)
-    {
+    function prepareL1L2Message(
+        PrepareL1L2MessageParams memory params
+    ) internal view returns (L1L2MessageParams memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) {
         IL1Bridgehub bridgehub = IL1Bridgehub(params.bridgehubAddress);
 
         // Headroom multiplier on `baseCost`. The prepare emits a fixed
@@ -400,7 +393,7 @@ library Utils {
                 10 +
             params.l2Value;
 
-        l2TransactionRequestDirect = L2TransactionRequestDirect({
+        l2TransactionRequestDirect = L1L2MessageParams({
             chainId: params.chainId,
             mintValue: requiredValueToDeploy,
             l2Contract: params.dstAddress,
@@ -413,23 +406,19 @@ library Utils {
         });
     }
 
-    function prepareL1L2TransactionTwoBridges(
+    function prepareL1L2IndirectMessage(
         uint256 l1GasPrice,
         uint256 l2GasLimit,
         uint256 chainId,
         address bridgehubAddress,
-        address secondBridgeAddress,
-        uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata,
+        address crossChainSender,
+        uint256 indirectCallValue,
+        bytes memory indirectCallData,
         address refundRecipient
-    )
-        internal
-        view
-        returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
-    {
+    ) internal view returns (L1L2IndirectMessageParams memory l2TransactionRequest, uint256 requiredValueToDeploy) {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddress);
 
-        // 10x headroom — see `prepareL1L2Transaction` comment for rationale.
+        // 10x headroom — see `prepareL1L2Message` comment for rationale.
         // Cap `l1GasPrice` at `block.basefee` so mintValue covers the case
         // where actual L1 gas at broadcast time exceeds the prepare-time
         // snapshot.
@@ -441,16 +430,16 @@ library Utils {
                 REQUIRED_L2_GAS_PRICE_PER_PUBDATA
             ) * 10;
 
-        l2TransactionRequest = L2TransactionRequestTwoBridgesOuter({
+        l2TransactionRequest = L1L2IndirectMessageParams({
             chainId: chainId,
             mintValue: requiredValueToDeploy,
             l2Value: 0,
             l2GasLimit: l2GasLimit,
             l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             refundRecipient: refundRecipient,
-            secondBridgeAddress: secondBridgeAddress,
-            secondBridgeValue: secondBridgeValue,
-            secondBridgeCalldata: secondBridgeCalldata
+            crossChainSender: crossChainSender,
+            indirectCallValue: indirectCallValue,
+            indirectCallData: indirectCallData
         });
     }
 
@@ -458,7 +447,7 @@ library Utils {
      * @dev Run the l2 l1 transaction
      */
     //slither-disable-next-line arbitrary-send-eth
-    function runL1L2Transaction(
+    function runL1L2Message(
         bytes memory l2Calldata,
         uint256 l2GasLimit,
         uint256 l2Value,
@@ -466,11 +455,10 @@ library Utils {
         address dstAddress,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
         address refundRecipient
     ) internal returns (bytes32 txHash) {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddress);
-        PrepareL1L2TransactionParams memory params = PrepareL1L2TransactionParams({
+        PrepareL1L2MessageParams memory params = PrepareL1L2MessageParams({
             l1GasPrice: bytesToUint256(vm.rpc("eth_gasPrice", "[]")),
             l2Calldata: l2Calldata,
             l2GasLimit: l2GasLimit,
@@ -479,26 +467,28 @@ library Utils {
             dstAddress: dstAddress,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy,
             refundRecipient: refundRecipient
         });
-        (
-            L2TransactionRequestDirect memory l2TransactionRequestDirect,
-            uint256 requiredValueToDeploy
-        ) = prepareL1L2Transaction(params);
+        (L1L2MessageParams memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) = prepareL1L2Message(
+            params
+        );
 
         address baseTokenAddress = bridgehub.baseToken(chainId);
         if (ADDRESS_ONE != baseTokenAddress) {
             IERC20 baseToken = IERC20(baseTokenAddress);
+            address nativeTokenVault = address(IL1AssetRouter(address(bridgehub.assetRouter())).nativeTokenVault());
             vm.broadcast(getBroadcasterAddress());
-            bool success = baseToken.approve(l1SharedBridgeProxy, requiredValueToDeploy);
+            bool success = baseToken.approve(nativeTokenVault, requiredValueToDeploy);
             require(success, "Approval failed");
             requiredValueToDeploy = 0;
         }
 
+        IL1InteropCenter l1InteropCenter = IL1InteropCenter(bridgehub.interopCenter());
         vm.broadcast(getBroadcasterAddress());
         vm.recordLogs();
-        bytes32 canonicalTxHash = bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(
+        bytes32 canonicalTxHash = L1InteropRequests.requestDirect(
+            l1InteropCenter,
+            requiredValueToDeploy,
             l2TransactionRequestDirect
         );
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -517,10 +507,9 @@ library Utils {
         address addr,
         uint256 amount,
         uint256 chainId,
-        address bridgehubAddress,
-        address l1SharedBridgeProxy
+        address bridgehubAddress
     ) internal returns (bytes32 txHash) {
-        runL1L2Transaction({
+        runL1L2Message({
             l2Calldata: hex"",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             l2Value: amount,
@@ -528,7 +517,6 @@ library Utils {
             dstAddress: addr,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy,
             refundRecipient: addr
         });
 
@@ -536,7 +524,7 @@ library Utils {
         return bytes32(0);
     }
 
-    function prepareGovernanceL1L2DirectTransaction(
+    function prepareGovernanceL1L2Message(
         uint256 l1GasPrice,
         bytes memory l2Calldata,
         uint256 l2GasLimit,
@@ -544,95 +532,90 @@ library Utils {
         address dstAddress,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
         address refundRecipient
     ) internal view returns (Call[] memory calls) {
-        (
-            L2TransactionRequestDirect memory l2TransactionRequestDirect,
-            uint256 requiredValueToDeploy
-        ) = prepareL1L2Transaction(
-                PrepareL1L2TransactionParams({
-                    l1GasPrice: l1GasPrice,
-                    l2Calldata: l2Calldata,
-                    l2GasLimit: l2GasLimit,
-                    l2Value: 0,
-                    factoryDeps: factoryDeps,
-                    dstAddress: dstAddress,
-                    chainId: chainId,
-                    bridgehubAddress: bridgehubAddress,
-                    l1SharedBridgeProxy: l1SharedBridgeProxy,
-                    refundRecipient: refundRecipient
-                })
-            );
+        (L1L2MessageParams memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) = prepareL1L2Message(
+            PrepareL1L2MessageParams({
+                l1GasPrice: l1GasPrice,
+                l2Calldata: l2Calldata,
+                l2GasLimit: l2GasLimit,
+                l2Value: 0,
+                factoryDeps: factoryDeps,
+                dstAddress: dstAddress,
+                chainId: chainId,
+                bridgehubAddress: bridgehubAddress,
+                refundRecipient: refundRecipient
+            })
+        );
 
         (uint256 ethAmountToPass, Call[] memory newCalls) = prepareApproveBaseTokenGovernanceCalls(
             IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
         );
 
         calls = mergeCalls(calls, newCalls);
 
-        bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionDirect,
-            (l2TransactionRequestDirect)
+        bytes memory l2TransactionRequestDirectCalldata = L1InteropRequests.encodeDirectCalldata(
+            l2TransactionRequestDirect
         );
 
         calls = appendCall(
             calls,
-            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestDirectCalldata})
+            Call({
+                target: IL1Bridgehub(bridgehubAddress).interopCenter(),
+                value: ethAmountToPass,
+                data: l2TransactionRequestDirectCalldata
+            })
         );
     }
 
-    function prepareGovernanceL1L2TwoBridgesTransaction(
+    function prepareGovernanceL1L2IndirectMessage(
         uint256 l1GasPrice,
         uint256 l2GasLimit,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
-        address secondBridgeAddress,
-        uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata,
+        address crossChainSender,
+        uint256 indirectCallValue,
+        bytes memory indirectCallData,
         address refundRecipient
     ) internal view returns (Call[] memory calls) {
         (
-            L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
+            L1L2IndirectMessageParams memory l2TransactionRequest,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2TransactionTwoBridges(
+        ) = prepareL1L2IndirectMessage(
                 l1GasPrice,
                 l2GasLimit,
                 chainId,
                 bridgehubAddress,
-                secondBridgeAddress,
-                secondBridgeValue,
-                secondBridgeCalldata,
+                crossChainSender,
+                indirectCallValue,
+                indirectCallData,
                 refundRecipient
             );
 
         (uint256 ethAmountToPass, Call[] memory newCalls) = prepareApproveBaseTokenGovernanceCalls(
             IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
         );
 
         calls = mergeCalls(calls, newCalls);
 
-        bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionTwoBridges,
-            (l2TransactionRequest)
-        );
+        bytes memory l2TransactionRequestCalldata = L1InteropRequests.encodeIndirectCalldata(l2TransactionRequest);
 
         calls = appendCall(
             calls,
-            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestCalldata})
+            Call({
+                target: IL1Bridgehub(bridgehubAddress).interopCenter(),
+                value: ethAmountToPass + indirectCallValue,
+                data: l2TransactionRequestCalldata
+            })
         );
     }
 
     function prepareApproveBaseTokenGovernanceCalls(
         IL1Bridgehub bridgehub,
-        address l1SharedBridgeProxy,
         uint256 chainId,
         uint256 amountToApprove
     ) internal view returns (uint256 ethAmountToPass, Call[] memory calls) {
@@ -641,7 +624,10 @@ library Utils {
             console.log("Base token not ETH, approving");
             IERC20 baseToken = IERC20(baseTokenAddress);
 
-            bytes memory approvalCalldata = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, amountToApprove));
+            bytes memory approvalCalldata = abi.encodeCall(
+                baseToken.approve,
+                (address(IL1AssetRouter(address(bridgehub.assetRouter())).nativeTokenVault()), amountToApprove)
+            );
 
             calls = new Call[](1);
             calls[0] = Call({target: baseTokenAddress, value: 0, data: approvalCalldata});
@@ -653,7 +639,7 @@ library Utils {
         }
     }
 
-    function prepareAdminL1L2DirectTransaction(
+    function prepareAdminL1L2Message(
         uint256 gasPrice,
         bytes memory l2Calldata,
         uint256 l2GasLimit,
@@ -662,32 +648,26 @@ library Utils {
         uint256 l2Value,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
         address refundRecipient
     ) internal view returns (Call[] memory calls) {
-        // 1) Prepare the L2TransactionRequestDirect (same logic as before)
-        (
-            L2TransactionRequestDirect memory l2TransactionRequestDirect,
-            uint256 requiredValueToDeploy
-        ) = prepareL1L2Transaction(
-                PrepareL1L2TransactionParams({
-                    l1GasPrice: gasPrice,
-                    l2Calldata: l2Calldata,
-                    l2GasLimit: l2GasLimit,
-                    l2Value: l2Value,
-                    factoryDeps: factoryDeps,
-                    dstAddress: dstAddress,
-                    chainId: chainId,
-                    bridgehubAddress: bridgehubAddress,
-                    l1SharedBridgeProxy: l1SharedBridgeProxy,
-                    refundRecipient: refundRecipient
-                })
-            );
+        // 1) Prepare the L1L2MessageParams (same logic as before)
+        (L1L2MessageParams memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) = prepareL1L2Message(
+            PrepareL1L2MessageParams({
+                l1GasPrice: gasPrice,
+                l2Calldata: l2Calldata,
+                l2GasLimit: l2GasLimit,
+                l2Value: l2Value,
+                factoryDeps: factoryDeps,
+                dstAddress: dstAddress,
+                chainId: chainId,
+                bridgehubAddress: bridgehubAddress,
+                refundRecipient: refundRecipient
+            })
+        );
 
         // 2) Prepare approval calls if base token != ETH
         (uint256 ethAmountToPass, Call[] memory approvalCalls) = prepareApproveBaseTokenAdminCalls(
             IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
         );
@@ -695,50 +675,51 @@ library Utils {
         // 3) Start building up the final calls array
         calls = mergeCalls(calls, approvalCalls);
 
-        // 4) Add the actual requestL2TransactionDirect call to the Bridgehub
-        bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionDirect,
-            (l2TransactionRequestDirect)
+        // 4) Add the direct sendMessage call to the L1 Interop Center
+        bytes memory l2TransactionRequestDirectCalldata = L1InteropRequests.encodeDirectCalldata(
+            l2TransactionRequestDirect
         );
 
         calls = appendCall(
             calls,
-            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestDirectCalldata})
+            Call({
+                target: IL1Bridgehub(bridgehubAddress).interopCenter(),
+                value: ethAmountToPass,
+                data: l2TransactionRequestDirectCalldata
+            })
         );
 
         return calls;
     }
 
-    function prepareAdminL1L2TwoBridgesTransaction(
+    function prepareAdminL1L2IndirectMessage(
         uint256 l1GasPrice,
         uint256 l2GasLimit,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
-        address secondBridgeAddress,
-        uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata,
+        address crossChainSender,
+        uint256 indirectCallValue,
+        bytes memory indirectCallData,
         address refundRecipient
     ) internal view returns (Call[] memory calls) {
-        // 1) Prepare the L2TransactionRequestTwoBridges (same logic as before)
+        // 1) Prepare the L1L2IndirectMessageParams
         (
-            L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
+            L1L2IndirectMessageParams memory l2TransactionRequest,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2TransactionTwoBridges(
+        ) = prepareL1L2IndirectMessage(
                 l1GasPrice,
                 l2GasLimit,
                 chainId,
                 bridgehubAddress,
-                secondBridgeAddress,
-                secondBridgeValue,
-                secondBridgeCalldata,
+                crossChainSender,
+                indirectCallValue,
+                indirectCallData,
                 refundRecipient
             );
 
         // 2) Prepare approval calls if base token != ETH
         (uint256 ethAmountToPass, Call[] memory approvalCalls) = prepareApproveBaseTokenAdminCalls(
             IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
         );
@@ -746,21 +727,22 @@ library Utils {
         // 3) Merge in the approval calls
         calls = mergeCalls(calls, approvalCalls);
 
-        // 4) Add the actual requestL2TransactionTwoBridges call to the Bridgehub
-        bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionTwoBridges,
-            (l2TransactionRequest)
-        );
+        // 4) Add the indirect sendMessage call to the L1 Interop Center
+        bytes memory l2TransactionRequestCalldata = L1InteropRequests.encodeIndirectCalldata(l2TransactionRequest);
 
         calls = appendCall(
             calls,
-            Call({target: bridgehubAddress, value: ethAmountToPass, data: l2TransactionRequestCalldata})
+            Call({
+                target: IL1Bridgehub(bridgehubAddress).interopCenter(),
+                value: ethAmountToPass + indirectCallValue,
+                data: l2TransactionRequestCalldata
+            })
         );
 
         return calls;
     }
 
-    function runAdminL1L2DirectTransaction(
+    function runAdminL1L2Message(
         uint256 gasPrice,
         address admin,
         address accessControlRestriction,
@@ -770,11 +752,10 @@ library Utils {
         address dstAddress,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
         address refundRecipient
     ) internal returns (bytes32 txHash) {
         // 1) Prepare the calls (no actual execution done here)
-        Call[] memory calls = prepareAdminL1L2DirectTransaction(
+        Call[] memory calls = prepareAdminL1L2Message(
             gasPrice,
             l2Calldata,
             l2GasLimit,
@@ -783,7 +764,6 @@ library Utils {
             0,
             chainId,
             bridgehubAddress,
-            l1SharedBridgeProxy,
             refundRecipient
         );
 
@@ -805,29 +785,27 @@ library Utils {
         console.logBytes32(txHash);
     }
 
-    function runAdminL1L2TwoBridgesTransaction(
+    function runAdminL1L2IndirectMessage(
         uint256 l1GasPrice,
         address admin,
         address accessControlRestriction,
         uint256 l2GasLimit,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
-        address secondBridgeAddress,
-        uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata,
+        address crossChainSender,
+        uint256 indirectCallValue,
+        bytes memory indirectCallData,
         address refundRecipient
     ) internal returns (bytes32 txHash) {
         // 1) Prepare the calls
-        Call[] memory calls = prepareAdminL1L2TwoBridgesTransaction(
+        Call[] memory calls = prepareAdminL1L2IndirectMessage(
             l1GasPrice,
             l2GasLimit,
             chainId,
             bridgehubAddress,
-            l1SharedBridgeProxy,
-            secondBridgeAddress,
-            secondBridgeValue,
-            secondBridgeCalldata,
+            crossChainSender,
+            indirectCallValue,
+            indirectCallData,
             refundRecipient
         );
 
@@ -849,7 +827,7 @@ library Utils {
         console.logBytes32(txHash);
     }
 
-    function runGovernanceL1L2DirectTransaction(
+    function runGovernanceL1L2Message(
         uint256 l1GasPrice,
         address governor,
         bytes32 salt,
@@ -858,44 +836,44 @@ library Utils {
         bytes[] memory factoryDeps,
         address dstAddress,
         uint256 chainId,
-        address bridgehubAddress,
-        address l1SharedBridgeProxy
+        address bridgehubAddress
     ) internal returns (bytes32 txHash) {
-        (
-            L2TransactionRequestDirect memory l2TransactionRequestDirect,
-            uint256 requiredValueToDeploy
-        ) = prepareL1L2Transaction(
-                PrepareL1L2TransactionParams({
-                    l1GasPrice: l1GasPrice,
-                    l2Calldata: l2Calldata,
-                    l2GasLimit: l2GasLimit,
-                    l2Value: 0,
-                    factoryDeps: factoryDeps,
-                    dstAddress: dstAddress,
-                    chainId: chainId,
-                    bridgehubAddress: bridgehubAddress,
-                    l1SharedBridgeProxy: l1SharedBridgeProxy,
-                    refundRecipient: msg.sender
-                })
-            );
+        (L1L2MessageParams memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) = prepareL1L2Message(
+            PrepareL1L2MessageParams({
+                l1GasPrice: l1GasPrice,
+                l2Calldata: l2Calldata,
+                l2GasLimit: l2GasLimit,
+                l2Value: 0,
+                factoryDeps: factoryDeps,
+                dstAddress: dstAddress,
+                chainId: chainId,
+                bridgehubAddress: bridgehubAddress,
+                refundRecipient: msg.sender
+            })
+        );
 
         requiredValueToDeploy = approveBaseTokenGovernance(
             IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
             governor,
             salt,
             chainId,
             requiredValueToDeploy
         );
 
-        bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionDirect,
-            (l2TransactionRequestDirect)
+        bytes memory l2TransactionRequestDirectCalldata = L1InteropRequests.encodeDirectCalldata(
+            l2TransactionRequestDirect
         );
 
         console.log("Executing transaction");
         vm.recordLogs();
-        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestDirectCalldata, requiredValueToDeploy, 0);
+        executeUpgrade(
+            governor,
+            salt,
+            IL1Bridgehub(bridgehubAddress).interopCenter(),
+            l2TransactionRequestDirectCalldata,
+            requiredValueToDeploy,
+            0
+        );
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
@@ -907,49 +885,51 @@ library Utils {
         console.logBytes32(txHash);
     }
 
-    function runGovernanceL1L2TwoBridgesTransaction(
+    function runGovernanceL1L2IndirectMessage(
         uint256 l1GasPrice,
         address governor,
         bytes32 salt,
         uint256 l2GasLimit,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
-        address secondBridgeAddress,
-        uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata
+        address crossChainSender,
+        uint256 indirectCallValue,
+        bytes memory indirectCallData
     ) internal returns (bytes32 txHash) {
         (
-            L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
+            L1L2IndirectMessageParams memory l2TransactionRequest,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2TransactionTwoBridges(
+        ) = prepareL1L2IndirectMessage(
                 l1GasPrice,
                 l2GasLimit,
                 chainId,
                 bridgehubAddress,
-                secondBridgeAddress,
-                secondBridgeValue,
-                secondBridgeCalldata,
+                crossChainSender,
+                indirectCallValue,
+                indirectCallData,
                 msg.sender
             );
 
         requiredValueToDeploy = approveBaseTokenGovernance(
             IL1Bridgehub(bridgehubAddress),
-            l1SharedBridgeProxy,
             governor,
             salt,
             chainId,
             requiredValueToDeploy
         );
 
-        bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IL1Bridgehub.requestL2TransactionTwoBridges,
-            (l2TransactionRequest)
-        );
+        bytes memory l2TransactionRequestCalldata = L1InteropRequests.encodeIndirectCalldata(l2TransactionRequest);
 
         console.log("Executing transaction");
         vm.recordLogs();
-        executeUpgrade(governor, salt, bridgehubAddress, l2TransactionRequestCalldata, requiredValueToDeploy, 0);
+        executeUpgrade(
+            governor,
+            salt,
+            IL1Bridgehub(bridgehubAddress).interopCenter(),
+            l2TransactionRequestCalldata,
+            requiredValueToDeploy + indirectCallValue,
+            0
+        );
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
@@ -963,7 +943,6 @@ library Utils {
 
     function approveBaseTokenGovernance(
         IL1Bridgehub bridgehub,
-        address l1SharedBridgeProxy,
         address governor,
         bytes32 salt,
         uint256 chainId,
@@ -974,7 +953,10 @@ library Utils {
             console.log("Base token not ETH, approving");
             IERC20 baseToken = IERC20(baseTokenAddress);
 
-            bytes memory approvalCalldata = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, amountToApprove));
+            bytes memory approvalCalldata = abi.encodeCall(
+                baseToken.approve,
+                (address(IL1AssetRouter(address(bridgehub.assetRouter())).nativeTokenVault()), amountToApprove)
+            );
 
             executeUpgrade(governor, salt, address(baseToken), approvalCalldata, 0, 0);
 
@@ -987,7 +969,6 @@ library Utils {
 
     function prepareApproveBaseTokenAdminCalls(
         IL1Bridgehub bridgehub,
-        address l1SharedBridgeProxy,
         uint256 chainId,
         uint256 amountToApprove
     ) internal view returns (uint256 ethAmountToPass, Call[] memory calls) {
@@ -998,7 +979,10 @@ library Utils {
 
             // Build approval calldata
             IERC20 baseToken = IERC20(baseTokenAddress);
-            bytes memory approvalCalldata = abi.encodeCall(baseToken.approve, (l1SharedBridgeProxy, amountToApprove));
+            bytes memory approvalCalldata = abi.encodeCall(
+                baseToken.approve,
+                (address(IL1AssetRouter(address(bridgehub.assetRouter())).nativeTokenVault()), amountToApprove)
+            );
 
             calls[0] = Call({target: baseTokenAddress, value: 0, data: approvalCalldata});
 
@@ -1062,10 +1046,9 @@ library Utils {
         bytes[] memory factoryDeps,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy,
         address refundRecipient
     ) internal {
-        runL1L2Transaction({
+        runL1L2Message({
             l2Calldata: "",
             l2GasLimit: MAX_PRIORITY_TX_GAS,
             l2Value: 0,
@@ -1073,7 +1056,6 @@ library Utils {
             dstAddress: 0x0000000000000000000000000000000000000000,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy,
             refundRecipient: refundRecipient
         });
     }

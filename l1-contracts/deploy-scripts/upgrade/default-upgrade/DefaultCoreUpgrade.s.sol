@@ -31,6 +31,8 @@ import {ChainCreationParamsLib} from "../../ctm/ChainCreationParamsLib.sol";
 /// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
 contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
+    bool internal deployedL1InteropCenter;
+
     using stdToml for string;
 
     /// @notice Internal state of the upgrade script
@@ -43,6 +45,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         uint256 newProtocolVersion;
         bool hasPreV32IntrospectionOverride;
         bool usePreV32IntrospectionOverride;
+        bool hasL1InteropCenter;
     }
     AdditionalConfigParams internal additionalConfig;
 
@@ -72,7 +75,9 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     }
 
     /// @notice Deploy everything that should be deployed
-    function deployNewEcosystemContractsL1() public virtual {}
+    function deployNewEcosystemContractsL1() public virtual {
+        coreAddresses.bridgehub.implementations.interopCenter = deploySimpleContract("L1InteropCenter");
+    }
 
     function getOwnerAddress() public virtual returns (address) {
         return config.ownerAddress;
@@ -111,6 +116,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         string memory upgradeInputPath
     ) public virtual {
         string memory upgradeToml = vm.readFile(upgradeInputPath);
+        require(upgradeToml.keyExists("$.has_l1_interop_center"), "Set has_l1_interop_center explicitly");
+        additionalConfig.hasL1InteropCenter = upgradeToml.readBool("$.has_l1_interop_center");
 
         // Only override the salt when explicitly provided (non-zero).
         // When zero, the script falls back to the CREATE2_FACTORY_SALT env var or built-in default.
@@ -163,6 +170,11 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     function setAddressesBasedOnBridgehub() internal virtual {
         address bridgehubProxy = coreAddresses.bridgehub.proxies.bridgehub;
 
+        if (additionalConfig.hasL1InteropCenter) {
+            coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubProxy);
+            return;
+        }
+
         bool preV32Ecosystem;
         if (additionalConfig.hasPreV32IntrospectionOverride) {
             preV32Ecosystem = additionalConfig.usePreV32IntrospectionOverride;
@@ -179,7 +191,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             // address stays zero and the upgrade deploys the handler itself.
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV31(bridgehubProxy);
         } else {
-            coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubProxy);
+            coreAddresses = AddressIntrospector.getCoreDeployedAddressesPreL1InteropCenter(bridgehubProxy);
         }
     }
 
@@ -227,6 +239,13 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
                 coreAddresses.bridgehub.proxies.chainRegistrationSender
             );
         }
+        vm.serializeAddress(
+            "bridgehub",
+            "l1_interop_center_implementation_addr",
+            coreAddresses.bridgehub.implementations.interopCenter
+        );
+        vm.serializeAddress("bridgehub", "l1_interop_center_proxy_addr", coreAddresses.bridgehub.proxies.interopCenter);
+        vm.serializeBool("bridgehub", "l1_interop_center_new_proxy", deployedL1InteropCenter);
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", coreAddresses.bridgehub.proxies.messageRoot);
         string memory bridgehubSerialized = vm.serializeAddress(
             "bridgehub",
@@ -265,7 +284,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridges.implementations.l1InteropHandler
         );
         vm.serializeAddress("bridges", "l1_interop_handler_proxy_addr", coreAddresses.bridges.proxies.l1InteropHandler);
-
         string memory bridgesSerialized = vm.serializeAddress(
             "bridges",
             "bridged_token_beacon",
@@ -420,7 +438,9 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](7);
+        address center = coreAddresses.bridgehub.proxies.interopCenter;
+        require(center != address(0), "L1InteropCenter proxy not deployed");
+        calls = new Call[](deployedL1InteropCenter ? 7 : 8);
 
         calls[0] = _buildCallProxyUpgrade(
             coreAddresses.bridgehub.proxies.bridgehub,
@@ -459,6 +479,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             coreAddresses.bridgehub.implementations.chainAssetHandler
         );
+
+        if (!deployedL1InteropCenter) {
+            calls[7] = _buildCallProxyUpgrade(center, coreAddresses.bridgehub.implementations.interopCenter);
+        }
     }
 
     function _buildCallProxyUpgrade(

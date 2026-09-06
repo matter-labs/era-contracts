@@ -200,7 +200,7 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 25] = [
     ),
     (
         L2_INTEROP_CENTER_ADDR,
-        ContractDeployment::SystemProxy(ContractSource::L1ContractName("InteropCenter")),
+        ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2InteropCenter")),
     ),
     (
         L2_INTEROP_HANDLER_ADDR,

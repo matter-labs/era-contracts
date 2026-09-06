@@ -1,3 +1,4 @@
+import assert from "assert";
 import { execSync, spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
@@ -40,7 +41,8 @@ import {
 import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
 import { forceBatchExecutedEqualsCommitted, modelV31BackfillPrerequisite, transferOwnable2Step } from "./harness-shims";
-import { impersonateAndRun, createProvider } from "../core/utils";
+import { impersonateAndRun, createProvider, getL2Chain } from "../core/utils";
+import { verifyPostUpgradeDeposits } from "./post-upgrade-deposits";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
 
@@ -215,6 +217,12 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     console.log("\n── Chain upgrades complete, verifying final protocol versions ──");
     await verifyProtocolVersions(l1Provider, upgradeChainAddresses, scenario.expectedProtocolVersion);
     console.log("✅ All protocol versions verified successfully!\n");
+    console.log("\n── Verifying deposits through the upgraded L1 Interop Center and Mailboxes ──");
+    await verifyPostUpgradeDeposits(
+      l1Chain.rpcUrl,
+      l1Addresses,
+      upgradeChainAddresses.map((_chain) => ({ ..._chain, rpcUrl: getL2Chain(chains, _chain.chainId).rpcUrl }))
+    );
   } finally {
     if (cleanupUpgradeHarnessInputs) {
       cleanupUpgradeHarnessInputs();
@@ -304,7 +312,7 @@ async function deployChainAdmins(
     getCreationBytecode("ChainAdminOwnable"),
     defaultSigner
   );
-  const adminIface = new ethers.utils.Interface(getAbi("AdminFacet"));
+  const chainIface = new ethers.utils.Interface(getAbi("IZKChain"));
 
   for (const chain of chains) {
     const diamondProxy = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), provider);
@@ -317,18 +325,29 @@ async function deployChainAdmins(
     await impersonateAndRun(provider, currentAdmin, async (signer) => {
       const tx = await signer.sendTransaction({
         to: chain.diamondProxy,
-        data: adminIface.encodeFunctionData("setPendingAdmin", [chainAdmin.address]),
+        data: chainIface.encodeFunctionData("setPendingAdmin", [chainAdmin.address]),
         gasLimit: 1_000_000,
       });
       return tx.wait();
     });
 
     const chainAdminContract = new ethers.Contract(chainAdmin.address, getAbi("ChainAdminOwnable"), defaultSigner);
+    // The frozen chains were paused when saved. Resume them before upgrading so the smoke check detects upgrade regressions.
     const acceptTx = await chainAdminContract.multicall(
-      [{ target: chain.diamondProxy, value: 0, data: adminIface.encodeFunctionData("acceptAdmin", []) }],
+      [
+        { target: chain.diamondProxy, value: 0, data: chainIface.encodeFunctionData("acceptAdmin", []) },
+        { target: chain.diamondProxy, value: 0, data: chainIface.encodeFunctionData("unpauseDeposits", []) },
+      ],
       true
     );
-    await acceptTx.wait();
+    const receipt: ethers.providers.TransactionReceipt = await acceptTx.wait();
+    const unpauseLogs = receipt.logs.filter(
+      (_log) =>
+        _log.address.toLowerCase() === chain.diamondProxy.toLowerCase() &&
+        _log.topics[0] === chainIface.getEventTopic("DepositsUnpaused")
+    );
+    assert.equal(unpauseLogs.length, 1, `Expected one DepositsUnpaused event for chain ${chain.chainId}`);
+    assert(chainIface.parseLog(unpauseLogs[0]).args.chainId.eq(chain.chainId), "DepositsUnpaused chain ID mismatch");
   }
 }
 

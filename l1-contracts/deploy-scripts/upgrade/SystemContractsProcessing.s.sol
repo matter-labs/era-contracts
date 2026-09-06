@@ -96,8 +96,8 @@ library SystemContractsProcessing {
         ids[i++] = CoreContract.L2InteropRootStorage;
         ids[i++] = CoreContract.BaseTokenHolder;
         ids[i++] = CoreContract.L2AssetTracker;
-        ids[i++] = CoreContract.InteropCenter;
-        // Stateless parser called by the InteropCenter on every send; must be co-deployed with it.
+        ids[i++] = CoreContract.L2InteropCenter;
+        // Stateless parser called by the L2InteropCenter on every send; must be co-deployed with it.
         ids[i++] = CoreContract.InteropAttributeParser;
         ids[i++] = CoreContract.L2InteropHandler;
         // Under-filling would silently leave `CoreContract(0)` entries; over-filling

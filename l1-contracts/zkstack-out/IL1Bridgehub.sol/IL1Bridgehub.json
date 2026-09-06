@@ -454,6 +454,19 @@
   },
   {
     "type": "function",
+    "name": "interopCenter",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "l1CtmDeployer",
     "inputs": [],
     "outputs": [
@@ -568,138 +581,6 @@
   },
   {
     "type": "function",
-    "name": "requestL2TransactionDirect",
-    "inputs": [
-      {
-        "name": "_request",
-        "type": "tuple",
-        "internalType": "struct L2TransactionRequestDirect",
-        "components": [
-          {
-            "name": "chainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "mintValue",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2Contract",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "l2Value",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2Calldata",
-            "type": "bytes",
-            "internalType": "bytes"
-          },
-          {
-            "name": "l2GasLimit",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2GasPerPubdataByteLimit",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "factoryDeps",
-            "type": "bytes[]",
-            "internalType": "bytes[]"
-          },
-          {
-            "name": "refundRecipient",
-            "type": "address",
-            "internalType": "address"
-          }
-        ]
-      }
-    ],
-    "outputs": [
-      {
-        "name": "canonicalTxHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
-    "name": "requestL2TransactionTwoBridges",
-    "inputs": [
-      {
-        "name": "_request",
-        "type": "tuple",
-        "internalType": "struct L2TransactionRequestTwoBridgesOuter",
-        "components": [
-          {
-            "name": "chainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "mintValue",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2Value",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2GasLimit",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "l2GasPerPubdataByteLimit",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "refundRecipient",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "secondBridgeAddress",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "secondBridgeValue",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "secondBridgeCalldata",
-            "type": "bytes",
-            "internalType": "bytes"
-          }
-        ]
-      }
-    ],
-    "outputs": [
-      {
-        "name": "canonicalTxHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
     "name": "setCTMAssetAddress",
     "inputs": [
       {
@@ -709,6 +590,19 @@
       },
       {
         "name": "_assetAddress",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setInteropCenter",
+    "inputs": [
+      {
+        "name": "_interopCenter",
         "type": "address",
         "internalType": "address"
       }
@@ -848,6 +742,19 @@
     "inputs": [
       {
         "name": "chainTypeManager",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "InteropCenterSet",
+    "inputs": [
+      {
+        "name": "interopCenter",
         "type": "address",
         "indexed": true,
         "internalType": "address"

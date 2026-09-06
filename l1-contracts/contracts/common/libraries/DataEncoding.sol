@@ -59,14 +59,14 @@ library DataEncoding {
         (amount, receiver, maybeTokenAddress) = abi.decode(_data, (uint256, address, address));
     }
 
-    function encodeAssetRouterBridgehubDepositData(
+    function encodeAssetRouterDepositData(
         bytes32 _assetId,
         bytes memory _transferData
     ) internal pure returns (bytes memory) {
         return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_assetId, _transferData));
     }
 
-    function decodeAssetRouterBridgehubDepositData(
+    function decodeAssetRouterDepositData(
         bytes calldata _dataWithVersion
     ) internal pure returns (bytes32 assetId, bytes memory transferData) {
         require(_dataWithVersion.length >= 33, BadTransferDataLength());
@@ -291,7 +291,7 @@ library DataEncoding {
         callStarters = new InteropCallStarter[](1);
         callStarters[0] = InteropCallStarter({
             to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
-            data: encodeAssetRouterBridgehubDepositData(_assetId, _transferData),
+            data: encodeAssetRouterDepositData(_assetId, _transferData),
             callAttributes: callAttributes
         });
     }

@@ -12,6 +12,7 @@ pub mod files;
 pub mod forge;
 pub mod governance_calls;
 pub mod l1_contracts;
+pub mod l1_interop;
 pub mod logger;
 pub mod output;
 pub mod paths;

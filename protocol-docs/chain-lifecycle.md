@@ -81,7 +81,7 @@ interop-registration time instead (next section).
   tokens at all. Because it is free it is rate-limited structurally: the
   `chainRegisteredOnChain[a][b]` mapping makes it callable **once per ordered chain pair**
   (`ChainAlreadyRegistered` on a repeat), which prevents spamming service transactions.
-- **`bridgehubDeposit`** — the caller-funded path, driven through the Bridgehub's two-bridges flow.
+- **`initiateIndirectCall`** — the caller-funded path, driven through the L1 Interop Center's indirect send.
   Anyone can trigger it, but the caller pays the base tokens for the L1->L2 transaction; no ETH
   `msg.value` is accepted. Not once-per-pair, since the caller bears the cost.
 

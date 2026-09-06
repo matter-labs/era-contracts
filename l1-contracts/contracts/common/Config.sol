@@ -182,11 +182,11 @@ uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 /// @dev the address used to identify eth as the base token for chains.
 address constant ETH_TOKEN_ADDRESS = address(1);
 
-/// @dev the value returned in bridgehubDeposit in the TwoBridges function.
-bytes32 constant TWO_BRIDGES_MAGIC_VALUE = bytes32(uint256(keccak256("TWO_BRIDGES_MAGIC_VALUE")) - 1);
+/// @dev Original indirect-call handshake marker; retained across the interface migration.
+bytes32 constant INDIRECT_CALL_MAGIC_VALUE = 0xa175e001c0e5684bc26302c2f9a55aec9f3936fe2aef558034003ef4da7fc77d;
 
 /// @dev https://eips.ethereum.org/EIPS/eip-1352
-address constant BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS = address(uint160(type(uint16).max));
+address constant MIN_CROSS_CHAIN_SENDER_ADDRESS = address(uint160(type(uint16).max));
 
 /// @dev the maximum number of supported chains, this is an arbitrary limit.
 /// @dev Note, that in case of a malicious Bridgehub admin, the total number of chains
@@ -299,6 +299,8 @@ uint256 constant INITIAL_BASE_TOKEN_HOLDER_BALANCE = (2 ** 127) - 1;
 
 /// @dev The total number of supported interop attributes.
 uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 7;
+
+uint256 constant SUPPORTED_L1_INTEROP_ATTRIBUTES = 4;
 
 /// @dev Whether chain migrations between settlement layers are enabled in the current release.
 /// @dev Release-level switch (disabled in v32): lifting the ban requires a protocol upgrade, unlike

@@ -131,7 +131,7 @@
   },
   {
     "type": "function",
-    "name": "bridgehubConfirmL2Transaction",
+    "name": "confirmL2Transaction",
     "inputs": [
       {
         "name": "_chainId",
@@ -154,7 +154,7 @@
   },
   {
     "type": "function",
-    "name": "bridgehubDeposit",
+    "name": "initiateIndirectCall",
     "inputs": [
       {
         "name": "_chainId",
@@ -181,7 +181,7 @@
       {
         "name": "request",
         "type": "tuple",
-        "internalType": "struct L2TransactionRequestTwoBridgesInner",
+        "internalType": "struct IndirectCallRequest",
         "components": [
           {
             "name": "magicValue",

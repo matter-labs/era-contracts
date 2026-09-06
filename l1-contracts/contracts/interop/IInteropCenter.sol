@@ -3,14 +3,15 @@
 // ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
+import {IInteropCenterBase} from "./IInteropCenterBase.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {BundleAttributes, CallAttributes, InteropBundle, InteropCallStarter} from "../common/Messaging.sol";
 import {AtomicFlowPreimage} from "../atomic-interop/IAtomicInterop.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Interface of the {InteropCenter}. See {protocol-docs/interop.md#zksync-interop-protocol}.
-interface IInteropCenter {
+/// @notice Interface of the {L2InteropCenter}. See {protocol-docs/interop.md#zksync-interop-protocol}.
+interface IInteropCenter is IInteropCenterBase {
     /// @notice Send-side metadata for an atomic bundle, parsed from the `atomicBundle` attribute.
     /// Deliberately NOT part of the cross-chain {InteropBundle}: `bundleHash` must not depend on the
     /// flowId preimage (circular — the preimage's leg hashes include this bundle's own hash). See
@@ -116,12 +117,6 @@ interface IInteropCenter {
     /// @param _receiver Address to receive the fees.
     function claimZKFees(address _receiver) external;
 
-    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
-    function pause() external;
-
-    /// @notice Unpauses the contract, re-enabling functions marked with `whenNotPaused`.
-    function unpause() external;
-
     /// @notice One-shot initialization for the InteropCenter; must never run again after v31.
     ///      See {protocol-docs/interop.md#initialization-and-versioning-notes}.
     /// @param _l1ChainId The chain ID of L1.
@@ -140,20 +135,6 @@ interface IInteropCenter {
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external;
-
-    /// @notice Sends an interop bundle.
-    /// @param _destinationChainId Chain ID to send to: an ERC-7930 address that MUST have an empty
-    ///                            address field, encoding an EVM destination chain ID.
-    /// @param _callStarters Array of call descriptors. The ERC-7930 address in each callStarter.to
-    ///                      MUST have an empty ChainReference field (all calls go to
-    ///                      _destinationChainId, so a per-call chain ID would be redundant).
-    /// @param _bundleAttributes Attributes of the bundle.
-    /// @return bundleHash Hash of the sent bundle.
-    function sendBundle(
-        bytes calldata _destinationChainId,
-        InteropCallStarter[] calldata _callStarters,
-        bytes[] calldata _bundleAttributes
-    ) external payable returns (bytes32 bundleHash);
 
     /// @notice Simulates {sendBundle} and reports the `bundleHash` it would produce for the same caller and
     ///         inputs, without collecting value or committing to the atomic interop IMT.

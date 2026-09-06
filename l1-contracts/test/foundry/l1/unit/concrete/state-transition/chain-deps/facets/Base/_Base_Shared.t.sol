@@ -20,7 +20,7 @@ contract TestBaseFacet is ZKChainBase {
 
     function functionWithOnlyChainTypeManagerModifier() external onlyChainTypeManager {}
 
-    function functionWithOnlyBridgehubModifier() external onlyBridgehub {}
+    function functionWithOnlyL1InteropCenterModifier() external onlyL1InteropCenter {}
 
     function functionWithOnlyAdminOrChainTypeManagerModifier() external onlyAdminOrChainTypeManager {}
 
@@ -48,7 +48,7 @@ contract ZKChainBaseTest is UtilsTest {
         selectors[0] = TestBaseFacet.functionWithOnlyAdminModifier.selector;
         selectors[1] = TestBaseFacet.functionWithOnlyValidatorModifier.selector;
         selectors[2] = TestBaseFacet.functionWithOnlyChainTypeManagerModifier.selector;
-        selectors[3] = TestBaseFacet.functionWithOnlyBridgehubModifier.selector;
+        selectors[3] = TestBaseFacet.functionWithOnlyL1InteropCenterModifier.selector;
         selectors[4] = TestBaseFacet.functionWithOnlyAdminOrChainTypeManagerModifier.selector;
         selectors[5] = TestBaseFacet.functionWithOnlyValidatorOrChainTypeManagerModifier.selector;
     }
@@ -69,6 +69,7 @@ contract ZKChainBaseTest is UtilsTest {
         });
 
         dummyBridgehub = new DummyBridgehub();
+        dummyBridgehub.setInteropCenter(makeAddr("l1InteropCenter"));
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), bytes32(0));
         mockChainTypeManagerVerifier(testnetVerifier);
         address diamondProxy = Utils.makeZKsyncOSDiamondProxy(facetCuts, address(dummyBridgehub));

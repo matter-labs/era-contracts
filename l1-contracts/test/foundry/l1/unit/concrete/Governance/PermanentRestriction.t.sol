@@ -1,13 +1,16 @@
 pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
+import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
+import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
+import {IInteropCenterBase} from "contracts/interop/IInteropCenterBase.sol";
+import {InteropCallStarter} from "contracts/common/Messaging.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {L1InteropRequests} from "../../../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {
-    BridgehubBurnCTMAssetData,
-    IBridgehubBase,
-    L2TransactionRequestTwoBridgesOuter
-} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L1L2IndirectMessageParams} from "../../../../../../deploy-scripts/utils/L1InteropRequests.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
@@ -59,6 +62,7 @@ contract TestPermanentRestriction is PermanentRestriction {
 
 contract PermanentRestrictionTest is ChainTypeManagerTest {
     uint256 internal L1_CHAIN_ID;
+    address internal l1InteropCenter = makeAddr("l1InteropCenter");
     ChainAdmin internal chainAdmin;
     AccessControlRestriction internal restriction;
     TestPermanentRestriction internal permRestriction;
@@ -260,7 +264,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     function _encodeMigraationCall(
         bool correctTarget,
         bool correctSelector,
-        bool correctSecondBridge,
+        bool correctCrossChainSender,
         bool correctEncodingVersion,
         bool correctAssetId,
         address l2Admin
@@ -269,30 +273,30 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             call.target = address(0);
             return call;
         }
-        call.target = address(bridgehub);
+        call.target = l1InteropCenter;
 
         if (!correctSelector) {
             call.data = hex"00000000";
             return call;
         }
 
-        L2TransactionRequestTwoBridgesOuter memory outer = L2TransactionRequestTwoBridgesOuter({
+        L1L2IndirectMessageParams memory outer = L1L2IndirectMessageParams({
             chainId: chainId,
             mintValue: 0,
             l2Value: 0,
             l2GasLimit: 0,
             l2GasPerPubdataByteLimit: 0,
             refundRecipient: address(0),
-            secondBridgeAddress: address(0),
-            secondBridgeValue: 0,
-            secondBridgeCalldata: hex""
+            crossChainSender: address(0),
+            indirectCallValue: 0,
+            indirectCallData: hex""
         });
-        if (!correctSecondBridge) {
-            call.data = abi.encodeCall(IL1Bridgehub.requestL2TransactionTwoBridges, (outer));
+        if (!correctCrossChainSender) {
+            call.data = L1InteropRequests.encodeIndirectCalldata(outer);
             // 0 is not correct second bridge
             return call;
         }
-        outer.secondBridgeAddress = sharedBridge;
+        outer.crossChainSender = sharedBridge;
 
         uint8 encoding = correctEncodingVersion ? 1 : 12;
 
@@ -306,9 +310,9 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
                 chainData: abi.encode(IZKChain(IBridgehubBase(bridgehub).getZKChain(chainId)).getProtocolVersion())
             })
         );
-        outer.secondBridgeCalldata = abi.encodePacked(bytes1(encoding), abi.encode(chainAssetId, bridgehubData));
+        outer.indirectCallData = abi.encodePacked(bytes1(encoding), abi.encode(chainAssetId, bridgehubData));
 
-        call.data = abi.encodeCall(IL1Bridgehub.requestL2TransactionTwoBridges, (outer));
+        call.data = L1InteropRequests.encodeIndirectCalldata(outer);
     }
 
     function assertInvalidMigrationCall(Call memory call) public {
@@ -398,6 +402,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             address(chainAssetHandler),
             address(0)
         ); // kl todo maybe address(1)
+        bridgehub.setInteropCenter(l1InteropCenter);
         vm.stopPrank();
 
         // ctm deployer address is 0 in this test
@@ -417,7 +422,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         vm.mockCall(
             address(sharedBridge),
             abi.encodeWithSelector(IAssetRouterBase.assetHandlerAddress.selector),
-            abi.encode(bridgehub)
+            abi.encode(address(chainAssetHandler))
         );
         vm.mockCall(
             address(bridgehub),
@@ -534,7 +539,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     function test_tryGetNewAdminFromMigration_ShortData() public {
         // Call with data length < 4 targeting bridgehub
         Call memory call = Call({
-            target: address(bridgehub),
+            target: l1InteropCenter,
             value: 0,
             data: hex"aabb" // Only 2 bytes
         });
@@ -542,24 +547,24 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         assertInvalidMigrationCall(call);
     }
 
-    function test_tryGetNewAdminFromMigration_EmptySecondBridgeCalldata() public {
-        // Create a call with empty secondBridgeCalldata
-        L2TransactionRequestTwoBridgesOuter memory outer = L2TransactionRequestTwoBridgesOuter({
+    function test_tryGetNewAdminFromMigration_EmptyCrossChainSenderCalldata() public {
+        // Create a call with empty indirectCallData
+        L1L2IndirectMessageParams memory outer = L1L2IndirectMessageParams({
             chainId: chainId,
             mintValue: 0,
             l2Value: 0,
             l2GasLimit: 0,
             l2GasPerPubdataByteLimit: 0,
             refundRecipient: address(0),
-            secondBridgeAddress: sharedBridge,
-            secondBridgeValue: 0,
-            secondBridgeCalldata: hex"" // Empty calldata
+            crossChainSender: sharedBridge,
+            indirectCallValue: 0,
+            indirectCallData: hex"" // Empty calldata
         });
 
         Call memory call = Call({
-            target: address(bridgehub),
+            target: l1InteropCenter,
             value: 0,
-            data: abi.encodeCall(IL1Bridgehub.requestL2TransactionTwoBridges, (outer))
+            data: L1InteropRequests.encodeIndirectCalldata(outer)
         });
 
         assertInvalidMigrationCall(call);
@@ -593,5 +598,78 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         // By default, bridgehub.getZKChain will return address(0) for unknown chainIds
 
         assertFalse(permRestriction.isAdminOfAChain(fakeChain));
+    }
+    function _decodeMigrationMessage(
+        Call memory _call
+    ) private pure returns (bytes memory recipient, bytes memory payload, bytes[] memory attributes) {
+        bytes memory data = _call.data;
+        bytes memory encoded = new bytes(data.length - 4);
+        assembly {
+            mcopy(add(encoded, 0x20), add(data, 0x24), mload(encoded))
+        }
+        return abi.decode(encoded, (bytes, bytes, bytes[]));
+    }
+
+    function test_directMessageToAssetRouterIsNotMigration() public {
+        Call memory call = _encodeMigraationCall(true, true, true, true, true, makeAddr("newAdmin"));
+        (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = _decodeMigrationMessage(call);
+        bytes[] memory directAttributes = new bytes[](2);
+        directAttributes[0] = attributes[0];
+        directAttributes[1] = attributes[1];
+        call.data = abi.encodeCall(IERC7786GatewaySource.sendMessage, (recipient, payload, directAttributes));
+        assertInvalidMigrationCall(call);
+    }
+
+    function _migrationBundle(address _newAdmin, bool _indirect) private returns (Call memory call) {
+        call = _encodeMigraationCall(true, true, true, true, true, _newAdmin);
+        (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = _decodeMigrationMessage(call);
+        (uint256 destinationChainId, address recipientAddress) = InteroperableAddress.parseEvmV1(recipient);
+        bytes[] memory callAttributes = new bytes[](_indirect ? 2 : 1);
+        callAttributes[0] = attributes[1];
+        if (_indirect) {
+            callAttributes[1] = attributes[2];
+        }
+        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
+        calls[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(recipientAddress),
+            data: payload,
+            callAttributes: callAttributes
+        });
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = attributes[0];
+        call.data = abi.encodeCall(
+            IInteropCenterBase.sendBundle,
+            (InteroperableAddress.formatEvmV1(destinationChainId), calls, bundleAttributes)
+        );
+    }
+
+    function test_indirectBundleRecognizedAndAdminProtected() public {
+        address newAdmin = makeAddr("newAdmin");
+        Call memory call = _migrationBundle(newAdmin, true);
+        (address decodedAdmin, bool migration) = permRestriction.getNewAdminFromMigration(call);
+        assertTrue(migration);
+        assertEq(decodedAdmin, newAdmin);
+        vm.expectRevert(abi.encodeWithSelector(NotAllowed.selector, newAdmin));
+        permRestriction.validateCall(call, owner);
+    }
+
+    function test_directBundleToAssetRouterIsNotMigration() public {
+        assertInvalidMigrationCall(_migrationBundle(makeAddr("newAdmin"), false));
+    }
+
+    function test_historicalRequestSelectorDoesNotMatch() public {
+        Call memory call = _encodeMigraationCall(true, true, true, true, true, makeAddr("newAdmin"));
+        call.data = bytes.concat(hex"24fd57fb", call.data);
+        assertInvalidMigrationCall(call);
+        call.target = address(bridgehub);
+        assertInvalidMigrationCall(call);
+    }
+
+    function test_truncatedIndirectAttributeIsNotMigration() public {
+        Call memory call = _encodeMigraationCall(true, true, true, true, true, makeAddr("newAdmin"));
+        (bytes memory recipient, bytes memory payload, bytes[] memory attributes) = _decodeMigrationMessage(call);
+        attributes[2] = abi.encodePacked(IERC7786Attributes.indirectCall.selector);
+        call.data = abi.encodeCall(IERC7786GatewaySource.sendMessage, (recipient, payload, attributes));
+        assertInvalidMigrationCall(call);
     }
 }

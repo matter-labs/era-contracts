@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 // solhint-disable no-console, gas-custom-errors
 
+import {UpgradeUtils} from "deploy-scripts/upgrade/default-upgrade/UpgradeUtils.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
@@ -95,8 +96,10 @@ contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
     ///      one. In this fixture it collapses to nothing — the ecosystem already has a wired handler — so
     ///      the calls themselves are covered by `PreV32ParityCalls.t.sol`, not here.
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
-        console.log("Test mode: keeping only the L1InteropHandler wiring in stage 1");
-        return _buildL1InteropHandlerWiringCalls();
+        Call[][] memory wiring = new Call[][](2);
+        wiring[0] = _buildL1InteropHandlerWiringCalls();
+        wiring[1] = _buildL1InteropCenterWiringCalls();
+        return UpgradeUtils.mergeCallsArray(wiring);
     }
 }
 

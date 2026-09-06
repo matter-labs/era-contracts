@@ -2,11 +2,21 @@
 
 End-to-end tests for ZKsync interoperability across 6 Anvil chains: L1 contract deployment, L1<->L2 bridging (ETH + ERC20), L2<->L2 interop transfers, and gateway setup with chain migration.
 
+L1 deposits use the registered `L1InteropCenter.sendMessage`: direct sends carry transaction
+parameters, value and factory dependencies; token deposits add `indirectCall` and target the
+L1 asset router. Encoders live in `src/core/interop-requests.ts`, with ABIs loaded through
+`src/core/contracts.ts`. Gateway migration still reads `BridgehubDepositFinalized` to obtain
+the canonical priority hash. See [the protocol design](../../../protocol-docs/l1-interop-center.md).
+
+After changing this send surface, regenerate only `chain-states/v0.34.0/`, then run both the
+integration suite and `yarn test:v31-to-v32`. The latter uses the frozen v31 source fixture;
+its older Bridgehub has no center getter, so the upgrade deploys and wires the new proxy.
+
 ## Chain Topology
 
 ```
 ┌──────────────┐
-│  L1 (31337)  │  port 9545 — Bridgehub, CTM, L1AssetRouter, L1NTV
+│  L1 (31337)  │  port 9545 — Bridgehub, L1InteropCenter, CTM, L1AssetRouter, L1NTV
 │  settlement  │
 └──────┬───────┘
        │
@@ -83,8 +93,12 @@ You can also add `.only` to a `describe` or `it` block in the spec file to isola
 `ANVIL_INTEROP_LIVE=1` skips Anvil setup and cleanup, writes the normal test manifest at `outputs/live-state/chains.json`
 from live RPCs and env, and runs specs `07`, `08`, and `09` by default. This file is not simulated chain state; it is
 the small manifest the existing specs load for RPC URLs, chain roles, and token addresses. The live setup
-deploys a fresh L1 `TestnetERC20Token`, mints it to `LIVE_SOURCE_PRIVATE_KEY`, deposits it to Chain A through the
-`@matterlabs/zksync-js` viem adapter, and records the resulting L2 token address. Specs derive the token asset ID from
+deploys a fresh L1 `TestnetERC20Token`, mints it to `LIVE_SOURCE_PRIVATE_KEY`, and deposits it to Chain A through
+`L1InteropCenter.sendMessage`. The source signer approves the NativeTokenVault for the token and any ERC20 base-token
+fees; the fee quote uses the submitted transaction's gas price and the required `LIVE_DEPOSIT_L2_GAS_LIMIT`.
+Choose this limit for fresh wrapped-token deployment on Chain A; setup validates it before deploying the L1 token.
+The `@matterlabs/zksync-js` adapter waits for actual L2 execution and resolves the resulting L2 token address.
+Specs derive the token asset ID from
 `L2NativeTokenVault` at execution time.
 
 ```bash
@@ -95,6 +109,7 @@ LIVE_L1_RPC=<l1-rpc> \
 LIVE_GW_RPC=<gateway-rpc> \
 LIVE_CHAIN_A_RPC=<source-chain-rpc> \
 LIVE_CHAIN_B_RPC=<destination-chain-rpc> \
+LIVE_DEPOSIT_L2_GAS_LIMIT=<l2-gas-limit> \
 LIVE_SOURCE_PRIVATE_KEY=<sender-private-key> \
 LIVE_UNBUNDLER_PRIVATE_KEY=<unbundler-private-key> \
 yarn test:hardhat:interop
@@ -112,6 +127,7 @@ Live environment variables:
 | `LIVE_GW_RPC`                      | Required Gateway RPC; chain ID is discovered from this RPC                   |
 | `LIVE_CHAIN_A_RPC`                 | Required source-chain RPC; chain ID is discovered from this RPC              |
 | `LIVE_CHAIN_B_RPC`                 | Required destination-chain RPC; chain ID is discovered from this RPC         |
+| `LIVE_DEPOSIT_L2_GAS_LIMIT`        | Required positive uint256 gas limit for the fresh token deposit on Chain A   |
 | `LIVE_SOURCE_PRIVATE_KEY`          | Required source signer for setup and specs                                   |
 | `LIVE_UNBUNDLER_PRIVATE_KEY`       | Required alternative signer, must be distinct from `LIVE_SOURCE_PRIVATE_KEY` |
 | `LIVE_RECIPIENT_ADDRESS`           | Optional token recipient; defaults to `LIVE_SOURCE_PRIVATE_KEY` wallet       |

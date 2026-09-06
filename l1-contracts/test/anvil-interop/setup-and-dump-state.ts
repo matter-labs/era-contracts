@@ -2,7 +2,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 
@@ -10,6 +10,13 @@ async function main(): Promise<void> {
   // Use the anvil-interop Foundry profile which disables CBOR metadata,
   // producing deterministic bytecode across platforms (macOS vs Linux CI).
   process.env.FOUNDRY_PROFILE = "anvil-interop";
+
+  // L1 deployment scripts read DA bytecode from disk; rebuilding the L1 script
+  // alone would leave default-profile DA metadata embedded in CREATE2 inputs.
+  execFileSync("forge", ["build"], {
+    cwd: path.resolve(__dirname, "../../../da-contracts"),
+    stdio: "inherit",
+  });
 
   const runner = new DeploymentRunner();
   // Clear stale state from previous runs. Without this, cached testTokens in
@@ -62,8 +69,10 @@ async function main(): Promise<void> {
     // Runs in finally so formatting happens even if deployment fails partway.
     console.log("\nFormatting generated files...");
     try {
-      const statesGlob = path.resolve(__dirname, "chain-states/**/*.json");
-      execSync(`npx prettier --write '${statesGlob}'`, { stdio: "inherit" });
+      execFileSync("npx", ["prettier", "--write", "chain-states/**/*.json"], {
+        cwd: __dirname,
+        stdio: "inherit",
+      });
     } catch {
       console.error("Warning: prettier failed");
     }

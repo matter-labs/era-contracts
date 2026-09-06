@@ -244,7 +244,7 @@ contract GatewayPreparation is Script {
 
         bytes memory data = abi.encodeCall(IBridgehubBase.addChainTypeManager, (gatewayCTMAddress));
 
-        bytes32 l2TxHash = Utils.runGovernanceL1L2DirectTransaction(
+        bytes32 l2TxHash = Utils.runGovernanceL1L2Message(
             _getL1GasPrice(),
             config.governance,
             governanoceOperationSalt,
@@ -253,8 +253,7 @@ contract GatewayPreparation is Script {
             new bytes[](0),
             L2_BRIDGEHUB_ADDRESS,
             config.gatewayChainId,
-            config.bridgehub,
-            config.sharedBridgeProxy
+            config.bridgehub
         );
 
         saveOutput(l2TxHash);
@@ -295,12 +294,12 @@ contract GatewayPreparation is Script {
         address ctmAddress = IL1Bridgehub(config.bridgehub).ctmAssetIdToAddress(assetId);
         require(ctmAddress == config.chainTypeManagerProxy, "CTM asset id does not match the expected CTM address");
 
-        bytes memory secondBridgeData = abi.encodePacked(
+        bytes memory indirectCallData = abi.encodePacked(
             SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
             abi.encode(assetId, L2_BRIDGEHUB_ADDRESS)
         );
 
-        bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
+        bytes32 l2TxHash = Utils.runGovernanceL1L2IndirectMessage(
             _getL1GasPrice(),
             config.governance,
             governanoceOperationSalt,
@@ -308,9 +307,8 @@ contract GatewayPreparation is Script {
             config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy,
-            config.sharedBridgeProxy,
             0,
-            secondBridgeData
+            indirectCallData
         );
 
         saveOutput(l2TxHash);
@@ -319,22 +317,21 @@ contract GatewayPreparation is Script {
     function registerAssetIdInBridgehub(address gatewayCTMAddress, bytes32 governanoceOperationSalt) public {
         initializeConfig();
 
-        bytes memory secondBridgeData = abi.encodePacked(
+        bytes memory indirectCallData = abi.encodePacked(
             NEW_ENCODING_VERSION,
             abi.encode(config.chainTypeManagerProxy, gatewayCTMAddress)
         );
 
-        bytes32 l2TxHash = Utils.runGovernanceL1L2TwoBridgesTransaction(
+        bytes32 l2TxHash = Utils.runGovernanceL1L2IndirectMessage(
             _getL1GasPrice(),
             config.governance,
             governanoceOperationSalt,
             Utils.MAX_PRIORITY_TX_GAS,
             config.gatewayChainId,
             config.bridgehub,
-            config.sharedBridgeProxy,
             config.ctmDeploymentTracker,
             0,
-            secondBridgeData
+            indirectCallData
         );
 
         saveOutput(l2TxHash);
@@ -352,8 +349,7 @@ contract GatewayPreparation is Script {
             create2Salt: bytes32(0),
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
             chainId: config.gatewayChainId,
-            bridgehubAddress: config.bridgehub,
-            l1SharedBridgeProxy: config.sharedBridgeProxy
+            bridgehubAddress: config.bridgehub
         });
 
         saveOutput(l2ChainAdminAddress);
@@ -412,9 +408,9 @@ contract GatewayPreparation is Script {
             })
         );
 
-        bytes memory secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
+        bytes memory indirectCallData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
 
-        bytes32 l2TxHash = Utils.runAdminL1L2TwoBridgesTransaction(
+        bytes32 l2TxHash = Utils.runAdminL1L2IndirectMessage(
             _getL1GasPrice(),
             chainAdmin,
             accessControlRestriction,
@@ -422,9 +418,8 @@ contract GatewayPreparation is Script {
             config.gatewayChainId,
             config.bridgehub,
             config.sharedBridgeProxy,
-            config.sharedBridgeProxy,
             0,
-            secondBridgeData,
+            indirectCallData,
             msg.sender
         );
 
@@ -475,7 +470,7 @@ contract GatewayPreparation is Script {
             l2Calldata = abi.encodeCall(ChainAdmin.multicall, (calls, true));
         }
         // TODO(EVM-925): this should migrate to use L2 transactions directly
-        bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
+        bytes32 l2TxHash = Utils.runAdminL1L2Message(
             _getL1GasPrice(),
             chainAdmin,
             accessControlRestriction,
@@ -485,7 +480,6 @@ contract GatewayPreparation is Script {
             l2ChainAdmin,
             config.gatewayChainId,
             config.bridgehub,
-            config.sharedBridgeProxy,
             msg.sender
         );
 
@@ -532,7 +526,7 @@ contract GatewayPreparation is Script {
 
         bytes memory data = abi.encodeCall(IAdmin.setDAValidatorPair, (l1DAValidator, l2DACommitmentScheme));
 
-        bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
+        bytes32 l2TxHash = Utils.runAdminL1L2Message(
             _getL1GasPrice(),
             chainAdmin,
             accessControlRestriction,
@@ -542,7 +536,6 @@ contract GatewayPreparation is Script {
             chainAdminOnGateway,
             config.gatewayChainId,
             config.bridgehub,
-            config.sharedBridgeProxy,
             msg.sender
         );
 
@@ -561,7 +554,7 @@ contract GatewayPreparation is Script {
 
         bytes memory data = abi.encodeCall(ValidatorTimelock.addValidatorForChainId, (chainId, validatorAddress));
 
-        bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
+        bytes32 l2TxHash = Utils.runAdminL1L2Message(
             _getL1GasPrice(),
             chainAdmin,
             accessControlRestriction,
@@ -571,7 +564,6 @@ contract GatewayPreparation is Script {
             chainAdminOnGateway,
             config.gatewayChainId,
             config.bridgehub,
-            config.sharedBridgeProxy,
             msg.sender
         );
 
@@ -588,7 +580,7 @@ contract GatewayPreparation is Script {
     function supplyGatewayWallet(address addr, uint256 amount) public {
         initializeConfig();
 
-        Utils.runL1L2Transaction(
+        Utils.runL1L2Message(
             hex"",
             Utils.MAX_PRIORITY_TX_GAS,
             amount,
@@ -596,7 +588,6 @@ contract GatewayPreparation is Script {
             addr,
             config.gatewayChainId,
             config.bridgehub,
-            config.sharedBridgeProxy,
             msg.sender
         );
 

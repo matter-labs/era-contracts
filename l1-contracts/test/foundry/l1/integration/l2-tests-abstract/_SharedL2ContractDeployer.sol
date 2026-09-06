@@ -47,7 +47,7 @@ import {
     MessageInclusionProof,
     TokenBridgingData
 } from "../../../../../contracts/common/Messaging.sol";
-import {InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
+import {L2InteropCenter} from "../../../../../contracts/interop/interop-center/L2InteropCenter.sol";
 import {L2WrappedBaseToken} from "../../../../../contracts/bridge/L2WrappedBaseToken.sol";
 import {MailboxFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {AdminFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -77,7 +77,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     IL2AssetRouter l2AssetRouter = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
     IL2Bridgehub l2Bridgehub = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
-    InteropCenter l2InteropCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
+    L2InteropCenter l2InteropCenter = L2InteropCenter(L2_INTEROP_CENTER_ADDR);
     IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
     uint256 internal constant L1_CHAIN_ID = 10; // it cannot be 9, the default block.chainid
@@ -113,7 +113,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     function setUp() public virtual {
         setUpInner(false);
-        // Interop is atomic-only: the InteropCenter calls `AtomicFlowManager.append` on send and the
+        // Interop is atomic-only: the L2InteropCenter calls `AtomicFlowManager.append` on send and the
         // InteropHandler calls `AtomicFlowManager.requireFlowFinalized` on execute. The AtomicFlowManager is
         // not deployed in these Foundry contexts, so mock both (void) calls to succeed. This mock is inert for
         // non-interop suites (they never touch that address), so installing it unconditionally in the single
@@ -296,7 +296,8 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         // Now, let's also append a priority transaction for a more representative example
         bytes[] memory deps = new bytes[](0);
 
-        vm.prank(address(l2Bridgehub));
+        // This fixture seeds an L1 priority request while isolating the L2 Bridgehub registry.
+        vm.mockCall(address(l2Bridgehub), abi.encodeWithSignature("interopCenter()"), abi.encode(address(this)));
         MailboxFacet(chainAddress).bridgehubRequestL2Transaction(
             BridgehubL2TransactionRequest({
                 sender: address(0),

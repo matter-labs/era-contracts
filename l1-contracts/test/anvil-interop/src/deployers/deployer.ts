@@ -81,6 +81,7 @@ export class ForgeDeployer {
       stateTransitionManager: deployed.state_transition_manager_proxy_addr as string,
       validatorTimelock: deployed.validator_timelock_addr as string,
       l1SharedBridge: bridges.shared_bridge_proxy_addr as string,
+      l1InteropCenter: bridgehub.l1_interop_center_proxy_addr as string,
       l1NullifierProxy: bridges.l1_nullifier_proxy_addr as string,
       l1NativeTokenVault: deployed.native_token_vault_addr as string,
       governance: deployed.governance_addr as string,

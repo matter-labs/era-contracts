@@ -12,7 +12,7 @@ import {
   getInteropProtocolFee,
 } from "./interop-helpers";
 import { ANVIL_DEFAULT_PRIVATE_KEY, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
-import { encodeNtvAssetId, encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
+import { encodeNtvAssetId, encodeBridgeBurnData, encodeAssetRouterDepositData } from "../core/data-encoding";
 import { createProvider } from "../core/utils";
 
 type Logger = (line: string) => void;
@@ -125,7 +125,7 @@ export async function executeTokenTransfer(
       : await getL2TokenBalance(targetProvider, destinationTokenBefore, sourceWallet.address);
 
   const transferData = encodeBridgeBurnData(amountWei, sourceWallet.address, sourceTokenAddr);
-  const depositData = encodeAssetRouterBridgehubDepositData(assetId, transferData);
+  const depositData = encodeAssetRouterDepositData(assetId, transferData);
 
   log("\n📦 Encoded bridgehub deposit data");
   log(`   Target Chain: ${targetChainId}`);

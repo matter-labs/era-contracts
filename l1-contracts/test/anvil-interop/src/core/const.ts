@@ -65,6 +65,7 @@ export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFf
 // grows the tree and rehashes the populated path, so `sendBundle` needs a generous gas cap.
 export const ATOMIC_SEND_BUNDLE_GAS_LIMIT = 3_000_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
+export const ERC20_DEPOSIT_L2_GAS_LIMIT = 2_000_000;
 // 7 gwei, used by Anvil interop specs to exercise the non-zero dynamic fee path.
 export const ANVIL_INTEROP_PROTOCOL_FEE_WEI = "7000000000";
 
@@ -75,11 +76,12 @@ export const ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI = 50_000_000_000n;
 // Mirrors contracts/common/Config.sol::REQUIRED_L2_GAS_PRICE_PER_PUBDATA.
 export const ANVIL_INTEROP_REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
 // Two-bridges base-token accounting funds the outer and inner priority requests.
-export const ANVIL_INTEROP_TWO_BRIDGES_PRIORITY_REQUEST_COUNT = 2;
+export const ANVIL_INTEROP_INDIRECT_PRIORITY_REQUEST_COUNT = 2;
 
 // Default TestnetERC20Token deployment parameters for interop test helpers
 export const TEST_TOKEN_DECIMALS = 18;
 export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
+export const POST_UPGRADE_DEPOSIT_AMOUNT = utils.parseEther("1");
 
 // Mirrors the InteropBundle struct in contracts/common/Messaging.sol; the trailing tuple is
 // BundleAttributes (executionAddress, unbundlerAddress, useFixedFee, salt). Atomic-send params do

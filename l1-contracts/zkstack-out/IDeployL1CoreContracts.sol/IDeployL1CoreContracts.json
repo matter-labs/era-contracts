@@ -20,6 +20,11 @@
                 "internalType": "struct BridgehubContracts",
                 "components": [
                   {
+                    "name": "interopCenter",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
                     "name": "bridgehub",
                     "type": "address",
                     "internalType": "address"
@@ -51,6 +56,11 @@
                 "type": "tuple",
                 "internalType": "struct BridgehubContracts",
                 "components": [
+                  {
+                    "name": "interopCenter",
+                    "type": "address",
+                    "internalType": "address"
+                  },
                   {
                     "name": "bridgehub",
                     "type": "address",

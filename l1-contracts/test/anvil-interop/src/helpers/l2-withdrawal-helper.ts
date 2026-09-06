@@ -9,7 +9,7 @@ import {
   L2_ASSET_ROUTER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
-import { encodeAssetRouterBridgehubDepositData, encodeBridgeBurnData, encodeNtvAssetId } from "../core/data-encoding";
+import { encodeAssetRouterDepositData, encodeBridgeBurnData, encodeNtvAssetId } from "../core/data-encoding";
 import type { CoreDeployedAddresses } from "../core/types";
 import { indirectCallAttr, interopCallValueAttr, sendInteropBundle } from "./interop-helpers";
 import { encodeEvmAddress } from "./erc7930";
@@ -86,7 +86,7 @@ export async function initiateEthWithdrawal(params: InitiateWithdrawalParams): P
   // The burn token address is left as `address(0)` so the NTV resolves the base token from the
   // assetId; the withdrawn ETH rides as the indirect-call message value (`interopCallValue` is 0).
   const transferData = encodeBridgeBurnData(amount, l1Recipient, ethers.constants.AddressZero);
-  const depositData = encodeAssetRouterBridgehubDepositData(l1EthAssetId, transferData);
+  const depositData = encodeAssetRouterDepositData(l1EthAssetId, transferData);
   const callStarter = {
     to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
     data: depositData,
@@ -145,7 +145,7 @@ export async function initiateErc20Withdrawal(params: InitiateErc20WithdrawalPar
   await approveTx.wait();
 
   const transferData = encodeBridgeBurnData(amount, l1Recipient, l2TokenAddress);
-  const depositData = encodeAssetRouterBridgehubDepositData(assetId, transferData);
+  const depositData = encodeAssetRouterDepositData(assetId, transferData);
   const callStarter = {
     to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
     data: depositData,

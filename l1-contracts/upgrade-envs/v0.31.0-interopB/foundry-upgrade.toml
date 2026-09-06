@@ -15,6 +15,7 @@ old_protocol_version = 0x2000000000  # v32.0.0 (current genesis)
 # autodetection would classify the ecosystem correctly on its own; the key is kept explicit so the
 # classification does not depend on the introspection heuristic.
 pre_v32_introspection = false
+has_l1_interop_center = true
 v28_protocol_version = 0x1c00000000  # v28.0.0 (for reference)
 
 [contracts]
