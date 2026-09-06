@@ -74,9 +74,9 @@ those are per-chain-admin actions and are not part of this ecosystem artifact.
 
 ## Deployed contracts
 
-The 30 new L1 contracts in `extra-verification-logs.txt` are **live on Sepolia** and
-**source-verified on Etherscan**. They were deployed by the deployer bundle described under
-"Camp A / Camp B" below — 32 transactions, ~72.4M gas total, whose hashes are in
+The 31 new L1 contracts in `extra-verification-logs.txt` are **live on Sepolia** and
+**source-verified on Etherscan** (31/31). They were deployed by the deployer bundle described
+under "Camp A / Camp B" below — 33 transactions, 75.4M gas total, whose hashes are in
 `transactions.txt`.
 
 Deploying them does not change the ecosystem: they are inert CREATE2 deployments until the
@@ -87,11 +87,17 @@ state.
 
 | check                                                                                | result                                                               |
 | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `ecosystem verify-upgrade` (PUVT)                                                    | 172 checks, 0 errors, 18 warnings                                    |
 | Fork rehearsal — every prepare bundle replayed under impersonation on a Sepolia fork | 33/33 txs pass                                                       |
-| Simulator scenario — all 26 txs against a Sepolia fork                               | 26/26 pass                                                           |
+| Simulator — both scenario files against a Sepolia fork                               | `All simulations succeed`: 44 txs, 0 failures                        |
+| era-contracts copy-paste check (`validate-upgrade-transactions`)                     | PASS — 27 txs byte-for-byte                                          |
 | `setNewVersionUpgrade` args                                                          | `0x1f00000001 -> 0x2100000000`, verifier = `ZKsyncOSTestnetVerifier` |
 | `setChainCreationParams` `zkTokenAssetId`                                            | byte-identical to the live v31 value                                 |
-| Etherscan verification                                                               | 30/30                                                                |
+| Etherscan verification                                                               | 31/31                                                                |
+
+The 44 simulated transactions are the two scenario files (28 + 2) plus the ownership and
+protocol-version invariant checks the simulator appends. The create-chain smoke test brings up
+chain 556 on v33.0.0.
 
 ### Two scenario files
 
@@ -149,7 +155,7 @@ Getting there took two rounds. The first was the module rename: the verifier liv
 the verifier for the upgrade _out of_ v31, written while this release was still numbered v32,
 and it said so (`EXPECTED_NEW_PROTOCOL_VERSION_STR = "0.32.0"` against a genesis declaring
 `0.33.0`). It is now `versions/v33/`, with the load-bearing v31 strings deliberately left alone:
-`GOV_SALT_SEED = b"v31:gov"` is a CREATE2 salt, and the expected *old* protocol version really is
+`GOV_SALT_SEED = b"v31:gov"` is a CREATE2 salt, and the expected _old_ protocol version really is
 0.31.0.
 
 The second round closed the two classes that were left:
@@ -157,7 +163,7 @@ The second round closed the two classes that were left:
 **The bytecode registry and the deployment are built under different profiles.** Provenance
 matches a deploy by hashing its creation code against `AllContractsHashes.json`. The artifact was
 originally built under `FOUNDRY_PROFILE=anvil-interop` (`cbor_metadata = false`), while the
-registry is generated under the default profile, *with* metadata — a 54-byte CBOR difference on
+registry is generated under the default profile, _with_ metadata — a 54-byte CBOR difference on
 `L1Bridgehub`, enough that no deployment ever matched and all 29 landed as "not present in the
 create2 deployments". Resolved by rebuilding and redeploying under the **default** profile, so
 the deployed code and the registry agree: 31 CREATE2 deployments now resolve. See "Why the
@@ -174,7 +180,7 @@ artifact:
   handler, which PUVT decides from the CREATE2 log rather than from the call list.
 - Stage 1 per-CTM (9 calls): `checkDeadline`, `checkMigrationsPaused`, the four
   `prepareUpgradeCTMCalls` proxy swaps, then `setDefaultUpgrade`, `setChainCreationParams`,
-  `setNewVersionUpgrade`. `setDefaultUpgrade` is checked to store the *generic*
+  `setNewVersionUpgrade`. `setDefaultUpgrade` is checked to store the _generic_
   `DefaultUpgradeZKsyncOS` and explicitly not this release's one-shot `V32UpgradeZKsyncOS` —
   storing the one-shot contract would silently re-run this release's migration on a later patch
   upgrade.
@@ -187,8 +193,8 @@ Three further things surfaced while doing this and are worth knowing:
   `MailboxFacet`, `L1Nullifier` and `L1AssetRouter` no longer take `eraChainId` /
   `eraDiamondProxy`. PUVT expected the v31 shapes.
 - **`L1MessageRoot.ERA_GATEWAY_CHAIN_ID` had two sources of truth.** `DefaultCoreUpgrade.s.sol`
-  reads `[legacy_gateway] chain_id` from the *upgrade input* and passes 0 when absent; PUVT read
-  it from *permanent-values*, where testnet carries a documented placeholder (EVM-1200) that no
+  reads `[legacy_gateway] chain_id` from the _upgrade input_ and passes 0 when absent; PUVT read
+  it from _permanent-values_, where testnet carries a documented placeholder (EVM-1200) that no
   contract should be constructed with. PUVT now mirrors the deploy script.
 - **The core `ProxyAdmin` was checked by bytecode hash.** It predates this release, so its code
   will never match the current `TransparentProxyAdmin` artifact — which is why two historical
