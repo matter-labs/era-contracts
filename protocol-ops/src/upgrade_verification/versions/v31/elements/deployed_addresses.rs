@@ -76,11 +76,6 @@ mod core_signatures {
 /// Expected constructor signatures for every contract deployed by
 /// `CTMUpgrade_v31` (i.e. `verify_ctm_provenance` and
 /// `verify_ctm_base_provenance`).
-///
-/// `V31ChainTypeManager._interopCenter` is intentionally the L2 built-in
-/// `INTEROP_CENTER` address — the contract stores it in an L1-side
-/// `immutable` but uses it only when constructing L2-aliased messages
-/// (see `ChainTypeManager.sol`). Pass `L2_INTEROP_CENTER_ADDR` here.
 mod ctm_signatures {
     alloy::sol! {
         contract V31AdminFacet {
@@ -1002,9 +997,6 @@ async fn verify_ctm_provenance(
             "l1-contracts/UpgradeStageValidator",
         ),
         // ChainTypeManager impl(bridgehub, interopCenter, bytecodesSupplier, permissionlessValidator).
-        // `L2_INTEROP_CENTER_ADDR` is the L2 built-in address, intentionally
-        // embedded in an L1-side immutable — the CTM only ever uses it when
-        // constructing L2-aliased messages (see ChainTypeManager.sol).
         (
             ctm_impl,
             V31ChainTypeManager::constructorCall::new((
