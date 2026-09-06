@@ -234,35 +234,16 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters
     function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal {
-        _validateChainCreationParams(_chainCreationParams);
-
-        if (_chainCreationParams.genesisBatchCommitment != bytes32(uint256(1))) {
-            revert GenesisBatchCommitmentIncorrect();
-        }
-
-        _processValidatedChainCreationParams(_chainCreationParams);
-    }
-
-    /// @notice Updates the parameters with which a new chain is created
-    /// @param _chainCreationParams The new chain creation parameters
-    function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external onlyOwner {
-        _setChainCreationParams(_chainCreationParams);
-    }
-
-    /// @notice Validates chain creation parameters
-    /// @param _chainCreationParams The chain creation parameters to validate
-    function _validateChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal pure {
         if (_chainCreationParams.genesisUpgrade == address(0)) {
             revert GenesisUpgradeZero();
         }
         if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
             revert GenesisBatchHashZero();
         }
-    }
+        if (_chainCreationParams.genesisBatchCommitment != bytes32(uint256(1))) {
+            revert GenesisBatchCommitmentIncorrect();
+        }
 
-    /// @notice Sets chain creation parameters after validation
-    /// @param _chainCreationParams The chain creation parameters
-    function _processValidatedChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal {
         l1GenesisUpgrade = _chainCreationParams.genesisUpgrade;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
@@ -294,6 +275,12 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             forceDeploymentsData: _chainCreationParams.forceDeploymentsData,
             forceDeploymentHash: forceDeploymentHash
         });
+    }
+
+    /// @notice Updates the parameters with which a new chain is created
+    /// @param _chainCreationParams The new chain creation parameters
+    function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external onlyOwner {
+        _setChainCreationParams(_chainCreationParams);
     }
 
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.

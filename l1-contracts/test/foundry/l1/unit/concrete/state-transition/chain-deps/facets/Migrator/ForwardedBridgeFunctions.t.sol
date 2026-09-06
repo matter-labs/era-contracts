@@ -456,7 +456,6 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
         vm.prank(chainAssetHandler);
         migratorFacet.forwardedBridgeMint(abi.encode(commitment), false);
 
-        assertEq(utilsFacet.util_getDeprecatedPrecommitmentForTheLatestBatch(), historicalSentinel);
         assertEq(vm.load(address(migratorFacet), bytes32(uint256(59))), historicalSentinel);
     }
 

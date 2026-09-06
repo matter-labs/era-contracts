@@ -71,7 +71,6 @@ contract PrepareChainCommitmentTest is MigratorTest {
         ZKChainCommitment memory commitment = migratorFacet.prepareChainCommitment();
 
         assertEq(commitment.precommitmentForTheLatestBatch, bytes32(0));
-        assertEq(utilsFacet.util_getDeprecatedPrecommitmentForTheLatestBatch(), historicalSentinel);
         assertEq(vm.load(address(migratorFacet), bytes32(uint256(59))), historicalSentinel);
     }
 

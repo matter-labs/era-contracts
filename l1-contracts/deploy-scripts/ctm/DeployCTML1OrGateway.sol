@@ -151,13 +151,19 @@ library DeployCTML1OrGateway {
     /// @notice Resolve a CTMContract enum to its contract name.
     // solhint-disable-next-line code-complexity
     function _resolveCTMContractName(CTMContract _c) private view returns (string memory) {
-        if (_c == CTMContract.ChainTypeManager) return "ChainTypeManager";
+        if (_c == CTMContract.ChainTypeManager) {
+            return "ChainTypeManager";
+        }
         if (_c == CTMContract.DefaultUpgrade) return "DefaultUpgradeZKsyncOS";
         if (_c == CTMContract.VerifierPlonk) return "ZKsyncOSVerifierPlonk";
         if (_c == CTMContract.DualVerifier) return "ZKsyncOSVerifier";
         if (_c == CTMContract.TestnetVerifier) return "ZKsyncOSTestnetVerifier";
-        if (_c == CTMContract.GatewayCTMDeployerCTM) return "GatewayCTMDeployerCTM";
-        if (_c == CTMContract.GatewayCTMDeployerVerifiers) return "GatewayCTMDeployerVerifiers";
+        if (_c == CTMContract.GatewayCTMDeployerCTM) {
+            return "GatewayCTMDeployerCTM";
+        }
+        if (_c == CTMContract.GatewayCTMDeployerVerifiers) {
+            return "GatewayCTMDeployerVerifiers";
+        }
 
         if (_c == CTMContract.AdminFacet) return "AdminFacet";
         if (_c == CTMContract.MailboxFacet) return "MailboxFacet";

@@ -133,7 +133,9 @@ library CoreOnGatewayHelper {
 
     /// @notice Resolve a CoreContract enum to its contract name.
     function _resolveContractName(CoreContract _c) internal pure returns (string memory) {
-        if (_c == CoreContract.L2NativeTokenVault) return "L2NativeTokenVault";
+        if (_c == CoreContract.L2NativeTokenVault) {
+            return "L2NativeTokenVault";
+        }
 
         if (_c == CoreContract.L2Bridgehub) return "L2Bridgehub";
         if (_c == CoreContract.L2AssetRouter) return "L2AssetRouter";
@@ -197,10 +199,18 @@ library CoreOnGatewayHelper {
 
     /// @notice Resolve an L2SystemContract to its canonical contract name.
     function _resolveL2SystemContractName(L2SystemContract _c) internal pure returns (string memory) {
-        if (_c == L2SystemContract.L2BaseToken) return "L2BaseToken";
-        if (_c == L2SystemContract.L1Messenger) return "L1Messenger";
-        if (_c == L2SystemContract.SystemContext) return "SystemContext";
-        if (_c == L2SystemContract.ContractDeployer) return "ContractDeployer";
+        if (_c == L2SystemContract.L2BaseToken) {
+            return "L2BaseToken";
+        }
+        if (_c == L2SystemContract.L1Messenger) {
+            return "L1Messenger";
+        }
+        if (_c == L2SystemContract.SystemContext) {
+            return "SystemContext";
+        }
+        if (_c == L2SystemContract.ContractDeployer) {
+            return "ContractDeployer";
+        }
         if (_c == L2SystemContract.L2ComplexUpgrader) {
             return "L2ComplexUpgrader";
         }
@@ -209,10 +219,18 @@ library CoreOnGatewayHelper {
 
     /// @notice Resolve an L2SystemContract to its canonical L2 address.
     function _resolveL2SystemContractAddress(L2SystemContract _c) internal pure returns (address) {
-        if (_c == L2SystemContract.L2BaseToken) return L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
-        if (_c == L2SystemContract.L1Messenger) return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR;
-        if (_c == L2SystemContract.SystemContext) return L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR;
-        if (_c == L2SystemContract.ContractDeployer) return L2_DEPLOYER_SYSTEM_CONTRACT_ADDR;
+        if (_c == L2SystemContract.L2BaseToken) {
+            return L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
+        }
+        if (_c == L2SystemContract.L1Messenger) {
+            return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR;
+        }
+        if (_c == L2SystemContract.SystemContext) {
+            return L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR;
+        }
+        if (_c == L2SystemContract.ContractDeployer) {
+            return L2_DEPLOYER_SYSTEM_CONTRACT_ADDR;
+        }
         if (_c == L2SystemContract.L2ComplexUpgrader) {
             return L2_COMPLEX_UPGRADER_ADDR;
         }

@@ -283,10 +283,6 @@ contract UtilsFacet is ZKChainBase {
         s.__DEPRECATED_precommitmentForTheLatestBatch = _precommitment;
     }
 
-    function util_getDeprecatedPrecommitmentForTheLatestBatch() external view returns (bytes32) {
-        return s.__DEPRECATED_precommitmentForTheLatestBatch;
-    }
-
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }
