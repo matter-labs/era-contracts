@@ -39,6 +39,8 @@ remappings = [
   "system-contracts/contracts/Constants.sol=frozen-system-constants/Constants.sol",
   "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
   "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
+  # Pin the duplicate vendored alias so remapping detection is deterministic across platforms.
+  "erc4626-tests/=lib/openzeppelin-contracts-upgradeable-v4/lib/erc4626-tests/",
   "test-utils/=test/foundry/l1/integration/utils/",
 ]
 optimizer = true

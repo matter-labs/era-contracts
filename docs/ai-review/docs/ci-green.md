@@ -2,292 +2,116 @@
 
 ## Relevant files
 
-- `.github/workflows/lint.yaml` — Solidity / TS lint, codespell, typos, `cargo fmt --check` for all Rust crates, and `cargo clippy -D warnings` for `protocol-ops`.
-- `.github/workflows/l1-contracts-ci.yaml` — l1-contracts build, `check-zkstack-out`, `check-hashes`, `check-selectors`, `check-legacy-bridge-sol`.
-- `.github/workflows/l1-contracts-foundry-ci.yaml` — foundry test build + contract-size check.
-- `.github/workflows/anvil-interop-ci.yaml` — interop integration test, v31→v32 upgrade test.
-- `.github/workflows/update-hashes-on-demand.yaml` — manual workflow to push hash updates back into a PR.
-- `recompute_hashes.sh` — one-shot rebuild + recompute + write hashes.
-- `package.json`, `l1-contracts/package.json`, `da-contracts/package.json` — top-level scripts referenced below.
+- `.github/workflows/lint.yaml` — repository lint, error lint, formatting for all Rust crates, protocol-ops Clippy and tests, codespell, and typos.
+- `.github/workflows/l1-contracts-ci.yaml` — DA/L1 builds and tests, generated ABI, genesis, hash, selector, and coverage checks.
+- `.github/workflows/l1-contracts-foundry-ci.yaml` — deploy-script compilation, contract-size checks, and deployment-script smoke tests.
+- `.github/workflows/anvil-interop-ci.yaml` — interop tests, the v31 to v32 upgrade test, and chain-state determinism.
+- `.github/workflows/update-generated-artifacts.yaml` — manual workflow for regenerating artifacts on a same-repository PR.
+- `.github/foundry-versions.env` — the Foundry pin used by CI and local regeneration.
+- `package.json`, `l1-contracts/package.json`, and `da-contracts/package.json` — supported local commands.
+- `AGENTS.md` — mandatory Foundry and Anvil cleanup rules.
 
-## TL;DR — the order to fix things
+## Toolchain
 
-CI checks form a dependency chain. Fix in this order:
+Use the Node version from `.nvmrc` and upstream Foundry from `.github/foundry-versions.env`. Do not use foundry-zksync or `forge --zksync`.
 
-```
-1. Tests       ← foundry, anvil-interop, v31→v32 upgrade. Biggest signal; bytecode-shaping bugs surface here.
-2. Linting     ← solhint, eslint, prettier, errors-lint, cargo fmt, cargo clippy, codespell, typos.
-3. Selectors   ← yarn l1 selectors --fix. Depends on final bytecode.
-4. zkstack-out ← regenerated JSON ABIs. Depends on final compile output.
-5. Hashes      ← ./recompute_hashes.sh. Depends on final bytecode hashes — the most sensitive of all.
-```
-
-**Why this order matters:** every step further down consumes outputs of an earlier one. Regenerating selectors / zkstack-out / hashes on top of code that still has bugs means doing all three again after each test fix. Linting comes after tests because a real fix often shifts code around, and re-running linters on the stable post-test code is cheaper than re-running them after every test iteration. Hashes go last because they're the most expensive to regenerate and the most fragile to subsequent change.
-
-Doing steps 3-5 before step 1 is the most common time-sink.
-
-## 1. Tests
-
-This is where the bulk of regressions surface — get this green first. Three test suites in CI: **foundry** (per-project), **anvil-interop** (full L1↔L2 flow), and **v31 → v32 upgrade** (real-state replay).
-
-### Install the pinned Foundry release
-
-CI uses upstream Foundry from `.github/foundry-versions.env`. To match locally:
+To install the pinned Foundry release:
 
 ```bash
 . .github/foundry-versions.env
 foundryup --install "$FOUNDRY_VERSION"
 ```
 
-### Build artifacts (in this order)
+## Core local checks
 
-From the repo root:
-
-```bash
-yarn da build:foundry   # da-contracts → da-contracts/out
-yarn l1 build:foundry   # l1-contracts → l1-contracts/out, zkstack-out
-```
-
-Order matters: l1 needs da artifacts, anvil-interop needs both, and `l1 build:foundry` regenerates `zkstack-out` (see step 4). If `yarn l1 build:foundry` fails, **stop and fix the Solidity** — every later step will fail too.
-
-### 1a. Foundry tests
+Run from the repository root:
 
 ```bash
-cd l1-contracts
-yarn test:foundry      # forge test --threads 1 --ffi --match-path 'test/foundry/{l1,zksync-os}/*'
-```
+yarn build-all-contracts
+(cd l1-contracts && forge build deploy-scripts)
 
-Common foundry test failures and their root causes:
+yarn l1 test:foundry
+yarn da test:foundry
 
-- **"Can't acquire config lock"** — transient; rerun.
-- **`L2-context vs L1-context` assertion mismatches** — tests in `l2-tests-in-l1-context` run L2 logic in an L1 environment; some L2 system features don't behave identically. Fix the assertion or move the test, don't paper over it.
-
-### 1b. Anvil-interop tests
-
-These run the full L1↔L2 interop flow against real anvil instances on ports 9545/4050-4053. They need:
-
-- Both foundry builds done above.
-- Pre-generated chain states under `l1-contracts/test/anvil-interop/chain-states/` (committed; only regenerate when mock system contracts change — see "Regenerating chain states" below).
-
-```bash
-cd l1-contracts
-yarn test:hardhat:interop                    # ~180s, uses pre-generated states
-ANVIL_INTEROP_PORT_OFFSET=100 yarn test:hardhat:interop  # avoid port collisions
-ANVIL_INTEROP_FRESH_DEPLOY=1 yarn test:hardhat:interop   # ~330s, fresh deploy
-ANVIL_INTEROP_KEEP_CHAINS=1 yarn test:hardhat:interop    # keep chains running for cast debugging
-```
-
-**Cleanup.** Never `pkill -f anvil` / `killall anvil` — other developers may have anvils running on different ports. Use the targeted cleanup script:
-
-```bash
-cd l1-contracts/test/anvil-interop
-bash cleanup.sh
-```
-
-CI runs this in the `if: always()` cleanup step; do the same locally.
-
-**Regenerating chain states.** Only when you've changed mock system contracts (`MockL2ToL1Messenger`, `MockMintBaseTokenHook`, etc.):
-
-```bash
-cd l1-contracts
-FOUNDRY_PROFILE=anvil-interop forge build
-cd test/anvil-interop
-npx ts-node setup-and-dump-state.ts
-```
-
-Commit the regenerated `chain-states/` files alongside the contract change. CI currently does not regenerate states on PRs — it expects committed states to match the current mock contracts.
-
-### 1c. Upgrade tests (v31→v32)
-
-This exercises the full upgrade flow against the captured v31 chain states. It uses protocol-ops's split flow: `ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, `ecosystem stage3` to register bridged tokens and populate `bridgedOut`, then `chain upgrade` per chain. In production a chain's priority-op lower bound must also be recorded (`RecordPriorityOpLowerBound.s.sol`) well before its `chain upgrade`; the test harness models the draft-v31 backfill prerequisite instead (see `harness-shims.ts`).
-
-```bash
-cd l1-contracts/test/anvil-interop
-npx ts-node run-v31-to-v32-upgrade-test.ts
-```
-
-Prerequisites: same as anvil-interop tests (both foundry builds done). Plus:
-
-- `protocol-ops` must build (`cd protocol-ops && cargo build`). The test runner shells out to it.
-- The pinned upstream Foundry on `PATH`.
-
-Common failures:
-
-- **"Script not found: deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol"** or **`CTMUpgrade_v31.s.sol`** — `yarn l1 build:foundry` not run, or the test override path is wrong.
-- **"call to non-contract address 0x0…"** — usually the upgrade script reading an address before the contract is deployed/registered. Use `cast run <txhash>` against the still-running anvil to get the trace; see `AGENTS.md` "Debugging Failed Transactions with cast run" for the recipe.
-- **"vm.writeToml: path not allowed"** — script-out path concatenation issue. Check that `vm.projectRoot()` is concatenated once, not twice.
-
-For deeper debugging, run with `ANVIL_INTEROP_KEEP_CHAINS=1` and inspect L1 state with `cast` after the test exits.
-
-## 2. Linting
-
-Run after tests are green. Lint failures are mostly cosmetic, but real fixes from step 1 often shift code around — running linting once on the post-test code is cheaper than re-running it after every test iteration.
-
-From repo root:
-
-```bash
-yarn lint:sol --fix --noPrompt   # Solidity
-yarn lint:ts --fix               # TypeScript
-yarn prettier:fix                # All formats — adds trailing newlines, etc.
-
-# Solidity error-naming convention
+yarn lint:check
 yarn l1 errors-lint --check
-```
 
-For Rust:
-
-```bash
 # `+1.91.1` overrides crate-local nightly toolchains to match CI.
 for dir in protocol-ops tools/{upgrade-readiness-checker,verifier-gen,wallets-gen,zksync-os-genesis-gen}; do
   (cd "$dir" && cargo +1.91.1 fmt --check)
 done
-(cd protocol-ops && cargo clippy --all-targets -- -D warnings)
+
+(
+  cd protocol-ops
+  cargo +1.91.1 clippy --all-targets -- -D warnings
+  cargo +1.91.1 test --all-targets
+)
 ```
 
-CI also runs `codespell` and `crate-ci/typos` as separate jobs (see `.github/workflows/lint.yaml`). They are easy to forget locally because neither is wired into `yarn lint:check`. Both must pass independently.
+`codespell` and `typos` run as separate CI jobs and are not included in `yarn lint:check`.
 
-**Important: filter out submodule paths locally.** CI's `actions/checkout@v6` runs without `submodules: true`, so it never sees the contents of `lib/`, `l1-contracts/lib/`, `da-contracts/lib/`, etc. Locally those directories are populated and produce hundreds of false-positive errors that CI doesn't see. Use `typos`'s native `--exclude` (do **not** pipe `git ls-files | xargs typos` — file paths with spaces in submodule audits will silently break the pipeline before scanning starts):
+## Anvil interop checks
+
+To reproduce the fast preloaded-state job:
 
 ```bash
-# typos — exclude submodule paths to match CI's view
-typos . \
-  --exclude 'lib/**' \
-  --exclude 'l1-contracts/lib/**' \
-  --exclude 'da-contracts/lib/**'
+yarn l1 build:anvil-interop-dev-artifacts
 
-# codespell — `skip` already supports comma-separated paths
-codespell . \
-  --skip='_typos.toml,*.json,*.lock,*.html,*.map,target,node_modules,venv,dist,report,yarn-error.log,lib,l1-contracts/lib,da-contracts/lib'
-
-# Quick "did *I* introduce a typo" check: only run on what your branch changed
-git diff --name-only -z main -- ':!lib' ':!*/lib/*' | xargs -0 typos
+(
+  set -e
+  cd l1-contracts/test/anvil-interop
+  trap 'bash cleanup.sh' EXIT
+  yarn install
+  yarn tsc --noEmit
+  yarn test:unit
+  ANVIL_INTEROP_MAX_PARALLEL_WORKERS=4 yarn ts-node run-hardhat-interop-test.ts
+)
 ```
 
-Sanity-check the filter is right: a clean run on the current branch should print **0** errors. If your numbers are in the hundreds you're seeing submodule noise — fix the filter, don't fix the code.
-
-A real-world catch: `typos` splits hyphenated words. A prefix like the three letters "m-i-s" with a dash, then `encoded` (the kind of phrasing you get when adding a hyphenated negation to a verb), tokenizes to two words and the prefix is flagged because it matches a known short typo. Either rephrase the comment to use the verb form (e.g. "encoded incorrectly") or whitelist that prefix in `_typos.toml` under `[default.extend-words]`. Other hyphenated forms (`pre-state`, `co-located`) can fire similarly when the prefix isn't on `typos`'s known-prefix list.
-
-Install once locally:
+To reproduce the v31 to v32 upgrade job after `yarn build-all-contracts`:
 
 ```bash
-# typos (Rust binary) — brew is easiest on macOS
-brew install typos-cli
-cargo install typos-cli                        # newest, requires recent rustc
-cargo install typos-cli --version 1.42.3       # last version that builds on rustc 1.87
-
-# codespell (Python)
-brew install codespell
-pip install codespell
+(
+  set -e
+  cd l1-contracts/test/anvil-interop
+  trap 'bash cleanup.sh' EXIT
+  yarn install
+  yarn ts-node run-v31-to-v32-upgrade-test.ts
+)
 ```
 
-When a real domain word fires:
+The upgrade harness invokes `protocol-ops.sh`, which builds `protocol_ops` when needed. It uses upstream Foundry.
 
-- For `typos`: add to `[default.extend-words]` in `_typos.toml` (key = lowercased typo, value = canonical replacement; use `word = "word"` to whitelist the word itself).
-- For `codespell`: add to `.codespellrc` under `ignore-words-list = ...` (comma-separated).
+Never use `pkill`, `killall`, or another blanket Anvil kill command. Always run `l1-contracts/test/anvil-interop/cleanup.sh`.
 
-Don't whitelist actual misspellings — fix them. cSpell warnings shown in the IDE are a separate VS Code extension and **do not run in CI**; ignore those unless `typos` or `codespell` agrees.
+## Generated artifacts
 
-## 3. Selectors
-
-`check-selectors` is fast and depends on the current bytecode. Run before zkstack-out so failures are isolated to selector drift, not the larger zkstack-out regeneration noise.
+Regenerate artifacts only after code and tests are stable. With the pinned Foundry release, run:
 
 ```bash
-cd l1-contracts
-yarn selectors --fix
-git add selectors         # from l1-contracts; from repo root: git add l1-contracts/selectors
-```
-
-CI runs `yarn l1 selectors --check`; locally run `--fix` first, then `--check` to confirm.
-
-## 4. zkstack-out
-
-CI re-runs `yarn l1 build:foundry` and fails if `zkstack-out/` differs from what's committed.
-
-```bash
-cd l1-contracts
-forge build
-npx ts-node scripts/copy-to-zkstack-out.ts
-cd ..
-yarn prettier:fix     # required: prettier adds trailing newlines to the JSON files
-git add l1-contracts/zkstack-out
-```
-
-Most commonly out of date when you've added/changed:
-
-- A function or event on an interface that protocol-ops imports (via `abigen!` in `protocol-ops/src/abi.rs`).
-- A new `IFoo.sol` interface that needs to be picked up.
-
-If you forget `yarn prettier:fix`, `check-zkstack-out` will still fail because the committed JSON has trailing newlines and your regenerated file doesn't.
-
-## 5. Hashes (LAST)
-
-Bytecode hashes for genesis system contracts and force-deployed contracts are committed in `AllContractsHashes.json`. CI regenerates and diffs. **Don't fix until everything else above is green** — every contract change invalidates these, so doing it last avoids redoing work.
-
-> ⚠️ `recompute_hashes.sh` requires the upstream Foundry release pinned in `.github/foundry-versions.env`. Install that release before regenerating hashes locally.
-
-```bash
-# Preferred: rebuild artifacts + recompute hashes in one shot (requires the pinned forge version).
 ./recompute_hashes.sh
-
-# Alternative (also requires the pinned forge version under the hood):
-yarn calculate-hashes:fix
-git add AllContractsHashes.json
+yarn l1 selectors --fix
 ```
 
-Verify your local result matches CI's expectation:
+The first command rebuilds DA and L1 contracts, refreshes `l1-contracts/zkstack-out/`, and updates `AllContractsHashes.json`. The second refreshes `l1-contracts/selectors` from that build.
+
+Read-only checks are:
 
 ```bash
 yarn calculate-hashes:check
+yarn l1 selectors --check
 ```
 
-If `calculate-hashes:check` reports a long list of mismatches across libraries you didn't touch (e.g. `Address`, `SafeERC20`), that's a sign the committed hashes are already stale on the branch — independent of your changes. Confirm by running `git stash && yarn calculate-hashes:check && git stash pop`. If the mismatches reproduce on stashed `HEAD`, regenerating is a separate maintenance task; don't try to fold it into your PR.
-
-## Practical pre-push checklist
-
-Before pushing, run from repo root:
+CI also regenerates `configs/genesis/zksync-os/latest.json`. On Linux, after building with the pinned Foundry release, reproduce that check with:
 
 ```bash
-# 1. Build everything (catches Solidity break first)
-yarn da build:foundry
-yarn l1 build:foundry
-
-# 2. Tests
-cd l1-contracts && yarn test:foundry && cd ..
-# (Only if you touched contracts that affect interop or upgrades)
-cd l1-contracts && yarn test:hardhat:interop && cd ..
-
-# 3. Lint
-yarn lint:sol --fix --noPrompt
-yarn lint:ts --fix
-yarn prettier:fix
-yarn l1 errors-lint --check
-# `+1.91.1` overrides crate-local nightly toolchains to match CI.
-for dir in protocol-ops tools/{upgrade-readiness-checker,verifier-gen,wallets-gen,zksync-os-genesis-gen}; do
-  (cd "$dir" && cargo +1.91.1 fmt --check)
-done
-( cd protocol-ops && cargo clippy --all-targets -- -D warnings )
-
-# 4. Selectors
-( cd l1-contracts && yarn selectors --fix )
-
-# 5. zkstack-out
-( cd l1-contracts && forge build && npx ts-node scripts/copy-to-zkstack-out.ts )
-yarn prettier:fix
-
-# 6. Hashes (LAST — only after everything above is green)
-./recompute_hashes.sh
-
-# 7. Verify nothing else changed
-git status
+(
+  cd tools/zksync-os-genesis-gen
+  cargo run --locked --release --bin zksync-os-genesis-gen -- \
+    --output-file ../../configs/genesis/zksync-os/latest.json
+)
 ```
 
-## When CI is failing on a PR you didn't push
+For a same-repository PR, the **Update All Generated Artifacts** workflow updates hashes, `zkstack-out`, selectors, and the selected Anvil fixture set. It does not regenerate the ZKsync OS genesis file.
 
-`update-hashes-on-demand.yaml` is a `workflow_dispatch` workflow that regenerates hashes + zkstack-out and pushes to the PR branch. It only works on PRs from the same repo (not forks), and requires `RELEASE_TOKEN`. Use it when a peer's PR is merge-blocked solely on stale artifacts and they don't have time to regenerate locally.
-
-## Things to NOT do when chasing green
-
-- **Don't `pkill -f anvil`** to clean up. Use `cleanup.sh`. (See `AGENTS.md`.)
-- **Don't add `try-catch` / `staticcall` to make a script "robust"** to a missing precondition. The CI failure points at a real ordering / initialization bug; fix the precondition.
-- **Don't `anvil_setStorageAt`** to skip a flow that's reverting. The reverting flow is the bug.
-- **Don't `--no-verify`, `--no-gpg-sign`, `--force-push`, or `--amend` published commits.** All of these turn a CI failure into something worse later. Add a new commit.
+The Anvil `state-generation-check` reconstructs the fixture set selected by `stateVersion` and compares it with the committed snapshots. If it reports drift, use the regeneration workflow; do not edit compressed state files manually.

@@ -2,12 +2,13 @@
  * Compare two chain-state directories, ignoring non-deterministic Anvil fields.
  *
  * With FOUNDRY_PROFILE=anvil-interop (cbor_metadata=false), bytecode and CREATE2
- * addresses are fully deterministic. The only remaining non-deterministic fields are:
+ * addresses are fully deterministic. The remaining non-deterministic fields include:
  *   - Block-level: timestamp, basefee, prevrandao, difficulty
  *   - Account balances: minor variations from basefee-dependent gas costs
+ *   - Priority-operation timestamps and gas-sensitive priority-tree hashes
  *   - blocks/transactions arrays: contain hashes derived from the above
  *
- * This script compares everything except those known volatile fields.
+ * This script compares all accounts and the deterministic projection of chain-diamond storage.
  *
  * Usage:
  *     npx ts-node compare-chain-states.ts <committed-dir> <generated-dir>
@@ -42,37 +43,79 @@ const IGNORED_BLOCK_FIELDS = new Set([
 // Maximum allowed balance difference in wei (0.01 ETH) — covers gas cost variations
 const BALANCE_TOLERANCE_WEI = BigInt("10000000000000000"); // 10^16
 
-// Interval mining (`--block-time 1`, needed so the interop relayers keep progressing) makes the
-// number of L2 blocks produced wall-clock-dependent, so two identical runs differ ONLY in state
-// that records the current L2 block/batch number. That drift is confined to the account and slots
-// below (verified by diffing two fresh Linux generations). We ignore exactly these by explicit
-// identity — NOT by value magnitude, since many real slots legitimately hold small integers.
+// Interval mining (`--block-time 1`, needed so the interop relayers keep progressing) makes block
+// progress and gas costs wall-clock-dependent. Ignore drift by storage identity or contract role,
+// not by value magnitude, since many deterministic slots legitimately hold small integers.
 
-// Accounts whose storage is a block/batch-indexed accumulator, so ~all of it legitimately drifts
-// run-to-run — skip storage compare entirely. Two sources: the fixed L2MessageRoot predeploy
-// (0x…010005; block-indexed roots, trees, batch counters), plus deployment-specific L1 contracts
-// resolved by role from addresses.json (L1 messageRoot and every chain diamond proxy — see
-// collectSkipStorageAccounts). The L1NativeTokenVault is NOT skipped wholesale; its single
-// gas-dependent `bridgedOut[ETH]` slot is handled by GAS_DEPENDENT_VALUE_SLOTS. Everything not in
-// this set is still storage-compared exactly.
+// MessageRoot storage is a block/batch-indexed accumulator, so ~all of it legitimately drifts
+// run-to-run. Chain diamonds are handled separately: their deterministic fixed-layout state and
+// facet membership are compared, while their gas-sensitive priority-tree contents are not.
 const BLOCK_INDEXED_STORAGE_ACCOUNTS = new Set(["0x0000000000000000000000000000000000010005"]);
 
-// Resolve the deployment-specific batch-indexed / fee-dependent L1 contracts by
-// role from the committed addresses.json, unioned with the fixed set above.
-function collectSkipStorageAccounts(versionDir: string): Set<string> {
+interface StorageAccountPolicies {
+  skip: Set<string>;
+  diamonds: Set<string>;
+}
+
+// Resolve deployment-specific MessageRoot and chain-diamond addresses by role. Only MessageRoot is
+// skipped wholesale; diamonds use the deterministic projection in isComparableDiamondSlot().
+function collectStorageAccountPolicies(versionDir: string): StorageAccountPolicies {
   const skip = new Set(BLOCK_INDEXED_STORAGE_ACCOUNTS);
+  const diamonds = new Set<string>();
   const p = path.join(versionDir, "addresses.json");
-  if (!fs.existsSync(p)) return skip;
+  if (!fs.existsSync(p)) return { skip, diamonds };
   const a = JSON.parse(fs.readFileSync(p, "utf-8")) as {
     l1Addresses?: { messageRoot?: string };
     chainAddresses?: Array<{ diamondProxy?: string }>;
   };
-  const add = (v: unknown) => {
-    if (typeof v === "string" && /^0x[0-9a-fA-F]{40}$/.test(v)) skip.add(v.toLowerCase());
+  const add = (set: Set<string>, v: unknown) => {
+    if (typeof v === "string" && /^0x[0-9a-fA-F]{40}$/.test(v)) set.add(v.toLowerCase());
   };
-  add(a.l1Addresses?.messageRoot);
-  for (const c of a.chainAddresses ?? []) add(c.diamondProxy);
-  return skip;
+  add(skip, a.l1Addresses?.messageRoot);
+  for (const c of a.chainAddresses ?? []) add(diamonds, c.diamondProxy);
+  return { skip, diamonds };
+}
+
+const ZK_CHAIN_FIXED_SLOT_COUNT = 69n;
+const LAST_TOKEN_MULTIPLIER_UPDATE_TIMESTAMP_SLOT = 67n;
+const GENESIS_STORED_BATCH_HASH_SLOT = "0xe710864318d4a32f37d6ce54cb3fadbef648dd12d8dbdf53973564d56b7f881c";
+const DIAMOND_STORAGE_POSITION = BigInt("0xc8fcad8db84d3cc18b4c41d551ea0ee66dd599cde068d998e57d5e09332c131b");
+const DIAMOND_FACETS_LENGTH_SLOT = DIAMOND_STORAGE_POSITION + 2n;
+const DIAMOND_FROZEN_SLOT = DIAMOND_STORAGE_POSITION + 3n;
+const DIAMOND_FACETS_ARRAY_START = BigInt("0xc0d727610ea16241eff4447d08bb1b4595f7d2ec4515282437a13b7d0df4b922");
+
+function storageWord(storage: Record<string, string>, slot: bigint): bigint {
+  const key = `0x${slot.toString(16).padStart(64, "0")}`;
+  return BigInt(storage[key] ?? "0x0");
+}
+
+// Priority-operation timestamps, historical roots and Merkle-tree sides depend on interval-mining
+// progress and gas-sensitive priority transactions. The fixed layout still covers protocol/config
+// state and the tree's indices, sizes and array lengths. Facet membership and the genesis batch hash
+// are deterministic and are compared as well.
+function isComparableDiamondSlot(
+  slot: string,
+  committedStorage: Record<string, string>,
+  generatedStorage: Record<string, string>
+): boolean {
+  let slotNumber: bigint;
+  try {
+    slotNumber = BigInt(slot);
+  } catch {
+    return true;
+  }
+
+  if (slotNumber < ZK_CHAIN_FIXED_SLOT_COUNT) {
+    return slotNumber !== LAST_TOKEN_MULTIPLIER_UPDATE_TIMESTAMP_SLOT;
+  }
+  if (slot === GENESIS_STORED_BATCH_HASH_SLOT) return true;
+  if (slotNumber === DIAMOND_FACETS_LENGTH_SLOT || slotNumber === DIAMOND_FROZEN_SLOT) return true;
+
+  const facetCount = [
+    storageWord(committedStorage, DIAMOND_FACETS_LENGTH_SLOT),
+    storageWord(generatedStorage, DIAMOND_FACETS_LENGTH_SLOT),
+  ].reduce((max, value) => (value > max ? value : max), 0n);
+  return slotNumber >= DIAMOND_FACETS_ARRAY_START && slotNumber < DIAMOND_FACETS_ARRAY_START + facetCount;
 }
 
 // Keccak-derived slots (collision-free across contracts) holding an L2 block/batch number in the
@@ -126,7 +169,7 @@ function compareChainState(
   data1: ChainStateData,
   data2: ChainStateData,
   name: string,
-  skipStorageAccounts: Set<string>
+  storagePolicies: StorageAccountPolicies
 ): string[] {
   const diffs: string[] = [];
 
@@ -180,9 +223,9 @@ function compareChainState(
       }
     }
 
-    // Skip storage for batch-indexed / fee-dependent contracts (MessageRoots,
-    // chain diamonds): their state tracks the non-deterministic block count.
-    if (!skipStorageAccounts.has(addr.toLowerCase())) {
+    // MessageRoot is wholly block-indexed. Diamonds compare their deterministic projection; every
+    // other account compares all storage except the explicit global drift slots below.
+    if (!storagePolicies.skip.has(addr.toLowerCase())) {
       const s1 = a1.storage || {};
       const s2 = a2.storage || {};
       if (JSON.stringify(s1) !== JSON.stringify(s2)) {
@@ -192,6 +235,7 @@ function compareChainState(
         // must match exactly.
         const diffSlots = allSlots.filter((s) => {
           if (s1[s] === s2[s]) return false;
+          if (storagePolicies.diamonds.has(addr.toLowerCase()) && !isComparableDiamondSlot(s, s1, s2)) return false;
           if (BLOCK_NUMBER_STORAGE_SLOTS.has(s)) return false;
           if (GAS_DEPENDENT_VALUE_SLOTS.has(s) && withinBalanceTolerance(s1[s], s2[s])) return false;
           return true;
@@ -224,7 +268,12 @@ function compareChainState(
   return diffs;
 }
 
-function compareJsonFiles(path1: string, path2: string, name: string, skipStorageAccounts: Set<string>): string[] {
+function compareJsonFiles(
+  path1: string,
+  path2: string,
+  name: string,
+  storagePolicies: StorageAccountPolicies
+): string[] {
   if (!fs.existsSync(path1)) return [`  Missing in committed: ${name}`];
   if (!fs.existsSync(path2)) return [`  Missing in generated: ${name}`];
 
@@ -247,7 +296,50 @@ function compareJsonFiles(path1: string, path2: string, name: string, skipStorag
     return [];
   }
 
-  return compareChainState(data1 as ChainStateData, data2 as ChainStateData, name, skipStorageAccounts);
+  return compareChainState(data1 as ChainStateData, data2 as ChainStateData, name, storagePolicies);
+}
+
+export function compareStateDirectories(committedDir: string, generatedDir: string): string[] {
+  const allDiffs: string[] = [];
+  const listVersionDirs = (root: string) =>
+    fs
+      .readdirSync(root)
+      .filter((entry) => fs.statSync(path.join(root, entry)).isDirectory())
+      .sort();
+  const committedVersions = listVersionDirs(committedDir);
+  const generatedVersions = listVersionDirs(generatedDir);
+  const committedVersionSet = new Set(committedVersions);
+  const generatedVersionSet = new Set(generatedVersions);
+
+  for (const versionDir of committedVersions.filter((entry) => !generatedVersionSet.has(entry))) {
+    allDiffs.push(`Missing version directory in generated: ${versionDir}`);
+  }
+  for (const versionDir of generatedVersions.filter((entry) => !committedVersionSet.has(entry))) {
+    allDiffs.push(`Missing version directory in committed: ${versionDir}`);
+  }
+
+  for (const versionDir of committedVersions.filter((entry) => generatedVersionSet.has(entry))) {
+    const committedVersion = path.join(committedDir, versionDir);
+    const generatedVersion = path.join(generatedDir, versionDir);
+
+    const storagePolicies = collectStorageAccountPolicies(committedVersion);
+
+    const isStateFile = (f: string) => f.endsWith(".json") || f.endsWith(".json.gz");
+    const allFiles = [
+      ...new Set([
+        ...fs.readdirSync(committedVersion).filter(isStateFile),
+        ...fs.readdirSync(generatedVersion).filter(isStateFile),
+      ]),
+    ].sort();
+
+    for (const filename of allFiles) {
+      const p1 = path.join(committedVersion, filename);
+      const p2 = path.join(generatedVersion, filename);
+      allDiffs.push(...compareJsonFiles(p1, p2, `${versionDir}/${filename}`, storagePolicies));
+    }
+  }
+
+  return allDiffs;
 }
 
 function main() {
@@ -265,36 +357,7 @@ function main() {
     }
   }
 
-  const allDiffs: string[] = [];
-
-  for (const versionDir of fs.readdirSync(committedDir).sort()) {
-    const committedVersion = path.join(committedDir, versionDir);
-    const generatedVersion = path.join(generatedDir, versionDir);
-
-    if (!fs.statSync(committedVersion).isDirectory()) continue;
-    if (!fs.existsSync(generatedVersion) || !fs.statSync(generatedVersion).isDirectory()) {
-      allDiffs.push(`Missing version directory in generated: ${versionDir}`);
-      continue;
-    }
-
-    // Resolve batch-indexed / fee-dependent contracts (whose storage to skip)
-    // by role from this version's committed addresses.json.
-    const skipStorageAccounts = collectSkipStorageAccounts(committedVersion);
-
-    const isStateFile = (f: string) => f.endsWith(".json") || f.endsWith(".json.gz");
-    const allFiles = [
-      ...new Set([
-        ...fs.readdirSync(committedVersion).filter(isStateFile),
-        ...fs.readdirSync(generatedVersion).filter(isStateFile),
-      ]),
-    ].sort();
-
-    for (const filename of allFiles) {
-      const p1 = path.join(committedVersion, filename);
-      const p2 = path.join(generatedVersion, filename);
-      allDiffs.push(...compareJsonFiles(p1, p2, `${versionDir}/${filename}`, skipStorageAccounts));
-    }
-  }
+  const allDiffs = compareStateDirectories(committedDir, generatedDir);
 
   if (allDiffs.length > 0) {
     console.log("Chain state differences found:");
@@ -308,4 +371,4 @@ function main() {
   }
 }
 
-main();
+if (require.main === module) main();

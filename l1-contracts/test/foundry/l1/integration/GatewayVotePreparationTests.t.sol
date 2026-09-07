@@ -18,7 +18,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 /// @notice Test-friendly subclass of GatewayVotePreparation that exposes the
@@ -212,7 +212,6 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             IDiamondInit.initialize.selector,
             bytes32(uint256(GATEWAY_CHAIN_ID)), // chainId
             bytes32(uint256(uint160(L2_BRIDGEHUB_ADDR))), // bridgehub
-            bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR))), // interopCenter
             bytes32(uint256(uint160(mockCTM))) // chainTypeManager
         );
         assertEq(diamondCut.initCalldata.length, 0, "chain-creation init tail must be empty");

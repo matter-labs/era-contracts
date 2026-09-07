@@ -335,7 +335,6 @@ library Utils {
                 chainId: 1,
                 bridgehub: bridgehub,
                 chainTypeManager: address(0x1234567890876543567890),
-                interopCenter: address(0x1234567890876543567890),
                 protocolVersion: 0,
                 admin: address(0x32149872498357874258787),
                 validatorTimelock: address(0x85430237648403822345345),

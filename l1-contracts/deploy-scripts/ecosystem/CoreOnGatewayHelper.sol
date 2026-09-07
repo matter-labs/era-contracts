@@ -6,7 +6,7 @@ import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 
-import {CoreContract, L2SystemContract, ZKsyncOSUpgradeType} from "./CoreContract.sol";
+import {CoreContract, L2SystemContract} from "./CoreContract.sol";
 import {UnknownCoreContract, UnknownL2SystemContract} from "./DeployScriptErrors.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
@@ -159,34 +159,6 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.ProxyAdmin) return "ProxyAdmin";
         if (_c == CoreContract.TransparentUpgradeableProxy) return "TransparentUpgradeableProxy";
 
-        revert UnknownCoreContract();
-    }
-
-    /// @notice Resolve a CoreContract enum to its ZKsyncOS upgrade type.
-    /// @dev Explicit per-contract mapping — no default fallback, so adding a new
-    ///      contract forces the developer to decide the upgrade type here.
-    function _resolveUpgradeType(CoreContract _c) internal pure returns (ZKsyncOSUpgradeType) {
-        if (_c == CoreContract.L2Bridgehub) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2AssetRouter) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2NativeTokenVault) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2MessageRoot) return ZKsyncOSUpgradeType.SystemProxy;
-        // Sits at L2_WRAPPED_BASE_TOKEN_IMPL_ADDR directly as the impl (not a proxy);
-        // user-space WETH proxies reference this address. Upgrade via bytecode replacement.
-        if (_c == CoreContract.L2WrappedBaseToken) return ZKsyncOSUpgradeType.Unsafe;
-        if (_c == CoreContract.L2MessageVerification) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2ChainAssetHandler) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2InteropRootStorage) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.BaseTokenHolder) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2AssetTracker) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.InteropCenter) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.InteropAttributeParser) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2InteropCommitmentTree) {
-            return ZKsyncOSUpgradeType.SystemProxy;
-        }
-        if (_c == CoreContract.AtomicFlowManager) {
-            return ZKsyncOSUpgradeType.SystemProxy;
-        }
         revert UnknownCoreContract();
     }
 

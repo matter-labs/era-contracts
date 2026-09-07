@@ -255,7 +255,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         ChainAdminOwnable admin = ChainAdminOwnable(payable(coreAddresses.shared.bridgehubAdmin));
         INativeTokenVaultBase ntv = INativeTokenVaultBase(coreAddresses.bridges.proxies.l1NativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
-        uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
 
         if (baseTokenAssetId == bytes32(0)) {
             baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, config.baseToken);
@@ -280,7 +279,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
     function registerTokenOnNTV() internal {
         INativeTokenVaultBase ntv = INativeTokenVaultBase(coreAddresses.bridges.proxies.l1NativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
-        uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
 
         // If it hasn't been registered already with ntv
         if (baseTokenAssetId == bytes32(0)) {
@@ -494,7 +492,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         vm.serializeString("root", "chain", chain);
 
         string memory toml = vm.serializeAddress("root", "governance_addr", output.governance);
-        string memory root = vm.projectRoot();
         vm.writeToml(toml, outputPath);
         console.log("Output saved at:", outputPath);
     }

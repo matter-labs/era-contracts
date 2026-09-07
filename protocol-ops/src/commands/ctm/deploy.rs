@@ -66,7 +66,6 @@ pub fn deploy(
             outputPath: runner.script_rel_path(DEPLOY_CTM_INVOCATION.output_rel()),
             bridgehub: input.bridgehub,
             reuseGovAndAdmin: input.reuse_gov_and_admin,
-            skipL1Deployments: false,
         })
         .with_wallet(auth)
         .with_env(
