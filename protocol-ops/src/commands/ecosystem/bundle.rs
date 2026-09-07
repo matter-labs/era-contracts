@@ -576,6 +576,81 @@ async fn broadcast_impersonated(rpc_url: &str, paths: &BundlePaths) -> anyhow::R
     broadcast::run(UpgradeBroadcastArgs::try_parse_from(args)?).await
 }
 
+/// Decide whether a real-chain `replay-bundle` run may proceed, given the chain id the
+/// bundle records and the one the endpoint reports. Returns the warnings to surface.
+///
+/// The bundle's metadata is the authority on which chain it is for; the env name is not.
+/// The deployer address is baked into some deployments' init code, so its key is valid on
+/// every chain — a wrong `--rpc` would otherwise receive real, correctly signed
+/// transactions. Mirrors the `cast chain-id` preflight the Deploy workflow runs before it
+/// exports any secret.
+fn ensure_bundle_chain_id(
+    recorded: Option<u64>,
+    actual: u64,
+    is_broadcast: bool,
+) -> anyhow::Result<Vec<String>> {
+    match recorded {
+        Some(expected) => {
+            anyhow::ensure!(
+                actual == expected,
+                "--rpc reports chain id {actual}, but the bundle was computed for chain id \
+                 {expected}. Refusing to continue: the deployer key is valid on both, so a \
+                 broadcast here would land real transactions on the wrong chain."
+            );
+            Ok(Vec::new())
+        }
+        // Only bundles packed before `l1.chain_id` was recorded. `--verify-only` is
+        // read-only, so it may proceed unconfirmed; a broadcast may not.
+        None => {
+            anyhow::ensure!(
+                !is_broadcast,
+                "bundle metadata records no l1.chain_id, so the target chain cannot be \
+                 confirmed. Refusing to broadcast; re-pack the bundle with a current \
+                 protocol_ops."
+            );
+            Ok(vec![format!(
+                "bundle metadata records no l1.chain_id; cannot confirm --rpc (chain id \
+                 {actual}) is the chain this bundle was computed for"
+            )])
+        }
+    }
+}
+
+/// Pick the receipt journal PUVT resolves CREATE2 deployments from: an explicit
+/// `--transactions-log`, else the journal this command writes itself.
+///
+/// The default only exists if *this* machine did the broadcast, so a consumer verifying
+/// someone else's must pass one. Failing with the artifact to fetch beats a bare
+/// missing-file error.
+fn resolve_transactions_log(
+    override_path: Option<&Path>,
+    default_path: PathBuf,
+) -> anyhow::Result<PathBuf> {
+    match override_path {
+        Some(path) => {
+            anyhow::ensure!(
+                path.is_file(),
+                "--transactions-log {} does not exist",
+                path.display()
+            );
+            Ok(path.to_path_buf())
+        }
+        None => {
+            anyhow::ensure!(
+                default_path.is_file(),
+                "no receipt journal at {} — this run did not broadcast, so there is nothing \
+                 to resolve CREATE2 deployments from. Verifying a broadcast performed \
+                 elsewhere needs that broadcast's journal: download \
+                 `deploy-result/transactions.txt` from the Deploy workflow run \
+                 (artifact `ecosystem-upgrade-deploy-result-<env>`) and pass it as \
+                 --transactions-log.",
+                default_path.display()
+            );
+            Ok(default_path)
+        }
+    }
+}
+
 /// Run PUVT against `rpc_url`. It resolves CREATE2 deployments from transaction hashes, so
 /// this run's own log is verified and the committed real-network log is passed alongside it
 /// as a reference.
@@ -591,9 +666,14 @@ async fn verify_upgrade(
     gateway_rpc_url: Option<&str>,
     zk_governance_commit: &str,
     paths: &BundlePaths,
+    transactions_log_override: Option<&Path>,
 ) -> anyhow::Result<()> {
     logger::step("verify-upgrade (PUVT)");
     fs::create_dir_all(&paths.work_dir)?;
+    let transactions_log = resolve_transactions_log(
+        transactions_log_override,
+        paths.work_dir.join(TRANSACTIONS_LOG),
+    )?;
     let reference_log = default_protocol_ops_out_dir(&env_cfg.env)?.join(TRANSACTIONS_LOG);
     let mut args = [
         "verify-upgrade".to_string(),
@@ -604,7 +684,7 @@ async fn verify_upgrade(
         "--l1-rpc-url".into(),
         rpc_url.to_string(),
         "--transactions-log".into(),
-        paths.work_dir.join(TRANSACTIONS_LOG).display().to_string(),
+        transactions_log.display().to_string(),
         "--zk-governance-commit".into(),
         zk_governance_commit.to_string(),
     ]
@@ -738,6 +818,7 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
         args.gw_rpc_url.as_deref(),
         &args.zk_governance_commit,
         &paths,
+        None,
     )
     .await?;
     drop(anvil);
@@ -770,6 +851,13 @@ pub struct ReplayBundleArgs {
     /// zk-governance commit for PUVT; defaults to the one recorded in the bundle.
     #[clap(long)]
     pub zk_governance_commit: Option<String>,
+    /// The receipt journal PUVT resolves CREATE2 deployments from: one 0x-prefixed L1 tx
+    /// hash per line. Defaults to the journal this command writes itself, which only
+    /// exists if *this* machine did the broadcast. A `--verify-only` consumer verifying
+    /// someone else's broadcast has to pass the journal that broadcast produced —
+    /// `deploy-result/transactions.txt` from the Deploy workflow's run artifact.
+    #[clap(long)]
+    pub transactions_log: Option<PathBuf>,
 }
 
 /// How a deploy bundle is consumed.
@@ -845,6 +933,22 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
         bundle_dir.display()
     ));
 
+    // Which chain the bundle is for is recorded in its metadata, never inferred from the
+    // env name. Confirm the endpoint agrees BEFORE anything is signed: the deployer address
+    // is baked into some init code, so the same key is valid on every chain and a wrong
+    // `--rpc` would otherwise receive real, correctly signed transactions. Mirrors the
+    // `cast chain-id` preflight the Deploy workflow runs before it exports any secret.
+    if let ReplayMode::Broadcast { rpc_url, .. } | ReplayMode::Verify { rpc_url } = &mode {
+        let actual = get_provider(rpc_url)?
+            .get_chain_id()
+            .await
+            .context("eth_chainId on --rpc")?;
+        let is_broadcast = matches!(mode, ReplayMode::Broadcast { .. });
+        for warning in ensure_bundle_chain_id(metadata.l1.chain_id, actual, is_broadcast)? {
+            logger::warn(&warning);
+        }
+    }
+
     match mode {
         ReplayMode::Rehearse { fork_url } => {
             if metadata.l1.forked_at_block.is_none() {
@@ -872,6 +976,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 args.gw_rpc_url.as_deref(),
                 &zk_governance_commit,
                 &paths,
+                args.transactions_log.as_deref(),
             )
             .await?;
             drop(anvil);
@@ -898,6 +1003,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 args.gw_rpc_url.as_deref(),
                 &zk_governance_commit,
                 &paths,
+                args.transactions_log.as_deref(),
             )
             .await?;
         }
@@ -908,6 +1014,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 args.gw_rpc_url.as_deref(),
                 &zk_governance_commit,
                 &paths,
+                args.transactions_log.as_deref(),
             )
             .await?;
         }
@@ -1123,6 +1230,7 @@ mod tests {
             verify_only: false,
             gw_rpc_url: None,
             zk_governance_commit: None,
+            transactions_log: None,
         };
         assert!(replay_mode(&base).is_err(), "--rpc alone must be rejected");
         assert!(replay_mode(&ReplayBundleArgs {
@@ -1130,5 +1238,90 @@ mod tests {
             ..base.clone()
         })
         .is_ok());
+    }
+
+    // ─── chain-id preflight (P1) ────────────────────────────────────────────
+
+    #[test]
+    fn a_matching_chain_id_passes_with_no_warnings() {
+        assert_eq!(
+            ensure_bundle_chain_id(Some(1), 1, true).unwrap(),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            ensure_bundle_chain_id(Some(11155111), 11155111, false).unwrap(),
+            Vec::<String>::new()
+        );
+    }
+
+    /// The deployer key is valid on every chain, so a wrong `--rpc` would otherwise take
+    /// real signed transactions. This must fail before anything is broadcast.
+    #[test]
+    fn a_mismatched_chain_id_is_refused_in_both_rpc_modes() {
+        for is_broadcast in [true, false] {
+            let err = ensure_bundle_chain_id(Some(1), 11155111, is_broadcast)
+                .expect_err("a chain-id mismatch must be refused");
+            let msg = err.to_string();
+            assert!(msg.contains("11155111"), "{msg}");
+            assert!(msg.contains("chain id 1"), "{msg}");
+        }
+    }
+
+    /// Bundles packed before `l1.chain_id` was recorded cannot be confirmed. Read-only
+    /// verification may still proceed, but a broadcast may not.
+    #[test]
+    fn an_unrecorded_chain_id_blocks_broadcast_but_warns_for_verify() {
+        let err = ensure_bundle_chain_id(None, 1, true)
+            .expect_err("broadcasting an unconfirmable bundle must be refused");
+        assert!(err.to_string().contains("Refusing to broadcast"), "{err}");
+
+        let warnings = ensure_bundle_chain_id(None, 1, false).expect("verify may proceed");
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("no l1.chain_id"), "{}", warnings[0]);
+    }
+
+    // ─── receipt journal resolution (P2) ────────────────────────────────────
+
+    #[test]
+    fn an_explicit_journal_is_used_when_it_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let journal = dir.path().join("deploy-result").join(TRANSACTIONS_LOG);
+        write(&journal, "0xabc\n");
+        assert_eq!(
+            resolve_transactions_log(Some(&journal), dir.path().join("unused")).unwrap(),
+            journal
+        );
+    }
+
+    #[test]
+    fn a_missing_explicit_journal_names_the_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("nope.txt");
+        let err = resolve_transactions_log(Some(&missing), dir.path().join("unused"))
+            .expect_err("a missing --transactions-log must fail");
+        assert!(err.to_string().contains("nope.txt"), "{err}");
+    }
+
+    #[test]
+    fn the_local_journal_is_the_default() {
+        let dir = tempfile::tempdir().unwrap();
+        let local = dir.path().join("replay").join(TRANSACTIONS_LOG);
+        write(&local, "0xabc\n");
+        assert_eq!(
+            resolve_transactions_log(None, local.clone()).unwrap(),
+            local
+        );
+    }
+
+    /// A downloaded bundle carries no journal, so `--verify-only` on a consumer machine
+    /// must say which artifact to fetch rather than report a missing file.
+    #[test]
+    fn a_consumer_with_no_journal_is_told_which_artifact_to_download() {
+        let dir = tempfile::tempdir().unwrap();
+        let err = resolve_transactions_log(None, dir.path().join("replay").join(TRANSACTIONS_LOG))
+            .expect_err("no journal must fail");
+        let msg = err.to_string();
+        assert!(msg.contains("deploy-result/transactions.txt"), "{msg}");
+        assert!(msg.contains("--transactions-log"), "{msg}");
     }
 }

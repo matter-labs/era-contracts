@@ -276,7 +276,8 @@ Variants:
 ```bash
 # verify a chain the bundle was already broadcast to (no replay)
 ./protocol-ops/target/release/protocol_ops ecosystem replay-bundle \
-  --bundle <dir> --rpc <l1-rpc> --verify-only
+  --bundle <dir> --rpc <l1-rpc> --verify-only \
+  --transactions-log <deploy-result/transactions.txt>
 
 # broadcast the deployer bundles for real, then verify
 ./protocol-ops/target/release/protocol_ops ecosystem replay-bundle \
@@ -290,3 +291,27 @@ and the receipts in `transactions.txt`) to
 `l1-contracts/upgrade-envs/v0.31.0-interopB/output/<env>/replay/`, never into the
 bundle directory, so a real broadcast's receipts are picked up by a later
 `--verify-only` run on the same machine.
+
+Both `--rpc` modes first read `eth_chainId` and require it to equal the bundle's
+recorded `l1.chain_id`, and refuse to continue otherwise. That check matters most
+for `--key`: the deployer address is baked into some init code, so the same key is
+valid on every chain, and a wrong `--rpc` would otherwise receive real, correctly
+signed transactions.
+
+**Verifying someone else's broadcast.** PUVT resolves CREATE2 deployments from a
+receipt journal, and `--verify-only` defaults to the one `replay-bundle` writes
+itself — which exists only if _this_ machine did the broadcast. When the broadcast
+happened in CI, or on another operator's machine, download that run's receipts and
+pass them explicitly:
+
+```bash
+gh run download <deploy-run-id> -R matter-labs/era-contracts \
+  -n ecosystem-upgrade-deploy-result-<env> -D ./deploy-result
+./protocol-ops/target/release/protocol_ops ecosystem replay-bundle \
+  --bundle <dir> --rpc <l1-rpc> --verify-only \
+  --transactions-log ./deploy-result/transactions.txt
+```
+
+The journal is one 0x-prefixed L1 transaction hash per line; blank lines and `#`
+comments are ignored. Without it the command stops with a message naming the
+artifact to fetch rather than reporting a missing file.
