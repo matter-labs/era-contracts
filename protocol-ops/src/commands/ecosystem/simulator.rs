@@ -364,7 +364,7 @@ pub struct GovernanceTomlToSimulatorArgs {
     /// broadcasts them to real Sepolia; the sim's fork inherits their effects
     /// from chain tip. Re-running them in the sim would revert (legacy-Gov
     /// `OperationMustBePending()`, already-deployed CREATE2 collisions, …).
-    /// See `contracts/.claude/skills/regenerate-v31-stage-calldata/SKILL.md`
+    /// See `contracts/.claude/skills/regenerate-upgrade-calldata/SKILL.md`
     /// ("Core principle") for the full reasoning.
     ///
     /// Defaults to `<env-out>/prepare/manifest.json` when `--env` is set and

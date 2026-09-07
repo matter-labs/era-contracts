@@ -613,7 +613,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // read this via `vm.envOr("LEGACY_GOV_SALT", bytes32(0))`. Child
     // processes inherit env vars from this process, so a single `set_var`
     // here covers every script in the pipeline. See
-    // `contracts/.claude/skills/regenerate-v31-stage-calldata/SKILL.md`
+    // `contracts/.claude/skills/regenerate-upgrade-calldata/SKILL.md`
     // ("Core principle") for why a per-regen salt is required.
     if let Some(cfg) = env_cfg.as_ref() {
         if let Some(salt) = cfg.v31_legacy_gov_salt()? {

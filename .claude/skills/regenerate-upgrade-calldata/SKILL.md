@@ -1,25 +1,36 @@
 ---
-name: regenerate-v31-stage-calldata
-description: Use when regenerating the committed v31 stage upgrade calldata (`output/stage/ecosystem.toml`) and the matching transaction-simulator scenario. Covers Docker-image and from-source paths through the prepare -> fork-broadcast -> PUVT -> tx-simulator-emit cycle, plus the real-Sepolia CREATE2 broadcast that keeps the simulator's local fork in sync.
+name: regenerate-upgrade-calldata
+description: Use when regenerating a committed upgrade artifact (`upgrade-envs/<release>/output/<env>/ecosystem.toml`) and its transaction-simulator scenario. Covers the prepare -> fork-rehearsal -> PUVT -> tx-simulator-emit cycle plus the real-network CREATE2 broadcast, via Docker or from source. Worked through on v31/stage; `regen-upgrade-calldata.sh <env>` takes the env, so substitute the release directory and env name for other releases.
 ---
 
-# Regenerate v31 stage calldata
+# Regenerate upgrade calldata
 
-Use this skill whenever contracts, upgrade scripts, or env config change and
-the committed v31 stage artifact needs to be refreshed:
+Use this skill whenever contracts, upgrade scripts, or env config change and a
+committed upgrade artifact needs to be refreshed:
 
 ```
-l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml
+l1-contracts/upgrade-envs/<release>/output/<env>/ecosystem.toml
 ```
 
 That single TOML carries the merged `[governance_calls]` (PUH stage 0/1/2 hex),
-`[core]`, `[ctms.<flavor>]` (Era + ZKsyncOS), and `[new_gateway]` sections.
-Reviewers diff it; downstream tools (PUVT, the simulator converter) read it.
+`[core]` and `[ctms.<flavor>]`. Reviewers diff it; downstream tools (PUVT, the
+simulator converter) read it.
+
+**This runbook is worked through on v31/stage**, i.e.
+`upgrade-envs/v0.31.0-interopB/output/stage/`. The pipeline shape — prepare →
+fork rehearsal → PUVT → simulator emit, plus the real-network broadcast — is
+the same for any release, and `regen-upgrade-calldata.sh` takes the env as its
+argument, so substitute the release directory and env name. What does *not*
+carry over is release-specific: v31 has two CTMs (Era + ZKsyncOS) and so three
+CREATE2 salts, a `[new_gateway]` section, and a zk-governance redeploy. v33 has
+none of those — one ZKsync OS CTM, one salt, no Gateway, no PUH redeploy — so
+read `upgrade-envs/v0.33.0-atomic-interop/output/testnet/README.md` for that
+release rather than adapting the v31 specifics here.
 
 ## Relevant files
 
 - `l1-contracts/test/anvil-interop/regen-upgrade-calldata.sh` — wraps prepare
-  → fork-broadcast → PUVT in one script.
+  → fork-rehearsal → PUVT in one script.
 - `l1-contracts/test/anvil-interop/yarn ts-node scripts/regen-via-docker.ts broadcast` —
   idempotent CREATE2 broadcaster that pre-filters against on-chain `eth_getCode`.
 - `protocol-ops/src/commands/ecosystem/simulator.rs` — `governance-toml-to-simulator`.

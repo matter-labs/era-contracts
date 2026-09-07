@@ -39,7 +39,7 @@
  *   ts-node scripts/regen-via-docker.ts sim-emit <output.json>
  *   ts-node scripts/regen-via-docker.ts shell
  *
- * See `.claude/skills/regenerate-v31-stage-calldata/SKILL.md`
+ * See `.claude/skills/regenerate-upgrade-calldata/SKILL.md`
  * (Core principle + Iteration via Docker) for the full pipeline context.
  */
 import { spawnSync } from "child_process";
@@ -575,7 +575,7 @@ async function main(): Promise<void> {
         "  # phase 3 — sim-inputs / sim JSON",
         "  protocol_ops ecosystem governance-toml-to-simulator --env <env> [--emit-sim-inputs <dir> | --out <json>]",
         "",
-        "See .claude/skills/regenerate-v31-stage-calldata (native Linux path).",
+        "See .claude/skills/regenerate-upgrade-calldata (native Linux path).",
         "Override with FORCE_DOCKER_REGEN=1 only if you truly need the Docker path on Linux.",
       ].join("\n")
     );
