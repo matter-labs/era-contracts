@@ -27,7 +27,14 @@ import {
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "../../../state-transition/L1StateTransitionErrors.sol";
-import {BootstrapManifest, ProxyUpgradeRow} from "../RegistryTypes.sol";
+import {BootstrapManifest, L2UpgradePlan, ProxyUpgradeRow} from "../RegistryTypes.sol";
+import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
+import {IDefaultUpgrade} from "../../IDefaultUpgrade.sol";
+import {IDiamondInit} from "../../../state-transition/chain-interfaces/IDiamondInit.sol";
+import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
+import {CTMUpgradeComposer} from "../libraries/CTMUpgradeComposer.sol";
+import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol";
+import {MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
 
 /// @title RegistryBootstrapMigration
 /// @author Matter Labs
@@ -56,6 +63,10 @@ contract RegistryBootstrapMigration {
     ///      not transcribed into structured storage.
     bytes internal encodedManifest;
 
+    /// @dev The FINAL L2 deployment list — the genesis release's table-derived set followed by the
+    ///      authored extras — stored as its ABI encoding (see {CTMTransition} for why).
+    bytes internal encodedL2Deployments;
+
     /// @notice Emitted once the ecosystem has crossed into the registry-driven model.
     event EcosystemBootstrapped(address indexed ctm, address indexed currentRelease, uint256 newProtocolVersion);
 
@@ -66,7 +77,8 @@ contract RegistryBootstrapMigration {
             address(_manifest.ctmProxyAdmin) == address(0) ||
             _manifest.currentRelease.addr == address(0) ||
             _manifest.ctmExecutor.addr == address(0) ||
-            _manifest.upgradeTimer.addr == address(0)
+            _manifest.upgradeTimer.addr == address(0) ||
+            _manifest.upgradeEngine.addr == address(0)
         ) {
             revert ZeroAddress();
         }
@@ -78,7 +90,36 @@ contract RegistryBootstrapMigration {
         }
         // Same row discipline as {CoreRegistry} and {CTMTransition} (shared lib).
         ProxyUpgradeRowLib.validateRows(rows);
-
+        // The L2 leg, exactly as a transition derives it: the genesis release's table (the target
+        // state, installed in full — there is no departing release to diff against) plus the
+        // authored extras, shape-validated before the object exists.
+        ICTMRelease release = ICTMRelease(_manifest.currentRelease.addr);
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory derived = TransitionDerivationLib
+            .deriveL2DeploymentsFromTable(
+                release.l2BytecodeInfos(),
+                IDiamondInit(release.diamondInit()).IS_ZKSYNC_OS()
+            );
+        L2PlanValidationLib.validateAuthored(
+            derived,
+            _manifest.l2Plan.extraDeployments,
+            _manifest.l2Plan.delegateTo,
+            _manifest.l2Plan.factoryDepHashes
+        );
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory l2Deployments = TransitionDerivationLib
+            .combineL2Deployments(derived, _manifest.l2Plan.extraDeployments);
+        // Same shape rules as {CTMTransition}: a nonempty plan needs its delegate, a composer needs
+        // a target, factory deps need an L2 side, and the dependency count is capped at what
+        // execution enforces.
+        bool hasL2Side = l2Deployments.length != 0 || _manifest.l2Plan.delegateTo != address(0);
+        if (
+            (l2Deployments.length != 0 && _manifest.l2Plan.delegateTo == address(0)) ||
+            (_manifest.l2Plan.delegateComposer.addr != address(0) && _manifest.l2Plan.delegateTo == address(0)) ||
+            (_manifest.l2Plan.factoryDepHashes.length != 0 && !hasL2Side) ||
+            _manifest.l2Plan.factoryDepHashes.length > MAX_NEW_FACTORY_DEPS
+        ) {
+            revert MalformedL2UpgradePlan();
+        }
+        encodedL2Deployments = abi.encode(l2Deployments);
         encodedManifest = abi.encode(_manifest);
     }
 
@@ -91,6 +132,44 @@ contract RegistryBootstrapMigration {
     /// @notice The whole manifest, exactly as it was pinned.
     function getManifest() public view returns (BootstrapManifest memory) {
         return abi.decode(encodedManifest, (BootstrapManifest));
+    }
+
+    /// @notice The FINAL, executable L2 plan of the edge: the stored derived-plus-extra
+    ///         deployments with the authored delegate leg and factory dependencies.
+    function l2Plan() public view returns (L2UpgradePlan memory) {
+        BootstrapManifest memory m = getManifest();
+        return
+            L2UpgradePlan({
+                deployments: abi.decode(encodedL2Deployments, (IComplexUpgrader.UniversalContractUpgradeInfo[])),
+                delegateTo: m.l2Plan.delegateTo,
+                delegateComposer: m.l2Plan.delegateComposer.addr,
+                factoryDepHashes: m.l2Plan.factoryDepHashes
+            });
+    }
+
+    /// @notice The engine init payload of the committed cut, composed from the pinned inputs by
+    ///         the same composer transitions use: the genesis release's verifier, the version edge,
+    ///         the schedule and the L2 transaction for the ecosystem the CTM belongs to.
+    function proposedUpgrade() public view returns (ProposedUpgrade memory) {
+        BootstrapManifest memory m = getManifest();
+        return
+            CTMUpgradeComposer.buildProposedUpgradeFromPlan({
+                _plan: l2Plan(),
+                _newRelease: ICTMRelease(m.currentRelease.addr),
+                _newProtocolVersion: m.newProtocolVersion,
+                _upgradeTimestamp: m.upgradeTimestamp,
+                _bridgehub: IChainTypeManager(m.ctm).BRIDGE_HUB()
+            });
+    }
+
+    /// @notice The diamond cut this edge commits — no facet cuts, the pinned engine's init over
+    ///         {proposedUpgrade}. Chains crossing the edge take exactly these bytes by hand.
+    function upgradeCut() public view returns (Diamond.DiamondCutData memory) {
+        return
+            CTMUpgradeComposer.buildUpgradeCutData(
+                getManifest().upgradeEngine.addr,
+                abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade()))
+            );
     }
 
     /// @notice Reverts unless the live ecosystem is exactly the starting state the manifest names
@@ -158,12 +237,15 @@ contract RegistryBootstrapMigration {
             CodehashPinLib.requirePin(row.implNew);
         }
 
-        m.upgradeCut.initAddress.requirePin(m.upgradeCutInitCodehash);
-        // The committed cut's L2 transaction must find every bytecode it depends on already
-        // published on the CTM's supplier, or the edge fails on every chain's L2 leg.
+        CodehashPinLib.requirePin(m.upgradeEngine);
+        if (m.l2Plan.delegateComposer.addr != address(0)) {
+            CodehashPinLib.requirePin(m.l2Plan.delegateComposer);
+        }
+        // The composed L2 transaction must find every bytecode it depends on already published
+        // on the CTM's supplier, or the edge fails on every chain's L2 leg.
         L2PlanValidationLib.requirePublished(
             BytecodesSupplier(IChainTypeManager(m.ctm).L1_BYTECODES_SUPPLIER()),
-            _committedProposedUpgrade(m.upgradeCut.initCalldata).l2ProtocolUpgradeTx.factoryDeps
+            m.l2Plan.factoryDepHashes
         );
 
         // The release must run the very code this migration installs as the anchor, so the anchor
@@ -213,22 +295,6 @@ contract RegistryBootstrapMigration {
         }
     }
 
-    /// @dev The committed cut's init calldata is `upgrade(ProposedUpgrade)` on the pinned engine:
-    ///      a 4-byte selector followed by the ABI-encoded proposal. Decoded here so the proposal's
-    ///      L2 transaction can be checked; a malformed payload fails the decode.
-    function _committedProposedUpgrade(bytes memory _initCalldata) private pure returns (ProposedUpgrade memory) {
-        // Shorter than a selector: not an engine call at all — name it instead of underflowing.
-        if (_initCalldata.length < 4) {
-            revert MalformedL2UpgradePlan();
-        }
-        uint256 encodedLength = _initCalldata.length - 4;
-        bytes memory encoded = new bytes(encodedLength);
-        for (uint256 i = 0; i < encodedLength; ++i) {
-            encoded[i] = _initCalldata[i + 4];
-        }
-        return abi.decode(encoded, (ProposedUpgrade));
-    }
-
     /// @notice Performs the whole edge, then hands authority to the bound executors.
     /// @dev Ordering is load-bearing: the CTM implementation is swapped BEFORE the registry setters
     ///      are called, because those setters only exist on the new implementation.
@@ -259,7 +325,7 @@ contract RegistryBootstrapMigration {
         // entrypoint too — `upgradeTransition` stays zero for the departing version, and only
         // registry-driven hops after this one populate it.
         ctm.setNewVersionUpgrade({
-            _cutData: m.upgradeCut,
+            _cutData: upgradeCut(),
             _oldProtocolVersion: m.expectedProtocolVersion,
             _oldProtocolVersionDeadline: m.oldProtocolVersionDeadline,
             _newProtocolVersion: m.newProtocolVersion

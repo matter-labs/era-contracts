@@ -12,6 +12,7 @@ import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgr
 import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {AuthoredL2Plan, PinnedContract} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../../../deploy-scripts/utils/Types.sol";
@@ -29,7 +30,6 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {LegacyTestAdminFacet} from "contracts/dev-contracts/test/LegacyTestAdminFacet.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IAdminV31} from "../../../../deploy-scripts/utils/UpgradeChainCall.sol";
 import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils.sol";
@@ -55,65 +55,40 @@ contract CTMUpgrade_v34_Test is CTMUpgrade_v34 {
         return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
     }
 
-    /// @dev The production override reads the `L2V34Upgrade` zkout bytecode to derive the L2
-    ///      delegate address (MemoryOOG here). This fixture relays no L2 leg, so route through
-    ///      the plain universal call with no delegate — the pre-merge default for this harness.
-    function getL2UpgradeTargetAndData(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
-    ) internal override returns (address, bytes memory) {
-        return getUniversalComplexUpgraderTargetAndData(_deployments, address(0), "");
+    /// @dev This fixture is L1-only: no L2 leg is relayed, and the real plan's delegate-bytecode
+    ///      read is MemoryOOG here. An empty authored remainder over the empty table above is an
+    ///      L1-only edge — the migration composes the all-zero L2 transaction for it, and the
+    ///      script-side proposal below mirrors that so the prepare's equivalence check holds.
+    function bootstrapAuthoredL2Plan() internal override returns (AuthoredL2Plan memory) {
+        return
+            AuthoredL2Plan({
+                extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
+                delegateTo: address(0),
+                delegateComposer: PinnedContract({addr: address(0), codehash: bytes32(0)}),
+                factoryDepHashes: new uint256[](0)
+            });
     }
 
-    /// @dev How many factory dependencies the placeholder publish stands in for.
-    uint256 internal constant PLACEHOLDER_FACTORY_DEP_COUNT = 45;
-    /// @dev Prefix of every placeholder bytecode; the index byte makes them distinct.
-    bytes internal constant PLACEHOLDER_BYTECODE_PREFIX = hex"00c0de";
-
-    /// @notice Publish PLACEHOLDER bytecodes instead of the real factory deps (reading those
-    ///         JSON artifacts is MemoryOOG here). The bootstrap's `migrate()` refuses a cut whose
-    ///         factory deps are not on the CTM's supplier, so the stand-ins must really be
-    ///         published — the same supplier and key the production publish step uses.
+    /// @notice Nothing to publish for an L1-only edge (reading the real factory deps' JSON
+    ///         artifacts is MemoryOOG here); the plan carries no dependencies either.
     function publishBytecodes() public override {
-        console.log("Test mode: publishing placeholder factory deps to avoid MemoryOOG");
-
-        bytes[] memory placeholders = new bytes[](PLACEHOLDER_FACTORY_DEP_COUNT);
-        factoryDepsResult.factoryDepsHashes = new uint256[](PLACEHOLDER_FACTORY_DEP_COUNT);
-        for (uint256 i = 0; i < PLACEHOLDER_FACTORY_DEP_COUNT; i++) {
-            placeholders[i] = bytes.concat(PLACEHOLDER_BYTECODE_PREFIX, bytes1(uint8(i)));
-            factoryDepsResult.factoryDepsHashes[i] = uint256(keccak256(placeholders[i]));
-        }
-        BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier).publishEVMBytecodes(placeholders);
+        console.log("Test mode: L1-only edge, no factory deps to publish");
         upgradeConfig.factoryDepsPublished = true;
     }
 
-    /// @notice Skip bytecode-heavy force-deployment generation in `getProposedUpgrade` (the base
-    ///         reads all zkout bytecodes, causing MemoryOOG). Return an empty L2 upgrade instead.
+    /// @notice The L1-only proposal: what `CTMUpgradeComposer.buildProposedUpgradeFromPlan`
+    ///         composes for a plan with no L2 side — the all-zero L2 transaction, the release's
+    ///         verifier and the version edge (the base reads every L2 bytecode here, MemoryOOG).
     function getProposedUpgrade(
         StateTransitionDeployedAddresses memory stateTransition,
         ChainCreationParamsConfig memory chainCreationParams,
         uint256,
         address,
-        PublishFactoryDepsResult memory _factoryDepsResult,
-        uint256 protocolUpgradeNonce
+        PublishFactoryDepsResult memory,
+        uint256
     ) public override returns (ProposedUpgrade memory proposedUpgrade) {
-        proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: composeUpgradeTx(
-                new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
-                _factoryDepsResult,
-                protocolUpgradeNonce
-            ),
-            // ZKsync OS has no bootloader, default-account or EVM-emulator bytecode; the
-            // audited struct keeps the fields and requires them to be zero.
-            bootloaderHash: bytes32(0),
-            defaultAccountHash: bytes32(0),
-            evmEmulatorHash: bytes32(0),
-            verifier: address(0),
-            verifierParams: ProposedUpgradeLib.emptyVerifierParams(),
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
-            upgradeTimestamp: 0,
-            newProtocolVersion: chainCreationParams.latestProtocolVersion
-        });
+        proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(chainCreationParams.latestProtocolVersion);
+        proposedUpgrade.verifier = stateTransition.verifiers.verifier;
     }
 }
 

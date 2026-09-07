@@ -228,10 +228,20 @@ the ecosystem executor (today's 1.2); the CTM executor is registered as an upgra
 4.4's first alternative is chosen, owns the notifier's ProxyAdmin. Each is one explicit
 authorization call bound to bootstrap data; none is required by a stage before it exists.
 
-The bootstrap's remaining script-composed payload (the `ProposedUpgrade` inside `upgradeCut`) moves
-into the bootstrap object: the manifest pins the L2 plan and the engine, and the cut is composed on
-read from those pinned inputs with the same composer the transitions use — bootstrap-specific
-inputs, shared composition code, no second permanent path.
+Implemented: the bootstrap's payload is composed on-chain. `BootstrapManifest` pins the engine and
+an `AuthoredL2Plan` (the same shape transitions carry); `RegistryBootstrapMigration.upgradeCut()`
+composes the cut from those inputs plus the genesis release's L2 table and verifier through
+`CTMUpgradeComposer` — bootstrap-specific inputs, shared composition code, no second path. Chains
+crossing the edge take those bytes by hand (`upgradeCut()` is what tooling hands them), and the v34
+prepare asserts the on-chain cut equals the script-composed one byte for byte (the step-7 proof for
+this edge). The plan check already paid for itself: the v34 prepare published every built-in's
+bytecode but not the `L2V34Upgrade` delegate's, so the upgrade transaction's factory dependencies
+lacked the preimage of the one bytecode the unsafe deployment installs — the bootstrap object
+refused the plan (`L2BytecodeNotInFactoryDeps`), and the prepare now publishes the delegate with
+the built-ins. The anvil harness mirrors the production shape: its bootstrap installs a fresh
+release whose L2 table is the current build's inventory (emitted by the same table builder the
+prepare uses), publishes that inventory, and relays the composed L2 leg through the real
+`L2ComplexUpgrader` like the transition's.
 
 ### 4.6 L2 migration composition
 
@@ -285,7 +295,8 @@ Targeted tests:
 4. Authority: ecosystem executor's narrow CTM-executor authorization and pauser registration —
    done (both emitted by the v34 CTM prepare's stage 2 as explicit bootstrap-join calls); notifier
    ProxyAdmin path — done (the row names its admin; the executor applies it only if it owns it).
-5. Bootstrap join: explicit bound authorization calls; no bootstrap machinery on transitions.
+5. Bootstrap join: explicit bound authorization calls; no bootstrap machinery on transitions —
+   done; bootstrap payload composed on-chain — done (4.5).
 6. Tooling: scripts emit the three calls; the Rust merger stops composing stage bodies; every
    remaining external action listed.
 7. Equivalence replay + targeted tests (Section 5).

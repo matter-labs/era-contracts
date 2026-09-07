@@ -9,7 +9,6 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {Call} from "contracts/governance/Common.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IL2V34Upgrade} from "contracts/upgrades/IL2V34Upgrade.sol";
@@ -19,8 +18,17 @@ import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/Ec
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
-import {BootstrapManifest, PinnedContract, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
-import {CTM_CONTRACT_COUNT, CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {
+    AuthoredL2Plan,
+    BootstrapManifest,
+    PinnedContract,
+    ProxyUpgradeRow
+} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    CTM_CONTRACT_COUNT,
+    CTMContract,
+    L2EcosystemContract
+} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
@@ -46,6 +54,10 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     /// @notice The write-once edge object. Its manifest pins everything the stage-1 calls used
     ///         to spell out.
     RegistryBootstrapMigration public bootstrapMigration;
+
+    /// @notice The v34 delegate-calldata composer the bootstrap manifest pins: the CODE that
+    ///         defines what `L2V34Upgrade` is called with.
+    address public l2DelegateComposer;
 
     function prepareCTMUpgrade() public virtual override {
         super.prepareCTMUpgrade();
@@ -84,6 +96,20 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                     ""
                 )
             );
+    }
+
+    /// @notice The L2 delegate's bytecode is a factory dependency of the upgrade transaction like
+    ///         the built-ins' — published by this prepare, so the sequencer has its preimage when
+    ///         the unsafe deployment below runs. (The bootstrap object refuses a plan that installs
+    ///         a bytecode its factory dependencies do not carry.)
+    function getAdditionalFactoryDependencyContracts()
+        internal
+        pure
+        override
+        returns (L2EcosystemContract[] memory additionalDependencyContracts)
+    {
+        additionalDependencyContracts = new L2EcosystemContract[](1);
+        additionalDependencyContracts[0] = L2EcosystemContract.L2V34Upgrade;
     }
 
     /// @notice The L2 delegate (`L2V34Upgrade`) rides the upgrade tx itself as an unsafe force
@@ -176,6 +202,8 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             )
         );
 
+        l2DelegateComposer = deploySimpleContract("L2V34DelegateCalldataComposer");
+
         bootstrapMigration = RegistryBootstrapMigration(
             deployViaCreate2AndNotify(
                 type(RegistryBootstrapMigration).creationCode,
@@ -183,12 +211,27 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                 "RegistryBootstrapMigration"
             )
         );
+
+        // Behaviour-preservation proof, kept until EVM-1644 retires the script composition: the
+        // cut the migration composes on-chain from its pinned inputs must equal the cut the base
+        // pipeline composed off-chain, byte for byte.
+        require(
+            keccak256(abi.encode(bootstrapMigration.upgradeCut())) == keccak256(newlyGeneratedData.upgradeCutData),
+            "bootstrap: on-chain composed cut differs from the script-composed cut"
+        );
+    }
+
+    function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
+        if (compareStrings(contractName, "L2V34DelegateCalldataComposer")) {
+            return abi.encode();
+        }
+        return super.getCreationCalldata(contractName);
     }
 
     function _bootstrapManifest(
         address _ctmProxy,
         ProxyAdmin _ctmProxyAdmin
-    ) internal view returns (BootstrapManifest memory manifest) {
+    ) internal returns (BootstrapManifest memory manifest) {
         address implNew = ctmAddresses.stateTransition.implementations.chainTypeManager;
         require(implNew != address(0), "new CTM implementation not deployed");
         address release = ctmAddresses.stateTransition.currentRelease;
@@ -220,10 +263,8 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             admin: ProxyAdmin(Utils.getProxyAdminAddress(notifierProxy))
         });
 
-        Diamond.DiamondCutData memory upgradeCut = abi.decode(
-            newlyGeneratedData.upgradeCutData,
-            (Diamond.DiamondCutData)
-        );
+        address engine = ctmAddresses.stateTransition.defaultUpgrade;
+        require(engine != address(0), "bootstrap engine not deployed");
 
         manifest = BootstrapManifest({
             ctm: _ctmProxy,
@@ -233,8 +274,9 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             currentRelease: PinnedContract({addr: release, codehash: release.codehash}),
             newProtocolVersion: getNewProtocolVersion(),
             oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
-            upgradeCut: upgradeCut,
-            upgradeCutInitCodehash: upgradeCut.initAddress.codehash,
+            upgradeEngine: PinnedContract({addr: engine, codehash: engine.codehash}),
+            l2Plan: bootstrapAuthoredL2Plan(),
+            upgradeTimestamp: 0,
             ctmExecutor: PinnedContract({
                 addr: address(ctmUpgradeExecutor),
                 codehash: address(ctmUpgradeExecutor).codehash
@@ -244,6 +286,24 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                 codehash: upgradeAddresses.upgradeTimer.codehash
             })
         });
+    }
+
+    /// @notice The authored L2 remainder of the bootstrap edge: the delegate's unsafe deployment
+    ///         (its address derived from the bytecode info), the pinned composer that defines its
+    ///         arguments, and the published factory dependencies. The table-derived set comes from
+    ///         the pinned genesis release, on-chain.
+    /// @dev Virtual so bytecode-light test harnesses can substitute an L1-only edge: the real plan
+    ///      reads the `L2V34Upgrade` artifact.
+    function bootstrapAuthoredL2Plan() internal virtual returns (AuthoredL2Plan memory) {
+        require(l2DelegateComposer != address(0), "L2 delegate composer not deployed");
+        bytes memory delegateInfo = Utils.getZKOSBytecodeInfoForContract("L2V34Upgrade.sol", "L2V34Upgrade");
+        return
+            AuthoredL2Plan({
+                extraDeployments: getAdditionalUniversalForceDeployments(),
+                delegateTo: L2GenesisForceDeploymentsHelper.generateRandomAddress(delegateInfo),
+                delegateComposer: PinnedContract({addr: l2DelegateComposer, codehash: l2DelegateComposer.codehash}),
+                factoryDepHashes: factoryDepsResult.factoryDepsHashes
+            });
     }
 
     /// @notice The migration swaps the CTM implementation itself (a source-checked manifest row).

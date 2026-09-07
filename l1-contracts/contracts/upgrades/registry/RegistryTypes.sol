@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
-import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {Facets} from "../../common/StateTransitionTypes.sol";
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
 
@@ -197,14 +196,18 @@ struct CoreRegistryManifest {
 ///        every release this CTM ever pins must run exactly that code.
 /// @param newProtocolVersion The version the CTM moves to.
 /// @param oldProtocolVersionDeadline Until when the departing version stays usable.
-/// @param upgradeCut The diamond cut committed for chains upgrading across this edge. The facet
-///        delta cannot be derived at CONSTRUCTION the way a transition's is — the departing
-///        version predates releases, so there is no `fromRelease` to diff against — so the cut
-///        carries NO facet cuts at all: its init target (pinned below) is the bootstrap engine,
-///        which derives the removals from each chain's own live diamond storage and the installs
-///        from its immutable-pinned genesis release AT EXECUTION. What remains reviewed as
-///        pinned calldata is the engine init payload (the `ProposedUpgrade`).
-/// @param upgradeCutInitCodehash Inline pin of `upgradeCut.initAddress`.
+/// @param upgradeEngine The pinned bootstrap engine (`BootstrapUpgradeZKsyncOS`), the committed
+///        cut's init target. The cut carries NO facet cuts and NO authored calldata: the facet
+///        delta cannot be derived at construction (the departing version predates releases, so
+///        there is no `fromRelease` to diff against), so the engine removes each chain's live
+///        routing and installs the genesis release's facet set AT EXECUTION; and the engine's
+///        `ProposedUpgrade` is COMPOSED on read (`upgradeCut()`) from the pinned inputs below by
+///        the same composer transitions use — the bootstrap is bootstrap-specific INPUTS, not a
+///        second composition path.
+/// @param l2Plan The authored L2 remainder, exactly as on a transition: extra deployments, the
+///        delegate target and its pinned calldata composer, and the factory dependencies. The
+///        table-derived deployments come from `currentRelease`'s own L2 bytecode table.
+/// @param upgradeTimestamp The chain-side earliest execution time the composed proposal carries.
 /// @param ctmExecutor The pinned `CTMUpgradeExecutor` that receives BOTH CTM ownership and the
 ///        CTM-domain `ProxyAdmin` — the whole CTM domain lands under one executor. It must be
 ///        BOUND to `ctm` AND to `ctmProxyAdmin`, otherwise its fixed entrypoints could never
@@ -221,8 +224,9 @@ struct BootstrapManifest {
     PinnedContract currentRelease;
     uint256 newProtocolVersion;
     uint256 oldProtocolVersionDeadline;
-    Diamond.DiamondCutData upgradeCut;
-    bytes32 upgradeCutInitCodehash;
+    PinnedContract upgradeEngine;
+    AuthoredL2Plan l2Plan;
+    uint256 upgradeTimestamp;
     PinnedContract ctmExecutor;
     PinnedContract upgradeTimer;
 }

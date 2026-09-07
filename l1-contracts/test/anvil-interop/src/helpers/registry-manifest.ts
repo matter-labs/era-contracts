@@ -58,6 +58,15 @@ function parseSolidityEnum(relSourcePath: string, enumName: string): Record<stri
 const COMPLEX_UPGRADER_SOL = "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 const CONTRACT_IDENTIFIERS_SOL = "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
+/** The `ContractUpgradeType.ZKsyncOSUnsafeForceDeployment` value, parsed from the Solidity source. */
+export function unsafeForceDeploymentType(): number {
+  return enumValue(
+    parseSolidityEnum(COMPLEX_UPGRADER_SOL, "ContractUpgradeType"),
+    "ZKsyncOSUnsafeForceDeployment",
+    "ContractUpgradeType"
+  );
+}
+
 function enumValue(map: Record<string, number>, name: string, enumName: string): number {
   const value = map[name];
   if (value === undefined) {

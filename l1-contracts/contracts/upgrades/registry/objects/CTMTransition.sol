@@ -135,10 +135,8 @@ contract CTMTransition is ICTMTransition {
             _manifest.l2Plan.delegateTo,
             _manifest.l2Plan.factoryDepHashes
         );
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory l2Deployments = _combineL2Deployments(
-            derivedDeployments,
-            _manifest.l2Plan.extraDeployments
-        );
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory l2Deployments = TransitionDerivationLib
+            .combineL2Deployments(derivedDeployments, _manifest.l2Plan.extraDeployments);
 
         // L2 plan shape: committed data must be data the composed transaction actually EXECUTES,
         // checked against the COMBINED plan — derived deployments included.
@@ -282,22 +280,5 @@ contract CTMTransition is ICTMTransition {
 
     function _requirePin(PinnedContract memory _pinned) private view {
         CodehashPinLib.requirePin(_pinned);
-    }
-
-    /// @dev Derived set first, authored extras after — order between deployments is free (the
-    ///      delegatecall always runs last on L2), this just keeps the stored list canonical.
-    function _combineL2Deployments(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _derived,
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _extras
-    ) private pure returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory combined) {
-        combined = new IComplexUpgrader.UniversalContractUpgradeInfo[](_derived.length + _extras.length);
-        uint256 derivedLength = _derived.length;
-        for (uint256 i = 0; i < derivedLength; ++i) {
-            combined[i] = _derived[i];
-        }
-        uint256 extrasLength = _extras.length;
-        for (uint256 i = 0; i < extrasLength; ++i) {
-            combined[derivedLength + i] = _extras[i];
-        }
     }
 }

@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.28;
 
-import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {DefaultUpgradeZKsyncOS} from "./DefaultUpgradeZKsyncOS.sol";
 import {ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {ICTMRelease} from "./registry/objects/ICTMRelease.sol";
+import {LiveRoutingReader} from "./registry/libraries/LiveRoutingReader.sol";
 import {ReleaseFacetReader} from "./registry/libraries/ReleaseFacetReader.sol";
 import {ZeroAddress} from "../common/L1ContractErrors.sol";
 
@@ -17,8 +17,7 @@ import {ZeroAddress} from "../common/L1ContractErrors.sol";
 ///         reinstall on-chain and applies it before the storage/L2 part, the same two-step shape
 ///         `upgradeFromTransition` gives every registry-driven edge after it.
 /// @dev The remove side is the DEPARTING diamond's own routing, read straight from its diamond
-///      storage — pre-v34 facets do not self-describe, but this init is delegatecalled into the
-///      diamond and sees that storage directly. The add side is the pinned genesis release's
+///      storage ({LiveRoutingReader}). The add side is the pinned genesis release's
 ///      facet set: the exact cuts a new chain geneses with (`ReleaseFacetReader`), so the
 ///      bootstrap edge cannot diverge from the genesis path — no hand-composed selector lists
 ///      anywhere in the committed calldata.
@@ -41,25 +40,8 @@ contract BootstrapUpgradeZKsyncOS is DefaultUpgradeZKsyncOS {
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
         // The reinstall FIRST, mirroring `Diamond.diamondCut`'s facets-then-init order that the
         // legacy committed cut relied on: the storage/L2 part below runs on the new facet set.
-        _applyDerivedFacetCuts(_removeAllLiveRouting());
+        _applyDerivedFacetCuts(LiveRoutingReader.removeAllCuts());
         _applyDerivedFacetCuts(ReleaseFacetReader.newChainInstallations(GENESIS_RELEASE));
         return super.upgrade(_proposedUpgrade);
-    }
-
-    /// @notice One `Remove` cut per live facet, covering its complete current routing.
-    /// @dev Snapshotted before anything is applied, so the mutation of the facet list during
-    ///      removal cannot skew the derivation.
-    function _removeAllLiveRouting() internal view returns (Diamond.FacetCut[] memory facetCuts) {
-        Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
-        uint256 facetCount = ds.facets.length;
-        facetCuts = new Diamond.FacetCut[](facetCount);
-        for (uint256 i = 0; i < facetCount; ++i) {
-            facetCuts[i] = Diamond.FacetCut({
-                facet: address(0),
-                action: Diamond.Action.Remove,
-                isFreezable: false,
-                selectors: ds.facetToSelectors[ds.facets[i]].selectors
-            });
-        }
     }
 }

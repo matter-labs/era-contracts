@@ -500,7 +500,7 @@ no bootstrap.
 `RegistryBootstrapMigration` expresses that crossing as a single pinned object. Its manifest carries
 the CTM and its departing version, the `ProxyAdmin`, the source-checked implementation swaps (the
 CTM's own implementation among them), the `releaseCodehash` anchor, the genesis `currentRelease`
-(which carries the verifier), the version edge and deadline, the upgrade cut, and the two executors
+(which carries the verifier), the version edge and deadline, the pinned engine and authored L2 plan, and the two executors
 that receive authority. Every address carries an inline pin.
 
 Governance transfers CTM and `ProxyAdmin` ownership to it; `migrate()` performs the whole edge and
@@ -522,12 +522,19 @@ Two properties that look like omissions but are not:
   `GovernanceUpgradeTimer`, and `validate()` calls its `checkDeadline()` — so `migrate()` cannot
   run before stage 0 started the timer and the operational window passed, and the CTM's own
   version-edge commit refuses to run while chain migrations are unpaused.
-- `upgradeCut` carries **no facet cuts**. The facet delta cannot be derived at construction (the
-  departing version predates releases, so there is no `fromRelease` to diff against), so it is
-  derived AT EXECUTION instead: the cut's init target is the bootstrap engine
+- The committed cut carries **no facet cuts and no authored calldata**. The facet delta cannot be
+  derived at construction (the departing version predates releases, so there is no `fromRelease` to
+  diff against), so it is derived AT EXECUTION instead: the cut's init target is the bootstrap engine
   (`BootstrapUpgradeZKsyncOS`), which removes each chain's live routing read from its own diamond
-  storage and installs the facet set of its immutable-pinned genesis release. The reviewed pinned
-  payload is the engine's `ProposedUpgrade` init calldata.
+  storage and installs the facet set of its immutable-pinned genesis release. The engine's
+  `ProposedUpgrade` is COMPOSED on read (`upgradeCut()`) from the manifest's pinned inputs — the
+  genesis release's table-derived L2 deployments plus the authored extras, the pinned delegate
+  composer, the release's verifier — by the same `CTMUpgradeComposer` transitions use, and the
+  plan is shape-checked at construction like a transition's (`L2PlanValidationLib`: every bytecode
+  the L2 leg installs — each table row's implementation and proxy shell, each extra — must be among
+  the factory dependencies, which `migrate()` requires published on the CTM's supplier). What
+  governance reviews is the manifest; the v34 prepare asserts the on-chain composed cut equals the
+  script-composed one byte for byte until EVM-1644 retires the script composition.
 
 CTM ownership is transferred, not forced: `migrate()` nominates the executor and completes the
 handover through `CTMUpgradeExecutor.acceptCTMOwnership()` in the same transaction. The accept is

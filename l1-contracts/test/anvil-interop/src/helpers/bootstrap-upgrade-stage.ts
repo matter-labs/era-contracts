@@ -14,11 +14,14 @@
  *      the release the CTM pins.
  *   2. Governance (impersonated) hands the CTM and the ecosystem ProxyAdmin to the deployed
  *      `RegistryBootstrapMigration`, whose manifest pins: the CTM implementation swap (a REAL
- *      source-checked proxy row), the legacy upgrade cut + its engine pin, the version edge and
- *      the old-version deadline, the release anchor, and the two bound executors.
+ *      source-checked proxy row), the upgrade engine, the authored L2 remainder (the delegate's
+ *      deployment, the composer defining its calldata, the published factory dependencies), the
+ *      version edge and the old-version deadline, the release the edge installs (the live
+ *      release's pins over the L2 table of the current build — see the runner), and the two
+ *      bound executors. The cut itself is COMPOSED by the migration from those inputs.
  *   3. `migrate()` runs the whole edge in one transaction: impl swap, legacy
  *      `setNewVersionUpgrade` commit (writing the deprecated `upgradeCutHash` — the ONLY writer
- *      left), release re-pin, and the authority handover to the executors.
+ *      left), release install + anchor, and the authority handover to the executors.
  *   4. Each chain's admin crosses the edge through the legacy 3-arg `upgradeChainFromVersion`,
  *      handing the committed cut — verified against `upgradeCutHash` exactly like production
  *      pre-v34 chains do.
@@ -40,7 +43,6 @@ const DEFAULT_GAS_LIMIT = 10_000_000;
 
 // Diamond.Action enum (contracts/state-transition/libraries/Diamond.sol).
 const DIAMOND_ACTION_ADD = 0;
-const DIAMOND_ACTION_REMOVE = 2;
 
 export type BootstrapPieces = {
   legacyAdminFacet: string;
@@ -75,7 +77,8 @@ export async function buildBootstrapSection(
   return {
     // The pre-v34 cut-taking entrypoint the harness installs (and the bootstrap cut removes).
     legacyAdminFacet: pieces.legacyAdminFacet,
-    // The legacy cut's init contract — pinned by `upgradeCutInitCodehash` in the migration.
+    // The bootstrap engine the composed cut's init targets — pinned by `upgradeEngine` in the
+    // migration (the harness's `BootstrapUpgradeDev`, bound to the release the edge installs).
     upgradeEngine: { address: pieces.bootstrapEngine, codehash: await codehash(pieces.bootstrapEngine) },
     // The canonical bootstrap operation: the CTM proxy's own implementation swap, as a
     // source-checked row.
@@ -106,63 +109,6 @@ export function bootstrapManifestChecks(
   ];
 }
 
-/**
- * The legacy cut committed by the bootstrap, reconstructed deterministically from the manifest
- * (both modes build it the same way — it is never stored raw in the JSON). It removes the
- * harness-installed legacy entrypoint and runs `DefaultUpgrade.upgrade` with a minimal
- * `ProposedUpgrade`: version bump only, no L2 transaction, no verifier/hash changes (an empty
- * L2 leg is skipped by `BaseZkSyncUpgrade`, and zero verifier/hash values mean "keep").
- */
-export function buildBootstrapCut(manifest: any, packSemVer: (v: string) => bigint): any {
-  const emptyL2Tx = {
-    txType: 0,
-    from: 0,
-    to: 0,
-    gasLimit: 0,
-    gasPerPubdataByteLimit: 0,
-    maxFeePerGas: 0,
-    maxPriorityFeePerGas: 0,
-    paymaster: 0,
-    nonce: 0,
-    value: 0,
-    reserved: [0, 0, 0, 0],
-    data: "0x",
-    signature: "0x",
-    factoryDeps: [],
-    paymasterInput: "0x",
-    reservedDynamic: "0x",
-  };
-  const proposedUpgrade = {
-    l2ProtocolUpgradeTx: emptyL2Tx,
-    bootloaderHash: ethers.constants.HashZero,
-    defaultAccountHash: ethers.constants.HashZero,
-    evmEmulatorHash: ethers.constants.HashZero,
-    verifier: ethers.constants.AddressZero,
-    verifierParams: {
-      recursionNodeLevelVkHash: ethers.constants.HashZero,
-      recursionLeafLevelVkHash: ethers.constants.HashZero,
-      recursionCircuitsSetVksHash: ethers.constants.HashZero,
-    },
-    l1ContractsUpgradeCalldata: "0x",
-    postUpgradeCalldata: "0x",
-    upgradeTimestamp: 0,
-    newProtocolVersion: packSemVer(manifest.bootstrapVersion),
-  };
-  const engineIface = new ethers.utils.Interface(getAbi("DefaultUpgrade"));
-  return {
-    facetCuts: [
-      {
-        facet: ethers.constants.AddressZero,
-        action: DIAMOND_ACTION_REMOVE,
-        isFreezable: false,
-        selectors: [legacyUpgradeSelector()],
-      },
-    ],
-    initAddress: manifest.bootstrap.upgradeEngine.address,
-    initCalldata: engineIface.encodeFunctionData("upgrade", [proposedUpgrade]),
-  };
-}
-
 /** `RegistryBootstrapMigration.BootstrapManifest` constructor argument. */
 export async function bootstrapInitArgs(
   l1Provider: ethers.providers.JsonRpcProvider,
@@ -172,9 +118,18 @@ export async function bootstrapInitArgs(
     ctmProxy: string;
     proxyAdmin: string;
     releaseCodehash: string;
+    /** The release the edge installs as the CTM's `currentRelease` (its L2 table is the derived L2 set). */
     currentRelease: string;
     ctmExecutor: string;
     upgradeTimer: string;
+    /** The pinned composer that defines the delegate calldata (the harness's fixed no-op composer). */
+    delegateComposer: { addr: string; codehash: string };
+    /** The harness's no-op delegate: its bytecode info and the address that info derives. */
+    l2Delegate: { deployedBytecodeInfo: string; address: string };
+    /** `ContractUpgradeType.ZKsyncOSUnsafeForceDeployment`. */
+    unsafeDeploymentType: number;
+    /** keccak256 of every bytecode the L2 leg installs — published on the supplier beforehand. */
+    factoryDepHashes: string[];
   }
 ): Promise<any> {
   const codehash = async (addr: string) => ethers.utils.keccak256(await l1Provider.getCode(addr));
@@ -199,8 +154,25 @@ export async function bootstrapInitArgs(
     currentRelease: { addr: params.currentRelease, codehash: params.releaseCodehash },
     newProtocolVersion: packSemVer(manifest.bootstrapVersion),
     oldProtocolVersionDeadline: ethers.BigNumber.from(manifest.bootstrap.oldProtocolVersionDeadline),
-    upgradeCut: buildBootstrapCut(manifest, packSemVer),
-    upgradeCutInitCodehash: manifest.bootstrap.upgradeEngine.codehash,
+    upgradeEngine: {
+      addr: manifest.bootstrap.upgradeEngine.address,
+      codehash: manifest.bootstrap.upgradeEngine.codehash,
+    },
+    // The L2 leg is COMPOSED on-chain from the genesis release's table plus these authored extras;
+    // the migration serves the resulting cut (`upgradeCut()`) — nothing is hand-built here.
+    l2Plan: {
+      extraDeployments: [
+        {
+          upgradeType: params.unsafeDeploymentType,
+          deployedBytecodeInfo: params.l2Delegate.deployedBytecodeInfo,
+          newAddress: params.l2Delegate.address,
+        },
+      ],
+      delegateTo: params.l2Delegate.address,
+      delegateComposer: params.delegateComposer,
+      factoryDepHashes: params.factoryDepHashes.map((h) => ethers.BigNumber.from(h)),
+    },
+    upgradeTimestamp: 0,
     // The executor and timer are deployed by this run (regular build), so their codehashes are
     // read live rather than committed — the manifest pins only cross-machine-stable values.
     ctmExecutor: { addr: params.ctmExecutor, codehash: await codehash(params.ctmExecutor) },

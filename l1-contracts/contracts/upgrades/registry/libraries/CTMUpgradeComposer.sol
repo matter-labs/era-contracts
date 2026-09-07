@@ -54,78 +54,98 @@ library CTMUpgradeComposer {
             });
     }
 
-    /// @notice Builds the L1 -> L2 protocol upgrade transaction from the transition's L2 plan
-    ///         (force-deployments, delegate target + calldata, factory dependencies).
-    /// @dev The transaction calls `ComplexUpgrader.forceDeployAndUpgradeUniversal` (the universal
-    ///      Era + ZKsyncOS path). Its nonce is derived from the new protocol version, as enforced
-    ///      by `BaseZkSyncUpgrade._setL2SystemContractUpgrade`. A transaction is composed whenever
-    ///      the plan has ANY L2 side — deployments or a delegate call; `L2ComplexUpgrader`
-    ///      supports an empty deployment list followed by a delegatecall, and transition
-    ///      initialization already rejects plans whose data could never execute.
+    /// @notice The L1 -> L2 protocol upgrade transaction a transition composes for the ecosystem
+    ///         whose Bridgehub is `_bridgehub` (see {buildL2UpgradeTxFromPlan}).
     function buildL2UpgradeTx(
         ICTMTransition _transition,
         address _bridgehub
     ) internal view returns (L2CanonicalTransaction memory) {
-        return _buildL2UpgradeTx(_transition, _transition.getManifest(), _bridgehub);
+        TransitionManifest memory m = _transition.getManifest();
+        return
+            buildL2UpgradeTxFromPlan({
+                _plan: _transition.l2Plan(),
+                _newRelease: ICTMRelease(m.newRelease),
+                _newProtocolVersion: m.newProtocolVersion,
+                _bridgehub: _bridgehub
+            });
     }
 
-    /// @dev Manifest-taking form so callers already holding the decoded manifest avoid re-decoding
-    ///      it; the FINAL plan (derived deployments included) still comes from the transition.
-    function _buildL2UpgradeTx(
-        ICTMTransition _transition,
-        TransitionManifest memory _m,
+    /// @notice The L1 -> L2 protocol upgrade transaction for a FINAL L2 plan: the force
+    ///         deployments, the delegate call the `L2ComplexUpgrader` performs after them (its
+    ///         calldata defined by the plan's pinned composer from `_newRelease` and `_bridgehub`)
+    ///         and the factory dependencies. Shared by transitions and the bootstrap edge, so both
+    ///         compose the same transaction from the same inputs.
+    function buildL2UpgradeTxFromPlan(
+        L2UpgradePlan memory _plan,
+        ICTMRelease _newRelease,
+        uint256 _newProtocolVersion,
         address _bridgehub
-    ) private view returns (L2CanonicalTransaction memory) {
-        uint256 newVersion = _m.newProtocolVersion;
-        L2UpgradePlan memory plan = _transition.l2Plan();
-        if (plan.deployments.length == 0 && plan.delegateTo == address(0)) {
-            // The upgrade has no L2 side (patch upgrades, or L1-only minor upgrades): an all-zero
-            // transaction (txType == 0) makes `BaseZkSyncUpgrade` skip the L2 protocol upgrade
-            // transaction entirely.
+    ) internal view returns (L2CanonicalTransaction memory) {
+        if (_plan.deployments.length == 0 && _plan.delegateTo == address(0)) {
+            // No L2 side (patch upgrades, or L1-only minor upgrades): an all-zero transaction
+            // (txType == 0) makes `BaseZkSyncUpgrade` skip the L2 protocol upgrade transaction.
             return ProposedUpgradeLib.emptyL2CanonicalTransaction();
         }
-
         // VM identity is single-sourced from the target release's pinned DiamondInit.
-        bool isZKsyncOS = IDiamondInit(ICTMRelease(_m.newRelease).diamondInit()).IS_ZKSYNC_OS();
-
+        bool isZKsyncOS = IDiamondInit(_newRelease.diamondInit()).IS_ZKSYNC_OS();
         L2CanonicalTransaction memory transaction = ProposedUpgradeLib.emptyL2CanonicalTransaction();
         transaction.txType = isZKsyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
         transaction.from = uint256(uint160(L2_FORCE_DEPLOYER_ADDR));
         transaction.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
         transaction.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
         transaction.gasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
-        transaction.nonce = protocolUpgradeNonce(newVersion);
+        transaction.nonce = protocolUpgradeNonce(_newProtocolVersion);
         // What the delegate is called WITH is defined by the pinned version-specific composer
         // from authoritative inputs — never by authored bytes (see {IL2DelegateCalldataComposer}).
-        bytes memory delegateCalldata = plan.delegateComposer == address(0)
+        bytes memory delegateCalldata = _plan.delegateComposer == address(0)
             ? bytes("")
-            : IL2DelegateCalldataComposer(plan.delegateComposer).composeDelegateCalldata(
-                ICTMRelease(_m.newRelease),
-                _bridgehub
-            );
+            : IL2DelegateCalldataComposer(_plan.delegateComposer).composeDelegateCalldata(_newRelease, _bridgehub);
         transaction.data = abi.encodeCall(
             IComplexUpgrader.forceDeployAndUpgradeUniversal,
-            (plan.deployments, plan.delegateTo, delegateCalldata)
+            (_plan.deployments, _plan.delegateTo, delegateCalldata)
         );
-        transaction.factoryDeps = plan.factoryDepHashes;
+        transaction.factoryDeps = _plan.factoryDepHashes;
         return transaction;
     }
 
-    /// @notice Builds the `ProposedUpgrade` embedded in the upgrade cut's init calldata.
+    /// @notice Builds the `ProposedUpgrade` embedded in a transition's upgrade cut init calldata.
     function buildProposedUpgrade(
         ICTMTransition _transition,
         address _bridgehub
-    ) internal view returns (ProposedUpgrade memory proposedUpgrade) {
+    ) internal view returns (ProposedUpgrade memory) {
         TransitionManifest memory m = _transition.getManifest();
-        proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(m.newProtocolVersion);
-        proposedUpgrade.l2ProtocolUpgradeTx = _buildL2UpgradeTx(_transition, m, _bridgehub);
         // Straight from the TARGET release, not from `CTM.currentRelease()`: a chain several
         // versions behind executes the transition that names its own next release, and the CTM may
         // already have moved past it.
-        proposedUpgrade.verifier = ICTMRelease(m.newRelease).verifier();
-        // The frozen `ProposedUpgrade` still carries the EraVM bytecode-hash words; they stay zero
-        // and `BaseZkSyncUpgrade` no longer reads them.
-        proposedUpgrade.upgradeTimestamp = m.upgradeTimestamp;
+        return
+            buildProposedUpgradeFromPlan({
+                _plan: _transition.l2Plan(),
+                _newRelease: ICTMRelease(m.newRelease),
+                _newProtocolVersion: m.newProtocolVersion,
+                _upgradeTimestamp: m.upgradeTimestamp,
+                _bridgehub: _bridgehub
+            });
+    }
+
+    /// @notice The `ProposedUpgrade` for a final L2 plan and its target release: the composed L2
+    ///         transaction, the release's verifier and the schedule. The frozen struct's EraVM
+    ///         bytecode-hash words stay zero (`BaseZkSyncUpgrade` no longer reads them).
+    function buildProposedUpgradeFromPlan(
+        L2UpgradePlan memory _plan,
+        ICTMRelease _newRelease,
+        uint256 _newProtocolVersion,
+        uint256 _upgradeTimestamp,
+        address _bridgehub
+    ) internal view returns (ProposedUpgrade memory proposedUpgrade) {
+        proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(_newProtocolVersion);
+        proposedUpgrade.l2ProtocolUpgradeTx = buildL2UpgradeTxFromPlan({
+            _plan: _plan,
+            _newRelease: _newRelease,
+            _newProtocolVersion: _newProtocolVersion,
+            _bridgehub: _bridgehub
+        });
+        proposedUpgrade.verifier = _newRelease.verifier();
+        proposedUpgrade.upgradeTimestamp = _upgradeTimestamp;
     }
 
     /// @notice The nonce of the L2 protocol upgrade transaction for a packed SemVer version.

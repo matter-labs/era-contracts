@@ -13,6 +13,9 @@ import {
 } from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {IL2DelegateCalldataComposer} from "contracts/upgrades/registry/objects/IL2DelegateCalldataComposer.sol";
+import {FixedDelegateCalldataComposer} from "contracts/dev-contracts/FixedDelegateCalldataComposer.sol";
 import {MockProxyUpgradeInitImpl} from "contracts/dev-contracts/test/MockProxyUpgradeInitImpl.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
@@ -21,11 +24,25 @@ import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpg
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {L2PlanFixtures} from "./L2PlanFixtures.sol";
+import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {
+    MAX_NEW_FACTORY_DEPS,
+    PRIORITY_TX_MAX_GAS_LIMIT,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
+} from "contracts/common/Config.sol";
+import {
+    L2_BRIDGEHUB_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_FORCE_DEPLOYER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {
     BootstrapAlreadyExecuted,
     BootstrapAuthorityNotHeld,
@@ -33,6 +50,9 @@ import {
     BootstrapNotYetExecuted,
     DeadlineNotYetPassed,
     L2BytecodeNotPublished,
+    L2DelegateNotAnExtraDeployment,
+    L2ExtraDeploymentNotBytecodeDerived,
+    MalformedL2UpgradePlan,
     ProxyUpgradeRowMismatch,
     RegistryCodehashMismatch,
     RegistryDuplicateProxyRow,
@@ -41,7 +61,9 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {
+    AuthoredL2Plan,
     BootstrapManifest,
+    L2UpgradePlan,
     ProxyUpgradeRow,
     GenesisFacet,
     ReleaseGenesisData,
@@ -51,7 +73,8 @@ import {
 import {
     CTM_CONTRACT_COUNT,
     CTMContract,
-    L2_ECOSYSTEM_CONTRACT_COUNT
+    L2_ECOSYSTEM_CONTRACT_COUNT,
+    L2EcosystemContract
 } from "../../../../../../../contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @dev Two distinct implementations so a proxy row is a real `expectedOldImpl -> implNew` edge.
@@ -76,7 +99,8 @@ contract ImplUnknown {
 
 /// @notice Tests the single source-checked edge from a pre-registry ecosystem into the
 ///         registry-driven model: implementation swaps, provenance anchor + genesis release,
-///         version edge, and the authority handover to the bound executors.
+///         version edge, the on-chain composed upgrade cut, and the authority handover to the
+///         bound executors.
 /// @dev Driven against a REAL `ZKsyncOSChainTypeManager` and a real OpenZeppelin `ProxyAdmin` — the two
 ///      contracts whose ownership the migration actually needs — rather than mocks, because the
 ///      property under test IS the authority movement.
@@ -98,9 +122,25 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     ProxyAdmin internal notifierAdmin;
     TransparentUpgradeableProxy internal notifierProxy;
     address internal genesisUpgradeAddr;
-    address internal upgradeCutInit;
+    /// @dev The pinned init target of the committed cut. This fixture never executes the cut (the
+    ///      CTM only commits its hash), so a distinct etched stand-in is all the pin needs.
+    address internal upgradeEngine;
+    /// @dev The pinned delegate-calldata composer of a plan-bearing manifest: a test-only stand-in
+    ///      returning `DELEGATE_CALLDATA` regardless of its inputs, so this suite can pin a real
+    ///      composer without a version-specific L2 migration behind it.
+    FixedDelegateCalldataComposer internal delegateComposer;
 
     uint256 internal newVersion;
+
+    bytes internal constant DELEGATE_CALLDATA = hex"beef";
+    // Dummy EVM bytecodes standing in for the L2 artifacts the edge installs (see {L2PlanFixtures}):
+    // the authored upgrade delegate, and the system-proxied member a genesis release's table can
+    // carry (implementation + proxy shell).
+    bytes internal constant DELEGATE_CODE = hex"aa01";
+    bytes internal constant BRIDGEHUB_IMPL_CODE = hex"dd01";
+    bytes internal constant SYSTEM_PROXY_CODE = hex"dd00";
+    /// @dev A nonzero schedule, so its pass-through into the composed proposal is observable.
+    uint256 internal constant PLAN_UPGRADE_TIMESTAMP = 1234567;
 
     function setUp() public {
         deploy();
@@ -120,8 +160,9 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         genesisUpgradeAddr = makeAddr("genesisUpgrade");
         vm.etch(genesisUpgradeAddr, hex"600042");
-        upgradeCutInit = makeAddr("upgradeCutInit");
-        vm.etch(upgradeCutInit, hex"600043");
+        upgradeEngine = makeAddr("upgradeEngine");
+        vm.etch(upgradeEngine, hex"600043");
+        delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
 
         // The ecosystem executor is bound first: the CTM executor pins it as an immutable.
         ecoExecutor = new EcosystemUpgradeExecutor(governor, ecosystemProxyAdmin, Utils.coreRegistryCodehash());
@@ -141,13 +182,16 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         upgradeTimer.startTimer();
         // The release constructor reads each facet's self-description (see the shared fixture).
         _mockFacetSelfDescriptions(facetCuts);
-        genesisRelease = _deployGenesisRelease();
+        // An empty L2 table: the default edge derives no L2 deployments.
+        genesisRelease = _deployRelease(new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT));
         migration = new RegistryBootstrapMigration(_manifest());
     }
 
     // ─────────────────────────────── fixtures ───────────────────────────────
 
-    function _deployGenesisRelease() internal returns (CTMRelease result) {
+    /// @dev A release pinning the fixture's facets, verifier and (ZKsync OS) DiamondInit over
+    ///      `_l2BytecodeInfos`.
+    function _deployRelease(bytes[] memory _l2BytecodeInfos) internal returns (CTMRelease result) {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
             genesisFacets[i] = GenesisFacet({
@@ -168,32 +212,73 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                     genesisBatchCommitment: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 54
                 }),
-                // Length-checked inventory; content is irrelevant to this fixture.
-                l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
+                l2BytecodeInfos: _l2BytecodeInfos
             })
         );
     }
 
-    function _manifest() internal view returns (BootstrapManifest memory) {
-        return _manifestWithFactoryDeps(new uint256[](0));
+    /// @dev A genesis release whose table carries one canonical system-proxy row (the L2
+    ///      Bridgehub), so the derived L2 set is nonempty. Its dependencies are the implementation
+    ///      and the proxy shell.
+    function _deployTableRelease() internal returns (CTMRelease) {
+        bytes[] memory table = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
+        table[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.systemProxyRow(
+            BRIDGEHUB_IMPL_CODE,
+            SYSTEM_PROXY_CODE
+        );
+        return _deployRelease(table);
     }
 
-    /// @dev The committed cut carries the engine's `upgrade(ProposedUpgrade)` calldata — the
-    ///      migration decodes it to check the L2 transaction's factory dependencies are published.
-    ///      The fixture never executes it (the CTM only commits its hash), so an otherwise-empty
-    ///      proposal carrying `_factoryDeps` is the whole payload.
-    function _upgradeCut(uint256[] memory _factoryDeps) internal view returns (Diamond.DiamondCutData memory) {
-        ProposedUpgrade memory proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(newVersion);
-        proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps = _factoryDeps;
+    /// @dev The default edge is L1-only: the genesis release's table is empty and nothing is
+    ///      authored, so the composed cut carries the all-zero L2 transaction `BaseZkSyncUpgrade`
+    ///      skips.
+    function _manifest() internal view returns (BootstrapManifest memory) {
+        return _manifestWithL2Plan(_emptyL2Plan());
+    }
+
+    function _emptyL2Plan() internal pure returns (AuthoredL2Plan memory) {
         return
-            Diamond.DiamondCutData({
-                facetCuts: new Diamond.FacetCut[](0),
-                initAddress: upgradeCutInit,
-                initCalldata: abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
+            AuthoredL2Plan({
+                extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
+                delegateTo: address(0),
+                delegateComposer: _noPin(),
+                factoryDepHashes: new uint256[](0)
             });
     }
 
-    function _manifestWithFactoryDeps(uint256[] memory _factoryDeps) internal view returns (BootstrapManifest memory) {
+    /// @dev The well-formed authored remainder: the delegate's Unsafe deployment at its
+    ///      bytecode-derived address, the pinned composer defining its calldata, and the delegate's
+    ///      bytecode as the one factory dependency.
+    function _authoredPlan() internal view returns (AuthoredL2Plan memory) {
+        IComplexUpgrader.UniversalContractUpgradeInfo[]
+            memory extras = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
+        extras[0] = L2PlanFixtures.unsafeDeployment(DELEGATE_CODE);
+        return
+            AuthoredL2Plan({
+                extraDeployments: extras,
+                delegateTo: extras[0].newAddress,
+                delegateComposer: _pin(address(delegateComposer)),
+                factoryDepHashes: L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE))
+            });
+    }
+
+    /// @dev Every bytecode an edge toward `_deployTableRelease()` installs: the delegate plus the
+    ///      table row's implementation and proxy shell.
+    function _tableCodes() internal pure returns (bytes[] memory) {
+        return L2PlanFixtures.codes(DELEGATE_CODE, BRIDGEHUB_IMPL_CODE, SYSTEM_PROXY_CODE);
+    }
+
+    /// @dev `_authoredPlan()` toward `_tableRelease`, with the table row's dependencies joining the
+    ///      delegate's and a nonzero schedule.
+    function _tableManifest(CTMRelease _tableRelease) internal view returns (BootstrapManifest memory manifest) {
+        AuthoredL2Plan memory plan = _authoredPlan();
+        plan.factoryDepHashes = L2PlanFixtures.factoryDepHashes(_tableCodes());
+        manifest = _manifestWithL2Plan(plan);
+        manifest.currentRelease = PinnedContract({addr: address(_tableRelease), codehash: Utils.releaseCodehash()});
+        manifest.upgradeTimestamp = PLAN_UPGRADE_TIMESTAMP;
+    }
+
+    function _manifestWithL2Plan(AuthoredL2Plan memory _l2Plan) internal view returns (BootstrapManifest memory) {
         // The one participating slot in the enum-indexed CTM-domain inventory: the CTM's own
         // implementation swap. The remaining slots stay inert (explicitly not upgraded).
         ProxyUpgradeRow[] memory upgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
@@ -213,11 +298,85 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 currentRelease: PinnedContract({addr: address(genesisRelease), codehash: Utils.releaseCodehash()}),
                 newProtocolVersion: newVersion,
                 oldProtocolVersionDeadline: type(uint256).max,
-                upgradeCut: _upgradeCut(_factoryDeps),
-                upgradeCutInitCodehash: upgradeCutInit.codehash,
-                ctmExecutor: PinnedContract({addr: address(ctmExecutor), codehash: address(ctmExecutor).codehash}),
-                upgradeTimer: PinnedContract({addr: address(upgradeTimer), codehash: address(upgradeTimer).codehash})
+                upgradeEngine: _pin(upgradeEngine),
+                l2Plan: _l2Plan,
+                upgradeTimestamp: 0,
+                ctmExecutor: _pin(address(ctmExecutor)),
+                upgradeTimer: _pin(address(upgradeTimer))
             });
+    }
+
+    function _pin(address _addr) internal view returns (PinnedContract memory) {
+        return PinnedContract({addr: _addr, codehash: _addr.codehash});
+    }
+
+    /// @dev The zero pin: no composer (the delegate is called with empty calldata).
+    function _noPin() internal pure returns (PinnedContract memory) {
+        return PinnedContract({addr: address(0), codehash: bytes32(0)});
+    }
+
+    /// @dev The L2 transaction the edge's FINAL plan composes, assembled here from the constants
+    ///      the composer reads rather than through the library under test, so the equality below
+    ///      is a real check of the composition.
+    function _expectedL2Tx(
+        L2UpgradePlan memory _plan,
+        bytes memory _delegateCalldata
+    ) internal view returns (L2CanonicalTransaction memory transaction) {
+        transaction = ProposedUpgradeLib.emptyL2CanonicalTransaction();
+        // VM identity comes off the release's DiamondInit, which the shared fixture builds with true.
+        transaction.txType = ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
+        transaction.from = uint256(uint160(L2_FORCE_DEPLOYER_ADDR));
+        transaction.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
+        transaction.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
+        transaction.gasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
+        (, uint32 minor, ) = SemVer.unpackSemVer(uint96(newVersion));
+        transaction.nonce = minor;
+        transaction.data = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgradeUniversal,
+            (_plan.deployments, _plan.delegateTo, _delegateCalldata)
+        );
+        transaction.factoryDeps = _plan.factoryDepHashes;
+    }
+
+    /// @dev The proposal the engine is handed: the release's verifier, the version edge, the
+    ///      schedule and `_transaction`; the frozen struct's EraVM bytecode-hash words stay zero.
+    function _expectedProposal(
+        L2CanonicalTransaction memory _transaction,
+        uint256 _upgradeTimestamp
+    ) internal view returns (ProposedUpgrade memory proposal) {
+        proposal = ProposedUpgradeLib.emptyProposedUpgrade(newVersion);
+        proposal.l2ProtocolUpgradeTx = _transaction;
+        proposal.verifier = address(testnetVerifier);
+        proposal.upgradeTimestamp = _upgradeTimestamp;
+    }
+
+    /// @dev No facet cuts; the pinned engine's `upgrade(proposal)` as the init.
+    function _expectedCut(ProposedUpgrade memory _proposal) internal view returns (Diamond.DiamondCutData memory) {
+        return
+            Diamond.DiamondCutData({
+                facetCuts: new Diamond.FacetCut[](0),
+                initAddress: upgradeEngine,
+                initCalldata: abi.encodeCall(IDefaultUpgrade.upgrade, (_proposal))
+            });
+    }
+
+    /// @dev Decodes an `upgrade(ProposedUpgrade)` init payload; external so the selector can be
+    ///      sliced off calldata.
+    function decodeUpgradeInit(bytes calldata _initCalldata) external pure returns (ProposedUpgrade memory) {
+        assertEq(bytes32(bytes4(_initCalldata[:4])), bytes32(IDefaultUpgrade.upgrade.selector), "init selector");
+        return abi.decode(_initCalldata[4:], (ProposedUpgrade));
+    }
+
+    /// @dev Decodes a `forceDeployAndUpgradeUniversal` payload.
+    function decodeUniversalCall(
+        bytes calldata _data
+    ) external pure returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory, address, bytes memory) {
+        assertEq(
+            bytes32(bytes4(_data[:4])),
+            bytes32(IComplexUpgrader.forceDeployAndUpgradeUniversal.selector),
+            "L2 tx selector"
+        );
+        return abi.decode(_data[4:], (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes));
     }
 
     /// @dev The governance bundle this object replaces stage 1 with: nominate the CTM, hand over
@@ -298,11 +457,16 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             implV32,
             "proxy must point at the pinned implementation"
         );
-        // The registry anchors are installed and the version edge committed.
+        // The registry anchors are installed and the version edge committed with the cut the
+        // object composes on-chain.
         assertEq(chainContractAddress.releaseCodehash(), Utils.releaseCodehash(), "anchor must be installed");
         assertEq(chainContractAddress.currentRelease(), address(genesisRelease), "release must be pinned");
         assertEq(chainContractAddress.protocolVersion(), newVersion, "version must be bumped");
-        assertTrue(chainContractAddress.upgradeCutHash(oldVersion) != bytes32(0), "upgrade cut must be committed");
+        assertEq(
+            chainContractAddress.upgradeCutHash(oldVersion),
+            keccak256(abi.encode(migration.upgradeCut())),
+            "the composed cut must be committed"
+        );
         // The verifier is pinned by the release the bootstrap installs, not by a version-keyed map.
         assertEq(CTMRelease(chainContractAddress.currentRelease()).verifier(), address(testnetVerifier));
 
@@ -327,32 +491,270 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         migration.migrate();
     }
 
+    // ─────────────────────────────── composed payload ───────────────────────────────
+
+    /// @dev The committed cut is composed ON-CHAIN from the pinned inputs — no cut bytes ride the
+    ///      manifest. Against a genesis release whose table carries a row: the pinned engine's
+    ///      `upgrade(proposal)` init over the release's verifier, the version edge, the schedule
+    ///      and the L2 transaction built from the FINAL plan, whose delegate calldata the pinned
+    ///      composer defines from that release and the CTM's Bridgehub.
+    function test_upgradeCut_composesTheEngineInitOverTheProposalBuiltFromThePlan() public {
+        CTMRelease tableRelease = _deployTableRelease();
+        RegistryBootstrapMigration composed = new RegistryBootstrapMigration(_tableManifest(tableRelease));
+        L2UpgradePlan memory plan = composed.l2Plan();
+
+        vm.expectCall(
+            address(delegateComposer),
+            abi.encodeCall(
+                IL2DelegateCalldataComposer.composeDelegateCalldata,
+                (ICTMRelease(address(tableRelease)), address(bridgehub))
+            )
+        );
+        Diamond.DiamondCutData memory cut = composed.upgradeCut();
+
+        ProposedUpgrade memory expected = _expectedProposal(
+            _expectedL2Tx(plan, DELEGATE_CALLDATA),
+            PLAN_UPGRADE_TIMESTAMP
+        );
+        assertEq(
+            keccak256(abi.encode(cut)),
+            keccak256(abi.encode(_expectedCut(expected))),
+            "the cut must be the engine init over the composed proposal"
+        );
+        assertEq(
+            keccak256(abi.encode(composed.proposedUpgrade())),
+            keccak256(abi.encode(expected)),
+            "the served proposal is the one the cut embeds"
+        );
+
+        // The same bytes, read back field by field.
+        assertEq(cut.facetCuts.length, 0, "the bootstrap cut carries no facet cuts");
+        assertEq(cut.initAddress, upgradeEngine, "the init target is the pinned engine");
+        ProposedUpgrade memory decoded = this.decodeUpgradeInit(cut.initCalldata);
+        assertEq(decoded.verifier, address(testnetVerifier), "the verifier comes off the pinned release");
+        assertEq(decoded.newProtocolVersion, newVersion);
+        assertEq(decoded.upgradeTimestamp, PLAN_UPGRADE_TIMESTAMP, "the schedule is the manifest's");
+        assertEq(decoded.bootloaderHash, bytes32(0));
+        assertEq(decoded.defaultAccountHash, bytes32(0));
+        assertEq(decoded.evmEmulatorHash, bytes32(0));
+        _assertComposedL2Tx(decoded.l2ProtocolUpgradeTx, plan, DELEGATE_CALLDATA);
+    }
+
+    /// @dev Field-level read of a composed L2 transaction against the plan it was built from.
+    function _assertComposedL2Tx(
+        L2CanonicalTransaction memory _transaction,
+        L2UpgradePlan memory _plan,
+        bytes memory _expectedDelegateCalldata
+    ) internal {
+        assertEq(_transaction.txType, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE, "the VM's upgrade tx type");
+        assertEq(_transaction.from, uint256(uint160(L2_FORCE_DEPLOYER_ADDR)));
+        assertEq(_transaction.to, uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)));
+        assertEq(_transaction.gasLimit, PRIORITY_TX_MAX_GAS_LIMIT);
+        assertEq(_transaction.gasPerPubdataByteLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
+        (, uint32 minor, ) = SemVer.unpackSemVer(uint96(newVersion));
+        assertEq(_transaction.nonce, minor, "the nonce is the new minor version");
+        assertEq(_transaction.factoryDeps, _plan.factoryDepHashes, "every plan dependency rides the tx");
+        (
+            IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments,
+            address delegateTo,
+            bytes memory delegateCalldata
+        ) = this.decodeUniversalCall(_transaction.data);
+        assertEq(abi.encode(deployments), abi.encode(_plan.deployments), "the tx deploys the FINAL plan");
+        assertEq(delegateTo, _plan.delegateTo, "the tx delegates to the plan's target");
+        assertEq(delegateCalldata, _expectedDelegateCalldata, "the delegate calldata");
+    }
+
+    /// @dev `migrate()` commits exactly the composed cut: the CTM's committed hash for the
+    ///      departing version is `keccak256(abi.encode(upgradeCut()))`, and chains crossing the
+    ///      edge hand those bytes to the legacy cut-taking entrypoint.
+    function test_migrate_commitsTheComposedCutHash() public {
+        CTMRelease tableRelease = _deployTableRelease();
+        RegistryBootstrapMigration composed = _deployAndAuthorize(_tableManifest(tableRelease));
+        L2PlanFixtures.publish(bytecodesSupplier, _tableCodes());
+        uint256 oldVersion = chainContractAddress.protocolVersion();
+        bytes32 expectedHash = keccak256(
+            abi.encode(
+                _expectedCut(
+                    _expectedProposal(_expectedL2Tx(composed.l2Plan(), DELEGATE_CALLDATA), PLAN_UPGRADE_TIMESTAMP)
+                )
+            )
+        );
+
+        vm.expectEmit(true, true, false, false, address(chainContractAddress));
+        emit IChainTypeManager.NewUpgradeCutHash(oldVersion, expectedHash);
+        composed.migrate();
+
+        assertEq(chainContractAddress.upgradeCutHash(oldVersion), expectedHash, "the CTM commits the composed cut");
+        assertEq(
+            chainContractAddress.upgradeCutHash(oldVersion),
+            keccak256(abi.encode(composed.upgradeCut())),
+            "the served cut is the committed one"
+        );
+        assertEq(chainContractAddress.currentRelease(), address(tableRelease), "the table release is pinned");
+        assertEq(chainContractAddress.protocolVersion(), newVersion);
+        composed.validateApplied();
+    }
+
+    /// @dev What the delegate is called WITH is defined by the pinned composer, asked with the
+    ///      genesis release and the CTM's Bridgehub: the composed data decodes to
+    ///      `forceDeployAndUpgradeUniversal(deployments, delegateTo, <composer output>)`.
+    function test_composedL2Tx_callsTheDelegateWithThePinnedComposersCalldata() public {
+        RegistryBootstrapMigration authored = new RegistryBootstrapMigration(_manifestWithL2Plan(_authoredPlan()));
+        L2UpgradePlan memory plan = authored.l2Plan();
+
+        vm.expectCall(
+            address(delegateComposer),
+            abi.encodeCall(
+                IL2DelegateCalldataComposer.composeDelegateCalldata,
+                (ICTMRelease(address(genesisRelease)), address(bridgehub))
+            )
+        );
+        L2CanonicalTransaction memory transaction = authored.proposedUpgrade().l2ProtocolUpgradeTx;
+
+        (
+            IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments,
+            address delegateTo,
+            bytes memory delegateCalldata
+        ) = this.decodeUniversalCall(transaction.data);
+        assertEq(deployments.length, 1, "the delegate's own deployment");
+        assertEq(abi.encode(deployments), abi.encode(plan.deployments));
+        assertEq(delegateTo, plan.delegateTo);
+        assertEq(delegateCalldata, DELEGATE_CALLDATA, "the delegate is called with what the composer composed");
+        assertEq(keccak256(abi.encode(transaction)), keccak256(abi.encode(_expectedL2Tx(plan, DELEGATE_CALLDATA))));
+    }
+
+    /// @dev A zero composer is a legal plan with a delegate target: the delegate is called with
+    ///      EMPTY calldata, there is no composer pin to hold, and the edge commits.
+    function test_composedL2Tx_withoutComposerCallsTheDelegateWithEmptyCalldata() public {
+        AuthoredL2Plan memory plan = _authoredPlan();
+        plan.delegateComposer = _noPin();
+        RegistryBootstrapMigration uncomposed = _deployAndAuthorize(_manifestWithL2Plan(plan));
+        L2UpgradePlan memory served = uncomposed.l2Plan();
+        assertEq(served.delegateComposer, address(0), "no composer is served as zero");
+
+        L2CanonicalTransaction memory transaction = uncomposed.proposedUpgrade().l2ProtocolUpgradeTx;
+        assertEq(transaction.txType, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE, "the plan still has an L2 side");
+        assertEq(
+            transaction.data,
+            abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (served.deployments, served.delegateTo, "")
+            ),
+            "without a composer the delegate is called with empty calldata"
+        );
+
+        uint256 oldVersion = chainContractAddress.protocolVersion();
+        L2PlanFixtures.publish(bytecodesSupplier, L2PlanFixtures.codes(DELEGATE_CODE));
+        uncomposed.migrate();
+        assertEq(chainContractAddress.upgradeCutHash(oldVersion), keccak256(abi.encode(uncomposed.upgradeCut())));
+    }
+
+    // ─────────────────────────────── final L2 plan ───────────────────────────────
+
+    /// @dev The FINAL plan is the genesis release's table-derived set followed by the authored
+    ///      extras; the authored delegate leg and dependencies ride through unchanged.
+    function test_l2Plan_isTheReleaseTableDerivedSetFollowedByTheAuthoredExtras() public {
+        CTMRelease tableRelease = _deployTableRelease();
+        BootstrapManifest memory manifest = _tableManifest(tableRelease);
+        RegistryBootstrapMigration composed = new RegistryBootstrapMigration(manifest);
+
+        L2UpgradePlan memory plan = composed.l2Plan();
+        assertEq(plan.deployments.length, 2, "derived row + authored delegate");
+        // The derived row: the VM's flavor (the release's DiamondInit was built with true), the
+        // member's fixed address, the table's descriptor verbatim.
+        assertTrue(
+            plan.deployments[0].upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
+            "table rows derive the VM's system-proxy upgrade"
+        );
+        assertEq(plan.deployments[0].newAddress, L2_BRIDGEHUB_ADDR, "table rows land on the member's fixed address");
+        assertEq(
+            plan.deployments[0].deployedBytecodeInfo,
+            L2PlanFixtures.systemProxyRow(BRIDGEHUB_IMPL_CODE, SYSTEM_PROXY_CODE)
+        );
+        // The authored extra follows, unchanged.
+        assertEq(
+            abi.encode(plan.deployments[1]),
+            abi.encode(manifest.l2Plan.extraDeployments[0]),
+            "the authored extra is appended after the derived set"
+        );
+        assertEq(plan.delegateTo, manifest.l2Plan.delegateTo);
+        assertEq(plan.delegateTo, plan.deployments[1].newAddress, "the delegate is the authored Unsafe extra");
+        assertEq(plan.delegateComposer, address(delegateComposer), "the pinned composer is served");
+        assertEq(plan.factoryDepHashes, manifest.l2Plan.factoryDepHashes, "dependencies ride through");
+    }
+
+    /// @dev The fixture's default: an empty genesis table and nothing authored is an L1-only
+    ///      edge — the served plan is empty and the composed cut carries the all-zero L2
+    ///      transaction `BaseZkSyncUpgrade` skips.
+    function test_l2Plan_emptyTableAndNoExtrasComposeAnL1OnlyEdge() public view {
+        L2UpgradePlan memory plan = migration.l2Plan();
+        assertEq(plan.deployments.length, 0, "nothing derived, nothing authored");
+        assertEq(plan.delegateTo, address(0));
+        assertEq(plan.delegateComposer, address(0));
+        assertEq(plan.factoryDepHashes.length, 0);
+
+        ProposedUpgrade memory proposal = migration.proposedUpgrade();
+        assertEq(proposal.l2ProtocolUpgradeTx.txType, 0, "no L2 side composes no L2 transaction");
+        assertEq(proposal.verifier, address(testnetVerifier));
+        assertEq(proposal.newProtocolVersion, newVersion);
+        assertEq(proposal.upgradeTimestamp, 0);
+        assertEq(
+            keccak256(abi.encode(migration.upgradeCut())),
+            keccak256(abi.encode(_expectedCut(_expectedProposal(ProposedUpgradeLib.emptyL2CanonicalTransaction(), 0)))),
+            "an L1-only edge is the engine init over an L2-less proposal"
+        );
+    }
+
+    /// @dev An empty table with an authored delegate: the final plan IS the extra, and the edge
+    ///      has an L2 side (the shape the publication gate below runs on).
+    function test_l2Plan_emptyTableWithAuthoredDelegateIsTheExtraAlone() public {
+        RegistryBootstrapMigration authored = new RegistryBootstrapMigration(_manifestWithL2Plan(_authoredPlan()));
+
+        L2UpgradePlan memory plan = authored.l2Plan();
+        assertEq(plan.deployments.length, 1, "the delegate's own deployment and nothing else");
+        assertTrue(
+            plan.deployments[0].upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment
+        );
+        assertEq(
+            plan.deployments[0].newAddress,
+            L2GenesisForceDeploymentsHelper.generateRandomAddress(plan.deployments[0].deployedBytecodeInfo),
+            "the extra sits at its bytecode-derived address"
+        );
+        assertEq(plan.delegateTo, plan.deployments[0].newAddress);
+        assertEq(plan.factoryDepHashes.length, 1);
+        assertEq(plan.factoryDepHashes[0], L2PlanFixtures.factoryDepHash(DELEGATE_CODE));
+        assertEq(
+            authored.proposedUpgrade().l2ProtocolUpgradeTx.txType,
+            ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
+            "an authored delegate alone gives the edge an L2 side"
+        );
+    }
+
     // ─────────────────────────── factory dependency publication ───────────────────────────
 
-    /// @dev The committed cut's L2 transaction fails on every chain unless its factory
+    /// @dev The composed L2 transaction fails on every chain unless the plan's factory
     ///      dependencies are on the CTM's supplier, so the edge refuses to commit until they are —
     ///      and commits, unchanged, once they are published.
-    function test_migrate_requiresCommittedCutFactoryDepsPublished() public {
-        bytes memory l2UpgradeCode = hex"c0de";
-        RegistryBootstrapMigration gated = new RegistryBootstrapMigration(
-            _manifestWithFactoryDeps(L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(l2UpgradeCode)))
-        );
-        vm.prank(governor);
-        chainContractAddress.transferOwnership(address(gated));
-        ecosystemProxyAdmin.transferOwnership(address(gated));
+    function test_migrate_requiresPlanFactoryDepsPublished() public {
+        RegistryBootstrapMigration gated = _deployAndAuthorize(_manifestWithL2Plan(_authoredPlan()));
+        uint256 oldVersion = chainContractAddress.protocolVersion();
         assertEq(chainContractAddress.L1_BYTECODES_SUPPLIER(), address(bytecodesSupplier));
-        assertEq(bytecodesSupplier.evmPublishingBlock(keccak256(l2UpgradeCode)), 0, "fixture: not yet published");
+        assertEq(bytecodesSupplier.evmPublishingBlock(keccak256(DELEGATE_CODE)), 0, "fixture: not yet published");
+        assertEq(gated.l2Plan().factoryDepHashes[0], uint256(keccak256(DELEGATE_CODE)), "the gated dependency");
+        bytes32 composedCutHash = keccak256(abi.encode(gated.upgradeCut()));
 
-        vm.expectRevert(abi.encodeWithSelector(L2BytecodeNotPublished.selector, keccak256(l2UpgradeCode)));
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeNotPublished.selector, keccak256(DELEGATE_CODE)));
         gated.migrate();
         assertFalse(gated.executed(), "a refused edge must stay unspent");
-        assertEq(chainContractAddress.protocolVersion(), 0, "a refused edge must not move the CTM");
+        assertEq(chainContractAddress.protocolVersion(), oldVersion, "a refused edge must not move the CTM");
+        assertEq(chainContractAddress.upgradeCutHash(oldVersion), bytes32(0), "a refused edge commits no cut");
 
-        L2PlanFixtures.publish(bytecodesSupplier, L2PlanFixtures.codes(l2UpgradeCode));
+        L2PlanFixtures.publish(bytecodesSupplier, L2PlanFixtures.codes(DELEGATE_CODE));
 
         gated.migrate();
         assertTrue(gated.executed(), "the same edge applies once the bytecode is published");
         assertEq(chainContractAddress.protocolVersion(), newVersion);
+        assertEq(chainContractAddress.upgradeCutHash(oldVersion), composedCutHash, "publication changes no bytes");
         gated.validateApplied();
     }
 
@@ -499,7 +901,64 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         migration.migrate();
     }
 
+    // ─────────────────────────── engine and composer pins ───────────────────────────
+
+    /// @dev The engine is the code the committed cut delegatecalls into on every chain, so it is
+    ///      held against live code like every other pin. A manifest whose pin disagrees still
+    ///      constructs (pins are checked on the execution path) but refuses to migrate.
+    function test_revertWhen_upgradeEnginePinMismatch() public {
+        BootstrapManifest memory manifest = _manifest();
+        manifest.upgradeEngine.codehash = keccak256("not the engine's code");
+        RegistryBootstrapMigration mispinned = _deployAndAuthorize(manifest);
+        uint256 oldVersion = chainContractAddress.protocolVersion();
+        assertEq(mispinned.upgradeCut().initAddress, upgradeEngine, "the engine is served like any pinned address");
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryCodehashMismatch.selector,
+                upgradeEngine,
+                keccak256("not the engine's code"),
+                upgradeEngine.codehash
+            )
+        );
+        mispinned.migrate();
+        assertFalse(mispinned.executed(), "a refused edge must stay unspent");
+        assertEq(chainContractAddress.upgradeCutHash(oldVersion), bytes32(0), "a refused edge commits no cut");
+    }
+
+    /// @dev The composer is version-specific CODE pinned in place of calldata, so when the plan
+    ///      names one it is held exactly like the engine.
+    function test_revertWhen_delegateComposerPinMismatch() public {
+        AuthoredL2Plan memory plan = _authoredPlan();
+        plan.delegateComposer.codehash = keccak256("not the composer's code");
+        RegistryBootstrapMigration mispinned = _deployAndAuthorize(_manifestWithL2Plan(plan));
+        assertEq(
+            mispinned.l2Plan().delegateComposer,
+            address(delegateComposer),
+            "the composer is served like every other pinned address"
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryCodehashMismatch.selector,
+                address(delegateComposer),
+                keccak256("not the composer's code"),
+                address(delegateComposer).codehash
+            )
+        );
+        mispinned.migrate();
+        assertFalse(mispinned.executed(), "a refused edge must stay unspent");
+    }
+
     // ─────────────────────────── manifest shape ───────────────────────────
+
+    function test_revertWhen_upgradeEngineIsZero() public {
+        BootstrapManifest memory manifest = _manifest();
+        manifest.upgradeEngine = _noPin();
+
+        vm.expectRevert(ZeroAddress.selector);
+        new RegistryBootstrapMigration(manifest);
+    }
 
     /// @dev Two rows for one proxy would BOTH pass the source check (they compare against the same
     ///      pre-migration implementation) and the last would silently win — so the reviewed edge
@@ -558,6 +1017,112 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         vm.expectRevert(ZeroAddress.selector);
         new RegistryBootstrapMigration(manifest);
     }
+
+    // ─────────────────────────── L2 plan shape ───────────────────────────
+    // The same rules {CTMTransition} enforces, run against the COMBINED (derived + authored) plan
+    // at construction, so an edge whose L2 leg cannot execute refuses to exist. One test per rule,
+    // each on an otherwise well-formed plan so exactly that rule fires.
+
+    function test_revertWhen_authoredDeploymentsWithoutDelegateTarget() public {
+        // Force-deployments but no delegate target: `L2ComplexUpgrader` always ends with the final
+        // delegatecall, so a deployments-only plan would construct here yet revert on L2 forever.
+        // (The composer is cleared so ONLY the deployments-without-target rule can fire.)
+        AuthoredL2Plan memory plan = _authoredPlan();
+        plan.delegateTo = address(0);
+        plan.delegateComposer = _noPin();
+
+        BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
+
+        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        new RegistryBootstrapMigration(manifest);
+    }
+
+    /// @dev The genesis release's table decides whether the derived set is empty: against a
+    ///      release with a row, an edge that authors NOTHING still needs its delegate.
+    function test_revertWhen_derivedDeploymentsWithoutDelegateTarget() public {
+        CTMRelease tableRelease = _deployTableRelease();
+        AuthoredL2Plan memory plan = _emptyL2Plan();
+        // The derived row's dependencies are present, so only the shape rule can fire.
+        plan.factoryDepHashes = L2PlanFixtures.factoryDepHashes(
+            L2PlanFixtures.codes(BRIDGEHUB_IMPL_CODE, SYSTEM_PROXY_CODE)
+        );
+        BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
+        manifest.currentRelease = PinnedContract({addr: address(tableRelease), codehash: Utils.releaseCodehash()});
+
+        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        new RegistryBootstrapMigration(manifest);
+    }
+
+    function test_revertWhen_delegateComposerWithoutTarget() public {
+        // Code defining calldata for a delegate call that never happens.
+        AuthoredL2Plan memory plan = _emptyL2Plan();
+        plan.delegateComposer = _pin(address(delegateComposer));
+
+        BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
+
+        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        new RegistryBootstrapMigration(manifest);
+    }
+
+    function test_revertWhen_factoryDepsWithoutL2Side() public {
+        // Dependencies with no transaction to ride in.
+        AuthoredL2Plan memory plan = _emptyL2Plan();
+        plan.factoryDepHashes = L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE));
+
+        BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
+
+        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        new RegistryBootstrapMigration(manifest);
+    }
+
+    /// @dev A plan carrying more factory deps than `BaseZkSyncUpgrade` accepts must be rejected at
+    ///      pin time: otherwise the edge commits and every per-chain upgrade then reverts.
+    function test_revertWhen_factoryDepsExceedTheCap() public {
+        AuthoredL2Plan memory plan = _authoredPlan();
+        // The delegate's real hash stays in front (so the presence rule holds); surplus dummies
+        // push the list one past the cap.
+        uint256[] memory tooManyDeps = new uint256[](MAX_NEW_FACTORY_DEPS + 1);
+        tooManyDeps[0] = plan.factoryDepHashes[0];
+        for (uint256 i = 1; i < tooManyDeps.length; ++i) {
+            tooManyDeps[i] = i;
+        }
+        plan.factoryDepHashes = tooManyDeps;
+
+        BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
+
+        vm.expectRevert(MalformedL2UpgradePlan.selector);
+        new RegistryBootstrapMigration(manifest);
+    }
+
+    function test_revertWhen_extraIsNotAtItsBytecodeDerivedAddress() public {
+        // An extra may only land on the address its own bytecode info derives — never on a fixed
+        // built-in or a table-derived target.
+        AuthoredL2Plan memory plan = _authoredPlan();
+        address derived = plan.extraDeployments[0].newAddress;
+        address elsewhere = makeAddr("elsewhere");
+        plan.extraDeployments[0].newAddress = elsewhere;
+        plan.delegateTo = elsewhere;
+
+        BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
+
+        vm.expectRevert(abi.encodeWithSelector(L2ExtraDeploymentNotBytecodeDerived.selector, derived, elsewhere));
+        new RegistryBootstrapMigration(manifest);
+    }
+
+    function test_revertWhen_delegateIsNotAnExtraDeployment() public {
+        // The code the upgrade delegatecalls into must be pinned by a bytecode hash the manifest
+        // carries: the delegate must be one of the extras.
+        AuthoredL2Plan memory plan = _authoredPlan();
+        address stranger = makeAddr("notAnExtra");
+        plan.delegateTo = stranger;
+
+        BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
+
+        vm.expectRevert(abi.encodeWithSelector(L2DelegateNotAnExtraDeployment.selector, stranger));
+        new RegistryBootstrapMigration(manifest);
+    }
+
+    // ─────────────────────────── version and rows ───────────────────────────
 
     function test_revertWhen_departingVersionIsNotTheExpectedOne() public {
         // A migration pinned for one ecosystem must refuse a differently-versioned one.

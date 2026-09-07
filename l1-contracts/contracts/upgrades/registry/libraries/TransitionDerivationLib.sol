@@ -150,6 +150,23 @@ library TransitionDerivationLib {
         }
     }
 
+    /// @notice The FINAL L2 deployment list: the table-derived set followed by the authored extras
+    ///         (order between deployments is free; the `L2ComplexUpgrader` delegatecall runs last).
+    function combineL2Deployments(
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _derived,
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _extras
+    ) internal pure returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory combined) {
+        combined = new IComplexUpgrader.UniversalContractUpgradeInfo[](_derived.length + _extras.length);
+        uint256 derivedLength = _derived.length;
+        for (uint256 i = 0; i < derivedLength; ++i) {
+            combined[i] = _derived[i];
+        }
+        uint256 extrasLength = _extras.length;
+        for (uint256 i = 0; i < extrasLength; ++i) {
+            combined[derivedLength + i] = _extras[i];
+        }
+    }
+
     /// @dev A release's facet rows with each facet's live self-described routing.
     function _loadRouting(ICTMRelease _release) private view returns (FacetRouting[] memory rows) {
         GenesisFacet[] memory facets = _release.genesisFacets();

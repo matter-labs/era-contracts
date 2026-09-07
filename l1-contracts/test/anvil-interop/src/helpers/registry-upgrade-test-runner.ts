@@ -33,10 +33,14 @@
  *   4. BOOTSTRAP STAGE ("v33 -> v34", see bootstrap-upgrade-stage.ts): cross the one-time entry
  *      edge into the registry model through `RegistryBootstrapMigration` — legacy cut-taking
  *      commit (the ONLY writer of the deprecated `upgradeCutHash`), the CTM implementation swap
- *      as a source-checked proxy row, and the authority handover to both bound executors —
- *      `migrate()` itself completes the executor's accept. Each chain crosses the edge
- *      through the legacy 3-arg `upgradeChainFromVersion`, HANDED the committed cut, exactly
- *      like production pre-v34 chains.
+ *      as a source-checked proxy row, the install of the bootstrap release (the live release's
+ *      pins over the L2 bytecode table built from the CURRENT artifacts, as a production
+ *      prepare deploys it), and the authority handover to both bound executors — `migrate()`
+ *      itself completes the executor's accept. The migration COMPOSES the cut on-chain from
+ *      that release's table plus the authored delegate; each chain crosses the edge through
+ *      the legacy 3-arg `upgradeChainFromVersion`, HANDED that cut, exactly like production
+ *      pre-v34 chains, and the composed L2 transaction is relayed to each L2 stand-in through
+ *      the real `L2ComplexUpgrader`.
  *   5. Execute the registry-driven hop ("v34 -> v35") purely through the executors' fixed entrypoints
  *      (`stage0/stage1/stage2(transition)` on the CTM executor, per-chain
  *      `upgradeChain(transition, chainId)`) — no generic delegatecall modules and no
@@ -65,13 +69,17 @@
  *   contract deployer built-in on the anvil L2 chains is a silent no-op stub (bytecode cannot
  *   be force-deployed from within the EVM). This synthetic minor bump has no L2 init logic, so
  *   a no-op stand-in is the faithful equivalent.
+ * - Bootstrap engine: `BootstrapUpgradeDev` — the production `BootstrapUpgradeZKsyncOS` facet
+ *   reinstall over the plain `DefaultUpgrade` L2 handling, because the ZKsync OS engine's
+ *   per-chain rewrite requires the real `L2V34Upgrade` calldata shape and this harness's delegate
+ *   is the no-op stand-in above.
  *
  * Everything else — ownership handover, migration pausing, transition composition, diamond
  * cuts, `DefaultUpgrade.upgradeFromTransition` init delegatecall, L2 tx commitment,
  * `L2ComplexUpgrader` execution — runs through unpatched production code paths.
  */
 
-import { execSync } from "child_process";
+import { execSync, spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { ethers } from "ethers";
@@ -85,12 +93,17 @@ import {
   getDeterministicCreationBytecode,
 } from "../core/contracts";
 import { createProvider, impersonateAndRun } from "../core/utils";
-import { coreInitArgs, packSemVer, releaseInitArgs, transitionInitArgs } from "./registry-manifest";
+import {
+  coreInitArgs,
+  packSemVer,
+  releaseInitArgs,
+  transitionInitArgs,
+  unsafeForceDeploymentType,
+} from "./registry-manifest";
 import {
   assertBootstrapEndState,
   bootstrapInitArgs,
   bootstrapManifestChecks,
-  buildBootstrapCut,
   buildBootstrapSection,
   crossBootstrapEdgeOnChains,
   handAuthorityToMigration,
@@ -98,6 +111,7 @@ import {
 } from "./bootstrap-upgrade-stage";
 import type { ChainRole } from "../core/types";
 import { clearGenesisUpgradeTxHash, selectUpgradeChains, traceFailedTx } from "./upgrade-test-utils";
+import { decodeUpgradeTxData, deployL2Contracts } from "./pipeline-upgrade-runner";
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -131,6 +145,17 @@ const STALE_REGISTRIES_HINT =
 // a codehash/bytecode-hash for MUST be deployed from this build, otherwise a manifest
 // regenerated on one machine would fail verifyAll() on another.
 const DETERMINISTIC_FOUNDRY_PROFILE = "registry-deterministic";
+
+// The forge script emitting the L2 inventory of the CURRENT artifacts (the release's L2 bytecode
+// table and the factory dependencies a CTM prepare publishes). The bootstrap release is built
+// from it — the same inventory the production prepare deploys its fresh release with — so the
+// derived L2 rows, the published preimages and the anvil L2 stand-ins all describe ONE build.
+const L2_INVENTORY_SCRIPT = "test/foundry/l1/integration/_EmitL2BytecodeInventory.s.sol:EmitL2BytecodeInventory";
+const L2_INVENTORY_OUT_REL = "script-out/registry-harness-l2-inventory.json";
+
+// Mirrors BytecodePublisher.MAX_BATCH_SIZE: the byte budget of one `publishEVMBytecodes` call.
+const MAX_PUBLISH_BATCH_BYTES = 126_000;
+const PUBLISH_GAS_LIMIT = 15_000_000;
 const DETERMINISTIC_SOURCES = [
   "contracts/state-transition/chain-deps/facets/Admin.sol",
   "contracts/state-transition/chain-deps/facets/Getters.sol",
@@ -149,10 +174,11 @@ const DETERMINISTIC_SOURCES = [
   "contracts/upgrades/registry/objects/CTMTransition.sol",
   "contracts/upgrades/registry/objects/CoreRegistry.sol",
   // Bootstrap stage: the manifest pins the fresh CTM implementation's codehash (proxy row) and
-  // the bootstrap engine's (`upgradeCutInitCodehash`); the legacy facet rides along for uniform
+  // the bootstrap engine's (`upgradeEngine`); the legacy facet rides along for uniform
   // reproducibility of the committed addresses.
   "contracts/state-transition/ZKsyncOSChainTypeManager.sol",
   "contracts/dev-contracts/test/LegacyTestAdminFacet.sol",
+  "contracts/dev-contracts/BootstrapUpgradeDev.sol",
 ];
 
 // Mirror L2GenesisForceDeploymentsHelper.generateRandomAddress: the delegate must be
@@ -268,6 +294,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     // ── 3. Deploy the executors + new implementations ──
     console.log("\n── Deploying executors and new-version implementations ──");
     buildDeterministicArtifacts();
+    const l2Inventory = emitL2BytecodeInventory();
     const deployed = await deployUpgradeMachinery(deployer, {
       l1ChainId,
       rollupDAManager: live.rollupDAManager,
@@ -277,7 +304,14 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       ctm: ctmAddresses.chainTypeManager,
       ecosystemProxyAdmin: live.ecosystemProxyAdmin,
       ctmProxyAdmin: live.ctmProxyAdmin,
+      l2BytecodeInfos: l2Inventory.rows,
     });
+    // The bootstrap installs this release under the CTM's provenance anchor, like every release.
+    assertEq(
+      ethers.utils.keccak256(await l1Provider.getCode(deployed.bootstrapRelease)),
+      ctmAddresses.releaseCodehash,
+      "bootstrap release runs the anchored release code"
+    );
 
     // ── 4. Regenerate (EMIT mode) or validate (CONSUME mode) the committed manifest, then
     //       deploy + initialize the release/transition/core registry from it ──
@@ -326,8 +360,8 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       assertTrue(await coreRegistryContract.verifyAll(), "core registry verifyAll() passes on the live deployment");
       assertEq(
         await transitionContract.fromRelease(),
-        live.fromRelease,
-        "transition departs from the CTM's live current release"
+        deployed.bootstrapRelease,
+        "transition departs from the release the bootstrap installs"
       );
       assertEq(
         (await transitionContract.newProtocolVersion()).toString(),
@@ -388,18 +422,32 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       getCreationBytecode("RegistryBootstrapMigration"),
       deployer
     );
+    // Every bytecode the composed L2 leg installs must be published before the edge commits: the
+    // inventory a CTM prepare publishes (the table's bytecodes and the baselines) plus the mock
+    // delegate the harness adds — the plan's factory dependencies are exactly these.
+    const factoryDeps = [...l2Inventory.factoryDeps, getDeterministicBytecode("MockContractDeployer")];
+    const supplier = new ethers.Contract(await ctm.L1_BYTECODES_SUPPLIER(), getAbi("BytecodesSupplier"), deployer);
+    await publishFactoryDeps(l1Provider, supplier, factoryDeps);
+    console.log(`  ✓ ${factoryDeps.length} factory dependencies published on the CTM's supplier`);
+    const codehashOf = async (addr: string): Promise<string> => ethers.utils.keccak256(await l1Provider.getCode(addr));
     const migration = await migrationFactory.deploy(
       await bootstrapInitArgs(l1Provider, manifestJson, packSemVer, {
         ctmProxy: ctmAddresses.chainTypeManager,
         proxyAdmin: live.ctmProxyAdmin,
         releaseCodehash: ctmAddresses.releaseCodehash,
-        currentRelease: live.fromRelease,
+        currentRelease: deployed.bootstrapRelease,
         ctmExecutor: deployed.ctmExecutor,
         upgradeTimer: upgradeTimer.address,
+        delegateComposer: { addr: deployed.delegateComposer, codehash: await codehashOf(deployed.delegateComposer) },
+        l2Delegate: upgradeDelegateInfo(),
+        unsafeDeploymentType: unsafeForceDeploymentType(),
+        factoryDepHashes: factoryDeps.map((bytecode) => ethers.utils.keccak256(bytecode)),
       })
     );
     await migration.deployed();
     console.log(`  RegistryBootstrapMigration: ${migration.address}`);
+    // The cut chains take by hand is the one the migration composes on-chain — nothing hand-built.
+    const bootstrapCut = await migration.upgradeCut();
 
     await handAuthorityToMigration(
       l1Provider,
@@ -420,8 +468,32 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     // clear it exactly like the pipeline upgrade runner does (see module docs). Once, before the first bump.
     await clearGenesisUpgradeTxHash(l1Provider, upgradeChains);
 
-    const bootstrapCut = buildBootstrapCut(manifestJson, packSemVer);
     await crossBootstrapEdgeOnChains(l1Provider, upgradeChains, live.oldVersion, bootstrapCut, sendAndCheck);
+    // The bootstrap's L2 leg is real (composed from the bootstrap release's table plus the mock
+    // delegate): relay it to each chain like the transition's, then clear the pending hash the
+    // same way the harness does for the genesis transaction — no batches execute on these chains.
+    // The anvil L2 stand-ins have no ZKsync OS deployer, so each table row's implementation and
+    // proxy shell are placed the way the pipeline runner does before the real `L2ComplexUpgrader`
+    // performs the system-proxy upgrades.
+    console.log("\n── Relaying the bootstrap's composed L2 upgrade transaction ──");
+    const bootstrapProposed = await migration.proposedUpgrade();
+    const bootstrapL2Call = decodeUpgradeTxData(bootstrapProposed.l2ProtocolUpgradeTx.data);
+    for (const chain of upgradeChains) {
+      const l2Chain = anvilManager.getL2Chains().find((c) => c.chainId === chain.chainId);
+      if (!l2Chain) {
+        throw new Error(`Missing running L2 chain ${chain.chainId}`);
+      }
+      const l2Provider = createProvider(l2Chain.rpcUrl);
+      await deployL2Contracts(
+        l2Provider,
+        bootstrapL2Call.forceDeployEntries,
+        bootstrapL2Call.delegateTo,
+        true,
+        "MockContractDeployer"
+      );
+      await relayL2UpgradeTx(l2Provider, bootstrapProposed.l2ProtocolUpgradeTx.data, chain.chainId);
+    }
+    await clearGenesisUpgradeTxHash(l1Provider, upgradeChains);
 
     console.log("\n── Verifying bootstrap end state ──");
     await assertBootstrapEndState(
@@ -476,14 +548,6 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       l1Provider,
       ecoExecutor.setCTMExecutorAuthorization(deployed.ctmExecutor, true, { gasLimit: DEFAULT_GAS_LIMIT }),
       "ecoExecutor.setCTMExecutorAuthorization(ctmExecutor)"
-    );
-    // Publish the actual delegate bytecode through the supplier before committing the edge.
-    // The transition carries this same hash in its factory dependencies.
-    const supplier = new ethers.Contract(await ctm.L1_BYTECODES_SUPPLIER(), getAbi("BytecodesSupplier"), deployer);
-    await sendAndCheck(
-      l1Provider,
-      supplier.publishEVMBytecode(getDeterministicBytecode("MockContractDeployer")),
-      "BytecodesSupplier.publishEVMBytecode(upgrade delegate)"
     );
     // The three-stage lifecycle. Stage 1 applies the ecosystem leg FIRST, then the CTM leg —
     // the order the merged governance bundle always had.
@@ -633,7 +697,7 @@ type LiveUpgradeInputs = {
   ctmImplOld: string;
   /** The CTM proxy's own ProxyAdmin — the authority the bootstrap manifest names. */
   ctmProxyAdmin: string;
-  /** The CTM's live `currentRelease` — the release edge the transition must depart from. */
+  /** The CTM's live (pre-bootstrap) `currentRelease` — the source of the bootstrap release's pins. */
   fromRelease: string;
   oldAdminFacet: string;
   adminSelectors: string[];
@@ -790,9 +854,13 @@ type DeployedMachinery = {
   ctmExecutor: string;
   ecoExecutor: string;
   composerHarness: string;
+  /** The harness's fixed no-op delegate-calldata composer, pinned by both edges' L2 plans. */
+  delegateComposer: string;
   legacyAdminFacet: string;
   bootstrapEngine: string;
   ctmImplNew: string;
+  /** The release the bootstrap edge installs — and the release the transition departs from. */
+  bootstrapRelease: string;
   newAdminFacet: string;
   newGettersFacet: string;
   newExecutorFacet: string;
@@ -816,6 +884,8 @@ async function deployUpgradeMachinery(
     ctm: string;
     ecosystemProxyAdmin: string;
     ctmProxyAdmin: string;
+    /** `ReleaseManifest.l2BytecodeInfos` of the bootstrap release (see emitL2BytecodeInventory). */
+    l2BytecodeInfos: string[];
   }
 ): Promise<DeployedMachinery> {
   const deployFrom = async (
@@ -858,7 +928,7 @@ async function deployUpgradeMachinery(
     params.ecosystemProxyAdmin,
     coreRegistryCodehash,
   ]);
-  return {
+  const machinery = {
     transitionCodehash,
     coreRegistryCodehash,
     // The deployer plays the role of protocol governance; each executor is BOUND to its
@@ -874,6 +944,16 @@ async function deployUpgradeMachinery(
     ]),
     ecoExecutor,
     composerHarness: await deploy("RegistryComposerHarness", []),
+    // Pinned CODE defines the delegate calldata. The mock delegate deliberately has no fallback,
+    // so the composed call names its explicit no-op method and a stale selector still fails.
+    delegateComposer: await deploy("FixedDelegateCalldataComposer", [
+      new ethers.utils.Interface(getAbi("MockContractDeployer")).encodeFunctionData("setBytecodeDetailsEVM", [
+        upgradeDelegateInfo().address,
+        ethers.utils.keccak256(getDeterministicBytecode("MockContractDeployer")),
+        ethers.utils.hexDataLength(getDeterministicBytecode("MockContractDeployer")),
+        ethers.utils.keccak256(getDeterministicBytecode("MockContractDeployer")),
+      ]),
+    ]),
     // The synthetic v-bump's "changed facet": a fresh AdminFacet built from the same source,
     // constructed with the live RollupDAManager so DA-validation behavior is unchanged.
     newAdminFacet: await deployPinned("AdminFacet", [params.l1ChainId, params.rollupDAManager]),
@@ -902,8 +982,20 @@ async function deployUpgradeMachinery(
     // ── Bootstrap stage (appended: deploy order is nonce-load-bearing, see NOTE above) ──
     // The legacy cut-taking entrypoint the harness installs pre-bootstrap.
     legacyAdminFacet: await deployPinned("LegacyTestAdminFacet", []),
-    // The bootstrap cut's init contract — its codehash is the manifest's `upgradeCutInitCodehash`.
-    bootstrapEngine: await deployPinned("DefaultUpgrade", []),
+  };
+  // The release the bootstrap installs: the production shape (a fresh release carrying the full
+  // L2 bytecode table of the build the prepare publishes), with the live release's facets,
+  // verifier, DiamondInit and genesis data — nothing about the chains changes at this edge.
+  const bootstrapRelease = await deployPinned("CTMRelease", [
+    await bootstrapReleaseManifest(deployer.provider, await liveCtm.currentRelease(), params.l2BytecodeInfos),
+  ]);
+  return {
+    ...machinery,
+    bootstrapRelease,
+    // The bootstrap engine, pinned by the manifest's `upgradeEngine`: the production facet
+    // reinstall from the release it is bound to (which removes the legacy entrypoint above) over
+    // the plain L2 handling — see BootstrapUpgradeDev for why not the ZKsync OS engine.
+    bootstrapEngine: await deployPinned("BootstrapUpgradeDev", [bootstrapRelease]),
     // The bootstrap's proxy row: the CTM's own implementation swap, built with live immutables.
     ctmImplNew: await deployPinned("ZKsyncOSChainTypeManager", [
       params.bridgehub,
@@ -912,6 +1004,103 @@ async function deployUpgradeMachinery(
       await liveCtm.PERMISSIONLESS_VALIDATOR(),
     ]),
   };
+}
+
+/**
+ * The bootstrap release's `ReleaseManifest`: the live release's pins over `l2BytecodeInfos` (see
+ * deployUpgradeMachinery). Read from the live object rather than from the committed manifest:
+ * the table carries the build-specific bytecode hashes of the current artifacts, which are not
+ * cross-machine-stable and so never committed.
+ */
+async function bootstrapReleaseManifest(
+  provider: ethers.providers.Provider,
+  liveRelease: string,
+  l2BytecodeInfos: string[]
+): Promise<unknown> {
+  const release = new ethers.Contract(liveRelease, getAbi("CTMRelease"), provider);
+  const manifest = await release.getManifest();
+  const pin = (p: { addr: string; codehash: string }) => ({ addr: p.addr, codehash: p.codehash });
+  return {
+    diamondInit: pin(manifest.diamondInit),
+    verifier: pin(manifest.verifier),
+    genesisUpgrade: pin(manifest.genesisUpgrade),
+    genesisFacets: manifest.genesisFacets.map(
+      (f: { facet: { addr: string; codehash: string }; isFreezable: boolean }) => ({
+        facet: pin(f.facet),
+        isFreezable: f.isFreezable,
+      })
+    ),
+    genesis: {
+      fixedForceDeploymentsData: manifest.genesis.fixedForceDeploymentsData,
+      genesisBatchHash: manifest.genesis.genesisBatchHash,
+      genesisBatchCommitment: manifest.genesis.genesisBatchCommitment,
+      genesisIndexRepeatedStorageChanges: manifest.genesis.genesisIndexRepeatedStorageChanges,
+    },
+    l2BytecodeInfos,
+  };
+}
+
+type L2BytecodeInventory = {
+  /** `ReleaseManifest.l2BytecodeInfos`: the enum-indexed table, empty rows as `0x`. */
+  rows: string[];
+  /** Every bytecode a CTM prepare publishes on the supplier: the table's and the baselines. */
+  factoryDeps: string[];
+};
+
+/** Runs the inventory script (see L2_INVENTORY_SCRIPT) against the current default-profile build. */
+function emitL2BytecodeInventory(): L2BytecodeInventory {
+  const outPath = path.join(l1ContractsDir, L2_INVENTORY_OUT_REL);
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  console.log("  emitting the L2 bytecode inventory from the current artifacts…");
+  const result = spawnSync("forge", ["script", L2_INVENTORY_SCRIPT, "--sig", "run(string)", outPath, "--ffi"], {
+    cwd: l1ContractsDir,
+    stdio: "inherit",
+  });
+  if (result.status !== 0) {
+    throw new Error(`${L2_INVENTORY_SCRIPT} failed with status ${result.status}`);
+  }
+  const inventory = JSON.parse(fs.readFileSync(outPath, "utf-8")) as L2BytecodeInventory;
+  fs.rmSync(outPath);
+  return inventory;
+}
+
+/**
+ * Publishes `bytecodes` on the CTM's supplier (skipping ones already there), batched by the
+ * publisher's byte budget — the L1 record `RegistryBootstrapMigration.migrate()` requires for
+ * every factory dependency of the composed L2 transaction.
+ */
+async function publishFactoryDeps(
+  l1Provider: ethers.providers.JsonRpcProvider,
+  supplier: ethers.Contract,
+  bytecodes: string[]
+): Promise<void> {
+  let batch: string[] = [];
+  let batchBytes = 0;
+  const flush = async () => {
+    if (batch.length === 0) {
+      return;
+    }
+    await sendAndCheck(
+      l1Provider,
+      supplier.publishEVMBytecodes(batch, { gasLimit: PUBLISH_GAS_LIMIT }),
+      `BytecodesSupplier.publishEVMBytecodes(${batch.length} bytecodes)`
+    );
+    batch = [];
+    batchBytes = 0;
+  };
+  for (const bytecode of bytecodes) {
+    const publishedAt: ethers.BigNumber = await supplier.evmPublishingBlock(ethers.utils.keccak256(bytecode));
+    if (!publishedAt.isZero()) {
+      continue;
+    }
+    const size = ethers.utils.hexDataLength(bytecode);
+    if (batchBytes + size > MAX_PUBLISH_BATCH_BYTES) {
+      await flush();
+    }
+    batch.push(bytecode);
+    batchBytes += size;
+  }
+  await flush();
 }
 
 // ── Manifest generation ──────────────────────────────────────────────
@@ -1027,11 +1216,11 @@ async function buildRegistryManifest(
         },
         // How the current release becomes that release. The `newRelease` edge is the deployed
         // CTMRelease address (nonce-deterministic, passed by the runner at initialization);
-        // `fromRelease` is the CTM's live current release.
+        // `fromRelease` is the release the bootstrap edge installs (nonce-deterministic too).
         transition: {
           // The audited release code BOTH edges must run (the CTM's own provenance anchor).
           releaseCodehash: releaseCodehashAnchor,
-          fromRelease: live.fromRelease,
+          fromRelease: deployed.bootstrapRelease,
           upgradeEngine: {
             address: deployed.newDefaultUpgrade,
             codehash: await codehash(deployed.newDefaultUpgrade),
@@ -1126,7 +1315,7 @@ function assertCommittedManifestMatchesLiveDeployment(
       deployed.newMessageRootImpl,
     ],
     ["ctm.ctmProxy", ctm?.ctmProxy, ctmProxy],
-    ["ctm.transition.fromRelease", ctm?.transition?.fromRelease, live.fromRelease],
+    ["ctm.transition.fromRelease", ctm?.transition?.fromRelease, deployed.bootstrapRelease],
     ["ctm.transition.releaseCodehash", ctm?.transition?.releaseCodehash, releaseCodehashAnchor],
     ["ctm.release.verifier.address", ctm?.release?.verifier?.address, deployed.newVerifier],
     ["ctm.transition.upgradeEngine.address", ctm?.transition?.upgradeEngine?.address, deployed.newDefaultUpgrade],
@@ -1204,24 +1393,6 @@ async function deployUpgradeObjectsFromManifest(
   );
   const upgradeTimer = await timerFactory.deploy(0, 0, deployed.ctmExecutor, deployer.address);
   await upgradeTimer.deployed();
-  // The delegate's calldata is defined by pinned CODE, not authored bytes: a fixed composer
-  // standing in for a version-specific one. The mock deliberately has no fallback, so the
-  // composed call names its explicit no-op method and a stale selector still fails.
-  const composerFactory = new ethers.ContractFactory(
-    getAbi("FixedDelegateCalldataComposer"),
-    getCreationBytecode("FixedDelegateCalldataComposer"),
-    deployer
-  );
-  const delegateBytecode = getDeterministicBytecode("MockContractDeployer");
-  const delegateComposer = await composerFactory.deploy(
-    new ethers.utils.Interface(getAbi("MockContractDeployer")).encodeFunctionData("setBytecodeDetailsEVM", [
-      upgradeDelegateInfo().address,
-      ethers.utils.keccak256(delegateBytecode),
-      ethers.utils.hexDataLength(delegateBytecode),
-      ethers.utils.keccak256(delegateBytecode),
-    ])
-  );
-  await delegateComposer.deployed();
   const pin = async (addr: string): Promise<{ addr: string; codehash: string }> => ({
     addr,
     codehash: ethers.utils.keccak256(await deployer.provider.getCode(addr)),
@@ -1236,7 +1407,7 @@ async function deployUpgradeObjectsFromManifest(
         release,
         await pin(coreRegistry),
         await pin(upgradeTimer.address),
-        await pin(delegateComposer.address)
+        await pin(deployed.delegateComposer)
       ),
       deployed.transitionCodehash
     ),

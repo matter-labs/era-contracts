@@ -11,8 +11,9 @@ import {CTMUpgrade_v34} from "deploy-scripts/upgrade/v34/CTMUpgrade_v34.s.sol";
 ///         (`--core-script-path` / `--ctm-script-path` overrides). Repoint the parents when the
 ///         next version's scripts land — the runner itself is version-independent.
 
-/// @dev CTM upgrade for the harness: skips factory-deps validation (zkout bytecodes are not
-///      published on the anvil fixtures — they are already on L2 via `anvil_setCode`), reads
+/// @dev CTM upgrade for the harness: publishes the factory dependencies for real (the
+///      bootstrap object refuses a plan whose bytecodes are not on the CTM's supplier — the
+///      anvil L2 stand-ins get theirs via `anvil_setCode`, but the L1 record must exist), reads
 ///      the upgrade target version from the upgrade input (the production flow reads it from
 ///      the genesis config, which pins the release this branch is built against; a harness
 ///      scenario upgrading an older fixture onto this release has to say where it is going),
@@ -53,11 +54,6 @@ contract CTMUpgradeForTests is CTMUpgrade_v34 {
         if (upgradeToml.keyExists("$.contracts.new_protocol_version")) {
             setNewProtocolVersion(upgradeToml.readUint("$.contracts.new_protocol_version"));
         }
-    }
-
-    /// @dev Skip loading zkout bytecodes — they are already on L2 via `anvil_setCode`.
-    function publishBytecodes() public override {
-        // no-op
     }
 
     /// @dev Replaces the heavy state_transition section with the two fields the anvil-interop

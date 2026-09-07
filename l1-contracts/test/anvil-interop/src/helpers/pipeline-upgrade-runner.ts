@@ -752,7 +752,7 @@ async function prepareAndRelayL2Upgrade(
 
 // ── L2 contract deployment ───────────────────────────────────────────
 
-async function deployL2Contracts(
+export async function deployL2Contracts(
   l2Provider: ethers.providers.JsonRpcProvider,
   forceDeployEntries: ForceDeployEntry[],
   delegateTo: string,
@@ -858,14 +858,14 @@ async function deployBehindSystemProxy(
 // ── Calldata decoding ────────────────────────────────────────────────
 
 /** Decoded force deployment entry with upgrade type metadata. */
-interface ForceDeployEntry {
+export interface ForceDeployEntry {
   address: string;
   upgradeType: number; // ContractUpgradeType enum value
   deployedBytecodeInfo?: string;
 }
 
 /** Decode the ComplexUpgrader calldata (any variant) into its components. */
-function decodeUpgradeTxData(upgradeTxData: string): {
+export function decodeUpgradeTxData(upgradeTxData: string): {
   forceDeployEntries: ForceDeployEntry[];
   delegateTo: string;
   innerCalldata: string;
