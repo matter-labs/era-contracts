@@ -38,7 +38,7 @@
  *      through the legacy 3-arg `upgradeChainFromVersion`, HANDED the committed cut, exactly
  *      like production pre-v34 chains.
  *   5. Execute the registry-driven hop ("v34 -> v35") purely through the executors' fixed entrypoints
- *      (`applyCTMUpgrade(transition)`, `applyL1Upgrade(coreRegistry)`, per-chain
+ *      (`stage0/stage1/stage2(transition)` on the CTM executor, per-chain
  *      `upgradeChain(transition, chainId)`) — no generic delegatecall modules and no
  *      stage-0/1/2 governance calldata anywhere. The schedule (upgrade timestamp, old-version
  *      deadline) lives IN the transition, not in call arguments.
@@ -155,12 +155,18 @@ const DETERMINISTIC_SOURCES = [
   "contracts/dev-contracts/test/LegacyTestAdminFacet.sol",
 ];
 
-// Fixed L2 address the transition pins for the upgrade's L2 delegate target (and its unsafe
-// force-deployment entry). In production this is where the per-upgrade L2 upgrade
-// implementation gets force-deployed by the same transaction; the harness places a no-op
-// contract there via anvil_setCode (see module docs above). Any free address works — this one
-// sits far away from the reserved system/genesis ranges (0x8000... / 0x10000...).
-const L2_UPGRADE_DELEGATE_ADDR = "0x00000000000000000000000000000000000ab001";
+// Mirror L2GenesisForceDeploymentsHelper.generateRandomAddress: the delegate must be
+// installed at the address committed by its descriptor, including in the Anvil stand-in.
+function upgradeDelegateInfo(): { deployedBytecodeInfo: string; address: string } {
+  const bytecode = getDeterministicBytecode("MockContractDeployer");
+  const hash = ethers.utils.keccak256(bytecode);
+  const deployedBytecodeInfo = ethers.utils.defaultAbiCoder.encode(
+    ["bytes32", "uint32", "bytes32"],
+    [hash, ethers.utils.hexDataLength(bytecode), hash]
+  );
+  const addressHash = ethers.utils.keccak256(ethers.utils.hexConcat([ethers.constants.HashZero, deployedBytecodeInfo]));
+  return { deployedBytecodeInfo, address: ethers.utils.getAddress(ethers.utils.hexDataSlice(addressHash, 12)) };
+}
 
 // AdminFacet.acceptAdmin() — used to locate the live AdminFacet on the chain diamonds.
 const ACCEPT_ADMIN_FRAGMENT = "acceptAdmin";
@@ -358,7 +364,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     );
 
     // One migration-pause window across both edges (`setNewVersionUpgrade` inside `migrate()`
-    // and `applyCTMUpgrade` both require it).
+    // and the CTM leg of `stage1` both require it).
     console.log("\n── Pausing chain migrations ──");
     await setMigrationPaused(l1Provider, live.chainAssetHandler, true);
 
@@ -454,20 +460,46 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       console.log("  ✓ ecosystem ProxyAdmin owned by ecoExecutor");
     }
 
+    // Bootstrap JOIN (production: two explicit governance calls in the v34 stage-2 bundle): the
+    // CTM executor holds migrations paused through the shared ChainAssetHandler, and drives the
+    // ecosystem leg of its own transitions through the ecosystem executor.
+    const cah = new ethers.Contract(live.chainAssetHandler, getAbi("L1ChainAssetHandler"), l1Provider);
+    const cahOwner: string = await cah.owner();
+    await impersonateAndRun(l1Provider, cahOwner, async (signer) => {
+      await sendAndCheck(
+        l1Provider,
+        cah.connect(signer).setUpgradePauser(deployed.ctmExecutor, true, { gasLimit: DEFAULT_GAS_LIMIT }),
+        "ChainAssetHandler.setUpgradePauser(ctmExecutor)"
+      );
+    });
     await sendAndCheck(
       l1Provider,
-      ctmExecutor.applyCTMUpgrade(objects.transition, { gasLimit: DEFAULT_GAS_LIMIT }),
-      "ctmExecutor.applyCTMUpgrade(transition)"
+      ecoExecutor.setCTMExecutorAuthorization(deployed.ctmExecutor, true, { gasLimit: DEFAULT_GAS_LIMIT }),
+      "ecoExecutor.setCTMExecutorAuthorization(ctmExecutor)"
     );
-    console.log("  ✓ applyCTMUpgrade executed");
-
+    // Publish the actual delegate bytecode through the supplier before committing the edge.
+    // The transition carries this same hash in its factory dependencies.
+    const supplier = new ethers.Contract(await ctm.L1_BYTECODES_SUPPLIER(), getAbi("BytecodesSupplier"), deployer);
     await sendAndCheck(
       l1Provider,
-      ecoExecutor.applyL1Upgrade(objects.coreRegistry, { gasLimit: DEFAULT_GAS_LIMIT }),
-      "ecoExecutor.applyL1Upgrade(coreRegistry)"
+      supplier.publishEVMBytecode(getDeterministicBytecode("MockContractDeployer")),
+      "BytecodesSupplier.publishEVMBytecode(upgrade delegate)"
     );
-    console.log("  ✓ applyL1Upgrade executed");
-
+    // The three-stage lifecycle. Stage 1 applies the ecosystem leg FIRST, then the CTM leg —
+    // the order the merged governance bundle always had.
+    await sendAndCheck(
+      l1Provider,
+      ctmExecutor.stage0(objects.transition, { gasLimit: DEFAULT_GAS_LIMIT }),
+      "ctmExecutor.stage0(transition)"
+    );
+    assertTrue(await cah.upgradePauseHeld(deployed.ctmExecutor), "stage 0 holds the migration pause");
+    console.log("  ✓ stage0 executed (pending transition recorded, pause held, timer started)");
+    await sendAndCheck(
+      l1Provider,
+      ctmExecutor.stage1(objects.transition, { gasLimit: DEFAULT_GAS_LIMIT }),
+      "ctmExecutor.stage1(transition)"
+    );
+    console.log("  ✓ stage1 executed (ecosystem rows, CTM leg, version commit, release pin)");
     for (const chain of upgradeChains) {
       await sendAndCheck(
         l1Provider,
@@ -477,7 +509,16 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       console.log(`  ✓ chain ${chain.chainId} upgraded`);
     }
 
-    // ── 8. Unpause migrations (production stage-2 equivalent) ──
+    // ── 8. Stage 2: completion checks, then the executor releases ITS hold; the harness's own
+    //       owner pause from the bootstrap window is lifted by the owner, as in production ──
+    await sendAndCheck(
+      l1Provider,
+      ctmExecutor.stage2(objects.transition, { gasLimit: DEFAULT_GAS_LIMIT }),
+      "ctmExecutor.stage2(transition)"
+    );
+    assertTrue(!(await cah.upgradePauseHeld(deployed.ctmExecutor)), "stage 2 released the executor's hold");
+    assertEq(await ctmExecutor.pendingTransition(), ethers.constants.AddressZero, "stage 2 cleared the lifecycle slot");
+    console.log("  ✓ stage2 executed (applied-state checks, hold released)");
     console.log("\n── Unpausing chain migrations ──");
     await setMigrationPaused(l1Provider, live.chainAssetHandler, false);
 
@@ -810,6 +851,13 @@ async function deployUpgradeMachinery(
   // release was deployed from, so all three anchors agree).
   const transitionCodehash = ethers.utils.keccak256(getDeterministicBytecode("CTMTransition"));
   const coreRegistryCodehash = ethers.utils.keccak256(getDeterministicBytecode("CoreRegistry"));
+  // Deployed before the CTM executor, which is BOUND to it (the ecosystem leg of every
+  // transition runs through it).
+  const ecoExecutor = await deploy("EcosystemUpgradeExecutor", [
+    deployer.address,
+    params.ecosystemProxyAdmin,
+    coreRegistryCodehash,
+  ]);
   return {
     transitionCodehash,
     coreRegistryCodehash,
@@ -821,13 +869,10 @@ async function deployUpgradeMachinery(
       deployer.address,
       params.ctm,
       params.ctmProxyAdmin,
+      ecoExecutor,
       transitionCodehash,
     ]),
-    ecoExecutor: await deploy("EcosystemUpgradeExecutor", [
-      deployer.address,
-      params.ecosystemProxyAdmin,
-      coreRegistryCodehash,
-    ]),
+    ecoExecutor,
     composerHarness: await deploy("RegistryComposerHarness", []),
     // The synthetic v-bump's "changed facet": a fresh AdminFacet built from the same source,
     // constructed with the live RollupDAManager so DA-validation behavior is unchanged.
@@ -884,12 +929,7 @@ async function buildRegistryManifest(
   // implementation at the pinned delegate address, then delegatecall it — the exact shape of a
   // production ZKsyncOS upgrade transaction. The bytecode info describes the no-op stand-in
   // the harness places at that address (see relayL2UpgradeTx).
-  const delegateBytecode = getDeterministicBytecode("MockContractDeployer");
-  const delegateCodeHash = ethers.utils.keccak256(delegateBytecode);
-  const deployedBytecodeInfo = ethers.utils.defaultAbiCoder.encode(
-    ["bytes32", "uint256", "bytes32"],
-    [delegateCodeHash, ethers.utils.hexDataLength(delegateBytecode), delegateCodeHash]
-  );
+  const { deployedBytecodeInfo, address: delegateAddress } = upgradeDelegateInfo();
 
   // Production freezability flags (DeployCTMUtils facet cuts).
   const freezability: Record<string, boolean> = {
@@ -1006,12 +1046,22 @@ async function buildRegistryManifest(
               {
                 upgradeType: "ZKsyncOSUnsafeForceDeployment",
                 deployedBytecodeInfo,
-                newAddress: L2_UPGRADE_DELEGATE_ADDR,
+                newAddress: delegateAddress,
               },
             ],
-            delegateTo: L2_UPGRADE_DELEGATE_ADDR,
-            delegateCalldata: "0x",
-            factoryDepHashes: [],
+            delegateTo: delegateAddress,
+            // The mock deliberately has no fallback. Call its explicit no-op method so stale
+            // selectors still fail, while isolating migration semantics from this lifecycle test.
+            delegateCalldata: new ethers.utils.Interface(getAbi("MockContractDeployer")).encodeFunctionData(
+              "setBytecodeDetailsEVM",
+              [
+                delegateAddress,
+                ethers.utils.keccak256(getDeterministicBytecode("MockContractDeployer")),
+                ethers.utils.hexDataLength(getDeterministicBytecode("MockContractDeployer")),
+                ethers.utils.keccak256(getDeterministicBytecode("MockContractDeployer")),
+              ]
+            ),
+            factoryDepHashes: [ethers.utils.keccak256(getDeterministicBytecode("MockContractDeployer"))],
           },
         },
       },
@@ -1128,7 +1178,7 @@ async function deployUpgradeObjectsFromManifest(
   manifestPath: string,
   deployed: DeployedMachinery,
   releaseCodehashAnchor: string
-): Promise<{ release: string; transition: string; coreRegistry: string }> {
+): Promise<{ release: string; transition: string; coreRegistry: string; upgradeTimer: string }> {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
   const ctm = (manifest.ctms || []).find((c: { name?: string }) => c.name === CTM_REGISTRY_NAME);
   if (!ctm) {
@@ -1154,14 +1204,30 @@ async function deployUpgradeObjectsFromManifest(
   };
 
   const release = await deployObject("CTMRelease", releaseInitArgs(ctm), releaseCodehashAnchor);
+  // The transition PINS its ecosystem leg and its stage-1 timer, so both exist first. The timer
+  // is bound to the CTM executor (only it can start it); zero delays make the stage-1 window
+  // pass immediately in the harness, and the deployer keeps the (unused) extension right.
+  const coreRegistry = await deployObject("CoreRegistry", coreInitArgs(manifest), deployed.coreRegistryCodehash);
+  const timerFactory = new ethers.ContractFactory(
+    getAbi("GovernanceUpgradeTimer"),
+    getCreationBytecode("GovernanceUpgradeTimer"),
+    deployer
+  );
+  const upgradeTimer = await timerFactory.deploy(0, 0, deployed.ctmExecutor, deployer.address);
+  await upgradeTimer.deployed();
+  const pin = async (addr: string): Promise<{ addr: string; codehash: string }> => ({
+    addr,
+    codehash: ethers.utils.keccak256(await deployer.provider.getCode(addr)),
+  });
   return {
     release,
     transition: await deployObject(
       "CTMTransition",
-      transitionInitArgs(manifest, ctm, release),
+      transitionInitArgs(manifest, ctm, release, await pin(coreRegistry), await pin(upgradeTimer.address)),
       deployed.transitionCodehash
     ),
-    coreRegistry: await deployObject("CoreRegistry", coreInitArgs(manifest), deployed.coreRegistryCodehash),
+    coreRegistry,
+    upgradeTimer: upgradeTimer.address,
   };
 }
 
@@ -1202,7 +1268,10 @@ async function relayL2UpgradeTx(
   upgradeTxData: string,
   chainId: number
 ): Promise<void> {
-  await l2Provider.send("anvil_setCode", [L2_UPGRADE_DELEGATE_ADDR, getDeterministicBytecode("MockContractDeployer")]);
+  await l2Provider.send("anvil_setCode", [
+    upgradeDelegateInfo().address,
+    getDeterministicBytecode("MockContractDeployer"),
+  ]);
 
   const txHash = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
     const tx = await signer.sendTransaction({

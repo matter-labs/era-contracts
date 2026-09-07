@@ -105,6 +105,8 @@ error ChainRequiresValidatorsSignaturesForCommit();
 error ConstructorsNotSupported();
 // 0xec273439
 error CTMAlreadyRegistered();
+// 0xbfb48b0c
+error CTMExecutorNotAuthorized(address ctmExecutor);
 // 0xc630ef3c
 error CTMNotRegistered();
 // 0x13df796c
@@ -129,6 +131,10 @@ error DepositExists();
 error DiamondAlreadyFrozen();
 // 0xa7151b9a
 error DiamondNotFrozen();
+// 0x9de51419
+error EcosystemExecutorProxyAdminMismatch(address expected, address actual);
+// 0x2ad5916a
+error EcosystemLegNotNamedByTransition(address pendingTransition, address coreRegistry);
 // 0x7138356f
 error EmptyAddress();
 // 0x2d4d012f
@@ -350,6 +356,8 @@ error NotInitializedReentrancyGuard();
 error NotL1(uint256 l1ChainId, uint256 blockChainId);
 // 0xc5441a63
 error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
+// 0x309dcd43
+error NotUpgradePauser(address caller);
 // 0xdf17e316
 error NotWhitelisted(address);
 // 0x9d7bb13f
@@ -464,6 +472,8 @@ error SystemLogsSizeTooBig();
 error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
 // 0x7a4902ad
 error TimerAlreadyStarted();
+// 0xafd69dcd
+error TimerNotBoundToExecutor(address timer, address timerGovernance);
 // 0xf511412f
 error TimerNotStarted();
 // 0x2d50c33b
@@ -488,6 +498,8 @@ error TransactionNotAllowed();
 error TransitionDeadlineBeforeUpgrade(uint256 deadline, uint256 upgradeTimestamp);
 // 0x8d905e8b
 error TransitionNotCommitted(address named, address committed);
+// 0xd7f856c4
+error TransitionNotPending(address named, address pending);
 // 0x01a7d6aa
 error TransitionReleaseMismatch(address expected, address actual);
 // 0x4c991078
@@ -518,8 +530,16 @@ error UnsupportedProofBatchEncoding(uint8 version);
 error UnsupportedUpgradeType();
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
+// 0x42b73f56
+error UpgradeLifecycleBusy(address pendingTransition);
 // 0xd7f878f7
 error UpgradeNotPermissionlessYet(uint256 deadline);
+// 0xc5796df7
+error UpgradePauseAlreadyHeld(address pauser);
+// 0x085b6b1f
+error UpgradePauseNotHeld(address pauser);
+// 0xdc5e276c
+error UpgradeStageOutOfOrder(uint8 currentStage, uint8 expectedStage);
 // 0x04d91f9d
 error UpgradeTimestampNotReached(uint256 upgradeTimestamp, uint256 currentTimestamp);
 // 0x47b3b145
@@ -556,6 +576,7 @@ error ZKsyncOSNotForceDeployForExistingContract(address);
 error ZKsyncOSNotForceDeployToPrecompileAddress(address);
 // 0x3d9d4821
 error ZKsyncOSPrecommitsNotSupported();
+
 // 0x8464be6c
 // 0xe45872b6
 // @dev An ecosystem row's live implementation matches neither its source nor its target —

@@ -113,6 +113,14 @@ struct AuthoredL2Plan {
 ///        NOT expressible here — a CTM is one of possibly many and upgrades on its own cadence;
 ///        shared contracts belong to the core registry. All slots zero when the CTM domain's
 ///        implementations do not change.
+/// @param coreRegistry The ecosystem leg of this upgrade: the `CoreRegistry` whose rows the
+///        `EcosystemUpgradeExecutor` applies in stage 1 BEFORE the CTM leg, and verifies in
+///        stage 2. A zero address means the upgrade has no ecosystem leg. Content provenance is
+///        the ecosystem executor's codehash pin; naming it here is what makes participation a
+///        reviewed, on-chain-enforced fact rather than a bundle-composition decision.
+/// @param upgradeTimer The `GovernanceUpgradeTimer` gating stage 1: stage 0 starts it, stage 1
+///        requires its deadline. Bound to the CTM executor (`TIMER_GOVERNANCE`), so nobody else
+///        can start it; its `owner` keeps the bounded extension right. Mandatory.
 // solhint-disable-next-line gas-struct-packing
 struct TransitionManifest {
     uint256 oldProtocolVersion;
@@ -124,6 +132,8 @@ struct TransitionManifest {
     uint256 oldProtocolVersionDeadline;
     uint256 upgradeTimestamp;
     AuthoredL2Plan l2Plan;
+    PinnedContract coreRegistry;
+    PinnedContract upgradeTimer;
 }
 
 /// @notice One proxy's upgrade row: a SOURCE-CHECKED edge, not just a target.

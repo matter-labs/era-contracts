@@ -93,6 +93,7 @@ contract StorageRegistriesTest is Test {
     address internal genesisUpgrade;
     address internal verifier;
     address internal upgradeEngine;
+    address internal upgradeTimer;
     address internal coreImplNew;
 
     uint256 internal constant OLD_VERSION = uint256(98) << 32;
@@ -117,6 +118,9 @@ contract StorageRegistriesTest is Test {
         genesisUpgrade = _pinned("genesisUpgrade");
         verifier = _pinned("verifier");
         upgradeEngine = _pinned("upgradeEngine");
+        // The transition only pins the timer (the executor checks its binding), so a stand-in
+        // with real code is all this suite needs.
+        upgradeTimer = _pinned("upgradeTimer");
         coreImplNew = _pinned("coreImplNew");
         // A real DiamondInit: VM identity is read from its IS_ZKSYNC_OS immutable.
         diamondInit = address(new DiamondInit(true));
@@ -245,7 +249,10 @@ contract StorageRegistriesTest is Test {
                 proxyUpgrades: noProxyUpgrades,
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeTimestamp: 1234567,
-                l2Plan: _l2Plan()
+                l2Plan: _l2Plan(),
+                // No ecosystem leg by default; the timer is mandatory.
+                coreRegistry: PinnedContract({addr: address(0), codehash: bytes32(0)}),
+                upgradeTimer: PinnedContract({addr: upgradeTimer, codehash: upgradeTimer.codehash})
             });
     }
 
@@ -456,7 +463,7 @@ contract StorageRegistriesTest is Test {
 
     /// @dev Regression: the transition must enforce the SAME version shape chains enforce at
     ///      execution (`BaseZkSyncUpgrade._setNewProtocolVersion`). Otherwise the transition pins,
-    ///      `applyCTMUpgrade` bumps the CTM, and every per-chain upgrade then reverts.
+    ///      stage 1 bumps the CTM, and every per-chain upgrade then reverts.
     function test_revertWhen_transitionUsesNonzeroMajorVersion() public {
         TransitionManifest memory manifest = _transitionManifest();
         // major = 1 — rejected per-chain, so it must be rejected at pin time too.
@@ -483,8 +490,8 @@ contract StorageRegistriesTest is Test {
     }
 
     /// @dev Regression: a plan carrying more factory deps than `BaseZkSyncUpgrade` accepts must be
-    ///      rejected at pin time. Otherwise `applyCTMUpgrade` bumps the CTM version and every
-    ///      per-chain upgrade then reverts, stranding chains on an unexecutable transition.
+    ///      rejected at pin time. Otherwise stage 1 bumps the CTM version and every per-chain
+    ///      upgrade then reverts, stranding chains on an unexecutable transition.
     function test_revertWhen_transitionExceedsFactoryDepCap() public {
         TransitionManifest memory manifest = _transitionManifest();
         // The extras' real hashes stay in front (so the presence rule holds); surplus dummies
@@ -524,6 +531,63 @@ contract StorageRegistriesTest is Test {
 
         vm.expectRevert(ZeroAddress.selector);
         new CTMTransition(manifest);
+    }
+
+    // ─────────────────────────── lifecycle inputs (timer, ecosystem leg) ───────────────────────────
+
+    function test_revertWhen_upgradeTimerZero() public {
+        // Stage 1 is gated on the timer's deadline, so a transition without one cannot exist.
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.upgradeTimer = PinnedContract({addr: address(0), codehash: bytes32(0)});
+
+        vm.expectRevert(ZeroAddress.selector);
+        new CTMTransition(manifest);
+    }
+
+    function test_revertWhen_transitionTimerPinMismatch() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.upgradeTimer.codehash = keccak256("not the timer's code");
+        CTMTransition mispinned = new CTMTransition(manifest);
+        assertEq(mispinned.upgradeTimer(), upgradeTimer, "the timer is served like every other pinned address");
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryCodehashMismatch.selector,
+                upgradeTimer,
+                keccak256("not the timer's code"),
+                upgradeTimer.codehash
+            )
+        );
+        mispinned.validate();
+        assertFalse(mispinned.verifyAll(), "a mispinned timer must not verify");
+    }
+
+    /// @dev The ecosystem leg is optional: zero means "no leg" and is not pin-checked; a named
+    ///      registry is pinned like every other address.
+    function test_transitionCoreRegistryIsOptionalAndPinnedWhenNamed() public {
+        assertEq(transition.coreRegistry(), address(0), "the default manifest names no ecosystem leg");
+        transition.validate();
+        assertTrue(transition.verifyAll());
+
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.coreRegistry = PinnedContract({addr: address(coreRegistry), codehash: address(coreRegistry).codehash});
+        CTMTransition withLeg = new CTMTransition(manifest);
+        assertEq(withLeg.coreRegistry(), address(coreRegistry));
+        withLeg.validate();
+        assertTrue(withLeg.verifyAll());
+
+        manifest.coreRegistry.codehash = keccak256("not the registry's code");
+        CTMTransition mispinned = new CTMTransition(manifest);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryCodehashMismatch.selector,
+                address(coreRegistry),
+                keccak256("not the registry's code"),
+                address(coreRegistry).codehash
+            )
+        );
+        mispinned.validate();
+        assertFalse(mispinned.verifyAll(), "a mispinned ecosystem leg must not verify");
     }
 
     // ─────────────────────────── L2 plan shape ───────────────────────────

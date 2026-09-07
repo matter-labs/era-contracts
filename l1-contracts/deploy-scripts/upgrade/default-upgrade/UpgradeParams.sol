@@ -51,4 +51,9 @@ struct CTMUpgradeParams {
     ///         `performForceDeployedContractsInit`, so a zero value breaks the genesis of chains created
     ///         from this release.
     bytes32 zkTokenAssetId;
+    /// @notice The `EcosystemUpgradeExecutor` the core prepare of this upgrade deployed (its output
+    ///         TOML, `[registry].ecosystem_upgrade_executor_addr`). The CTM executor is BOUND to it —
+    ///         every transition's ecosystem leg runs through it — so the CTM prepare takes it as an
+    ///         input rather than re-deriving a deployment it did not make.
+    address ecosystemUpgradeExecutor;
 }

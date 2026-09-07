@@ -173,7 +173,13 @@ export function releaseInitArgs(ctm: any): any {
  * read from the JSON, since the release must be deployed first anyway (transition
  * initialization validates it and derives the facet/hash delta from the release pair).
  */
-export function transitionInitArgs(manifest: any, ctm: any, newRelease: string): any {
+export function transitionInitArgs(
+  manifest: any,
+  ctm: any,
+  newRelease: string,
+  coreRegistry: { addr: string; codehash: string },
+  upgradeTimer: { addr: string; codehash: string }
+): any {
   // Release provenance is enforced by the CTM's stored `releaseCodehash` at `setCurrentRelease`
   // time, not by the transition manifest — which is why the runner checks the freshly deployed
   // release against that same anchor.
@@ -209,5 +215,9 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string):
       delegateCalldata: transition.l2Plan.delegateCalldata,
       factoryDepHashes: transition.l2Plan.factoryDepHashes.map((h: string) => ethers.BigNumber.from(h)),
     },
+    // The ecosystem leg and the stage-1 timer are deploy-time objects of this same run (like
+    // `newRelease`), so they ride in as pins rather than from the committed manifest.
+    coreRegistry,
+    upgradeTimer,
   };
 }

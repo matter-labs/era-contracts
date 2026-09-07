@@ -64,6 +64,27 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
         super.prepareEcosystemUpgrade();
         // AFTER the implementation deploys: the registry pins them.
         deployCoreRegistryBootstrap();
+        _saveRegistryOutput();
+    }
+
+    /// @notice The ecosystem executor this run deployed — the CTM prepare binds its executor to it.
+    function getEcosystemUpgradeExecutor() public view virtual override returns (address) {
+        return address(ecosystemUpgradeExecutor);
+    }
+
+    /// @dev Appends the `[registry]` table (the objects the CTM prepare and reviewers take from this
+    ///      run) to the core output TOML `saveOutput` wrote. Keyed `writeToml` no-ops for a missing
+    ///      key, so the root object is re-serialized and the file rewritten (see
+    ///      `prepareDefaultGovernanceCalls`).
+    function _saveRegistryOutput() internal {
+        vm.serializeAddress("registry", "core_registry_addr", address(coreRegistry));
+        string memory registry = vm.serializeAddress(
+            "registry",
+            "ecosystem_upgrade_executor_addr",
+            address(ecosystemUpgradeExecutor)
+        );
+        string memory updatedToml = vm.serializeString("root", "registry", registry);
+        vm.writeToml(updatedToml, upgradeConfig.outputPath);
     }
 
     /// @notice Deploys the write-once inventory of this upgrade's swaps and the bound executor

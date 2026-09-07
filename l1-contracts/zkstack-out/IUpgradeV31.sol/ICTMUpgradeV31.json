@@ -52,6 +52,11 @@
             "name": "zkTokenAssetId",
             "type": "bytes32",
             "internalType": "bytes32"
+          },
+          {
+            "name": "ecosystemUpgradeExecutor",
+            "type": "address",
+            "internalType": "address"
           }
         ]
       }

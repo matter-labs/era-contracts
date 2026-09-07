@@ -9,8 +9,15 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
 import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
+import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {MockProxyUpgradeInitImpl} from "contracts/dev-contracts/test/MockProxyUpgradeInitImpl.sol";
-import {ProxyUpgradeRowMismatch, RegistryCodehashMismatch} from "contracts/common/L1ContractErrors.sol";
+import {
+    EcosystemLegNotNamedByTransition,
+    ProxyUpgradeRowMismatch,
+    RegistryCodehashMismatch,
+    Unauthorized,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
 import {
     CoreRegistryManifest,
     ProxyUpgradeRow,
@@ -38,6 +45,33 @@ contract DummyImplA {
 contract DummyImplB {
     function version() external pure returns (uint256) {
         return 2;
+    }
+}
+
+/// @dev Test double of a CTM executor's lifecycle surface — the ONLY thing the ecosystem
+///      executor reads from an authorized caller (`ICTMUpgradeExecutor.pendingTransition()`),
+///      plus a passthrough so the double is the `msg.sender` of `applyL1Upgrade`.
+///      MOCKED deliberately: this suite isolates the ecosystem executor's authority rule from the
+///      CTM lifecycle. The same rule is driven end to end with the real `CTMUpgradeExecutor`
+///      (stage 0 recording the transition, stage 1 applying the leg) in CTMUpgradeLifecycle.t.sol.
+contract StubCTMExecutor {
+    ICTMTransition public pendingTransition;
+
+    function setPendingTransition(ICTMTransition _transition) external {
+        pendingTransition = _transition;
+    }
+
+    function applyEcosystemLeg(EcosystemUpgradeExecutor _executor, ICoreRegistry _coreRegistry) external {
+        _executor.applyL1Upgrade(_coreRegistry);
+    }
+}
+
+/// @dev The one transition getter the authority rule reads: which registry the leg is for.
+contract StubTransition {
+    address public coreRegistry;
+
+    constructor(address _coreRegistry) {
+        coreRegistry = _coreRegistry;
     }
 }
 
@@ -183,10 +217,109 @@ contract EcosystemUpgradeExecutorTest is Test {
 
     function test_revertWhen_executorCalledByNonEcosystemGovernance() public {
         // Not even the CTM-scope governor may drive the ecosystem executor: authority domains
-        // are separate, and the entrypoint is owner-gated (no arbitrary-delegatecall surface).
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(makeAddr("ctmGovernor"));
+        // are separate, and the entrypoint admits the owner or an explicitly authorized CTM
+        // executor only (no arbitrary-delegatecall surface).
+        address ctmGovernor = makeAddr("ctmGovernor");
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, ctmGovernor));
+        vm.prank(ctmGovernor);
         ecosystemExecutor.applyL1Upgrade(coreRegistry);
+    }
+
+    // ─────────────────────────── CTM executor authorization ───────────────────────────
+
+    function test_setCTMExecutorAuthorization_grantsAndRevokes() public {
+        address ctmExecutor = makeAddr("ctmExecutor");
+        assertFalse(ecosystemExecutor.isAuthorizedCTMExecutor(ctmExecutor));
+
+        vm.expectEmit(true, true, true, true, address(ecosystemExecutor));
+        emit EcosystemUpgradeExecutor.CTMExecutorAuthorizationSet(ctmExecutor, true);
+        vm.prank(ecosystemGovernor);
+        ecosystemExecutor.setCTMExecutorAuthorization(ctmExecutor, true);
+        assertTrue(ecosystemExecutor.isAuthorizedCTMExecutor(ctmExecutor), "authorization must be recorded");
+
+        vm.expectEmit(true, true, true, true, address(ecosystemExecutor));
+        emit EcosystemUpgradeExecutor.CTMExecutorAuthorizationSet(ctmExecutor, false);
+        vm.prank(ecosystemGovernor);
+        ecosystemExecutor.setCTMExecutorAuthorization(ctmExecutor, false);
+        assertFalse(ecosystemExecutor.isAuthorizedCTMExecutor(ctmExecutor), "revocation must be recorded");
+    }
+
+    function test_revertWhen_setCTMExecutorAuthorizationByStranger() public {
+        vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(makeAddr("stranger"));
+        ecosystemExecutor.setCTMExecutorAuthorization(makeAddr("ctmExecutor"), true);
+    }
+
+    function test_revertWhen_setCTMExecutorAuthorizationForZeroAddress() public {
+        vm.expectRevert(ZeroAddress.selector);
+        vm.prank(ecosystemGovernor);
+        ecosystemExecutor.setCTMExecutorAuthorization(address(0), true);
+    }
+
+    /// @dev The authority rule for a non-owner caller: authorized, AND the registry is the one its
+    ///      pending transition names. See the mock note on `StubCTMExecutor`.
+    function test_authorizedCTMExecutorAppliesTheRegistryItsPendingTransitionNames() public {
+        StubCTMExecutor ctmExecutor = new StubCTMExecutor();
+        ctmExecutor.setPendingTransition(ICTMTransition(address(new StubTransition(address(coreRegistry)))));
+        vm.prank(ecosystemGovernor);
+        ecosystemExecutor.setCTMExecutorAuthorization(address(ctmExecutor), true);
+
+        vm.expectEmit(true, true, true, true, address(ecosystemExecutor));
+        emit EcosystemUpgradeExecutor.L1UpgradeApplied(address(coreRegistry));
+        ctmExecutor.applyEcosystemLeg(ecosystemExecutor, coreRegistry);
+
+        assertEq(
+            address(uint160(uint256(vm.load(address(bridgehubProxy), EIP1967_IMPL_SLOT)))),
+            address(implNew),
+            "the named leg must be applied through the bound admin"
+        );
+    }
+
+    function test_revertWhen_authorizedCTMExecutorNamesAnotherRegistry() public {
+        StubCTMExecutor ctmExecutor = new StubCTMExecutor();
+        StubTransition pending = new StubTransition(address(coreRegistry));
+        ctmExecutor.setPendingTransition(ICTMTransition(address(pending)));
+        vm.prank(ecosystemGovernor);
+        ecosystemExecutor.setCTMExecutorAuthorization(address(ctmExecutor), true);
+
+        ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](1);
+        rows[0] = _row(address(messageRootProxy), address(implOld), address(implNew));
+        ICoreRegistry otherRegistry = _deployRegistry(rows);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(EcosystemLegNotNamedByTransition.selector, address(pending), address(otherRegistry))
+        );
+        ctmExecutor.applyEcosystemLeg(ecosystemExecutor, otherRegistry);
+        assertEq(
+            address(uint160(uint256(vm.load(address(messageRootProxy), EIP1967_IMPL_SLOT)))),
+            address(implOld),
+            "an unnamed leg must not be applied"
+        );
+    }
+
+    function test_revertWhen_authorizedCTMExecutorHasNoPendingTransition() public {
+        StubCTMExecutor ctmExecutor = new StubCTMExecutor();
+        vm.prank(ecosystemGovernor);
+        ecosystemExecutor.setCTMExecutorAuthorization(address(ctmExecutor), true);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(EcosystemLegNotNamedByTransition.selector, address(0), address(coreRegistry))
+        );
+        ctmExecutor.applyEcosystemLeg(ecosystemExecutor, coreRegistry);
+    }
+
+    function test_revertWhen_revokedCTMExecutorAppliesALeg() public {
+        StubCTMExecutor ctmExecutor = new StubCTMExecutor();
+        ctmExecutor.setPendingTransition(ICTMTransition(address(new StubTransition(address(coreRegistry)))));
+        vm.prank(ecosystemGovernor);
+        ecosystemExecutor.setCTMExecutorAuthorization(address(ctmExecutor), true);
+        vm.prank(ecosystemGovernor);
+        ecosystemExecutor.setCTMExecutorAuthorization(address(ctmExecutor), false);
+
+        // The pending transition names the registry, but the authorization is gone.
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(ctmExecutor)));
+        ctmExecutor.applyEcosystemLeg(ecosystemExecutor, coreRegistry);
+        assertEq(address(uint160(uint256(vm.load(address(bridgehubProxy), EIP1967_IMPL_SLOT)))), address(implOld));
     }
 
     // ─────────────────────────── post-state verification ───────────────────────────

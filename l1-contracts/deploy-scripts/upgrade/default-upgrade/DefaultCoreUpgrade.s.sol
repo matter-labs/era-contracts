@@ -97,6 +97,12 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         return config.ownerAddress;
     }
 
+    /// @notice The ecosystem executor this upgrade's core prepare deployed; zero for prepares that
+    ///         deploy none. The CTM prepare of the same upgrade binds its executor to it.
+    function getEcosystemUpgradeExecutor() public view virtual returns (address) {
+        return address(0);
+    }
+
     function setOwners(address owner) public virtual {
         config.ownerAddress = owner;
     }

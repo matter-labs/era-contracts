@@ -7,6 +7,8 @@ import {ZKsyncOSChainTypeManagerSharedTest} from "../../state-transition/ChainTy
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
+import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
@@ -64,8 +66,15 @@ import {
 /// @dev The registry is a storage-backed double (fixture addresses are dynamic), but everything
 ///      it pins here is real: live facet addresses/selectors, a real replacement `AdminFacet`,
 ///      the real `DefaultUpgrade`, real verifier contracts.
+/// @dev Each hop runs the executor's full three-stage lifecycle ({docs/upgrade-stage-lifecycle.md})
+///      against the fixture's REAL `L1ChainAssetHandler`: stage 0 takes the executor's migration
+///      pause hold, stage 1 commits, `upgradeChain` crosses the chain, stage 2 releases the hold.
+///      No ecosystem leg is named (the hops are CTM-only); the ecosystem executor is still bound
+///      and wired because the executor requires the join. The lifecycle's own rules are covered
+///      in CTMUpgradeLifecycle.t.sol.
 abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     CTMUpgradeExecutor internal ctmExecutor;
+    EcosystemUpgradeExecutor internal ecosystemExecutor;
     CTMTransition internal transitionV32;
     CTMTransition internal transitionV33;
 
@@ -103,8 +112,8 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     ///      (VM identity is read from the release's pinned DiamondInit).
     function _l2DeploymentType() internal pure virtual returns (IComplexUpgrader.ContractUpgradeType);
 
-    /// @dev The `genesisBatchCommitment` the registry pins in its genesis params —
-    ///      `applyCTMUpgrade` feeds it to `setChainCreationParams`, which ZKsyncOS CTMs only
+    /// @dev The `genesisBatchCommitment` the registry pins in its genesis params — the release
+    ///      the stage-1 commit installs feeds it to chain creation, which ZKsyncOS CTMs only
     ///      accept as exactly `bytes32(uint256(1))`.
     function _registryGenesisBatchCommitment() internal pure virtual returns (bytes32);
 
@@ -124,14 +133,22 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         );
         chainAddress = createNewChain(getDiamondCutData(diamondInit));
         _mockGetZKChainFromBridgehub(chainAddress);
-        _mockMigrationPausedFromBridgehub();
 
+        // The ecosystem executor is bound first: the CTM executor pins it as an immutable.
+        ecosystemExecutor = new EcosystemUpgradeExecutor(governor, new ProxyAdmin(), Utils.coreRegistryCodehash());
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
             IChainTypeManager(address(chainContractAddress)),
             new ProxyAdmin(),
+            ecosystemExecutor,
             Utils.transitionCodehash()
         );
+        // The bootstrap-join authorizations every stage-0 requires: pause holder on the fixture's
+        // real ChainAssetHandler, authorized CTM executor on the ecosystem executor.
+        vm.prank(governor);
+        chainAssetHandler.setUpgradePauser(address(ctmExecutor), true);
+        vm.prank(governor);
+        ecosystemExecutor.setCTMExecutorAuthorization(address(ctmExecutor), true);
 
         // Real v33 artifacts: a fresh AdminFacet implementation (same selectors, new address)
         // and the plain DefaultUpgrade as the upgrade-init contract.
@@ -178,7 +195,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         UtilsFacet(chainAddress).util_setL2SystemContractsUpgradeTxHash(bytes32(0));
 
         // Every bytecode the v33 hop installs must be published on the CTM's supplier before
-        // `applyCTMUpgrade` commits the edge — the prepare pipeline's publish step.
+        // stage 1 commits the edge — the prepare pipeline's publish step.
         assertEq(chainContractAddress.L1_BYTECODES_SUPPLIER(), address(bytecodesSupplier));
         L2PlanFixtures.publish(
             bytecodesSupplier,
@@ -273,6 +290,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         }
 
         ProxyUpgradeRow[] memory noProxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
+        // One timer per hop, bound to the executor (the only address that can start it), with
+        // zero delays so stage 1 is admissible in the block stage 0 ran in.
+        address upgradeTimer = address(new GovernanceUpgradeTimer(0, 0, address(ctmExecutor), governor));
         transition = new CTMTransition(
             TransitionManifest({
                 oldProtocolVersion: _oldVersion,
@@ -283,16 +303,31 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
                 proxyUpgrades: noProxyUpgrades,
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: 0,
-                l2Plan: l2Plan
+                l2Plan: l2Plan,
+                coreRegistry: PinnedContract({addr: address(0), codehash: bytes32(0)}),
+                upgradeTimer: PinnedContract({addr: upgradeTimer, codehash: upgradeTimer.codehash})
             })
         );
     }
 
-    function _runHop(CTMTransition _transition) internal {
+    /// @dev Stages 0 and 1: the hop is committed on the CTM and the lifecycle is still open.
+    function _commitHop(CTMTransition _transition) internal {
         vm.startPrank(governor);
-        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(_transition)));
-        ctmExecutor.upgradeChain(ICTMTransition(address(_transition)), chainId);
+        ctmExecutor.stage0(ICTMTransition(address(_transition)));
+        ctmExecutor.stage1(ICTMTransition(address(_transition)));
         vm.stopPrank();
+        assertTrue(chainAssetHandler.migrationPaused(), "the executor's hold must pause migrations");
+    }
+
+    /// @dev The whole hop: commit, cross the chain, complete (the hold is released again).
+    function _runHop(CTMTransition _transition) internal {
+        _commitHop(_transition);
+        vm.startPrank(governor);
+        ctmExecutor.upgradeChain(ICTMTransition(address(_transition)), chainId);
+        ctmExecutor.stage2(ICTMTransition(address(_transition)));
+        vm.stopPrank();
+        assertEq(address(ctmExecutor.pendingTransition()), address(0), "completion must free the lifecycle slot");
+        assertFalse(chainAssetHandler.migrationPaused(), "completion must release the executor's hold");
     }
 
     function test_registryDrivenUpgrade_v32ThenV33_endToEnd() public {
@@ -432,8 +467,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         // Governance commits the hop but never executes the chain upgrade. Once the old-version
         // deadline (1000, pinned by the transition) passes, the upgrade is operationally
         // mandatory and ANYONE may execute it — no discretionary inputs remain.
-        vm.prank(governor);
-        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(transitionV32)));
+        _commitHop(transitionV32);
 
         vm.warp(1001);
         vm.prank(makeAddr("keeper"));
@@ -447,8 +481,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     ///      any point in the window — a stranger still has to wait for the deadline
     ///      (`test_revertWhen_strangerUpgradesChainBeforeDeadline` in CTMUpgradeExecutor.t.sol).
     function test_chainAdminUpgradesTheirOwnChainBeforeTheDeadline() public {
-        vm.prank(governor);
-        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(transitionV32)));
+        _commitHop(transitionV32);
 
         vm.warp(999);
         vm.prank(IGetters(chainAddress).getAdmin());

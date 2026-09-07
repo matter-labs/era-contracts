@@ -38,6 +38,12 @@ interface ICTMTransition {
 
     function upgradeTimestamp() external view returns (uint256);
 
+    /// @notice The ecosystem leg's `CoreRegistry`, zero when the upgrade has none.
+    function coreRegistry() external view returns (address);
+
+    /// @notice The `GovernanceUpgradeTimer` gating stage 1 of this transition.
+    function upgradeTimer() external view returns (address);
+
     /// @notice The DERIVED facet swaps realizing `fromRelease -> newRelease` routing.
     /// @notice The final, ready-to-execute diamond cuts — DERIVED from the release pair at
     ///         initialization (all `Remove` cuts first, then `Add`), applied verbatim by the

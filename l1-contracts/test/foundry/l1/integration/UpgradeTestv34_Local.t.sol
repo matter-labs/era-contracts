@@ -33,6 +33,8 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IAdminV31} from "../../../../deploy-scripts/utils/UpgradeChainCall.sol";
 import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 
 /// @notice Test-only v34 CTM upgrade with the same MemoryOOG mocks as the v32 local harness
 ///         (the heavy JSON/zkout reads live on the shared base). The bootstrap flow itself —
@@ -303,17 +305,45 @@ contract UpgradeIntegrationTest_v34_Local is
         assertTrue(_newChainDiamond != address(0), "new chain not registered");
         assertEq(IGetters(_newChainDiamond).getProtocolVersion(), _expectedNewVersion, "new chain wrong version");
 
-        // Stage 2's version-specific CTM leg IS the migration's own post-state gate — the
-        // harness already executed the prepared stage-2 bundle green in `internalTest`; assert
-        // the emitted call list shape and that the gate still holds against the final state.
+        // Stage 2's version-specific CTM leg: the migration's own post-state gate, then the two
+        // bootstrap-JOIN authorizations the recurring stage lifecycle needs and the executor
+        // cannot grant itself (upgrade pauser on the shared ChainAssetHandler, CTM-executor
+        // authorization on the ecosystem executor). The harness already executed the prepared
+        // stage-2 bundle green in `internalTest`; assert the emitted call list shape, that the
+        // gate still holds against the final state, and that both joins landed.
+        address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
+        address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
+        EcosystemUpgradeExecutor ecosystemExecutor = v34.ecosystemUpgradeExecutor();
         Call[] memory stage2 = v34.prepareVersionSpecificStage2GovernanceCallsL1();
-        assertEq(stage2.length, 1, "v34 CTM stage 2 must be the single post-state gate");
+        assertEq(stage2.length, 3, "v34 CTM stage 2 must be the post-state gate plus the two join authorizations");
         assertEq(stage2[0].target, address(v34.bootstrapMigration()), "stage 2 must target the migration");
         assertEq(
             stage2[0].data,
             abi.encodeCall(v34.bootstrapMigration().validateApplied, ()),
             "stage 2 must call validateApplied"
         );
+        assertEq(stage2[1].target, chainAssetHandler, "stage 2 must target the Bridgehub's ChainAssetHandler");
+        assertEq(
+            stage2[1].data,
+            abi.encodeCall(IChainAssetHandlerBase.setUpgradePauser, (executor, true)),
+            "stage 2 must register the executor as an upgrade pauser"
+        );
+        assertEq(stage2[2].target, address(ecosystemExecutor), "stage 2 must target the ecosystem executor");
+        assertEq(
+            stage2[2].data,
+            abi.encodeCall(EcosystemUpgradeExecutor.setCTMExecutorAuthorization, (executor, true)),
+            "stage 2 must authorize the executor on the ecosystem executor"
+        );
         v34.bootstrapMigration().validateApplied();
+        assertTrue(
+            IChainAssetHandlerBase(chainAssetHandler).isUpgradePauser(executor),
+            "the executor must be a registered upgrade pauser after stage 2"
+        );
+        assertTrue(
+            ecosystemExecutor.isAuthorizedCTMExecutor(executor),
+            "the executor must be authorized on the ecosystem executor after stage 2"
+        );
+        // The join is wiring only: no hold is taken until a transition's stage 0.
+        assertFalse(IChainAssetHandlerBase(chainAssetHandler).upgradePauseHeld(executor), "no hold before stage 0");
     }
 }

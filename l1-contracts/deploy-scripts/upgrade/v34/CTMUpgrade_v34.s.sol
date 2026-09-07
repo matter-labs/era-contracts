@@ -15,6 +15,9 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {IL2V34Upgrade} from "contracts/upgrades/IL2V34Upgrade.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {BootstrapManifest, PinnedContract, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {CTM_CONTRACT_COUNT, CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
@@ -160,6 +163,9 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                         getOwnerAddress(),
                         IChainTypeManager(ctmProxy),
                         ctmProxyAdmin,
+                        // The ecosystem executor the core prepare of this upgrade deployed — the
+                        // bound route for every future transition's ecosystem leg.
+                        ecosystemUpgradeExecutor(),
                         // The audited-object anchor for every FUTURE transition this executor
                         // accepts. The registry objects carry no immutables, so the compiled
                         // runtime code IS the on-chain runtime code.
@@ -281,16 +287,45 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         return new Call[](0);
     }
 
-    /// @notice The stage-2 CTM gate is the pinned object's own post-state check: version,
-    ///         installed release + anchor pin, applied proxy rows, and the authority landing
-    ///         under the bound executor — one reverting view call instead of composed checks.
+    /// @notice The stage-2 CTM leg: the pinned object's own post-state check (version, installed
+    ///         release + anchor pin, applied proxy rows, authority landing under the bound
+    ///         executor), then the two bootstrap-JOIN authorizations the recurring stage
+    ///         lifecycle needs and this executor cannot grant itself — registering it as an
+    ///         upgrade pauser on the shared ChainAssetHandler, and authorizing it on the ecosystem
+    ///         executor for its own transitions' ecosystem legs. Both targets are bound data
+    ///         (the CAH via the Bridgehub, the ecosystem executor from the core prepare's output).
     function prepareVersionSpecificStage2GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         require(address(bootstrapMigration) != address(0), "bootstrap migration not deployed");
-        calls = new Call[](1);
+        address chainAssetHandler = IBridgehubBase(coreAddresses.bridgehub.proxies.bridgehub).chainAssetHandler();
+        calls = new Call[](3);
         calls[0] = Call({
             target: address(bootstrapMigration),
             data: abi.encodeCall(bootstrapMigration.validateApplied, ()),
             value: 0
         });
+        calls[1] = Call({
+            target: chainAssetHandler,
+            data: abi.encodeCall(IChainAssetHandlerBase.setUpgradePauser, (address(ctmUpgradeExecutor), true)),
+            value: 0
+        });
+        calls[2] = Call({
+            target: address(ecosystemUpgradeExecutor()),
+            data: abi.encodeCall(
+                EcosystemUpgradeExecutor.setCTMExecutorAuthorization,
+                (address(ctmUpgradeExecutor), true)
+            ),
+            value: 0
+        });
+    }
+
+    /// @notice The `EcosystemUpgradeExecutor` the core prepare of this upgrade deployed — an input
+    ///         of this prepare (`CTMUpgradeParams.ecosystemUpgradeExecutor`, read by protocol-ops
+    ///         from the core output TOML), checked to exist so a stale or missing input fails here
+    ///         instead of in stage 2.
+    function ecosystemUpgradeExecutor() public view returns (EcosystemUpgradeExecutor) {
+        address executor = upgradeAddresses.ecosystemUpgradeExecutor;
+        require(executor != address(0), "ecosystem executor not set (core prepare output)");
+        require(executor.code.length != 0, "ecosystem executor has no code");
+        return EcosystemUpgradeExecutor(payable(executor));
     }
 }

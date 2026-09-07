@@ -104,13 +104,15 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         upgradeCutInit = makeAddr("upgradeCutInit");
         vm.etch(upgradeCutInit, hex"600043");
 
+        // The ecosystem executor is bound first: the CTM executor pins it as an immutable.
+        ecoExecutor = new EcosystemUpgradeExecutor(governor, ecosystemProxyAdmin, Utils.coreRegistryCodehash());
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
             IChainTypeManager(address(chainContractAddress)),
             ecosystemProxyAdmin,
+            ecoExecutor,
             Utils.transitionCodehash()
         );
-        ecoExecutor = new EcosystemUpgradeExecutor(governor, ecosystemProxyAdmin, Utils.coreRegistryCodehash());
 
         newVersion = SemVer.packSemVer(0, 1, 0);
         // The pinned timer gates `migrate()`: stage 0 starts it, the edge runs after its window.
@@ -354,6 +356,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             governor,
             IChainTypeManager(foreignCtm),
             ecosystemProxyAdmin,
+            ecoExecutor,
             Utils.transitionCodehash()
         );
         BootstrapManifest memory manifest = _manifest();
@@ -385,6 +388,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             governor,
             IChainTypeManager(address(chainContractAddress)),
             foreignProxyAdmin,
+            ecoExecutor,
             Utils.transitionCodehash()
         );
         BootstrapManifest memory manifest = _manifest();

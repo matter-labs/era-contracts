@@ -58,19 +58,51 @@ interface IChainAssetHandlerBase is IAssetHandler {
     /// @param pauser Address that triggered the unpause
     event UnpausedMigration(address indexed pauser);
 
+    /// @notice Emitted when an upgrade pauser is registered or removed by the owner.
+    event UpgradePauserSet(address indexed pauser, bool allowed);
+
+    /// @notice Emitted when an upgrade pauser takes its hold on the migration pause.
+    event MigrationPauseAcquired(address indexed pauser);
+
+    /// @notice Emitted when an upgrade pauser's hold is released (by itself or by the owner).
+    event MigrationPauseReleased(address indexed pauser);
+
     function migrationNumber(uint256 _chainId) external view returns (uint256);
 
-    /// @dev Denotes whether the migrations of chains is paused.
+    /// @notice Whether chain migrations are paused: the owner's pause OR at least one upgrade
+    ///         pauser's hold.
     function migrationPaused() external view returns (bool);
+
+    /// @notice Whether `_pauser` may hold migrations paused during an upgrade lifecycle.
+    function isUpgradePauser(address _pauser) external view returns (bool);
+
+    /// @notice Whether `_pauser` currently holds migrations paused.
+    function upgradePauseHeld(address _pauser) external view returns (bool);
+
+    /// @notice The number of upgrade holds currently in place.
+    function upgradePauseHolds() external view returns (uint256);
+
+    /// @notice Registers or removes an upgrade pauser. Owner only.
+    function setUpgradePauser(address _pauser, bool _allowed) external;
+
+    /// @notice Takes the caller's hold on the migration pause. Registered pausers only; one hold
+    ///         per pauser.
+    function acquireMigrationPause() external;
+
+    /// @notice Releases the caller's own hold — never another pauser's, never the owner's pause.
+    function releaseMigrationPause() external;
+
+    /// @notice Owner recovery: releases `_pauser`'s hold (a stuck or retired executor).
+    function clearMigrationPauseHold(address _pauser) external;
 
     /// @notice Whether chain migrations between settlement layers are enabled in the current release.
     /// @dev Chain migrations are explicitly disabled in the v32 release, in which all chains are
     /// required to settle on L1. See `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`.
     function migrationsEnabled() external view returns (bool);
 
-    /// @notice Pauses migration functions.
+    /// @notice Sets the owner's migration pause.
     function pauseMigration() external;
 
-    /// @notice Unpauses migration functions.
+    /// @notice Clears the owner's migration pause (upgrade holds are unaffected).
     function unpauseMigration() external;
 }

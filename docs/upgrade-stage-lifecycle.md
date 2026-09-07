@@ -175,7 +175,7 @@ pause bookkeeping of 4.3.
 
 | Entrypoint           | Behaviour migrated                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `stage0(transition)` | `onlyOwner`. Reject if another transition is mid-lifecycle. Genuine-object check, `validate()`, both edges (release + version) so a wrong object fails BEFORE it is recorded. Record `pendingTransition`. Pause chain migrations through the authorized route (4.3; records whether the pause pre-existed). `timer.startTimer()`.                                                                                                                              |
+| `stage0(transition)` | `onlyOwner`. Reject if another transition is mid-lifecycle. Genuine-object check, `validate()`, both edges (release + version), the named `coreRegistry`'s pin, this executor's authorization on the ecosystem executor, and the timer's binding — so a wrong object or a missing bootstrap join fails BEFORE anything is recorded. Record `pendingTransition`. Take this executor's hold on the migration pause (4.3). `timer.startTimer()`.                  |
 | `stage1(transition)` | `onlyOwner`. Same transition, stage `Prepared`. `timer.checkDeadline()`. Migrations must be paused. Ecosystem leg FIRST (`ECOSYSTEM_EXECUTOR.applyL1Upgrade(coreRegistry)` when referenced — the order the merged bundle has today). Then the existing `applyCTMUpgrade` body, made internal: publication check, CTM-domain rows (incl. the notifier row, 4.4), `setNewVersionUpgradeFromTransition`, `setCurrentRelease`. Any revert reverts the whole stage. |
 | `stage2(transition)` | `onlyOwner`. Same transition, stage `Executed`. Completion checks: `validateTransitionApplied` (committed edge, version, CTM-domain rows) and `ECOSYSTEM_EXECUTOR.validateUpgradeApplied(coreRegistry)` when referenced. Then restoration: release THIS upgrade's migration pause (4.3). Mark `Completed`, clear the pending slot.                                                                                                                             |
 
@@ -191,21 +191,25 @@ owner is governance. The stages need a route that (a) does not hand a CTM execut
 ecosystem authority, (b) cannot let one upgrade's stage 2 clear a pause another upgrade still
 needs, and (c) preserves a pre-existing governance pause.
 
-Proposed: the ChainAssetHandler gains an owner-managed allowlist of UPGRADE PAUSERS and per-pauser
-holds. `migrationPaused` becomes `ownerPaused || holdCount > 0`; a pauser can only acquire and
-release ITS OWN hold; the owner's flag is untouched by pausers. A CTM executor is registered once
-(an explicit governance call, bound in the bootstrap data for the first one). Overlapping upgrades
-and a pre-existing pause then compose without any executor-side bookkeeping beyond "did stage 0
-acquire a hold".
+Implemented: the ChainAssetHandler has an owner-managed allowlist of UPGRADE PAUSERS
+(`setUpgradePauser`) and per-pauser holds (`acquireMigrationPause` / `releaseMigrationPause`).
+`migrationPaused()` is `ownerPaused || upgradePauseHolds != 0`; a pauser can only acquire and
+release ITS OWN hold, releasing is gated on the hold rather than the allowlist (a de-registered
+executor can still let go), and the owner has `clearMigrationPauseHold(pauser)` for a stuck one.
+The owner's own `pauseMigration` / `unpauseMigration` touch only the owner's flag. A CTM executor
+is registered once — an explicit governance call the v34 CTM prepare emits in its stage 2, bound
+to the bootstrap's pinned executor. Overlapping upgrades and a pre-existing pause then compose
+without any executor-side bookkeeping.
 
 ### 4.4 ServerNotifier: an explicit row and an authorized path
 
 The notifier is a per-CTM proxy but sits under its OWN `ProxyAdmin`, owned by the CTM's
 `ChainAdmin` — not under `CTM_PROXY_ADMIN`. It must appear in the reviewed upgrade description
 (`CTMContract.ServerNotifier` row in the transition's CTM-domain inventory), and its execution path
-must be explicit rather than assumed. Proposed: rows resolve their admin from the proxy's live
-EIP-1967 admin slot (through the bound ProxyAdmin's `getProxyAdmin`), the executor must OWN that
-admin, and the bootstrap data carries the one-time `transferOwnership` of the notifier's ProxyAdmin
+must be explicit rather than assumed. Proposed: each row explicitly names its ProxyAdmin, which reads the proxy's live admin and
+implementation through its admin-only getters. A different ProxyAdmin cannot inspect a transparent
+proxy this way, so the existing CTM ProxyAdmin cannot discover the notifier's admin. The executor
+must own the named admin, and the bootstrap data carries the one-time `transferOwnership` of the notifier's ProxyAdmin
 from the ChainAdmin to the executor as an explicit, bound authorization call. Alternative if the
 ChainAdmin must keep that authority: the row stays in the transition, stage 1 skips rows whose
 admin the executor does not own, and stage 2 REQUIRES them applied — the description still names
@@ -267,12 +271,28 @@ Targeted tests:
 ## 6. Order of work
 
 1. This inventory (baseline) — done.
-2. Object inputs: `coreRegistry` + `upgradeTimer` on the transition; CAH pauser holds; notifier row.
-3. `stage0/1/2` on `CTMUpgradeExecutor`; `applyCTMUpgrade` internal.
-4. Authority: ecosystem executor's narrow CTM-executor authorization; pauser registration; notifier
-   ProxyAdmin path.
+2. Object inputs: `coreRegistry` + `upgradeTimer` on the transition — done; CAH pauser holds —
+   done; notifier row — next (needs a per-row admin, see 4.4).
+3. `stage0/1/2` on `CTMUpgradeExecutor`; `applyCTMUpgrade` internal — done.
+4. Authority: ecosystem executor's narrow CTM-executor authorization and pauser registration —
+   done (both emitted by the v34 CTM prepare's stage 2 as explicit bootstrap-join calls); notifier
+   ProxyAdmin path — next.
 5. Bootstrap join: explicit bound authorization calls; no bootstrap machinery on transitions.
 6. Tooling: scripts emit the three calls; the Rust merger stops composing stage bodies; every
    remaining external action listed.
 7. Equivalence replay + targeted tests (Section 5).
 8. Only then: simplify the no-Gateway path behind the same stage interface.
+
+## Executor succession
+
+The CTM executor stores its ecosystem executor explicitly because that relationship cannot be
+recovered from a transparent proxy by an arbitrary caller. This is a replaceable binding, not
+an immutable dependency: `setEcosystemExecutor` is owner-only, requires no pending transition,
+and requires the successor to name the same ecosystem ProxyAdmin. Governance transfers that
+ProxyAdmin through the old executor's owner-gated `forward`, authorizes the existing CTM executor
+on the successor, and updates the binding. A single governance transaction can perform the whole
+handover. Stage 0 still checks authorization before taking a pause hold.
+
+This changes neither the CTM executor's bound CTM nor its transition provenance anchor. Replacing
+an object schema or its accepted codehash is a separate migration and must not be simulated by
+silently regenerating already-deployed source state.

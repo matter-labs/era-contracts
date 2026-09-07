@@ -352,6 +352,14 @@ impl<'a> UpgradeInner<'a> {
         logger::info(format!(
             "ChainRegistrationSender (core prepare): {chain_registration_sender:#x}"
         ));
+        let ecosystem_upgrade_executor = read_ecosystem_upgrade_executor(
+            &self
+                .contracts_path
+                .join(inputs.core_output_path.trim_start_matches('/')),
+        )?;
+        logger::info(format!(
+            "EcosystemUpgradeExecutor (core prepare): {ecosystem_upgrade_executor:#x}"
+        ));
 
         // Per-CTM CREATE2 salt. Each CTM prepare deploys a few contracts
         // whose constructor args are env-wide constants — notably
@@ -397,6 +405,7 @@ impl<'a> UpgradeInner<'a> {
                         governance,
                         chainRegistrationSender: chain_registration_sender,
                         zkTokenAssetId: inputs.zk_token_asset_id,
+                        ecosystemUpgradeExecutor: ecosystem_upgrade_executor,
                     },
                 }
                 .abi_encode(),
@@ -436,6 +445,33 @@ fn read_chain_registration_sender_proxy(core_toml: &Path) -> anyhow::Result<Addr
     value.parse().with_context(|| {
         format!(
             "chain_registration_sender_proxy_addr in {} is not a valid address: {}",
+            core_toml.display(),
+            value,
+        )
+    })
+}
+
+/// The `[registry].ecosystem_upgrade_executor_addr` the core prepare wrote — the executor the
+/// CTM prepare binds its `CTMUpgradeExecutor` to.
+fn read_ecosystem_upgrade_executor(core_toml: &Path) -> anyhow::Result<Address> {
+    let raw =
+        fs::read_to_string(core_toml).with_context(|| format!("read {}", core_toml.display()))?;
+    let top: toml::Value =
+        toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
+    let value = top
+        .get("registry")
+        .and_then(|v| v.get("ecosystem_upgrade_executor_addr"))
+        .and_then(|v| v.as_str())
+        .with_context(|| {
+            format!(
+                "missing registry.ecosystem_upgrade_executor_addr in {}",
+                core_toml.display()
+            )
+        })?;
+
+    value.parse().with_context(|| {
+        format!(
+            "ecosystem_upgrade_executor_addr in {} is not a valid address: {}",
             core_toml.display(),
             value,
         )

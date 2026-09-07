@@ -64,7 +64,8 @@ contract CTMTransition is ICTMTransition {
         if (
             _manifest.fromRelease == address(0) ||
             _manifest.newRelease == address(0) ||
-            _manifest.upgradeEngine.addr == address(0)
+            _manifest.upgradeEngine.addr == address(0) ||
+            _manifest.upgradeTimer.addr == address(0)
         ) {
             revert ZeroAddress();
         }
@@ -220,6 +221,14 @@ contract CTMTransition is ICTMTransition {
         return getManifest().upgradeTimestamp;
     }
 
+    function coreRegistry() external view returns (address) {
+        return getManifest().coreRegistry.addr;
+    }
+
+    function upgradeTimer() external view returns (address) {
+        return getManifest().upgradeTimer.addr;
+    }
+
     function facetCuts() external view returns (Diamond.FacetCut[] memory) {
         return derivedFacetCuts;
     }
@@ -246,6 +255,11 @@ contract CTMTransition is ICTMTransition {
         ICTMRelease(m.newRelease).validate();
         ICTMRelease(m.fromRelease).validate();
         _requirePin(m.upgradeEngine);
+        _requirePin(m.upgradeTimer);
+        // The ecosystem leg is optional; when named it is pinned like every other address.
+        if (m.coreRegistry.addr != address(0)) {
+            _requirePin(m.coreRegistry);
+        }
         ProxyUpgradeRowLib.requireRowPins(ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT));
     }
 
@@ -256,6 +270,8 @@ contract CTMTransition is ICTMTransition {
         }
         return
             CodehashPinLib.pinHolds(m.upgradeEngine) &&
+            CodehashPinLib.pinHolds(m.upgradeTimer) &&
+            (m.coreRegistry.addr == address(0) || CodehashPinLib.pinHolds(m.coreRegistry)) &&
             ProxyUpgradeRowLib.rowPinsHold(ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT));
     }
 

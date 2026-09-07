@@ -24,6 +24,7 @@ const ARTIFACTS = {
   AdminFacet: "Admin.sol/AdminFacet.json",
   BaseTokenHolder: "BaseTokenHolder.sol/BaseTokenHolder.json",
   // ── Registry-driven upgrade machinery (see registry-upgrade-test-runner.ts) ──
+  BytecodesSupplier: "BytecodesSupplier.sol/BytecodesSupplier.json",
   CTMUpgradeExecutor: "CTMUpgradeExecutor.sol/CTMUpgradeExecutor.json",
   EcosystemUpgradeExecutor: "EcosystemUpgradeExecutor.sol/EcosystemUpgradeExecutor.json",
   RegistryComposerHarness: "RegistryComposerHarness.sol/RegistryComposerHarness.json",

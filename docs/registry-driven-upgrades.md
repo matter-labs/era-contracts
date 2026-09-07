@@ -97,14 +97,14 @@ Who holds what, who reads what. Solid = writes or drives; dashed = reads.
 ```mermaid
 flowchart TB
     subgraph obj["Write-once objects — manifest fixed in the constructor"]
-      REL["CTMRelease<br/>pinned facet rows, verifier,<br/>system hashes, genesis params"]
-      TRA["CTMTransition<br/>version edge, engine, schedule,<br/>L2 plan + DERIVED cuts"]
+      REL["CTMRelease<br/>pinned facet rows, verifier,<br/>genesis params"]
+      TRA["CTMTransition<br/>version edge, engine, schedule, timer,<br/>ecosystem leg, L2 plan + DERIVED cuts"]
       CR["CoreRegistry<br/>enum-indexed ecosystem inventory"]
       BOOT["RegistryBootstrapMigration<br/>pre-registry entry edge"]
     end
 
     subgraph exe["Bound executors — immutable target + immutable object codehash"]
-      CE["CTMUpgradeExecutor<br/>CTM · TRANSITION_CODEHASH"]
+      CE["CTMUpgradeExecutor<br/>CTM · CTM ProxyAdmin · ECOSYSTEM_EXECUTOR<br/>TRANSITION_CODEHASH · stage0/1/2"]
       EE["EcosystemUpgradeExecutor<br/>PROXY_ADMIN · CORE_REGISTRY_CODEHASH"]
     end
 
@@ -121,10 +121,12 @@ flowchart TB
     BZU["BaseZkSyncUpgrade — upgrade"]
 
     GML --> REL
-    TRA -. "derive cuts + hash delta<br/>(in the constructor)" .-> TDL
+    TRA -. "derive cuts + L2 deployments<br/>(in the constructor)" .-> TDL
     TDL -. "reads both releases" .-> REL
 
-    CE -- "applyCTMUpgrade / upgradeChain" --> CTM
+    CE -- "stage1 (CTM leg) / upgradeChain" --> CTM
+    CE -- "stage1: applyL1Upgrade(coreRegistry)<br/>stage2: validateUpgradeApplied" --> EE
+    CE -- "stage0: hold pause · stage2: release" --> CAH["L1ChainAssetHandler<br/>owner pause + pauser holds"]
     CE -. "codehash-check + validate" .-> TRA
     EE -. "codehash-check + validate" .-> CR
     BOOT -- "one-time: hands over CTM ownership" --> CE
@@ -136,7 +138,7 @@ flowchart TB
     CE -- "compose cut" --> CUC
     CUC -. "engine, schedule, L2 plan" .-> TRA
 
-    DI -. "routing, verifier, hashes" .-> REL
+    DI -. "routing, verifier" .-> REL
     DI --> RFR
     BZU -. "derived cuts + proposal" .-> TRA
     BZU --> CUC
@@ -163,18 +165,33 @@ flowchart LR
     CTMEXE -->|owns| CTM
     CTMEXE -->|owns| CTMPA["CTM-domain ProxyAdmin"]
     ECOEXE -->|owns| PA
+    CTMEXE -.->|"applyL1Upgrade — authorized, own pending<br/>transition's registry only"| ECOEXE
+    CTMEXE -.->|"acquire/release its OWN pause hold<br/>(registered pauser)"| CAH["L1ChainAssetHandler"]
+    PUH -->|owns| CAH
 ```
 
 Each executor is **bound at construction** to the contracts it governs and to the codehash of the
-object type it accepts — both immutable.
+object type it accepts. Its CTM / ProxyAdmin and object-type codehash bindings are immutable. The
+CTM executor's ecosystem-executor binding is replaceable by its owner through
+`setEcosystemExecutor`, only while no transition is pending and only for a successor naming the
+same ecosystem ProxyAdmin. Governance must transfer that ProxyAdmin's ownership and authorize the
+CTM executor on the successor; see [executor succession](upgrade-stage-lifecycle.md#executor-succession).
 
-| Executor                   | Bound to                                                                    | Entrypoints                                                                                                                                                                                                                                                                                                                               |
-| -------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CTMUpgradeExecutor`       | one `ChainTypeManager` + its own `ProxyAdmin`, the `CTMTransition` codehash | `applyCTMUpgrade`, `upgradeChain`, `acceptCTMOwnership`, `setProtocolVersionDeadline`, `validateTransitionApplied`, and the routine/recovery passthroughs (`freezeChain`, `unfreezeChain`, `revertBatches`, `setValidator`, `setPriorityTxMaxGasLimit`, `setPorterAvailability`, `deactivatePriorityMode`, `setValidatorTimelockPostV29`) |
-| `EcosystemUpgradeExecutor` | one `ProxyAdmin`, the `CoreRegistry` codehash                               | `applyL1Upgrade`, `validateUpgradeApplied`                                                                                                                                                                                                                                                                                                |
+| Executor                   | Bound to                                                                                                    | Entrypoints                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMUpgradeExecutor`       | one `ChainTypeManager` + its own `ProxyAdmin`, the `EcosystemUpgradeExecutor`, the `CTMTransition` codehash | `stage0` / `stage1` / `stage2` (the upgrade lifecycle, [stage lifecycle](upgrade-stage-lifecycle.md)), `upgradeChain`, `acceptCTMOwnership`, `setProtocolVersionDeadline`, `validateTransitionApplied`, and the routine/recovery passthroughs (`freezeChain`, `unfreezeChain`, `revertBatches`, `setValidator`, `setPriorityTxMaxGasLimit`, `setPorterAvailability`, `deactivatePriorityMode`, `setValidatorTimelockPostV29`) |
+| `EcosystemUpgradeExecutor` | one `ProxyAdmin`, the `CoreRegistry` codehash                                                               | `applyL1Upgrade` (owner, or an authorized CTM executor for its pending transition's registry), `validateUpgradeApplied`, `setCTMExecutorAuthorization`                                                                                                                                                                                                                                                                        |
 
 CTM authority and ecosystem authority are separate: each CTM is governed by its own executor and
-upgrades on its own cadence.
+upgrades on its own cadence. The one bridge between them is narrow and explicit: the ecosystem
+executor's owner AUTHORIZES a CTM executor (`setCTMExecutorAuthorization`), after which that
+executor may call `applyL1Upgrade` — only for the `CoreRegistry` its pending transition names, so
+the ecosystem leg of an upgrade runs inside the CTM executor's stage lifecycle without the CTM
+executor gaining any standing authority over shared contracts. The other shared surface, the
+`L1ChainAssetHandler` migration pause, is reached the same way: the owner registers the CTM
+executor as an UPGRADE PAUSER, and a pauser can only acquire and release its own hold —
+`migrationPaused()` is the owner's pause OR any hold, so one upgrade's completion can never lift a
+pause another upgrade (or the owner) still requires.
 
 `UpgradeExecutorBase` gives both ONE role. `owner` (`Ownable2Step`) drives the fixed entrypoints,
 whose inputs are write-once objects and whose invariants cannot be bypassed, and the same owner can
@@ -199,7 +216,7 @@ methods have no such path, which is why they are passthroughs.
 
 | CTM owner method                                                                                                                                             | Through the executor                                                              | Chain side                              |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- | --------------------------------------- |
-| `setNewVersionUpgradeFromTransition`, `setCurrentRelease`                                                                                                    | `applyCTMUpgrade` (together, from a transition)                                   | —                                       |
+| `setNewVersionUpgradeFromTransition`, `setCurrentRelease`                                                                                                    | `stage1` (together, from the pending transition)                                  | —                                       |
 | `upgradeChainFromVersion`                                                                                                                                    | `upgradeChain`                                                                    | —                                       |
 | `setProtocolVersionDeadline`                                                                                                                                 | passthrough                                                                       | —                                       |
 | `freezeChain`, `unfreezeChain`, `setValidator`, `setPriorityTxMaxGasLimit`, `setPorterAvailability`, `deactivatePriorityMode`, `setValidatorTimelockPostV29` | passthrough                                                                       | — (`onlyChainTypeManager`)              |
@@ -318,11 +335,19 @@ When a chain migrates between settlement layers, `forwardedBridgeBurn` forwards 
 sequenceDiagram
     participant G as Governance
     participant E as CTMUpgradeExecutor
+    participant X as EcosystemUpgradeExecutor
+    participant H as L1ChainAssetHandler
+    participant T as GovernanceUpgradeTimer
     participant C as ChainTypeManager
     participant D as Chain diamond
 
-    G->>E: applyCTMUpgrade(transition)
-    Note over E: codehash-check, validate,<br/>check release + version edges
+    G->>E: stage0(transition)
+    Note over E: codehash-check, validate, both edges,<br/>coreRegistry pin, timer bound to E
+    E->>H: acquireMigrationPause()
+    E->>T: startTimer()
+    G->>E: stage1(transition)
+    E->>T: checkDeadline()
+    E->>X: applyL1Upgrade(coreRegistry) — ecosystem leg first
     E->>C: setNewVersionUpgradeFromTransition(transition)
     E->>C: setCurrentRelease(newRelease)
     G->>E: upgradeChain(transition, chainId)
@@ -330,20 +355,39 @@ sequenceDiagram
     C->>D: upgradeChainFromVersion(oldV)
     D->>C: upgradeCutForVersion(oldV) — cut derived from upgradeTransition[oldV]
     Note over D: apply derived facetCuts verbatim,<br/>then run composed ProposedUpgrade
+    G->>E: stage2(transition)
+    Note over E: validateTransitionApplied +<br/>X.validateUpgradeApplied(coreRegistry)
+    E->>H: releaseMigrationPause()
 ```
 
-A proposal is a sequence of fixed-signature executor calls:
+A proposal is three fixed-signature executor calls — the governance stages the prepare scripts
+used to compose as calldata, moved into the executor ([stage lifecycle](upgrade-stage-lifecycle.md)).
+One transition is mid-lifecycle at a time; each stage names it and is rejected for a different one,
+out of order, or twice:
 
-- **`EcosystemUpgradeExecutor.applyL1Upgrade(coreRegistry)`** walks the source-checked rows. A proxy
-  already at `implNew` is skipped; a proxy at `expectedOldImpl` is upgraded; a proxy at anything else
-  reverts. Replaying a stale registry therefore cannot downgrade a proxy a later upgrade moved on.
+- **`CTMUpgradeExecutor.stage0(transition)`** — preparation. Everything rejectable is rejected
+  BEFORE the transition is recorded: codehash and `validate()`, the **release edge**
+  (`ctm.currentRelease() == transition.fromRelease()`) and the **version edge**
+  (`ctm.protocolVersion() == transition.oldProtocolVersion()`), the named `coreRegistry`'s pin,
+  this executor's authorization on the ecosystem executor, and that the transition's timer is bound
+  to this executor. It then records the transition, takes the executor's HOLD on the migration pause
+  (the CTM's version commit is only admissible while migrations are paused) and starts the timer.
 
-- **`CTMUpgradeExecutor.applyCTMUpgrade(transition)`** asserts both edges before any mutation:
-  the **release edge** (`ctm.currentRelease() == transition.fromRelease()`) and the **version edge**
-  (`ctm.protocolVersion() == transition.oldProtocolVersion()`). Because the call moves
-  `currentRelease`, the release edge also rejects replays. It then commits the transition with
-  `setNewVersionUpgradeFromTransition` — one argument, so the version edge, the schedule and the cut
-  are read from the same object and cannot be passed inconsistently.
+- **`CTMUpgradeExecutor.stage1(transition)`** — execution, once the timer's deadline has passed.
+  The ecosystem leg runs FIRST through `EcosystemUpgradeExecutor.applyL1Upgrade(coreRegistry)`
+  (the order the merged bundle always had), which walks the source-checked rows: a proxy already at
+  `implNew` is skipped, a proxy at `expectedOldImpl` is upgraded, anything else reverts — replaying a
+  stale registry cannot downgrade a proxy a later upgrade moved on. Then the CTM leg: factory-dep
+  publication, the CTM-domain rows, and the commit with `setNewVersionUpgradeFromTransition` — one
+  argument, so the version edge, the schedule and the cut are read from the same object and cannot
+  be passed inconsistently — followed by `setCurrentRelease`. Because it moves `currentRelease`,
+  the release edge also rejects replays. Any failure reverts the whole stage.
+
+- **`CTMUpgradeExecutor.stage2(transition)`** — completion. The applied-state checks for both legs
+  (`validateTransitionApplied`, `validateUpgradeApplied`) run BEFORE the restoration: only then is
+  the executor's pause hold released and the lifecycle slot cleared. Stage 2 attests that the L1
+  edge is complete and the operational restriction is lifted — not that every chain has finished
+  its own upgrade.
 
 - **`CTMUpgradeExecutor.upgradeChain(transition, chainId)`** per chain. The owner may upgrade any
   chain at any time; a chain's **own admin** may upgrade **that** chain at any time — upgrading is
@@ -483,7 +527,13 @@ The prepare side of this edge is `deploy-scripts/upgrade/v34/` (`CTMUpgrade_v34`
 `CoreUpgrade_v34`): it rides the default pipeline for implementation deploys and cut
 composition, then deploys the executor and the migration (manifest pinned from the run's own
 outputs) and collapses the stage-1 CTM leg to THREE governance calls — nominate the CTM, hand
-over its ProxyAdmin, and `migrate()`. `UpgradeTestv34_Local.t.sol`
+over its ProxyAdmin, and `migrate()`. Its stage-2 CTM leg is the migration's `validateApplied()` plus
+the two bootstrap-JOIN authorizations the recurring stage lifecycle needs and the executor cannot
+grant itself: `L1ChainAssetHandler.setUpgradePauser(executor, true)` and
+`EcosystemUpgradeExecutor.setCTMExecutorAuthorization(executor, true)` — explicit governance calls
+whose targets are bound data (the CAH through the Bridgehub; the ecosystem executor from the core
+prepare's own output, handed to the CTM prepare as `CTMUpgradeParams.ecosystemUpgradeExecutor` — the
+CTM executor is constructed BOUND to it). `UpgradeTestv34_Local.t.sol`
 drives the whole edge through this pipeline in-forge, including the chain crossing via the
 legacy cut-taking leg (`LegacyTestAdminFacet`, the same dance the anvil bootstrap stage does). The v31 upgrade surface (scripts, its anvil CI job, fork harness and
 fixtures) is deleted; the pre-registry history lives on the release branches. The remaining

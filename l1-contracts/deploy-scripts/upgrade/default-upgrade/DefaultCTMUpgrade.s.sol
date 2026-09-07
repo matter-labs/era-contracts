@@ -67,6 +67,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     struct UpgradeDeployedAddresses {
         address upgradeTimer;
         address upgradeStageValidator;
+        address ecosystemUpgradeExecutor;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -145,6 +146,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         if (_params.chainRegistrationSender != address(0)) {
             coreAddresses.bridgehub.proxies.chainRegistrationSender = _params.chainRegistrationSender;
         }
+        setEcosystemUpgradeExecutor(_params.ecosystemUpgradeExecutor);
         prepareCTMUpgrade();
         prepareDefaultGovernanceCalls();
         prepareDefaultCTMAdminCalls();
@@ -341,6 +343,12 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
     function getOwnerAddress() public virtual returns (address) {
         return config.ownerAddress;
+    }
+
+    /// @notice The ecosystem executor of this upgrade (a core-prepare output). Set from the prepare
+    ///         params in production; in-forge harnesses that drive both prepares call it directly.
+    function setEcosystemUpgradeExecutor(address _ecosystemUpgradeExecutor) public virtual {
+        upgradeAddresses.ecosystemUpgradeExecutor = _ecosystemUpgradeExecutor;
     }
 
     function setNewProtocolVersion(uint256 _protocolVersion) public virtual {
