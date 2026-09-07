@@ -18,8 +18,11 @@ import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgra
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
+import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
+import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
@@ -28,6 +31,7 @@ import {
     BootstrapExecutorNotBound,
     BootstrapNotYetExecuted,
     DeadlineNotYetPassed,
+    L2BytecodeNotPublished,
     ProxyUpgradeRowMismatch,
     RegistryCodehashMismatch,
     RegistryDuplicateProxyRow,
@@ -153,6 +157,25 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     }
 
     function _manifest() internal view returns (BootstrapManifest memory) {
+        return _manifestWithFactoryDeps(new uint256[](0));
+    }
+
+    /// @dev The committed cut carries the engine's `upgrade(ProposedUpgrade)` calldata — the
+    ///      migration decodes it to check the L2 transaction's factory dependencies are published.
+    ///      The fixture never executes it (the CTM only commits its hash), so an otherwise-empty
+    ///      proposal carrying `_factoryDeps` is the whole payload.
+    function _upgradeCut(uint256[] memory _factoryDeps) internal view returns (Diamond.DiamondCutData memory) {
+        ProposedUpgrade memory proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(newVersion);
+        proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps = _factoryDeps;
+        return
+            Diamond.DiamondCutData({
+                facetCuts: new Diamond.FacetCut[](0),
+                initAddress: upgradeCutInit,
+                initCalldata: abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
+            });
+    }
+
+    function _manifestWithFactoryDeps(uint256[] memory _factoryDeps) internal view returns (BootstrapManifest memory) {
         // The one participating slot in the enum-indexed CTM-domain inventory: the CTM's own
         // implementation swap. The remaining slots stay inert (explicitly not upgraded).
         ProxyUpgradeRow[] memory upgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
@@ -162,7 +185,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             implNew: PinnedContract({addr: implV32, codehash: implV32.codehash}),
             callInitializeUpgrade: false
         });
-        Diamond.FacetCut[] memory noFacetCuts = new Diamond.FacetCut[](0);
         return
             BootstrapManifest({
                 ctm: address(chainContractAddress),
@@ -172,11 +194,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 currentRelease: PinnedContract({addr: address(genesisRelease), codehash: Utils.releaseCodehash()}),
                 newProtocolVersion: newVersion,
                 oldProtocolVersionDeadline: type(uint256).max,
-                upgradeCut: Diamond.DiamondCutData({
-                    facetCuts: noFacetCuts,
-                    initAddress: upgradeCutInit,
-                    initCalldata: hex""
-                }),
+                upgradeCut: _upgradeCut(_factoryDeps),
                 upgradeCutInitCodehash: upgradeCutInit.codehash,
                 ctmExecutor: PinnedContract({addr: address(ctmExecutor), codehash: address(ctmExecutor).codehash}),
                 upgradeTimer: PinnedContract({addr: address(upgradeTimer), codehash: address(upgradeTimer).codehash})
@@ -238,6 +256,35 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         vm.expectRevert(BootstrapAlreadyExecuted.selector);
         migration.migrate();
+    }
+
+    // ─────────────────────────── factory dependency publication ───────────────────────────
+
+    /// @dev The committed cut's L2 transaction fails on every chain unless its factory
+    ///      dependencies are on the CTM's supplier, so the edge refuses to commit until they are —
+    ///      and commits, unchanged, once they are published.
+    function test_migrate_requiresCommittedCutFactoryDepsPublished() public {
+        bytes memory l2UpgradeCode = hex"c0de";
+        RegistryBootstrapMigration gated = new RegistryBootstrapMigration(
+            _manifestWithFactoryDeps(L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(l2UpgradeCode)))
+        );
+        vm.prank(governor);
+        chainContractAddress.transferOwnership(address(gated));
+        ecosystemProxyAdmin.transferOwnership(address(gated));
+        assertEq(chainContractAddress.L1_BYTECODES_SUPPLIER(), address(bytecodesSupplier));
+        assertEq(bytecodesSupplier.evmPublishingBlock(keccak256(l2UpgradeCode)), 0, "fixture: not yet published");
+
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeNotPublished.selector, keccak256(l2UpgradeCode)));
+        gated.migrate();
+        assertFalse(gated.executed(), "a refused edge must stay unspent");
+        assertEq(chainContractAddress.protocolVersion(), 0, "a refused edge must not move the CTM");
+
+        L2PlanFixtures.publish(bytecodesSupplier, L2PlanFixtures.codes(l2UpgradeCode));
+
+        gated.migrate();
+        assertTrue(gated.executed(), "the same edge applies once the bytecode is published");
+        assertEq(chainContractAddress.protocolVersion(), newVersion);
+        gated.validateApplied();
     }
 
     // ─────────────────────────── post-state verification ───────────────────────────

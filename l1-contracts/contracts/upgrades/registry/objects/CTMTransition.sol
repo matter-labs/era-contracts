@@ -9,6 +9,7 @@ import {ICTMTransition} from "./ICTMTransition.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {CTM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol";
+import {L2PlanValidationLib} from "../libraries/L2PlanValidationLib.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
@@ -125,11 +126,19 @@ contract CTMTransition is ICTMTransition {
         }
         // The FINAL deployment list: the target release's table-derived set (empty for a
         // same-release pair by identity) followed by the authored extras.
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory derivedDeployments = TransitionDerivationLib
+            .deriveL2Deployments(ICTMRelease(_manifest.fromRelease), ICTMRelease(_manifest.newRelease));
+        // The authored remainder is reviewed data, but its SHAPE is mechanical (see the lib):
+        // extras only at their bytecode-derived address, the delegate among them, every installed
+        // bytecode among the factory dependencies.
+        L2PlanValidationLib.validateAuthored(
+            derivedDeployments,
+            _manifest.l2Plan.extraDeployments,
+            _manifest.l2Plan.delegateTo,
+            _manifest.l2Plan.factoryDepHashes
+        );
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory l2Deployments = _combineL2Deployments(
-            TransitionDerivationLib.deriveL2Deployments(
-                ICTMRelease(_manifest.fromRelease),
-                ICTMRelease(_manifest.newRelease)
-            ),
+            derivedDeployments,
             _manifest.l2Plan.extraDeployments
         );
 

@@ -81,6 +81,9 @@ interface IChainTypeManager {
 
     function BRIDGE_HUB() external view returns (address);
 
+    // solhint-disable-next-line func-name-mixedcase
+    function L1_BYTECODES_SUPPLIER() external view returns (address);
+
     function PERMISSIONLESS_VALIDATOR() external view returns (address);
 
     function setPendingAdmin(address _newPendingAdmin) external;

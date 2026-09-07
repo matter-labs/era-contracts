@@ -12,12 +12,16 @@ import {CTMUpgradeExecutor} from "../executors/CTMUpgradeExecutor.sol";
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {GovernanceUpgradeTimer} from "../../GovernanceUpgradeTimer.sol";
+import {BytecodesSupplier} from "../../BytecodesSupplier.sol";
+import {L2PlanValidationLib} from "../libraries/L2PlanValidationLib.sol";
+import {ProposedUpgrade} from "../../../state-transition/libraries/ProposedUpgradeLib.sol";
 import {
     BootstrapAlreadyExecuted,
     BootstrapAuthorityNotHeld,
     BootstrapExecutorNotBound,
     BootstrapNotYetExecuted,
     BootstrapReleaseNotInstalled,
+    MalformedL2UpgradePlan,
     ProxyUpgradeRowMismatch,
     RegistryUnknownKey,
     ZeroAddress
@@ -151,6 +155,12 @@ contract RegistryBootstrapMigration {
         }
 
         m.upgradeCut.initAddress.requirePin(m.upgradeCutInitCodehash);
+        // The committed cut's L2 transaction must find every bytecode it depends on already
+        // published on the CTM's supplier, or the edge fails on every chain's L2 leg.
+        L2PlanValidationLib.requirePublished(
+            BytecodesSupplier(IChainTypeManager(m.ctm).L1_BYTECODES_SUPPLIER()),
+            _committedProposedUpgrade(m.upgradeCut.initCalldata).l2ProtocolUpgradeTx.factoryDeps
+        );
 
         // The release must run the very code this migration installs as the anchor, so the anchor
         // and the release it vouches for cannot be mismatched at the moment of installation.
@@ -197,6 +207,21 @@ contract RegistryBootstrapMigration {
         if (proxyAdminOwner != m.ctmExecutor.addr) {
             revert BootstrapAuthorityNotHeld(address(m.ctmProxyAdmin), proxyAdminOwner);
         }
+    }
+
+    /// @dev The committed cut's init calldata is `upgrade(ProposedUpgrade)` on the pinned engine:
+    ///      a 4-byte selector followed by the ABI-encoded proposal. Decoded here so the proposal's
+    ///      L2 transaction can be checked; a malformed payload fails the decode.
+    function _committedProposedUpgrade(bytes memory _initCalldata) private pure returns (ProposedUpgrade memory) {
+        // Shorter than a selector: not an engine call at all — name it instead of underflowing.
+        if (_initCalldata.length < 4) {
+            revert MalformedL2UpgradePlan();
+        }
+        bytes memory encoded = new bytes(_initCalldata.length - 4);
+        for (uint256 i = 0; i < encoded.length; ++i) {
+            encoded[i] = _initCalldata[i + 4];
+        }
+        return abi.decode(encoded, (ProposedUpgrade));
     }
 
     /// @notice Performs the whole edge, then hands authority to the bound executors.

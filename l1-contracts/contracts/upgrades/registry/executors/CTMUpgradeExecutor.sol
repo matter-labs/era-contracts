@@ -18,6 +18,8 @@ import {
 import {OutdatedProtocolVersion} from "../../../state-transition/L1StateTransitionErrors.sol";
 import {CodehashPinLib} from "../libraries/CodehashPinLib.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
+import {L2PlanValidationLib} from "../libraries/L2PlanValidationLib.sol";
+import {BytecodesSupplier} from "../../BytecodesSupplier.sol";
 
 /// @title CTMUpgradeExecutor
 /// @author Matter Labs
@@ -174,6 +176,13 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
         if (currentProtocolVersion != oldProtocolVersion) {
             revert OutdatedProtocolVersion(currentProtocolVersion, oldProtocolVersion);
         }
+
+        // Every bytecode the L2 transaction depends on must already be published on the CTM's
+        // supplier — otherwise the committed edge fails on every chain's L2 leg.
+        L2PlanValidationLib.requirePublished(
+            BytecodesSupplier(CHAIN_TYPE_MANAGER.L1_BYTECODES_SUPPLIER()),
+            _transition.l2Plan().factoryDepHashes
+        );
 
         // CTM-domain implementation swaps FIRST — the commit below may need setters that only
         // exist on the implementation this very transition installs (the bootstrap's

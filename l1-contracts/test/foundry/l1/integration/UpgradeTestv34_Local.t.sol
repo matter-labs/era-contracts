@@ -29,6 +29,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {LegacyTestAdminFacet} from "contracts/dev-contracts/test/LegacyTestAdminFacet.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IAdminV31} from "../../../../deploy-scripts/utils/UpgradeChainCall.sol";
 import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils.sol";
@@ -61,15 +62,25 @@ contract CTMUpgrade_v34_Test is CTMUpgrade_v34 {
         return getUniversalComplexUpgraderTargetAndData(_deployments, address(0), "");
     }
 
-    /// @notice Skip bytecode publishing (reads large JSON files).
-    function publishBytecodes() public override {
-        console.log("Test mode: Skipping bytecode publishing to avoid MemoryOOG");
+    /// @dev How many factory dependencies the placeholder publish stands in for.
+    uint256 internal constant PLACEHOLDER_FACTORY_DEP_COUNT = 45;
+    /// @dev Prefix of every placeholder bytecode; the index byte makes them distinct.
+    bytes internal constant PLACEHOLDER_BYTECODE_PREFIX = hex"00c0de";
 
-        factoryDepsResult.factoryDepsHashes = new uint256[](45);
-        bytes32 dummyHash = bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001));
-        for (uint256 i = 0; i < 45; i++) {
-            factoryDepsResult.factoryDepsHashes[i] = uint256(dummyHash);
+    /// @notice Publish PLACEHOLDER bytecodes instead of the real factory deps (reading those
+    ///         JSON artifacts is MemoryOOG here). The bootstrap's `migrate()` refuses a cut whose
+    ///         factory deps are not on the CTM's supplier, so the stand-ins must really be
+    ///         published — the same supplier and key the production publish step uses.
+    function publishBytecodes() public override {
+        console.log("Test mode: publishing placeholder factory deps to avoid MemoryOOG");
+
+        bytes[] memory placeholders = new bytes[](PLACEHOLDER_FACTORY_DEP_COUNT);
+        factoryDepsResult.factoryDepsHashes = new uint256[](PLACEHOLDER_FACTORY_DEP_COUNT);
+        for (uint256 i = 0; i < PLACEHOLDER_FACTORY_DEP_COUNT; i++) {
+            placeholders[i] = bytes.concat(PLACEHOLDER_BYTECODE_PREFIX, bytes1(uint8(i)));
+            factoryDepsResult.factoryDepsHashes[i] = uint256(keccak256(placeholders[i]));
         }
+        BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier).publishEVMBytecodes(placeholders);
         upgradeConfig.factoryDepsPublished = true;
     }
 

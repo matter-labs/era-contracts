@@ -12,9 +12,12 @@ import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {
     CTM_CONTRACT_COUNT,
-    L2_ECOSYSTEM_CONTRACT_COUNT
+    L2_ECOSYSTEM_CONTRACT_COUNT,
+    L2EcosystemContract
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {L2PlanFixtures} from "./L2PlanFixtures.sol";
+import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -34,6 +37,7 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {
     AuthoredL2Plan,
     GenesisFacet,
+    L2UpgradePlan,
     ReleaseGenesisData,
     ReleaseManifest,
     TransitionManifest,
@@ -75,6 +79,13 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     uint256 internal constant V32 = uint256(32) << 32; // 0.32.0
     uint256 internal constant V33 = uint256(33) << 32; // 0.33.0
 
+    // Dummy EVM bytecodes standing in for the v33 hop's L2 artifacts (see {L2PlanFixtures}): the
+    // upgrade delegate (authored Unsafe extra) and the L2Bridgehub system-proxy row the v33
+    // release's table carries (implementation + proxy shell). All three are factory deps.
+    bytes internal constant L2_DELEGATE_CODE = hex"c0de01";
+    bytes internal constant L2_BRIDGEHUB_IMPL_CODE = hex"c0de02";
+    bytes internal constant L2_SYSTEM_PROXY_CODE = hex"c0de03";
+
     // ---------------------------------------------------------------------------------------
     // Per-VM hooks
     // ---------------------------------------------------------------------------------------
@@ -88,12 +99,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     /// @dev The L2 upgrade-transaction type the chain must commit for this VM.
     function _expectedL2UpgradeTxType() internal pure virtual returns (uint256);
 
-    /// @dev The force-deployment flavor the registry pins for the L2 side of the upgrade.
+    /// @dev The force-deployment flavor the transition DERIVES for the target release's table rows
+    ///      (VM identity is read from the release's pinned DiamondInit).
     function _l2DeploymentType() internal pure virtual returns (IComplexUpgrader.ContractUpgradeType);
-
-    /// @dev The pinned `deployedBytecodeInfo` — opaque on L1 (only decoded on L2), so any
-    ///      VM-shaped payload is enough here.
-    function _l2DeployedBytecodeInfo() internal pure virtual returns (bytes memory);
 
     /// @dev The `genesisBatchCommitment` the registry pins in its genesis params —
     ///      `applyCTMUpgrade` feeds it to `setChainCreationParams`, which ZKsyncOS CTMs only
@@ -169,6 +177,14 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         // subsequent minor upgrade correctly reverts with PreviousUpgradeNotFinalized.
         UtilsFacet(chainAddress).util_setL2SystemContractsUpgradeTxHash(bytes32(0));
 
+        // Every bytecode the v33 hop installs must be published on the CTM's supplier before
+        // `applyCTMUpgrade` commits the edge — the prepare pipeline's publish step.
+        assertEq(chainContractAddress.L1_BYTECODES_SUPPLIER(), address(bytecodesSupplier));
+        L2PlanFixtures.publish(
+            bytecodesSupplier,
+            L2PlanFixtures.codes(L2_DELEGATE_CODE, L2_BRIDGEHUB_IMPL_CODE, L2_SYSTEM_PROXY_CODE)
+        );
+
         // The first hop departs from the fixture CTM's genesis (current) release; V33 then
         // transitions from the V32 release the first hop pinned.
         transitionV32 = _makeTransition(0, V32, verifierV32, chainContractAddress.currentRelease(), address(0));
@@ -176,10 +192,19 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     }
 
     /// @dev One release's full manifest: the fixture's routing (AdminFacet swapped for
-    ///      `_adminFacet` when nonzero), the verifier, carried base-system hashes, genesis params.
-    ///      Hop 1 changes only the verifier, so its target release differs from genesis in that
-    ///      one field and the DERIVED facet/hash delta is empty — an L1-only upgrade.
+    ///      `_adminFacet` when nonzero), the verifier, carried base-system hashes, genesis params
+    ///      and the L2 bytecode table. Hop 1 changes only the verifier, so its target release
+    ///      differs from genesis in that one field and the DERIVED facet/hash/deployment delta is
+    ///      empty — an L1-only upgrade. The v33 release (nonzero `_adminFacet`) also carries one
+    ///      table row, the L2Bridgehub system-proxy upgrade, which the v33 transition derives.
     function _releaseManifest(address _adminFacet, address _verifier) internal returns (ReleaseManifest memory) {
+        bytes[] memory l2BytecodeInfos = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
+        if (_adminFacet != address(0)) {
+            l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.systemProxyRow(
+                L2_BRIDGEHUB_IMPL_CODE,
+                L2_SYSTEM_PROXY_CODE
+            );
+        }
         return
             ReleaseManifest({
                 diamondInit: PinnedContract({addr: diamondInit, codehash: diamondInit.codehash}),
@@ -197,8 +222,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
                     genesisBatchCommitment: _registryGenesisBatchCommitment(),
                     genesisIndexRepeatedStorageChanges: 54
                 }),
-                // Length-checked inventory; content is irrelevant to this fixture.
-                l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
+                l2BytecodeInfos: l2BytecodeInfos
             });
     }
 
@@ -223,8 +247,8 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     ///      initialization — nothing is hand-authored. When `_newAdminFacet` is zero the target
     ///      release equals the source routing (empty derived delta -> L1-only upgrade with empty
     ///      cuts); otherwise the derived delta replaces the chain's REAL AdminFacet by the given
-    ///      implementation, and the hop also carries an L2 force-deployment, making it a full
-    ///      minor upgrade.
+    ///      implementation, and the hop also carries an L2 side — the table-derived L2Bridgehub
+    ///      row plus the authored upgrade delegate — making it a full minor upgrade.
     function _makeTransition(
         uint256 _oldVersion,
         uint256 _newVersion,
@@ -237,21 +261,20 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         bool hasL2Side = _newAdminFacet != address(0);
         IComplexUpgrader.UniversalContractUpgradeInfo[]
             memory deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](hasL2Side ? 1 : 0);
-        if (hasL2Side) {
-            deployments[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
-                upgradeType: _l2DeploymentType(),
-                deployedBytecodeInfo: _l2DeployedBytecodeInfo(),
-                newAddress: makeAddr("l2Bridgehub")
-            });
-        }
         // A nonempty L2 plan MUST carry a delegate target: `L2ComplexUpgrader` always ends with
-        // the final delegatecall, so a deployments-only plan (no target) would revert on L2.
+        // the final delegatecall, so a deployments-only plan (no target) would revert on L2. The
+        // delegate is the one authored extra, and every bytecode the hop installs (the delegate,
+        // the table row's implementation and proxy shell) is a factory dependency.
         AuthoredL2Plan memory l2Plan;
         l2Plan.extraDeployments = deployments;
         l2Plan.factoryDepHashes = new uint256[](0);
         if (hasL2Side) {
-            l2Plan.delegateTo = makeAddr("l2UpgradeTarget");
+            deployments[0] = L2PlanFixtures.unsafeDeployment(L2_DELEGATE_CODE);
+            l2Plan.delegateTo = deployments[0].newAddress;
             l2Plan.delegateCalldata = hex"beef";
+            l2Plan.factoryDepHashes = L2PlanFixtures.factoryDepHashes(
+                L2PlanFixtures.codes(L2_DELEGATE_CODE, L2_BRIDGEHUB_IMPL_CODE, L2_SYSTEM_PROXY_CODE)
+            );
         }
 
         ProxyUpgradeRow[] memory noProxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
@@ -308,11 +331,28 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             "the AdminFacet must be re-pointed to the v33 implementation"
         );
 
+        // The executed L2 plan is the table-DERIVED L2Bridgehub row followed by the authored
+        // delegate, and the delegatecall targets that delegate at its bytecode-derived address.
+        L2UpgradePlan memory plan = transitionV33.l2Plan();
+        assertEq(plan.deployments.length, 2, "derived row + authored delegate");
+        assertTrue(plan.deployments[0].upgradeType == _l2DeploymentType(), "table row derives the VM's flavor");
+        assertEq(plan.deployments[0].newAddress, L2_BRIDGEHUB_ADDR, "table row lands on the member's fixed address");
+        assertEq(
+            plan.deployments[0].deployedBytecodeInfo,
+            L2PlanFixtures.systemProxyRow(L2_BRIDGEHUB_IMPL_CODE, L2_SYSTEM_PROXY_CODE)
+        );
+        assertTrue(
+            plan.deployments[1].upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment
+        );
+        assertEq(plan.deployments[1].newAddress, plan.delegateTo, "the delegate is the authored Unsafe extra");
+        assertEq(plan.factoryDepHashes.length, 3, "delegate + implementation + proxy shell");
+
         // The committed L2 upgrade transaction is exactly the registry-composed one, carrying
         // the VM's upgrade-transaction type (254 for Era, 126 for ZKsyncOS).
         L2CanonicalTransaction memory expectedTx = CTMUpgradeComposer.buildL2UpgradeTx(
             ICTMTransition(address(transitionV33))
         );
+        assertEq(expectedTx.factoryDeps.length, 3, "the L2 transaction carries every installed bytecode");
         assertEq(expectedTx.txType, _expectedL2UpgradeTxType(), "the upgrade tx must carry the VM's upgrade tx type");
         assertEq(expectedTx.nonce, 33, "upgrade tx nonce must equal the new minor version");
         assertEq(
@@ -447,12 +487,6 @@ contract RegistryDrivenUpgradeZKsyncOSTest is ZKsyncOSChainTypeManagerSharedTest
 
     function _l2DeploymentType() internal pure override returns (IComplexUpgrader.ContractUpgradeType) {
         return IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade;
-    }
-
-    function _l2DeployedBytecodeInfo() internal pure override returns (bytes memory) {
-        // For ZKsyncOS this is the abi-encoded (bytecodeHash, bytecodeLength, observableHash)
-        // tuple of the new implementation.
-        return abi.encode(bytes32(uint256(0xb001)), uint32(64), bytes32(uint256(0xb002)));
     }
 
     function _registryGenesisBatchCommitment() internal pure override returns (bytes32) {

@@ -45,7 +45,7 @@ contract ZKsyncOSChainTypeManagerSharedTest is ChainTypeManagerTest {
         ZKsyncOSChainTypeManager implementation = new ZKsyncOSChainTypeManager(
             address(bridgehub),
             interopCenterAddress,
-            address(0),
+            address(bytecodesSupplier),
             address(0)
         );
 

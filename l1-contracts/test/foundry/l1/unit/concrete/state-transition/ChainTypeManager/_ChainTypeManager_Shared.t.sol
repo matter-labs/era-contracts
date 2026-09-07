@@ -29,6 +29,7 @@ import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChain
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
+import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
@@ -52,6 +53,9 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
 
     ZKsyncOSChainTypeManager internal chainTypeManager;
     ZKsyncOSChainTypeManager internal chainContractAddress;
+    /// @dev The CTM's `L1_BYTECODES_SUPPLIER`: a real supplier, so the registry objects' publication
+    ///      checks run against the same contract the prepare pipeline publishes factory deps to.
+    BytecodesSupplier internal bytecodesSupplier;
     L1GenesisUpgrade internal genesisUpgradeContract;
     L1Bridgehub internal bridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
@@ -121,10 +125,11 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
 
         newChainAdmin = makeAddr("chainadmin");
 
+        bytecodesSupplier = new BytecodesSupplier();
         chainTypeManager = new ZKsyncOSChainTypeManager(
             address(bridgehub),
             interopCenterAddress,
-            address(0),
+            address(bytecodesSupplier),
             address(0)
         );
         diamondInit = address(new DiamondInit(true));

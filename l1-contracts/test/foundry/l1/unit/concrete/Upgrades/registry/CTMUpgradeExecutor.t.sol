@@ -17,6 +17,7 @@ import {
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -28,6 +29,7 @@ import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
 import {
+    L2BytecodeNotPublished,
     TransitionNotCommitted,
     RegistryCodehashMismatch,
     TransitionReleaseMismatch,
@@ -60,6 +62,10 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
     address internal chainAddress;
     address internal genesisUpgradeAddr;
     address internal upgradeEngineAddr;
+
+    /// @dev Dummy EVM bytecode of the L2 upgrade delegate every fixture transition carries as its
+    ///      one Unsafe extra (see {L2PlanFixtures}); published on the fixture supplier in `setUp`.
+    bytes internal constant L2_DELEGATE_CODE = hex"de1e";
 
     function setUp() public {
         deploy();
@@ -104,6 +110,11 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         vm.prank(governor);
         ctmExecutor.forward(repoint);
         assertEq(chainContractAddress.currentRelease(), address(fromRelease));
+
+        // The delegate's bytecode is a factory dependency of every fixture transition, and
+        // `applyCTMUpgrade` requires it published on the CTM's supplier before the edge commits.
+        assertEq(chainContractAddress.L1_BYTECODES_SUPPLIER(), address(bytecodesSupplier));
+        L2PlanFixtures.publish(bytecodesSupplier, L2PlanFixtures.codes(L2_DELEGATE_CODE));
 
         release = _deployRelease(2);
         transition = _deployTransition(777);
@@ -155,15 +166,22 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         address _fromRelease,
         uint256 _oldProtocolVersion
     ) internal returns (CTMTransition result) {
+        return _deployTransitionWithDelegate(_upgradeTimestamp, _fromRelease, _oldProtocolVersion, L2_DELEGATE_CODE);
+    }
+
+    /// @dev The L2 side of a fixture transition is the minimal well-formed plan: the delegate,
+    ///      force-deployed Unsafe at its bytecode-derived address, with its bytecode as the one
+    ///      factory dependency.
+    function _deployTransitionWithDelegate(
+        uint256 _upgradeTimestamp,
+        address _fromRelease,
+        uint256 _oldProtocolVersion,
+        bytes memory _delegateCode
+    ) internal returns (CTMTransition result) {
         IComplexUpgrader.UniversalContractUpgradeInfo[]
             memory deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
-        deployments[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
-            upgradeType: IComplexUpgrader.ContractUpgradeType.EraForceDeployment,
-            deployedBytecodeInfo: hex"aa01",
-            newAddress: makeAddr("l2Bridgehub")
-        });
-        uint256[] memory factoryDeps = new uint256[](1);
-        factoryDeps[0] = 1;
+        deployments[0] = L2PlanFixtures.unsafeDeployment(_delegateCode);
+        uint256[] memory factoryDeps = L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(_delegateCode));
 
         ProxyUpgradeRow[] memory noProxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         result = new CTMTransition(
@@ -180,7 +198,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                 upgradeTimestamp: _upgradeTimestamp,
                 l2Plan: AuthoredL2Plan({
                     extraDeployments: deployments,
-                    delegateTo: makeAddr("l2UpgradeDelegate"),
+                    delegateTo: deployments[0].newAddress,
                     delegateCalldata: hex"beef",
                     factoryDepHashes: factoryDeps
                 })
@@ -353,6 +371,33 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         vm.expectRevert(abi.encodeWithSelector(OutdatedProtocolVersion.selector, newVersion, 0));
         vm.prank(governor);
         ctmExecutor.applyCTMUpgrade(ICTMTransition(address(staleVersionTransition)));
+    }
+
+    /// @dev Publication is live L1 state, so it is checked where the edge COMMITS: a transition
+    ///      whose factory dependency is not yet on the CTM's supplier pins fine but cannot be
+    ///      applied — and applies once the bytecode is published, with nothing else changed.
+    function test_applyCTMUpgrade_requiresFactoryDepsPublishedOnTheCtmSupplier() public {
+        bytes memory unpublishedDelegate = hex"de1f";
+        CTMTransition unpublished = _deployTransitionWithDelegate(
+            777,
+            chainContractAddress.currentRelease(),
+            0,
+            unpublishedDelegate
+        );
+        assertEq(bytecodesSupplier.evmPublishingBlock(keccak256(unpublishedDelegate)), 0, "fixture: not yet published");
+
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeNotPublished.selector, keccak256(unpublishedDelegate)));
+        vm.prank(governor);
+        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(unpublished)));
+        assertEq(chainContractAddress.protocolVersion(), 0, "a refused apply must not move the CTM");
+        assertEq(chainContractAddress.upgradeTransition(0), address(0), "a refused apply must commit nothing");
+
+        L2PlanFixtures.publish(bytecodesSupplier, L2PlanFixtures.codes(unpublishedDelegate));
+
+        vm.prank(governor);
+        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(unpublished)));
+        assertEq(chainContractAddress.protocolVersion(), newVersion, "the same transition applies once published");
+        assertEq(chainContractAddress.upgradeTransition(0), address(unpublished));
     }
 
     /// @dev The chain needs the transition itself, not just its cut hash, to rebuild the cut.
