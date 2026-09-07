@@ -253,6 +253,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // batch has been authenticated, since whether it carries an Airbender commitment decides it.
         uint256[] memory proofPublicInput;
 
+        // Era proves one batch per call. Unconditional: with the Airbender lane the public input is
+        // a (Boojum, Airbender) pair for a single batch, so a multi-batch Era call would otherwise
+        // produce a two-entry array that the gate reads as that pair and route batch 2's Boojum
+        // transition hash to the Airbender lane — settling each batch on one lane.
+        if (!s.zksyncOS && committedBatchesLength != 1) {
+            revert CanOnlyProcessOneBatch();
+        }
+
         // Check that the batch passed by the validator is indeed the first unverified batch
         bool prevAirbenderBound = _checkBatchHashMismatch(prevBatch, currentTotalBatchesVerified, true);
 
@@ -270,9 +278,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 // A batch carries an Airbender commitment only if the hash form that covers it
                 // matched; one committed before the lane existed proves on Boojum alone.
                 airbenderLane = provedAirbenderBound && committedBatches[0].airbenderCommitment != bytes32(0);
-                if (airbenderLane && committedBatchesLength != 1) {
-                    revert CanOnlyProcessOneBatch();
-                }
                 proofPublicInput = new uint256[](airbenderLane ? 2 : committedBatchesLength);
             }
 
@@ -315,18 +320,21 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             );
         }
 
-        _verifyProof(proofPublicInput, proof);
+        _verifyProof(proofPublicInput, proof, airbenderLane);
 
         emit BlocksVerification(s.totalBatchesVerified, currentTotalBatchesVerified);
         s.totalBatchesVerified = currentTotalBatchesVerified;
     }
 
-    function _verifyProof(uint256[] memory proofPublicInput, uint256[] memory _proof) internal view {
-        // We only allow processing of 1 batch proof at a time on Era Chains.
-        // We allow processing multiple proofs at once on ZKsync OS Chains.
-        // With the Airbender lane the array is a (Boojum, Airbender) pair for a single batch, so the
-        // guard is enforced against the batch count where that array is built.
-        if (!s.zksyncOS && proofPublicInput.length > 2) {
+    function _verifyProof(
+        uint256[] memory proofPublicInput,
+        uint256[] memory _proof,
+        bool _airbenderLane
+    ) internal view {
+        // Era hands the verifier one word per enabled proof system for a single batch: two with the
+        // Airbender lane, one without. Exact, not an upper bound — a longer array would let a second
+        // batch's Boojum transition hash arrive where the Airbender word is expected.
+        if (!s.zksyncOS && proofPublicInput.length != (_airbenderLane ? 2 : 1)) {
             revert CanOnlyProcessOneBatch();
         }
 

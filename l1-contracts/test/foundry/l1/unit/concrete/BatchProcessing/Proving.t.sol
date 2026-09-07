@@ -19,6 +19,7 @@ import {
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {
     BatchHashMismatch,
+    CanOnlyProcessOneBatch,
     InvalidPublicInputsLength,
     VerifiedBatchesExceedsCommittedBatches
 } from "contracts/common/L1ContractErrors.sol";
@@ -39,6 +40,24 @@ contract PublicInputRevealingVerifier is IVerifier {
 
     function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) external pure returns (bool) {
         revert RevealedPublicInput(_publicInputs[0], _proof.length == 0 ? type(uint256).max : _proof[0]);
+    }
+
+    function verificationKeyHash() external pure returns (bytes32) {
+        return bytes32(0);
+    }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
+}
+
+/// @notice Reports the size of the public input array the Executor handed the verifier.
+/// @dev The value alone cannot distinguish a one-word array from a two-word one whose first word is
+/// the same, which is exactly the confusion the `!= 0` sentinel prevents.
+contract PublicInputCountRevealingVerifier is IVerifier {
+    error RevealedPublicInputCount(uint256 count);
+
+    function verify(uint256[] calldata _publicInputs, uint256[] calldata) external pure returns (bool) {
+        revert RevealedPublicInputCount(_publicInputs.length);
     }
 
     function verificationKeyHash() external pure returns (bytes32) {
@@ -324,6 +343,56 @@ contract ProvingTest is ExecutorTest {
         assertEq(getters.getTotalBlocksVerified(), 1);
     }
 
+    /// Era proves one batch per call, unconditionally. Making this depend on the Airbender lane let
+    /// two Boojum-only batches produce a two-entry array that the gate reads as a (Boojum,
+    /// Airbender) pair, routing the second batch's Boojum transition hash to the Airbender lane —
+    /// so each batch settled on one lane, or on none with Airbender masked off.
+    function test_eraProvesOneBatchPerCall() public {
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](2);
+        batches[0] = newStoredBatchInfo;
+        batches[1] = newStoredBatchInfo;
+        batches[1].batchNumber = 2;
+
+        (uint256 from, uint256 to, bytes memory proveData) = Utils.encodeProveBatchesData(
+            genesisStoredBatchInfo,
+            batches,
+            _gateProof()
+        );
+
+        vm.expectRevert(CanOnlyProcessOneBatch.selector);
+        vm.prank(validator);
+        executor.proveBatchesSharedBridge(address(0), from, to, proveData);
+    }
+
+    /// A batch committed without a heap hash carries no Airbender commitment, so the Executor emits
+    /// the Boojum word alone. Dropping the `!= 0` sentinel would make it emit a pair whose second
+    /// word is zero.
+    ///
+    /// @dev Observed at the chain's verifier rather than behind the gate: the gate slices one word
+    /// per lane, so no lane can see how many the Executor actually built.
+    function test_batchWithoutAirbenderDataEmitsOnePublicInput() public {
+        IExecutor.StoredBatchInfo memory laneOff = newStoredBatchInfo;
+        laneOff.airbenderCommitment = bytes32(0);
+        vm.store(address(executor), keccak256(abi.encode(uint256(1), uint256(14))), keccak256(abi.encode(laneOff)));
+
+        vm.etch(getters.getVerifier(), address(new PublicInputCountRevealingVerifier()).code);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(PublicInputCountRevealingVerifier.RevealedPublicInputCount.selector, uint256(1))
+        );
+        _proveWithPrev(genesisStoredBatchInfo, _gateProof(), laneOff);
+    }
+
+    /// The mirror: a batch that does carry one makes the Executor build the pair.
+    function test_batchWithAirbenderDataEmitsTwoPublicInputs() public {
+        vm.etch(getters.getVerifier(), address(new PublicInputCountRevealingVerifier()).code);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(PublicInputCountRevealingVerifier.RevealedPublicInputCount.selector, uint256(2))
+        );
+        _proveWith(_gateProof());
+    }
+
     function _installGate(IVerifier _boojum, IVerifier _airbender) internal {
         EraMultiProofVerifier gate = new EraMultiProofVerifier(_boojum, _airbender);
         vm.etch(getters.getVerifier(), address(gate).code);
@@ -418,8 +487,16 @@ contract ProvingTest is ExecutorTest {
     }
 
     function _proveWithPrev(IExecutor.StoredBatchInfo memory _prev, uint256[] memory _proof) internal {
+        _proveWithPrev(_prev, _proof, newStoredBatchInfo);
+    }
+
+    function _proveWithPrev(
+        IExecutor.StoredBatchInfo memory _prev,
+        uint256[] memory _proof,
+        IExecutor.StoredBatchInfo memory _proved
+    ) internal {
         IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
-        batches[0] = newStoredBatchInfo;
+        batches[0] = _proved;
         (uint256 from, uint256 to, bytes memory proveData) = Utils.encodeProveBatchesData(_prev, batches, _proof);
         vm.prank(validator);
         executor.proveBatchesSharedBridge(address(0), from, to, proveData);

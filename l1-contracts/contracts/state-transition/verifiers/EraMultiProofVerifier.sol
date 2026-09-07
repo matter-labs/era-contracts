@@ -67,12 +67,6 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
             revert EmptyProofLength();
         }
 
-        // One word per lane: the two systems commit to different `auxiliaryOutputHash` values, so a
-        // batch has a different transition hash under each.
-        if (_publicInputs.length != 2) {
-            revert InvalidPublicInputsLength();
-        }
-
         // The header word carries the proof type and nothing else, so a value with data in the reserved
         // bits is rejected rather than read as a bare type.
         if (_proof[0] >> 8 != 0) {
@@ -99,6 +93,17 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
         // rather than depending on a value written elsewhere.
         if (disabled >= ALL_PROOF_SYSTEMS_DISABLED) {
             revert InvalidDisabledProofSystemsMask(disabled);
+        }
+
+        // One word per lane: the two systems commit to different `auxiliaryOutputHash` values, so a
+        // batch has a different transition hash under each. With the Airbender lane switched off the
+        // Executor emits the Boojum word alone for a batch that carries no Airbender commitment, so
+        // a single word is accepted only in that case — the kill switch has to leave Boojum-only
+        // settlement working, and a chain that has not enabled the lane must still be able to prove.
+        if (
+            _publicInputs.length != 2 && !(disabled & AIRBENDER_PROOF_SYSTEM_DISABLED != 0 && _publicInputs.length == 1)
+        ) {
+            revert InvalidPublicInputsLength();
         }
 
         if (disabled & BOOJUM_PROOF_SYSTEM_DISABLED == 0) {

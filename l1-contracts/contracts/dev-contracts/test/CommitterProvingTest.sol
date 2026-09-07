@@ -25,6 +25,23 @@ contract CommitterProvingTest is CommitterFacet {
         return commitment;
     }
 
+    /// @dev The Airbender-shape commitment the same call produces, so equivalence tests can pin the
+    /// production derivation against externally recorded vectors rather than a copy of it.
+    function createAirbenderBatchCommitment(
+        CommitBatchInfo calldata _newBatchData,
+        bytes32 _stateDiffHash,
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes
+    ) external view returns (bytes32) {
+        (, , , bytes32 airbenderCommitment) = _createBatchCommitment(
+            _newBatchData,
+            _stateDiffHash,
+            _blobCommitments,
+            _blobHashes
+        );
+        return airbenderCommitment;
+    }
+
     function processL2Logs(
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash,

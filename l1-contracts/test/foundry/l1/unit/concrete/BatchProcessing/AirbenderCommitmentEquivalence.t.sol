@@ -4,6 +4,9 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
+import {CommitterProvingTest} from "contracts/dev-contracts/test/CommitterProvingTest.sol";
+import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+
 /// @notice Pins the Airbender-shape batch commitment against values produced by the Rust
 /// implementation the guest runs.
 ///
@@ -58,6 +61,85 @@ contract AirbenderCommitmentEquivalenceTest is Test {
         0xce388864ee2658a135fcd83bf6bc3f61ce22172cac9d645719f6040b516cc4e4;
     bytes32 internal constant ALL_BLOBS_AIRBENDER_COMMITMENT =
         0xf6ef17dadb3219a501704adaf7a8cf56b9d2eb787efa50bfefdcbdd17f9cc213;
+
+    // --- A vector the production Committer can be fed directly -------------------------------
+    // Every component is a value `_createBatchCommitment` takes verbatim, except the system logs,
+    // which it hashes — so these pin the contract's own derivation rather than a copy of it.
+    bytes internal constant CALLABLE_SYSTEM_LOGS = "equivalence-test-system-logs";
+    bytes32 internal constant CALLABLE_STATE_DIFF_HASH =
+        0xbabb276f2a3cc5e989b45d546bd4fe011e38b6871007c3bb2578022c15e2d061;
+    bytes32 internal constant CALLABLE_STORED_HEAP_HASH =
+        0x4b9346c9c57e30d3fd3d17736fbad5e97f684654796068b370cd4a4ee5de4aca;
+    bytes32 internal constant CALLABLE_EVENTS_QUEUE_HASH =
+        0x44812432df1531df1815bbb31b03e35099006b09195f0d29f17a5f256898c080;
+    bytes32 internal constant CALLABLE_AIRBENDER_HEAP_HASH =
+        0x4573e336e6fbc57669de3612287d906192449493f016be61605c173e608eb5bb;
+    bytes32 internal constant CALLABLE_STORED_COMMITMENT =
+        0x97b974572cf9cbe4faf546c0a76168c55e94ede51c57d14ee413b1b3c2cc5fb4;
+    bytes32 internal constant CALLABLE_AIRBENDER_COMMITMENT =
+        0x2848bf1052d20059f77e2e7dc64d3faa230b108f37bc0db7563eee8b274e7005;
+
+    CommitterProvingTest internal committer;
+
+    function setUp() public {
+        committer = new CommitterProvingTest();
+        // `_batchMetaParameters` reads these from storage; the recorded batch was built with the
+        // emulator hash equal to the default-AA hash (Rust's `None` substitution).
+        vm.store(address(committer), bytes32(uint256(23)), BOOTLOADER_CODE_HASH);
+        vm.store(address(committer), bytes32(uint256(24)), DEFAULT_AA_CODE_HASH);
+        vm.store(address(committer), bytes32(uint256(25)), bytes32(0)); // zkPorterIsAvailable
+        vm.store(address(committer), bytes32(uint256(58)), DEFAULT_AA_CODE_HASH);
+    }
+
+    function _callableBatch() internal pure returns (CommitBatchInfo memory batch) {
+        batch.batchNumber = 1;
+        batch.indexRepeatedStorageChanges = ENUMERATION_INDEX;
+        batch.newStateRoot = STATE_ROOT;
+        batch.bootloaderHeapInitialContentsHash = CALLABLE_STORED_HEAP_HASH;
+        batch.eventsQueueStateHash = CALLABLE_EVENTS_QUEUE_HASH;
+        batch.airbenderBootloaderHeapHash = CALLABLE_AIRBENDER_HEAP_HASH;
+        batch.systemLogs = CALLABLE_SYSTEM_LOGS;
+    }
+
+    function _callableBlobs() internal pure returns (bytes32[] memory commitments, bytes32[] memory hashes) {
+        bytes32[] memory words = _allBlobWords();
+        commitments = new bytes32[](TOTAL_BLOBS);
+        hashes = new bytes32[](TOTAL_BLOBS);
+        for (uint256 i = 0; i < TOTAL_BLOBS; ++i) {
+            hashes[i] = words[i * 2];
+            commitments[i] = words[i * 2 + 1];
+        }
+    }
+
+    /// The production derivation, called directly, against the Rust vector. This is what ties the
+    /// external oracle to `Committer` — the inline reconstructions below only pin the layout.
+    function test_committerProducesTheRustAirbenderCommitment() public {
+        (bytes32[] memory commitments, bytes32[] memory hashes) = _callableBlobs();
+
+        assertEq(
+            committer.createBatchCommitment(_callableBatch(), CALLABLE_STATE_DIFF_HASH, commitments, hashes),
+            CALLABLE_STORED_COMMITMENT,
+            "Committer's Boojum commitment diverges from Rust"
+        );
+        assertEq(
+            committer.createAirbenderBatchCommitment(_callableBatch(), CALLABLE_STATE_DIFF_HASH, commitments, hashes),
+            CALLABLE_AIRBENDER_COMMITMENT,
+            "Committer's Airbender commitment diverges from the guest's"
+        );
+    }
+
+    /// The `0` sentinel suppresses the lane rather than producing a commitment over a zero heap.
+    function test_committerEmitsNoAirbenderCommitmentWithoutAHeapHash() public {
+        (bytes32[] memory commitments, bytes32[] memory hashes) = _callableBlobs();
+        CommitBatchInfo memory batch = _callableBatch();
+        batch.airbenderBootloaderHeapHash = bytes32(0);
+
+        assertEq(
+            committer.createAirbenderBatchCommitment(batch, CALLABLE_STATE_DIFF_HASH, commitments, hashes),
+            bytes32(0),
+            "no heap hash must mean no Airbender commitment"
+        );
+    }
 
     function _blobWords() internal pure returns (bytes32[] memory words) {
         words = new bytes32[](2 * TOTAL_BLOBS);
