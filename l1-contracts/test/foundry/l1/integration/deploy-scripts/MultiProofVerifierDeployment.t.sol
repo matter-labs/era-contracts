@@ -16,12 +16,21 @@ import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsy
 ///      instead of standing up a Bridgehub for the whole CTM deployment.
 contract MultiProofVerifierDeployer is DeployCTMScript {
     function deployMultiProofLane(address _owner, address _ziskPlonk, bool _testnet) public {
+        deployMultiProofLane(_owner, _ziskPlonk, _testnet, address(0));
+    }
+
+    function deployMultiProofLane(address _owner, address _ziskPlonk, bool _testnet, address _ziskRange) public {
+        config.multiProof.ziskRangeVerifierAddr = _ziskRange;
         config.isZKsyncOS = true;
         config.testnetVerifier = _testnet;
         config.multiProof.enabled = true;
         config.ownerAddress = _owner;
         config.multiProof.ziskPlonkVerifierAddr = _ziskPlonk;
         deployVerifiers();
+    }
+
+    function writeOutput(string memory _path) public {
+        saveOutput(_path);
     }
 
     function chainVerifier() public view returns (address) {
@@ -123,6 +132,44 @@ contract MultiProofVerifierDeploymentTest is Test {
             deployer.ziskVerifier(),
             "production lane uses the real ZiSK verifier"
         );
+    }
+
+    function test_rangeVerifierWithoutCode_revertsDeployment() public {
+        vm.expectRevert("zisk_range_verifier_addr holds no code: deploy the range verifier first");
+        deployer.deployMultiProofLane(owner, ziskPlonk, false, makeAddr("missingRangeVerifier"));
+    }
+
+    function testFuzz_rangeVerifierOverride_wiringAndOutput(bool _testnet) public {
+        // Only address selection is under test; proof verification has separate suites.
+        address rangeVerifier = makeAddr("externalRangeVerifier");
+        vm.etch(rangeVerifier, hex"fe");
+        deployer.deployMultiProofLane(owner, ziskPlonk, _testnet, rangeVerifier);
+
+        address selected = address(MultiProofVerifier(deployer.multiProofVerifier()).ZISK_RANGE_VERIFIER());
+        if (_testnet) {
+            assertEq(selected, deployer.ziskTestnetVerifier());
+            selected = address(ZiskTestnetVerifier(selected).INNER_VERIFIER());
+        }
+        assertEq(selected, rangeVerifier);
+        assertEq(deployer.ziskVerifier(), rangeVerifier);
+        _assertOutputRangeVerifier(rangeVerifier);
+    }
+
+    function test_defaultRangeVerifier_output() public {
+        deployer.deployMultiProofLane(owner, ziskPlonk, false);
+        _assertOutputRangeVerifier(deployer.ziskVerifier());
+    }
+
+    function _assertOutputRangeVerifier(address _expected) internal {
+        string memory outputPath = string.concat(
+            "test/foundry/l1/integration/deploy-scripts/script-out/multiproof-",
+            vm.toString(_expected),
+            ".toml"
+        );
+        deployer.writeOutput(outputPath);
+        string memory output = vm.readFile(outputPath);
+        assertEq(vm.parseTomlAddress(output, ".deployed_addresses.state_transition.zisk_verifier_addr"), _expected);
+        vm.removeFile(outputPath);
     }
 
     /// @dev The ZKsync OS verifier holds the PLONK sub-verifier, which the

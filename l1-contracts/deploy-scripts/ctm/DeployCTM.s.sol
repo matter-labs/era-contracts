@@ -281,7 +281,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             config.testnetVerifier
         );
         multiProofAddresses.airbenderVerifier = deploySimpleContract(airbenderVerifierName, false);
-        multiProofAddresses.ziskVerifier = deploySimpleContract("ZiskVerifier", false);
+        multiProofAddresses.ziskVerifier = config.multiProof.ziskRangeVerifierAddr;
+        if (multiProofAddresses.ziskVerifier == address(0)) {
+            multiProofAddresses.ziskVerifier = deploySimpleContract("ZiskVerifier", false);
+        }
         if (config.testnetVerifier) {
             multiProofAddresses.ziskTestnetVerifier = deploySimpleContract("ZiskTestnetVerifier", false);
         }

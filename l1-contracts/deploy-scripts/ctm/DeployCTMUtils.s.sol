@@ -165,11 +165,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         if (toml.keyExists("$.zisk_plonk_verifier_addr")) {
             config.multiProof.ziskPlonkVerifierAddr = toml.readAddress("$.zisk_plonk_verifier_addr");
         }
-        // The aggregation verifier for the single-VK ZiSK lane. It pins the
-        // aggregator guest programVK, the inner guest programVK and the
-        // vadcop-final root, and checks the SNARK for every range size. The
-        // aggregator VK is a deferred step, so this defaults to zero; when set,
-        // the deploy wires it with setZiskRangeVerifier.
+        // When set, deploy uses this verifier instead of deploying the default ZiskVerifier.
         if (toml.keyExists("$.zisk_range_verifier_addr")) {
             config.multiProof.ziskRangeVerifierAddr = toml.readAddress("$.zisk_range_verifier_addr");
         }
@@ -359,18 +355,14 @@ abstract contract DeployCTMUtils is DeployUtils {
             // beforehand (see verifiers/README.md) and passed by address.
             return abi.encode(config.multiProof.ziskPlonkVerifierAddr);
         } else if (compareStrings(contractName, "ZiskTestnetVerifier")) {
-            address ziskRangeVerifier = config.multiProof.ziskRangeVerifierAddr != address(0)
-                ? config.multiProof.ziskRangeVerifierAddr
-                : multiProofAddresses.ziskVerifier;
+            address ziskRangeVerifier = multiProofAddresses.ziskVerifier;
             return abi.encode(ziskRangeVerifier);
         } else if (compareStrings(contractName, "MultiProofVerifier")) {
             // The Airbender side is the ZKsync OS dual verifier, so the
             // sub-verifier registry has one home.
             // An operator may supply a range verifier of their own; otherwise
             // the one deployed alongside this wrapper is used.
-            address ziskRangeVerifier = config.multiProof.ziskRangeVerifierAddr != address(0)
-                ? config.multiProof.ziskRangeVerifierAddr
-                : multiProofAddresses.ziskVerifier;
+            address ziskRangeVerifier = multiProofAddresses.ziskVerifier;
             if (config.testnetVerifier) {
                 ziskRangeVerifier = multiProofAddresses.ziskTestnetVerifier;
             }
