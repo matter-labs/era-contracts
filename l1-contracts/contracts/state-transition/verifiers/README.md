@@ -29,6 +29,16 @@ The three pins are:
 `verificationKeyHash()` is `keccak256` over the three pins in that order, so
 a rotation of any pin rotates the hash.
 
+The current pins come from [guest release 0.0.5](https://github.com/matter-labs/zksync-os-zisk/releases/tag/0.0.5),
+using ZiSK 0.18.0. Its inner program VK is
+`0xac3a6494410ce230354e5ffae7c97f94bb5488d6e1764818c9d75156ce1dc59e`
+and combined verification key hash is
+`0xb70fd0a92d1375cc2f2a4e5e6907aa9af3131da257843088374bb0d834c61141`.
+The aggregator and SNARK setup keys are unchanged. The existing real proofs
+use the previous inner guest: they still validate against the SNARK backend,
+but the range verifier rejects them after this rotation. A fresh 0.0.5 proof
+session is required to validate successful settlement with the current pins.
+
 ## Generating the snarkJS Plonk verifier
 
 The Plonk verifier is machine-generated from the ZiSK SNARK setup and is

@@ -19,11 +19,10 @@ import {ZiskVerifier} from "contracts/state-transition/verifiers/ZiskVerifier.so
 ///      binding digest `keccak256(innerProgramVK || rootCVadcopFinal ||
 ///      chainedPI)`.
 ///
-///      `ZiskVerifier.verify` rebuilds exactly those 320 aggregated bytes from
-///      its own pins and the batch public inputs, so the aggregated fixture
-///      drives the production path end to end: the reconstruction AND the real
-///      pairing. MultiProofRangeVectorTest pins the same vector against a
-///      signal stand-in, which is what lets it name the exact expected signal.
+///      These fixtures predate guest 0.0.5. They anchor the unchanged SNARK
+///      backend and show that the range verifier rejects the previous guest
+///      after its VK rotates. Successful settlement with the current guest
+///      still requires a fresh proof session.
 contract ZiskVerifierRealProofTest is Test {
     /// @dev Real 768-byte BN254 PLONK SNARK of batch 1 (inner guest).
     bytes internal constant BATCH_PROOF =
@@ -123,15 +122,23 @@ contract ZiskVerifierRealProofTest is Test {
         pis[3] = uint256(COMMITMENT_4);
     }
 
-    /// @dev The exposed wire-form pins are exactly the fixtures' public-values
-    ///      bytes [0..32] and [288..320]; the zero region [64..288] the
-    ///      reconstruction assumes is present in a real aggregated output; and
-    ///      the VK hash commits to all three pins.
+    /// @dev Guest 0.0.5 rotates only the inner VK. The historical fixtures
+    ///      retain the same aggregator, root, and zero-padding layout.
     function test_pinnedWireForms_and_layout() public requiresPlonkVerifier {
         // The batch fixture is an inner state-transition proof, so its wire
         // [0..32] holds the inner pin; the aggregated proof attests to the
         // aggregator ELF, so its wire [0..32] holds the aggregator pin.
-        assertEq(ziskVerifier.innerProgramVK(), _word(BATCH_PUBLIC_VALUES, 0), "innerProgramVK");
+        assertEq(
+            ziskVerifier.innerProgramVK(),
+            0xac3a6494410ce230354e5ffae7c97f94bb5488d6e1764818c9d75156ce1dc59e,
+            "guest 0.0.5 innerProgramVK"
+        );
+        assertNotEq(ziskVerifier.innerProgramVK(), _word(BATCH_PUBLIC_VALUES, 0), "previous guest VK");
+        assertEq(
+            ziskVerifier.verificationKeyHash(),
+            0xb70fd0a92d1375cc2f2a4e5e6907aa9af3131da257843088374bb0d834c61141,
+            "guest 0.0.5 release hash"
+        );
         assertEq(ziskVerifier.aggregatorProgramVK(), _word(AGGREGATED_PUBLIC_VALUES, 0), "aggregatorProgramVK");
 
         // One cargo-zisk setup produces both proofs, so both wires end with
@@ -158,12 +165,13 @@ contract ZiskVerifierRealProofTest is Test {
         );
     }
 
-    /// @dev The production path over a real aggregated proof: ZiskVerifier
-    ///      reconstructs the 320 public values from its pins and the range's
-    ///      batch public inputs, then the generated Plonk verifier checks the
-    ///      pairing. Nothing here is mocked.
-    function test_realAggregatedProof_reconstructedAndVerified() public requiresPlonkVerifier {
-        assertTrue(ziskVerifier.verify(_rangePublicInputs(), _proofWords(AGGREGATED_PROOF)));
+    /// @dev The historical SNARK remains valid, but its binding digest names
+    ///      the previous guest and must fail against the rotated verifier.
+    function test_realAggregatedProof_previousGuest_rejected() public requiresPlonkVerifier {
+        assertTrue(
+            ziskVerifier.PLONK_VERIFIER().verifyProof(_proof24(AGGREGATED_PROOF), [_signal(AGGREGATED_PUBLIC_VALUES)])
+        );
+        assertFalse(ziskVerifier.verify(_rangePublicInputs(), _proofWords(AGGREGATED_PROOF)));
     }
 
     /// @dev A range that differs in one batch reconstructs a different digest,
