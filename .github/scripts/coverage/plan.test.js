@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 const { execFileSync } = require("node:child_process");
 const { test } = require("node:test");
 const { sourceRevisions, groupSpecs, trustedRun, restoreBaseline, recipeHash, coverageCommand } = require("./plan");
@@ -233,23 +234,62 @@ test("API failure is a warning and local recovery, not a coverage regression", a
   assert.equal(state.time, 0);
 });
 
-test("CLI outputs exact matrices for push, historical dispatch and PR recovery", (t) => {
+test("CLI outputs exact matrices and fetches missing commits from a shallow checkout", (t) => {
   const { request } = fixture(t);
-  const root = path.resolve(__dirname, "../../..");
-  const git = (ref) => execFileSync("git", ["rev-parse", ref], { cwd: root, encoding: "utf8" }).trim();
-  const head = git("HEAD");
-  const base = git("HEAD^1");
+  const source = path.join(request.directory, "origin");
+  const git = (cwd, ...args) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: "pipe" }).trim();
+  for (const file of [
+    ".github/scripts/coverage/plan.js",
+    ".github/scripts/coverage/check.js",
+    ".github/workflows/l1-contracts-ci.yaml",
+    ".github/foundry-versions.env",
+    ".nvmrc",
+    "l1-contracts/package.json",
+  ]) {
+    fs.mkdirSync(path.dirname(path.join(source, file)), { recursive: true });
+    fs.copyFileSync(path.resolve(__dirname, "../../..", file), path.join(source, file));
+  }
+  const specs = path.join(source, "l1-contracts/test/anvil-interop/test/hardhat");
+  fs.mkdirSync(specs, { recursive: true });
+  fs.writeFileSync(path.join(specs, "01-one.spec.ts"), "");
+  fs.writeFileSync(path.join(specs, "02-two.spec.ts"), "");
+  git(source, "init", "-q");
+  const commits = [];
+  for (const label of ["base", "head"]) {
+    fs.writeFileSync(path.join(specs, "01-one.spec.ts"), label);
+    git(source, "add", "--force", ".");
+    git(
+      source,
+      "-c",
+      "user.name=Coverage test",
+      "-c",
+      "user.email=coverage@example.invalid",
+      "-c",
+      "commit.gpgsign=false",
+      "-c",
+      "core.hooksPath=/dev/null",
+      "commit",
+      "-qm",
+      label
+    );
+    commits.push(git(source, "rev-parse", "HEAD"));
+  }
+  const [base, head] = commits;
   const eventPath = path.join(request.directory, "event.json");
   const outputPath = path.join(request.directory, "outputs");
   // The CLI must recover from an unavailable API without using the developer's GitHub credentials.
   fs.writeFileSync(path.join(request.directory, "gh"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
   for (const eventName of ["push", "workflow_dispatch", "pull_request"]) {
+    const root = path.join(request.directory, eventName);
+    git(request.directory, "clone", "--quiet", "--depth=1", pathToFileURL(source).href, root);
+    assert.throws(() => git(root, "rev-parse", "--verify", "HEAD^1"));
+    assert.throws(() => git(root, "cat-file", "-e", `${base}^{commit}`));
     fs.writeFileSync(
       eventPath,
       JSON.stringify({ inputs: { source_sha: base }, pull_request: { base: { sha: base } } })
     );
     fs.writeFileSync(outputPath, "");
-    execFileSync(process.execPath, [path.join(__dirname, "plan.js")], {
+    execFileSync(process.execPath, [path.join(root, ".github/scripts/coverage/plan.js")], {
       cwd: root,
       encoding: "utf8",
       env: {
@@ -284,6 +324,9 @@ test("CLI outputs exact matrices for push, historical dispatch and PR recovery",
     assert.equal(output.base_sha, eventName === "push" ? head : base);
     assert.equal(output.cached, "false");
     assert.equal(output.pr_sha, eventName === "pull_request" ? head : "");
+    if (eventName !== "push") {
+      assert.doesNotThrow(() => git(root, "cat-file", "-e", `${base}^{commit}`));
+    }
     assert.equal(JSON.parse(output.anvil).include.length, expected.length * 2);
     assert.match(output.recipe, /^[a-f0-9]{64}$/);
     assert.ok(output.node_version && output.foundry_version);
