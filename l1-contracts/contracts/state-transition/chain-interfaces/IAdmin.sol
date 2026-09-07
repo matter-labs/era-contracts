@@ -125,12 +125,8 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _pubdataContent The new pubdata content.
     function setPubdataContent(PubdataContent _pubdataContent) external;
 
-    /// @notice Sets the bit mask of proof systems the chain does not require in order to settle. Every
-    /// batch needs every proof system while the mask is `0`, so a lane that cannot produce proofs stops
-    /// the chain; the switch trades a proof system for liveness. A ZKsync OS chain accepts only
-    /// `ZISK_PROOF_SYSTEM_DISABLED`, so its Airbender lane can not be switched off. Callable only for
-    /// ZKsync OS chains.
-    /// @param _disabledProofSystems The proof systems the chain no longer requires.
+    /// @notice Sets the disabled proof systems for a ZKsync OS chain.
+    /// @param _disabledProofSystems Zero enables ZiSK; ZISK_PROOF_SYSTEM_DISABLED selects Airbender-only proofs.
     function setDisabledProofSystems(uint8 _disabledProofSystems) external;
 
     /// @notice Makes the chain as permanent rollup.

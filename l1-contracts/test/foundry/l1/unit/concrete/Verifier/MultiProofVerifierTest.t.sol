@@ -260,7 +260,11 @@ contract MultiProofVerifierTest is Test {
         lane.verify(_rangePublicInputs(), _type5Proof(0, 2));
 
         disabledProofSystemsMask = ZISK_PROOF_SYSTEM_DISABLED;
-        assertTrue(lane.verify(_rangePublicInputs(), _type5Proof(0, 2)));
+        uint256[] memory proof = new uint256[](2);
+        proof[0] = 2;
+        assertTrue(lane.verify(_rangePublicInputs(), proof));
+        vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, 5));
+        lane.verify(_rangePublicInputs(), _type5Proof(0, 2));
     }
 
     /// @dev The verifier does not trust the stored mask: a value the setter could never write, such as
@@ -276,6 +280,40 @@ contract MultiProofVerifierTest is Test {
             abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, AIRBENDER_PROOF_SYSTEM_DISABLED)
         );
         lane.verify(_rangePublicInputs(), _type5Proof(0, 2));
+    }
+
+    function test_disabled_type2_forwardsRawInputsAndProof() public {
+        disabledProofSystemsMask = ZISK_PROOF_SYSTEM_DISABLED;
+        uint256[] memory inputs = _rangePublicInputs();
+        uint256[] memory proof = new uint256[](3);
+        proof[0] = 2;
+        proof[2] = 123;
+        vm.expectCall(address(passVerifier), abi.encodeCall(IVerifier.verify, (inputs, proof)));
+        assertTrue(verifier.verify(inputs, proof));
+    }
+
+    function test_disabled_type2_reservedHeaderBits_rejected() public {
+        disabledProofSystemsMask = ZISK_PROOF_SYSTEM_DISABLED;
+        uint256[] memory proof = new uint256[](2);
+        proof[0] = (1 << 8) | 2;
+        vm.expectRevert(MultiProofVerifier.InvalidProofFormat.selector);
+        verifier.verify(_singlePublicInputs(), proof);
+    }
+
+    function test_testnet_realProofMode_followsChainSwitch() public {
+        uint256[] memory proof = new uint256[](2);
+        proof[0] = 2;
+        disabledProofSystemsMask = ZISK_PROOF_SYSTEM_DISABLED;
+        assertEq(testnetVerifier.getProofMode(disabledProofSystemsMask), 2);
+        assertTrue(testnetVerifier.verify(_singlePublicInputs(), proof));
+        vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, 5));
+        testnetVerifier.verify(_singlePublicInputs(), _type5Proof(0, 2));
+
+        disabledProofSystemsMask = 0;
+        assertEq(testnetVerifier.getProofMode(disabledProofSystemsMask), 5);
+        vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, 2));
+        testnetVerifier.verify(_singlePublicInputs(), proof);
+        assertTrue(testnetVerifier.verify(_singlePublicInputs(), _type5Proof(0, 2)));
     }
 
     // --- Forwarding to the sub-verifiers ---

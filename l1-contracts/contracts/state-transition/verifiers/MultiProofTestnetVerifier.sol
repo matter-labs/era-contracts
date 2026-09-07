@@ -3,19 +3,19 @@
 pragma solidity 0.8.28;
 
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
+import {MultiProofVerifier} from "./MultiProofVerifier.sol";
 import {IZKsyncOSVerifier} from "../chain-interfaces/IZKsyncOSVerifier.sol";
 import {NonZeroCarriedHash} from "../../common/L1ContractErrors.sol";
 import {PUBLIC_INPUT_SHIFT} from "../../common/Config.sol";
 
-/// @title Generic Testnet Verifier (multi-proof lane)
+/// @title Multi-proof Testnet Verifier
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Wraps any IVerifier and adds mock proof support for testnet environments.
+/// @notice Wraps MultiProofVerifier and adds mock proof support for testnet environments.
 ///         - Empty proofs: accepted unconditionally (skip verification).
 ///         - Mock proofs (type 3): validated for public input consistency, no cryptographic check.
 ///         - All other proofs: delegated to the inner verifier.
-/// @dev Can wrap DualVerifier, MultiProofVerifier, or any other IVerifier implementation.
-///      Named distinctly from the DualVerifier-based `TestnetVerifier` upstream ships.
+/// @dev Real proofs follow the calling chain's mode; empty and type-3 proofs remain testnet-only bypasses.
 contract MultiProofTestnetVerifier is IVerifier, IZKsyncOSVerifier {
     uint256 internal constant MOCK_PROOF_TYPE = 3;
 
@@ -42,17 +42,12 @@ contract MultiProofTestnetVerifier is IVerifier, IZKsyncOSVerifier {
         }
 
         // Everything else: delegate to the real verifier.
-        return INNER_VERIFIER.verify(_publicInputs, _proof);
+        return MultiProofVerifier(address(INNER_VERIFIER)).verifyForChain(msg.sender, _publicInputs, _proof);
     }
 
-    /// @notice The proof systems a chain behind this wrapper does not require.
-    /// @dev The wrapper stands between the chain and the inner verifier, so the inner verifier reads
-    ///      this contract rather than the chain. It answers `0`, requiring every proof system: the mock
-    ///      proof route is the bypass this wrapper provides, and it is the one a test chain uses. The
-    ///      switch that trades a proof system for liveness belongs to production chains, which reach the
-    ///      inner verifier directly.
-    function disabledProofSystems() external pure returns (uint8) {
-        return 0;
+    /// @inheritdoc IZKsyncOSVerifier
+    function getProofMode(uint8 _disabledProofSystems) external view returns (uint256) {
+        return IZKsyncOSVerifier(address(INNER_VERIFIER)).getProofMode(_disabledProofSystems);
     }
 
     /// @inheritdoc IVerifier

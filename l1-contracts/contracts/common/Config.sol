@@ -72,6 +72,9 @@ uint256 constant PUBLIC_INPUT_SHIFT = 32;
 /// @dev Proof type used by the ZKsync OS PLONK verifier.
 uint256 constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
 
+/// @dev Proof type containing both Airbender and ZiSK proofs.
+uint256 constant ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE = 5;
+
 /// @dev Proof type used by the proof-skipping ZKsync OS testnet verifier.
 uint256 constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
 

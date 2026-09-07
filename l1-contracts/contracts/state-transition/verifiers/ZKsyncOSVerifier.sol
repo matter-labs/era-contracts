@@ -95,6 +95,11 @@ contract ZKsyncOSVerifier is IVerifier, IZKsyncOSVerifier {
         }
     }
 
+    /// @inheritdoc IZKsyncOSVerifier
+    function getProofMode(uint8) external pure returns (uint256) {
+        return ZKSYNC_OS_PLONK_VERIFICATION_TYPE;
+    }
+
     function _extractZKsyncOSProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
         uint256 resultLength = _proof.length - ZKSYNC_OS_PROOF_METADATA_LENGTH;
 

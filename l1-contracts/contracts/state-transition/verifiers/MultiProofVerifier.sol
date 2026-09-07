@@ -6,43 +6,19 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IZKsyncOSVerifier} from "../chain-interfaces/IZKsyncOSVerifier.sol";
 import {IGetters} from "../chain-interfaces/IGetters.sol";
 import {InvalidDisabledProofSystemsMask, NonZeroCarriedHash} from "../../common/L1ContractErrors.sol";
-import {ZISK_PROOF_SYSTEM_DISABLED} from "../../common/Config.sol";
+import {
+    ZISK_PROOF_SYSTEM_DISABLED,
+    ZKSYNC_OS_PLONK_VERIFICATION_TYPE,
+    ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE,
+    ZISK_SNARK_PROOF_LENGTH
+} from "../../common/Config.sol";
 
 /// @title Multi-Proof Verifier
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Requires BOTH an Airbender proof and a ZiSK proof for each state transition.
-///         Only accepts the combined proof type (MULTI_PROOF_TYPE = 5).
-///         Single-system proofs (type 2) and mock proofs (type 3) are rejected.
-///
-/// @dev Proof encoding received from the Executor:
-///      proof[0] = proof_type. This format holds no verifier version, so bits
-///                 8-255 are reserved and must be zero.
-///      proof[1] = carried hash. Reserved and must be zero.
-///
-///      For type 5 (MULTI_PROOF):
-///      proof[2]              = N  (number of Airbender proof elements)
-///      proof[3 .. 3+N]       = Airbender sub-proof, in the envelope that
-///                              `airbenderVerifier` parses:
-///                                [3]        = ZKSYNC_OS_PLONK_VERIFICATION_TYPE
-///                                [4]        = 0. This is the carried-hash slot,
-///                                             which the ZKsync OS verifier
-///                                             requires to be zero.
-///                                [5 .. 3+N] = Airbender PLONK proof words
-///      proof[3+N .. 3+N+24]  = ZiSK SNARK proof (24 uint256 = 768 bytes)
-///
-///      The ZiSK public values are NOT carried in the proof. Every range,
-///      single batch or many, is ONE aggregated proof checked by
-///      `ziskRangeVerifier`, which RECONSTRUCTS the 320-byte ZiSK public
-///      values on-chain from its own pinned VKs and the batch public inputs
-///      (the self-contained seed-0 chain). Reconstructing rather than reading
-///      them makes the cross-proof binding inherent: a ZiSK proof that
-///      attested to a different state transition would reconstruct a different
-///      SNARK signal and fail — there is no separately submitted commitment
-///      left to forget to check.
+/// @notice Verifies the real proof format selected by each chain's ZiSK switch.
+/// @dev See {protocol-docs/multi-proof-verification.md}.
 contract MultiProofVerifier is IVerifier, IZKsyncOSVerifier {
-    uint256 internal constant MULTI_PROOF_TYPE = 5;
-
     /// @notice Inner verifier for Airbender proofs. It is the ZKsync OS
     ///         verifier, which owns the PLONK sub-verifier that this contract
     ///         exposes.
@@ -69,25 +45,54 @@ contract MultiProofVerifier is IVerifier, IZKsyncOSVerifier {
         ZISK_RANGE_VERIFIER = _ziskRangeVerifier;
     }
 
-    /// @notice Verify a combined Airbender + ZiSK proof.
+    /// @inheritdoc IVerifier
     function verify(
         uint256[] calldata _publicInputs,
         uint256[] calldata _proof
     ) public view virtual override returns (bool) {
-        if (_proof.length == 0) revert EmptyProof();
+        return verifyForChain(msg.sender, _publicInputs, _proof);
+    }
 
-        // The header word carries the proof type and nothing else. Bits 8-255
-        // are reserved, so a payload that sets any of them is rejected rather
-        // than read as a bare type.
-        if (_proof[0] >> 8 != 0) revert InvalidProofFormat();
-
-        uint256 proofType = _proof[0] & 255;
-
-        if (proofType == MULTI_PROOF_TYPE) {
-            return _verifyMultiProof(_publicInputs, _proof);
+    /// @notice Verifies a proof using an explicitly supplied chain's policy.
+    /// @param _chain Chain whose disabled proof systems determine the accepted format.
+    /// @param _publicInputs Batch public inputs.
+    /// @param _proof Encoded proof.
+    /// @dev Used by the testnet wrapper to preserve its caller's context. The chain's
+    /// executor calls `verify`, which always uses msg.sender as the chain.
+    function verifyForChain(
+        address _chain,
+        uint256[] calldata _publicInputs,
+        uint256[] calldata _proof
+    ) public view returns (bool) {
+        if (_proof.length == 0) {
+            revert EmptyProof();
         }
+        if (_proof[0] >> 8 != 0) {
+            revert InvalidProofFormat();
+        }
+        uint256 proofType = _proof[0];
+        uint256 requiredType = getProofMode(IGetters(_chain).disabledProofSystems());
+        if (proofType != requiredType) {
+            revert UnknownProofType(proofType);
+        }
+        if (requiredType == ZKSYNC_OS_PLONK_VERIFICATION_TYPE) {
+            if (!AIRBENDER_VERIFIER.verify(_publicInputs, _proof)) {
+                revert AirbenderVerificationFailed();
+            }
+            return true;
+        }
+        return _verifyMultiProof(_publicInputs, _proof);
+    }
 
-        revert UnknownProofType(proofType);
+    /// @inheritdoc IZKsyncOSVerifier
+    function getProofMode(uint8 _disabledProofSystems) public pure returns (uint256) {
+        if (_disabledProofSystems & ~ZISK_PROOF_SYSTEM_DISABLED != 0) {
+            revert InvalidDisabledProofSystemsMask(_disabledProofSystems);
+        }
+        return
+            _disabledProofSystems & ZISK_PROOF_SYSTEM_DISABLED == 0
+                ? ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE
+                : ZKSYNC_OS_PLONK_VERIFICATION_TYPE;
     }
 
     /// @inheritdoc IVerifier
@@ -110,7 +115,9 @@ contract MultiProofVerifier is IVerifier, IZKsyncOSVerifier {
         uint256[] calldata _proof
     ) internal view returns (bool) {
         // proof[0] = type, proof[1] = carried hash, proof[2] = N
-        if (_proof.length < 3) revert ProofTooShort();
+        if (_proof.length < 3) {
+            revert ProofTooShort();
+        }
 
         // The carried-hash slot holds a continuation input that the settlement
         // layer does not accept, so it stays reserved and must be zero.
@@ -121,7 +128,9 @@ contract MultiProofVerifier is IVerifier, IZKsyncOSVerifier {
         uint256 airbenderLen = _proof[2];
         // 24 = the ZiSK SNARK proof words. The ZiSK public values are no
         // longer carried: the range verifier reconstructs them on-chain.
-        if (_proof.length < 3 + airbenderLen + 24) revert ProofTooShort();
+        if (_proof.length < 3 + airbenderLen + ZISK_SNARK_PROOF_LENGTH) {
+            revert ProofTooShort();
+        }
 
         // --- Airbender verification ---
         // The batch public inputs reach the ZKsync OS verifier whole. That
@@ -146,27 +155,13 @@ contract MultiProofVerifier is IVerifier, IZKsyncOSVerifier {
         // inherent: a ZiSK proof attesting to a different transition would
         // reconstruct a different signal and fail here. Only the 24-word SNARK
         // is passed through.
-        //
-        // One verifier serves every chain of a protocol version
-        // (`ChainTypeManager.protocolVersionVerifier`), so the requirement is
-        // read from the calling chain rather than held here. The caller is that
-        // chain's diamond.
-        uint8 disabledProofSystems = IGetters(msg.sender).disabledProofSystems();
-        // Re-checked against the setter's own predicate, so the Airbender requirement holds here rather
-        // than resting on a value written elsewhere.
-        if (disabledProofSystems & ~ZISK_PROOF_SYSTEM_DISABLED != 0) {
-            revert InvalidDisabledProofSystemsMask(disabledProofSystems);
+        uint256 ziskStart = 3 + airbenderLen;
+        uint256[] memory ziskProof = new uint256[](ZISK_SNARK_PROOF_LENGTH);
+        for (uint256 i = 0; i < ZISK_SNARK_PROOF_LENGTH; ++i) {
+            ziskProof[i] = _proof[ziskStart + i];
         }
-
-        if (disabledProofSystems & ZISK_PROOF_SYSTEM_DISABLED == 0) {
-            uint256 ziskStart = 3 + airbenderLen;
-            uint256[] memory ziskProof = new uint256[](24);
-            for (uint256 i = 0; i < 24; ++i) {
-                ziskProof[i] = _proof[ziskStart + i];
-            }
-            if (!ZISK_RANGE_VERIFIER.verify(_publicInputs, ziskProof)) {
-                revert ZiskVerificationFailed();
-            }
+        if (!ZISK_RANGE_VERIFIER.verify(_publicInputs, ziskProof)) {
+            revert ZiskVerificationFailed();
         }
 
         return true;

@@ -1,7 +1,8 @@
 # ZKsync OS multi-proof verifiers
 
-`MultiProofVerifier` accepts a combined proof (type 5) and requires BOTH an
-Airbender SNARK and a ZiSK SNARK for every state transition. `ZiskVerifier`
+`MultiProofVerifier` selects between Airbender-only (type 2) and combined
+Airbender + ZiSK (type 5) proofs according to the chain's switch. See
+[proof-mode discovery and switch semantics](../../../../protocol-docs/multi-proof-verification.md). `ZiskVerifier`
 is its range verifier: it pins three values, RECONSTRUCTS the 320-byte ZiSK
 public values on-chain from those pins and the batch public inputs (the
 self-contained seed-0 chain), and delegates the Plonk check to a standalone
