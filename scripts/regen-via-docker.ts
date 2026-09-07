@@ -51,6 +51,10 @@ import { ethers } from "ethers";
 
 const CONTRACTS_DIR = path.resolve(__dirname, "..");
 const ENV_DIR = "upgrade-envs/v0.33.0-atomic-interop";
+// This wrapper is stage-only: it mounts `stage.toml` and reads/writes
+// `output/stage/`. `regen-upgrade-calldata.sh` takes the env as its first
+// argument, so it has to be passed explicitly.
+const ENV_NAME = "stage";
 const OUT_DIR_HOST = path.join(CONTRACTS_DIR, "l1-contracts", ENV_DIR, "output");
 const OUT_DIR_CONTAINER = `/contracts/l1-contracts/${ENV_DIR}/output`;
 const IMAGE = process.env.PROTOCOL_OPS_IMAGE ?? "ghcr.io/matter-labs/protocol-ops:v31-camp-split";
@@ -207,6 +211,7 @@ function cmdRegen(pk: string, rpc: string, binMount: string[]): number {
     IMAGE,
     "bash",
     "test/anvil-interop/regen-upgrade-calldata.sh",
+    ENV_NAME,
   ];
   return dockerRun(args);
 }
@@ -508,7 +513,7 @@ function cmdSimEmit(pk: string, binMount: string[], outJson: string): number {
     "ecosystem",
     "governance-toml-to-simulator",
     "--env",
-    "stage",
+    ENV_NAME,
     "--governance-toml",
     `/contracts/l1-contracts/${ENV_DIR}/output/stage/ecosystem.toml`,
     "--include-manifest",

@@ -216,7 +216,7 @@
     "to": "0xdfa2193b161d7bd45fc81b4e80225eebdc3cf96c",
     "data": "0xf7c7eb92",
     "value": "0",
-    "valueToMint": "10000000000000000000",
+    "valueToMint": "10",
     "tag": "stage2"
   },
   {
@@ -248,7 +248,7 @@
     "tag": "test_create_chain_zkos"
   },
   {
-    "description": "ACK: test_upgrade_chain_zkos is deliberately absent from this artifact — the per-chain upgrade is                  generated separately by `protocol_ops chain upgrade`. The reviewer is responsible                  for checking that file.",
+    "description": "ACK: test_upgrade_chain_zkos is deliberately absent from this artifact and is covered outside it. The reviewer is responsible for checking wherever it is covered.",
     "network": "sepolia",
     "from": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",
     "to": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",

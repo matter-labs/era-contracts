@@ -287,8 +287,9 @@ protocol_ops ecosystem upgrade-broadcast \
 
 # 4. Emit the simulator scenario + the committed sim-inputs.
 protocol_ops ecosystem governance-toml-to-simulator --env testnet \
-  --camp-a-signers 0x<deployer> --skip-test-upgrade-calls \
-  --out <out>/simulator/<date>-v33-atomic-interop-testnet.json
+  --camp-a-signers 0x<deployer> --ack test_upgrade_chain_zkos \
+  --descriptions ../sim-descriptions.toml --include-manifest <out>/sim-inputs/manifest.json \
+  --out <out>/simulator/<date>-v33-atomic-interop-testnet-1-ecosystem.json
 protocol_ops ecosystem governance-toml-to-simulator --env testnet \
   --camp-a-signers 0x<deployer> --emit-sim-inputs <out>/sim-inputs
 

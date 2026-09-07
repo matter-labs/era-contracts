@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use alloy::dyn_abi::{DynSolType, DynSolValue};
 use alloy::hex;
-use alloy::primitives::Address;
+use alloy::primitives::{Address, U256};
 use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -525,12 +525,17 @@ const CHECK_DEADLINE_TIME_INCREASE_SECS: u64 = 200_000;
 /// belongs to phase 2 (real-chain broadcast), not the sim.
 const CREATE2_FACTORY: &str = "0x4e59b44847b379578588920ca78fbf26c0b4956c";
 
-/// ETH (wei) minted to the governance sender (PUH) at the first stage-2 call
-/// so the `requestL2TransactionDirect{value: y}` / `...TwoBridges{value: y}`
-/// priority requests have msg.value coverage. 10 ETH is well above the
-/// aggregate `priority_txs_l2_gas_limit * max_expected_l1_gas_price` budget
-/// across the v31 stage's stage-2 L1→L2 chain.
-const STAGE2_PUH_FUND_WEI: &str = "10000000000000000000";
+/// ETH minted to the governance sender (PUH) at the first stage-2 call so the
+/// `requestL2TransactionDirect{value: y}` / `...TwoBridges{value: y}` priority
+/// requests have msg.value coverage. Well above the aggregate
+/// `priority_txs_l2_gas_limit * max_expected_l1_gas_price` budget of a
+/// release whose stage 2 chains L1→L2 requests (v31 stage did; v33 has no
+/// Gateway and so no stage-2 priority txs, leaving this a harmless top-up).
+///
+/// Denominated in **whole ETH**, like `valueToMint` itself: the simulator
+/// reads that field with `ethers.parseEther`. The previous value was the same
+/// amount written in wei, which `parseEther` then scaled by another 1e18.
+const STAGE2_PUH_FUND_ETH: &str = "10";
 
 /// Subset of `prepare/manifest.json` needed to walk every Safe bundle.
 #[derive(Debug, Deserialize)]
@@ -874,6 +879,43 @@ pub struct ManifestToSimulatorArgs {
     pub out: Option<PathBuf>,
 }
 
+/// `1e18`, as the divisor between wei and whole ETH.
+const WEI_PER_ETH: u64 = 1_000_000_000_000_000_000;
+
+/// Render a wei amount as the decimal-ETH string the transaction-simulator expects.
+///
+/// The simulator parses this field with `ethers.parseEther`, i.e. it reads it as whole ETH — the
+/// sibling `valueToMint: "1"` means one ETH, not one wei. Everything upstream of here counts in
+/// wei: Safe bundles serialise `value` as a decimal wei string and governance `Call.value` is a
+/// `U256` of wei. Passing either through unconverted multiplies it by 1e18, so a one-wei call
+/// would simulate as a one-ETH call. Every call this tool emits today is value-0, where the bug
+/// is invisible; this makes it correct for the ones that are not.
+fn wei_to_eth_decimal(wei: U256) -> String {
+    let divisor = U256::from(WEI_PER_ETH);
+    let whole = wei / divisor;
+    let frac = wei % divisor;
+    if frac.is_zero() {
+        return whole.to_string();
+    }
+    // 18 fractional digits, zero-padded, then trimmed — exact, no floating point.
+    let frac = format!("{frac:018}");
+    format!("{whole}.{}", frac.trim_end_matches('0'))
+}
+
+/// Same, for a Safe bundle's `value` field: a decimal (or `0x`-prefixed) wei string.
+fn safe_bundle_value_to_eth_decimal(raw: Option<&str>) -> anyhow::Result<String> {
+    let Some(raw) = raw.map(str::trim).filter(|s| !s.is_empty()) else {
+        return Ok("0".to_string());
+    };
+    let wei = if let Some(hex) = raw.strip_prefix("0x").or_else(|| raw.strip_prefix("0X")) {
+        U256::from_str_radix(hex, 16)
+    } else {
+        U256::from_str_radix(raw, 10)
+    }
+    .with_context(|| format!("Safe bundle `value` is not a wei amount: {raw:?}"))?;
+    Ok(wei_to_eth_decimal(wei))
+}
+
 /// Convert a protocol-ops Safe-bundle manifest straight into a transaction-simulator scenario.
 ///
 /// `governance-toml-to-simulator` builds a scenario out of an ecosystem artifact. A per-chain
@@ -1051,7 +1093,7 @@ fn manifest_to_simulator_transactions(
                 from: format!("{:#x}", bundle.target),
                 to: format!("{:#x}", tx.to),
                 data: tx.data.clone(),
-                value: tx.value.clone().unwrap_or_else(|| "0".to_string()),
+                value: safe_bundle_value_to_eth_decimal(tx.value.as_deref())?,
                 value_to_mint,
                 time_increase: None,
                 emulate_all_batches_executed: None,
@@ -1094,7 +1136,7 @@ fn governance_toml_to_simulator_transactions(
         for (idx, call) in calls.into_iter().enumerate() {
             let data_hex = format!("0x{}", hex::encode(&call.data));
             // Mint logic:
-            //   - First stage-2 call → top up PUH with `STAGE2_PUH_FUND_WEI`
+            //   - First stage-2 call → top up PUH with `STAGE2_PUH_FUND_ETH`
             //     so subsequent L1→L2 priority requests have msg.value.
             //   - Otherwise, first-ever call → seed PUH with 1 wei so the
             //     anvil account exists.
@@ -1102,7 +1144,7 @@ fn governance_toml_to_simulator_transactions(
             let value_to_mint = if stage == 2 && stage2_topup_pending {
                 stage2_topup_pending = false;
                 should_fund_sender = false;
-                Some(STAGE2_PUH_FUND_WEI.to_string())
+                Some(STAGE2_PUH_FUND_ETH.to_string())
             } else if should_fund_sender {
                 should_fund_sender = false;
                 Some("1".to_string())
@@ -1134,7 +1176,7 @@ fn governance_toml_to_simulator_transactions(
                 from: format!("{from:#x}"),
                 to: format!("{:#x}", call.target),
                 data: data_hex,
-                value: call.value.to_string(),
+                value: wei_to_eth_decimal(call.value),
                 value_to_mint,
                 time_increase,
                 emulate_all_batches_executed: None,
@@ -1188,7 +1230,7 @@ fn append_test_upgrade_calls(
                 from: format!("{caller:#x}"),
                 to: format!("{:#x}", call.target),
                 data: data_hex,
-                value: call.value.to_string(),
+                value: wei_to_eth_decimal(call.value),
                 value_to_mint: Some("1".to_string()),
                 time_increase: None,
                 emulate_all_batches_executed,
@@ -1199,4 +1241,87 @@ fn append_test_upgrade_calls(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod value_conversion_tests {
+    use super::*;
+
+    /// The case from the PR review: a Safe call carrying one wei must not
+    /// simulate as one ETH.
+    #[test]
+    fn one_wei_is_not_one_eth() {
+        assert_eq!(
+            safe_bundle_value_to_eth_decimal(Some("1")).unwrap(),
+            "0.000000000000000001"
+        );
+    }
+
+    #[test]
+    fn zero_and_absent_both_render_zero() {
+        assert_eq!(safe_bundle_value_to_eth_decimal(None).unwrap(), "0");
+        assert_eq!(safe_bundle_value_to_eth_decimal(Some("0")).unwrap(), "0");
+        assert_eq!(safe_bundle_value_to_eth_decimal(Some("  ")).unwrap(), "0");
+        assert_eq!(wei_to_eth_decimal(U256::ZERO), "0");
+    }
+
+    #[test]
+    fn whole_eth_has_no_fractional_part() {
+        assert_eq!(wei_to_eth_decimal(U256::from(WEI_PER_ETH)), "1");
+        assert_eq!(
+            wei_to_eth_decimal(U256::from(WEI_PER_ETH) * U256::from(42)),
+            "42"
+        );
+    }
+
+    #[test]
+    fn fractional_amounts_are_exact_and_trimmed() {
+        // 1.5 ETH
+        assert_eq!(
+            wei_to_eth_decimal(U256::from(1_500_000_000_000_000_000u64)),
+            "1.5"
+        );
+        // 0.1 ETH — the classic binary-float trap; must be exact.
+        assert_eq!(
+            wei_to_eth_decimal(U256::from(100_000_000_000_000_000u64)),
+            "0.1"
+        );
+    }
+
+    #[test]
+    fn hex_values_are_accepted() {
+        // Safe bundles are decimal, but tolerate 0x rather than mis-parsing it.
+        assert_eq!(
+            safe_bundle_value_to_eth_decimal(Some("0xde0b6b3a7640000")).unwrap(),
+            "1"
+        );
+    }
+
+    #[test]
+    fn a_non_numeric_value_is_an_error_not_a_silent_zero() {
+        assert!(safe_bundle_value_to_eth_decimal(Some("1 ether")).is_err());
+    }
+
+    /// Round-trips through the simulator's own reading of the field: whatever
+    /// we emit, `parseEther` must give back the wei we started from.
+    #[test]
+    fn round_trips_through_parse_ether_semantics() {
+        for wei in [
+            0u64,
+            1,
+            999,
+            100_000_000_000_000_000,
+            WEI_PER_ETH,
+            2_500_000_000_000_000_001,
+        ] {
+            let s = wei_to_eth_decimal(U256::from(wei));
+            let (whole, frac) = match s.split_once('.') {
+                Some((w, f)) => (w, format!("{f:0<18}")),
+                None => (s.as_str(), "0".repeat(18)),
+            };
+            let back = U256::from_str_radix(whole, 10).unwrap() * U256::from(WEI_PER_ETH)
+                + U256::from_str_radix(&frac, 10).unwrap();
+            assert_eq!(back, U256::from(wei), "round-trip failed for {wei} -> {s}");
+        }
+    }
 }
