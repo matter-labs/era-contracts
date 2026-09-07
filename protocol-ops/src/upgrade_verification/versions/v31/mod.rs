@@ -25,8 +25,26 @@ use elements::{
     rpc_state::verify_v31_artifact_state,
 };
 
-pub(crate) const EXPECTED_NEW_PROTOCOL_VERSION_STR: &str = "0.31.0";
-pub(crate) const EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR: &str = "0.29.4";
+// Target protocol versions, per CTM flavour. Each CTM upgrades to its own
+// flavour's chain-creation `latestProtocolVersion`, which comes from that
+// flavour's genesis config — `DefaultCTMUpgrade.getNewProtocolVersion()` returns
+// `config.contracts.chainCreationParams.latestProtocolVersion`. The two
+// flavours' genesis lines moved independently, so a single shared constant
+// cannot describe both: this branch ships Era genesis v0.32.2 (see the
+// `old_protocol_version` note in `upgrade-envs/v0.31.0-interopB/
+// foundry-upgrade.toml`) and ZKsync-OS genesis v0.31.2.
+pub(crate) const EXPECTED_ERA_NEW_PROTOCOL_VERSION_STR: &str = "0.32.2";
+pub(crate) const EXPECTED_ZKSYNC_OS_NEW_PROTOCOL_VERSION_STR: &str = "0.31.2";
+// Source protocol versions, per CTM flavour: the version each CTM is on when
+// v31 executes, checked against both the artifact's `old_protocol_version` and
+// the live CTM's `protocolVersion()`.
+//
+// Era is v0.30.1, not the v0.29.4 the July calldata was cut against. Mainnet's
+// Era CTM moved to v0.30.1 at block 25766158 — after that calldata was
+// generated and 268k blocks after its contracts were deployed — so the recorded
+// ceremony would revert (`setNewVersionUpgrade old protocol version mismatch`)
+// and the re-cut upgrades Era from v0.30.1.
+pub(crate) const EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR: &str = "0.30.1";
 pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.30.1";
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
 pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
@@ -39,8 +57,14 @@ pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
 /// `Bridgehub.settlementLayer(chainId) == L1` invariant on stage.
 pub(crate) const STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID: u64 = 270;
 
-pub(crate) fn get_expected_new_protocol_version() -> ProtocolVersion {
-    ProtocolVersion::from_str(EXPECTED_NEW_PROTOCOL_VERSION_STR).unwrap()
+pub(crate) fn get_expected_new_protocol_version_for_ctm_flavor(
+    flavor: CtmFlavor,
+) -> ProtocolVersion {
+    let version = match flavor {
+        CtmFlavor::Era => EXPECTED_ERA_NEW_PROTOCOL_VERSION_STR,
+        CtmFlavor::ZksyncOs => EXPECTED_ZKSYNC_OS_NEW_PROTOCOL_VERSION_STR,
+    };
+    ProtocolVersion::from_str(version).unwrap()
 }
 
 pub(crate) fn get_expected_old_protocol_version_for_ctm_flavor(
@@ -58,13 +82,6 @@ pub(crate) fn is_expected_old_protocol_version_for_ctm_flavor(
     flavor: CtmFlavor,
 ) -> bool {
     version == get_expected_old_protocol_version_for_ctm_flavor(flavor)
-}
-
-pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static str {
-    match flavor {
-        CtmFlavor::Era => "v0.29.4",
-        CtmFlavor::ZksyncOs => "v0.30.1",
-    }
 }
 
 /// Run the full v31 verification pipeline.

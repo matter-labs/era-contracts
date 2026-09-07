@@ -31,7 +31,7 @@ use crate::upgrade_verification::{
 };
 
 use super::super::get_expected_old_protocol_version_for_ctm_flavor;
-use super::{super::expected_old_protocol_version_label, call_list::CallList};
+use super::call_list::CallList;
 
 mod facets;
 mod helpers;
@@ -217,7 +217,7 @@ pub(crate) async fn verify_per_chain_protocol_versions(
             result.report_error(&format!(
                 "{} CTM old protocol version must be {}, got {}",
                 ctm.flavor.label(),
-                expected_old_protocol_version_label(ctm.flavor),
+                get_expected_old_protocol_version_for_ctm_flavor(ctm.flavor),
                 protocol_label(artifact_old_protocol_version)
             ));
             setup_errors += 1;
