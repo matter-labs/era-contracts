@@ -1273,6 +1273,24 @@ fn verify_ctm_base_provenance(
             default_upgrade_ctor,
             "l1-contracts/V32UpgradeZKsyncOS",
         );
+
+        // DefaultUpgradeZKsyncOS() — no ctor args. This is the contract the CTM
+        // *stores* as its `defaultUpgrade`, so every later patch upgrade
+        // delegates through it. Its provenance therefore matters as much as the
+        // one-shot cut's: without this, `setDefaultUpgrade` could name any live
+        // address and stage-1 verification would still pass, because the only
+        // other check compares it to the same artifact field.
+        let ctm_stored_default_upgrade = required_address(
+            &ctm.value,
+            &scope,
+            &["state_transition", "ctm_stored_default_upgrade_addr"],
+        )?;
+        result.expect_create2_params(
+            verifiers,
+            &ctm_stored_default_upgrade,
+            Vec::<u8>::new(),
+            "l1-contracts/DefaultUpgradeZKsyncOS",
+        );
     }
 
     // DiamondInit(bool _isZKsyncOS) — encoded as a single 32-byte word.

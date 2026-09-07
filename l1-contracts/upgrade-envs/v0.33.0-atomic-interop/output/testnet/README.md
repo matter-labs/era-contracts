@@ -54,10 +54,13 @@ handler, chain registration sender, and the CTM-side proxies), `L1Nullifier` +
 **Stage 2** — 3 calls: `unpauseMigration()`,
 `UpgradeStageValidator.checkProtocolUpgradePresence()`, `.checkMigrationsUnpaused()`.
 
+**Stage 3** — not governance, and not in this artifact. See "Stage 3" below; it must run
+before the per-chain cuts.
+
 > **Two upgrade contracts, and they are not interchangeable.** The diamond cut delegates to
-> `V32UpgradeZKsyncOS` (`0xe5Ba13e1…`), this release's one-shot payload — it requires a recorded
+> `V32UpgradeZKsyncOS` (`0x957d0c89…`), this release's one-shot payload — it requires a recorded
 > priority-op lower bound and a fully executed batch queue. What the CTM _stores_ as its
-> `defaultUpgrade` is the generic `DefaultUpgradeZKsyncOS` (`0x7Ce89dd4…`), because that is what
+> `defaultUpgrade` is the generic `DefaultUpgradeZKsyncOS` (`0xB0747C54…`), because that is what
 > later upgrades reuse when they need no custom logic (a verifier-only patch, say). Storing the
 > one-shot contract there would make every such upgrade revert on preconditions that only ever
 > held during v31 -> v33.
@@ -130,6 +133,46 @@ provenance check validates the claim rather than trusting it — the acknowledge
 real checked tag, it must genuinely not be derivable from the TOML (so an ack can never hide a
 dropped transaction), and the calldata must be exactly `0x`. The simulator skips it at replay
 and re-checks the calldata rule there.
+
+### Stage 3: populate `L1NativeTokenVault.bridgedOut`
+
+**This step is required and is not part of the calldata in this artifact.** Skipping it leaves
+withdrawals and failed-deposit recovery broken for assets that existed before the upgrade.
+
+v33 replaces the removed L2 asset tracker's accounting with two new mappings on the vault,
+`bridgedOut` and `bridgedOutPopulated`. Both start empty, so for a pre-existing asset the vault
+cannot tell "nothing was ever bridged out" from "we have not looked yet" — and it refuses to
+decrement rather than guess. `populateBridgedOut(assetIds)` folds each asset's pre-upgrade
+amount in and flips its `bridgedOutPopulated` flag.
+
+Run it with:
+
+```bash
+protocol_ops ecosystem stage3 --env testnet --sender <EOA> --private-key <KEY>
+```
+
+It needs **no governance privileges** — any signable EOA works, which is why it is a separate
+phase rather than a fourth governance stage. It is additive and idempotent per asset, so an
+interrupted run is resumed by running it again. `PopulateBridgedOutScript` is the standalone
+forge entry point for the same library, useful for assets registered in the NTV later.
+
+**Ordering.** Stage 3 runs after governance stage 2 and *before* the per-chain diamond cuts, so
+that by the time a chain's cut lands every asset it can withdraw is already populated. The full
+sequence is therefore:
+
+| phase | what | who signs |
+| --- | --- | --- |
+| deploy | the CREATE2 bundle in `transactions.txt` | any EOA |
+| ceremony 1 | governance stage 0 (arms the timer) | PUH |
+| ceremony 2 | governance stages 1 + 2, ≥ 20 min later | PUH |
+| stage 3 | `bridgedOut` population | any EOA |
+| per chain | `setUpgradeTimestamp` then the diamond cut | that chain's admin |
+
+**Why PUVT does not check it.** PUVT verifies *calldata* — the governance bundles this artifact
+carries. Stage 3 emits no calldata to verify: it is a broadcast loop whose input is the live set
+of registered assets and whose correct result is on-chain state, not bytes in a TOML. Asserting
+it belongs in an integration test that upgrades, observes a withdrawal fail, runs stage 3, and
+observes the same withdrawal succeed.
 
 ### Preconditions that live on chain, not in the calldata
 

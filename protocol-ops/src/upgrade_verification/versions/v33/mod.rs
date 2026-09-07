@@ -19,6 +19,7 @@ pub(crate) mod elements;
 pub(crate) mod utils;
 
 use elements::{
+    ctm_admin_calls::verify_ctm_admin_calls,
     deployed_addresses::verify_v33_provenance,
     governance_stage_calls::{verify_governance_stage_calls, verify_per_chain_protocol_versions},
     protocol_version::ProtocolVersion,
@@ -179,6 +180,8 @@ pub(crate) async fn verify(
     verify_per_chain_protocol_versions(artifact, &verifiers, result).await?;
 
     verify_governance_stage_calls(artifact, &verifiers, result).await?;
+
+    verify_ctm_admin_calls(artifact, &verifiers, result).await?;
 
     Ok(())
 }

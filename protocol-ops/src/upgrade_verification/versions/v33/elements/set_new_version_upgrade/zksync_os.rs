@@ -249,11 +249,25 @@ fn verify_zksync_os_deployed_bytecode_info(
             bytecode_info,
             expected_file,
             addr_label,
-            0,
-            32,
-            64,
+            SIMPLE_INFO_BLAKE_START,
+            SIMPLE_INFO_LENGTH_START,
+            SIMPLE_INFO_OBSERVABLE_START,
         ),
         ZksyncOSUpgradeType::SystemProxyUpgrade => {
+            // Reading the two triplets at fixed offsets says nothing about the
+            // envelope that carries them. A non-canonical header — a shifted
+            // offset, a wrong inner length — leaves the payload exactly where
+            // this code looks, so it would verify here and then be rejected by
+            // Solidity's `abi.decode` during the L2 upgrade. Check the header
+            // before trusting the offsets.
+            if !verify_zksync_os_proxy_info_envelope(
+                result,
+                bytecode_info,
+                expected_file,
+                addr_label,
+            ) {
+                return;
+            }
             verify_zksync_os_bytecode_info_triplet(
                 verifiers,
                 result,
@@ -278,6 +292,70 @@ fn verify_zksync_os_deployed_bytecode_info(
     }
 }
 
+/// Canonical ABI header of a `ZKsyncOSSystemProxyUpgrade` descriptor,
+/// `abi.encode(bytes implInfo, bytes proxyInfo)` where each `bytes` is one
+/// 96-byte triplet. Solidity emits exactly these four words and rejects
+/// anything else on decode, so they are fixed expectations rather than values
+/// to be read and followed.
+const PROXY_INFO_OFFSET_IMPL: usize = 64;
+const PROXY_INFO_OFFSET_PROXY: usize = 192;
+const PROXY_INFO_INNER_LEN: usize = 96;
+
+/// Validates the envelope of a 320-byte proxy descriptor. Returns false when
+/// the header is not canonical, in which case the payload offsets cannot be
+/// trusted and the caller must not read them.
+fn verify_zksync_os_proxy_info_envelope(
+    result: &mut VerificationResult,
+    bytecode_info: &[u8],
+    expected_file: &str,
+    addr_label: &str,
+) -> bool {
+    let word = |start: usize| -> Option<usize> {
+        let w = &bytecode_info[start..start + 32];
+        // A canonical offset/length fits in the low 8 bytes; anything in the
+        // upper 24 is either an overflow attempt or garbage.
+        if w[..24].iter().any(|b| *b != 0) {
+            return None;
+        }
+        Some(u64::from_be_bytes(w[24..32].try_into().unwrap()) as usize)
+    };
+
+    let mut ok = true;
+    for (start, expected, what) in [
+        (0usize, PROXY_INFO_OFFSET_IMPL, "implementation offset"),
+        (32, PROXY_INFO_OFFSET_PROXY, "proxy offset"),
+        (64, PROXY_INFO_INNER_LEN, "implementation length"),
+        (192, PROXY_INFO_INNER_LEN, "proxy length"),
+    ] {
+        match word(start) {
+            Some(actual) if actual == expected => {}
+            Some(actual) => {
+                result.report_error(&format!(
+                    "ZKsyncOS force deployment at {addr_label} ({expected_file}): \
+                     deployedBytecodeInfo {what} is {actual}, expected {expected}; \
+                     the descriptor is not canonical ABI and would fail L2-side decoding"
+                ));
+                ok = false;
+            }
+            None => {
+                result.report_error(&format!(
+                    "ZKsyncOS force deployment at {addr_label} ({expected_file}): \
+                     deployedBytecodeInfo {what} has dirty high-order bytes"
+                ));
+                ok = false;
+            }
+        }
+    }
+    ok
+}
+
+/// A simple (non-proxy) ZKsync OS `deployedBytecodeInfo` is the 96-byte
+/// triplet `abi.encode(blakeHash, uint32 length, observableKeccak)`.
+pub(super) const ZKSYNC_OS_SIMPLE_BYTECODE_INFO_LEN: usize = 96;
+const SIMPLE_INFO_BLAKE_START: usize = 0;
+const SIMPLE_INFO_LENGTH_START: usize = 32;
+const SIMPLE_INFO_OBSERVABLE_START: usize = 64;
+
 #[allow(clippy::too_many_arguments)]
 fn verify_zksync_os_bytecode_info_triplet(
     verifiers: &Verifiers,
@@ -289,6 +367,7 @@ fn verify_zksync_os_bytecode_info_triplet(
     length_word_start: usize,
     observable_start: usize,
 ) {
+    let errors_before = result.errors;
     let observable =
         FixedBytes::<32>::from_slice(&bytecode_info[observable_start..observable_start + 32]);
     if !evm_deployed_bytecode_hash_matches_file(verifiers, &observable, expected_file) {
@@ -325,13 +404,26 @@ fn verify_zksync_os_bytecode_info_triplet(
     }
 
     // `uint32 length` is padded to a full 32-byte word; the value lives in the
-    // last 4 big-endian bytes.
+    // last 4 big-endian bytes and the other 28 must be zero. Reading only the
+    // low 4 would accept a word whose high bytes carry anything at all.
     let length_word = &bytecode_info[length_word_start..length_word_start + 32];
+    if length_word[..28].iter().any(|b| *b != 0) {
+        result.report_error(&format!(
+            "ZKsyncOS force deployment at {addr_label} ({expected_file}): \
+             deployedBytecodeInfo.length is not a canonically padded uint32"
+        ));
+    }
     let actual_length = u32::from_be_bytes(length_word[28..32].try_into().unwrap());
     if actual_length != expected_length {
         result.report_error(&format!(
             "ZKsyncOS force deployment at {addr_label} ({expected_file}): \
              deployedBytecodeInfo.length mismatch: expected {expected_length}, got {actual_length}"
+        ));
+    }
+
+    if result.errors == errors_before {
+        result.report_ok(&format!(
+            "{addr_label}: deployedBytecodeInfo blake+length+observableKeccak all match {expected_file}"
         ));
     }
 }
@@ -432,25 +524,28 @@ fn verify_zksync_os_l2_v33_deployment(
         ));
     }
 
-    match zksync_os_bytecode_info_hashes(&deployment.deployedBytecodeInfo) {
-        Some((first_hash, observable_hash)) => {
-            if evm_deployed_bytecode_hash_matches_file(
-                verifiers,
-                &observable_hash,
-                L2_V32_UPGRADE_CONTRACT,
-            ) {
-                result.report_ok("ZKsync OS delegate deployment uses L2V32Upgrade bytecode info");
-            } else {
-                result.report_error(&format!(
-                    "ZKsync OS delegate bytecode info does not map to {}: blake={}, observable={}",
-                    L2_V32_UPGRADE_CONTRACT, first_hash, observable_hash
-                ));
-            }
-        }
-        None => result.report_error(&format!(
-            "ZKsync OS L2V32Upgrade bytecode info must be 96 bytes, got {}",
+    // The delegate's address is *derived* from this descriptor, so a matching
+    // address proves only that the descriptor hashes to the address — not that
+    // the descriptor describes L2V32Upgrade. All three fields are consumed by
+    // the L2 deployer (`setBytecodeDetailsEVM`), so all three are checked:
+    // altering blake or length and recomputing the address must not pass.
+    if deployment.deployedBytecodeInfo.len() == ZKSYNC_OS_SIMPLE_BYTECODE_INFO_LEN {
+        verify_zksync_os_bytecode_info_triplet(
+            verifiers,
+            result,
+            &deployment.deployedBytecodeInfo,
+            L2_V32_UPGRADE_CONTRACT,
+            "L2V32Upgrade delegate target",
+            SIMPLE_INFO_BLAKE_START,
+            SIMPLE_INFO_LENGTH_START,
+            SIMPLE_INFO_OBSERVABLE_START,
+        );
+    } else {
+        result.report_error(&format!(
+            "ZKsync OS L2V32Upgrade bytecode info must be {} bytes, got {}",
+            ZKSYNC_OS_SIMPLE_BYTECODE_INFO_LEN,
             deployment.deployedBytecodeInfo.len()
-        )),
+        ));
     }
 }
 
@@ -460,18 +555,6 @@ fn generate_zksync_os_random_address(bytecode_info: &[u8]) -> Address {
     preimage.extend_from_slice(bytecode_info);
     let hash = keccak256(preimage);
     Address::from_slice(&hash[12..])
-}
-
-fn zksync_os_bytecode_info_hashes(
-    bytecode_info: &[u8],
-) -> Option<(FixedBytes<32>, FixedBytes<32>)> {
-    if bytecode_info.len() != 96 {
-        return None;
-    }
-    Some((
-        FixedBytes::<32>::from_slice(&bytecode_info[0..32]),
-        FixedBytes::<32>::from_slice(&bytecode_info[64..96]),
-    ))
 }
 
 fn evm_deployed_bytecode_hash_matches_file(
@@ -497,15 +580,84 @@ mod tests {
         assert_eq!(generate_zksync_os_random_address(&[1u8]), expected);
     }
 
-    #[test]
-    fn zksync_os_bytecode_info_hashes_requires_abi_tuple_size() {
-        let mut bytecode_info = [0u8; 96];
-        bytecode_info[31] = 1;
-        bytecode_info[95] = 2;
+    fn canonical_proxy_envelope() -> [u8; 320] {
+        let mut info = [0u8; 320];
+        info[31] = 0x40; // offset of implInfo
+        info[63] = 0xc0; // offset of proxyInfo
+        info[95] = 0x60; // len(implInfo)  = 96
+        info[223] = 0x60; // len(proxyInfo) = 96
+        info
+    }
 
-        let (first_hash, observable_hash) = zksync_os_bytecode_info_hashes(&bytecode_info).unwrap();
-        assert_eq!(first_hash[31], 1);
-        assert_eq!(observable_hash[31], 2);
-        assert!(zksync_os_bytecode_info_hashes(&bytecode_info[..95]).is_none());
+    #[test]
+    fn proxy_info_envelope_accepts_canonical_header() {
+        let mut result = VerificationResult::default();
+        assert!(verify_zksync_os_proxy_info_envelope(
+            &mut result,
+            &canonical_proxy_envelope(),
+            "l1-contracts/L2Bridgehub",
+            "0xdead",
+        ));
+        assert_eq!(result.errors, 0);
+    }
+
+    /// The mutation from the PR review: shifting the first offset by one leaves
+    /// both triplets exactly where the fixed-offset reads look for them, so
+    /// only an envelope check can reject it. Solidity's decoder does.
+    #[test]
+    fn proxy_info_envelope_rejects_offset_shifted_by_one() {
+        let mut info = canonical_proxy_envelope();
+        info[31] = 0x41;
+
+        let mut result = VerificationResult::default();
+        assert!(!verify_zksync_os_proxy_info_envelope(
+            &mut result,
+            &info,
+            "l1-contracts/L2Bridgehub",
+            "0xdead",
+        ));
+        assert_eq!(result.errors, 1);
+    }
+
+    #[test]
+    fn proxy_info_envelope_rejects_wrong_inner_length() {
+        let mut info = canonical_proxy_envelope();
+        info[95] = 0x61;
+
+        let mut result = VerificationResult::default();
+        assert!(!verify_zksync_os_proxy_info_envelope(
+            &mut result,
+            &info,
+            "l1-contracts/L2Bridgehub",
+            "0xdead",
+        ));
+        assert_eq!(result.errors, 1);
+    }
+
+    #[test]
+    fn proxy_info_envelope_rejects_dirty_high_order_bytes() {
+        let mut info = canonical_proxy_envelope();
+        info[0] = 1;
+
+        let mut result = VerificationResult::default();
+        assert!(!verify_zksync_os_proxy_info_envelope(
+            &mut result,
+            &info,
+            "l1-contracts/L2Bridgehub",
+            "0xdead",
+        ));
+        assert_eq!(result.errors, 1);
+    }
+
+    /// The simple-triplet field offsets the delegate check relies on.
+    #[test]
+    fn simple_bytecode_info_layout_is_blake_length_observable() {
+        assert_eq!(SIMPLE_INFO_BLAKE_START, 0);
+        assert_eq!(SIMPLE_INFO_LENGTH_START, 32);
+        assert_eq!(SIMPLE_INFO_OBSERVABLE_START, 64);
+        assert_eq!(
+            SIMPLE_INFO_OBSERVABLE_START + 32,
+            ZKSYNC_OS_SIMPLE_BYTECODE_INFO_LEN
+        );
     }
 }

@@ -42,6 +42,10 @@ mod stage2;
 
 use helpers::{protocol_label, required_ctm_address};
 
+// Re-exported for sibling elements that need to resolve a per-CTM artifact
+// address (e.g. `ctm_admin_calls`).
+pub(crate) use helpers::required_ctm_address as ctm_address;
+
 pub struct GovernanceStage0Calls {
     pub calls: CallList,
 }

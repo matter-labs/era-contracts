@@ -740,6 +740,14 @@ fn verify_kept_proxy_upgrade_call_args(
 /// The distinction matters: the stored address is what every *later* patch
 /// upgrade reuses, so pointing it at the one-shot contract would silently
 /// re-run this release's migration on a future upgrade.
+///
+/// Three independent things are checked, because the first two alone are
+/// self-referential — they only relate the call to other fields of the same
+/// artifact, so substituting one live address in both places would pass:
+/// the call matches the artifact's declared address, that address is *not*
+/// the one-shot upgrader, and it is a `DefaultUpgradeZKsyncOS` this upgrade
+/// CREATE2-deployed. The last one is what actually establishes what the CTM
+/// will delegate through.
 fn verify_set_default_upgrade_call_args(
     calls: &CallList,
     index: usize,
@@ -781,6 +789,39 @@ fn verify_set_default_upgrade_call_args(
                     errors += 1;
                 }
             }
+
+            // Establish what the address actually *is*, independently of the
+            // artifact. Without this the two checks above are satisfied by any
+            // address the artifact names consistently.
+            const STORED_DEFAULT_UPGRADE_FILE: &str = "l1-contracts/DefaultUpgradeZKsyncOS";
+            match verifiers
+                .network_verifier
+                .create2_known_bytecodes
+                .get(&decoded.newUpgrade)
+            {
+                Some(file) if file == STORED_DEFAULT_UPGRADE_FILE => result.report_ok(&format!(
+                    "{} setDefaultUpgrade stores {}, deployed by this upgrade as {STORED_DEFAULT_UPGRADE_FILE}",
+                    ctm.flavor.label(),
+                    decoded.newUpgrade,
+                )),
+                Some(file) => {
+                    result.report_error(&format!(
+                        "{} setDefaultUpgrade stores {}, which this upgrade deployed as {file}, not {STORED_DEFAULT_UPGRADE_FILE}",
+                        ctm.flavor.label(),
+                        decoded.newUpgrade,
+                    ));
+                    errors += 1;
+                }
+                None => {
+                    result.report_error(&format!(
+                        "{} setDefaultUpgrade stores {}, which is not among this upgrade's CREATE2 deployments; the CTM would delegate every later patch upgrade through an unverified contract",
+                        ctm.flavor.label(),
+                        decoded.newUpgrade,
+                    ));
+                    errors += 1;
+                }
+            }
+
             errors
         }
         Err(err) => {

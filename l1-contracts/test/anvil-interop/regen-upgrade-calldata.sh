@@ -219,3 +219,9 @@ echo "Verify cmds: $OUT/extra-verification-logs.txt"
 echo
 echo "Next: broadcast the deployer bundle to the real L1, then emit the transaction-simulator"
 echo "scenario. Both are documented in $OUT/README.md."
+echo
+echo "Reminder: the rollout has a step this artifact carries no calldata for. After governance"
+echo "stage 2 and BEFORE the per-chain diamond cuts, run"
+echo "  protocol_ops ecosystem stage3 --env $ENV_NAME --sender <EOA> --private-key <KEY>"
+echo "to populate L1NativeTokenVault.bridgedOut. Withdrawals and failed-deposit recovery of"
+echo "pre-upgrade assets stay broken until it has run. See \"Stage 3\" in $OUT/README.md."

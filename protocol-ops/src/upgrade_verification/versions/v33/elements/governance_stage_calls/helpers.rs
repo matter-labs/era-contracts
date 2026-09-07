@@ -171,7 +171,7 @@ pub(super) fn verify_call_by_address(
     errors
 }
 
-pub(super) fn required_ctm_address(
+pub(crate) fn required_ctm_address(
     ctm: &CtmArtifact,
     path: &[&str],
     result: &mut VerificationResult,

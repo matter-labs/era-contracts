@@ -68,6 +68,7 @@ sol! {
         function isZKsyncOS() external view returns (bool);
         function owner() external view returns (address);
         function PERMISSIONLESS_VALIDATOR() external view returns (address);
+        function serverNotifierAddress() external view returns (address);
     }
 
     #[sol(rpc)]
