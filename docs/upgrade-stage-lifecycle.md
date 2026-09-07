@@ -307,7 +307,17 @@ Targeted tests:
 - overlapping upgrades and a pre-existing governance pause: stage 2 of one upgrade leaves the
   other's hold and the owner's flag in place;
 - completion checks failing BEFORE restoration (no unpause when the applied-state check fails);
-- bootstrap followed by a normal registry-driven upgrade (the pipeline's shape).
+- bootstrap followed by a normal registry-driven upgrade (the pipeline's shape);
+- individual-contract upgrades leave unrelated state untouched: a facet-only edge, a
+  verifier-only edge and a ValidatorTimelock-only SemVer patch, each one release (or none) and one
+  transition through the three stages, asserting the other facets, the verifier, the CTM
+  implementation, the release and the L2 side (`RegistryIndividualUpgrade.t.sol`).
+
+All of the above are covered: the stage-order, authority, pause and completion cases in
+`CTMUpgradeLifecycle.t.sol`, the bootstrap-then-recurring shape in the chained anvil pipeline
+(`run-v33-to-v34-upgrade-test.ts`), the individual upgrades in `RegistryIndividualUpgrade.t.sol`;
+the scripted-versus-on-chain replay is the v34 prepare's byte-for-byte cut check plus the pipeline's
+end-state assertions.
 
 ## 6. Order of work
 
@@ -323,7 +333,7 @@ Targeted tests:
 6. Tooling: scripts emit the three calls; the Rust merger stops composing stage bodies; every
    remaining external action listed — done (4.7; the v35 scripts and the chained anvil pipeline
    are the proof).
-7. Equivalence replay + targeted tests (Section 5).
+7. Equivalence replay + targeted tests (Section 5) — done.
 8. Only then: simplify the no-Gateway path behind the same stage interface.
 
 ## Executor succession
