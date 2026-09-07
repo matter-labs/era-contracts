@@ -10,8 +10,7 @@ import {IL2ChainAssetHandler} from "../../core/chain-asset-handler/IL2ChainAsset
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice Contract that stores some of the context variables, that may be either
- * block-scoped, tx-scoped or system-wide.
+ * @notice Tracks the current settlement layer chain ID.
  */
 contract SystemContext {
     /// @notice Emitted when the Settlement Layer chain id is modified.
@@ -32,8 +31,6 @@ contract SystemContext {
     }
 
     /// @notice Function to set the settlement layer chain id, can only be called from the bootloader.
-    /// TODO(EVM-1315): This function is identical to the one in the system-contracts/contracts/SystemContext.sol,
-    /// we should remove this duplication.
     function setSettlementLayerChainId(uint256 _newSettlementLayerChainId) external onlyCallFromBootloader {
         if (currentSettlementLayerChainId != _newSettlementLayerChainId) {
             // slither-disable-next-line reentrancy-no-eth

@@ -9,7 +9,6 @@ import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {ISystemContractProxy} from "contracts/l2-upgrades/ISystemContractProxy.sol";
 import {SystemContractProxyAdmin} from "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -22,6 +21,19 @@ import {
     L2_REMOVED_GW_ASSET_TRACKER_ADDR,
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+
+// The historical Era entry point is used only to prove it stops being reachable after upgrade.
+interface IV31ContractDeployer {
+    struct ForceDeployment {
+        bytes32 bytecodeHash;
+        address newAddress;
+        bool callConstructor;
+        uint256 value;
+        bytes input;
+    }
+
+    function forceDeployOnAddresses(ForceDeployment[] calldata _deployments) external;
+}
 
 /// @dev Stands in for the retired v31 tracker implementation: any selector it exposes must stop
 /// being reachable through the proxy once the neutralization lands.
@@ -48,11 +60,11 @@ contract V31L2ComplexUpgrader {
     }
 
     function forceDeployAndUpgrade(
-        IL2ContractDeployer.ForceDeployment[] calldata _forceDeployments,
+        IV31ContractDeployer.ForceDeployment[] calldata _forceDeployments,
         address _delegateTo,
         bytes calldata _calldata
     ) external payable onlyForceDeployer {
-        IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(_forceDeployments);
+        IV31ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(_forceDeployments);
         upgrade(_delegateTo, _calldata);
     }
 
@@ -111,7 +123,7 @@ contract FaithfulZKOSDeployer {
 
     /// @dev The v31-only ComplexUpgrader selector calls this before the regression swaps the
     /// implementation. An empty list is enough to prove that selector is initially reachable.
-    function forceDeployOnAddresses(IL2ContractDeployer.ForceDeployment[] calldata _deployments) external pure {
+    function forceDeployOnAddresses(IV31ContractDeployer.ForceDeployment[] calldata _deployments) external pure {
         require(_deployments.length == 0, "only the empty legacy probe is supported");
     }
 
@@ -252,7 +264,7 @@ contract RemovedTrackerNeutralizationTest is Test {
         // list here, so the probe changes no state beyond proving which implementation is active.
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
         V31L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).forceDeployAndUpgrade(
-            new IL2ContractDeployer.ForceDeployment[](0),
+            new IV31ContractDeployer.ForceDeployment[](0),
             address(delegate),
             abi.encodeCall(NoopUpgradeDelegate.noop, ())
         );
@@ -314,7 +326,7 @@ contract RemovedTrackerNeutralizationTest is Test {
         vm.expectRevert();
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
         V31L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).forceDeployAndUpgrade(
-            new IL2ContractDeployer.ForceDeployment[](0),
+            new IV31ContractDeployer.ForceDeployment[](0),
             address(delegate),
             abi.encodeCall(NoopUpgradeDelegate.noop, ())
         );

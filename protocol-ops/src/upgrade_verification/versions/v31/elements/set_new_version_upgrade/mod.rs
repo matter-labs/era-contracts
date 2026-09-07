@@ -3,14 +3,11 @@
 //! Decodes `setNewVersionUpgrade(diamondCut, …).diamondCut.initCalldata` as
 //! `DefaultUpgrade.upgrade(ProposedUpgrade)` and validates the entire
 //! `ProposedUpgrade` payload — static fields, the L1→L2 upgrade tx, the
-//! `forceDeployAndUpgrade(Universal)` inner call, factory deps, and the
+//! `forceDeployAndUpgradeUniversal` inner call, factory deps, and the
 //! `IL2V32Upgrade.upgrade` arguments.
 //!
-//! The flavor-specific logic lives in the [`zksync_os`] submodule — expected
-//! force-deployments, deployed-bytecode-info decoding, the ZKsync OS
-//! factory-dep set, and the `forceDeployAndUpgradeUniversal` orchestrator.
-//! (The Era-VM arm was removed together with the rest of the Era CTM
-//! verification in the OS-only build.)
+//! The [`zksync_os`] submodule owns expected force-deployments, deployed-bytecode-info
+//! decoding, the factory-dep set, and the `forceDeployAndUpgradeUniversal` orchestrator.
 //!
 //! This module owns the shared `sol!` types (re-exported under the module
 //! path for external consumers like `governance_stage_calls`), the
@@ -132,26 +129,11 @@ sol! {
         }
 
         #[derive(Debug)]
-        struct ForceDeployment {
-            bytes32 bytecodeHash;
-            address newAddress;
-            bool callConstructor;
-            uint256 value;
-            bytes input;
-        }
-
-        #[derive(Debug)]
         struct UniversalContractUpgradeInfo {
             ContractUpgradeType upgradeType;
             bytes deployedBytecodeInfo;
             address newAddress;
         }
-
-        function forceDeployAndUpgrade(
-            ForceDeployment[] calldata _forceDeployments,
-            address _delegateTo,
-            bytes calldata _calldata
-        ) external payable;
 
         function forceDeployAndUpgradeUniversal(
             UniversalContractUpgradeInfo[] calldata _forceDeployments,
@@ -170,7 +152,6 @@ sol! {
 
     #[sol(rpc)]
     contract BytecodesSupplier {
-        mapping(bytes32 bytecodeHash => uint256 blockNumber) public publishingBlock;
         mapping(bytes32 bytecodeHash => uint256 blockNumber) public evmPublishingBlock;
     }
 }
@@ -178,7 +159,7 @@ sol! {
 impl ProposedUpgrade {
     /// Top-level entry: dispatches `verify_static_fields` (bytecode hashes
     /// per flavor + empty-field invariants) and `verify_l2_protocol_upgrade_tx`
-    /// (canonical L2 tx shape + inner `forceDeployAndUpgrade(Universal)` walk).
+    /// (canonical L2 tx shape + inner `forceDeployAndUpgradeUniversal` walk).
     pub async fn verify_v31_template(
         &self,
         verifiers: &Verifiers,
@@ -443,11 +424,8 @@ async fn verify_factory_deps(
         ));
     }
 
-    // Re-add the legacy PUVT `BytecodesSupplier.publishingBlock(hash) != 0`
-    // check for every factoryDep when an RPC + supplier address are
-    // available. This is intentionally a post-calldata check: it requires
-    // reading on-chain state from a live L1 RPC with the v31 prepare bundles
-    // already replayed.
+    // `BytecodesSupplier.evmPublishingBlock` must be queried after the prepare
+    // bundles have been replayed on the L1 RPC.
     if let Some(supplier_addr) = bytecodes_supplier_addr {
         let supplier =
             BytecodesSupplier::new(supplier_addr, verifiers.network_verifier.get_l1_provider());

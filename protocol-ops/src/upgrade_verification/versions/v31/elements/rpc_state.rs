@@ -88,8 +88,8 @@ fn expect_debug_eq<T: std::fmt::Debug + PartialEq>(
 /// weaker and produced misleading errors for every contract with immutables;
 /// Phase 6 supersedes it.
 ///
-/// Bytecode-supplier `publishingBlock` checks for the L2 upgrade tx
-/// `factoryDeps` are restored separately inside
+/// Bytecode-supplier `evmPublishingBlock` checks for the L2 upgrade tx
+/// `factoryDeps` live inside
 /// `set_new_version_upgrade::verify_factory_deps` so they sit alongside the
 /// rest of the L2 upgrade tx checks.
 pub(crate) async fn verify_v31_artifact_state(

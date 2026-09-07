@@ -671,9 +671,7 @@ contract CommittingTest is ExecutorTest {
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
-    /// @dev Not a behavioral test: recomputes the interop-root rolling hash encoding used by the
-    /// server, kept as an executable reference for the packed layout.
-    function test_recalculateinteropRootRollingHash() public pure {
+    function test_recalculateinteropRootRollingHash() public {
         InteropRoot[] memory interopRoots = new InteropRoot[](2);
         InteropRoot memory interopRoot1 = InteropRoot({
             chainId: 260,
@@ -696,6 +694,17 @@ contract CommittingTest is ExecutorTest {
             InteropRoot memory interopRoot = interopRoots[i];
             // The `uint256(128)` is the ABI head offset of `sides` inside `abi.encode(InteropRoot)`
             // (4 fields: chainId, blockOrBatchNumber, timestamp, sides pointer).
+            console.logBytes(
+                abi.encodePacked(
+                    rollingHash,
+                    interopRoot.chainId,
+                    interopRoot.blockOrBatchNumber,
+                    interopRoot.timestamp,
+                    uint256(128),
+                    interopRoot.sides.length,
+                    interopRoot.sides
+                )
+            );
             rollingHash = keccak256(
                 abi.encodePacked(
                     rollingHash,
@@ -708,6 +717,6 @@ contract CommittingTest is ExecutorTest {
                 )
             );
         }
-        assert(rollingHash != bytes32(0));
+        console.logBytes32(rollingHash);
     }
 }

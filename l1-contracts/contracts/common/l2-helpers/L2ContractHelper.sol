@@ -2,6 +2,13 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
+import {
+    RLP_SHORT_STRING_PREFIX,
+    RLP_SHORT_LIST_PREFIX,
+    RLP_ADDRESS_PREFIX,
+    RLP_ENCODED_ADDRESS_LENGTH
+} from "../Config.sol";
+
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
@@ -14,8 +21,8 @@ library L2ContractHelper {
     function computeCreateAddress(address _sender, uint256 _senderNonce) internal pure returns (address) {
         bytes memory encodedNonce;
         if (_senderNonce == 0) {
-            encodedNonce = hex"80";
-        } else if (_senderNonce <= 0x7f) {
+            encodedNonce = abi.encodePacked(RLP_SHORT_STRING_PREFIX);
+        } else if (_senderNonce < RLP_SHORT_STRING_PREFIX) {
             encodedNonce = abi.encodePacked(uint8(_senderNonce));
         } else {
             uint256 nonceLength;
@@ -26,7 +33,7 @@ library L2ContractHelper {
             }
 
             encodedNonce = new bytes(nonceLength + 1);
-            encodedNonce[0] = bytes1(uint8(0x80 + nonceLength));
+            encodedNonce[0] = bytes1(uint8(RLP_SHORT_STRING_PREFIX + nonceLength));
             for (uint256 i = 0; i < nonceLength; ++i) {
                 encodedNonce[nonceLength - i] = bytes1(uint8(_senderNonce >> (8 * i)));
             }
@@ -35,7 +42,12 @@ library L2ContractHelper {
         // The RLP payload is 21 bytes for the encoded sender plus at most 33 bytes for a uint256
         // nonce, so its list prefix always fits in the single-byte short-list form.
         bytes32 hash = keccak256(
-            abi.encodePacked(bytes1(uint8(0xc0 + 21 + encodedNonce.length)), hex"94", _sender, encodedNonce)
+            abi.encodePacked(
+                bytes1(uint8(RLP_SHORT_LIST_PREFIX + RLP_ENCODED_ADDRESS_LENGTH + encodedNonce.length)),
+                RLP_ADDRESS_PREFIX,
+                _sender,
+                encodedNonce
+            )
         );
 
         return address(uint160(uint256(hash)));

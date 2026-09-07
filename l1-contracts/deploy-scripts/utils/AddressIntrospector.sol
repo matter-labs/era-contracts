@@ -466,6 +466,14 @@ library AddressIntrospector {
         }
     }
 
+    function _tryAddress(address _target, string memory _sig) private view returns (address) {
+        (bool ok, bytes memory data) = _target.staticcall(abi.encodeWithSignature(_sig));
+        if (ok && data.length >= 32) {
+            return abi.decode(data, (address));
+        }
+        return address(0);
+    }
+
     /// @notice Get fflonk and plonk sub-verifiers from a ZKsyncOS dual verifier
     /// @param _verifier The verifier address
     function _getSubVerifiers(address _verifier) private view returns (address fflonk, address plonk) {

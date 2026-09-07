@@ -5,8 +5,7 @@ pragma solidity ^0.8.21;
 import {IL2ToL1Messenger} from "./IL2ToL1Messenger.sol";
 import {IL2InteropRootStorage} from "../../interop/IL2InteropRootStorage.sol";
 import {IMessageVerification} from "../interfaces/IMessageVerification.sol";
-import {IBaseToken} from "./IBaseToken.sol";
-import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
+import {IL2BaseToken} from "../../l2-system/interfaces/IL2BaseToken.sol";
 import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "../../core/chain-asset-handler/IChainAssetHandler.sol";
@@ -46,16 +45,13 @@ import {
     L2_BOOTLOADER_ADDRESS
 } from "./L2ContractAddresses.sol";
 
-/// @dev The address of the L2 deployer system contract.
-IL2ContractDeployer constant L2_CONTRACT_DEPLOYER = IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
-
 /// @dev The address of the special smart contract that can send arbitrary length message as an L2 log
 IL2ToL1Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT = IL2ToL1Messenger(
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 );
 
 /// @dev The eth token system contract
-IBaseToken constant L2_BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+IL2BaseToken constant L2_BASE_TOKEN_SYSTEM_CONTRACT = IL2BaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
 
 /// @dev The system context system contract
 ISystemContext constant L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT = ISystemContext(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR);

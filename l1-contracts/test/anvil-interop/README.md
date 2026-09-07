@@ -24,8 +24,8 @@ End-to-end tests for ZKsync interoperability across 6 Anvil chains: L1 contract 
 ## Quick Start
 
 ```bash
-# From the repository root — run all tests with pregenerated state (~85s)
-cd l1-contracts
+# From contracts/l1-contracts/ — run all tests with pregenerated state (~85s)
+cd contracts/l1-contracts
 yarn test:hardhat:interop
 
 # Force full deployment from scratch (~5 min)
@@ -37,18 +37,18 @@ yarn test:hardhat:interop --keep-chains
 
 ## Pregenerated Chain States
 
-Tests load pregenerated Anvil snapshots from `chain-states/v0.34.0/` by default (the current snapshot version, configured as `stateVersion` in `config/anvil-config.json`). This skips the full deployment and cuts test time from ~5 min to ~85s.
+Tests load pregenerated Anvil snapshots from `chain-states/v0.34.0/` by default (the current protocol version, configured as `stateVersion` in `config/anvil-config.json`). This skips the full deployment and cuts test time from ~5 min to ~85s.
 
-The runner auto-detects pregenerated state by checking for `chain-states/<state-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `ANVIL_INTEROP_FRESH_DEPLOY=1`), it runs the full deployment.
+The runner auto-detects pregenerated state by checking for `chain-states/<protocol-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `ANVIL_INTEROP_FRESH_DEPLOY=1`), it runs the full deployment.
 
-Only the current snapshot directory, selected by `stateVersion`, is regenerated. Upgrade scenarios select their frozen source fixture explicitly; those fixtures must not be regenerated from current contracts.
+Only the directory for the current protocol version, selected by `stateVersion`, is regenerated. Upgrade scenarios select their frozen source fixture explicitly; those fixtures must not be regenerated from current contracts.
 
 The per-chain state dumps are committed **gzip-compressed** (`<chainId>.json.gz`). These snapshots are multi-MB; storing them as raw JSON floods every regeneration with an enormous, unreviewable diff. GitHub renders `.gz` as binary ("Binary file not shown"), keeping them out of PR diffs, and gzip shrinks them ~10x. `addresses.json` stays plain text so contract-address changes remain reviewable. Compression/decompression is handled automatically by `dumpAllStates()` / `loadChainStates()` in `deployment-runner.ts` — no manual step.
 
 To regenerate pregenerated state after contract changes:
 
 ```bash
-cd l1-contracts/test/anvil-interop
+cd contracts/l1-contracts/test/anvil-interop
 yarn setup-and-dump
 ```
 
@@ -60,9 +60,9 @@ After running once with `--keep-chains`, the Anvil chains and deployment state p
 
 ```bash
 # Run all test specs (no redeployment)
-cd l1-contracts
+cd contracts/l1-contracts
 ANVIL_INTEROP_SKIP_SETUP=1 ANVIL_INTEROP_SKIP_CLEANUP=1 \
-  yarn hardhat test test/anvil-interop/test/hardhat/*.spec.ts \
+  yarn hardhat test test/anvil-interop/test/hardhat/0*.spec.ts \
   --network hardhat --no-compile
 
 # Run a single spec file
@@ -88,7 +88,7 @@ deploys a fresh L1 `TestnetERC20Token`, mints it to `LIVE_SOURCE_PRIVATE_KEY`, d
 `L2NativeTokenVault` at execution time.
 
 ```bash
-cd l1-contracts
+cd contracts/l1-contracts
 
 ANVIL_INTEROP_LIVE=1 \
 LIVE_L1_RPC=<l1-rpc> \
@@ -124,16 +124,12 @@ Live environment variables:
 
 | Spec                         | What it tests                                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `01-deployment-verification` | L1 contracts deployed, CTM registered, all 5 L2 chains have diamond proxies, L2 system contracts present, test tokens deployed, initial chainBalance is zero |
+| `01-deployment-verification` | L1 contracts deployed, CTM registered, all 4 L2 chains have diamond proxies, L2 system contracts present, test tokens deployed, initial chainBalance is zero |
 | `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), net flow assertions                                                           |
 | `03-interop-transfer`        | Unsupported interop routes revert; only GW-settled L2<->GW-settled L2 interop is intentionally registered                                                    |
 | `04-gateway-setup`           | GW chain contracts deployed, interop chains registered on GW L2Bridgehub, GW designated as settlement layer on L1                                            |
 | `05-gateway-bridge`          | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW)                                                                                            |
 | `06-gateway-interop`         | L2A<->L2B interop transfers between GW-settled L2 chains                                                                                                     |
-| `07-interop-bundles`         | Direct, indirect, and mixed bundles; fees, replay protection, and execution-address checks                                                                   |
-| `08-interop-messages`        | Base-token and ERC20 messages across ETH and custom-base-token chains                                                                                        |
-| `09-interop-unbundle`        | Bundle verification and recovery of calls that cannot execute                                                                                                |
-| `13-imt-atomic-swap`         | IMT-backed atomic swaps, timeout refunds, and invalid-flow rejection                                                                                         |
 
 ## Coverage
 
@@ -281,11 +277,7 @@ test/anvil-interop/
 │   ├── 03-interop-transfer.spec.ts
 │   ├── 04-gateway-setup.spec.ts
 │   ├── 05-gateway-bridge.spec.ts
-│   ├── 06-gateway-interop.spec.ts
-│   ├── 07-interop-bundles.spec.ts
-│   ├── 08-interop-messages.spec.ts
-│   ├── 09-interop-unbundle.spec.ts
-│   └── 13-imt-atomic-swap.spec.ts
+│   └── 06-gateway-interop.spec.ts
 └── outputs/                       # Deployment outputs (gitignored)
 ```
 
@@ -296,6 +288,7 @@ test/anvil-interop/
 - **L1→L2 transaction failures / refundRecipient**: Priority requests always succeed on Anvil; failure + refund logic is untested
 - **Batch settlement**: No real sequencer or prover; batches are never committed/proved/executed
 - **Custom pubdata pricing**: Gas and pubdata costs use Anvil defaults, not ZKsync fee models
+- **Non-ETH base tokens**: All chains use ETH as the base token
 - **Validium mode**: All chains run as rollup (validium carries no meaning without batch settlement)
 - **Settlement fees**: `processLogsAndMessages` still uses a zero settlement fee payer; interop sends cover non-zero dynamic base-token fees and fixed ZK fees separately
 
@@ -362,6 +355,6 @@ Note: `cleanup.sh` reads ports from `anvil-config.json` automatically — no man
 
 ```bash
 # Full cleanup: kill chains, remove outputs, reset state
-cd l1-contracts/test/anvil-interop
+cd contracts/l1-contracts/test/anvil-interop
 yarn cleanup
 ```

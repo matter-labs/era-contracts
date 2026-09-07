@@ -16,6 +16,11 @@ import {
 /// @dev `keccak256("")`
 bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
+uint8 constant RLP_SHORT_STRING_PREFIX = 0x80;
+uint8 constant RLP_SHORT_LIST_PREFIX = 0xc0;
+bytes1 constant RLP_ADDRESS_PREFIX = 0x94;
+uint256 constant RLP_ENCODED_ADDRESS_LENGTH = 21;
+
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = bytes32(0);
 
 /// @dev Denotes the type of the ZKsync OS transaction that came from L1.

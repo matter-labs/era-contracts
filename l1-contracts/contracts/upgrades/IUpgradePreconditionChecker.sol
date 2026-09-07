@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: MIT
+
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
+
+/// @title Upgrade precondition checker interface
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @notice Release-specific upgrade scheduling checks; see {protocol-docs/upgrade-scheduling.md}.
+interface IUpgradePreconditionChecker {
+    /// @notice Reverts if the chain cannot take the guarded upgrade.
+    /// @param _chainId The id of the chain whose upgrade is being scheduled.
+    /// @param _zkChain The chain's DiamondProxy address.
+    function checkUpgradePreconditions(uint256 _chainId, address _zkChain) external view;
+}

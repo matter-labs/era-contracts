@@ -60,7 +60,7 @@ contract BaseUpgrade is Test {
 
         protocolVersion = SemVer.packSemVer(0, 1, 0);
         chainId = 1;
-        bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setChainId, (chainId));
+        bytes memory systemContextCalldata = abi.encodeCall(ISystemContext.setSettlementLayerChainId, (chainId));
 
         verifier = makeAddr("verifier");
         bytes32 txHash = bytes32(bytes("txHash"));

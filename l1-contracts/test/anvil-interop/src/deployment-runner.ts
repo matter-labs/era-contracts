@@ -70,11 +70,14 @@ export class DeploymentRunner {
     return config;
   }
 
-  /** Snapshot version used to name the chain-states folder (e.g. "v0.34.0"). */
-  getStateVersion(): string {
+  /**
+   * Protocol version string used to name the chain-states folder (e.g. "v0.34.0"). It is read from
+   * the harness's own `stateVersion` config so fixture selection remains explicit.
+   */
+  getProtocolVersionString(): string {
     const cfg = JSON.parse(fs.readFileSync(this.configPath, "utf-8")) as { stateVersion?: string };
-    if (!cfg.stateVersion || !/^v\d+\.\d+\.\d+$/.test(cfg.stateVersion)) {
-      throw new Error(`stateVersion in ${this.configPath} must match v<major>.<minor>.<patch>`);
+    if (!cfg.stateVersion) {
+      throw new Error(`stateVersion missing in ${this.configPath}`);
     }
     return cfg.stateVersion;
   }
@@ -779,13 +782,13 @@ export class DeploymentRunner {
     return { chains: chainInfo, l1Addresses, ctmAddresses, chainAddresses };
   }
 
-  /** Resolve the chain-states directory for the configured snapshot version. */
+  /** Resolve the chain-states directory for the current protocol version. */
   getChainStatesDir(): string {
-    const stateVersion = this.getStateVersion();
-    return path.resolve(this.configDir, "..", "chain-states", stateVersion);
+    const version = this.getProtocolVersionString();
+    return path.resolve(this.configDir, "..", "chain-states", version);
   }
 
-  /** Check whether pre-generated chain states exist for the configured snapshot version. */
+  /** Check whether pre-generated chain states exist for the current protocol version. */
   hasChainStates(): boolean {
     const stateDir = this.getChainStatesDir();
     return fs.existsSync(path.join(stateDir, "addresses.json"));

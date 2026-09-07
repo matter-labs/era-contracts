@@ -20,11 +20,8 @@ async function main(): Promise<void> {
   try {
     // Compute output paths before starting chains, so Anvil
     // can be started with --dump-state flags from the beginning.
-    const stateVersion = runner.getStateVersion();
-    const stateDir = path.join(__dirname, "chain-states", stateVersion);
-    // The version is validated by getStateVersion(), so this removes only the selected fixture set.
-    // Starting empty ensures chains removed from config do not survive as stale snapshots.
-    fs.rmSync(stateDir, { recursive: true, force: true });
+    const version = runner.getProtocolVersionString();
+    const stateDir = path.join(__dirname, "chain-states", version);
     const dumpStatePaths = runner.buildDumpStatePaths(stateDir);
 
     // Run full deployment + test tokens + TBM with pinned inputs:
@@ -58,7 +55,7 @@ async function main(): Promise<void> {
     fs.writeFileSync(path.join(stateDir, "addresses.json"), JSON.stringify(addresses, null, 2));
     console.log(`Addresses saved to ${path.join(stateDir, "addresses.json")}`);
 
-    console.log(`\nDone. All chain states saved to chain-states/${stateVersion}/`);
+    console.log(`\nDone. All chain states saved to chain-states/${version}/`);
   } finally {
     await anvilManager.stopAll();
     // Format generated JSON files so CI formatting checks pass.

@@ -11,6 +11,7 @@ import {
 } from "../common/L1ContractErrors.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IServerNotifier} from "./IServerNotifier.sol";
+import {IUpgradePreconditionChecker} from "../upgrades/IUpgradePreconditionChecker.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
@@ -29,6 +30,11 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
     /// @notice Maps each chainId => protocolVersion => expected upgrade timestamp.
     mapping(uint256 chainId => mapping(uint256 oldProtocolVersion => uint256 upgradeTimestamp))
         public protocolVersionToUpgradeTimestamp;
+
+    /// @inheritdoc IServerNotifier
+    mapping(uint256 oldProtocolVersion => IUpgradePreconditionChecker checker)
+        public
+        override upgradePreconditionChecker;
 
     /// @notice Modifier to ensure the caller is the administrator of the specified chain.
     /// @param _chainId The ID of the chain that requires the caller to be an admin.
@@ -106,11 +112,24 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
         if (_upgradeTimestamp == 0) {
             revert ZeroUpgradeTimestamp();
         }
-        uint256 _oldProtocolVersion = chainTypeManager.getProtocolVersion(_chainId);
-        if (chainTypeManager.upgradeCutHash(_oldProtocolVersion) == bytes32(0)) {
-            revert CutDataForProtocolVersionNotAvailable(_oldProtocolVersion);
+        uint256 oldProtocolVersion = chainTypeManager.getProtocolVersion(_chainId);
+        if (chainTypeManager.upgradeCutHash(oldProtocolVersion) == bytes32(0)) {
+            revert CutDataForProtocolVersionNotAvailable(oldProtocolVersion);
         }
-        protocolVersionToUpgradeTimestamp[_chainId][_oldProtocolVersion] = _upgradeTimestamp;
-        emit UpgradeTimestampUpdated(_chainId, _oldProtocolVersion, _upgradeTimestamp);
+        IUpgradePreconditionChecker checker = upgradePreconditionChecker[oldProtocolVersion];
+        if (address(checker) != address(0)) {
+            checker.checkUpgradePreconditions(_chainId, chainTypeManager.getZKChain(_chainId));
+        }
+        protocolVersionToUpgradeTimestamp[_chainId][oldProtocolVersion] = _upgradeTimestamp;
+        emit UpgradeTimestampUpdated(_chainId, oldProtocolVersion, _upgradeTimestamp);
+    }
+
+    /// @inheritdoc IServerNotifier
+    function setUpgradePreconditionChecker(
+        uint256 _oldProtocolVersion,
+        IUpgradePreconditionChecker _checker
+    ) external onlyOwner {
+        upgradePreconditionChecker[_oldProtocolVersion] = _checker;
+        emit UpgradePreconditionCheckerSet(_oldProtocolVersion, address(_checker));
     }
 }

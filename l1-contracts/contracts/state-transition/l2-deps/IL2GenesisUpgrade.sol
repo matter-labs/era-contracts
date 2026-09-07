@@ -3,20 +3,6 @@ pragma solidity 0.8.28;
 
 import {TokenBridgingData, TokenMetadata} from "../../common/Messaging.sol";
 
-/// @notice A struct that describes a forced deployment on an address
-struct ForceDeployment {
-    // The bytecode hash to put on an address
-    bytes32 bytecodeHash;
-    // The address on which to deploy the bytecodehash to
-    address newAddress;
-    // Whether to run the constructor on the force deployment
-    bool callConstructor;
-    // The value with which to initialize a contract
-    uint256 value;
-    // The constructor calldata
-    bytes input;
-}
-
 // solhint-disable-next-line gas-struct-packing
 struct ZKChainSpecificForceDeploymentsData {
     address l2LegacySharedBridge;

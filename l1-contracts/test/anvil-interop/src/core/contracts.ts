@@ -23,7 +23,6 @@ const ARTIFACTS = {
   DummyInteropRecipient: "DummyInteropRecipient.sol/DummyInteropRecipient.json",
   EmptyContract: "EmptyContract.sol/EmptyContract.json",
   GettersFacet: "Getters.sol/GettersFacet.json",
-  IBaseToken: "IBaseToken.sol/IBaseToken.json",
   IERC7786Attributes: "IERC7786Attributes.sol/IERC7786Attributes.json",
   IL1Bridgehub: "IL1Bridgehub.sol/IL1Bridgehub.json",
   IL1GenesisUpgrade: "IL1GenesisUpgrade.sol/IL1GenesisUpgrade.json",

@@ -21,12 +21,14 @@ interface IDeployCTM {
         string calldata inputPath,
         string calldata outputPath,
         address bridgehub,
-        bool reuseGovAndAdmin
+        bool reuseGovAndAdmin,
+        bool skipL1Deployments
     ) external;
 
     /// @notice Runs the deployment for testing purposes
     /// @param bridgehub The address of the bridgehub contract
-    function runForTest(address bridgehub) external;
+    /// @param skipL1Deployments Whether to skip L1 contract deployments
+    function runForTest(address bridgehub, bool skipL1Deployments) external;
 
     /// @notice Returns the deployed contract addresses
     /// @return The CTMDeployedAddresses struct containing all deployed addresses

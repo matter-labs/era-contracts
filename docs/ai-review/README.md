@@ -9,6 +9,7 @@ docs/ai-review/
 ├── docs/
 └── commands/
     ├── sb/
+    ├── jcr/
     └── ...
 
 .claude/commands/       ← reusable AI-agent commands (Claude Code auto-discovers)

@@ -391,6 +391,11 @@
         "name": "bridgehub",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "skipL1Deployments",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "outputs": [],
@@ -417,6 +422,11 @@
       },
       {
         "name": "reuseGovAndAdmin",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "skipL1Deployments",
         "type": "bool",
         "internalType": "bool"
       }

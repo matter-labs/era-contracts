@@ -18,8 +18,6 @@ import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_ROUTER,
     L2_ASSET_TRACKER_ADDR,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
@@ -203,14 +201,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         l2Bridgehub.registerChainForInterop(INTEROP_DESTINATION_CHAIN_ID, baseTokenAssetId);
         vm.stopPrank();
 
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
-            abi.encode(bytes(""))
-        );
-
         // Fund L2InteropHandler with ETH so it can send value with receiveMessage calls
-        // The mint mock doesn't actually give ETH, so we need to fund it manually
         vm.deal(L2_INTEROP_HANDLER_ADDR, 1000 ether);
 
         // Mock currentSettlementLayerChainId for gateway mode check in L2InteropHandler

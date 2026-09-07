@@ -92,7 +92,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         address bridgehubProxy,
         uint256 ctmRepresentativeChainId
     ) internal virtual {
-        super.initializeConfig(configPath);
+        super.initializeConfig(configPath, bridgehubProxy);
         string memory toml = vm.readFile(configPath);
 
         refundRecipient = toml.readAddress("$.refund_recipient");
@@ -152,6 +152,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
         // Deploy all factory dependencies
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps(gatewayCTMDeployerConfig);
+        address l1AssetRouter = address(IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).assetRouter());
+
         for (uint i = 0; i < deps.length; i++) {
             bytes[] memory localDeps = new bytes[](1);
             localDeps[0] = deps[i];

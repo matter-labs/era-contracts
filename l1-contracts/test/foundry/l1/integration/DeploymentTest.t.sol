@@ -99,6 +99,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 addresses.chainTypeManager.protocolVersion(),
                 addresses.chainTypeManager.storedBatchZero(),
                 address(addresses.bridgehub),
+                address(addresses.interopCenter),
                 address(addresses.chainTypeManager)
             );
 
@@ -140,6 +141,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 addresses.chainTypeManager.protocolVersion(),
                 addresses.chainTypeManager.storedBatchZero(),
                 address(addresses.bridgehub),
+                address(addresses.interopCenter),
                 address(addresses.chainTypeManager)
             );
 

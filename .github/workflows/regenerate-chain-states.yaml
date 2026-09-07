@@ -89,8 +89,8 @@ jobs:
 
       - name: Cleanup Anvil
         if: always()
-        working-directory: l1-contracts/test/anvil-interop
-        run: bash cleanup.sh
+        run: |
+          pkill -9 anvil 2>/dev/null || true
 
       - name: Commit and push updated chain states
         run: |
