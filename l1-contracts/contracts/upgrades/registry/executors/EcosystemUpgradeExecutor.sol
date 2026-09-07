@@ -17,9 +17,8 @@ import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 ///         admin and points every ecosystem proxy at its new implementation, as pinned by a
 ///         write-once core registry. Ecosystem authority is deliberately separate from CTM
 ///         authority (`CTMUpgradeExecutor`).
-/// @dev Fixed logic, no generic delegatecall. The break-glass `forward` (base) is gated by a
-///      SEPARATE governor. The registry address is a *pinned implementation address* — the exact
-///      generated contract governance approved — never a proxy.
+/// @dev Fixed logic, no generic delegatecall. The registry address is a *pinned implementation
+///      address* — the exact generated contract governance approved — never a proxy.
 /// @dev The ecosystem is the SHARED singletons — bridges, Bridgehub, MessageRoot. Nothing
 ///      CTM-scoped is expressible here: the CTM's own implementation (and its per-CTM proxies)
 ///      upgrade through the transition's `ctmProxyRows`, under `CTMUpgradeExecutor`'s authority —
@@ -37,10 +36,9 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase {
 
     constructor(
         address _initialOwner,
-        address _emergencyUpgradeBoard,
         ProxyAdmin _proxyAdmin,
         bytes32 _coreRegistryCodehash
-    ) UpgradeExecutorBase(_initialOwner, _emergencyUpgradeBoard) {
+    ) UpgradeExecutorBase(_initialOwner) {
         if (address(_proxyAdmin) == address(0)) {
             revert ZeroAddress();
         }

@@ -27,9 +27,14 @@ import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 ///         `CTMTransition` objects. CTM authority is deliberately separate from ecosystem
 ///         authority (`EcosystemUpgradeExecutor`): each CTM is governed by its own executor and
 ///         upgrades on its own cadence.
-/// @dev Fixed logic, no generic delegatecall. The break-glass `forward` (base) is gated by a
-///      SEPARATE governor. The transition each entrypoint takes is a *pinned implementation
-///      address* — the exact generated contract governance approved — never a proxy.
+/// @dev Fixed logic, no generic delegatecall. The transition each upgrade entrypoint takes is a
+///      *pinned implementation address* — the exact generated contract governance approved —
+///      never a proxy. The CTM's routine and recovery owner operations that have NO chain-side
+///      alternative (the chain gates them `onlyChainTypeManager`) are exposed as fixed
+///      passthroughs below, so none of them depends on the raw-call escape hatch (base). What is
+///      deliberately NOT passed through: the legacy cut-taking commits and `executeUpgrade`
+///      (an arbitrary cut — the very bypass the object-driven path exists to remove) and the
+///      release-provenance setters (driven by `applyCTMUpgrade` and the bootstrap only).
 contract CTMUpgradeExecutor is UpgradeExecutorBase {
     using CodehashPinLib for address;
 
@@ -61,11 +66,10 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
 
     constructor(
         address _initialOwner,
-        address _emergencyUpgradeBoard,
         IChainTypeManager _ctm,
         ProxyAdmin _ctmProxyAdmin,
         bytes32 _transitionCodehash
-    ) UpgradeExecutorBase(_initialOwner, _emergencyUpgradeBoard) {
+    ) UpgradeExecutorBase(_initialOwner) {
         if (address(_ctm) == address(0) || address(_ctmProxyAdmin) == address(0)) {
             revert ZeroAddress();
         }
@@ -99,6 +103,52 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase {
     ///      to retire a version), and the transition's pinned value is only its starting point.
     function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
         CHAIN_TYPE_MANAGER.setProtocolVersionDeadline(_protocolVersion, _timestamp);
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Routine operational and recovery passthroughs — the CTM owner surface with no chain-side
+    // alternative. One argument list each, forwarded verbatim; the CTM keeps every check.
+    // ---------------------------------------------------------------------------------------
+
+    /// @notice Freezes a chain diamond (incident response).
+    function freezeChain(uint256 _chainId) external onlyOwner {
+        CHAIN_TYPE_MANAGER.freezeChain(_chainId);
+    }
+
+    /// @notice Unfreezes a chain diamond.
+    function unfreezeChain(uint256 _chainId) external onlyOwner {
+        CHAIN_TYPE_MANAGER.unfreezeChain(_chainId);
+    }
+
+    /// @notice Reverts a chain's batches down to `_newLastBatch` — governance recovery when the
+    ///         validator that could otherwise do it is the problem.
+    function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwner {
+        CHAIN_TYPE_MANAGER.revertBatches(_chainId, _newLastBatch);
+    }
+
+    /// @notice Adds or removes a chain validator.
+    function setValidator(uint256 _chainId, address _validator, bool _active) external onlyOwner {
+        CHAIN_TYPE_MANAGER.setValidator(_chainId, _validator, _active);
+    }
+
+    /// @notice Sets a chain's priority transaction gas limit cap.
+    function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external onlyOwner {
+        CHAIN_TYPE_MANAGER.setPriorityTxMaxGasLimit(_chainId, _maxGasLimit);
+    }
+
+    /// @notice Sets a chain's zkPorter availability flag.
+    function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
+        CHAIN_TYPE_MANAGER.setPorterAvailability(_chainId, _zkPorterIsAvailable);
+    }
+
+    /// @notice Deactivates priority mode on a chain.
+    function deactivatePriorityMode(uint256 _chainId) external onlyOwner {
+        CHAIN_TYPE_MANAGER.deactivatePriorityMode(_chainId);
+    }
+
+    /// @notice Points the CTM at a new post-v29 validator timelock.
+    function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external onlyOwner {
+        CHAIN_TYPE_MANAGER.setValidatorTimelockPostV29(_validatorTimelockPostV29);
     }
 
     /// @notice Installs the transition and points new-chain genesis at its target release.

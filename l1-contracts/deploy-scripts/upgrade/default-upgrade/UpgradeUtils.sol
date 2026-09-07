@@ -48,9 +48,7 @@ library UpgradeUtils {
             require(releaseVerifier != address(0), "release pins no verifier");
             return IZKsyncOSVerifier(releaseVerifier).isTestnetVerifier();
         }
-        address verifier = ILegacyProtocolVersionVerifier(address(_ctm)).protocolVersionVerifier(
-            packedProtocolVersion
-        );
+        address verifier = ILegacyProtocolVersionVerifier(address(_ctm)).protocolVersionVerifier(packedProtocolVersion);
         require(verifier != address(0), "verifier not set for the current protocol version");
         require(verifier.code.length != 0, "verifier has no code");
         (bool ok, bytes memory data) = verifier.staticcall(abi.encodeCall(IZKsyncOSVerifier.isTestnetVerifier, ()));

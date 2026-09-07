@@ -102,17 +102,11 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
-            makeAddr("emergencyUpgradeBoard"),
             IChainTypeManager(address(chainContractAddress)),
             ecosystemProxyAdmin,
             Utils.transitionCodehash()
         );
-        ecoExecutor = new EcosystemUpgradeExecutor(
-            governor,
-            makeAddr("emergencyUpgradeBoard"),
-            ecosystemProxyAdmin,
-            Utils.coreRegistryCodehash()
-        );
+        ecoExecutor = new EcosystemUpgradeExecutor(governor, ecosystemProxyAdmin, Utils.coreRegistryCodehash());
 
         newVersion = SemVer.packSemVer(0, 1, 0);
         // The pinned timer gates `migrate()`: stage 0 starts it, the edge runs after its window.
@@ -314,7 +308,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         address foreignCtm = makeAddr("foreignCtm");
         CTMUpgradeExecutor foreignExecutor = new CTMUpgradeExecutor(
             governor,
-            makeAddr("emergencyUpgradeBoard2"),
             IChainTypeManager(foreignCtm),
             ecosystemProxyAdmin,
             Utils.transitionCodehash()
@@ -346,7 +339,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         ProxyAdmin foreignProxyAdmin = new ProxyAdmin();
         CTMUpgradeExecutor foreignExecutor = new CTMUpgradeExecutor(
             governor,
-            makeAddr("emergencyUpgradeBoard2"),
             IChainTypeManager(address(chainContractAddress)),
             foreignProxyAdmin,
             Utils.transitionCodehash()

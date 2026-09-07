@@ -66,13 +66,6 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
         deployCoreRegistryBootstrap();
     }
 
-    /// @notice The break-glass governor of the deployed `EcosystemUpgradeExecutor`.
-    /// @dev Defaults to the upgrade owner so local/test runs work unconfigured. A PRODUCTION run
-    ///      MUST override this with the real EmergencyUpgradeBoard.
-    function getEmergencyUpgradeBoard() public virtual returns (address) {
-        return getOwnerAddress();
-    }
-
     /// @notice Deploys the write-once inventory of this upgrade's swaps and the bound executor
     ///         that applies it.
     /// @dev Both ride the CREATE2 factory: the Safe bundle replays factory transactions only, so
@@ -92,7 +85,6 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
                     type(EcosystemUpgradeExecutor).creationCode,
                     abi.encode(
                         getOwnerAddress(),
-                        getEmergencyUpgradeBoard(),
                         ProxyAdmin(coreAddresses.shared.transparentProxyAdmin),
                         // The audited-object anchor for every registry this executor accepts.
                         keccak256(vm.getDeployedCode("CoreRegistry.sol:CoreRegistry"))

@@ -128,14 +128,6 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         getFixedForceDeploymentsData();
     }
 
-    /// @notice The break-glass governor of the deployed `CTMUpgradeExecutor`.
-    /// @dev Defaults to the upgrade owner so local/test runs work unconfigured. A PRODUCTION run
-    ///      MUST override this with the real EmergencyUpgradeBoard — the whole point of the
-    ///      split is that the routine owner cannot bypass transition invariants.
-    function getEmergencyUpgradeBoard() public virtual returns (address) {
-        return getOwnerAddress();
-    }
-
     /// @notice Deploys the bound executor and the write-once migration pinned to this prepare
     ///         run's outputs.
     function deployRegistryBootstrap() public virtual {
@@ -166,7 +158,6 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                     type(CTMUpgradeExecutor).creationCode,
                     abi.encode(
                         getOwnerAddress(),
-                        getEmergencyUpgradeBoard(),
                         IChainTypeManager(ctmProxy),
                         ctmProxyAdmin,
                         // The audited-object anchor for every FUTURE transition this executor

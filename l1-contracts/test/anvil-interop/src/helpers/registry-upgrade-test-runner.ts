@@ -826,19 +826,17 @@ async function deployUpgradeMachinery(
   return {
     transitionCodehash,
     coreRegistryCodehash,
-    // The deployer plays the role of protocol governance AND (for this harness) the break-glass
-    // governor; each executor is BOUND to its immutable authority targets at construction.
-    // Bound to the whole CTM domain: the CTM itself AND its own ProxyAdmin (a transition's
-    // `ctmProxyRows` — the CTM impl swap included — apply through it).
+    // The deployer plays the role of protocol governance; each executor is BOUND to its
+    // immutable authority targets at construction. Bound to the whole CTM domain: the CTM itself
+    // AND its own ProxyAdmin (a transition's `ctmProxyRows` — the CTM impl swap included — apply
+    // through it).
     ctmExecutor: await deploy("CTMUpgradeExecutor", [
-      deployer.address,
       deployer.address,
       params.ctm,
       params.ctmProxyAdmin,
       transitionCodehash,
     ]),
     ecoExecutor: await deploy("EcosystemUpgradeExecutor", [
-      deployer.address,
       deployer.address,
       params.ecosystemProxyAdmin,
       coreRegistryCodehash,

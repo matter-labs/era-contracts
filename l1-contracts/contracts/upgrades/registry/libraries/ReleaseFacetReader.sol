@@ -28,7 +28,8 @@ library ReleaseFacetReader {
 
     /// @notice Whether a live chain diamond's routing is EXACTLY the release's: the same facet
     ///         addresses (no extras, no omissions) and, per facet, the same selector set as the
-    ///         pinned facet's self-description. Order-insensitive on both levels.
+    ///         pinned facet's self-description AND the same freezability. Order-insensitive on
+    ///         both levels.
     /// @dev Post-upgrade / monitoring read: after a chain crosses an edge its loupe output must
     ///      match the target release byte-for-byte in routing terms — the on-chain form of the
     ///      "upgrade path equals genesis path" guarantee. A view over ~a hundred selectors; the
@@ -59,7 +60,10 @@ library ReleaseFacetReader {
                 if (live[j].addr != expected[i].facet.addr) {
                     continue;
                 }
-                found = _selectorSetsEqual(selectors, live[j].selectors);
+                // Freezability is part of the release row, not of the loupe's `facets()` view.
+                found =
+                    _selectorSetsEqual(selectors, live[j].selectors) &&
+                    IGetters(_chain).isFacetFreezable(live[j].addr) == expected[i].isFreezable;
                 break;
             }
             if (!found) {

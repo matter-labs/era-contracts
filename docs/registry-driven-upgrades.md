@@ -151,7 +151,6 @@ flowchart TB
 ```mermaid
 flowchart LR
     PUH["Governance (owner)"]
-    BG["Break-glass governor<br/>(separately governed)"]
     CTMEXE["CTMUpgradeExecutor"]
     ECOEXE["EcosystemUpgradeExecutor"]
     CTM["ChainTypeManager"]
@@ -159,8 +158,8 @@ flowchart LR
 
     PUH -->|owns| CTMEXE
     PUH -->|owns| ECOEXE
-    BG -.->|"forward(Call[])"| CTMEXE
-    BG -.->|"forward(Call[])"| ECOEXE
+    PUH -.->|"forward(Call[]) — logged escape hatch"| CTMEXE
+    PUH -.->|"forward(Call[]) — logged escape hatch"| ECOEXE
     CTMEXE -->|owns| CTM
     CTMEXE -->|owns| CTMPA["CTM-domain ProxyAdmin"]
     ECOEXE -->|owns| PA
@@ -169,19 +168,47 @@ flowchart LR
 Each executor is **bound at construction** to the contracts it governs and to the codehash of the
 object type it accepts — both immutable.
 
-| Executor                   | Bound to                                                                    | Entrypoints                                             |
-| -------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `CTMUpgradeExecutor`       | one `ChainTypeManager` + its own `ProxyAdmin`, the `CTMTransition` codehash | `applyCTMUpgrade`, `upgradeChain`, `acceptCTMOwnership` |
-| `EcosystemUpgradeExecutor` | one `ProxyAdmin`, the `CoreRegistry` codehash                               | `applyL1Upgrade`                                        |
+| Executor                   | Bound to                                                                    | Entrypoints                                                                                                                                                                                                                                                                                                                               |
+| -------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMUpgradeExecutor`       | one `ChainTypeManager` + its own `ProxyAdmin`, the `CTMTransition` codehash | `applyCTMUpgrade`, `upgradeChain`, `acceptCTMOwnership`, `setProtocolVersionDeadline`, `validateTransitionApplied`, and the routine/recovery passthroughs (`freezeChain`, `unfreezeChain`, `revertBatches`, `setValidator`, `setPriorityTxMaxGasLimit`, `setPorterAvailability`, `deactivatePriorityMode`, `setValidatorTimelockPostV29`) |
+| `EcosystemUpgradeExecutor` | one `ProxyAdmin`, the `CoreRegistry` codehash                               | `applyL1Upgrade`, `validateUpgradeApplied`                                                                                                                                                                                                                                                                                                |
 
 CTM authority and ecosystem authority are separate: each CTM is governed by its own executor and
 upgrades on its own cadence.
 
-`UpgradeExecutorBase` gives both two roles. `owner` (`Ownable2Step`) drives the fixed entrypoints,
-whose inputs are write-once objects and whose invariants cannot be bypassed. `emergencyUpgradeBoard`
-alone can `forward` raw calls, which **can** bypass every transition invariant. The separation is
-realized by giving break-glass to a differently-governed holder; with one holder for both it is only
-auditability.
+`UpgradeExecutorBase` gives both ONE role. `owner` (`Ownable2Step`) drives the fixed entrypoints,
+whose inputs are write-once objects and whose invariants cannot be bypassed, and the same owner can
+`forward` raw calls — the escape hatch that keeps the authority the executor holds (CTM / ProxyAdmin
+ownership) reachable for recovery and succession. Every forwarded call is logged.
+
+An earlier design gated `forward` behind a separately governed "emergency board". That gate is not
+implementable in the ZKsync governance model: the `EmergencyUpgradeBoard` does not call targets — it
+submits through the `ProtocolUpgradeHandler`, which performs the calls, exactly as every routine
+proposal does. Both routes reach the executor as the same `msg.sender`, so an on-chain distinction
+between them does not exist, and a gate on the board's address would have left the hatch
+permanently dead. What guards raw calls is therefore the owner's own process (the handler's
+timelock and Security Council veto, or the emergency board's all-of quorum), and what the fixed
+entrypoints guarantee is that the NORMAL path is object-driven — a bypass is an explicit,
+event-logged raw call, never an implicit one.
+
+### Authority matrix after bootstrap
+
+Who can do what once the CTM domain is owned by `CTMUpgradeExecutor`. "Chain side" is the
+`onlyAdmin` / `onlyAdminOrChainTypeManager` path on the chain's own Admin facet; `onlyChainTypeManager`
+methods have no such path, which is why they are passthroughs.
+
+| CTM owner method                                                                                                                                             | Through the executor                                                              | Chain side                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- | --------------------------------------- |
+| `setNewVersionUpgradeFromTransition`, `setCurrentRelease`                                                                                                    | `applyCTMUpgrade` (together, from a transition)                                   | —                                       |
+| `upgradeChainFromVersion`                                                                                                                                    | `upgradeChain`                                                                    | —                                       |
+| `setProtocolVersionDeadline`                                                                                                                                 | passthrough                                                                       | —                                       |
+| `freezeChain`, `unfreezeChain`, `setValidator`, `setPriorityTxMaxGasLimit`, `setPorterAvailability`, `deactivatePriorityMode`, `setValidatorTimelockPostV29` | passthrough                                                                       | — (`onlyChainTypeManager`)              |
+| `revertBatches`                                                                                                                                              | passthrough                                                                       | validator (`revertBatchesSharedBridge`) |
+| `changeFeeParams`, `setTokenMultiplier`                                                                                                                      | `forward` only                                                                    | chain admin                             |
+| `setPendingAdmin`, `setServerNotifier`                                                                                                                       | `forward` only                                                                    | CTM admin (`onlyOwnerOrAdmin`)          |
+| `executeUpgrade` (arbitrary cut), legacy `setNewVersionUpgrade` / `setUpgradeDiamondCut` / `setLegacyValidatorTimelock`                                      | `forward` only — deliberately: the bypass the object-driven path exists to remove | —                                       |
+| `setReleaseCodehash`                                                                                                                                         | `forward` only — one-shot, installed by the bootstrap                             | —                                       |
+| CTM / ProxyAdmin `transferOwnership` (executor succession)                                                                                                   | `forward` only                                                                    | —                                       |
 
 ## Provenance and pinning
 
@@ -203,13 +230,20 @@ impossible.
 
 **Inline codehash pins.** Every executable address an object names carries its expected
 `EXTCODEHASH` beside it — facets in their rows, `DiamondInit`, the verifier, the genesis upgrade, the
-upgrade engine, each `implNew`. Pins are checked in the constructor and re-checked by `validate()`.
+upgrade engine, each `implNew`. Pins are deliberately NOT checked in the constructor — the manifest
+author supplies both halves of every pair, so that would prove only self-consistency — and are held
+against live code by `validate()` on the paths that commit or apply an object.
 There is no detached, optional pin list. A pin holds only against an account that **has code**, so an
 empty account can never satisfy one.
 
-**Two validation surfaces.** `validate()` reverts and is used on every execution path;
+**Two validation surfaces.** `validate()` reverts and runs where an object is committed or applied
+(`applyCTMUpgrade`, `applyL1Upgrade`, `migrate()`, transition construction for both release edges);
 `verifyAll()` returns `bool` and is for inspection and deployment tooling. Enforcement is never left
-to an advisory predicate.
+to an advisory predicate. Two paths deliberately skip `validate()` and say so in code: the per-chain
+`upgradeChain` and the engine's `upgradeFromTransition` execute only the transition the CTM already
+committed, whose pins cannot have moved (an `EXTCODEHASH` is fixed for a non-selfdestructible
+contract), and re-checking them per chain on a permissionless path would cost ~19 code reads for no
+new information.
 
 **Post-state verification.** Pins prove the objects; a second, deeper layer proves the upgrade
 LANDED, and stage 2 gates on it instead of composed per-target checks:
@@ -238,8 +272,10 @@ The CTM stores one release pointer and derives genesis data from it:
 - `upgradeTransition[oldProtocolVersion]` — the transition committed for chains departing from that
   version, and the ONLY commitment for registry-driven edges: `upgradeCutForVersion` derives the cut
   from it on read (a chain is never handed cut bytes), and `protocolVersionDeadline` resolves the
-  departing version's deadline from it (the current version is open-ended; there is no deadline
-  setter — the schedule is part of the write-once transition governance approved).
+  departing version's deadline from it (the current version is open-ended). The transition's
+  deadline is only the STARTING value: `setProtocolVersionDeadline` (owner; a fixed executor
+  passthrough) keeps moving it afterwards — extended while chains lag, shortened to retire a
+  version — and a stored value takes precedence over the transition's when set.
 - `upgradeCutHash` — DEPRECATED. Written only by the legacy cut-taking commit path; pre-v32 Admin
   facets crossing that edge verify the handed cut bytes against it. Transition commits leave it
   zero. The same legacy path is the only writer of the legacy deadline storage.
@@ -351,11 +387,17 @@ The **L2 force deployments are derived too**: every nonempty row of the target r
 `l2BytecodeInfos` table becomes one force deployment of that descriptor at its member's fixed
 address (`L2InventoryLib`), by the SAME function the deploy tooling uses to compose the bootstrap
 L2 leg. Same philosophy as the facet delta — a full reinstall of the target release's set, empty
-for a same-release pair. What stays **reviewed-and-pinned, not proven**, is the authored remainder
-(`AuthoredL2Plan`): the delegate target + calldata, extra deployments the table cannot express
-(the version-specific delegate, force-deployed Unsafe at a bytecode-derived address), and the
-factory-dep hashes. L1 cannot verify L2 execution effects, so what the delegate call _does_ on L2
-is covered by review of that pinned payload, not by an on-chain proof.
+for a same-release pair. What stays **reviewed-and-pinned** is the authored remainder (`AuthoredL2Plan`): the delegate
+target + calldata, extra deployments the table cannot express, and the factory-dep hashes. Its SHAPE
+is mechanical, though, and `L2PlanValidationLib` enforces it at construction: an extra may only be an
+`Unsafe` deployment at the address DERIVED from its own bytecode info (`keccak256(0x00…00 ‖ info)`), so
+it cannot land on a fixed built-in or a table-derived target; the delegate must be one of those
+extras, so the code the upgrade delegatecalls into is pinned by a bytecode hash the manifest carries;
+and every bytecode any deployment installs must be among the factory dependencies. Publication is
+live L1 state, so it is checked where the edge COMMITS — `applyCTMUpgrade` and the bootstrap's
+`migrate()` refuse unless every factory dependency is published on the CTM's `BytecodesSupplier`.
+What is _not_ proven is what the delegate does on L2: its bytecode hash names an auditable artifact,
+not a behavior, and L1 cannot verify L2 execution effects.
 
 ## Rules enforced at construction
 
@@ -380,7 +422,10 @@ before chains may upgrade.
 `L2ComplexUpgrader` unconditionally ends with a delegatecall, so a nonempty combined plan requires
 a delegate target; delegate calldata without a target, or factory deps without any L2 side, are
 rejected as dead payload. The factory-dep count is capped at the same limit execution enforces. A
-table row for a member with no fixed address fails the derivation itself.
+table row for a member with no fixed address fails the derivation itself. Extras must be `Unsafe`
+deployments at their bytecode-derived address, the delegate must be one of them, and every installed
+bytecode (implementation and proxy shell of each derived row, each extra) must be among the factory
+dependencies (`L2PlanValidationLib`).
 
 **Base-system hashes.** Zero means "leave unchanged" in an upgrade, so a nonzero → zero change is not
 representable and is rejected at derivation rather than stored as a silent no-op. The Era CTM

@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
 import {Utils} from "../../Utils/Utils.sol";
+import {UtilsFacet} from "../../Utils/UtilsFacet.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -19,14 +20,17 @@ import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
 import {
     TransitionNotCommitted,
     RegistryCodehashMismatch,
     TransitionReleaseMismatch,
-    Unauthorized,
     UpgradeNotPermissionlessYet
 } from "contracts/common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
@@ -52,7 +56,6 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
     CTMRelease internal release;
     CTMTransition internal transition;
 
-    address internal emergencyUpgradeBoard;
     uint256 internal newVersion;
     address internal chainAddress;
     address internal genesisUpgradeAddr;
@@ -64,17 +67,15 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         _mockGetZKChainFromBridgehub(chainAddress);
         _mockMigrationPausedFromBridgehub();
 
-        emergencyUpgradeBoard = makeAddr("emergencyUpgradeBoard");
         ctmProxyAdmin = new ProxyAdmin();
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
-            emergencyUpgradeBoard,
             IChainTypeManager(address(chainContractAddress)),
             ctmProxyAdmin,
             Utils.transitionCodehash()
         );
 
-        // Handover through the fixed entrypoint — no break-glass involved.
+        // Handover through the fixed entrypoint — no escape hatch involved.
         vm.prank(governor);
         chainContractAddress.transferOwnership(address(ctmExecutor));
         vm.prank(governor);
@@ -90,8 +91,8 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         upgradeEngineAddr = makeAddr("upgradeEngine");
         vm.etch(upgradeEngineAddr, hex"600043");
         // Transitions require real releases on BOTH edges, so the fixture CTM's mocked genesis
-        // release is replaced by a real one — through the break-glass raw-call surface, which is
-        // exactly the production escape hatch for out-of-band CTM state (the routine executor
+        // release is replaced by a real one — through the owner-gated raw-call escape hatch, which
+        // is exactly the production route for out-of-band CTM state (the routine executor
         // entrypoints cannot set currentRelease directly, by design).
         fromRelease = _deployRelease(1);
         Call[] memory repoint = new Call[](1);
@@ -100,7 +101,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
             value: 0,
             data: abi.encodeCall(IChainTypeManager.setCurrentRelease, (address(fromRelease)))
         });
-        vm.prank(emergencyUpgradeBoard);
+        vm.prank(governor);
         ctmExecutor.forward(repoint);
         assertEq(chainContractAddress.currentRelease(), address(fromRelease));
 
@@ -226,22 +227,25 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         ctmExecutor.applyCTMUpgrade(ICTMTransition(address(transition)));
     }
 
-    function test_revertWhen_forwardCalledByOwner() public {
-        // Break-glass is a SEPARATE authority: even the owner cannot forward raw calls.
-        Call[] memory calls = new Call[](0);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
-        vm.prank(governor);
-        ctmExecutor.forward(calls);
-    }
-
-    function test_forwardExecutesForEmergencyUpgradeBoard() public {
+    function test_forwardExecutesForOwner() public {
+        // The escape hatch shares the owner role with the fixed entrypoints (its mechanics are the
+        // base suite's business); here it must reach the bound CTM with the executor's authority.
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: address(chainContractAddress),
             value: 0,
-            data: abi.encodeCall(IChainTypeManager.setPriorityTxMaxGasLimit, (chainId, 80_000_000))
+            data: abi.encodeCall(IChainTypeManager.setPriorityTxMaxGasLimit, (chainId, MAX_GAS_PER_TRANSACTION))
         });
-        vm.prank(emergencyUpgradeBoard);
+        vm.prank(governor);
+        ctmExecutor.forward(calls);
+
+        assertEq(IGetters(chainAddress).getPriorityTxMaxGasLimit(), MAX_GAS_PER_TRANSACTION);
+    }
+
+    function test_revertWhen_forwardCalledByStranger() public {
+        Call[] memory calls = new Call[](0);
+        vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(makeAddr("stranger"));
         ctmExecutor.forward(calls);
     }
 
@@ -254,15 +258,16 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
         vm.expectRevert("Ownable2Step: caller is not the new owner");
         ctmExecutor.acceptCTMOwnership();
 
-        // Break-glass hands the CTM back to governance, which nominates the executor again;
-        // a stranger may then complete the handover — the accept only ever lands on the executor.
+        // The owner hands the CTM back to itself through the escape hatch and nominates the
+        // executor again; a stranger may then complete the handover — the accept only ever lands
+        // on the executor.
         Call[] memory giveBack = new Call[](1);
         giveBack[0] = Call({
             target: address(chainContractAddress),
             value: 0,
             data: abi.encodeWithSignature("transferOwnership(address)", governor)
         });
-        vm.prank(emergencyUpgradeBoard);
+        vm.prank(governor);
         ctmExecutor.forward(giveBack);
         vm.prank(governor);
         chainContractAddress.acceptOwnership();
@@ -277,7 +282,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
 
     // The transition pins the deadline its edge was approved with (1000 in this fixture), but the
     // deadline is operational state that keeps moving after the commit — the executor's fixed
-    // entrypoint must keep overriding it, repeatedly, without break-glass.
+    // entrypoint must keep overriding it, repeatedly, without the escape hatch.
     function test_setProtocolVersionDeadline_overridesTransitionPinnedDeadline() public {
         _applyCTMUpgrade();
         assertEq(chainContractAddress.protocolVersionDeadline(0), 1000);
@@ -331,7 +336,7 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                 impostor.codehash
             )
         );
-        vm.prank(emergencyUpgradeBoard);
+        vm.prank(governor);
         ctmExecutor.forward(repoint);
     }
 
@@ -360,6 +365,150 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
             address(transition),
             "the CTM must record the transition chains rebuild their cut from"
         );
+    }
+
+    // ──────────────── routine operational and recovery passthroughs ────────────────
+    // Each passthrough runs end-to-end: executor -> bound CTM -> the fixture's real chain diamond,
+    // asserting the chain-side (or CTM-side) state and event. All of them share one unhappy path,
+    // the executor's `onlyOwner` gate, checked before the CTM is reached.
+
+    function test_freezeChain_freezesTheChainDiamond() public {
+        assertFalse(IGetters(chainAddress).isDiamondStorageFrozen());
+
+        vm.expectEmit(true, true, true, true, chainAddress);
+        emit IAdmin.Freeze();
+        vm.prank(governor);
+        ctmExecutor.freezeChain(chainId);
+
+        assertTrue(IGetters(chainAddress).isDiamondStorageFrozen(), "the freeze must land on the chain diamond");
+    }
+
+    function test_unfreezeChain_unfreezesTheChainDiamond() public {
+        vm.prank(governor);
+        ctmExecutor.freezeChain(chainId);
+        assertTrue(IGetters(chainAddress).isDiamondStorageFrozen());
+
+        vm.expectEmit(true, true, true, true, chainAddress);
+        emit IAdmin.Unfreeze();
+        vm.prank(governor);
+        ctmExecutor.unfreezeChain(chainId);
+
+        assertFalse(IGetters(chainAddress).isDiamondStorageFrozen(), "the unfreeze must land on the chain diamond");
+    }
+
+    function test_revertBatches_rollsTheChainBackToTheGivenBatch() public {
+        // Committing real batches is the executor-facet suites' business; the fixture's UtilsFacet
+        // seeds the committed counter so the revert has something to roll back.
+        UtilsFacet(chainAddress).util_setTotalBatchesCommitted(3);
+        assertEq(IGetters(chainAddress).getTotalBatchesCommitted(), 3);
+
+        vm.expectEmit(true, true, true, true, chainAddress);
+        emit IExecutor.BlocksRevert(1, 0, 0);
+        vm.prank(governor);
+        ctmExecutor.revertBatches(chainId, 1);
+
+        assertEq(IGetters(chainAddress).getTotalBatchesCommitted(), 1, "the chain must be rolled back to batch 1");
+    }
+
+    function test_setValidator_togglesTheChainValidatorFlag() public {
+        address newValidator = makeAddr("newValidator");
+        assertFalse(IGetters(chainAddress).isValidator(newValidator));
+
+        vm.expectEmit(true, true, true, true, chainAddress);
+        emit IAdmin.ValidatorStatusUpdate(newValidator, true);
+        vm.prank(governor);
+        ctmExecutor.setValidator(chainId, newValidator, true);
+        assertTrue(IGetters(chainAddress).isValidator(newValidator), "the validator must be enabled on the chain");
+
+        vm.prank(governor);
+        ctmExecutor.setValidator(chainId, newValidator, false);
+        assertFalse(IGetters(chainAddress).isValidator(newValidator), "the validator must be disabled again");
+    }
+
+    function test_setPriorityTxMaxGasLimit_setsTheChainCap() public {
+        uint256 oldLimit = IGetters(chainAddress).getPriorityTxMaxGasLimit();
+        assertTrue(oldLimit != MAX_GAS_PER_TRANSACTION, "the fixture must start below the cap for the change to show");
+
+        vm.expectEmit(true, true, true, true, chainAddress);
+        emit IAdmin.NewPriorityTxMaxGasLimit(oldLimit, MAX_GAS_PER_TRANSACTION);
+        vm.prank(governor);
+        ctmExecutor.setPriorityTxMaxGasLimit(chainId, MAX_GAS_PER_TRANSACTION);
+
+        assertEq(IGetters(chainAddress).getPriorityTxMaxGasLimit(), MAX_GAS_PER_TRANSACTION);
+    }
+
+    function test_setPorterAvailability_setsTheChainFlag() public {
+        UtilsFacet utilsFacet = UtilsFacet(chainAddress);
+        assertFalse(utilsFacet.util_getZkPorterAvailability());
+
+        vm.expectEmit(true, true, true, true, chainAddress);
+        emit IAdmin.IsPorterAvailableStatusUpdate(true);
+        vm.prank(governor);
+        ctmExecutor.setPorterAvailability(chainId, true);
+
+        assertTrue(utilsFacet.util_getZkPorterAvailability(), "porter availability must land on the chain");
+    }
+
+    function test_deactivatePriorityMode_clearsTheChainFlag() public {
+        // Entering priority mode is the chain's own flow (a permanent rollup with stale priority
+        // ops), covered by the priority-mode suites; the fixture's UtilsFacet arms the flag so the
+        // passthrough has something to clear.
+        UtilsFacet utilsFacet = UtilsFacet(chainAddress);
+        utilsFacet.util_setPriorityModeActivated(true);
+
+        vm.expectEmit(true, true, true, true, chainAddress);
+        emit IAdmin.PriorityModeDeactivated();
+        vm.prank(governor);
+        ctmExecutor.deactivatePriorityMode(chainId);
+
+        assertFalse(utilsFacet.util_getPriorityModeActivated(), "priority mode must be cleared on the chain");
+    }
+
+    function test_setValidatorTimelockPostV29_updatesTheCtm() public {
+        address oldTimelock = chainContractAddress.validatorTimelockPostV29();
+        address newTimelock = makeAddr("validatorTimelockPostV29");
+
+        vm.expectEmit(true, true, true, true, address(chainContractAddress));
+        emit IChainTypeManager.NewValidatorTimelockPostV29(oldTimelock, newTimelock);
+        vm.prank(governor);
+        ctmExecutor.setValidatorTimelockPostV29(newTimelock);
+
+        assertEq(chainContractAddress.validatorTimelockPostV29(), newTimelock);
+    }
+
+    function test_revertWhen_passthroughsCalledByStranger() public {
+        address newValidator = makeAddr("newValidator");
+        address newTimelock = makeAddr("validatorTimelockPostV29");
+        address oldTimelock = chainContractAddress.validatorTimelockPostV29();
+        uint256 oldLimit = IGetters(chainAddress).getPriorityTxMaxGasLimit();
+        UtilsFacet(chainAddress).util_setPriorityModeActivated(true);
+
+        vm.startPrank(makeAddr("stranger"));
+        vm.expectRevert("Ownable: caller is not the owner");
+        ctmExecutor.freezeChain(chainId);
+        vm.expectRevert("Ownable: caller is not the owner");
+        ctmExecutor.unfreezeChain(chainId);
+        vm.expectRevert("Ownable: caller is not the owner");
+        ctmExecutor.revertBatches(chainId, 0);
+        vm.expectRevert("Ownable: caller is not the owner");
+        ctmExecutor.setValidator(chainId, newValidator, true);
+        vm.expectRevert("Ownable: caller is not the owner");
+        ctmExecutor.setPriorityTxMaxGasLimit(chainId, MAX_GAS_PER_TRANSACTION);
+        vm.expectRevert("Ownable: caller is not the owner");
+        ctmExecutor.setPorterAvailability(chainId, true);
+        vm.expectRevert("Ownable: caller is not the owner");
+        ctmExecutor.deactivatePriorityMode(chainId);
+        vm.expectRevert("Ownable: caller is not the owner");
+        ctmExecutor.setValidatorTimelockPostV29(newTimelock);
+        vm.stopPrank();
+
+        // Nothing reached the chain or the CTM.
+        assertFalse(IGetters(chainAddress).isDiamondStorageFrozen());
+        assertFalse(IGetters(chainAddress).isValidator(newValidator));
+        assertEq(IGetters(chainAddress).getPriorityTxMaxGasLimit(), oldLimit);
+        assertFalse(UtilsFacet(chainAddress).util_getZkPorterAvailability());
+        assertTrue(UtilsFacet(chainAddress).util_getPriorityModeActivated());
+        assertEq(chainContractAddress.validatorTimelockPostV29(), oldTimelock);
     }
 
     // ─────────────────────────── post-state verification ───────────────────────────

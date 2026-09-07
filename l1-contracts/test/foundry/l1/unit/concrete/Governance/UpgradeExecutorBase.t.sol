@@ -29,85 +29,69 @@ contract OwnedTarget {
 }
 
 /// @dev Minimal concrete executor: exercises the shared `UpgradeExecutorBase` (ownership +
-///      break-glass `forward` + `receive`) without any domain entrypoints.
+///      owner-gated `forward` + `receive`) without any domain entrypoints.
 contract TestUpgradeExecutor is UpgradeExecutorBase {
-    constructor(
-        address _initialOwner,
-        address _emergencyUpgradeBoard
-    ) UpgradeExecutorBase(_initialOwner, _emergencyUpgradeBoard) {}
+    constructor(address _initialOwner) UpgradeExecutorBase(_initialOwner) {}
 }
 
-/// @notice Tests the shared authority base: ownership, the SEPARATELY GOVERNED break-glass
-///         `forward` hatch (the only arbitrary authority — a plain call, no delegatecall),
-///         and `receive`.
+/// @notice Tests the shared authority base under its ONE-role model: ownership, the owner-gated
+///         raw-call escape hatch `forward` (a plain call, no delegatecall) and `receive`.
+/// @dev There is deliberately no second "emergency board" role to test: routine and emergency
+///      governance both reach the executor as the same `msg.sender` (the ProtocolUpgradeHandler
+///      performs the calls for either route), so an on-chain gate on a board address could not
+///      tell them apart and would have left `forward` dead. What gates raw calls is the owner's
+///      own governance process, not this contract.
 contract UpgradeExecutorBaseTest is Test {
     event CallForwarded(address indexed target, uint256 value, bytes data);
 
     address internal governance = makeAddr("governance");
-    address internal emergencyUpgradeBoard = makeAddr("emergencyUpgradeBoard");
     address internal stranger = makeAddr("stranger");
 
     TestUpgradeExecutor internal executor;
     OwnedTarget internal target;
 
     function setUp() public {
-        executor = new TestUpgradeExecutor(governance, emergencyUpgradeBoard);
+        executor = new TestUpgradeExecutor(governance);
         target = new OwnedTarget(address(executor));
+    }
+
+    function _setValueCall(OwnedTarget _target, uint256 _value, uint256 _ethValue) internal pure returns (Call memory) {
+        return Call({target: address(_target), value: _ethValue, data: abi.encodeCall(OwnedTarget.setValue, (_value))});
     }
 
     /*//////////////////////////////////////////////////////////////
                               constructor
     //////////////////////////////////////////////////////////////*/
 
-    function test_constructorSetsOwnerAndEmergencyUpgradeBoard() public view {
+    function test_constructorSetsOwner() public view {
         assertEq(executor.owner(), governance);
         assertEq(executor.pendingOwner(), address(0));
-        assertEq(executor.emergencyUpgradeBoard(), emergencyUpgradeBoard);
     }
 
     function test_revertWhen_constructorZeroOwner() public {
-        // A zero owner would permanently disable every fixed upgrade entrypoint and leave only
-        // break-glass authority.
+        // A zero owner would permanently disable every entrypoint, the escape hatch included:
+        // Ownable2Step cannot hand ownership out of address(0).
         vm.expectRevert(ZeroAddress.selector);
-        new TestUpgradeExecutor(address(0), emergencyUpgradeBoard);
-    }
-
-    function test_revertWhen_constructorZeroEmergencyUpgradeBoard() public {
-        vm.expectRevert(ZeroAddress.selector);
-        new TestUpgradeExecutor(governance, address(0));
+        new TestUpgradeExecutor(address(0));
     }
 
     /*//////////////////////////////////////////////////////////////
                                forward
     //////////////////////////////////////////////////////////////*/
 
-    function test_revertWhen_forwardCalledByNonEmergencyUpgradeBoard() public {
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, stranger));
-        vm.prank(stranger);
-        executor.forward(new Call[](0));
-    }
-
-    function test_revertWhen_forwardCalledByOwner() public {
-        // Break-glass is a SEPARATE authority: the owner drives only the fixed domain
-        // entrypoints and cannot bypass their invariants through raw calls.
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governance));
-        vm.prank(governance);
-        executor.forward(new Call[](0));
-    }
-
     function test_successfulForward_multipleCallsWithValue() public {
         vm.deal(address(executor), 1 ether);
 
         Call[] memory calls = new Call[](2);
-        calls[0] = Call({target: address(target), value: 0.25 ether, data: abi.encodeCall(OwnedTarget.setValue, (3))});
-        calls[1] = Call({target: address(target), value: 0, data: abi.encodeCall(OwnedTarget.setValue, (4))});
+        calls[0] = _setValueCall(target, 3, 0.25 ether);
+        calls[1] = _setValueCall(target, 4, 0);
 
         vm.expectEmit(true, true, true, true, address(executor));
         emit CallForwarded(address(target), 0.25 ether, calls[0].data);
         vm.expectEmit(true, true, true, true, address(executor));
         emit CallForwarded(address(target), 0, calls[1].data);
 
-        vm.prank(emergencyUpgradeBoard);
+        vm.prank(governance);
         executor.forward(calls);
 
         // Calls execute in order: the second write wins, the value of the first arrived.
@@ -116,17 +100,44 @@ contract UpgradeExecutorBaseTest is Test {
         assertEq(address(executor).balance, 0.75 ether);
     }
 
+    function test_revertWhen_forwardCalledByStranger() public {
+        Call[] memory calls = new Call[](1);
+        calls[0] = _setValueCall(target, 1, 0);
+
+        vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(stranger);
+        executor.forward(calls);
+
+        assertEq(target.value(), 0, "a refused forward must not reach the target");
+    }
+
     function test_revertWhen_forwardedCallReverts() public {
         // The target is owner-gated on the executor, so a call forwarded to a target the
-        // executor does NOT own must bubble the target's revert.
+        // executor does NOT own must bubble the target's own revert data unchanged.
         OwnedTarget foreignTarget = new OwnedTarget(makeAddr("someoneElse"));
 
         Call[] memory calls = new Call[](1);
-        calls[0] = Call({target: address(foreignTarget), value: 0, data: abi.encodeCall(OwnedTarget.setValue, (1))});
+        calls[0] = _setValueCall(foreignTarget, 1, 0);
 
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(executor)));
-        vm.prank(emergencyUpgradeBoard);
+        vm.prank(governance);
         executor.forward(calls);
+    }
+
+    function test_revertWhen_aLaterCallFailsTheWholeBatchRollsBack() public {
+        // `forward` reverts on the first failure, so a batch is all-or-nothing: the successful
+        // first call must not survive the second call's revert.
+        OwnedTarget foreignTarget = new OwnedTarget(makeAddr("someoneElse"));
+
+        Call[] memory calls = new Call[](2);
+        calls[0] = _setValueCall(target, 3, 0);
+        calls[1] = _setValueCall(foreignTarget, 1, 0);
+
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(executor)));
+        vm.prank(governance);
+        executor.forward(calls);
+
+        assertEq(target.value(), 0, "the first call must be rolled back with the batch");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -164,32 +175,32 @@ contract UpgradeExecutorBaseTest is Test {
         assertEq(executor.pendingOwner(), address(0));
     }
 
-    function test_emergencyUpgradeBoardHandoverIsTwoStep() public {
-        address council = makeAddr("securityCouncil");
+    function test_forwardAuthorityFollowsOwnership() public {
+        // One role: the escape hatch is not a separate capability, so it moves with ownership —
+        // the departed owner loses it and the new owner gains it, at acceptance and not before.
+        address newGovernance = makeAddr("newGovernance");
+        Call[] memory calls = new Call[](1);
+        calls[0] = _setValueCall(target, 7, 0);
 
-        vm.prank(emergencyUpgradeBoard);
-        executor.transferEmergencyUpgradeBoard(council);
-
-        // Nothing changes until acceptance; the pending holder cannot forward yet.
-        assertEq(executor.emergencyUpgradeBoard(), emergencyUpgradeBoard);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, council));
-        vm.prank(council);
-        executor.forward(new Call[](0));
-
-        vm.prank(council);
-        executor.acceptEmergencyUpgradeBoard();
-        assertEq(executor.emergencyUpgradeBoard(), council);
-        assertEq(executor.pendingEmergencyUpgradeBoard(), address(0));
-
-        // The old holder lost the capability.
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, emergencyUpgradeBoard));
-        vm.prank(emergencyUpgradeBoard);
-        executor.forward(new Call[](0));
-    }
-
-    function test_revertWhen_emergencyUpgradeBoardTransferByNonHolder() public {
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governance));
         vm.prank(governance);
-        executor.transferEmergencyUpgradeBoard(governance);
+        executor.transferOwnership(newGovernance);
+
+        // A pending owner holds nothing yet.
+        vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(newGovernance);
+        executor.forward(calls);
+
+        vm.prank(newGovernance);
+        executor.acceptOwnership();
+
+        vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(governance);
+        executor.forward(calls);
+
+        vm.expectEmit(true, true, true, true, address(executor));
+        emit CallForwarded(address(target), 0, calls[0].data);
+        vm.prank(newGovernance);
+        executor.forward(calls);
+        assertEq(target.value(), 7);
     }
 }

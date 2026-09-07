@@ -83,12 +83,7 @@ contract EcosystemUpgradeExecutorTest is Test {
         // The ecosystem executor is BOUND to (and owns) one immutable ecosystem ProxyAdmin and
         // pins the audited `CoreRegistry` codehash, mirroring the production ownership chain (and
         // nothing else — no CTM authority).
-        ecosystemExecutor = new EcosystemUpgradeExecutor(
-            ecosystemGovernor,
-            makeAddr("emergencyUpgradeBoard"),
-            proxyAdmin,
-            coreRegistryCodehash
-        );
+        ecosystemExecutor = new EcosystemUpgradeExecutor(ecosystemGovernor, proxyAdmin, coreRegistryCodehash);
         proxyAdmin.transferOwnership(address(ecosystemExecutor));
     }
 

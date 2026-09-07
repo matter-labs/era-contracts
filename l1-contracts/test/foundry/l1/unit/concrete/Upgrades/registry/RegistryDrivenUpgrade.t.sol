@@ -120,7 +120,6 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
 
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
-            makeAddr("emergencyUpgradeBoard"),
             IChainTypeManager(address(chainContractAddress)),
             new ProxyAdmin(),
             Utils.transitionCodehash()
@@ -143,9 +142,9 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         address genesisRelease = address(new CTMRelease(_releaseManifest(address(0), address(testnetVerifier))));
 
         // Hand CTM ownership to the executor through its fixed entrypoint, then perform two raw
-        // one-off admin actions through break-glass (exactly what the separately governed hatch
-        // exists for): re-point currentRelease at the real genesis release and raise the chain's
-        // priority-tx gas limit.
+        // one-off admin actions through the owner-gated escape hatch (exactly what it exists for):
+        // re-point currentRelease at the real genesis release and raise the chain's priority-tx
+        // gas limit.
         vm.prank(governor);
         chainContractAddress.transferOwnership(address(ctmExecutor));
         vm.prank(governor);
@@ -161,7 +160,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             value: 0,
             data: abi.encodeCall(IChainTypeManager.setPriorityTxMaxGasLimit, (chainId, PRIORITY_TX_MAX_GAS_LIMIT))
         });
-        vm.prank(makeAddr("emergencyUpgradeBoard"));
+        vm.prank(governor);
         ctmExecutor.forward(calls);
 
         // The chain's genesis upgrade transaction is still pending: on a real chain the server
@@ -364,6 +363,34 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             abi.encode(drifted)
         );
         assertFalse(releaseV33.verifyChainRouting(chainAddress), "drifted selector set must not match");
+    }
+
+    /// @dev Freezability is part of a release row but not of the loupe's `facets()` view, so the
+    ///      routing check reads it per facet from the live diamond: a release pinning the live
+    ///      addresses and selectors but the OPPOSITE freezability for any one facet must not match.
+    function test_verifyChainRoutingRejectsFreezabilityMismatch() public {
+        // Control: the same manifest builder, unflipped, describes the live chain.
+        ReleaseManifest memory manifest = _releaseManifest(address(0), address(testnetVerifier));
+        CTMRelease unflipped = new CTMRelease(manifest);
+        assertTrue(unflipped.verifyChainRouting(chainAddress), "the unflipped manifest must match the live chain");
+
+        for (uint256 i = 0; i < manifest.genesisFacets.length; ++i) {
+            ReleaseManifest memory flippedManifest = _releaseManifest(address(0), address(testnetVerifier));
+            flippedManifest.genesisFacets[i].isFreezable = !flippedManifest.genesisFacets[i].isFreezable;
+            CTMRelease flipped = new CTMRelease(flippedManifest);
+
+            // Addresses and selectors still match; only this row's freezability disagrees with
+            // what the diamond installed.
+            assertEq(
+                IGetters(chainAddress).isFacetFreezable(manifest.genesisFacets[i].facet.addr),
+                manifest.genesisFacets[i].isFreezable,
+                "the live diamond must carry the original freezability"
+            );
+            assertFalse(
+                flipped.verifyChainRouting(chainAddress),
+                "a release with one facet's freezability flipped must not match"
+            );
+        }
     }
 
     function test_permissionlessUpgradeChainAfterDeadline() public {

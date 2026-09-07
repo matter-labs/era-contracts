@@ -172,6 +172,8 @@ interface IChainTypeManager {
 
     function unfreezeChain(uint256 _chainId) external;
 
+    function revertBatches(uint256 _chainId, uint256 _newLastBatch) external;
+
     function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external;
 
     function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external;
