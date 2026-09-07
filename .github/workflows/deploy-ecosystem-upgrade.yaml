@@ -469,13 +469,35 @@ jobs:
           # normal deployments tolerate them, verification-only runs do not.
           verified=0
           failed=0
+          readonly verification_attempts=3
+          readonly verification_retry_delay=10
           while IFS= read -r cmd; do
             echo "--- $cmd"
-            if eval "$cmd --chain $CHAIN --watch --retries 8 --delay 20"; then
+            # These contracts are built by da-contracts, not l1-contracts.
+            # Keep the recorded address and constructor arguments unchanged.
+            read -r _forge _verify _address contract _rest <<< "$cmd"
+            verification_root="$PWD"
+            case "$contract" in
+              EIP7702Checker|RollupL1DAValidator) verification_root="../da-contracts" ;;
+            esac
+            success=false
+            for ((attempt=1; attempt<=verification_attempts; attempt++)); do
+              # --retries covers verification polling, but not an initial ABI
+              # request timeout. Retry the complete idempotent submission too.
+              if (cd "$verification_root" && eval "$cmd --chain $CHAIN --watch --retries 8 --delay 20"); then
+                success=true
+                break
+              fi
+              if [ "$attempt" -lt "$verification_attempts" ]; then
+                echo "Retrying verification ($attempt/$verification_attempts): $contract"
+                sleep "$verification_retry_delay"
+              fi
+            done
+            if [ "$success" = true ]; then
               echo "  OK"
               verified=$((verified + 1))
             else
-              echo "::warning::verification failed (re-run once Etherscan indexes the code): $cmd"
+              echo "::warning::verification failed after $verification_attempts attempts: $cmd"
               failed=$((failed + 1))
             fi
           done < <(grep 'forge verify-contract' "$LOG" | sed 's/^.*forge verify-contract/forge verify-contract/' | sort -u)
