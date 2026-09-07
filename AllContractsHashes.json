@@ -34,9 +34,9 @@
   {
     "contractName": "l1-contracts/AdminFacet",
     "evmBytecodePath": "/l1-contracts/out/Admin.sol/AdminFacet.json",
-    "evmBytecodeHash": "0x2e266414271ea0cf28230deae2a56f3080009e4966e23b01d2333a5c1153519c",
-    "evmDeployedBytecodeHash": "0x031127ac1e30794fb670bf48994e9a99ffb83b967fa2acd6ba55891af67db2a3",
-    "evmDeployedBytecodeBlakeHash": "0xbe36e2427df3082bf9efcdf655e661fd21005a943f0dbcbcaa587237720dc8ff",
+    "evmBytecodeHash": "0xd85ef39d0b96860c330dbfab0d1e135892fa426a9c8b017f11d4ae9d1644b90c",
+    "evmDeployedBytecodeHash": "0x2156365eaa0c86aa9baa52c052ecbbc660931baa7af23ab9e3c85e747e5979a2",
+    "evmDeployedBytecodeBlakeHash": "0xf65cecdfef7a13d1392e9b4fefda87c2d6e96be3cff6d9b5882473e03f859364",
     "evmDeployedBytecodeLength": 22426
   },
   {
@@ -362,9 +362,9 @@
   {
     "contractName": "l1-contracts/GatewayCTMDeployerCTMZKsyncOS",
     "evmBytecodePath": "/l1-contracts/out/GatewayCTMDeployerCTMZKsyncOS.sol/GatewayCTMDeployerCTMZKsyncOS.json",
-    "evmBytecodeHash": "0xb7878ef5cf42fbc680c12a4d3b2ea18e9e4c6800ab153775e9940eb37f906548",
-    "evmDeployedBytecodeHash": "0xfeffca624716a790c387a37b4832e131198debec2f2feac046a3459c08748f0f",
-    "evmDeployedBytecodeBlakeHash": "0xcf64cd360f55a824cad236438733c0d8abab407d0ca85bf5366e294020066ed4",
+    "evmBytecodeHash": "0xd09b86236672c2bbcd47d7b911c999d8d9ae2825721125183e6bd370edbf1fb8",
+    "evmDeployedBytecodeHash": "0x35cc73aa4914156a3ec9f635aa22c86da2767bca3af13145354c246f0d9f56cb",
+    "evmDeployedBytecodeBlakeHash": "0x3b341164a894dd7245eb66533d1925e77382a4aaed4e3bd0f359ed47c8e7fb4d",
     "evmDeployedBytecodeLength": 701
   },
   {
@@ -898,10 +898,10 @@
   {
     "contractName": "l1-contracts/ServerNotifier",
     "evmBytecodePath": "/l1-contracts/out/ServerNotifier.sol/ServerNotifier.json",
-    "evmBytecodeHash": "0xa988693bbc4109c6cc3c3911a3da496f007a24772119d66e4702d3b32cc09195",
-    "evmDeployedBytecodeHash": "0xd462e5afdefb8776f829bf6ea08d57c973c5b854aafeffacba7512f27375d4ff",
-    "evmDeployedBytecodeBlakeHash": "0x2abaefce118b1e1cc1b6c574faece4e76aedc4e2157dc8ad8fcdb5b758cf7eda",
-    "evmDeployedBytecodeLength": 4642
+    "evmBytecodeHash": "0xb84cf23b453741edc592deff67ea3c62e494ab275c5284e4c41bc30699888df1",
+    "evmDeployedBytecodeHash": "0xc660f13c4458d7c9d328dd533016768bfc4c4523ddf2d54b278c6adaa82ee2d8",
+    "evmDeployedBytecodeBlakeHash": "0x2e2f12c6b991e528417b2c93a504100fe25a3a3f19cc91c282d15ddeb151a9ae",
+    "evmDeployedBytecodeLength": 5257
   },
   {
     "contractName": "l1-contracts/SignatureCheckerUpgradeable",
