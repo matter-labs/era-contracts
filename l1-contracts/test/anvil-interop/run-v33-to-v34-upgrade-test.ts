@@ -2,7 +2,8 @@
 
 import { runPipelineUpgradeScenario } from "./src/helpers/pipeline-upgrade-runner";
 
-// The v34 BOOTSTRAP edge, driven end to end by the production toolchain: protocol-ops
+// The v34 BOOTSTRAP edge followed by the first REGISTRY-DRIVEN upgrade, both driven end to end
+// by the production toolchain. Bootstrap: protocol-ops
 // `upgrade-prepare-all` runs the real `CTMUpgrade_v34` / `CoreUpgrade_v34` prepare (deploying
 // the `CTMUpgradeExecutor` + `RegistryBootstrapMigration`), and the governance replay executes
 // the collapsed stage-1 leg — nominate the CTM, hand over its ProxyAdmin, `migrate()`,
@@ -37,6 +38,16 @@ runPipelineUpgradeScenario({
   // registry model cannot bump yet (no EraVM-deployable release). Chain 10 (L1-settled) and 11
   // (the gateway itself, which settles on L1) are the supported shapes.
   targetRoles: ["directSettled", "gateway"],
+  // Then the FIRST registry-driven upgrade on the bootstrapped ecosystem ("v34 -> v35"), driven
+  // by the base prepare pipeline: one fresh ecosystem implementation pinned in a CoreRegistry, a
+  // fresh release pinned by a CTMTransition, and exactly three governance calls.
+  followUp: {
+    label: "v35-registry-driven",
+    upgradeInputTemplatePath: "test/anvil-interop/config/recurring-upgrade.toml",
+    expectedProtocolVersion: "0x2300000000",
+    coreScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v35.sol:CoreUpgradeForTests_v35",
+    ctmScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v35.sol:CTMUpgradeForTests_v35",
+  },
 })
   .then(() => {
     process.exit(0);

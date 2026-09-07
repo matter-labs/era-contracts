@@ -371,6 +371,16 @@ sequenceDiagram
     E->>H: releaseMigrationPause()
 ```
 
+The three governance calls above are ALL a registry-driven prepare emits. `DefaultCoreUpgrade`
+deploys the ecosystem implementations and their `CoreRegistry`; `DefaultCTMUpgrade` deploys the
+release, the timer bound to the executor and the `CTMTransition`, and writes
+`stage0/1/2(transition)`. Every other call a version script needs governance or an admin to make
+is declared as an external action (phase, label, authority) and listed in the prepare output, and
+protocol-ops refuses to merge a bundle whose calls are not all either an executor stage call or a
+declared action. Governance therefore reads targets, code, initialization, ordering and authority
+changes from the objects, and the artifact names whatever is left outside them (see
+`docs/upgrade-stage-lifecycle.md` §4.7).
+
 A proposal is three fixed-signature executor calls — the governance stages the prepare scripts
 used to compose as calldata, moved into the executor ([stage lifecycle](upgrade-stage-lifecycle.md)).
 One transition is mid-lifecycle at a time; each stage names it and is rejected for a different one,

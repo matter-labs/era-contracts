@@ -265,6 +265,29 @@ the bootstrap authorization calls, the governance self-upgrade, Gateway bring-up
 explicitly in the output; the tooling must never imply the three calls cover it when they do not.
 The Rust merger stops concatenating stage bodies.
 
+Implemented. The base prepare pipelines are registry-driven: `DefaultCoreUpgrade` deploys the
+new ecosystem implementations and pins them in a `CoreRegistry` (nothing when the run deployed
+none) and emits no governance call; `DefaultCTMUpgrade` deploys the release, a
+`GovernanceUpgradeTimer` bound to the live executor (the CTM's owner, checked to be an executor
+bound to that CTM) and a `CTMTransition` naming the core prepare's registry
+(`CTMUpgradeParams.coreRegistry`, read by protocol-ops from the core output), and its three stage
+bundles are exactly `stage0/1/2(transition)`. Every other governance or admin call a version
+script emits goes through `declareExternalAction` (`ExternalActionsLib`: phase, label, authority,
+call) and is written to the output as `external_actions`; the v34 bootstrap scripts declare their
+whole one-time edge this way (pause/unpause, timer start, the two handovers, `migrate()`, the
+post-state gates, the two join authorizations, the notifier admin swap). The protocol-ops merger
+copies each prepare's bundles in source order and composes nothing; it lists its own appends
+(PUH/Guardians wiring, CTM `acceptOwnership` normalization, the new-Gateway bundle) under the
+same `external_actions`, and refuses a bundle whose calls are not all either an executor stage
+call or a declared action (`check_bundle_provenance`). The recurring shape is proven by the v35
+scripts (`CoreUpgrade_v35`: one fresh `L1MessageRoot`; `CTMUpgrade_v35`: the base pipeline with
+nothing overridden), run through protocol-ops right after the bootstrap in the anvil pipeline: the
+merged artifact is asserted to carry exactly the three calls, chains cross through the cut-reading
+`upgradeChainFromVersion`, and the end state is checked. The release-pair L2 derivation
+(`TransitionDerivationLib.deriveL2Deployments`) now diffs the two tables, so an upgrade whose L2
+built-ins are unchanged has no L2 leg — a facet-only or verifier-only edge composes the all-zero
+L2 transaction with no delegate and no factory dependency.
+
 ## 5. Proof obligations
 
 Replay the scripted flow and the on-chain flow against equivalent fixtures (the anvil
@@ -298,7 +321,8 @@ Targeted tests:
 5. Bootstrap join: explicit bound authorization calls; no bootstrap machinery on transitions —
    done; bootstrap payload composed on-chain — done (4.5).
 6. Tooling: scripts emit the three calls; the Rust merger stops composing stage bodies; every
-   remaining external action listed.
+   remaining external action listed — done (4.7; the v35 scripts and the chained anvil pipeline
+   are the proof).
 7. Equivalence replay + targeted tests (Section 5).
 8. Only then: simplify the no-Gateway path behind the same stage interface.
 

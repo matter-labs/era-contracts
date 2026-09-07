@@ -124,6 +124,22 @@ export type PipelineUpgradeScenario = {
    * crosses natively, and installing the shim there collides (`FacetExists`).
    */
   installLegacyCutTakingFacet?: boolean;
+  /**
+   * A REGISTRY-DRIVEN hop run on the same chains right after this scenario: the base prepare
+   * pipeline deploys a fresh release + `CTMTransition`, governance executes exactly the three
+   * `CTMUpgradeExecutor.stageN(transition)` calls, and every chain crosses through the
+   * cut-READING `upgradeChainFromVersion` (see runRecurringHop).
+   */
+  followUp?: RecurringUpgradeHop;
+};
+
+export type RecurringUpgradeHop = {
+  label: string;
+  upgradeInputTemplatePath: string;
+  /** Protocol version the chains must report once the hop has been applied. */
+  expectedProtocolVersion: string;
+  coreScriptPath: string;
+  ctmScriptPath: string;
 };
 
 // ── Main entry point ─────────────────────────────────────────────────
@@ -248,6 +264,16 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       expectedProtocolVersion: scenario.expectedProtocolVersion,
     });
     console.log("✅ Pipeline upgrade scenario verified successfully!\n");
+
+    if (scenario.followUp) {
+      await runRecurringHop(scenario, scenario.followUp, {
+        l1Provider,
+        rpcUrl: l1Chain.rpcUrl,
+        l1Addresses,
+        ctmAddresses,
+        upgradeChainAddresses,
+      });
+    }
   } finally {
     if (cleanupUpgradeHarnessInputs) {
       cleanupUpgradeHarnessInputs();
@@ -255,6 +281,213 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     if (!keepChains) {
       await anvilManager.stopAll();
     }
+  }
+}
+
+// ── Registry-driven follow-up hop ─────────────────────────────────────
+
+/** `abi.decode(Call[])` of a governance bundle's hex. */
+function decodeGovernanceCalls(hex: string): Array<{ target: string; value: ethers.BigNumber; data: string }> {
+  if (hex === "0x" || hex === "") {
+    return [];
+  }
+  const [calls] = ethers.utils.defaultAbiCoder.decode(["tuple(address target,uint256 value,bytes data)[]"], hex);
+  return calls.map((c: { target: string; value: ethers.BigNumber; data: string }) => ({
+    target: c.target,
+    value: c.value,
+    data: c.data,
+  }));
+}
+
+/**
+ * The registry-driven hop that follows the bootstrap on the same chains — the production shape
+ * of every upgrade after v34, driven by the real toolchain end to end:
+ *
+ *   1. protocol-ops `upgrade-prepare-all` runs the (trimmed) v35 prepares: the core prepare
+ *      deploys one ecosystem implementation and pins it in a `CoreRegistry`; the CTM prepare
+ *      deploys the release and the `CTMTransition` naming that registry, the timer bound to the
+ *      executor, and emits exactly `stage0/1/2(transition)`.
+ *   2. The merged `ecosystem.toml` is asserted to carry ONLY those three calls (one per stage,
+ *      all on the bound executor) and to list nothing but the admin action under
+ *      `external_actions` — the tooling claim, checked on the artifact.
+ *   3. The governance replay executes the three stages; each chain then crosses through the
+ *      cut-READING `upgradeChainFromVersion` as its own admin (no cut is handed over).
+ *   4. End state: chains and CTM at the new version, the transition committed for the departing
+ *      version, the CTM on the transition's release, the MessageRoot proxy re-pointed through the
+ *      ecosystem executor, the lifecycle slot cleared and the migration pause released.
+ */
+async function runRecurringHop(
+  scenario: PipelineUpgradeScenario,
+  hop: RecurringUpgradeHop,
+  ctx: {
+    l1Provider: ethers.providers.JsonRpcProvider;
+    rpcUrl: string;
+    l1Addresses: { bridgehub: string; governance: string; messageRoot: string };
+    ctmAddresses: { chainTypeManager: string };
+    upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>;
+  }
+): Promise<void> {
+  console.log(`\n══ Registry-driven follow-up hop: ${hop.label} ══`);
+  const { l1Provider, upgradeChainAddresses } = ctx;
+  const ctm = new ethers.Contract(ctx.ctmAddresses.chainTypeManager, getAbi("IChainTypeManager"), l1Provider);
+  const oldVersion: ethers.BigNumber = await ctm.protocolVersion();
+  console.log(`  departing protocol version: ${oldVersion.toHexString()}`);
+
+  // The bootstrap's L2 leg is still "pending" on these sequencer-less chains (see module docs).
+  await clearGenesisUpgradeTxHash(l1Provider, upgradeChainAddresses);
+
+  const hopScenario: PipelineUpgradeScenario = {
+    ...scenario,
+    label: hop.label,
+    upgradeInputTemplatePath: hop.upgradeInputTemplatePath,
+    expectedProtocolVersion: hop.expectedProtocolVersion,
+    coreScriptPath: hop.coreScriptPath,
+    ctmScriptPath: hop.ctmScriptPath,
+    followUp: undefined,
+  };
+  const inputs = prepareUpgradeHarnessInputs(hopScenario, {
+    l1Addresses: ctx.l1Addresses,
+    ctmAddresses: ctx.ctmAddresses,
+    chainAddresses: upgradeChainAddresses,
+  });
+  try {
+    console.log("\n── Preparing the registry-driven upgrade via protocol-ops ──");
+    await runEcosystemUpgradeScripts({
+      rpcUrl: ctx.rpcUrl,
+      scenario: hopScenario,
+      upgradeHarnessInputs: inputs,
+      executeBundles: true,
+    });
+    const mergedEcosystemToml = path.join(inputs.protocolOpsOutDir, "ecosystem.toml");
+    if (!fs.existsSync(mergedEcosystemToml)) {
+      throw new Error(`Merged ecosystem TOML not emitted by upgrade-prepare-all: ${mergedEcosystemToml}`);
+    }
+    const merged = parseToml(fs.readFileSync(mergedEcosystemToml, "utf8")) as {
+      external_actions?: string[];
+      governance_calls: { stage0_calls: string; stage1_calls: string; stage2_calls: string };
+      core: {
+        registry?: { core_registry_addr?: string };
+        upgrade_addresses?: { bridgehub?: { message_root_implementation_addr?: string } };
+      };
+      ctms: {
+        zksync_os: {
+          registry?: { ctm_transition_addr?: string; ctm_upgrade_executor_addr?: string; ctm_release_addr?: string };
+        };
+      };
+    };
+    const registry = merged.ctms.zksync_os.registry ?? {};
+    const transitionAddr = registry.ctm_transition_addr;
+    const executorAddr = registry.ctm_upgrade_executor_addr;
+    if (!transitionAddr || !executorAddr || transitionAddr === ethers.constants.AddressZero) {
+      throw new Error("the CTM prepare did not report its transition and bound executor");
+    }
+    console.log(`  transition: ${transitionAddr}\n  executor:   ${executorAddr}`);
+
+    // ── The tooling claim, checked on the artifact ──
+    const executorIface = new ethers.utils.Interface(getAbi("CTMUpgradeExecutor"));
+    (["stage0", "stage1", "stage2"] as const).forEach((stage, n) => {
+      const key = `stage${n}_calls` as "stage0_calls" | "stage1_calls" | "stage2_calls";
+      const calls = decodeGovernanceCalls(merged.governance_calls[key]);
+      if (calls.length !== 1) {
+        throw new Error(`stage ${n} must be exactly one executor call, got ${calls.length}`);
+      }
+      const expected = executorIface.encodeFunctionData(stage, [transitionAddr]);
+      if (
+        calls[0].target.toLowerCase() !== executorAddr.toLowerCase() ||
+        calls[0].data.toLowerCase() !== expected.toLowerCase()
+      ) {
+        throw new Error(`stage ${n} is not CTMUpgradeExecutor.${stage}(transition) on the bound executor`);
+      }
+    });
+    const externalActions = merged.external_actions ?? [];
+    const nonAdmin = externalActions.filter((line) => !line.startsWith("phase admin |"));
+    if (nonAdmin.length !== 0) {
+      throw new Error(`a registry-driven prepare declared governance external actions:\n${nonAdmin.join("\n")}`);
+    }
+    console.log(
+      `  ✓ merged bundles are exactly stage0/1/2(transition); ${externalActions.length} admin-phase external action(s), no governance ones`
+    );
+
+    // ── Governance executes the three stages ──
+    console.log("\n── Replaying the three executor calls via protocol-ops ──");
+    await runEcosystemGovernanceUpgrade({
+      rpcUrl: ctx.rpcUrl,
+      bridgehubAddress: inputs.bridgehubAddress,
+      governanceTomlPaths: [mergedEcosystemToml],
+      outDir: path.join(inputs.protocolOpsOutDir, "governance"),
+      executeBundles: true,
+    });
+
+    // ── Each chain crosses through the cut-READING entrypoint, as its own admin ──
+    console.log("\n── Chains cross the registry-driven edge ──");
+    const adminIface = new ethers.utils.Interface(getAbi("AdminFacet"));
+    for (const chain of upgradeChainAddresses) {
+      const getters = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), l1Provider);
+      const admin: string = await getters.getAdmin();
+      const data = adminIface.encodeFunctionData("upgradeChainFromVersion", [chain.diamondProxy, oldVersion]);
+      await impersonateAndRun(l1Provider, admin, async (signer) => {
+        await sendAndCheck(
+          l1Provider,
+          signer.sendTransaction({ to: chain.diamondProxy, data, gasLimit: 10_000_000 }),
+          `chain ${chain.chainId}: upgradeChainFromVersion(${oldVersion.toHexString()})`
+        );
+      });
+      console.log(`  ✓ chain ${chain.chainId} crossed the registry-driven edge (cut read from the CTM)`);
+    }
+
+    // ── End state ──
+    console.log("\n── Verifying the registry-driven end state ──");
+    await verifyProtocolVersions(l1Provider, upgradeChainAddresses, hop.expectedProtocolVersion);
+    const version: ethers.BigNumber = await ctm.protocolVersion();
+    if (!version.eq(ethers.BigNumber.from(hop.expectedProtocolVersion))) {
+      throw new Error(`CTM protocol version ${version.toHexString()}, expected ${hop.expectedProtocolVersion}`);
+    }
+    const committed: string = await ctm.upgradeTransition(oldVersion);
+    if (committed.toLowerCase() !== transitionAddr.toLowerCase()) {
+      throw new Error(`CTM committed transition ${committed} for the departing version, expected ${transitionAddr}`);
+    }
+    const transition = new ethers.Contract(transitionAddr, getAbi("ICTMTransition"), l1Provider);
+    const newRelease: string = await transition.newRelease();
+    const currentRelease: string = await ctm.currentRelease();
+    if (currentRelease.toLowerCase() !== newRelease.toLowerCase()) {
+      throw new Error(`CTM currentRelease ${currentRelease} is not the transition's target release ${newRelease}`);
+    }
+    const executor = new ethers.Contract(executorAddr, getAbi("CTMUpgradeExecutor"), l1Provider);
+    const pending: string = await executor.pendingTransition();
+    if (pending !== ethers.constants.AddressZero) {
+      throw new Error(`stage 2 did not clear the lifecycle slot (pending ${pending})`);
+    }
+    const bridgehub = new ethers.Contract(ctx.l1Addresses.bridgehub, getAbi("IL1Bridgehub"), l1Provider);
+    const chainAssetHandler: string = await bridgehub.chainAssetHandler();
+    const cah = new ethers.Contract(chainAssetHandler, getAbi("L1ChainAssetHandler"), l1Provider);
+    if (await cah.migrationPaused()) {
+      throw new Error("stage 2 did not release the migration pause");
+    }
+    const expectedMessageRootImpl = merged.core.upgrade_addresses?.bridgehub?.message_root_implementation_addr;
+    if (!expectedMessageRootImpl) {
+      throw new Error("the core prepare did not report the fresh L1MessageRoot implementation");
+    }
+    const implSlot = await l1Provider.getStorageAt(ctx.l1Addresses.messageRoot, EIP1967_IMPL_SLOT);
+    const liveMessageRootImpl = ethers.utils.getAddress("0x" + implSlot.slice(26));
+    if (liveMessageRootImpl.toLowerCase() !== expectedMessageRootImpl.toLowerCase()) {
+      throw new Error(
+        `MessageRoot proxy points at ${liveMessageRootImpl}, expected the fresh ${expectedMessageRootImpl}`
+      );
+    }
+    for (const chain of upgradeChainAddresses) {
+      const getters = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), l1Provider);
+      const recorded: string = await getters.getL2SystemContractsUpgradeTxHash();
+      if (recorded !== ethers.constants.HashZero) {
+        throw new Error(
+          `chain ${chain.chainId}: an L1-only edge must not record an L2 upgrade transaction (${recorded})`
+        );
+      }
+    }
+    console.log(
+      `✅ Registry-driven hop ${hop.label} verified: three calls, one transition, chains at ${hop.expectedProtocolVersion}\n`
+    );
+  } finally {
+    inputs.cleanup();
   }
 }
 

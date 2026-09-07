@@ -97,14 +97,17 @@ library TransitionDerivationLib {
         }
     }
 
-    /// @notice Derives the transition's L2 force deployments from the target release's L2
-    ///         bytecode table: every nonempty row becomes one force deployment of that row's
-    ///         descriptor at its member's fixed address ({L2InventoryLib}).
-    /// @dev Same philosophy as {deriveFacetCuts}: a FULL REINSTALL of the target release's L2
-    ///      set, no row-level diffing (each release rebuilds its bytecodes anyway, and re-applying
-    ///      an identical system-proxy row is a no-op upgrade). A same-release pair (SemVer patch)
-    ///      derives an empty list by identity. VM identity is single-sourced from the target
-    ///      release's pinned DiamondInit, exactly like the L2 transaction composition.
+    /// @notice Derives the transition's L2 force deployments from the RELEASE PAIR: every row of
+    ///         the target release's L2 bytecode table whose descriptor differs from the departing
+    ///         release's (a member new to the set counts as changed) becomes one force deployment
+    ///         of that descriptor at its member's fixed address ({L2InventoryLib}).
+    /// @dev Same philosophy as {deriveFacetCuts}: the delta is derived from the pair, never
+    ///      authored, and members whose bytecode did not change are not touched — a facet-only or
+    ///      verifier-only upgrade derives an empty L2 set. A same-release pair (SemVer patch)
+    ///      derives an empty list by identity. The bootstrap edge has no departing release and
+    ///      installs the target table in full ({deriveL2DeploymentsFromTable}). VM identity is
+    ///      single-sourced from the target release's pinned DiamondInit, exactly like the L2
+    ///      transaction composition.
     function deriveL2Deployments(
         ICTMRelease _fromRelease,
         ICTMRelease _newRelease
@@ -113,7 +116,31 @@ library TransitionDerivationLib {
             return deployments;
         }
         bool isZKsyncOS = IDiamondInit(_newRelease.diamondInit()).IS_ZKSYNC_OS();
-        return deriveL2DeploymentsFromTable(_newRelease.l2BytecodeInfos(), isZKsyncOS);
+        return
+            deriveL2DeploymentsFromTable(
+                changedL2Rows(_fromRelease.l2BytecodeInfos(), _newRelease.l2BytecodeInfos()),
+                isZKsyncOS
+            );
+    }
+
+    /// @notice The rows of `_newTable` that differ from `_fromTable` at the same member index, every
+    ///         other slot empty. The enum is append-only, so a departing release built against a
+    ///         shorter enum simply has no row to compare for the appended members.
+    function changedL2Rows(
+        bytes[] memory _fromTable,
+        bytes[] memory _newTable
+    ) internal pure returns (bytes[] memory changed) {
+        uint256 length = _newTable.length;
+        changed = new bytes[](length);
+        uint256 fromLength = _fromTable.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (_newTable[i].length == 0) {
+                continue;
+            }
+            if (i >= fromLength || keccak256(_fromTable[i]) != keccak256(_newTable[i])) {
+                changed[i] = _newTable[i];
+            }
+        }
     }
 
     /// @notice The table form of {deriveL2Deployments}, shared with the deploy tooling so the

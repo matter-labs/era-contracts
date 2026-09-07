@@ -119,6 +119,10 @@ contract StorageRegistriesTest is Test {
     bytes internal constant BRIDGEHUB_IMPL_CODE = hex"dd01";
     bytes internal constant SYSTEM_CONTEXT_IMPL_CODE = hex"dd02";
     bytes internal constant SYSTEM_PROXY_CODE = hex"dd00";
+    // Distinct stand-ins for the release-pair L2 diff tests: a changed SystemContext
+    // implementation and a member new to the set.
+    bytes internal constant CHANGED_SYSTEM_CONTEXT_IMPL_CODE = hex"dd12";
+    bytes internal constant ASSET_ROUTER_IMPL_CODE = hex"dd13";
 
     function setUp() public {
         // Facets must actually self-describe their routing (the registry objects read it from
@@ -844,6 +848,99 @@ contract StorageRegistriesTest is Test {
             ),
             "composed data must be derived ++ extras, delegate, composer calldata"
         );
+    }
+
+    /// @dev The L2 set is derived from the release PAIR: a member whose descriptor is identical in
+    ///      both releases is not touched, so a facet-only or verifier-only upgrade toward a release
+    ///      carrying the same table has no L2 leg at all — no delegate, no factory dependency.
+    function test_transitionDerivesNoL2RowsWhenTheTableIsUnchanged() public {
+        CTMRelease departing = _tableRelease();
+        CTMRelease target = _tableRelease();
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.fromRelease = address(departing);
+        manifest.newRelease = address(target);
+        manifest.l2Plan = AuthoredL2Plan({
+            extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
+            delegateTo: address(0),
+            delegateComposer: PinnedContract({addr: address(0), codehash: bytes32(0)}),
+            factoryDepHashes: new uint256[](0)
+        });
+        CTMTransition l1Only = new CTMTransition(manifest);
+
+        assertEq(l1Only.l2Plan().deployments.length, 0, "identical table rows derive no L2 deployment");
+        assertEq(_l2Tx(l1Only).txType, 0, "an unchanged table composes the all-zero L2 transaction");
+    }
+
+    /// @dev Only the members whose descriptor changed are derived (a member new to the set counts as
+    ///      changed); the rows identical to the departing release stay out of the L2 leg.
+    function test_transitionDerivesOnlyTheChangedL2Rows() public {
+        CTMRelease departing = _tableRelease();
+        ReleaseManifest memory targetManifest = _newReleaseManifest();
+        // Unchanged member, changed implementation, member new to the set.
+        targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.systemProxyRow(
+            BRIDGEHUB_IMPL_CODE,
+            SYSTEM_PROXY_CODE
+        );
+        targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.SystemContext)] = L2PlanFixtures.systemProxyRow(
+            CHANGED_SYSTEM_CONTEXT_IMPL_CODE,
+            SYSTEM_PROXY_CODE
+        );
+        targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2AssetRouter)] = L2PlanFixtures.systemProxyRow(
+            ASSET_ROUTER_IMPL_CODE,
+            SYSTEM_PROXY_CODE
+        );
+        CTMRelease target = new CTMRelease(targetManifest);
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.fromRelease = address(departing);
+        manifest.newRelease = address(target);
+        manifest.l2Plan = _l2Plan();
+        manifest.l2Plan.factoryDepHashes = _concat(
+            manifest.l2Plan.factoryDepHashes,
+            L2PlanFixtures.factoryDepHashes(
+                L2PlanFixtures.codes(CHANGED_SYSTEM_CONTEXT_IMPL_CODE, ASSET_ROUTER_IMPL_CODE, SYSTEM_PROXY_CODE)
+            )
+        );
+        CTMTransition transition = new CTMTransition(manifest);
+
+        L2UpgradePlan memory plan = transition.l2Plan();
+        assertEq(
+            plan.deployments.length,
+            2 + manifest.l2Plan.extraDeployments.length,
+            "only the two changed members are derived, then the authored extras"
+        );
+        // Derived rows follow the table (member) order: L2AssetRouter precedes SystemContext.
+        assertEq(
+            plan.deployments[0].newAddress,
+            L2InventoryLib.fixedAddress(L2EcosystemContract.L2AssetRouter),
+            "the member new to the set is derived"
+        );
+        assertEq(
+            plan.deployments[1].newAddress,
+            L2InventoryLib.fixedAddress(L2EcosystemContract.SystemContext),
+            "the member whose implementation changed is derived"
+        );
+        assertEq(
+            plan.deployments[1].deployedBytecodeInfo,
+            targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.SystemContext)],
+            "the derived row carries the TARGET release's descriptor"
+        );
+    }
+
+    /// @dev The enum is append-only: a departing release built against a shorter enum has no row
+    ///      to compare for the appended members, which therefore count as changed.
+    function test_changedL2RowsTreatsAppendedMembersAsChanged() public pure {
+        bytes[] memory fromTable = new bytes[](1);
+        fromTable[0] = hex"01";
+        bytes[] memory newTable = new bytes[](3);
+        newTable[0] = hex"01";
+        newTable[2] = hex"02";
+
+        bytes[] memory changed = TransitionDerivationLib.changedL2Rows(fromTable, newTable);
+
+        assertEq(changed.length, 3, "the diff is indexed like the target table");
+        assertEq(changed[0].length, 0, "an identical row is not a change");
+        assertEq(changed[1].length, 0, "an empty target row is never a change");
+        assertEq(changed[2], hex"02", "a row past the departing table's length is a change");
     }
 
     function test_revertWhen_derivedDeploymentsWithoutDelegateTarget() public {

@@ -10,17 +10,12 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.sol";
-import {CoreRegistryManifest, PinnedContract, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
-import {
-    L1EcosystemContract,
-    L1_ECOSYSTEM_CONTRACT_COUNT
-} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
-import {Utils} from "../../utils/Utils.sol";
+import {ExternalActionsLib} from "../default-upgrade/ExternalActionsLib.sol";
 
 /// @notice Core (ecosystem) side of the v34 upgrade: deploys the new shared-singleton
 ///         implementation set, pins it in a write-once `CoreRegistry` (the enum-indexed
@@ -33,9 +28,6 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
     /// @notice The bound executor the ecosystem `ProxyAdmin` lands under. Deployed by this
     ///         prepare run.
     EcosystemUpgradeExecutor public ecosystemUpgradeExecutor;
-
-    /// @notice The write-once inventory of this upgrade's implementation swaps.
-    CoreRegistry public coreRegistry;
 
     /// @notice Deploy the v34 ecosystem-wide implementation set (implementations only).
     function deployNewEcosystemContractsL1() public virtual override {
@@ -60,46 +52,19 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
         );
     }
 
-    function prepareEcosystemUpgrade() public virtual override {
-        super.prepareEcosystemUpgrade();
-        // AFTER the implementation deploys: the registry pins them.
-        deployCoreRegistryBootstrap();
-        _saveRegistryOutput();
-    }
-
     /// @notice The ecosystem executor this run deployed — the CTM prepare binds its executor to it.
     function getEcosystemUpgradeExecutor() public view virtual override returns (address) {
         return address(ecosystemUpgradeExecutor);
     }
 
-    /// @dev Appends the `[registry]` table (the objects the CTM prepare and reviewers take from this
-    ///      run) to the core output TOML `saveOutput` wrote. Keyed `writeToml` no-ops for a missing
-    ///      key, so the root object is re-serialized and the file rewritten (see
-    ///      `prepareDefaultGovernanceCalls`).
-    function _saveRegistryOutput() internal {
-        vm.serializeAddress("registry", "core_registry_addr", address(coreRegistry));
-        string memory registry = vm.serializeAddress(
-            "registry",
-            "ecosystem_upgrade_executor_addr",
-            address(ecosystemUpgradeExecutor)
-        );
-        string memory updatedToml = vm.serializeString("root", "registry", registry);
-        vm.writeToml(updatedToml, upgradeConfig.outputPath);
-    }
-
-    /// @notice Deploys the write-once inventory of this upgrade's swaps and the bound executor
-    ///         that applies it.
+    /// @notice The bootstrap edge deploys the registry AND the bound executor that will apply it
+    ///         (a recurring prepare finds the executor live), then declares every governance call
+    ///         of its one-time ecosystem leg.
     /// @dev Both ride the CREATE2 factory: the Safe bundle replays factory transactions only, so
     ///      a plain CREATE would leave the stage-1 calls pointing at codeless addresses.
-    function deployCoreRegistryBootstrap() public virtual {
-        coreRegistry = CoreRegistry(
-            deployViaCreate2AndNotify(
-                type(CoreRegistry).creationCode,
-                abi.encode(CoreRegistryManifest({proxyUpgrades: _coreProxyUpgradeRows()})),
-                "CoreRegistry"
-            )
-        );
-
+    function deployEcosystemUpgradeObjects() public virtual override {
+        deployCoreRegistry();
+        require(address(coreRegistry) != address(0), "v34 deploys every ecosystem implementation");
         ecosystemUpgradeExecutor = EcosystemUpgradeExecutor(
             payable(
                 deployViaCreate2AndNotify(
@@ -114,89 +79,75 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
                 )
             )
         );
+        _declareBootstrapActions();
     }
 
-    /// @notice The enum-indexed ecosystem inventory: one slot per `L1EcosystemContract` member,
-    ///         a source-checked row (live impl read from the EIP-1967 slot) for every proxy this
-    ///         upgrade swaps, every other slot an explicit inert zero.
-    function _coreProxyUpgradeRows() internal view returns (ProxyUpgradeRow[] memory rows) {
-        rows = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
-        rows[uint256(L1EcosystemContract.L1Bridgehub)] = _row(
-            coreAddresses.bridgehub.proxies.bridgehub,
-            coreAddresses.bridgehub.implementations.bridgehub
-        );
-        rows[uint256(L1EcosystemContract.L1Nullifier)] = _row(
-            coreAddresses.bridges.proxies.l1Nullifier,
-            coreAddresses.bridges.implementations.l1Nullifier
-        );
-        rows[uint256(L1EcosystemContract.L1AssetRouter)] = _row(
-            coreAddresses.bridges.proxies.l1AssetRouter,
-            coreAddresses.bridges.implementations.l1AssetRouter
-        );
-        rows[uint256(L1EcosystemContract.L1NativeTokenVault)] = _row(
-            coreAddresses.bridges.proxies.l1NativeTokenVault,
-            coreAddresses.bridges.implementations.l1NativeTokenVault
-        );
-        // L1MessageRoot is a plain upgrade like the rest: v31's reinitializer was removed in
-        // this release, and every ecosystem it can upgrade had already consumed that version.
-        rows[uint256(L1EcosystemContract.L1MessageRoot)] = _row(
-            coreAddresses.bridgehub.proxies.messageRoot,
-            coreAddresses.bridgehub.implementations.messageRoot
-        );
-        rows[uint256(L1EcosystemContract.CTMDeploymentTracker)] = _row(
-            coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
-            coreAddresses.bridgehub.implementations.ctmDeploymentTracker
-        );
-        rows[uint256(L1EcosystemContract.L1ChainAssetHandler)] = _row(
-            coreAddresses.bridgehub.proxies.chainAssetHandler,
-            coreAddresses.bridgehub.implementations.chainAssetHandler
-        );
-    }
-
-    function _row(address _proxy, address _implNew) internal view returns (ProxyUpgradeRow memory) {
-        require(_implNew != address(0), "new implementation not deployed");
-        return
-            ProxyUpgradeRow({
-                proxy: _proxy,
-                expectedOldImpl: Utils.getImplementation(_proxy),
-                implNew: PinnedContract({addr: _implNew, codehash: _implNew.codehash}),
-                callInitializeUpgrade: false,
-                admin: ProxyAdmin(address(0))
-            });
-    }
-
-    /// @notice The proxy swaps ride the registry: stage 1 hands the ecosystem `ProxyAdmin` to
-    ///         the bound executor and applies the pinned inventory in ONE call, replacing one
-    ///         raw `ProxyAdmin.upgrade` per proxy.
-    function prepareUpgradeProxiesCalls() public virtual override returns (Call[] memory calls) {
-        require(address(coreRegistry) != address(0), "core registry not deployed");
-        calls = new Call[](2);
-        calls[0] = Call({
-            target: coreAddresses.shared.transparentProxyAdmin,
-            data: abi.encodeCall(Ownable.transferOwnership, (address(ecosystemUpgradeExecutor))),
-            value: 0
+    /// @notice Every governance call of the bootstrap edge's ecosystem leg, declared as the
+    ///         external action it is: this edge predates the transition lifecycle, so governance
+    ///         itself pauses, hands the ecosystem `ProxyAdmin` to the bound executor, applies the
+    ///         pinned inventory through it, gates on the executor's post-state check and unpauses.
+    ///         Every later upgrade gets all of this from `CTMUpgradeExecutor.stage0/1/2`.
+    function _declareBootstrapActions() internal virtual {
+        address chainAssetHandler = coreAddresses.bridgehub.proxies.chainAssetHandler;
+        require(chainAssetHandler != address(0), "chainAssetHandlerProxy is zero");
+        string memory cahOwner = "ChainAssetHandler owner (governance)";
+        Call memory pause = Call({
+            target: chainAssetHandler,
+            value: 0,
+            data: abi.encodeCall(IChainAssetHandlerBase.pauseMigration, ())
         });
-        calls[1] = Call({
-            target: address(ecosystemUpgradeExecutor),
-            data: abi.encodeCall(EcosystemUpgradeExecutor.applyL1Upgrade, (ICoreRegistry(address(coreRegistry)))),
-            value: 0
-        });
-    }
-
-    /// @notice The stage-2 ecosystem gate is the executor's own post-state check: every registry
-    ///         row's proxy points at its pinned implementation, read live through the bound
-    ///         `ProxyAdmin` — one reverting view call instead of composed per-proxy checks.
-    function prepareVersionSpecificStage2GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
-        require(address(coreRegistry) != address(0), "core registry not deployed");
-        calls = new Call[](1);
-        calls[0] = Call({
-            target: address(ecosystemUpgradeExecutor),
-            data: abi.encodeCall(
-                EcosystemUpgradeExecutor.validateUpgradeApplied,
-                (ICoreRegistry(address(coreRegistry)))
-            ),
-            value: 0
-        });
+        declareExternalAction(
+            ExternalActionsLib.PHASE_STAGE_0,
+            "pause chain migrations for the upgrade",
+            cahOwner,
+            pause
+        );
+        // Re-asserted first in stage 1: the emergency-upgrade path's built-in pre-step unpauses,
+        // and the CTM's version commit refuses to run while migrations are unpaused.
+        declareExternalAction(ExternalActionsLib.PHASE_STAGE_1, "re-assert the migration pause", cahOwner, pause);
+        declareExternalAction(
+            ExternalActionsLib.PHASE_STAGE_1,
+            "hand the ecosystem ProxyAdmin to the bound ecosystem executor",
+            "ecosystem ProxyAdmin owner (governance)",
+            Call({
+                target: coreAddresses.shared.transparentProxyAdmin,
+                value: 0,
+                data: abi.encodeCall(Ownable.transferOwnership, (address(ecosystemUpgradeExecutor)))
+            })
+        );
+        declareExternalAction(
+            ExternalActionsLib.PHASE_STAGE_1,
+            "apply the pinned ecosystem inventory (applyL1Upgrade)",
+            "ecosystem executor owner (governance)",
+            Call({
+                target: address(ecosystemUpgradeExecutor),
+                value: 0,
+                data: abi.encodeCall(EcosystemUpgradeExecutor.applyL1Upgrade, (ICoreRegistry(address(coreRegistry))))
+            })
+        );
+        declareExternalAction(
+            ExternalActionsLib.PHASE_STAGE_2,
+            "ecosystem post-state gate (validateUpgradeApplied)",
+            "any (view)",
+            Call({
+                target: address(ecosystemUpgradeExecutor),
+                value: 0,
+                data: abi.encodeCall(
+                    EcosystemUpgradeExecutor.validateUpgradeApplied,
+                    (ICoreRegistry(address(coreRegistry)))
+                )
+            })
+        );
+        declareExternalAction(
+            ExternalActionsLib.PHASE_STAGE_2,
+            "unpause chain migrations",
+            cahOwner,
+            Call({
+                target: chainAssetHandler,
+                value: 0,
+                data: abi.encodeCall(IChainAssetHandlerBase.unpauseMigration, ())
+            })
+        );
     }
 
     /// @notice Override to properly set deployerAddress in upgrade context.

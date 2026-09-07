@@ -56,4 +56,8 @@ struct CTMUpgradeParams {
     ///         every transition's ecosystem leg runs through it — so the CTM prepare takes it as an
     ///         input rather than re-deriving a deployment it did not make.
     address ecosystemUpgradeExecutor;
+    /// @notice The `CoreRegistry` the core prepare of this upgrade deployed (its output TOML,
+    ///         `[registry].core_registry_addr`); zero when the upgrade has no ecosystem leg. The
+    ///         transition PINS it as its ecosystem leg, so the CTM prepare takes it as an input.
+    address coreRegistry;
 }

@@ -360,6 +360,12 @@ impl<'a> UpgradeInner<'a> {
         logger::info(format!(
             "EcosystemUpgradeExecutor (core prepare): {ecosystem_upgrade_executor:#x}"
         ));
+        let core_registry = read_core_registry(
+            &self
+                .contracts_path
+                .join(inputs.core_output_path.trim_start_matches('/')),
+        )?;
+        logger::info(format!("CoreRegistry (core prepare): {core_registry:#x}"));
 
         // Per-CTM CREATE2 salt. Each CTM prepare deploys a few contracts
         // whose constructor args are env-wide constants — notably
@@ -406,6 +412,7 @@ impl<'a> UpgradeInner<'a> {
                         chainRegistrationSender: chain_registration_sender,
                         zkTokenAssetId: inputs.zk_token_asset_id,
                         ecosystemUpgradeExecutor: ecosystem_upgrade_executor,
+                        coreRegistry: core_registry,
                     },
                 }
                 .abi_encode(),
@@ -445,6 +452,33 @@ fn read_chain_registration_sender_proxy(core_toml: &Path) -> anyhow::Result<Addr
     value.parse().with_context(|| {
         format!(
             "chain_registration_sender_proxy_addr in {} is not a valid address: {}",
+            core_toml.display(),
+            value,
+        )
+    })
+}
+
+/// The `[registry].core_registry_addr` the core prepare wrote — the ecosystem leg the CTM
+/// prepare's transition pins. Zero when the core prepare deployed no ecosystem implementation
+/// (the upgrade then has no ecosystem leg).
+fn read_core_registry(core_toml: &Path) -> anyhow::Result<Address> {
+    let raw =
+        fs::read_to_string(core_toml).with_context(|| format!("read {}", core_toml.display()))?;
+    let top: toml::Value =
+        toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
+    let value = top
+        .get("registry")
+        .and_then(|v| v.get("core_registry_addr"))
+        .and_then(|v| v.as_str())
+        .with_context(|| {
+            format!(
+                "missing registry.core_registry_addr in {}",
+                core_toml.display()
+            )
+        })?;
+    value.parse().with_context(|| {
+        format!(
+            "core_registry_addr in {} is not a valid address: {}",
             core_toml.display(),
             value,
         )

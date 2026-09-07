@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {CoreUpgrade_v34} from "deploy-scripts/upgrade/v34/CoreUpgrade_v34.s.sol";
@@ -56,20 +57,59 @@ contract CTMUpgradeForTests is CTMUpgrade_v34 {
         }
     }
 
-    /// @dev Replaces the heavy state_transition section with the two fields the anvil-interop
-    ///      runner actually reads (the committed diamond cut + the engine address).
+    /// @dev Replaces the heavy state_transition section with the fields the anvil-interop runner
+    ///      and the protocol-ops merger actually read: the committed diamond cut, the engine
+    ///      address and the `[registry]` objects (the merger recognizes executor stage calls by the
+    ///      executor address written there).
     function saveOutput(string memory outputPath) internal override {
-        bytes memory upgradeCutData = getChainUpgradeDiamondCutData();
-        address defaultUpgradeAddr = getAddresses().stateTransition.defaultUpgrade;
+        TrimmedUpgradeOutput.write(
+            vm,
+            outputPath,
+            getChainUpgradeDiamondCutData(),
+            getAddresses().stateTransition.defaultUpgrade,
+            TrimmedUpgradeOutput.Registry({
+                ctmTransition: address(0),
+                ctmUpgradeExecutor: address(0),
+                ctmRelease: getAddresses().stateTransition.currentRelease,
+                coreRegistry: address(0)
+            })
+        );
+    }
+}
 
-        string memory stateTransition = vm.serializeAddress(
+/// @dev The trimmed per-CTM output both harness variants write.
+library TrimmedUpgradeOutput {
+    struct Registry {
+        address ctmTransition;
+        address ctmUpgradeExecutor;
+        address ctmRelease;
+        address coreRegistry;
+    }
+
+    function write(
+        Vm _vm,
+        string memory _outputPath,
+        bytes memory _upgradeCutData,
+        address _defaultUpgrade,
+        Registry memory _registry
+    ) internal {
+        string memory stateTransition = _vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
-            defaultUpgradeAddr
+            _defaultUpgrade
         );
-        vm.serializeBytes("root", "chain_upgrade_diamond_cut", upgradeCutData);
-        string memory toml = vm.serializeString("root", "state_transition", stateTransition);
-        vm.writeToml(toml, outputPath);
+        _vm.serializeAddress("registry", "ctm_transition_addr", _registry.ctmTransition);
+        _vm.serializeAddress("registry", "ctm_release_addr", _registry.ctmRelease);
+        _vm.serializeAddress("registry", "core_registry_addr", _registry.coreRegistry);
+        string memory registry = _vm.serializeAddress(
+            "registry",
+            "ctm_upgrade_executor_addr",
+            _registry.ctmUpgradeExecutor
+        );
+        _vm.serializeBytes("root", "chain_upgrade_diamond_cut", _upgradeCutData);
+        _vm.serializeString("root", "registry", registry);
+        string memory toml = _vm.serializeString("root", "state_transition", stateTransition);
+        _vm.writeToml(toml, _outputPath);
     }
 }
 

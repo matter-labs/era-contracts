@@ -44,6 +44,8 @@ import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBa
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {UpgradeChainCall} from "./utils/UpgradeChainCall.sol";
+import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -218,6 +220,9 @@ contract AdminFunctions is Script, IAdminFunctions {
         // chainIds.length (max possible), trimmed before serialization.
         Call[] memory acceptCalls = new Call[](chainIds.length);
         uint256 acceptCount = 0;
+        // From the bootstrap edge on, the CTM domain and the ecosystem ProxyAdmin are owned by the
+        // bound upgrade executors, which governance owns — the governed shape, not a drift.
+        bool registryDriven = false;
 
         for (uint256 i = 0; i < chainIds.length; i++) {
             address ctm = IL1Bridgehub(_bridgehub).chainTypeManager(chainIds[i]);
@@ -233,6 +238,10 @@ contract AdminFunctions is Script, IAdminFunctions {
 
             Ownable2Step ctmOwnable = Ownable2Step(ctm);
             address ctmOwner = ctmOwnable.owner();
+            if (_isUnderBoundCTMExecutor(ctm, ctmOwner, _governance)) {
+                registryDriven = true;
+                continue;
+            }
             if (ctmOwner != _governance && ctmOwnable.pendingOwner() != _governance) {
                 _issueAsOwner(ctmOwner, ctm, abi.encodeCall(Ownable2Step.transferOwnership, (_governance)), _wraps);
             }
@@ -257,11 +266,55 @@ contract AdminFunctions is Script, IAdminFunctions {
         address ctmDeploymentTracker = address(IL1Bridgehub(_bridgehub).l1CtmDeployer());
         address l1Nullifier = address(IL1AssetRouter(assetRouter).L1_NULLIFIER());
 
+        if (registryDriven && _isUnderBoundEcosystemExecutor(_bridgehub, _governance)) {
+            return;
+        }
         _ensureProxyAdminOwnedByGovernance(_bridgehub, _governance, _wraps);
         _ensureProxyAdminOwnedByGovernance(assetRouter, _governance, _wraps);
         _ensureProxyAdminOwnedByGovernance(chainAssetHandler, _governance, _wraps);
         _ensureProxyAdminOwnedByGovernance(ctmDeploymentTracker, _governance, _wraps);
         _ensureProxyAdminOwnedByGovernance(l1Nullifier, _governance, _wraps);
+    }
+
+    /// @dev Whether `_ctm` (a registry-era CTM, v34+) is owned by a `CTMUpgradeExecutor` bound to
+    ///      it and owned by `_governance`: the CTM domain — the CTM and its ProxyAdmin — then lives
+    ///      where the bootstrap edge put it. A registry-era CTM owned by any other contract is a
+    ///      misconfiguration this fails on (the executor getters revert on a stranger).
+    function _isUnderBoundCTMExecutor(
+        address _ctm,
+        address _ctmOwner,
+        address _governance
+    ) private view returns (bool) {
+        if (_ctmOwner == _governance || _ctmOwner.code.length == 0) {
+            return false;
+        }
+        if (IChainTypeManager(_ctm).protocolVersion() < UpgradeChainCall.V34_THRESHOLD) {
+            return false;
+        }
+        CTMUpgradeExecutor executor = CTMUpgradeExecutor(payable(_ctmOwner));
+        require(
+            address(executor.CHAIN_TYPE_MANAGER()) == _ctm,
+            "CTM owner is a contract but not the executor bound to it"
+        );
+        require(executor.owner() == _governance, "the CTM executor is not owned by governance");
+        return true;
+    }
+
+    /// @dev Whether the ecosystem `ProxyAdmin` (read off the Bridgehub proxy) is owned by an
+    ///      `EcosystemUpgradeExecutor` bound to it and owned by `_governance`.
+    function _isUnderBoundEcosystemExecutor(address _bridgehub, address _governance) private view returns (bool) {
+        address proxyAdmin = address(uint160(uint256(vm.load(_bridgehub, Utils.ADMIN_SLOT))));
+        address paOwner = IOwnableSingleStep(proxyAdmin).owner();
+        if (paOwner == _governance || paOwner.code.length == 0) {
+            return false;
+        }
+        EcosystemUpgradeExecutor executor = EcosystemUpgradeExecutor(payable(paOwner));
+        require(
+            address(executor.PROXY_ADMIN()) == proxyAdmin,
+            "ecosystem ProxyAdmin owner is not the executor bound to it"
+        );
+        require(executor.owner() == _governance, "the ecosystem executor is not owned by governance");
+        return true;
     }
 
     /// Helper: read the EIP-1967 admin slot of `_proxy`, and if its single-step

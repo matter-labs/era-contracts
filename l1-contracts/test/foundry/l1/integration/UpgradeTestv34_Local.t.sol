@@ -35,6 +35,7 @@ import {IAdminV31} from "../../../../deploy-scripts/utils/UpgradeChainCall.sol";
 import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
+import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
 /// @notice Test-only v34 CTM upgrade with the same MemoryOOG mocks as the v32 local harness
 ///         (the heavy JSON/zkout reads live on the shared base). The bootstrap flow itself —
@@ -92,13 +93,8 @@ contract CTMUpgrade_v34_Test is CTMUpgrade_v34 {
     }
 }
 
-/// @notice Test-only Core upgrade that skips governance calls needing real ownership in the fixture.
-contract CoreUpgrade_v34_Test is CoreUpgrade_v34 {
-    function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
-        console.log("Test mode: Skipping version-specific stage-1 governance calls");
-        calls = new Call[](0);
-    }
-}
+/// @notice The v34 core prepare needs no trimming in the local fixture.
+contract CoreUpgrade_v34_Test is CoreUpgrade_v34 {}
 
 /// @notice Chain leg of the bootstrap edge: the local baseline chain runs the CURRENT
 ///         (cut-READING) Admin facet, but the bootstrap commits the legacy cut-taking edge —
@@ -280,17 +276,28 @@ contract UpgradeIntegrationTest_v34_Local is
         assertTrue(_newChainDiamond != address(0), "new chain not registered");
         assertEq(IGetters(_newChainDiamond).getProtocolVersion(), _expectedNewVersion, "new chain wrong version");
 
-        // Stage 2's version-specific CTM leg: the migration's own post-state gate, then the two
-        // bootstrap-JOIN authorizations the recurring stage lifecycle needs and the executor
-        // cannot grant itself (upgrade pauser on the shared ChainAssetHandler, CTM-executor
-        // authorization on the ecosystem executor). The harness already executed the prepared
-        // stage-2 bundle green in `internalTest`; assert the emitted call list shape, that the
-        // gate still holds against the final state, and that both joins landed.
+        // The bootstrap's CTM stage 2, every call a declared external action: the migration's own
+        // post-state gate, the two bootstrap-JOIN authorizations the recurring stage lifecycle
+        // needs and the executor cannot grant itself (upgrade pauser on the shared
+        // ChainAssetHandler, CTM-executor authorization on the ecosystem executor), and the
+        // unpaused read. The harness already executed the prepared stage-2 bundle green in
+        // `internalTest`; assert the emitted call list shape, that the gate still holds against
+        // the final state, and that both joins landed.
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
         EcosystemUpgradeExecutor ecosystemExecutor = v34.ecosystemUpgradeExecutor();
-        Call[] memory stage2 = v34.prepareVersionSpecificStage2GovernanceCallsL1();
-        assertEq(stage2.length, 3, "v34 CTM stage 2 must be the post-state gate plus the two join authorizations");
+        Call[] memory stage2 = v34.prepareStage2GovernanceCalls();
+        assertEq(stage2.length, 4, "v34 CTM stage 2: post-state gate, two join authorizations, unpaused read");
+        assertEq(
+            stage2[3].data,
+            abi.encodeCall(UpgradeStageValidator.checkMigrationsUnpaused, ()),
+            "stage 2 must end with the unpaused read"
+        );
+        assertEq(
+            v34.externalActionDescriptions().length,
+            9,
+            "the bootstrap's CTM prepare declares every one of its governance and admin calls"
+        );
         assertEq(stage2[0].target, address(v34.bootstrapMigration()), "stage 2 must target the migration");
         assertEq(
             stage2[0].data,
