@@ -18,6 +18,7 @@ import {
     EmptyBytes32,
     EcosystemExecutorProxyAdminMismatch,
     MigrationsNotPaused,
+    NoPendingTransition,
     TimerNotBoundToExecutor,
     TransitionNotCommitted,
     TransitionNotPending,
@@ -151,6 +152,31 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         address previousExecutor = address(ECOSYSTEM_EXECUTOR);
         ECOSYSTEM_EXECUTOR = _newExecutor;
         emit EcosystemExecutorChanged(previousExecutor, address(_newExecutor));
+    }
+
+    /// @notice Emitted when governance abandons the pending transition (see `abandonPendingTransition`).
+    event UpgradeAbandoned(address indexed transition, UpgradeStage stage);
+
+    /// @notice Break-glass for a lifecycle that cannot complete: a stage 1 that keeps reverting (a
+    ///         row at an unexpected implementation, an edge the CTM has departed from) or a stage 2
+    ///         whose completion check can never pass (a foreign-admin row its administrator never
+    ///         applies). Clears the lifecycle slot and releases this executor's migration pause
+    ///         hold if it still holds one, so a corrected transition can be prepared.
+    /// @dev Governance's explicit, logged decision. Whatever stage 1 already committed on the CTM
+    ///      stands — abandoning is bookkeeping, not a rollback; chains still cross a committed edge.
+    function abandonPendingTransition() external onlyOwner {
+        ICTMTransition transition = pendingTransition;
+        if (address(transition) == address(0)) {
+            revert NoPendingTransition();
+        }
+        UpgradeStage stage = pendingStage;
+        delete pendingTransition;
+        pendingStage = UpgradeStage.None;
+        IChainAssetHandlerBase chainAssetHandler = _chainAssetHandler();
+        if (chainAssetHandler.upgradePauseHeld(address(this))) {
+            chainAssetHandler.releaseMigrationPause();
+        }
+        emit UpgradeAbandoned(address(transition), stage);
     }
 
     /// @dev Type provenance: the object at `_transition` must run the audited `CTMTransition` code.

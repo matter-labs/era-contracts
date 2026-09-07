@@ -184,6 +184,14 @@ unauthorized caller. `applyCTMUpgrade` disappears as a public entrypoint so the 
 be bypassed. Stage 2 keeps today's meaning — completion checks plus restoration; it is NOT
 redefined as "every chain has finalized its L2 upgrade" (a separate policy decision).
 
+One owner-only break-glass, `abandonPendingTransition()`, exists for a lifecycle that cannot
+complete — a stage 1 that keeps reverting (a row at an unexpected implementation, an edge the CTM
+has departed from) or a stage 2 whose completion check can never pass (a foreign-admin row its
+administrator never applies). It clears the slot and releases the executor's own pause hold if it
+still holds one, so a corrected transition can be prepared. Whatever stage 1 already committed on
+the CTM stands; without it the executor would be bricked for every later upgrade (`forward` can
+release the hold but cannot clear the executor's own storage).
+
 ### 4.3 Migration pause: narrow route, shared flag
 
 `pauseMigration`/`unpauseMigration` are `onlyOwner` on the shared `L1ChainAssetHandler`, whose

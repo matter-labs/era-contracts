@@ -36,6 +36,7 @@ import {
     DeadlineNotYetPassed,
     EcosystemLegNotNamedByTransition,
     MigrationsNotPaused,
+    NoPendingTransition,
     NotUpgradePauser,
     ProxyUpgradeRowMismatch,
     RegistryCodehashMismatch,
@@ -454,6 +455,91 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         CTMTransition next = _deployTransitionFrom(880, appliedRelease, SemVer.packSemVer(0, 1, 0));
         _stage0(next);
         assertEq(address(ctmExecutor.pendingTransition()), address(next));
+    }
+
+    // ─────────────────────────── abandoning a stuck lifecycle ───────────────
+
+    /// @dev A prepared transition whose stage 1 can never run (here: a CTM-domain row moved to an
+    ///      unexpected implementation) is abandoned: the slot frees, the hold is released, and a
+    ///      corrected transition prepares normally.
+    function test_abandon_afterStage0_releasesTheHoldAndFreesTheSlot() public {
+        CTMTransition full = _deployFullTransition();
+        _stage0(full);
+        vm.prank(governor);
+        ctmExecutor.forward(_singleCall(address(ctmProxyAdmin), _moveProxyCall(ctmDomainProxy, implOther)));
+        vm.expectRevert(
+            abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(ctmDomainProxy), implOld, implOther)
+        );
+        vm.prank(governor);
+        ctmExecutor.stage1(ICTMTransition(address(full)));
+
+        vm.expectEmit(true, true, true, true, address(chainAssetHandler));
+        emit IChainAssetHandlerBase.MigrationPauseReleased(address(ctmExecutor));
+        vm.expectEmit(true, true, true, true, address(ctmExecutor));
+        emit CTMUpgradeExecutor.UpgradeAbandoned(address(full), ICTMUpgradeExecutor.UpgradeStage.Prepared);
+        vm.prank(governor);
+        ctmExecutor.abandonPendingTransition();
+
+        _assertLifecycleIdle();
+        assertFalse(chainAssetHandler.migrationPaused(), "the abandoned upgrade's hold is released");
+        _assertCtmUntouched();
+        // The corrected transition (the row now departs from where the proxy actually is).
+        TransitionManifest memory corrected = _fullManifest();
+        corrected.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = _row(
+            address(ctmDomainProxy),
+            implOther,
+            implNew
+        );
+        CTMTransition next = new CTMTransition(corrected);
+        _stage0(next);
+        _assertPendingWithHold(next, ICTMUpgradeExecutor.UpgradeStage.Prepared);
+    }
+
+    /// @dev Abandoning after stage 1 is bookkeeping only: the edge stage 1 committed on the CTM
+    ///      stands, the slot frees and the hold is released.
+    function test_abandon_afterStage1_keepsTheCommittedEdge() public {
+        uint256 oldVersion = chainContractAddress.protocolVersion();
+        _stage0(transition);
+        _stage1(transition);
+
+        vm.expectEmit(true, true, true, true, address(ctmExecutor));
+        emit CTMUpgradeExecutor.UpgradeAbandoned(address(transition), ICTMUpgradeExecutor.UpgradeStage.Executed);
+        vm.prank(governor);
+        ctmExecutor.abandonPendingTransition();
+
+        _assertLifecycleIdle();
+        assertFalse(chainAssetHandler.migrationPaused());
+        assertEq(chainContractAddress.protocolVersion(), newVersion, "the committed version bump stands");
+        assertEq(chainContractAddress.upgradeTransition(oldVersion), address(transition), "the commit stands");
+        assertEq(chainContractAddress.currentRelease(), address(release), "the release pin stands");
+    }
+
+    /// @dev The hold is released only if the executor still holds it: the owner may already have
+    ///      cleared it through the ChainAssetHandler's own break-glass.
+    function test_abandon_withoutAHoldOnlyFreesTheSlot() public {
+        _stage0(transition);
+        vm.prank(governor);
+        chainAssetHandler.clearMigrationPauseHold(address(ctmExecutor));
+        assertFalse(chainAssetHandler.upgradePauseHeld(address(ctmExecutor)));
+
+        vm.prank(governor);
+        ctmExecutor.abandonPendingTransition();
+
+        _assertLifecycleIdle();
+    }
+
+    function test_revertWhen_abandonWithoutAPendingTransition() public {
+        vm.expectRevert(NoPendingTransition.selector);
+        vm.prank(governor);
+        ctmExecutor.abandonPendingTransition();
+    }
+
+    function test_revertWhen_abandonByStranger() public {
+        _stage0(transition);
+        vm.prank(makeAddr("stranger"));
+        vm.expectRevert("Ownable: caller is not the owner");
+        ctmExecutor.abandonPendingTransition();
+        _assertPendingWithHold(transition, ICTMUpgradeExecutor.UpgradeStage.Prepared);
     }
 
     // ─────────────────────────── stage-0 join conditions ───────────────────────────

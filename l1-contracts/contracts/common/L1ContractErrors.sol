@@ -334,6 +334,8 @@ error NonSequentialVersion();
 error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
 // 0x31967fc6
 error NonZeroCarriedHash();
+// 0x5dfa249f
+error NoPendingTransition();
 // 0xfa5cd00f
 error NotAllowed(address addr);
 // 0x64846fe4
