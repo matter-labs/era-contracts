@@ -51,7 +51,8 @@ contract SetChainCreationParamsTest is ChainTypeManagerTest {
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
-            commitment: genesisBatchCommitment
+            commitment: genesisBatchCommitment,
+            airbenderCommitment: bytes32(0)
         });
         bytes32 expectedStoredBatchZero = keccak256(abi.encode(newBatchZero));
 

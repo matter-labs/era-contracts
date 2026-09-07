@@ -126,11 +126,10 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](35);
+        bytes4[] memory selectors = new bytes4[](34);
         uint256 i = 0;
         selectors[i++] = getters.getVerifier.selector;
         selectors[i++] = getters.disabledProofSystems.selector;
-        selectors[i++] = getters.airbenderCommitment.selector;
         selectors[i++] = getters.getAdmin.selector;
         selectors[i++] = getters.getPendingAdmin.selector;
         selectors[i++] = getters.getTotalBlocksCommitted.selector;
@@ -310,7 +309,8 @@ contract ExecutorTest is UtilsCallMockerTest {
             dependencyRootsRollingHash: bytes32(0),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             timestamp: 0,
-            commitment: bytes32("")
+            commitment: bytes32(""),
+            airbenderCommitment: bytes32(0)
         });
 
         InitializeData memory params = InitializeData({
@@ -412,6 +412,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             priorityOperationsHash: keccak256(""),
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
+            airbenderBootloaderHeapHash: bytes32(0),
             systemLogs: l2Logs,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });

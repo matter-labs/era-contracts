@@ -63,7 +63,8 @@ contract RevertingTest is ExecutorTest {
             dependencyRootsRollingHash: bytes32(0),
             l2LogsTreeRoot: 0,
             timestamp: currentTimestamp,
-            commitment: entries[EVENT_INDEX].topics[3]
+            commitment: entries[EVENT_INDEX].topics[3],
+            airbenderCommitment: bytes32(0)
         });
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);

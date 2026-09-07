@@ -255,6 +255,7 @@ contract ExecutorRevertBatchesTest is ExecutorTest {
             priorityOperationsHash: keccak256(""),
             bootloaderHeapInitialContentsHash: bytes32(0),
             eventsQueueStateHash: bytes32(0),
+            airbenderBootloaderHeapHash: bytes32(0),
             systemLogs: new bytes(0),
             operatorDAInput: new bytes(0)
         });
@@ -271,7 +272,8 @@ contract ExecutorRevertBatchesTest is ExecutorTest {
                     l2LogsTreeRoot: bytes32(0),
                     dependencyRootsRollingHash: bytes32(0),
                     timestamp: 0,
-                    commitment: bytes32(0)
+                    commitment: bytes32(0),
+                    airbenderCommitment: bytes32(0)
                 }),
                 newBatchesData
             )

@@ -24,7 +24,6 @@ import {
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {
-    AirbenderProofWitnesses,
     IExecutor,
     SystemLogKey,
     MAX_NUMBER_OF_BLOBS,
@@ -209,7 +208,8 @@ library Utils {
                 dependencyRootsRollingHash: bytes32(0),
                 l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
                 timestamp: 0,
-                commitment: bytes32("")
+                commitment: bytes32(""),
+                airbenderCommitment: bytes32(0)
             });
     }
 
@@ -224,6 +224,7 @@ library Utils {
                 priorityOperationsHash: keccak256(""),
                 bootloaderHeapInitialContentsHash: randomBytes32("bootloaderHeapInitialContentsHash"),
                 eventsQueueStateHash: randomBytes32("eventsQueueStateHash"),
+                airbenderBootloaderHeapHash: bytes32(0),
                 systemLogs: abi.encode(randomBytes32("systemLogs")),
                 operatorDAInput: abi.encodePacked(uint256(0))
             });
@@ -276,23 +277,6 @@ library Utils {
             bytes.concat(
                 bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
                 abi.encode(_prevBatch, _committedBatches, _proof)
-            )
-        );
-    }
-
-    /// @dev Prove data carrying the Airbender-lane witnesses, i.e. `BatchDecoder` encoding 2.
-    function encodeProveBatchesDataWithAirbender(
-        IExecutor.StoredBatchInfo memory _prevBatch,
-        IExecutor.StoredBatchInfo[] memory _committedBatches,
-        uint256[] memory _proof,
-        AirbenderProofWitnesses memory _airbender
-    ) internal pure returns (uint256, uint256, bytes memory) {
-        return (
-            _committedBatches[0].batchNumber,
-            _committedBatches[_committedBatches.length - 1].batchNumber,
-            bytes.concat(
-                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_PROOF_AIRBENDER),
-                abi.encode(_prevBatch, _committedBatches, _proof, _airbender)
             )
         );
     }
@@ -406,11 +390,10 @@ library Utils {
     }
 
     function getGettersSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](36);
+        bytes4[] memory selectors = new bytes4[](35);
         uint256 i = 0;
         selectors[i++] = GettersFacet.getVerifier.selector;
         selectors[i++] = GettersFacet.disabledProofSystems.selector;
-        selectors[i++] = GettersFacet.airbenderCommitment.selector;
         selectors[i++] = GettersFacet.getAdmin.selector;
         selectors[i++] = GettersFacet.getPendingAdmin.selector;
         selectors[i++] = GettersFacet.getTotalBlocksCommitted.selector;
@@ -638,6 +621,29 @@ library Utils {
         return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
 
+    /// @dev The same batch commitment in Airbender shape: the two words Airbender does not
+    /// reproduce are substituted, everything else is reused.
+    function createAirbenderBatchCommitment(
+        CommitBatchInfo calldata _newBatchData,
+        bytes32 _stateDiffHash,
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes
+    ) public pure returns (bytes32) {
+        bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
+        bytes32 metadataHash = keccak256(_batchMetaParameters());
+        bytes32 auxiliaryOutputHash = keccak256(
+            // solhint-disable-next-line func-named-parameters
+            abi.encodePacked(
+                keccak256(_newBatchData.systemLogs),
+                _stateDiffHash,
+                _newBatchData.airbenderBootloaderHeapHash,
+                bytes32(0),
+                _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes)
+            )
+        );
+        return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
+    }
+
     function _batchPassThroughData(CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
         return
             // solhint-disable-next-line func-named-parameters
@@ -714,19 +720,6 @@ library Utils {
         bytes32[] memory _blobHashes
     ) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(_stateDiffHash, _totalPubdataHash, _blobsAmount, _blobHashes));
-    }
-
-    /// @dev The batch metadata hash, i.e. the second layer of a batch commitment.
-    function batchMetadataHash() public pure returns (bytes32) {
-        return keccak256(_batchMetaParameters());
-    }
-
-    /// @dev The 32-word blob region of the auxiliary output preimage.
-    function blobAuxOutputWords(
-        bytes32[] memory _blobCommitments,
-        bytes32[] memory _blobHashes
-    ) public pure returns (bytes32[] memory) {
-        return _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes);
     }
 
     /// @dev The opening commitment the rollup DA validator derives for `getDefaultBlobCommitment()`,

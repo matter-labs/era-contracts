@@ -32,6 +32,10 @@ struct CommitBatchInfo {
     bytes32 priorityOperationsHash;
     bytes32 bootloaderHeapInitialContentsHash;
     bytes32 eventsQueueStateHash;
+    /// @dev The same heap, hashed the way Airbender hashes it. The only value the contract cannot
+    /// derive for itself, and the only new thing the lane asks the operator for. `0` on chains that
+    /// do not run the lane, which then commit `airbenderCommitment = 0` and prove Boojum alone.
+    bytes32 airbenderBootloaderHeapHash;
     bytes systemLogs;
     bytes operatorDAInput;
 }

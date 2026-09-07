@@ -76,7 +76,8 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
-            commitment: bytes32(uint256(0x01))
+            commitment: bytes32(uint256(0x01)),
+            airbenderCommitment: bytes32(0)
         });
         vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
@@ -89,6 +90,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             priorityOperationsHash: keccak256(""),
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
+            airbenderBootloaderHeapHash: bytes32(0),
             systemLogs: l2Logs,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
@@ -226,7 +228,8 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             dependencyRootsRollingHash: bytes32(0),
             timestamp: currentTimestamp,
-            commitment: entries[EVENT_INDEX].topics[3]
+            commitment: entries[EVENT_INDEX].topics[3],
+            airbenderCommitment: bytes32(0)
         });
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);

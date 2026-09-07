@@ -16,7 +16,12 @@ contract CommitterProvingTest is CommitterFacet {
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
     ) external view returns (bytes32) {
-        (, , bytes32 commitment) = _createBatchCommitment(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes);
+        (, , bytes32 commitment, ) = _createBatchCommitment(
+            _newBatchData,
+            _stateDiffHash,
+            _blobCommitments,
+            _blobHashes
+        );
         return commitment;
     }
 

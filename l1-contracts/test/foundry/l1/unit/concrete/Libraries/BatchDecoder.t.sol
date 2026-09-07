@@ -306,13 +306,7 @@ contract BatchDecoderTest is Test {
         uint256 _processBatchFrom,
         uint256 _processBatchTo
     ) external pure returns (IExecutor.StoredBatchInfo memory, IExecutor.StoredBatchInfo[] memory, uint256[] memory) {
-        (
-            IExecutor.StoredBatchInfo memory prevBatch,
-            IExecutor.StoredBatchInfo[] memory provedBatches,
-            uint256[] memory proof,
-
-        ) = BatchDecoder.decodeAndCheckProofData(_proofData, _processBatchFrom, _processBatchTo);
-        return (prevBatch, provedBatches, proof);
+        return BatchDecoder.decodeAndCheckProofData(_proofData, _processBatchFrom, _processBatchTo);
     }
 
     function externalDecodeAndCheckExecuteData(
@@ -354,7 +348,8 @@ contract BatchDecoderTest is Test {
                 dependencyRootsRollingHash: bytes32(0),
                 l2LogsTreeRoot: bytes32(0),
                 timestamp: uint256(batchNumber) * 100,
-                commitment: bytes32(0)
+                commitment: bytes32(0),
+                airbenderCommitment: bytes32(0)
             });
     }
 
@@ -369,6 +364,7 @@ contract BatchDecoderTest is Test {
                 priorityOperationsHash: bytes32(0),
                 bootloaderHeapInitialContentsHash: bytes32(0),
                 eventsQueueStateHash: bytes32(0),
+                airbenderBootloaderHeapHash: bytes32(0),
                 systemLogs: "",
                 operatorDAInput: ""
             });

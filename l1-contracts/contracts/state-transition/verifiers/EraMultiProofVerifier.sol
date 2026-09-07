@@ -41,10 +41,8 @@ import {
 /// @dev There is no carried-hash slot, unlike the ZKsync OS envelope: Era has no continuation proofs, so a
 /// permanently-zero reserved word would be audited surface with no meaning.
 ///
-/// @dev `_publicInputs` is the pair `[boojum, airbender]` for a single batch, not one entry per
-/// batch: the two systems commit to different `auxiliaryOutputHash` values, so a batch has a
-/// different transition hash under each. Each word reaches its lane untruncated, because the lanes
-/// apply `PUBLIC_INPUT_SHIFT` themselves; shifting here would double-shift.
+/// @dev The batch public inputs reach both lanes whole and untruncated, because each lane applies
+/// `PUBLIC_INPUT_SHIFT` itself. Shifting here would double-shift them.
 contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
     /// @notice The Boojum router (`EraDualVerifier`), which dispatches the FFLONK and PLONK wrappers.
     /// @dev Immutable: the two lanes are fixed at deployment, so the pair of proof systems a batch is
@@ -69,8 +67,8 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
             revert EmptyProofLength();
         }
 
-        // One word per lane. A caller using the legacy prove encoding arrives with a single word and
-        // is refused here, so that encoding cannot be used to leave the Airbender lane unchecked.
+        // One word per lane: the two systems commit to different `auxiliaryOutputHash` values, so a
+        // batch has a different transition hash under each.
         if (_publicInputs.length != 2) {
             revert InvalidPublicInputsLength();
         }

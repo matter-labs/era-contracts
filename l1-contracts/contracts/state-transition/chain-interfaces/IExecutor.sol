@@ -69,34 +69,6 @@ uint256 constant L2_LOG_VALUE_OFFSET = 56;
 /// than the maximal number of blobs supported by the contract (`MAX_NUMBER_OF_BLOBS`).
 uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
 
-/// @notice Enough of a batch's commitment preimage to re-derive its Airbender commitment. Supplied
-/// for the batch being proved, and additionally for the previous batch on the one transition that
-/// seeds the chain (see `AirbenderCommitment.deriveBootstrapCommitment`).
-/// @dev Calldata only; never stored. Authenticated by recomputing the batch's stored commitment
-/// from it, which pins every member except `airbenderBootloaderHeapHash`.
-/// @dev `passThroughDataHash` is deliberately absent: it is derivable from the authenticated
-/// `StoredBatchInfo`, so supplying it would add a word and a degree of operator freedom for nothing.
-struct AirbenderCommitmentWitness {
-    bytes32 metadataHash;
-    bytes32 l2ToL1LogsHash;
-    bytes32 stateDiffHash;
-    /// @dev The bootloader heap hash as committed, whatever shape that is. The contract cannot tell
-    /// which proof system produced it; the authentication check is what fixes it.
-    bytes32 storedBootloaderHeapHash;
-    bytes32 eventsQueueStateHash;
-    bytes32 airbenderBootloaderHeapHash;
-    bytes32[] blobAuxOutputWords;
-}
-
-/// @notice The Airbender-lane witnesses a prove call carries, if any.
-/// @dev Both members are `0`- or `1`-length rather than optional, because Solidity has no optional
-/// calldata struct. `proved` is empty exactly for the legacy encoding, which predates the lane;
-/// `bootstrap` is non-empty only on the transition that seeds the chain.
-struct AirbenderProofWitnesses {
-    AirbenderCommitmentWitness[] proved;
-    AirbenderCommitmentWitness[] bootstrap;
-}
-
 /// @title The interface of the ZKsync Executor contract capable of processing events emitted in the ZKsync protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -121,6 +93,28 @@ interface IExecutor is IZKChainBase {
         bytes32 l2LogsTreeRoot;
         uint256 timestamp; // For ZKsync OS not used, always set to 0
         bytes32 commitment; // For ZKsync OS batches we'll store batch output hash here
+        /// @dev The same batch commitment in Airbender shape: identical pass-through and
+        /// metaparameters, and an auxiliary output differing in the only two words Airbender does
+        /// not reproduce — the bootloader heap hash, which it computes with Blake2s, and the events
+        /// queue hash, which it pins to zero. `0` for batches committed before the lane existed and
+        /// for chains that do not run it.
+        bytes32 airbenderCommitment;
+    }
+
+    /// @notice `StoredBatchInfo` as hashed before the Airbender lane existed.
+    /// @dev Kept so batches committed under that form still authenticate after the upgrade. Such a
+    /// batch carries no Airbender commitment, so it proves on Boojum alone.
+    // solhint-disable-next-line gas-struct-packing
+    struct PreAirbenderStoredBatchInfo {
+        uint64 batchNumber;
+        bytes32 batchHash;
+        uint64 indexRepeatedStorageChanges;
+        uint256 numberOfLayer1Txs;
+        bytes32 priorityOperationsHash;
+        bytes32 dependencyRootsRollingHash;
+        bytes32 l2LogsTreeRoot;
+        uint256 timestamp;
+        bytes32 commitment;
     }
 
     /// @notice Legacy StoredBatchInfo struct

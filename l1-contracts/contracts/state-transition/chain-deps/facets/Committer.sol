@@ -365,12 +365,17 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         }
 
         // Create batch commitment for the proof verification
-        (bytes32 metadataHash, bytes32 auxiliaryOutputHash, bytes32 commitment) = _createBatchCommitment(
-            _newBatch,
-            daOutput.stateDiffHash,
-            daOutput.blobsOpeningCommitments,
-            daOutput.blobsLinearHashes
-        );
+        (
+            bytes32 metadataHash,
+            bytes32 auxiliaryOutputHash,
+            bytes32 commitment,
+            bytes32 airbenderCommitment
+        ) = _createBatchCommitment(
+                _newBatch,
+                daOutput.stateDiffHash,
+                daOutput.blobsOpeningCommitments,
+                daOutput.blobsLinearHashes
+            );
 
         storedBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: _newBatch.batchNumber,
@@ -381,7 +386,8 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             l2LogsTreeRoot: logOutput.l2LogsTreeRoot,
             dependencyRootsRollingHash: logOutput.dependencyRootsRollingHash,
             timestamp: _newBatch.timestamp,
-            commitment: commitment
+            commitment: commitment,
+            airbenderCommitment: airbenderCommitment
         });
 
         if (L1_CHAIN_ID != block.chainid) {
@@ -513,7 +519,9 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             l2LogsTreeRoot: _newBatch.l2LogsTreeRoot,
             dependencyRootsRollingHash: _newBatch.dependencyRootsRollingHash,
             timestamp: 0,
-            commitment: batchOutputHash
+            commitment: batchOutputHash,
+            // ZKsync OS chains have no Airbender lane.
+            airbenderCommitment: bytes32(0)
         });
 
         if (L1_CHAIN_ID != block.chainid) {
@@ -748,7 +756,11 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
-    ) internal view returns (bytes32 metadataHash, bytes32 auxiliaryOutputHash, bytes32 commitment) {
+    )
+        internal
+        view
+        returns (bytes32 metadataHash, bytes32 auxiliaryOutputHash, bytes32 commitment, bytes32 airbenderCommitment)
+    {
         bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
         metadataHash = keccak256(_batchMetaParameters());
         auxiliaryOutputHash = keccak256(
@@ -756,6 +768,41 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         );
 
         commitment = keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
+
+        // The Airbender shape reuses everything above and differs in exactly two words of the
+        // auxiliary output. A chain that does not run the lane supplies no heap hash and gets `0`,
+        // which the Executor reads as "this batch has no Airbender commitment".
+        if (_newBatchData.airbenderBootloaderHeapHash != bytes32(0)) {
+            bytes32 airbenderAuxiliaryOutputHash = keccak256(
+                _airbenderAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes)
+            );
+            airbenderCommitment = keccak256(
+                abi.encode(passThroughDataHash, metadataHash, airbenderAuxiliaryOutputHash)
+            );
+        }
+    }
+
+    /// @dev `_batchAuxiliaryOutput` with the two words Airbender does not reproduce substituted: the
+    /// heap hash it computes with Blake2s, and the events queue hash it pins to zero.
+    function _airbenderAuxiliaryOutput(
+        CommitBatchInfo memory _batch,
+        bytes32 _stateDiffHash,
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes
+    ) internal pure returns (bytes memory) {
+        if (_batch.systemLogs.length > MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES) {
+            revert SystemLogsSizeTooBig();
+        }
+
+        return
+            // solhint-disable-next-line func-named-parameters
+            abi.encodePacked(
+                keccak256(_batch.systemLogs),
+                _stateDiffHash,
+                _batch.airbenderBootloaderHeapHash,
+                bytes32(0),
+                _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes)
+            );
     }
 
     function _batchPassThroughData(CommitBatchInfo memory _batch) internal pure returns (bytes memory) {

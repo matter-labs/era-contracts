@@ -5,19 +5,13 @@ pragma solidity 0.8.28;
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "../../../core/message-root/IMessageRoot.sol";
-import {AIRBENDER_PROOF_SYSTEM_DISABLED, EMPTY_STRING_KECCAK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
-import {AirbenderProofWitnesses, IExecutor, ProcessLogsInput} from "../../chain-interfaces/IExecutor.sol";
-import {AirbenderCommitment} from "../../libraries/AirbenderCommitment.sol";
+import {EMPTY_STRING_KECCAK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
+import {IExecutor, ProcessLogsInput} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {GW_ASSET_TRACKER} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {
-    AirbenderBootstrapWitnessCountInvalid,
-    AirbenderBootstrapWitnessNotExpected,
-    AirbenderBootstrapWitnessRequired,
-    AirbenderProvedWitnessCountInvalid,
-    AirbenderWitnessNotSupportedOnZKsyncOS,
     CanOnlyProcessOneBatch,
     CantExecuteUnprovenBatches,
     InvalidMessageRoot,
@@ -248,46 +242,39 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         (
             StoredBatchInfo memory prevBatch,
             StoredBatchInfo[] memory committedBatches,
-            uint256[] memory proof,
-            AirbenderProofWitnesses memory airbender
+            uint256[] memory proof
         ) = BatchDecoder.decodeAndCheckProofData(_proofData, _processBatchFrom, _processBatchTo);
-
-        bool airbenderLane = airbender.proved.length != 0;
-        // A bootstrap witness on its own reaches no derivation, so it would be accepted and dropped.
-        if (!airbenderLane && airbender.bootstrap.length != 0) {
-            revert AirbenderBootstrapWitnessNotExpected();
-        }
-        // Only `[0]` is ever read, so anything beyond it would be accepted and ignored.
-        if (airbenderLane && airbender.proved.length != 1) {
-            revert AirbenderProvedWitnessCountInvalid(airbender.proved.length);
-        }
-        // Bootstrap-only is already refused above, so presence of the lane is the whole condition.
-        if (airbenderLane && s.zksyncOS) {
-            revert AirbenderWitnessNotSupportedOnZKsyncOS();
-        }
 
         // Save the variables into the stack to save gas on reading them later
         uint256 currentTotalBatchesVerified = s.totalBatchesVerified;
         uint256 committedBatchesLength = committedBatches.length;
 
-        // Era proves one batch per call. The guard used to be inferred from the public input array
-        // holding one entry; with the Airbender lane that array is a (Boojum, Airbender) pair for a
-        // single batch instead, so it is checked against the batch count directly.
-        if (!s.zksyncOS && committedBatchesLength != 1) {
-            revert CanOnlyProcessOneBatch();
-        }
-
-        // Initialize the array, that will be used as public input to the ZKP
-        uint256[] memory proofPublicInput = new uint256[](airbenderLane ? 2 : committedBatchesLength);
+        // Initialize the array, that will be used as public input to the ZKP. Sized once the proved
+        // batch has been authenticated, since whether it carries an Airbender commitment decides it.
+        uint256[] memory proofPublicInput;
 
         // Check that the batch passed by the validator is indeed the first unverified batch
-        _checkBatchHashMismatch(prevBatch, currentTotalBatchesVerified, true);
+        bool prevAirbenderBound = _checkBatchHashMismatch(prevBatch, currentTotalBatchesVerified, true);
 
+        bool airbenderLane;
         bytes32 prevBatchCommitment = prevBatch.commitment;
         bytes32 prevBatchStateCommitment = prevBatch.batchHash;
         for (uint256 i = 0; i < committedBatchesLength; ++i) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
-            _checkBatchHashMismatch(committedBatches[i], currentTotalBatchesVerified, false);
+            bool provedAirbenderBound = _checkBatchHashMismatch(
+                committedBatches[i],
+                currentTotalBatchesVerified,
+                false
+            );
+            if (i == 0) {
+                // A batch carries an Airbender commitment only if the hash form that covers it
+                // matched; one committed before the lane existed proves on Boojum alone.
+                airbenderLane = provedAirbenderBound && committedBatches[0].airbenderCommitment != bytes32(0);
+                if (airbenderLane && committedBatchesLength != 1) {
+                    revert CanOnlyProcessOneBatch();
+                }
+                proofPublicInput = new uint256[](airbenderLane ? 2 : committedBatchesLength);
+            }
 
             bytes32 currentBatchCommitment = committedBatches[i].commitment;
             bytes32 currentBatchStateCommitment = committedBatches[i].batchHash;
@@ -308,44 +295,41 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert VerifiedBatchesExceedsCommittedBatches();
         }
 
-        // Derived only after `_checkBatchHashMismatch` above has authenticated both batches, since
-        // the witnesses are opened against their `commitment` fields.
-        bytes32 provedAirbenderCommitment;
         if (airbenderLane) {
-            provedAirbenderCommitment = AirbenderCommitment.deriveAirbenderCommitment(
-                airbender.proved[0],
-                committedBatches[0]
-            );
+            // Both ends come from `StoredBatchInfo`, authenticated by `storedBatchHashes` exactly as
+            // the Boojum commitments above are.
+            //
+            // A predecessor with no Airbender commitment of its own — one committed before the lane
+            // was enabled, or during a period with it switched off — seeds the chain from its Boojum
+            // commitment instead. That value is authenticated, publicly recomputable, and openable
+            // by the guest, whose binding needs only some `(meta, aux)` pair reproducing it; the
+            // sequencer holds the Boojum pair for its own batch. So seeding needs no extra input and
+            // no separate protocol, and it still pins the predecessor's state.
+            bytes32 previousAirbenderCommitment = (prevAirbenderBound && prevBatch.airbenderCommitment != bytes32(0))
+                ? prevBatch.airbenderCommitment
+                : prevBatch.commitment;
+
             proofPublicInput[1] = _getBatchProofPublicInput(
-                _previousAirbenderCommitment(prevBatch, airbender),
-                provedAirbenderCommitment
+                previousAirbenderCommitment,
+                committedBatches[0].airbenderCommitment
             );
         }
 
         _verifyProof(proofPublicInput, proof);
-
-        // Recorded once the verifier has accepted, and only if the lane is enabled: with the
-        // lane switched off the gate verifies nothing against this value, so recording it would put
-        // an unattested entry into the chain. Leaving the gap unrecorded means the next transition
-        // after the lane is switched back on seeds afresh, which is what an absent attestation
-        // should cost.
-        // The empty-proof term is what stops a testnet gate poisoning the chain permanently:
-        // `EraMultiProofTestnetVerifier` accepts an empty proof before either lane runs, and an
-        // entry recorded off the back of one is constrained by nothing. Once its batch is executed
-        // `_revertBatches` can no longer reach it, so every successor would inherit a `prev` that no
-        // proof can produce. Mainnet never reaches this — `EmptyProofLength` reverts first.
-        //
-        // Indexed by the position `_checkBatchHashMismatch` authenticated, so this does not lean on
-        // the separate invariant that a stored struct's `batchNumber` equals its index.
-        if (airbenderLane && proof.length != 0 && s.disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
-            s.airbenderCommitments[s.storedBatchHashes[currentTotalBatchesVerified]] = provedAirbenderCommitment;
-        }
 
         emit BlocksVerification(s.totalBatchesVerified, currentTotalBatchesVerified);
         s.totalBatchesVerified = currentTotalBatchesVerified;
     }
 
     function _verifyProof(uint256[] memory proofPublicInput, uint256[] memory _proof) internal view {
+        // We only allow processing of 1 batch proof at a time on Era Chains.
+        // We allow processing multiple proofs at once on ZKsync OS Chains.
+        // With the Airbender lane the array is a (Boojum, Airbender) pair for a single batch, so the
+        // guard is enforced against the batch count where that array is built.
+        if (!s.zksyncOS && proofPublicInput.length > 2) {
+            revert CanOnlyProcessOneBatch();
+        }
+
         bool successVerifyProof = s.verifier.verify(proofPublicInput, _proof);
         if (!successVerifyProof) {
             revert InvalidProof();
@@ -373,37 +357,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     )
                 )
             ) >> PUBLIC_INPUT_SHIFT;
-    }
-
-    /// @dev The `prev` end of the Airbender transition: the commitment recorded when the previous
-    /// batch was verified, or — on the transition that seeds the chain — one derived from that
-    /// batch's own witness.
-    /// @dev Keyed by the batch's stored hash rather than its number. A batch number is reused after
-    /// `_revertBatches`, so keying on it would let a reverted batch's commitment be read back as the
-    /// predecessor of a different batch that later takes the same number — unprovable, and with no
-    /// way to clear the entry. The stored hash changes when a batch is re-committed, so the
-    /// replacement reads `0` and seeds afresh.
-    function _previousAirbenderCommitment(
-        StoredBatchInfo memory _prevBatch,
-        AirbenderProofWitnesses memory _airbender
-    ) internal view returns (bytes32) {
-        bytes32 recorded = s.airbenderCommitments[s.storedBatchHashes[_prevBatch.batchNumber]];
-        if (recorded != bytes32(0)) {
-            // A bootstrap witness here would be silently ignored, so refuse it rather than let the
-            // operator believe it had any effect.
-            if (_airbender.bootstrap.length != 0) {
-                revert AirbenderBootstrapWitnessNotExpected();
-            }
-            return recorded;
-        }
-        if (_airbender.bootstrap.length == 0) {
-            revert AirbenderBootstrapWitnessRequired();
-        }
-        // Only `[0]` is read, so anything past it would be accepted and ignored.
-        if (_airbender.bootstrap.length != 1) {
-            revert AirbenderBootstrapWitnessCountInvalid(_airbender.bootstrap.length);
-        }
-        return AirbenderCommitment.deriveBootstrapCommitment(_airbender.bootstrap[0], _prevBatch);
     }
 
     /// @dev Gets zk proof public input for Era.
