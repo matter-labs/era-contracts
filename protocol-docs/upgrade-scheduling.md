@@ -4,9 +4,8 @@
 add scheduling prerequisites by registering an `IUpgradePreconditionChecker` for the protocol
 version the chain upgrades **from**.
 
-The notifier owner calls `setUpgradePreconditionChecker(oldProtocolVersion, checker)`. A non-zero
-checker must return `UPGRADE_PRECONDITION_CHECKER_MAGIC` from its interface-support getter. Setting
-zero removes the checker; versions without a checker retain their existing scheduling behavior.
+The notifier owner calls `setUpgradePreconditionChecker(oldProtocolVersion, checker)`. Setting zero
+removes the checker; versions without a checker retain their existing scheduling behavior.
 
 Scheduling validates the caller, non-zero timestamp and upgrade cut, then calls the checker's
 `checkUpgradePreconditions(chainId, zkChain)`. The checker is selected using the chain's current
@@ -16,8 +15,9 @@ The test stub in `ServerNotifier.t.sol` demonstrates the interface.
 
 Register a checker before opening scheduling for the release. Registration does not invalidate
 previously stored timestamps, and prerequisites may change after scheduling. Upgrade execution
-must retain its own checks. The magic value confirms interface intent only; a broken checker can
-block scheduling until the owner replaces or removes it.
+must retain its own checks. The owner is responsible for selecting the correct checker; registration
+does not validate its implementation. A broken checker can block scheduling until the owner replaces
+or removes it.
 
 The per-version registry lets future releases add prerequisites without embedding release logic
 in the notifier. This change does not register a checker for any existing upgrade; release-specific

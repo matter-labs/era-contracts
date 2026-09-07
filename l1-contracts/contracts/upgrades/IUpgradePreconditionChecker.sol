@@ -8,10 +8,6 @@ pragma solidity ^0.8.21;
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Release-specific upgrade scheduling checks; see {protocol-docs/upgrade-scheduling.md}.
 interface IUpgradePreconditionChecker {
-    /// @notice Confirms support for this interface.
-    /// @return The canonical upgrade-precondition checker magic value.
-    function getSupportsUpgradePreconditionCheckerMagic() external view returns (bytes32);
-
     /// @notice Reverts if the chain cannot take the guarded upgrade.
     /// @param _chainId The id of the chain whose upgrade is being scheduled.
     /// @param _zkChain The chain's DiamondProxy address.

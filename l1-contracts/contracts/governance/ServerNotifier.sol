@@ -6,14 +6,12 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 import {
     CutDataForProtocolVersionNotAvailable,
     Unauthorized,
-    UpgradePreconditionCheckerMagicMismatch,
     ZeroAddress,
     ZeroUpgradeTimestamp
 } from "../common/L1ContractErrors.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IServerNotifier} from "./IServerNotifier.sol";
 import {IUpgradePreconditionChecker} from "../upgrades/IUpgradePreconditionChecker.sol";
-import {UPGRADE_PRECONDITION_CHECKER_MAGIC} from "../upgrades/UpgradePreconditionCheckerConfig.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
@@ -131,11 +129,6 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
         uint256 _oldProtocolVersion,
         IUpgradePreconditionChecker _checker
     ) external onlyOwner {
-        if (address(_checker) != address(0)) {
-            if (_checker.getSupportsUpgradePreconditionCheckerMagic() != UPGRADE_PRECONDITION_CHECKER_MAGIC) {
-                revert UpgradePreconditionCheckerMagicMismatch(address(_checker));
-            }
-        }
         upgradePreconditionChecker[_oldProtocolVersion] = _checker;
         emit UpgradePreconditionCheckerSet(_oldProtocolVersion, address(_checker));
     }

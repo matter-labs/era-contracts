@@ -2,13 +2,6 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {
-    SERVER_NOTIFIER_OWNER_SLOT,
-    SERVER_NOTIFIER_PENDING_OWNER_SLOT,
-    SERVER_NOTIFIER_CHAIN_TYPE_MANAGER_SLOT,
-    SERVER_NOTIFIER_UPGRADE_TIMESTAMP_SLOT,
-    SERVER_NOTIFIER_PRECONDITION_CHECKER_SLOT
-} from "foundry-test/TestConstants.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
@@ -19,12 +12,10 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DummyChainAssetHandler} from "contracts/dev-contracts/test/DummyChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IUpgradePreconditionChecker} from "contracts/upgrades/IUpgradePreconditionChecker.sol";
-import {UPGRADE_PRECONDITION_CHECKER_MAGIC} from "contracts/upgrades/UpgradePreconditionCheckerConfig.sol";
 import {
     CutDataForProtocolVersionNotAvailable,
     InvalidProtocolVersion,
     Unauthorized,
-    UpgradePreconditionCheckerMagicMismatch,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 
@@ -37,19 +28,8 @@ contract UpgradePreconditionCheckerStub is IUpgradePreconditionChecker {
     }
 
     /// @inheritdoc IUpgradePreconditionChecker
-    function getSupportsUpgradePreconditionCheckerMagic() external pure returns (bytes32) {
-        return UPGRADE_PRECONDITION_CHECKER_MAGIC;
-    }
-
-    /// @inheritdoc IUpgradePreconditionChecker
     function checkUpgradePreconditions(uint256, address) external view {
         require(ready, "Upgrade not ready");
-    }
-}
-
-contract WrongMagicChecker {
-    function getSupportsUpgradePreconditionCheckerMagic() external pure returns (bytes32) {
-        return keccak256("NotAnUpgradePreconditionChecker");
     }
 }
 
@@ -260,6 +240,14 @@ contract ServerNotifierTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_setCheckerRegistersAndEmits() public {
+        uint256 deadline = block.timestamp + 7 days;
+        vm.prank(chainAdmin);
+        serverNotifier.setUpgradeTimestamp(chainId, deadline);
+
+        address pendingOwner = makeAddr("pendingOwner");
+        vm.prank(owner);
+        serverNotifier.transferOwnership(pendingOwner);
+
         vm.expectEmit(true, false, false, true, address(serverNotifier));
         emit IServerNotifier.UpgradePreconditionCheckerSet(protocolVersion, address(checker));
 
@@ -267,6 +255,10 @@ contract ServerNotifierTest is Test {
         serverNotifier.setUpgradePreconditionChecker(protocolVersion, checker);
 
         assertEq(address(serverNotifier.upgradePreconditionChecker(protocolVersion)), address(checker));
+        assertEq(serverNotifier.owner(), owner);
+        assertEq(serverNotifier.pendingOwner(), pendingOwner);
+        assertEq(address(serverNotifier.chainTypeManager()), address(chainTypeManager));
+        assertEq(serverNotifier.protocolVersionToUpgradeTimestamp(chainId, protocolVersion), deadline);
     }
 
     function test_setCheckerCanDeregister() public {
@@ -292,26 +284,6 @@ contract ServerNotifierTest is Test {
         vm.prank(chainAdmin);
         vm.expectRevert("Ownable: caller is not the owner");
         serverNotifier.setUpgradePreconditionChecker(protocolVersion, checker);
-    }
-
-    function test_setCheckerRevertsOnWrongMagic() public {
-        _registerChecker();
-        WrongMagicChecker wrongMagic = new WrongMagicChecker();
-
-        vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(UpgradePreconditionCheckerMagicMismatch.selector, address(wrongMagic)));
-        serverNotifier.setUpgradePreconditionChecker(protocolVersion, IUpgradePreconditionChecker(address(wrongMagic)));
-
-        assertEq(address(serverNotifier.upgradePreconditionChecker(protocolVersion)), address(checker));
-    }
-
-    function test_setCheckerRevertsOnContractWithoutMagicGetter() public {
-        vm.prank(owner);
-        vm.expectRevert();
-        serverNotifier.setUpgradePreconditionChecker(
-            protocolVersion,
-            IUpgradePreconditionChecker(address(chainTypeManager))
-        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -371,45 +343,5 @@ contract ServerNotifierTest is Test {
         serverNotifier.setUpgradeTimestamp(chainId, deadline + 1 days);
 
         assertEq(serverNotifier.protocolVersionToUpgradeTimestamp(chainId, protocolVersion), deadline);
-    }
-
-    function _load(uint256 _slot) internal view returns (bytes32) {
-        return vm.load(address(serverNotifier), bytes32(_slot));
-    }
-
-    function test_ownerSlot() public view {
-        assertEq(_load(SERVER_NOTIFIER_OWNER_SLOT), bytes32(uint256(uint160(owner))));
-    }
-
-    function test_pendingOwnerAndInitializedSlot() public {
-        address pendingOwner = makeAddr("pendingOwner");
-        vm.prank(owner);
-        serverNotifier.transferOwnership(pendingOwner);
-
-        // `_pendingOwner` occupies the low 20 bytes; `_initialized = 1` starts at byte 20.
-        bytes32 expected = bytes32((uint256(1) << 160) | uint256(uint160(pendingOwner)));
-        assertEq(_load(SERVER_NOTIFIER_PENDING_OWNER_SLOT), expected);
-    }
-
-    function test_chainTypeManagerSlot() public view {
-        assertEq(_load(SERVER_NOTIFIER_CHAIN_TYPE_MANAGER_SLOT), bytes32(uint256(uint160(address(chainTypeManager)))));
-    }
-
-    function test_upgradeTimestampMappingSlot() public {
-        uint256 deadline = block.timestamp + 7 days;
-        vm.prank(chainAdmin);
-        serverNotifier.setUpgradeTimestamp(chainId, deadline);
-
-        bytes32 innerSlot = keccak256(abi.encode(chainId, SERVER_NOTIFIER_UPGRADE_TIMESTAMP_SLOT));
-        bytes32 valueSlot = keccak256(abi.encode(protocolVersion, innerSlot));
-        assertEq(uint256(_load(uint256(valueSlot))), deadline);
-    }
-
-    function test_preconditionCheckerMappingSlot() public {
-        vm.prank(owner);
-        serverNotifier.setUpgradePreconditionChecker(protocolVersion, checker);
-
-        bytes32 valueSlot = keccak256(abi.encode(protocolVersion, SERVER_NOTIFIER_PRECONDITION_CHECKER_SLOT));
-        assertEq(uint256(_load(uint256(valueSlot))), uint256(uint160(address(checker))));
     }
 }
