@@ -6,6 +6,9 @@ name: "Ecosystem Upgrade: Deploy + Verify (v31)"
 # bundles and actually BROADCASTS them to a real L1, producing the
 # `transactions.txt` the PUVT (`ecosystem verify-upgrade`) consumes, then
 # verifies the freshly deployed contracts on Etherscan.
+# To verify an existing deployment without loading its signing key or sending
+# any transactions, dispatch with verify_only=true and run_verify=true using
+# the SAME generate_run_id that supplied the deployed bundle.
 #
 # It runs the SAME `protocol_ops` commands you'd run locally (see
 # `docs/ecosystem-upgrade-deploy.md`), so a local deploy and a CI deploy are
@@ -69,6 +72,11 @@ on:
         required: false
         default: true
         type: boolean
+      verify_only:
+        description: "Verify already deployed contracts on Etherscan only: never load the deployer key or broadcast transactions"
+        required: false
+        default: false
+        type: boolean
       zksync_foundry_version:
         description: "foundry-zksync version (forge --zksync), used for the verify build"
         required: false
@@ -93,8 +101,15 @@ jobs:
         env:
           GENERATE_RUN_ID: ${{ inputs.generate_run_id }}
           RESUME_DEPLOY_RUN_ID: ${{ inputs.resume_deploy_run_id }}
+          VERIFY_ONLY: ${{ inputs.verify_only }}
+          RUN_VERIFY: ${{ inputs.run_verify }}
         with:
           script: |
+            if (process.env.VERIFY_ONLY === "true" &&
+                (process.env.RUN_VERIFY !== "true" || process.env.RESUME_DEPLOY_RUN_ID)) {
+              core.setFailed("verify_only requires run_verify=true and no resume_deploy_run_id");
+              return;
+            }
             const runAttempt = Number(process.env.GITHUB_RUN_ATTEMPT);
             if (runAttempt > 1) {
               core.setFailed(
@@ -201,6 +216,9 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      - name: Test verification-only workflow guards
+        run: node --test .github/tests/deploy-verify-only.test.cjs
+
       - name: Build protocol_ops
         working-directory: protocol-ops
         run: cargo build --release
@@ -225,7 +243,7 @@ jobs:
           github-token: ${{ github.token }}
 
       - name: Download the prior deploy receipt journal
-        if: ${{ inputs.resume_deploy_run_id != '' }}
+        if: ${{ !inputs.verify_only && inputs.resume_deploy_run_id != '' }}
         uses: actions/download-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-result-${{ inputs.environment }}
@@ -279,6 +297,7 @@ jobs:
       # Restore its journal before retrying so idempotently skipped calls do not
       # disappear from the PUVT's provenance input.
       - name: Initialize or restore the deployment receipt journal
+        if: ${{ !inputs.verify_only }}
         env:
           ENVIRONMENT: ${{ inputs.environment }}
           GENERATE_RUN_ID: ${{ inputs.generate_run_id }}
@@ -325,10 +344,21 @@ jobs:
             echo "TXLOG=$OUTDIR/transactions.txt"
           } >> "$GITHUB_ENV"
 
+      - name: Select Etherscan network for verification only
+        if: ${{ inputs.verify_only }}
+        run: |
+          set -euo pipefail
+          case "$(jq -r '.l1.chain_id' "$DEPLOY_BUNDLE_DIR/bundle-metadata.json")" in
+            1) echo "ETHERSCAN_CHAIN=mainnet" >> "$GITHUB_ENV" ;;
+            11155111) echo "ETHERSCAN_CHAIN=sepolia" >> "$GITHUB_ENV" ;;
+            *) echo "::error::Unsupported Etherscan chain"; exit 1 ;;
+          esac
+
       # Which L1 to broadcast to comes from the BUNDLE, not from the env's name:
       # `bundle-metadata.json` records the `l1.chain_id` the calldata was computed
       # against, avoiding a name-based selection of the wrong chain and key.
       - name: Select + mask RPC and deployer key (L1 from the bundle)
+        if: ${{ !inputs.verify_only }}
         env:
           ENVIRONMENT: ${{ inputs.environment }}
           RPC_SEPOLIA: ${{ secrets.L1_RPC_URL_SEPOLIA }}
@@ -382,6 +412,7 @@ jobs:
       # Broadcast ONLY the deployer bundles (target == deployer), robustly, one
       # at a time. Writes transactions.txt next to --out for the PUVT.
       - name: Broadcast deployer bundles to L1
+        if: ${{ !inputs.verify_only }}
         run: |
           set -euo pipefail
           MANIFEST="$DEPLOY_BUNDLE_DIR/prepare/manifest.json"
@@ -397,7 +428,7 @@ jobs:
           cat "$TXLOG" || true
 
       - name: Upload transactions.txt + executed log
-        if: always()
+        if: ${{ always() && !inputs.verify_only }}
         uses: actions/upload-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-result-${{ inputs.environment }}
@@ -409,22 +440,21 @@ jobs:
       # 1 logged — which already carry the exact `--constructor-args <hex>` taken
       # from the CREATE2 init code, so nothing is guessed. Etherscan read APIs lag
       # freshly deployed code, so `--retries/--delay` ride that out; any residual
-      # failure warns (re-run once indexed) but never fails the deploy
-      # (transactions.txt / PUVT is the source of truth).
+      # failure does not fail a deployment, but DOES fail verification-only runs.
       - name: Verify contracts on Etherscan
         if: ${{ inputs.run_verify }}
-        continue-on-error: true
+        continue-on-error: ${{ !inputs.verify_only }}
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
         working-directory: l1-contracts
         run: |
           set -uo pipefail
           if [ -z "${ETHERSCAN_API_KEY:-}" ]; then
-            echo "::warning::ETHERSCAN_API_KEY not set; skipping verification"; exit 0
+            echo "::error::ETHERSCAN_API_KEY not set"; exit 1
           fi
           LOG="$DEPLOY_BUNDLE_DIR/extra-verification-logs.txt"
           if [ ! -f "$LOG" ]; then
-            echo "::warning::extra-verification-logs.txt not found; skipping"; exit 0
+            echo "::error::extra-verification-logs.txt not found"; exit 1
           fi
           # $ETHERSCAN_CHAIN was resolved from the bundle's l1.chain_id, not from
           # the env's name (see the RPC step).
@@ -435,18 +465,21 @@ jobs:
           # Create2FactoryUtils.notifyAboutDeployment), so there is nothing to
           # guess. We only append the chain + `--watch`; the key comes from
           # $ETHERSCAN_API_KEY in the env. `--retries/--delay` ride out Etherscan
-          # indexing freshly-deployed code. Best-effort: a failure warns (some may
-          # need a re-run once Etherscan has indexed the code) but never fails the
-          # deploy — transactions.txt / PUVT is the source of truth.
-          grep 'forge verify-contract' "$LOG" \
-            | sed 's/^.*forge verify-contract/forge verify-contract/' \
-            | sort -u \
-            | while IFS= read -r cmd; do
-                echo "--- $cmd"
-                if eval "$cmd --chain $CHAIN --watch --retries 8 --delay 20"; then
-                  echo "  OK"
-                else
-                  echo "::warning::verification failed (re-run once Etherscan indexes the code): $cmd"
-                fi
-              done
-          echo "Verification pass complete (constructor args come from the deploy init code; see warnings for any Etherscan-lag retries)."
+          # indexing freshly-deployed code. Report partial failures explicitly;
+          # normal deployments tolerate them, verification-only runs do not.
+          verified=0
+          failed=0
+          while IFS= read -r cmd; do
+            echo "--- $cmd"
+            if eval "$cmd --chain $CHAIN --watch --retries 8 --delay 20"; then
+              echo "  OK"
+              verified=$((verified + 1))
+            else
+              echo "::warning::verification failed (re-run once Etherscan indexes the code): $cmd"
+              failed=$((failed + 1))
+            fi
+          done < <(grep 'forge verify-contract' "$LOG" | sed 's/^.*forge verify-contract/forge verify-contract/' | sort -u)
+          echo "Etherscan verification: $verified succeeded, $failed failed"
+          if [ "$failed" -ne 0 ] || [ "$verified" -eq 0 ]; then
+            echo "::error::Etherscan verification incomplete"; exit 1
+          fi
