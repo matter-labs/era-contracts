@@ -2,7 +2,7 @@
 
 ## Relevant files
 
-- `.github/workflows/lint.yaml` — repository lint, error lint, protocol-ops formatting, Clippy and tests, codespell, and typos.
+- `.github/workflows/lint.yaml` — repository lint, error lint, formatting for all Rust crates, protocol-ops Clippy and tests, codespell, and typos.
 - `.github/workflows/l1-contracts-ci.yaml` — DA/L1 builds and tests, generated ABI, genesis, hash, selector, and coverage checks.
 - `.github/workflows/l1-contracts-foundry-ci.yaml` — deploy-script compilation, contract-size checks, and deployment-script smoke tests.
 - `.github/workflows/anvil-interop-ci.yaml` — interop tests, the v31 to v32 upgrade test, and chain-state determinism.
@@ -36,9 +36,13 @@ yarn da test:foundry
 yarn lint:check
 yarn l1 errors-lint --check
 
+# `+1.91.1` overrides crate-local nightly toolchains to match CI.
+for dir in protocol-ops tools/{upgrade-readiness-checker,verifier-gen,wallets-gen,zksync-os-genesis-gen}; do
+  (cd "$dir" && cargo +1.91.1 fmt --check)
+done
+
 (
   cd protocol-ops
-  cargo +1.91.1 fmt --check
   cargo +1.91.1 clippy --all-targets -- -D warnings
   cargo +1.91.1 test --all-targets
 )
