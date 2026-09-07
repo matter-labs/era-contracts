@@ -101,27 +101,46 @@ cargo run --release --bin protocol_ops -- ecosystem verify-deployment \
   --expect-testnet-verifier true
 ```
 
-`--from-block` should be at or before the ecosystem's first deployment block:
-the chain creation parameters, the pending-admin history and the DA pair
-whitelist all come from logs, and hosted RPCs reject a scan from genesis.
+`--from-block` must be at or before the ecosystem's first deployment block: the
+chain creation parameters, the pending-admin history and the DA pair whitelist
+all come from logs, and "no events found" is otherwise indistinguishable from
+"never set". The command checks this by requiring the bridgehub proxy's own
+construction event to fall inside the window, and fails if it does not. Hosted
+RPCs reject a scan from genesis, which is why there is no safe default.
+
+Every code, storage and log read is pinned to the block the run started at, so a
+report is not smeared across an upgrade in progress; that block is printed in the
+discovery header.
 
 What it checks:
 
-| Section                  | What it proves                                                                                                                                                                                                                                                                                                                                                           |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Bytecode**             | Every discovered contract against the local build, with the artifact's own `immutableReferences` masked and CBOR metadata digests blanked. Reports `exact` vs `metadata-only`, and warns when anything is metadata-only — that also means the genesis root and the L2 force-deployment hashes are not independently reproducible.                                        |
-| **Immutables**           | Values read back out of deployed runtime code at the artifact's immutable offsets and checked against what discovery says they should be (bridgehub, chain id, WETH, asset router, verifier, …). Unrecognised ones are printed.                                                                                                                                          |
-| **Wiring**               | Every setter the deploy scripts are supposed to have run: `setNativeTokenVault`, the three `L1Nullifier` setters, `setL1InteropHandler`, `CAH.setAddresses`, `ServerNotifier.setChainTypeManager`, `setDefaultUpgrade`, `registerEthToken`, and the three-call CTM registration.                                                                                         |
-| **Chain creation**       | Recomputes `storedBatchZero`, `initialCutHash` and `initialForceDeploymentHash` from the `NewChainCreationParams` event and binds them to what the CTM stores; then checks the diamond cut (selectors against the deployed facets' dispatchers, freezability, no collisions) and every force-deployments field, including the L2 implementations' blake2s/length/keccak. |
-| **Verifier and genesis** | Which verifier flavour is deployed, and the deployed genesis root and prover VK hash against `configs/genesis/zksync-os/latest.json`.                                                                                                                                                                                                                                    |
-| **Data availability**    | The `RollupDAManager` whitelist, and whether each live chain's DA pair is one `makePermanentRollup()` would accept.                                                                                                                                                                                                                                                      |
-| **Roles**                | `owner` / `pendingOwner` / `admin` / `pendingAdmin` / `securityCouncil` / `tokenMultiplierSetter` across the ecosystem, grouped by holder. Fails on stalled two-step handoffs, warns on `transferOwnership(currentOwner)` no-ops and on roles held by an EOA.                                                                                                            |
-| **Registered chains**    | Each chain's protocol version, verifier, facet set, base token registration, genesis batch and settlement layer against the CTM.                                                                                                                                                                                                                                         |
+| Section                  | What it proves                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Bytecode**             | Every discovered contract against the local build, with the artifact's own `immutableReferences` masked and CBOR metadata digests blanked at offsets taken from the local artifact only, so a forged tag cannot open a blanking window. Reports `exact` vs `metadata-only`, and warns when anything is metadata-only — that also means the genesis root and the L2 force-deployment hashes are not independently reproducible.                                |
+| **Immutables**           | Values read back out of deployed runtime code at the artifact's immutable offsets and checked against what discovery says they should be (bridgehub, chain id, WETH, asset router, verifier, …). Every use site of an immutable must carry the same value — masking hides a divergent one from the bytecode comparison. Unrecognised ones are printed.                                                                                                        |
+| **Wiring**               | Every setter the deploy scripts are supposed to have run: `setNativeTokenVault`, the three `L1Nullifier` setters, `setL1InteropHandler`, `CAH.setAddresses`, `ServerNotifier.setChainTypeManager`, `setDefaultUpgrade`, `registerEthToken`, and the three-call CTM registration. Also every proxy's EIP-1967 admin slot — a proxy running the right code under an unexpected admin is not verified.                                                           |
+| **Chain creation**       | Recomputes `storedBatchZero`, `initialCutHash` and `initialForceDeploymentHash` from the `NewChainCreationParams` event and binds them to what the CTM stores; then checks the diamond cut (exactly the six canonical facets, selectors against the deployed facets' dispatchers, freezability, no collisions) and every force-deployments field, including each L2 implementation, the `SystemContractProxy` it sits behind, and `l2TokenProxyBytecodeHash`. |
+| **Verifier and genesis** | Which verifier flavour is deployed, and the deployed genesis root and prover VK hash against `configs/genesis/zksync-os/latest.json`.                                                                                                                                                                                                                                                                                                                         |
+| **Data availability**    | The `RollupDAManager` whitelist — each allowed validator identified against the `da-contracts` build, since nothing stops an EOA being paired — and whether each live chain's DA pair is one `makePermanentRollup()` would accept.                                                                                                                                                                                                                            |
+| **Roles**                | `owner` / `pendingOwner` / `admin` / `pendingAdmin` / `securityCouncil` / `tokenMultiplierSetter` across the ecosystem and every registered chain, grouped by holder. Fails on stalled two-step handoffs, warns on `transferOwnership(currentOwner)` no-ops and on roles held by an EOA.                                                                                                                                                                      |
+| **Registered chains**    | Each chain's protocol version, verifier, facet set, base token registration, genesis batch and settlement layer against the CTM.                                                                                                                                                                                                                                                                                                                              |
 
 Expectations the tool cannot derive from chain state are flags:
 `--era-chain-id`, `--weth`, `--max-number-of-zk-chains` (default 100),
 `--expect-testnet-verifier`, `--zk-token-l1-address`. `--env` supplies the
 bridgehub and era chain id from `permanent-values/<env>.toml`.
+
+> **L2 bytecode commitments need published preimages.** The chain creation
+> params commit to the L2 implementations by hash. When a hash does not match the
+> local build, the command reports it as _unverified_ and fails: equal length does
+> not imply equal code, so nothing can be concluded from hashes alone. Publishing
+> the bytecode through `BytecodesSupplier.publishEVMBytecode` lets the command
+> recover the preimage and decide properly, and a deployment built with
+> `bytecode_hash = "none"` reproduces the hashes exactly.
+
+> **Era CTMs are not supported.** Their force deployments use the Era
+> bytecode-hash encoding rather than the ZKsync OS `(bytes, bytes)` pair. The
+> command rejects them up front rather than aborting part-way through.
 
 > **`--zk-token-l1-address` is worth passing.** The ZK token asset id is
 > `keccak(abi.encode(originChainId, L2_NTV, token))`. Copying another

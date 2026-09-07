@@ -32,6 +32,7 @@ sol! {
         function whitelistedSettlementLayers(uint256 chainId) external view returns (bool);
         function baseTokenAssetId(uint256 chainId) external view returns (bytes32);
         function settlementLayer(uint256 chainId) external view returns (uint256);
+        function chainTypeManager(uint256 chainId) external view returns (address);
     }
 
     #[sol(rpc)]
@@ -158,6 +159,8 @@ sol! {
             bytes32 forceDeploymentHash
         );
         event DAPairUpdated(address indexed l1DAValidator, uint8 indexed l2Scheme, bool status);
+        event EVMBytecodePublished(bytes32 indexed bytecodeHash, bytes bytecode);
+        event Upgraded(address indexed implementation);
     }
 
     struct FacetCut {

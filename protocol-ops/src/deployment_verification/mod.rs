@@ -38,12 +38,23 @@ use crate::deployment_verification::contracts::{
     IServerNotifierView, ITimelockView,
 };
 use crate::deployment_verification::discovery::{
-    address_at_slot, probe, EIP1967_IMPLEMENTATION_SLOT,
+    address_at_slot, probe, EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT,
 };
 
 /// `L2_NATIVE_TOKEN_VAULT_ADDR`, the deployment-tracker leg of every NTV asset id.
 const L2_NATIVE_TOKEN_VAULT_ADDR: Address =
     Address::new(alloy::hex!("0000000000000000000000000000000000010004"));
+/// The facets `DeployCTMUtils.getChainCreationFacetCuts` puts in a chain
+/// creation cut, in cut order. A cut that is not exactly this is not a chain
+/// creation cut.
+const CHAIN_CREATION_FACETS: [&str; 6] = [
+    "AdminFacet",
+    "GettersFacet",
+    "MailboxFacet",
+    "ExecutorFacet",
+    "MigratorFacet",
+    "CommitterFacet",
+];
 /// Scheme id of `L2DACommitmentScheme.BLOBS_ZKSYNC_OS`.
 const BLOBS_ZKSYNC_OS_SCHEME: u8 = 4;
 /// Scheme id of `L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256`, i.e.
@@ -99,12 +110,14 @@ impl CodeCache {
         &mut self,
         provider: &AlloyProvider,
         address: Address,
+        block: u64,
     ) -> anyhow::Result<alloy::primitives::Bytes> {
         if let Some(code) = self.0.get(&address) {
             return Ok(code.clone());
         }
         let code = provider
             .get_code_at(address)
+            .block_id(block.into())
             .await
             .with_context(|| format!("eth_getCode({address})"))?;
         self.0.insert(address, code.clone());
@@ -128,10 +141,17 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
     let mut result = VerificationResult::labelled("verify-deployment");
 
     let chain_id = provider.get_chain_id().await.context("eth_chainId")?;
+    // Pin every code, storage and log read to one block. Without it a report
+    // taken during an upgrade or a role handoff mixes states from different
+    // blocks and is not reproducible.
+    let to_block = provider
+        .get_block_number()
+        .await
+        .context("eth_blockNumber")?;
     let index = load_artifacts(&mut result)?;
 
     result.print_section("Discovery");
-    let core = discovery::discover_core(&provider, input.bridgehub).await?;
+    let core = discovery::discover_core(&provider, input.bridgehub, to_block).await?;
     result.expect(
         core.l1_chain_id == chain_id,
         &format!("Bridgehub L1_CHAIN_ID {} matches the RPC", core.l1_chain_id),
@@ -146,12 +166,31 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
         &provider,
         input.bridgehub,
         input.from_block,
+        to_block,
     )
     .await
     .context("discovering the CTM registered on the bridgehub")?;
-    let ctm = discovery::discover_ctm(&provider, ctm_address).await?;
+    let ctm = discovery::discover_ctm(&provider, ctm_address, to_block).await?;
+    // Discovery picks one CTM. Verifying an ecosystem that has more while
+    // reporting success would be a false pass, so name the others and fail.
+    let registered_ctms =
+        registered_chain_type_managers(&provider, &core, input.from_block, to_block).await?;
+    if registered_ctms.len() > 1 {
+        result.report_error(&format!(
+            "{} chain type managers are registered on this bridgehub ({}), but this command \
+             verifies one ({}). Multi-CTM ecosystems are not supported; verify each CTM's \
+             ecosystem separately.",
+            registered_ctms.len(),
+            registered_ctms
+                .iter()
+                .map(|address| format!("{address}"))
+                .collect::<Vec<_>>()
+                .join(", "),
+            ctm.ctm
+        ));
+    }
     result.print_info(&format!(
-        "  bridgehub {}  ctm {}  protocol {}.{}.{} ({}) ",
+        "  block {to_block}  bridgehub {}  ctm {}  protocol {}.{}.{} ({})",
         core.bridgehub, ctm.ctm, ctm.semver.0, ctm.semver.1, ctm.semver.2, ctm.protocol_version
     ));
     result.print_info(&format!(
@@ -165,16 +204,38 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
         }
     ));
 
-    let params = chain_creation::fetch(&provider, ctm.ctm, input.from_block).await?;
+    anyhow::ensure!(
+        ctm.is_zksync_os,
+        "the CTM at {} is an Era CTM. Its force deployments carry the Era bytecode-hash \
+         encoding, which this command does not decode, so it would abort part-way through \
+         rather than produce a report. Era support is not implemented.",
+        ctm.ctm
+    );
+
+    // Every conclusion drawn from logs below (chain creation params, pending
+    // admins, the DA whitelist) is only as complete as the scan window. Anchor
+    // it: the bridgehub proxy's own construction event must fall inside.
+    verify_scan_window_covers_deployment(&provider, &mut result, &core, input.from_block, to_block)
+        .await?;
+
+    let params = chain_creation::fetch(&provider, ctm.ctm, input.from_block, to_block).await?;
 
     // ── bytecode ─────────────────────────────────────────────────────────
     result.print_section("Bytecode");
-    let expected =
-        build_expected_list(&provider, &mut code_cache, &core, &ctm, &params, &index).await?;
+    let (expected, proxy_admins) = build_expected_list(
+        &provider,
+        &mut code_cache,
+        &core,
+        &ctm,
+        &params,
+        &index,
+        to_block,
+    )
+    .await?;
     let mut exact = 0usize;
     let mut metadata_only = 0usize;
     for entry in &expected {
-        let code = code_cache.get(&provider, entry.address).await?;
+        let code = code_cache.get(&provider, entry.address, to_block).await?;
         if code.is_empty() {
             result.report_error(&format!("{} at {} has no code", entry.label, entry.address));
             continue;
@@ -254,7 +315,7 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
     result.print_section("Immutables");
     let expectations = immutable_expectations(input_ref, &core, &ctm);
     for entry in &expected {
-        let code = code_cache.get(&provider, entry.address).await?;
+        let code = code_cache.get(&provider, entry.address, to_block).await?;
         let Some((artifact, _)) = index.identify(&code).into_iter().next() else {
             continue;
         };
@@ -271,6 +332,15 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
             ));
         }
         for value in values {
+            if value.inconsistent {
+                result.report_error(&format!(
+                    "{}.{} does not carry the same value at all {} of its use sites — masking \
+                     hides this from the bytecode comparison, so the runtime executes with a \
+                     value other than the one reported here",
+                    entry.label, value.name, value.occurrences
+                ));
+                continue;
+            }
             let actual = value.as_b256();
             match expectations.iter().find(|(name, _)| *name == value.name) {
                 Some((_, want)) if *want == actual => result.report_ok(&format!(
@@ -297,6 +367,23 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
 
     // ── wiring ───────────────────────────────────────────────────────────
     result.print_section("Wiring");
+    for (label, admin) in &proxy_admins {
+        // ServerNotifier deliberately sits behind its own ChainAdmin-owned
+        // ProxyAdmin; everything else shares the ecosystem one.
+        let expected = if *label == "ServerNotifier" {
+            ctm.server_notifier_proxy_admin
+        } else {
+            core.proxy_admin
+        };
+        result.expect(
+            *admin == expected,
+            &format!("{label} proxy admin is {expected}"),
+            &format!(
+                "{label} proxy admin is {admin}, expected {expected} — whoever holds this slot \
+                 can replace the implementation"
+            ),
+        );
+    }
     verify_wiring(&provider, &mut result, &core, &ctm, &index).await?;
 
     // ── chain creation ───────────────────────────────────────────────────
@@ -310,6 +397,7 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
         &ctm,
         &params,
         &index,
+        to_block,
     )
     .await?;
 
@@ -319,7 +407,17 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
 
     // ── DA ───────────────────────────────────────────────────────────────
     result.print_section("Data availability");
-    verify_da(&provider, &mut result, &input, &ctm, &index, &expected).await?;
+    verify_da(
+        &provider,
+        &mut code_cache,
+        &mut result,
+        &input,
+        &ctm,
+        &index,
+        &expected,
+        to_block,
+    )
+    .await?;
 
     // ── roles ────────────────────────────────────────────────────────────
     result.print_section("Roles");
@@ -355,6 +453,91 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
     result.ensure_success()
 }
 
+/// Every CTM currently registered on the bridgehub.
+///
+/// `ChainTypeManagerAdded` is append-only in the log, so registration is
+/// re-checked on chain rather than inferred from the events alone.
+async fn registered_chain_type_managers(
+    provider: &AlloyProvider,
+    core: &discovery::CoreAddresses,
+    from_block: u64,
+    to_block: u64,
+) -> anyhow::Result<Vec<Address>> {
+    let filter = Filter::new()
+        .address(core.bridgehub)
+        .event_signature(keccak256(b"ChainTypeManagerAdded(address)"))
+        .from_block(from_block)
+        .to_block(to_block);
+    let logs = provider
+        .get_logs(&filter)
+        .await
+        .context("eth_getLogs for ChainTypeManagerAdded")?;
+
+    let bridgehub = IBridgehubView::new(core.bridgehub, provider);
+    let mut out: Vec<Address> = Vec::new();
+    for log in logs {
+        let Some(topic) = log.topics().get(1) else {
+            continue;
+        };
+        let candidate = Address::from_slice(&topic[12..]);
+        if out.contains(&candidate) {
+            continue;
+        }
+        if bridgehub
+            .chainTypeManagerIsRegistered(candidate)
+            .call()
+            .await?
+        {
+            out.push(candidate);
+        }
+    }
+    Ok(out)
+}
+
+/// Fails when `--from-block` starts after the ecosystem was deployed.
+///
+/// The pending-admin state and the DA whitelist are both reconstructed by
+/// replaying events, and "no events found" is otherwise indistinguishable
+/// from "never set". A window that misses the deployment turns a live pending
+/// handoff, or an allowed DA pair, into a silent pass.
+async fn verify_scan_window_covers_deployment(
+    provider: &AlloyProvider,
+    result: &mut VerificationResult,
+    core: &discovery::CoreAddresses,
+    from_block: u64,
+    to_block: u64,
+) -> anyhow::Result<()> {
+    // `Upgraded` is emitted by the transparent proxy in its constructor, so it
+    // is the earliest event the bridgehub can possibly have.
+    let filter = Filter::new()
+        .address(core.bridgehub)
+        .event_signature(IEcosystemEvents::Upgraded::SIGNATURE_HASH)
+        .from_block(from_block)
+        .to_block(to_block);
+    let logs = provider
+        .get_logs(&filter)
+        .await
+        .context("eth_getLogs for the bridgehub proxy Upgraded event")?;
+    match logs.first().and_then(|log| log.block_number) {
+        Some(block) => {
+            result.report_ok(&format!(
+                "scan window {from_block}..={to_block} covers the bridgehub deployment (block \
+                 {block})"
+            ));
+            Ok(())
+        }
+        None => {
+            result.report_error(&format!(
+                "--from-block {from_block} starts after the bridgehub was deployed: its \
+                 construction `Upgraded` event is not in the scanned range. Pending admins and \
+                 the DA whitelist are replayed from events, so a late window reports \
+                 'never set' for state that was set earlier. Lower --from-block."
+            ));
+            Ok(())
+        }
+    }
+}
+
 fn load_artifacts(result: &mut VerificationResult) -> anyhow::Result<ArtifactIndex> {
     let l1 = paths::resolve_l1_contracts_path()?;
     let da = paths::path_from_root("da-contracts");
@@ -380,8 +563,10 @@ async fn build_expected_list(
     ctm: &discovery::CtmAddresses,
     params: &chain_creation::ChainCreationParams,
     index: &ArtifactIndex,
-) -> anyhow::Result<Vec<Expected>> {
+    to_block: u64,
+) -> anyhow::Result<(Vec<Expected>, Vec<(&'static str, Address)>)> {
     let mut out: Vec<Expected> = Vec::new();
+    let mut proxy_admins: Vec<(&'static str, Address)> = Vec::new();
     macro_rules! add {
         ($label:expr, $address:expr, $artifacts:expr) => {
             out.push(Expected {
@@ -497,8 +682,15 @@ async fn build_expected_list(
             continue;
         }
         add!(label, address, vec!["TransparentUpgradeableProxy"]);
+        // Whoever holds the admin slot can replace the implementation, so a
+        // proxy running the right code under an unexpected admin is not a
+        // verified proxy.
+        proxy_admins.push((
+            label,
+            address_at_slot(provider, address, EIP1967_ADMIN_SLOT, to_block).await?,
+        ));
         let implementation =
-            address_at_slot(provider, address, EIP1967_IMPLEMENTATION_SLOT).await?;
+            address_at_slot(provider, address, EIP1967_IMPLEMENTATION_SLOT, to_block).await?;
         out.push(Expected {
             label: Box::leak(format!("{label} impl").into_boxed_str()),
             address: implementation,
@@ -516,16 +708,8 @@ async fn build_expected_list(
     add!("DefaultUpgrade", ctm.default_upgrade, default_upgrade_names);
 
     // Diamond facets come from the live chain creation cut, in cut order.
-    let facet_names = [
-        "AdminFacet",
-        "GettersFacet",
-        "MailboxFacet",
-        "ExecutorFacet",
-        "MigratorFacet",
-        "CommitterFacet",
-    ];
     for (position, cut) in params.diamond_cut.facetCuts.iter().enumerate() {
-        let label: &'static str = facet_names
+        let label: &'static str = CHAIN_CREATION_FACETS
             .get(position)
             .copied()
             .unwrap_or("Facet (unexpected position)");
@@ -539,18 +723,34 @@ async fn build_expected_list(
 
     // The rollup DA manager and the 7702 checker are only reachable through
     // facet immutables, so they are discovered rather than configured.
-    if let Some(address) =
-        immutable_address(index, provider, code_cache, params, 0, "ROLLUP_DA_MANAGER").await?
+    if let Some(address) = immutable_address(
+        index,
+        provider,
+        code_cache,
+        params,
+        0,
+        "ROLLUP_DA_MANAGER",
+        to_block,
+    )
+    .await?
     {
         add!("RollupDAManager", address, vec!["RollupDAManager"]);
     }
-    if let Some(address) =
-        immutable_address(index, provider, code_cache, params, 2, "EIP_7702_CHECKER").await?
+    if let Some(address) = immutable_address(
+        index,
+        provider,
+        code_cache,
+        params,
+        2,
+        "EIP_7702_CHECKER",
+        to_block,
+    )
+    .await?
     {
         add!("EIP7702Checker", address, vec!["EIP7702Checker"]);
     }
 
-    Ok(out)
+    Ok((out, proxy_admins))
 }
 
 /// Reads one named immutable out of a deployed facet.
@@ -561,11 +761,12 @@ async fn immutable_address(
     params: &chain_creation::ChainCreationParams,
     facet_position: usize,
     immutable: &str,
+    to_block: u64,
 ) -> anyhow::Result<Option<Address>> {
     let Some(cut) = params.diamond_cut.facetCuts.get(facet_position) else {
         return Ok(None);
     };
-    let code = code_cache.get(provider, cut.facet).await?;
+    let code = code_cache.get(provider, cut.facet, to_block).await?;
     let Some((artifact, _)) = index.identify(&code).into_iter().next() else {
         return Ok(None);
     };
@@ -718,6 +919,7 @@ async fn verify_chain_creation(
     ctm: &discovery::CtmAddresses,
     params: &chain_creation::ChainCreationParams,
     index: &ArtifactIndex,
+    to_block: u64,
 ) -> anyhow::Result<()> {
     result.print_info(&format!(
         "  parameters last set at block {}",
@@ -781,29 +983,45 @@ async fn verify_chain_creation(
             "genesisIndexRepeatedStorageChanges is 0",
             &format!("got {}", params.genesis_index_repeated_storage_changes),
         );
-        // `DiamondInit` takes three EraVM bytecode hashes that ZKsync OS
-        // does not use; a non-zero here means the wrong VM's genesis config.
-        let zero_init = params
-            .diamond_cut
-            .initCalldata
-            .iter()
-            .all(|byte| *byte == 0);
+        // `DiamondInit.initialize` decodes three bytes32 that ZKsync OS does
+        // not use. Checking only that the supplied bytes are zero passes
+        // vacuously on empty or truncated calldata, which would still make
+        // chain creation revert — so the length is part of the check.
+        const DIAMOND_INIT_CALLDATA_LEN: usize = 3 * 32;
+        let init = &params.diamond_cut.initCalldata;
         result.expect(
-            zero_init,
-            "diamondCut.initCalldata is all zero (no EraVM bytecode hashes)",
+            init.len() == DIAMOND_INIT_CALLDATA_LEN && init.iter().all(|byte| *byte == 0),
+            "diamondCut.initCalldata is three zero words (no EraVM bytecode hashes)",
             &format!(
-                "got 0x{}",
-                alloy::hex::encode(&params.diamond_cut.initCalldata)
+                "diamondCut.initCalldata is {} bytes (0x{}), expected \
+                 {DIAMOND_INIT_CALLDATA_LEN} zero bytes",
+                init.len(),
+                alloy::hex::encode(init)
             ),
         );
     }
 
     // ── the diamond cut ──────────────────────────────────────────────────
+    // The cut is governance-supplied data: iterating whatever it contains
+    // would let a short cut (no CommitterFacet, say) pass every per-facet
+    // check and still produce chains that cannot commit.
     let expected_freezable = [false, false, true, true, false, true];
+    result.expect(
+        params.diamond_cut.facetCuts.len() == CHAIN_CREATION_FACETS.len(),
+        &format!(
+            "chain creation cut has all {} canonical facets",
+            CHAIN_CREATION_FACETS.len()
+        ),
+        &format!(
+            "chain creation cut has {} facets, expected the canonical {:?}",
+            params.diamond_cut.facetCuts.len(),
+            CHAIN_CREATION_FACETS
+        ),
+    );
     let mut seen: HashSet<[u8; 4]> = HashSet::new();
     let mut duplicates = 0usize;
     for (position, cut) in params.diamond_cut.facetCuts.iter().enumerate() {
-        let code = code_cache.get(provider, cut.facet).await?;
+        let code = code_cache.get(provider, cut.facet, to_block).await?;
         let from_bytecode = facet_selectors_from_bytecode(&code);
         let in_cut = chain_creation::cut_selectors(&cut.selectors);
 
@@ -875,6 +1093,17 @@ async fn verify_chain_creation(
         "forceDeployments.l1ChainId",
         &format!("got {}", data.l1ChainId),
     );
+    // Always reconcile against the value already baked into L1AssetRouter:
+    // the two drive L1 and future-L2 routing and must agree whether or not the
+    // operator supplied an external expectation.
+    result.expect(
+        data.eraChainId == core.era_chain_id,
+        "forceDeployments.eraChainId agrees with L1AssetRouter.ERA_CHAIN_ID",
+        &format!(
+            "forceDeployments.eraChainId is {} but L1AssetRouter.ERA_CHAIN_ID is {}",
+            data.eraChainId, core.era_chain_id
+        ),
+    );
     if let Some(era_chain_id) = input.expected_era_chain_id {
         result.expect(
             data.eraChainId == U256::from(era_chain_id),
@@ -926,35 +1155,106 @@ async fn verify_chain_creation(
 
     verify_zk_token_asset_id(provider, result, input, core, data.zkTokenAssetId).await?;
 
-    // L2 implementations that every new chain force-deploys.
-    for entry in force_deployment_entries(data)? {
-        match verify_bytecode_info(index, entry.artifact, &entry.implementation) {
-            BytecodeInfoVerdict::Exact => result.report_ok(&format!(
-                "forceDeployments.{} = {} (exact)",
-                entry.field, entry.artifact
-            )),
-            BytecodeInfoVerdict::MetadataOnly => result.report_warn(&format!(
-                "forceDeployments.{}: {} has the right length ({} bytes) and the local build is \
-                 the same code, but the blake2s/keccak differ because they hash the CBOR \
-                 metadata trailer. Consistent with this checkout, not independently reproducible.",
-                entry.field, entry.artifact, entry.implementation.length
-            )),
-            BytecodeInfoVerdict::Mismatch { local } => result.report_error(&format!(
-                "forceDeployments.{}: on chain is {} bytes (blake {}), local {} is {} bytes \
-                 (blake {})",
-                entry.field,
-                entry.implementation.length,
-                entry.implementation.blake,
-                entry.artifact,
-                local.length,
-                local.blake
-            )),
-            BytecodeInfoVerdict::MissingArtifact => result.report_error(&format!(
-                "forceDeployments.{}: no artifact named {} in the local build",
-                entry.field, entry.artifact
-            )),
-        }
+    // L2 implementations, and the SystemContractProxy each one is installed
+    // behind, that every new chain force-deploys.
+    let published = chain_creation::published_bytecodes(
+        provider,
+        ctm.bytecodes_supplier,
+        input.from_block,
+        to_block,
+    )
+    .await?;
+    if published.is_empty() {
+        result.print_info(
+            "  no bytecode preimages published on L1; hashes that differ can only be reported \
+             as unverifiable",
+        );
     }
+
+    // Every entry whose hash the local build does not produce and whose
+    // preimage is unpublished is *unverified*, not verified-bad. Reporting
+    // each one separately buries the findings that are; report the set once.
+    let mut unverifiable: Vec<String> = Vec::new();
+    let mut report_verdict = |what: String, verdict: BytecodeInfoVerdict| match verdict {
+        BytecodeInfoVerdict::Exact => result.report_ok(&format!("{what} (exact)")),
+        BytecodeInfoVerdict::MetadataOnlyProven { digests } => result.report_ok(&format!(
+            "{what} (metadata-only, proven against the published preimage, {digests} cbor \
+             digest(s))"
+        )),
+        BytecodeInfoVerdict::Unverifiable => unverifiable.push(what),
+        BytecodeInfoVerdict::Mismatch { local } => result.report_error(&format!(
+            "{what}: on chain is a different contract (local build is {} bytes, blake {})",
+            local.length, local.blake
+        )),
+        BytecodeInfoVerdict::MissingArtifact => {
+            result.report_error(&format!("{what}: no such artifact in the local build"))
+        }
+    };
+
+    for entry in force_deployment_entries(data)? {
+        report_verdict(
+            format!("forceDeployments.{} = {}", entry.field, entry.artifact),
+            verify_bytecode_info(index, entry.artifact, &entry.implementation, &published),
+        );
+        // The proxy half is force-deployed at the fixed L2 address itself, so
+        // a wrong one takes over every core contract.
+        report_verdict(
+            format!("forceDeployments.{} proxy", entry.field),
+            verify_bytecode_info(
+                index,
+                chain_creation::SYSTEM_CONTRACT_PROXY_ARTIFACT,
+                &entry.proxy,
+                &published,
+            ),
+        );
+    }
+
+    // `l2TokenProxyBytecodeHash` is keccak of the deployed BeaconProxy code and
+    // is written into the L2 native token vault at genesis; a wrong value
+    // breaks every bridged token the chain ever deploys.
+    match index.get(chain_creation::BEACON_PROXY_ARTIFACT) {
+        Some(beacon_proxy) => {
+            let local = keccak256(&beacon_proxy.deployed_code);
+            if local == data.l2TokenProxyBytecodeHash {
+                result.report_ok("forceDeployments.l2TokenProxyBytecodeHash = BeaconProxy");
+            } else if published.contains_key(&data.l2TokenProxyBytecodeHash) {
+                let preimage = &published[&data.l2TokenProxyBytecodeHash];
+                result.expect(
+                    matches!(
+                        beacon_proxy.compare(preimage),
+                        Some(CodeMatch::MetadataOnly { .. })
+                    ),
+                    "forceDeployments.l2TokenProxyBytecodeHash = BeaconProxy (metadata-only, \
+                     proven against the published preimage)",
+                    &format!(
+                        "forceDeployments.l2TokenProxyBytecodeHash {} resolves to a published \
+                         bytecode that is not BeaconProxy",
+                        data.l2TokenProxyBytecodeHash
+                    ),
+                );
+            } else {
+                unverifiable.push("forceDeployments.l2TokenProxyBytecodeHash".to_string());
+            }
+        }
+        None => result.report_error(
+            "no BeaconProxy artifact in the local build; cannot check \
+             forceDeployments.l2TokenProxyBytecodeHash",
+        ),
+    }
+
+    if !unverifiable.is_empty() {
+        result.report_error(&format!(
+            "{} L2 bytecode commitment(s) could not be verified: the on-chain hash does not \
+             match this build and the bytecode behind it was never published to the \
+             BytecodesSupplier, so nothing can be concluded — equal length does not imply equal \
+             code. Publish the preimages (`BytecodesSupplier.publishEVMBytecode`) or build the \
+             deployment with `bytecode_hash = \"none\"` so the hashes are reproducible. \
+             Unverified: {}",
+            unverifiable.len(),
+            unverifiable.join(", ")
+        ));
+    }
+
     Ok(())
 }
 
@@ -1108,13 +1408,16 @@ fn verify_verifier_and_genesis(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn verify_da(
     provider: &AlloyProvider,
+    code_cache: &mut CodeCache,
     result: &mut VerificationResult,
     input: &VerifyDeploymentInput,
     ctm: &discovery::CtmAddresses,
-    _index: &ArtifactIndex,
+    index: &ArtifactIndex,
     expected: &[Expected],
+    to_block: u64,
 ) -> anyhow::Result<()> {
     let Some(manager) = expected
         .iter()
@@ -1128,7 +1431,8 @@ async fn verify_da(
     let filter = Filter::new()
         .address(manager)
         .event_signature(IEcosystemEvents::DAPairUpdated::SIGNATURE_HASH)
-        .from_block(input.from_block);
+        .from_block(input.from_block)
+        .to_block(to_block);
     let logs = provider
         .get_logs(&filter)
         .await
@@ -1143,8 +1447,35 @@ async fn verify_da(
             allowed.push(pair);
         }
     }
+    // A whitelisted address is only meaningful if it is actually one of the DA
+    // validators: nothing stops an EOA or an arbitrary contract being paired.
+    const DA_VALIDATOR_ARTIFACTS: [&str; 4] = [
+        "RollupL1DAValidator",
+        "BlobsL1DAValidatorZKsyncOS",
+        "ValidiumL1DAValidator",
+        "AvailL1DAValidator",
+    ];
     for (validator, scheme) in &allowed {
-        result.print_info(&format!("  allowed DA pair: {validator} scheme {scheme}"));
+        let code = code_cache.get(provider, *validator, to_block).await?;
+        let identified = index
+            .identify(&code)
+            .into_iter()
+            .find(|(artifact, _)| DA_VALIDATOR_ARTIFACTS.contains(&artifact.name.as_str()));
+        match identified {
+            Some((artifact, kind)) => result.report_ok(&format!(
+                "allowed DA pair: {validator} scheme {scheme} = {} ({})",
+                artifact.name,
+                kind.label()
+            )),
+            None if code.is_empty() => result.report_error(&format!(
+                "allowed DA pair: {validator} scheme {scheme} has no code — chains pairing with \
+                 it cannot post DA"
+            )),
+            None => result.report_error(&format!(
+                "allowed DA pair: {validator} scheme {scheme} is not any of {DA_VALIDATOR_ARTIFACTS:?} \
+                 in the local build"
+            )),
+        }
     }
     result.expect(
         !allowed.is_empty(),
@@ -1232,6 +1563,22 @@ async fn verify_roles(
         input.from_block,
     )
     .await?;
+    // Chain admins control DA, fees and the transaction filterer, so they
+    // belong in the same audit as the ecosystem roles.
+    let bridgehub = IBridgehubView::new(core.bridgehub, provider);
+    for chain_id in bridgehub.getAllZKChainChainIDs().call().await? {
+        let chain = bridgehub.getZKChain(chain_id).call().await?;
+        let admin = contracts::IZKChainView::new(chain, provider)
+            .getAdmin()
+            .call()
+            .await?;
+        let label: &'static str = Box::leak(format!("chain {chain_id}").into_boxed_str());
+        roles::collect_admin(provider, &mut report, label, chain, admin, input.from_block).await?;
+        // The admin is itself usually a ChainAdmin contract with an owner.
+        let admin_label: &'static str =
+            Box::leak(format!("chain {chain_id} ChainAdmin").into_boxed_str());
+        roles::collect_ownable(provider, &mut report, admin_label, admin).await?;
+    }
     roles::classify_holders(provider, &mut report).await?;
 
     for (holder, holdings) in report.by_holder() {
@@ -1319,6 +1666,14 @@ async fn verify_roles(
                  are registered — the first commit reverts and nobody can sign it"
             ),
         );
+        if threshold.is_zero() && !validators.is_zero() {
+            result.report_warn(&format!(
+                "{validators} shared validator(s) are registered but sharedSigningThreshold is 0, \
+                 so MultisigCommitter accepts commits with no signatures. That is the intended \
+                 posture until the set is final — raise the threshold once it is, and never \
+                 before the validators exist."
+            ));
+        }
     }
     Ok(())
 }
@@ -1340,6 +1695,17 @@ async fn verify_chains(
     for chain_id in chain_ids {
         let address = bh.getZKChain(chain_id).call().await?;
         let chain = contracts::IZKChainView::new(address, provider);
+        // Comparing a chain against a CTM that is not its own would produce
+        // misleading mismatches rather than a real finding.
+        let chain_ctm = bh.chainTypeManager(chain_id).call().await?;
+        if chain_ctm != ctm.ctm {
+            result.report_error(&format!(
+                "chain {chain_id} belongs to CTM {chain_ctm}, not the one being verified \
+                 ({}); its parameters are not covered by this report",
+                ctm.ctm
+            ));
+            continue;
+        }
         let protocol_version = chain.getProtocolVersion().call().await?;
         let verifier = chain.getVerifier().call().await?;
         let stored_zero = chain.storedBatchHash(U256::ZERO).call().await?;
@@ -1381,6 +1747,18 @@ async fn verify_chains(
             ),
         );
         let base_token = chain.getBaseTokenAssetId().call().await?;
+        // Two copies of the same value drive different halves of fee and
+        // bridge processing; if they diverge, L1 routes a different asset than
+        // the chain thinks it has.
+        let bridgehub_base_token = bh.baseTokenAssetId(chain_id).call().await?;
+        result.expect(
+            base_token == bridgehub_base_token,
+            &format!("chain {chain_id} base token agrees with the bridgehub"),
+            &format!(
+                "chain {chain_id} reports base token {base_token} but the bridgehub has \
+                 {bridgehub_base_token}"
+            ),
+        );
         result.expect(
             bh.assetIdIsRegistered(base_token).call().await?,
             &format!("chain {chain_id} base token asset id is registered on the bridgehub"),

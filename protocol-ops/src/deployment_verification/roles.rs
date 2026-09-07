@@ -306,6 +306,60 @@ mod tests {
     }
 
     #[test]
+    fn a_pending_role_pointing_at_the_live_holder_is_a_self_transfer() {
+        // `transferOwnership(currentOwner)` leaves pendingOwner set to the
+        // address that already holds it. That is a no-op to clear, not a
+        // handoff somebody still has to accept.
+        let holder = Address::repeat_byte(7);
+        let contract = Address::repeat_byte(9);
+        let report = RoleReport {
+            holdings: vec![
+                RoleHolding {
+                    contract: "NTV".into(),
+                    contract_address: contract,
+                    role: Role::Owner,
+                    holder,
+                },
+                RoleHolding {
+                    contract: "NTV".into(),
+                    contract_address: contract,
+                    role: Role::PendingOwner,
+                    holder,
+                },
+            ],
+            ..Default::default()
+        };
+        assert!(report.stalled_handoffs().is_empty());
+        let self_transfers = report.self_transfers();
+        assert_eq!(self_transfers.len(), 1);
+        assert_eq!(self_transfers[0].contract, "NTV");
+    }
+
+    #[test]
+    fn a_pending_role_pointing_elsewhere_is_stalled() {
+        let contract = Address::repeat_byte(9);
+        let report = RoleReport {
+            holdings: vec![
+                RoleHolding {
+                    contract: "InteropHandler".into(),
+                    contract_address: contract,
+                    role: Role::Owner,
+                    holder: Address::repeat_byte(1),
+                },
+                RoleHolding {
+                    contract: "InteropHandler".into(),
+                    contract_address: contract,
+                    role: Role::PendingOwner,
+                    holder: Address::repeat_byte(2),
+                },
+            ],
+            ..Default::default()
+        };
+        assert!(report.self_transfers().is_empty());
+        assert_eq!(report.stalled_handoffs().len(), 1);
+    }
+
+    #[test]
     fn a_cleared_pending_role_is_not_a_stalled_handoff() {
         let report = RoleReport {
             holdings: vec![

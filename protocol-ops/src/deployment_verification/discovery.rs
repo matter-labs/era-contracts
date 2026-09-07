@@ -24,14 +24,17 @@ pub const EIP1967_ADMIN_SLOT: FixedBytes<32> = FixedBytes(alloy::hex!(
     "b53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103"
 ));
 
-/// Reads an address out of a raw storage slot.
+/// Reads an address out of a raw storage slot, at a pinned block so the whole
+/// report describes one chain state.
 pub async fn address_at_slot(
     provider: &AlloyProvider,
     address: Address,
     slot: FixedBytes<32>,
+    block: u64,
 ) -> anyhow::Result<Address> {
     let word = provider
         .get_storage_at(address, U256::from_be_bytes(slot.0))
+        .block_id(block.into())
         .await
         .with_context(|| format!("eth_getStorageAt({address}, {slot})"))?;
     Ok(Address::from_slice(&word.to_be_bytes::<32>()[12..]))
@@ -45,14 +48,28 @@ pub async fn address_at_slot(
 pub async fn probe<T>(call: alloy::contract::Result<T>, what: &str) -> anyhow::Result<Option<T>> {
     match call {
         Ok(value) => Ok(Some(value)),
-        Err(alloy::contract::Error::TransportError(alloy::transports::RpcError::ErrorResp(_))) => {
-            Ok(None)
-        }
-        // `Ok(())`-shaped empty returndata also means "no such function here".
+        Err(alloy::contract::Error::TransportError(alloy::transports::RpcError::ErrorResp(
+            err,
+        ))) if is_evm_revert(err.code, &err.message) => Ok(None),
+        // Empty returndata where a value was expected also means "no such
+        // function here".
         Err(alloy::contract::Error::AbiError(_)) => Ok(None),
         Err(err) => Err(anyhow::anyhow!("{what}: {err}")),
     }
 }
+
+/// Whether a JSON-RPC error response is an EVM revert rather than a provider
+/// failure. Rate limiting, backend errors and unavailable state must not be
+/// read as "this contract does not expose the getter" — that would silently
+/// drop role and configuration checks out of an otherwise clean report.
+fn is_evm_revert(code: i64, message: &str) -> bool {
+    // Geth and friends use code 3 for a reverted `eth_call`, with the revert
+    // data attached; some providers only set the message.
+    code == EVM_REVERT_ERROR_CODE || message.to_ascii_lowercase().contains("execution reverted")
+}
+
+/// JSON-RPC error code for a reverted `eth_call`.
+const EVM_REVERT_ERROR_CODE: i64 = 3;
 
 /// The bridgehub layer, as it is wired on chain.
 #[derive(Debug, Clone)]
@@ -81,6 +98,7 @@ pub struct CoreAddresses {
 pub async fn discover_core(
     provider: &AlloyProvider,
     bridgehub: Address,
+    block: u64,
 ) -> anyhow::Result<CoreAddresses> {
     let bh = IBridgehubView::new(bridgehub, provider);
 
@@ -122,7 +140,7 @@ pub async fn discover_core(
         bridgehub,
         governance: bh.owner().call().await.context("bridgehub.owner()")?,
         chain_admin: bh.admin().call().await.context("bridgehub.admin()")?,
-        proxy_admin: address_at_slot(provider, bridgehub, EIP1967_ADMIN_SLOT).await?,
+        proxy_admin: address_at_slot(provider, bridgehub, EIP1967_ADMIN_SLOT, block).await?,
         message_root: bh
             .messageRoot()
             .call()
@@ -207,7 +225,11 @@ pub struct CtmAddresses {
     pub initial_force_deployment_hash: FixedBytes<32>,
 }
 
-pub async fn discover_ctm(provider: &AlloyProvider, ctm: Address) -> anyhow::Result<CtmAddresses> {
+pub async fn discover_ctm(
+    provider: &AlloyProvider,
+    ctm: Address,
+    block: u64,
+) -> anyhow::Result<CtmAddresses> {
     let c = ICtmView::new(ctm, provider);
     let protocol_version = c
         .protocolVersion()
@@ -262,8 +284,13 @@ pub async fn discover_ctm(provider: &AlloyProvider, ctm: Address) -> anyhow::Res
             .await
             .context("ctm.defaultUpgrade()")?,
         server_notifier,
-        server_notifier_proxy_admin: address_at_slot(provider, server_notifier, EIP1967_ADMIN_SLOT)
-            .await?,
+        server_notifier_proxy_admin: address_at_slot(
+            provider,
+            server_notifier,
+            EIP1967_ADMIN_SLOT,
+            block,
+        )
+        .await?,
         validator_timelock: c
             .validatorTimelockPostV29()
             .call()

@@ -52,6 +52,10 @@ pub struct ImmutableValue {
     /// and ascending AST id is declaration order.
     pub name: String,
     pub raw: Vec<u8>,
+    /// The use sites of this immutable do not all carry `raw`.
+    pub inconsistent: bool,
+    /// How many use sites were read.
+    pub occurrences: usize,
 }
 
 impl ImmutableValue {
@@ -84,9 +88,10 @@ pub struct Artifact {
     /// slot at each use site, and all of them must be masked before two
     /// builds can be compared.
     immutable_slots: Vec<(usize, usize)>,
-    /// First occurrence of each immutable, in declaration order — one entry
-    /// per source-level `immutable`, which is what the value tables label.
-    immutables: Vec<(usize, usize)>,
+    /// Every occurrence of each immutable, grouped and in declaration order —
+    /// one entry per source-level `immutable`, which is what the value tables
+    /// label.
+    immutables: Vec<Vec<(usize, usize)>>,
     /// Selectors derived from the artifact ABI, independent of `evmole`.
     pub abi_selectors: HashSet<[u8; 4]>,
 }
@@ -115,27 +120,60 @@ impl Artifact {
         if masked_deployed == masked_local {
             return Some(CodeMatch::Exact);
         }
-        let (blanked_deployed, digests) = blank_cbor_digests(&masked_deployed);
-        let (blanked_local, _) = blank_cbor_digests(&masked_local);
-        (blanked_deployed == blanked_local && digests > 0)
-            .then_some(CodeMatch::MetadataOnly { digests })
+        let offsets = cbor_digest_offsets(&masked_local);
+        if offsets.is_empty() {
+            return None;
+        }
+        (blank_at(&masked_deployed, &offsets) == blank_at(&masked_local, &offsets)).then_some(
+            CodeMatch::MetadataOnly {
+                digests: offsets.len(),
+            },
+        )
     }
 
     /// Reads each immutable's value out of deployed runtime code.
+    ///
+    /// Solc splices the same value at every use site, so a runtime whose
+    /// occurrences disagree has been tampered with at one of them — masking
+    /// hides that from `compare`, which is why `inconsistent` is carried out
+    /// here rather than left implicit.
     pub fn immutable_values(&self, deployed: &[u8]) -> Vec<ImmutableValue> {
         let names = immutable_names(&self.name);
         self.immutables
             .iter()
             .enumerate()
-            .filter(|(_, (start, len))| start + len <= deployed.len())
-            .map(|(i, (start, len))| ImmutableValue {
-                name: names
-                    .and_then(|n| n.get(i).copied())
-                    .map(str::to_string)
-                    .unwrap_or_else(|| format!("#{i}")),
-                raw: deployed[*start..start + len].to_vec(),
+            .filter_map(|(i, occurrences)| {
+                let readable: Vec<Vec<u8>> = occurrences
+                    .iter()
+                    .filter(|(start, len)| start + len <= deployed.len())
+                    .map(|(start, len)| deployed[*start..start + len].to_vec())
+                    .collect();
+                let first = readable.first()?.clone();
+                Some(ImmutableValue {
+                    name: names
+                        .and_then(|n| n.get(i).copied())
+                        .map(str::to_string)
+                        .unwrap_or_else(|| format!("#{i}")),
+                    inconsistent: readable.iter().any(|value| *value != first),
+                    occurrences: readable.len(),
+                    raw: first,
+                })
             })
             .collect()
+    }
+
+    /// An artifact with no immutables, for tests in sibling modules.
+    #[cfg(test)]
+    pub fn for_test(name: &str, deployed_code: Vec<u8>) -> Self {
+        Self {
+            name: name.to_string(),
+            file: format!("{name}.sol"),
+            source: "test".to_string(),
+            deployed_code,
+            immutable_slots: Vec::new(),
+            immutables: Vec::new(),
+            abi_selectors: HashSet::new(),
+        }
     }
 
     pub fn has_immutable_names(&self) -> bool {
@@ -143,23 +181,33 @@ impl Artifact {
     }
 }
 
-/// Blanks every CBOR metadata IPFS digest in `code`, returning the normalised
-/// bytes and how many were blanked.
-fn blank_cbor_digests(code: &[u8]) -> (Vec<u8>, usize) {
-    let mut out = code.to_vec();
-    let mut found = 0usize;
+/// Offsets of the CBOR metadata IPFS digests in `code`.
+///
+/// Only ever computed from the *local* artifact. Deriving them from the
+/// deployed code as well would let a crafted runtime introduce its own
+/// blanking windows by embedding the tag in executable code, and hide 34
+/// bytes of difference behind each one.
+fn cbor_digest_offsets(code: &[u8]) -> Vec<usize> {
+    let mut offsets = Vec::new();
     let mut cursor = 0usize;
-    while let Some(offset) = find_subslice(&out[cursor..], &CBOR_IPFS_TAG) {
+    while let Some(offset) = find_subslice(&code[cursor..], &CBOR_IPFS_TAG) {
         let digest_start = cursor + offset + CBOR_IPFS_TAG.len();
-        let digest_end = digest_start + CBOR_IPFS_DIGEST_LEN;
-        if digest_end > out.len() {
+        if digest_start + CBOR_IPFS_DIGEST_LEN > code.len() {
             break;
         }
-        out[digest_start..digest_end].fill(0);
-        found += 1;
-        cursor = digest_end;
+        offsets.push(digest_start);
+        cursor = digest_start + CBOR_IPFS_DIGEST_LEN;
     }
-    (out, found)
+    offsets
+}
+
+/// Blanks `code` at the given digest offsets.
+fn blank_at(code: &[u8], offsets: &[usize]) -> Vec<u8> {
+    let mut out = code.to_vec();
+    for start in offsets {
+        out[*start..start + CBOR_IPFS_DIGEST_LEN].fill(0);
+    }
+    out
 }
 
 fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -206,6 +254,23 @@ impl ArtifactIndex {
             "no artifacts with deployed bytecode found; is the build up to date?"
         );
         Ok(Self { by_len, by_name })
+    }
+
+    /// Builds an index straight from artifacts, for tests that need a known
+    /// local build rather than a Foundry `out/` directory.
+    #[cfg(test)]
+    pub fn from_artifacts(artifacts: Vec<Artifact>) -> Self {
+        let mut by_len: HashMap<usize, Vec<Arc<Artifact>>> = HashMap::new();
+        let mut by_name: HashMap<String, Arc<Artifact>> = HashMap::new();
+        for artifact in artifacts {
+            let artifact = Arc::new(artifact);
+            by_len
+                .entry(artifact.deployed_code.len())
+                .or_default()
+                .push(artifact.clone());
+            by_name.insert(artifact.name.clone(), artifact);
+        }
+        Self { by_len, by_name }
     }
 
     pub fn get(&self, name: &str) -> Option<&Arc<Artifact>> {
@@ -344,15 +409,17 @@ fn read_artifact(source: &str, file: &str, path: &Path) -> anyhow::Result<Option
 
     // Ascending AST id is declaration order, which is how the name tables and
     // the deploy scripts' constructor arguments are ordered.
-    let mut by_declaration: Vec<(u64, usize, usize)> = Vec::new();
+    let mut by_declaration: Vec<(u64, Vec<(usize, usize)>)> = Vec::new();
     let mut immutable_slots: Vec<(usize, usize)> = Vec::new();
     for (ast_id, refs) in &bytecode.immutable_references {
         let ast_id = ast_id.parse::<u64>().unwrap_or(u64::MAX);
-        immutable_slots.extend(refs.iter().map(|entry| (entry.start, entry.length)));
-        // The same value is spliced at every use site, so the first is
-        // enough to read it back.
-        if let Some(first) = refs.first() {
-            by_declaration.push((ast_id, first.start, first.length));
+        let occurrences: Vec<(usize, usize)> = refs
+            .iter()
+            .map(|entry| (entry.start, entry.length))
+            .collect();
+        immutable_slots.extend(occurrences.iter().copied());
+        if !occurrences.is_empty() {
+            by_declaration.push((ast_id, occurrences));
         }
     }
     by_declaration.sort();
@@ -384,7 +451,7 @@ fn read_artifact(source: &str, file: &str, path: &Path) -> anyhow::Result<Option
         immutable_slots,
         immutables: by_declaration
             .into_iter()
-            .map(|(_, start, len)| (start, len))
+            .map(|(_, occurrences)| occurrences)
             .collect(),
         abi_selectors,
     }))
@@ -452,40 +519,103 @@ fn immutable_names(contract: &str) -> Option<&'static [&'static str]> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn blanks_every_cbor_digest() {
+    fn with_two_trailers(first: u8, second: u8) -> Vec<u8> {
         let mut code = vec![0x60, 0x80];
         code.extend_from_slice(&CBOR_IPFS_TAG);
-        code.extend_from_slice(&[0xAA; CBOR_IPFS_DIGEST_LEN]);
+        code.extend_from_slice(&[first; CBOR_IPFS_DIGEST_LEN]);
         code.extend_from_slice(&[0x11, 0x22]);
         code.extend_from_slice(&CBOR_IPFS_TAG);
-        code.extend_from_slice(&[0xBB; CBOR_IPFS_DIGEST_LEN]);
+        code.extend_from_slice(&[second; CBOR_IPFS_DIGEST_LEN]);
+        code
+    }
 
-        let (blanked, count) = blank_cbor_digests(&code);
-        assert_eq!(count, 2);
-        assert!(blanked[10..10 + CBOR_IPFS_DIGEST_LEN]
-            .iter()
-            .all(|b| *b == 0));
-        assert!(blanked.ends_with(&[0u8; CBOR_IPFS_DIGEST_LEN]));
+    fn artifact_of(code: Vec<u8>, immutables: Vec<Vec<(usize, usize)>>) -> Artifact {
+        let immutable_slots = immutables.iter().flatten().copied().collect();
+        Artifact {
+            name: "T".into(),
+            file: "T.sol".into(),
+            source: "test".into(),
+            deployed_code: code,
+            immutable_slots,
+            immutables,
+            abi_selectors: HashSet::new(),
+        }
+    }
+
+    #[test]
+    fn blanks_the_digests_and_nothing_else() {
+        let code = with_two_trailers(0xAA, 0xBB);
+        let offsets = cbor_digest_offsets(&code);
+        assert_eq!(offsets, vec![10, 10 + CBOR_IPFS_DIGEST_LEN + 2 + 8]);
+
+        let mut expected = code.clone();
+        for start in &offsets {
+            expected[*start..start + CBOR_IPFS_DIGEST_LEN].fill(0);
+        }
+        // Full-buffer equality: every byte outside the two digests survives,
+        // so a mutation that zeroed more than the metadata would fail here.
+        assert_eq!(blank_at(&code, &offsets), expected);
+    }
+
+    #[test]
+    fn a_changed_executable_byte_is_not_metadata() {
+        let artifact = artifact_of(with_two_trailers(0xAA, 0xBB), vec![]);
+        let mut tampered = with_two_trailers(0xCC, 0xDD);
+        assert_eq!(
+            artifact.compare(&tampered),
+            Some(CodeMatch::MetadataOnly { digests: 2 })
+        );
+        // The two bytes between the trailers are executable, not metadata.
+        tampered[10 + CBOR_IPFS_DIGEST_LEN] = 0x99;
+        assert_eq!(artifact.compare(&tampered), None);
+    }
+
+    #[test]
+    fn a_forged_tag_cannot_open_a_new_blanking_window() {
+        // Local code has one trailer; the deployed code embeds a second tag to
+        // try to hide 34 bytes of difference behind it.
+        let mut local = vec![0x60u8; 60];
+        local.extend_from_slice(&CBOR_IPFS_TAG);
+        local.extend_from_slice(&[0xAA; CBOR_IPFS_DIGEST_LEN]);
+        let artifact = artifact_of(local.clone(), vec![]);
+
+        let mut forged = local.clone();
+        forged[..CBOR_IPFS_TAG.len()].copy_from_slice(&CBOR_IPFS_TAG);
+        forged[CBOR_IPFS_TAG.len()..CBOR_IPFS_TAG.len() + CBOR_IPFS_DIGEST_LEN].fill(0x77);
+        assert_eq!(artifact.compare(&forged), None);
     }
 
     #[test]
     fn masks_immutables_before_comparing() {
-        let artifact = Artifact {
-            name: "T".into(),
-            file: "T.sol".into(),
-            source: "test".into(),
-            deployed_code: vec![0x60, 0x00, 0x00, 0x00, 0x5b],
-            immutable_slots: vec![(1, 3)],
-            immutables: vec![(1, 3)],
-            abi_selectors: HashSet::new(),
-        };
+        let artifact = artifact_of(vec![0x60, 0x00, 0x00, 0x00, 0x5b], vec![vec![(1, 3)]]);
         assert_eq!(
             artifact.compare(&[0x60, 0xde, 0xad, 0xbe, 0x5b]),
             Some(CodeMatch::Exact)
         );
         assert_eq!(artifact.compare(&[0x61, 0xde, 0xad, 0xbe, 0x5b]), None);
         assert_eq!(artifact.compare(&[0x60, 0xde, 0xad, 0xbe]), None);
+    }
+
+    #[test]
+    fn flags_an_immutable_whose_use_sites_disagree() {
+        // One immutable spliced at two offsets, as solc emits for a value read
+        // from two places. `compare` masks both, so only the read-back catches
+        // a runtime that carries a different value at the second one.
+        let artifact = artifact_of(
+            vec![0x60, 0x00, 0x00, 0x5b, 0x00, 0x00, 0x5b],
+            vec![vec![(1, 2), (4, 2)]],
+        );
+
+        let consistent = [0x60, 0xbe, 0xef, 0x5b, 0xbe, 0xef, 0x5b];
+        assert_eq!(artifact.compare(&consistent), Some(CodeMatch::Exact));
+        let values = artifact.immutable_values(&consistent);
+        assert_eq!(values[0].occurrences, 2);
+        assert!(!values[0].inconsistent);
+        assert_eq!(values[0].raw, vec![0xbe, 0xef]);
+
+        let tampered = [0x60, 0xbe, 0xef, 0x5b, 0xde, 0xad, 0x5b];
+        assert_eq!(artifact.compare(&tampered), Some(CodeMatch::Exact));
+        assert!(artifact.immutable_values(&tampered)[0].inconsistent);
     }
 
     #[test]

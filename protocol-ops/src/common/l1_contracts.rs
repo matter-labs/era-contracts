@@ -45,7 +45,9 @@ pub async fn resolve_ctm_proxy(
 /// 2. Otherwise, scan `ChainTypeManagerAdded(address indexed)` events on the
 ///    bridgehub and return the most recently added CTM.
 pub async fn discover_ctm_proxy(l1_rpc_url: &str, bridgehub: Address) -> anyhow::Result<Address> {
-    discover_ctm_proxy_with(&provider(l1_rpc_url)?, bridgehub, 0).await
+    let p = provider(l1_rpc_url)?;
+    let to_block = alloy::providers::Provider::get_block_number(&p).await?;
+    discover_ctm_proxy_with(&p, bridgehub, 0, to_block).await
 }
 
 /// [`discover_ctm_proxy`] against a caller-supplied provider, so a command
@@ -56,6 +58,7 @@ pub async fn discover_ctm_proxy_with(
     p: &AlloyProvider,
     bridgehub: Address,
     from_block: u64,
+    to_block: u64,
 ) -> anyhow::Result<Address> {
     use alloy::primitives::keccak256;
     use alloy::providers::Provider;
@@ -86,7 +89,8 @@ pub async fn discover_ctm_proxy_with(
     let filter = Filter::new()
         .address(bridgehub)
         .event_signature(topic0)
-        .from_block(from_block);
+        .from_block(from_block)
+        .to_block(to_block);
     let logs = p
         .get_logs(&filter)
         .await
