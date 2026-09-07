@@ -217,8 +217,9 @@ contract RegistryBootstrapMigration {
         if (_initCalldata.length < 4) {
             revert MalformedL2UpgradePlan();
         }
-        bytes memory encoded = new bytes(_initCalldata.length - 4);
-        for (uint256 i = 0; i < encoded.length; ++i) {
+        uint256 encodedLength = _initCalldata.length - 4;
+        bytes memory encoded = new bytes(encodedLength);
+        for (uint256 i = 0; i < encodedLength; ++i) {
             encoded[i] = _initCalldata[i + 4];
         }
         return abi.decode(encoded, (ProposedUpgrade));

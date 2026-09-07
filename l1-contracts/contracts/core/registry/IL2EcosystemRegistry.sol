@@ -30,8 +30,6 @@ interface IL2EcosystemRegistry {
 
     function l1ChainId() external view returns (uint256);
 
-    function eraChainId() external view returns (uint256);
-
     function l1AssetRouter() external view returns (address);
 
     function aliasedL1Governance() external view returns (address);

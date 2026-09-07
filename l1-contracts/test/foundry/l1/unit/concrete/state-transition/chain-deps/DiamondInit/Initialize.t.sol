@@ -12,7 +12,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {EmptyAssetId, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract InitializeTest is DiamondInitTest {
     /// @dev Builds the standard genesis cut. Kept separate from the deploy so revert tests can
@@ -125,11 +125,14 @@ contract InitializeTest is DiamondInitTest {
         assertEq(utilsFacet.util_getValidator(Utils.TEST_VALIDATOR_TIMELOCK), true);
 
         assertEq(utilsFacet.util_getStoredBatchHashes(0), bytes32(0));
-        // The base system contract hashes are no longer passed in calldata: DiamondInit reads
-        // them from the genesis registry the CTM pins (mocked in UtilsCallMocker).
-        assertEq(utilsFacet.util_getL2BootloaderBytecodeHash(), Utils.TEST_BASE_SYSTEM_CONTRACT_HASH);
-        assertEq(utilsFacet.util_getL2DefaultAccountBytecodeHash(), Utils.TEST_BASE_SYSTEM_CONTRACT_HASH);
-        assertEq(utilsFacet.util_getL2EvmEmulatorBytecodeHash(), Utils.TEST_BASE_SYSTEM_CONTRACT_HASH);
+        // The EraVM bytecode-hash slots are deprecated tombstones: initialization must leave the
+        // physical slots zero even though the mocked release still serves non-zero hashes. Read
+        // the raw slots (indices from ZKChainStorage's layout, see
+        // `forge inspect GettersFacet storage-layout`) instead of keeping dormant getters that
+        // would silently follow the fields if they were ever moved.
+        assertEq(vm.load(address(utilsFacet), bytes32(uint256(23))), bytes32(0)); // __DEPRECATED_l2BootloaderBytecodeHash
+        assertEq(vm.load(address(utilsFacet), bytes32(uint256(24))), bytes32(0)); // __DEPRECATED_l2DefaultAccountBytecodeHash
+        assertEq(vm.load(address(utilsFacet), bytes32(uint256(58))), bytes32(0)); // __DEPRECATED_l2EvmEmulatorBytecodeHash
     }
 
     /// @notice The genesis registry is mandatory: a CTM that pins none must make chain creation
@@ -144,22 +147,6 @@ contract InitializeTest is DiamondInitTest {
         Diamond.DiamondCutData memory cut = _buildCut(Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN);
 
         vm.expectRevert(ZeroAddress.selector);
-
-        _deployDiamondAsCtm(cut);
-    }
-
-    /// @notice On Era (non-ZKsync-OS) chains the registry must pin non-zero base system contract
-    ///         hashes.
-    function test_revertWhen_registryReturnsZeroBootloaderHash() public {
-        vm.mockCall(
-            Utils.TEST_GENESIS_REGISTRY,
-            abi.encodeWithSelector(ICTMRelease.baseSystemContractHashes.selector),
-            abi.encode(bytes32(0), Utils.TEST_BASE_SYSTEM_CONTRACT_HASH, Utils.TEST_BASE_SYSTEM_CONTRACT_HASH)
-        );
-
-        Diamond.DiamondCutData memory cut = _buildCut(Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN);
-
-        vm.expectRevert(EmptyBytes32.selector);
 
         _deployDiamondAsCtm(cut);
     }

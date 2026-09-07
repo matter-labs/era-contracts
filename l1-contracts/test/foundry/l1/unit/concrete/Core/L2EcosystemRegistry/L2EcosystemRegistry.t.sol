@@ -26,7 +26,6 @@ contract L2EcosystemRegistryTest is Test {
         bytes memory bytecodeInfo = abi.encode(bytes32(_salt));
         data = FixedForceDeploymentsData({
             l1ChainId: 100 + _salt,
-            eraChainId: 200 + _salt,
             l1AssetRouter: address(uint160(0xAA00 + _salt)),
             l2TokenProxyBytecodeHash: keccak256(abi.encode("proxy", _salt)),
             aliasedL1Governance: address(uint160(0xBB00 + _salt)),
@@ -99,7 +98,6 @@ contract L2EcosystemRegistryTest is Test {
 
         // Typed getters serve the decoded fields.
         assertEq(registry.l1ChainId(), data.l1ChainId);
-        assertEq(registry.eraChainId(), data.eraChainId);
         assertEq(registry.l1AssetRouter(), data.l1AssetRouter);
         assertEq(registry.aliasedL1Governance(), data.aliasedL1Governance);
         assertEq(registry.aliasedChainRegistrationSender(), data.aliasedChainRegistrationSender);

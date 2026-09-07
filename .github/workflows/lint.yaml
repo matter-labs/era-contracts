@@ -33,8 +33,16 @@ jobs:
 
       - uses: codespell-project/actions-codespell@8f01853be192eb0f849a5c7d721450e7a467c579 # v2.2
 
-  protocol-ops-fmt:
+  rust-fmt:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        working-directory:
+          - protocol-ops
+          - tools/upgrade-readiness-checker
+          - tools/verifier-gen
+          - tools/wallets-gen
+          - tools/zksync-os-genesis-gen
     steps:
       - uses: actions/checkout@v6
 
@@ -44,8 +52,9 @@ jobs:
           components: rustfmt
 
       - name: Check formatting
-        run: cargo fmt --check
-        working-directory: protocol-ops
+        # `+1.91.1` overrides crate-local rust-toolchain.toml files.
+        run: cargo +1.91.1 fmt --check
+        working-directory: ${{ matrix.working-directory }}
 
   protocol-ops-clippy:
     runs-on: ubuntu-latest
@@ -59,6 +68,21 @@ jobs:
 
       - name: Check Clippy
         run: cargo clippy --all-targets -- -D warnings
+        working-directory: protocol-ops
+
+  protocol-ops-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.91.1
+
+      # Clippy compiles the tests but never executes them; the source-sync mirror guards
+      # (gateway config, L1Nullifier constructor) only bite when their assertions run.
+      - name: Run tests
+        run: cargo test --all-targets
         working-directory: protocol-ops
 
   typos:

@@ -252,8 +252,8 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         new DiamondProxy(GATEWAY_CHAIN_ID, diamondCut);
     }
 
-    /// @notice Deploys a real bootstrap `CTMRelease` pinning the computed Gateway facet set and
-    /// base system hashes — the object the Gateway deployer takes pre-deployed.
+    /// @notice Deploys a real bootstrap `CTMRelease` pinning the computed Gateway facet set — the
+    /// object the Gateway deployer takes pre-deployed.
     function _deployGatewayGenesisRegistry(
         DeployedContracts memory contracts,
         GatewayCTMDeployerConfig memory config
@@ -271,9 +271,11 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
                     verifier: contracts.stateTransition.verifiers.verifier,
                     genesisUpgrade: contracts.stateTransition.genesisUpgrade,
                     genesis: ReleaseGenesisData({
-                        bootloaderHash: config.bootloaderHash,
-                        defaultAccountHash: config.defaultAccountHash,
-                        evmEmulatorHash: config.evmEmulatorHash,
+                        // ZKsync OS has no bootloader / default account / EVM emulator bytecode,
+                        // so the Gateway deployer config carries no hashes; the release pins zeros.
+                        bootloaderHash: bytes32(0),
+                        defaultAccountHash: bytes32(0),
+                        evmEmulatorHash: bytes32(0),
                         fixedForceDeploymentsData: config.forceDeploymentsData,
                         genesisBatchHash: config.genesisRoot,
                         genesisBatchCommitment: config.genesisBatchCommitment,

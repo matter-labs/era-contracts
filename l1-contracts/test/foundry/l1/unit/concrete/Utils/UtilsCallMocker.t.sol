@@ -26,13 +26,13 @@ contract UtilsCallMockerTest is Test {
     address private constant DEFAULT_CHAIN_TYPE_MANAGER = address(0x1234567890876543567890);
     uint256 private constant DEFAULT_PROTOCOL_VERSION = 0;
 
-    // Original function for backward compatibility - uses hardcoded chainTypeManager from makeInitializeData
+    // Original function for backward compatibility - uses Utils.TEST_CHAIN_TYPE_MANAGER as the CTM
     function mockDiamondInitInteropCenterCallsWithAddress(
         address bridgehub,
         address assetRouter,
         bytes32 baseTokenAssetId
     ) public {
-        // Default chainTypeManager address from Utils.makeInitializeData
+        // Default chainTypeManager address, equal to Utils.TEST_CHAIN_TYPE_MANAGER
         address defaultChainTypeManager = address(0x1234567890876543567890);
         mockDiamondInitInteropCenterCallsWithAddress(bridgehub, assetRouter, baseTokenAssetId, defaultChainTypeManager);
     }
@@ -233,7 +233,7 @@ contract UtilsCallMockerTest is Test {
     ///      which a real `GenesisRegistry` cannot pin) and install their facets via the cut's
     ///      own `facetCuts`, often with hand-picked selector subsets. The mocked registry
     ///      therefore pins NO facets (empty list, so DiamondInit installs nothing further) and
-    ///      only serves the base system contract hashes DiamondInit reads at genesis.
+    ///      only serves the verifier and genesis params DiamondInit / the CTM read at genesis.
     function mockGenesisRegistryContract() public {
         address genesisRegistry = Utils.TEST_GENESIS_REGISTRY;
         // Release provenance is a codehash check, so the mocked release must actually CARRY the

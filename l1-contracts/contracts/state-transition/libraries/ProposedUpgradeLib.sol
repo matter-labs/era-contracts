@@ -7,9 +7,9 @@ import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
 
 /// @notice The struct that represents the upgrade proposal.
 /// @param l2ProtocolUpgradeTx The system upgrade transaction.
-/// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
-/// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
-/// @param evmEmulatorHash The hash of the new EVM emulator bytecode. If zero, it will not be updated.
+/// @param bootloaderHash Deprecated. Ignored: EraVM bytecode hashes are kept for calldata compatibility only.
+/// @param defaultAccountHash Deprecated. Ignored, same as bootloaderHash.
+/// @param evmEmulatorHash Deprecated. Ignored, same as bootloaderHash.
 /// @param verifier Deprecated. Verifier is fetched from CTM based on protocol version.
 /// @param verifierParams Deprecated. Verifier params are kept for backward compatibility.
 /// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently

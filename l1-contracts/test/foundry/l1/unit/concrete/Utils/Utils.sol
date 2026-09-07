@@ -388,7 +388,7 @@ library Utils {
     }
 
     function getGettersSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](35);
+        bytes4[] memory selectors = new bytes4[](32);
         uint256 i = 0;
         selectors[i++] = GettersFacet.getVerifier.selector;
         selectors[i++] = GettersFacet.getAdmin.selector;
@@ -403,9 +403,6 @@ library Utils {
         selectors[i++] = GettersFacet.isValidator.selector;
         selectors[i++] = GettersFacet.l2LogsRootHash.selector;
         selectors[i++] = GettersFacet.storedBatchHash.selector;
-        selectors[i++] = GettersFacet.getL2BootloaderBytecodeHash.selector;
-        selectors[i++] = GettersFacet.getL2DefaultAccountBytecodeHash.selector;
-        selectors[i++] = GettersFacet.getL2EvmEmulatorBytecodeHash.selector;
         selectors[i++] = GettersFacet.getVerifierParams.selector;
         selectors[i++] = GettersFacet.isDiamondStorageFrozen.selector;
         selectors[i++] = GettersFacet.getPriorityTxMaxGasLimit.selector;
@@ -441,7 +438,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](75);
+        bytes4[] memory selectors = new bytes4[](69);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -456,12 +453,6 @@ library Utils {
         selectors[i++] = UtilsFacet.util_getStoredBatchHashes.selector;
         selectors[i++] = UtilsFacet.util_setVerifierParams.selector;
         selectors[i++] = UtilsFacet.util_getVerifierParams.selector;
-        selectors[i++] = UtilsFacet.util_setL2BootloaderBytecodeHash.selector;
-        selectors[i++] = UtilsFacet.util_getL2BootloaderBytecodeHash.selector;
-        selectors[i++] = UtilsFacet.util_setL2DefaultAccountBytecodeHash.selector;
-        selectors[i++] = UtilsFacet.util_getL2DefaultAccountBytecodeHash.selector;
-        selectors[i++] = UtilsFacet.util_getL2EvmEmulatorBytecodeHash.selector;
-        selectors[i++] = UtilsFacet.util_setL2EvmEmulatorBytecodeHash.selector;
         selectors[i++] = UtilsFacet.util_setPendingAdmin.selector;
         selectors[i++] = UtilsFacet.util_getPendingAdmin.selector;
         selectors[i++] = UtilsFacet.util_setAdmin.selector;
@@ -615,15 +606,9 @@ library Utils {
     }
 
     function _batchMetaParameters() internal pure returns (bytes memory) {
-        // Mirrors the base system contract hashes the _Executor_Shared.t.sol chain stores: they
-        // come from the mocked genesis registry (see UtilsCallMocker.mockGenesisRegistryContract).
-        return
-            abi.encodePacked(
-                false,
-                TEST_BASE_SYSTEM_CONTRACT_HASH,
-                TEST_BASE_SYSTEM_CONTRACT_HASH,
-                TEST_BASE_SYSTEM_CONTRACT_HASH
-            );
+        // The EraVM bytecode-hash slots are deprecated and zero on every chain initialized by the
+        // current DiamondInit; the Era commitment format still packs them.
+        return abi.encodePacked(false, bytes32(0), bytes32(0), bytes32(0));
     }
 
     function _batchAuxiliaryOutput(

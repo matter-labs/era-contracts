@@ -50,10 +50,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     /// the old version where it was an immutable.
     uint256 public L1_CHAIN_ID;
 
-    /// @dev Chain ID of Era for legacy reasons.
-    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
-    /// the old version where it was an immutable.
-    uint256 public ERA_CHAIN_ID;
+    /// @dev Deprecated slot, retained to preserve the upgradeable storage layout.
+    /// Formerly `ERA_CHAIN_ID` (the chain id of Era, kept for legacy reasons). No longer read or written.
+    // slither-disable-next-line uninitialized-state
+    uint256 private __DEPRECATED_ERA_CHAIN_ID;
 
     /// @dev The address of the L1 asset router counterpart.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
@@ -148,20 +148,17 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
     /// @param _l1ChainId The chain id of L1.
-    /// @param _eraChainId The chain id of Era.
     /// @param _l1AssetRouter The address of the L1 asset router.
     /// @param _baseTokenAssetId The asset id of the base token.
     /// @param _aliasedOwner The address of the owner of the contract.
     function initL2(
         uint256 _l1ChainId,
-        uint256 _eraChainId,
         IL1AssetRouter _l1AssetRouter,
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
     ) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
-        // solhint-disable-next-line func-named-parameters
-        updateL2(_l1ChainId, _eraChainId, _l1AssetRouter, _baseTokenAssetId, _aliasedOwner);
+        updateL2(_l1ChainId, _l1AssetRouter, _baseTokenAssetId, _aliasedOwner);
         _setAssetHandler(_baseTokenAssetId, L2_NATIVE_TOKEN_VAULT_ADDR);
     }
 
@@ -169,14 +166,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     /// @dev This function is used to initialize the new implementation of L2AssetRouter on existing chains during
     /// the upgrade.
     /// @param _l1ChainId The chain id of L1.
-    /// @param _eraChainId The chain id of Era.
     /// @param _l1AssetRouter The address of the L1 asset router.
     /// @param _baseTokenAssetId The asset id of the base token.
     /// @param _aliasedOwner The expected owner. If the current owner is different (e.g. a temporary
     ///        multisig on a chain that predates decentralized governance), it will be reset.
     function updateL2(
         uint256 _l1ChainId,
-        uint256 _eraChainId,
         IL1AssetRouter _l1AssetRouter,
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
@@ -185,7 +180,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         L1_CHAIN_ID = _l1ChainId;
         L1_ASSET_ROUTER = _l1AssetRouter;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
-        ERA_CHAIN_ID = _eraChainId;
         // Reset the owner to the expected (aliased L1) governance; pre-v31 ZKsync OS testnets ran with a
         // temporary multisig owner.
         if (owner() != _aliasedOwner) {

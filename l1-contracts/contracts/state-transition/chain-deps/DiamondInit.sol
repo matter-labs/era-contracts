@@ -23,7 +23,7 @@ import {ReleaseFacetReader} from "../../upgrades/registry/libraries/ReleaseFacet
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
-import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {EmptyAssetId, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
@@ -92,26 +92,6 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
             );
         }
 
-        (
-            bytes32 l2BootloaderBytecodeHash,
-            bytes32 l2DefaultAccountBytecodeHash,
-            bytes32 l2EvmEmulatorBytecodeHash
-        ) = release.baseSystemContractHashes();
-
-        if (!IS_ZKSYNC_OS) {
-            if (l2BootloaderBytecodeHash == bytes32(0)) {
-                revert EmptyBytes32();
-            }
-
-            if (l2DefaultAccountBytecodeHash == bytes32(0)) {
-                revert EmptyBytes32();
-            }
-
-            if (l2EvmEmulatorBytecodeHash == bytes32(0)) {
-                revert EmptyBytes32();
-            }
-        }
-
         s.chainId = _chainId;
         s.bridgehub = bridgehub;
         s.chainTypeManager = msg.sender;
@@ -136,9 +116,6 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.validators[validatorTimelock] = true;
 
         s.storedBatchHashes[0] = ctm.storedBatchZero();
-        s.l2BootloaderBytecodeHash = l2BootloaderBytecodeHash;
-        s.l2DefaultAccountBytecodeHash = l2DefaultAccountBytecodeHash;
-        s.l2EvmEmulatorBytecodeHash = l2EvmEmulatorBytecodeHash;
         s.priorityTxMaxGasLimit = DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT;
         s.priorityModeInfo.permissionlessValidator = ctm.PERMISSIONLESS_VALIDATOR();
         s.feeParams = FeeParams({

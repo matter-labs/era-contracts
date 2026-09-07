@@ -606,7 +606,7 @@ type LiveUpgradeInputs = {
   messageRootProxy: string;
   /** The proxy's live (pre-upgrade) implementation — the source side of the ecosystem edge. */
   messageRootImplOld: string;
-  /** Live complete base-system hashes — the release carries complete target values. */
+  /** Base-system hashes pinned by the release — always zero on ZKsync OS. */
   bootloaderHash: string;
   defaultAccountHash: string;
   evmEmulatorHash: string;
@@ -689,11 +689,11 @@ async function readLiveUpgradeInputs(
     }
   }
 
-  // Live complete base-system hashes: the release describes the complete post-upgrade state,
-  // and this synthetic bump does not change them.
-  const bootloaderHash: string = await firstDiamond.getL2BootloaderBytecodeHash();
-  const defaultAccountHash: string = await firstDiamond.getL2DefaultAccountBytecodeHash();
-  const evmEmulatorHash: string = await firstDiamond.getL2EvmEmulatorBytecodeHash();
+  // ZKsync OS chains carry no base-system bytecodes: the EraVM hash slots are deprecated and
+  // their getters are gone (EVM-1643), so the release pins the three hashes as zero.
+  const bootloaderHash: string = ethers.constants.HashZero;
+  const defaultAccountHash: string = ethers.constants.HashZero;
+  const evmEmulatorHash: string = ethers.constants.HashZero;
 
   const adminFacetView = new ethers.Contract(upgradeChains[0].diamondProxy, getAbi("AdminFacet"), l1Provider);
   const rollupDAManager: string = await adminFacetView.getRollupDAManager();

@@ -116,6 +116,43 @@ jobs:
             exit 1
           fi
 
+  # The production OS genesis embeds deployed bytecode from the Forge artifacts. Regenerate it
+  # from this commit's build so contract changes cannot leave the committed genesis image stale.
+  check-zksync-os-genesis:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        working-directory: tools/zksync-os-genesis-gen
+        run: rustup toolchain install
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: tools/zksync-os-genesis-gen
+
+      - name: Restore this commit's artifacts
+        uses: ./.github/actions/restore-ci-artifacts
+
+      - name: Regenerate ZKsync OS genesis
+        working-directory: tools/zksync-os-genesis-gen
+        run: |
+          cargo run --locked --release --bin zksync-os-genesis-gen -- \
+            --output-file ../../configs/genesis/zksync-os/latest.json
+
+      - name: Check ZKsync OS genesis
+        run: |
+          if [ -n "$(git status --porcelain -- configs/genesis/zksync-os/latest.json)" ]; then
+            echo "::error::configs/genesis/zksync-os/latest.json is out of date. From Linux, rebuild with the pinned default Foundry profile, then run the ZKsync OS genesis generator."
+            git --no-pager status --porcelain -- configs/genesis/zksync-os/latest.json
+            git --no-pager diff --stat -- configs/genesis/zksync-os/latest.json
+            exit 1
+          fi
+
   check-hashes:
     needs: [build]
     runs-on: ubuntu-latest

@@ -61,11 +61,6 @@ contract L2EcosystemRegistry is IL2EcosystemRegistry {
     }
 
     /// @inheritdoc IL2EcosystemRegistry
-    function eraChainId() external view returns (uint256) {
-        return getFixedForceDeploymentsData().eraChainId;
-    }
-
-    /// @inheritdoc IL2EcosystemRegistry
     function l1AssetRouter() external view returns (address) {
         return getFixedForceDeploymentsData().l1AssetRouter;
     }

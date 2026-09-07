@@ -16,8 +16,6 @@ import {
     L2UpgradeNonceNotEqualToNewProtocolVersion,
     NewProtocolMajorVersionNotZero,
     PatchCantSetUpgradeTxn,
-    PatchUpgradeCantSetBootloader,
-    PatchUpgradeCantSetDefaultAccount,
     PreviousProtocolMajorVersionNotZero,
     PreviousUpgradeNotCleaned,
     PreviousUpgradeNotFinalized,
@@ -144,29 +142,6 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    // Patch upgrade can't set bootloader
-    function test_revertWhen_PatchUpgradeCantSetBootloader() public {
-        uint256 newVersion = SemVer.packSemVer(0, 1, 1);
-        baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
-        proposedUpgrade.verifier = mockVerifier;
-        proposedUpgrade.newProtocolVersion = newVersion;
-
-        vm.expectRevert(abi.encodeWithSelector(PatchUpgradeCantSetBootloader.selector));
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
-    }
-
-    // Patch upgrade can't set default account
-    function test_revertWhen_PatchUpgradeCantSetDefaultAccount() public {
-        uint256 newVersion = SemVer.packSemVer(0, 1, 1);
-        baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
-        proposedUpgrade.verifier = mockVerifier;
-        proposedUpgrade.newProtocolVersion = newVersion;
-        proposedUpgrade.bootloaderHash = bytes32(0);
-
-        vm.expectRevert(abi.encodeWithSelector(PatchUpgradeCantSetDefaultAccount.selector));
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
-    }
-
     // L2 system upgrade tx type is wrong
     function test_revertWhen_InvalidTxType(uint256 newTxType) public {
         vm.assume(newTxType != SYSTEM_UPGRADE_L2_TX_TYPE && newTxType > 0);
@@ -178,11 +153,6 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
     // Patch upgrade can't set upgrade txn
     function test_revertWhen_PatchCantSetUpgradeTxn() public {
-        // Change basic hashes to 0, to skip previous path only checks
-        proposedUpgrade.bootloaderHash = bytes32(0);
-        proposedUpgrade.defaultAccountHash = bytes32(0);
-        proposedUpgrade.evmEmulatorHash = bytes32(0);
-
         uint256 newVersion = SemVer.packSemVer(0, 1, 1);
         baseZkSyncUpgrade.setProtocolVersion(SemVer.packSemVer(0, 1, 0));
         proposedUpgrade.verifier = mockVerifier;
@@ -235,22 +205,16 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
-    function test_SuccessWith_L2BootloaderBytecodeHashIsZero() public {
-        proposedUpgrade.bootloaderHash = bytes32(0);
+    // The EraVM bytecode-hash fields of ProposedUpgrade are dead on the ZKsync OS line. These values
+    // deliberately violate the old bytecode-hash format, so the upgrade would revert if it processed them.
+    function test_upgrade_IgnoresLegacyBytecodeHashes() public {
+        proposedUpgrade.bootloaderHash = bytes32(uint256(1));
+        proposedUpgrade.defaultAccountHash = bytes32(uint256(2));
+        proposedUpgrade.evmEmulatorHash = bytes32(uint256(3));
 
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
-    }
-
-    function test_SuccessWith_L2DefaultAccountBytecodeHashIsZero() public {
-        proposedUpgrade.defaultAccountHash = bytes32(0);
-
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
-
-        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 
     function test_SuccessWith_TxTypeIsZero() public {
@@ -259,21 +223,16 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
-        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 
     function test_SuccessUpgrade() public {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
-        assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }
 
-    /// @dev A zero verifier in the proposal means "leave unchanged", the same convention the
-    ///      base-system hashes use — it is how the genesis upgrade runs after `DiamondInit` has
-    ///      already installed the release's verifier.
+    /// @dev A zero verifier in the proposal means "leave unchanged" — it is how the genesis
+    ///      upgrade runs after `DiamondInit` has already installed the release's verifier.
     function test_zeroVerifierLeavesTheInstalledOneUnchanged() public {
         // Install a verifier first (genesis does this via `DiamondInit`), then upgrade with zero.
         baseZkSyncUpgrade.upgrade(proposedUpgrade);

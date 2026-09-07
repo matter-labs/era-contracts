@@ -23,15 +23,10 @@ struct GatewayCTMDeployerConfig {
     /// @notice Flag indicating whether to use ZKsync OS mode.
     bool isZKsyncOS;
     // Facet selector lists are intentionally absent: the genesis cut installs no facets directly.
-    // The Gateway CTM points at a `GenesisRegistry` (deployed and initialized by this
-    // deployer), and `DiamondInit` reads each facet's own `ISelfDescribingFacet.selectors()` at
-    // chain creation — mirroring the L1 registry-driven genesis path.
-    /// @notice Hash of the bootloader bytecode.
-    bytes32 bootloaderHash;
-    /// @notice Hash of the default account bytecode.
-    bytes32 defaultAccountHash;
-    /// @notice Hash of the EVM emulator bytecode.
-    bytes32 evmEmulatorHash;
+    // The Gateway CTM points at a genesis release (deployed and pinned by this deployer), and
+    // `DiamondInit` reads each facet's own `ISelfDescribingFacet.selectors()` at chain creation —
+    // mirroring the L1 registry-driven genesis path. ZKsync OS has no bootloader, default-account
+    // or EVM-emulator bytecode, so no base-system hashes ride here either.
     /// @notice Root hash of the genesis state.
     bytes32 genesisRoot;
     /// @notice Leaf index in the genesis rollup.
