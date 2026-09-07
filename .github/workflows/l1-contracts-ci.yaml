@@ -34,6 +34,7 @@ jobs:
       node_version: ${{ steps.plan.outputs.node_version }}
       foundry_version: ${{ steps.plan.outputs.foundry_version }}
       coverage_command: ${{ steps.plan.outputs.coverage_command }}
+      tooling_changes: ${{ steps.plan.outputs.tooling_changes }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v6
@@ -684,6 +685,15 @@ jobs:
         run: |
           node - <<'NODE'
           const results = JSON.parse(process.env.RESULTS);
+          const changed = JSON.parse(results.plan.outputs?.tooling_changes || '[]');
+          if (changed.length) {
+            const message = `Coverage unavailable: measurement tooling changed: ${changed.join(', ')}. ` +
+              'This requires maintainer review of the coverage baseline transition; rerunning cannot resolve it. ' +
+              'No regression decision was made.';
+            require('node:fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, message + '\n');
+            console.error(`::error::${message}`);
+            process.exit(1);
+          }
           const failed = Object.entries(results).filter(([, job]) => job.result !== 'success').map(([name]) => name);
           if (failed.length) {
             const message = `Coverage unavailable: ${failed.join(', ')} did not succeed. No regression decision was made. Rerun the failed jobs to retry baseline recovery.`;

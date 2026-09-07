@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
-const { execFileSync } = require("node:child_process");
+const { execFileSync, spawnSync } = require("node:child_process");
 const { test } = require("node:test");
 const { sourceRevisions, groupSpecs, trustedRun, restoreBaseline, recipeHash, coverageCommand } = require("./plan");
 
@@ -234,7 +234,7 @@ test("API failure is a warning and local recovery, not a coverage regression", a
   assert.equal(state.time, 0);
 });
 
-test("CLI outputs exact matrices and fetches missing commits from a shallow checkout", (t) => {
+test("CLI handles shallow checkouts and refuses comparisons or regeneration across tooling changes", (t) => {
   const { request } = fixture(t);
   const source = path.join(request.directory, "origin");
   const git = (cwd, ...args) => execFileSync("git", args, { cwd, encoding: "utf8", stdio: "pipe" }).trim();
@@ -244,7 +244,9 @@ test("CLI outputs exact matrices and fetches missing commits from a shallow chec
     ".github/workflows/l1-contracts-ci.yaml",
     ".github/foundry-versions.env",
     ".nvmrc",
+    "da-contracts/package.json",
     "l1-contracts/package.json",
+    "l1-contracts/test/anvil-interop/package.json",
   ]) {
     fs.mkdirSync(path.dirname(path.join(source, file)), { recursive: true });
     fs.copyFileSync(path.resolve(__dirname, "../../..", file), path.join(source, file));
@@ -253,10 +255,27 @@ test("CLI outputs exact matrices and fetches missing commits from a shallow chec
   fs.mkdirSync(specs, { recursive: true });
   fs.writeFileSync(path.join(specs, "01-one.spec.ts"), "");
   fs.writeFileSync(path.join(specs, "02-two.spec.ts"), "");
+  const collector = "l1-contracts/test/anvil-interop/src/coverage/collector.ts";
+  const merger = "l1-contracts/scripts/merge-coverage.ts";
+  for (const file of [collector, merger, "l1-contracts/foundry.toml"]) {
+    fs.mkdirSync(path.dirname(path.join(source, file)), { recursive: true });
+    fs.writeFileSync(path.join(source, file), "original");
+  }
   git(source, "init", "-q");
   const commits = [];
-  for (const label of ["base", "head"]) {
+  for (const label of ["base", "head", "tooling"]) {
     fs.writeFileSync(path.join(specs, "01-one.spec.ts"), label);
+    const packagePath = path.join(source, "l1-contracts/package.json");
+    const pkg = JSON.parse(fs.readFileSync(packagePath));
+    pkg.description = label;
+    if (label === "tooling") {
+      fs.rmSync(path.join(source, collector));
+      fs.writeFileSync(path.join(source, collector.replace("collector.ts", "replacement.ts")), "new collector");
+      fs.writeFileSync(path.join(source, merger), "new merger");
+      fs.writeFileSync(path.join(source, "l1-contracts/foundry.toml"), "new settings");
+      pkg.scripts["coverage:merge"] = "ts-node scripts/other-merge.ts";
+    }
+    fs.writeFileSync(packagePath, JSON.stringify(pkg));
     git(source, "add", "--force", ".");
     git(
       source,
@@ -273,15 +292,25 @@ test("CLI outputs exact matrices and fetches missing commits from a shallow chec
       label
     );
     commits.push(git(source, "rev-parse", "HEAD"));
+    git(source, "branch", label);
   }
-  const [base, head] = commits;
+  const [base, head, tooling] = commits;
   const eventPath = path.join(request.directory, "event.json");
   const outputPath = path.join(request.directory, "outputs");
   // The CLI must recover from an unavailable API without using the developer's GitHub credentials.
   fs.writeFileSync(path.join(request.directory, "gh"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
-  for (const eventName of ["push", "workflow_dispatch", "pull_request"]) {
-    const root = path.join(request.directory, eventName);
-    git(request.directory, "clone", "--quiet", "--depth=1", pathToFileURL(source).href, root);
+  for (const [eventName, ref] of [
+    ["push", "head"],
+    ["workflow_dispatch", "head"],
+    ["pull_request", "head"],
+    ["push", "tooling"],
+    ["workflow_dispatch", "tooling"],
+    ["pull_request", "tooling"],
+  ]) {
+    const sha = ref === "head" ? head : tooling;
+    const incompatible = ref === "tooling" && eventName !== "push";
+    const root = path.join(request.directory, `${eventName}-${ref}`);
+    git(request.directory, "clone", "--quiet", "--depth=1", "--branch", ref, pathToFileURL(source).href, root);
     assert.throws(() => git(root, "rev-parse", "--verify", "HEAD^1"));
     assert.throws(() => git(root, "cat-file", "-e", `${base}^{commit}`));
     fs.writeFileSync(
@@ -289,7 +318,7 @@ test("CLI outputs exact matrices and fetches missing commits from a shallow chec
       JSON.stringify({ inputs: { source_sha: base }, pull_request: { base: { sha: base } } })
     );
     fs.writeFileSync(outputPath, "");
-    execFileSync(process.execPath, [path.join(root, ".github/scripts/coverage/plan.js")], {
+    const result = spawnSync(process.execPath, [path.join(root, ".github/scripts/coverage/plan.js")], {
       cwd: root,
       encoding: "utf8",
       env: {
@@ -298,11 +327,19 @@ test("CLI outputs exact matrices and fetches missing commits from a shallow chec
         GITHUB_REPOSITORY: REPO,
         GITHUB_EVENT_NAME: eventName,
         GITHUB_EVENT_PATH: eventPath,
-        GITHUB_SHA: head,
+        GITHUB_SHA: sha,
         GITHUB_OUTPUT: outputPath,
         RUNNER_TEMP: request.directory,
       },
     });
+    if (incompatible && eventName === "workflow_dispatch") {
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /Coverage unavailable: requested source uses different measurement tooling/);
+      assert.match(result.stderr, /Select a workflow ref with matching measurement tooling/);
+      assert.equal(fs.readFileSync(outputPath, "utf8"), "");
+      continue;
+    }
+    assert.equal(result.status, 0, result.stderr);
     const output = Object.fromEntries(
       fs
         .readFileSync(outputPath, "utf8")
@@ -314,16 +351,33 @@ test("CLI outputs exact matrices and fetches missing commits from a shallow chec
         })
     );
     const expected =
-      eventName === "pull_request"
+      eventName === "pull_request" && !incompatible
         ? [
-            { kind: "pr", sha: head },
+            { kind: "pr", sha },
             { kind: "base", sha: base },
           ]
-        : [{ kind: "base", sha: eventName === "push" ? head : base }];
+        : [{ kind: eventName === "pull_request" ? "pr" : "base", sha: eventName === "workflow_dispatch" ? base : sha }];
     assert.deepEqual(JSON.parse(output.revisions), expected);
-    assert.equal(output.base_sha, eventName === "push" ? head : base);
+    assert.equal(output.base_sha, eventName === "push" ? sha : base);
     assert.equal(output.cached, "false");
-    assert.equal(output.pr_sha, eventName === "pull_request" ? head : "");
+    assert.equal(output.pr_sha, eventName === "pull_request" ? sha : "");
+    const changes = JSON.parse(output.tooling_changes);
+    if (incompatible) {
+      assert.deepEqual(
+        changes.sort(),
+        [
+          collector,
+          collector.replace("collector.ts", "replacement.ts"),
+          merger,
+          "l1-contracts/foundry.toml",
+          "l1-contracts/package.json (coverage:merge)",
+        ].sort()
+      );
+      assert.doesNotMatch(result.stderr, /Baseline lookup unavailable/);
+      assert.doesNotMatch(result.stdout, /Generating missing coverage/);
+    } else {
+      assert.deepEqual(changes, []);
+    }
     if (eventName !== "push") {
       assert.doesNotThrow(() => git(root, "cat-file", "-e", `${base}^{commit}`));
     }
