@@ -13,6 +13,8 @@ import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {IL2DelegateCalldataComposer} from "contracts/upgrades/registry/objects/IL2DelegateCalldataComposer.sol";
+import {FixedDelegateCalldataComposer} from "contracts/dev-contracts/FixedDelegateCalldataComposer.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {ReleaseFacetReader} from "contracts/upgrades/registry/libraries/ReleaseFacetReader.sol";
 import {TransitionDerivationLib} from "contracts/upgrades/registry/libraries/TransitionDerivationLib.sol";
@@ -97,9 +99,17 @@ contract StorageRegistriesTest is Test {
     address internal upgradeEngine;
     address internal upgradeTimer;
     address internal coreImplNew;
+    /// @dev The pinned delegate-calldata composer of the default transition: a test-only stand-in
+    ///      returning `DELEGATE_CALLDATA` regardless of its inputs, so this suite can pin a real
+    ///      composer without a version-specific L2 migration behind it.
+    FixedDelegateCalldataComposer internal delegateComposer;
+    /// @dev The ecosystem Bridgehub the composer is handed. Only forwarded to the pinned composer
+    ///      (which ignores it here), so a bare labelled address is all this suite needs.
+    address internal bridgehub;
 
     uint256 internal constant OLD_VERSION = uint256(98) << 32;
     uint256 internal constant NEW_VERSION = uint256(99) << 32;
+    bytes internal constant DELEGATE_CALLDATA = hex"beef";
 
     // Dummy EVM bytecodes standing in for the L2 artifacts a hop installs (see {L2PlanFixtures}):
     // the authored extras (the upgrade delegate and one more Unsafe deployment) and the
@@ -124,6 +134,8 @@ contract StorageRegistriesTest is Test {
         // with real code is all this suite needs.
         upgradeTimer = _pinned("upgradeTimer");
         coreImplNew = _pinned("coreImplNew");
+        delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
+        bridgehub = makeAddr("bridgehub");
         // A real DiamondInit: VM identity is read from its IS_ZKSYNC_OS immutable.
         diamondInit = address(new DiamondInit(true));
 
@@ -197,9 +209,9 @@ contract StorageRegistriesTest is Test {
     }
 
     /// @dev The well-formed authored remainder: two Unsafe extras at their bytecode-derived
-    ///      addresses, the delegate being the first of them, and both bytecodes among the factory
-    ///      dependencies.
-    function _l2Plan() internal pure returns (AuthoredL2Plan memory plan) {
+    ///      addresses, the delegate being the first of them, both bytecodes among the factory
+    ///      dependencies, and the pinned composer defining the delegate's calldata.
+    function _l2Plan() internal view returns (AuthoredL2Plan memory plan) {
         IComplexUpgrader.UniversalContractUpgradeInfo[]
             memory extraDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](2);
         extraDeployments[0] = L2PlanFixtures.unsafeDeployment(DELEGATE_CODE);
@@ -208,9 +220,23 @@ contract StorageRegistriesTest is Test {
             AuthoredL2Plan({
                 extraDeployments: extraDeployments,
                 delegateTo: extraDeployments[0].newAddress,
-                delegateCalldata: hex"beef",
+                delegateComposer: _pin(address(delegateComposer)),
                 factoryDepHashes: L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE, EXTRA_CODE))
             });
+    }
+
+    function _pin(address _addr) internal view returns (PinnedContract memory) {
+        return PinnedContract({addr: _addr, codehash: _addr.codehash});
+    }
+
+    /// @dev The zero pin: no composer (the delegate is called with empty calldata), no ecosystem leg.
+    function _noPin() internal pure returns (PinnedContract memory) {
+        return PinnedContract({addr: address(0), codehash: bytes32(0)});
+    }
+
+    /// @dev The L2 transaction `_transition` composes against this suite's Bridgehub.
+    function _l2Tx(CTMTransition _transition) internal view returns (L2CanonicalTransaction memory) {
+        return CTMUpgradeComposer.buildL2UpgradeTx(ICTMTransition(address(_transition)), bridgehub);
     }
 
     /// @dev The factory dependencies a target release built by `_tableRelease()` installs: the
@@ -224,7 +250,7 @@ contract StorageRegistriesTest is Test {
     }
 
     /// @dev `_l2Plan()` extended with the table dependencies, for hops toward `_tableRelease()`.
-    function _l2PlanWithTableDeps() internal pure returns (AuthoredL2Plan memory plan) {
+    function _l2PlanWithTableDeps() internal view returns (AuthoredL2Plan memory plan) {
         plan = _l2Plan();
         plan.factoryDepHashes = _concat(plan.factoryDepHashes, _tableDeps());
     }
@@ -322,10 +348,17 @@ contract StorageRegistriesTest is Test {
         assertTrue(derivedCuts[5].isFreezable);
     }
 
-    function test_composerBuildsL2TxAndProposalFromTransition() public view {
-        L2CanonicalTransaction memory transaction = CTMUpgradeComposer.buildL2UpgradeTx(
-            ICTMTransition(address(transition))
+    function test_composerBuildsL2TxAndProposalFromTransition() public {
+        // The delegate calldata is DEFINED by the pinned composer, which the library asks with the
+        // TARGET release and the Bridgehub it was handed — never with authored bytes.
+        vm.expectCall(
+            address(delegateComposer),
+            abi.encodeCall(
+                IL2DelegateCalldataComposer.composeDelegateCalldata,
+                (ICTMRelease(address(newRelease)), bridgehub)
+            )
         );
+        L2CanonicalTransaction memory transaction = _l2Tx(transition);
         // VM identity single-source: the target release's DiamondInit was built with true.
         assertEq(transaction.txType, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE);
         assertEq(transaction.from, uint256(uint160(L2_FORCE_DEPLOYER_ADDR)));
@@ -333,9 +366,24 @@ contract StorageRegistriesTest is Test {
         (, uint32 minor, ) = SemVer.unpackSemVer(uint96(NEW_VERSION));
         assertEq(transaction.nonce, minor);
         assertEq(transaction.factoryDeps.length, 2);
+        L2UpgradePlan memory plan = transition.l2Plan();
+        assertEq(
+            transaction.data,
+            abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (plan.deployments, plan.delegateTo, DELEGATE_CALLDATA)
+            ),
+            "the delegate is called with what the pinned composer composed"
+        );
 
         ProposedUpgrade memory proposedUpgrade = CTMUpgradeComposer.buildProposedUpgrade(
-            ICTMTransition(address(transition))
+            ICTMTransition(address(transition)),
+            bridgehub
+        );
+        assertEq(
+            keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx)),
+            keccak256(abi.encode(transaction)),
+            "the proposal embeds the same composed transaction"
         );
         assertEq(proposedUpgrade.newProtocolVersion, NEW_VERSION);
         assertEq(proposedUpgrade.upgradeTimestamp, 1234567);
@@ -360,15 +408,13 @@ contract StorageRegistriesTest is Test {
         manifest.l2Plan.factoryDepHashes = L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE));
         CTMTransition minimal = new CTMTransition(manifest);
 
-        L2CanonicalTransaction memory transaction = CTMUpgradeComposer.buildL2UpgradeTx(
-            ICTMTransition(address(minimal))
-        );
+        L2CanonicalTransaction memory transaction = _l2Tx(minimal);
         assertEq(transaction.txType, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE, "minimal delegate plan must compose a tx");
         assertEq(
             transaction.data,
             abi.encodeCall(
                 IComplexUpgrader.forceDeployAndUpgradeUniversal,
-                (delegateOnly, delegateOnly[0].newAddress, hex"beef")
+                (delegateOnly, delegateOnly[0].newAddress, DELEGATE_CALLDATA)
             )
         );
         assertEq(transaction.factoryDeps.length, 1, "only the delegate's bytecode rides as a factory dep");
@@ -386,7 +432,7 @@ contract StorageRegistriesTest is Test {
         manifest.l2Plan = AuthoredL2Plan({
             extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
             delegateTo: address(0),
-            delegateCalldata: "",
+            delegateComposer: _noPin(),
             factoryDepHashes: new uint256[](0)
         });
     }
@@ -415,7 +461,7 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_sameReleaseTransitionCarriesAuthoredExtras() public {
         TransitionManifest memory manifest = _patchManifest();
         // The smallest payload a plan can carry: one Unsafe extra that is also the delegate, no
-        // calldata. Shape-valid, so only the same-release rule can fire.
+        // composer. Shape-valid, so only the same-release rule can fire.
         IComplexUpgrader.UniversalContractUpgradeInfo[]
             memory extras = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
         extras[0] = L2PlanFixtures.unsafeDeployment(DELEGATE_CODE);
@@ -595,38 +641,107 @@ contract StorageRegistriesTest is Test {
 
     // ─────────────────────────── L2 plan shape ───────────────────────────
 
-    function test_revertWhen_delegateCalldataWithoutTarget() public {
+    function test_revertWhen_delegateComposerWithoutTarget() public {
         TransitionManifest memory manifest = _transitionManifest();
         manifest.l2Plan.extraDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
         manifest.l2Plan.factoryDepHashes = new uint256[](0);
         manifest.l2Plan.delegateTo = address(0);
-        // delegateCalldata stays "beef" — data the composed tx would never execute.
+        // The composer pin stays — code defining calldata for a delegate call that never happens.
 
         vm.expectRevert(MalformedL2UpgradePlan.selector);
-        CTMTransition malformed = new CTMTransition(manifest);
+        new CTMTransition(manifest);
     }
 
     function test_revertWhen_factoryDepsWithoutL2Side() public {
         TransitionManifest memory manifest = _transitionManifest();
         manifest.l2Plan.extraDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
         manifest.l2Plan.delegateTo = address(0);
-        manifest.l2Plan.delegateCalldata = "";
+        manifest.l2Plan.delegateComposer = _noPin();
         // factoryDepHashes stay non-empty with no transaction to ride in.
 
         vm.expectRevert(MalformedL2UpgradePlan.selector);
-        CTMTransition malformed = new CTMTransition(manifest);
+        new CTMTransition(manifest);
     }
 
     function test_revertWhen_deploymentsWithoutDelegateTarget() public {
         // Force-deployments but no delegate target: `L2ComplexUpgrader` always ends with the final
         // delegatecall, so a deployments-only plan would initialize here yet revert on L2 forever.
-        // (delegateCalldata is cleared so ONLY the deployments-without-target rule can fire.)
+        // (The composer is cleared so ONLY the deployments-without-target rule can fire.)
         TransitionManifest memory manifest = _transitionManifest();
         manifest.l2Plan.delegateTo = address(0);
-        manifest.l2Plan.delegateCalldata = "";
+        manifest.l2Plan.delegateComposer = _noPin();
 
         vm.expectRevert(MalformedL2UpgradePlan.selector);
         new CTMTransition(manifest);
+    }
+
+    // ─────────────────────────── delegate composer ───────────────────────────
+
+    /// @dev The composer is version-specific CODE pinned in place of calldata, so it is held
+    ///      against live code exactly like every other pin: a manifest whose pin disagrees with the
+    ///      composer's code still constructs (pins are checked on the execution paths, see
+    ///      {CTMRelease}) but fails `validate()` and does not verify.
+    function test_revertWhen_transitionDelegateComposerPinMismatch() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.l2Plan.delegateComposer.codehash = keccak256("not the composer's code");
+        CTMTransition mispinned = new CTMTransition(manifest);
+        assertEq(
+            mispinned.l2Plan().delegateComposer,
+            address(delegateComposer),
+            "the composer is served like every other pinned address"
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryCodehashMismatch.selector,
+                address(delegateComposer),
+                keccak256("not the composer's code"),
+                address(delegateComposer).codehash
+            )
+        );
+        mispinned.validate();
+        assertFalse(mispinned.verifyAll(), "a mispinned composer must not verify");
+    }
+
+    /// @dev The live side of the same pin: a correctly pinned composer whose code later differs
+    ///      from the pin (modelled by re-etching it) stops the transition from validating.
+    function test_revertWhen_delegateComposerCodeDrifts() public {
+        transition.validate();
+        assertTrue(transition.verifyAll());
+        bytes32 pinned = address(delegateComposer).codehash;
+
+        vm.etch(address(delegateComposer), hex"600042");
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryCodehashMismatch.selector,
+                address(delegateComposer),
+                pinned,
+                address(delegateComposer).codehash
+            )
+        );
+        transition.validate();
+        assertFalse(transition.verifyAll(), "a drifted composer must not verify");
+    }
+
+    /// @dev A zero composer is a legal plan with a delegate target: the delegate is called with
+    ///      EMPTY calldata, and there is no pin to hold.
+    function test_zeroDelegateComposerComposesEmptyDelegateCalldata() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.l2Plan.delegateComposer = _noPin();
+        CTMTransition uncomposed = new CTMTransition(manifest);
+        assertEq(uncomposed.l2Plan().delegateComposer, address(0), "no composer is served as zero");
+        uncomposed.validate();
+        assertTrue(uncomposed.verifyAll());
+
+        L2CanonicalTransaction memory transaction = _l2Tx(uncomposed);
+        L2UpgradePlan memory plan = uncomposed.l2Plan();
+        assertEq(transaction.txType, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE, "the plan still has an L2 side");
+        assertEq(
+            transaction.data,
+            abi.encodeCall(IComplexUpgrader.forceDeployAndUpgradeUniversal, (plan.deployments, plan.delegateTo, "")),
+            "without a composer the delegate is called with empty calldata"
+        );
     }
 
     // ─────────────────────────── derived L2 deployments ───────────────────────────
@@ -717,8 +832,18 @@ contract StorageRegistriesTest is Test {
         }
         // The authored remainder rides through unchanged.
         assertEq(plan.delegateTo, manifest.l2Plan.delegateTo);
-        assertEq(plan.delegateCalldata, hex"beef");
+        assertEq(plan.delegateComposer, address(delegateComposer), "the pinned composer is served");
         assertEq(plan.factoryDepHashes.length, manifest.l2Plan.factoryDepHashes.length);
+        // ...and the composed transaction executes the COMBINED deployments, then the delegate
+        // with the calldata the pinned composer defines.
+        assertEq(
+            _l2Tx(combined).data,
+            abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (plan.deployments, plan.delegateTo, DELEGATE_CALLDATA)
+            ),
+            "composed data must be derived ++ extras, delegate, composer calldata"
+        );
     }
 
     function test_revertWhen_derivedDeploymentsWithoutDelegateTarget() public {
@@ -728,7 +853,7 @@ contract StorageRegistriesTest is Test {
         manifest.newRelease = address(_tableRelease());
         manifest.l2Plan.extraDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
         manifest.l2Plan.delegateTo = address(0);
-        manifest.l2Plan.delegateCalldata = "";
+        manifest.l2Plan.delegateComposer = _noPin();
         // The derived rows' dependencies are all present, so only the shape rule can fire.
         manifest.l2Plan.factoryDepHashes = _tableDeps();
 
@@ -771,7 +896,7 @@ contract StorageRegistriesTest is Test {
         manifest.l2Plan = AuthoredL2Plan({
             extraDeployments: new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
             delegateTo: address(0),
-            delegateCalldata: "",
+            delegateComposer: _noPin(),
             factoryDepHashes: new uint256[](0)
         });
 
@@ -780,12 +905,9 @@ contract StorageRegistriesTest is Test {
         L2UpgradePlan memory plan = l1Only.l2Plan();
         assertEq(plan.deployments.length, 0, "an L1-only hop deploys nothing on L2");
         assertEq(plan.delegateTo, address(0));
+        assertEq(plan.delegateComposer, address(0));
         // No L2 side: the composer emits the all-zero transaction `BaseZkSyncUpgrade` skips.
-        assertEq(
-            CTMUpgradeComposer.buildL2UpgradeTx(ICTMTransition(address(l1Only))).txType,
-            0,
-            "an L1-only hop composes no L2 transaction"
-        );
+        assertEq(_l2Tx(l1Only).txType, 0, "an L1-only hop composes no L2 transaction");
     }
 
     function test_revertWhen_extraDeploymentIsNotUnsafe() public {

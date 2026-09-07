@@ -144,12 +144,12 @@ contract CTMTransition is ICTMTransition {
         // checked against the COMBINED plan — derived deployments included.
         // `L2ComplexUpgrader.forceDeployAndUpgradeUniversal` unconditionally ends with the
         // delegatecall, so a nonempty plan REQUIRES a delegate target (a deployments-only plan
-        // would initialize here but revert on L2 forever); a delegate calldata without a target,
+        // would initialize here but revert on L2 forever); a delegate composer without a target,
         // or factory deps without any L2 side, would be silently dead payload — refuse all of it.
         bool hasL2Side = l2Deployments.length != 0 || _manifest.l2Plan.delegateTo != address(0);
         if (
             (l2Deployments.length != 0 && _manifest.l2Plan.delegateTo == address(0)) ||
-            (_manifest.l2Plan.delegateCalldata.length != 0 && _manifest.l2Plan.delegateTo == address(0)) ||
+            (_manifest.l2Plan.delegateComposer.addr != address(0) && _manifest.l2Plan.delegateTo == address(0)) ||
             (_manifest.l2Plan.factoryDepHashes.length != 0 && !hasL2Side)
         ) {
             revert MalformedL2UpgradePlan();
@@ -241,7 +241,7 @@ contract CTMTransition is ICTMTransition {
             L2UpgradePlan({
                 deployments: abi.decode(encodedL2Deployments, (IComplexUpgrader.UniversalContractUpgradeInfo[])),
                 delegateTo: m.l2Plan.delegateTo,
-                delegateCalldata: m.l2Plan.delegateCalldata,
+                delegateComposer: m.l2Plan.delegateComposer.addr,
                 factoryDepHashes: m.l2Plan.factoryDepHashes
             });
     }
@@ -256,6 +256,10 @@ contract CTMTransition is ICTMTransition {
         ICTMRelease(m.fromRelease).validate();
         _requirePin(m.upgradeEngine);
         _requirePin(m.upgradeTimer);
+        // The delegate composer is version-specific CODE the manifest pins in place of calldata.
+        if (m.l2Plan.delegateComposer.addr != address(0)) {
+            _requirePin(m.l2Plan.delegateComposer);
+        }
         // The ecosystem leg is optional; when named it is pinned like every other address.
         if (m.coreRegistry.addr != address(0)) {
             _requirePin(m.coreRegistry);
@@ -271,6 +275,7 @@ contract CTMTransition is ICTMTransition {
         return
             CodehashPinLib.pinHolds(m.upgradeEngine) &&
             CodehashPinLib.pinHolds(m.upgradeTimer) &&
+            (m.l2Plan.delegateComposer.addr == address(0) || CodehashPinLib.pinHolds(m.l2Plan.delegateComposer)) &&
             (m.coreRegistry.addr == address(0) || CodehashPinLib.pinHolds(m.coreRegistry)) &&
             ProxyUpgradeRowLib.rowPinsHold(ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT));
     }

@@ -20,6 +20,7 @@ import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpg
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
+import {FixedDelegateCalldataComposer} from "contracts/dev-contracts/FixedDelegateCalldataComposer.sol";
 import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -69,6 +70,9 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest {
     CTMRelease internal fromRelease;
     CTMRelease internal release;
     CTMTransition internal transition;
+    /// @dev The pinned delegate-calldata composer every fixture transition carries: a test-only
+    ///      stand-in returning `DELEGATE_CALLDATA` regardless of its inputs.
+    FixedDelegateCalldataComposer internal delegateComposer;
 
     uint256 internal newVersion;
     address internal chainAddress;
@@ -78,6 +82,8 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest {
     /// @dev Dummy EVM bytecode of the L2 upgrade delegate every fixture transition carries as its
     ///      one Unsafe extra (see {L2PlanFixtures}); published on the fixture supplier in `setUp`.
     bytes internal constant L2_DELEGATE_CODE = hex"de1e";
+    /// @dev The delegate calldata `delegateComposer` composes.
+    bytes internal constant DELEGATE_CALLDATA = hex"beef";
 
     function setUp() public virtual {
         deploy();
@@ -123,6 +129,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest {
         vm.etch(genesisUpgradeAddr, hex"600042");
         upgradeEngineAddr = makeAddr("upgradeEngine");
         vm.etch(upgradeEngineAddr, hex"600043");
+        delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
         // Transitions require real releases on BOTH edges, so the fixture CTM's mocked genesis
         // release is replaced by a real one — through the owner-gated raw-call escape hatch, which
         // is exactly the production route for out-of-band CTM state (the routine executor
@@ -245,7 +252,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest {
                 l2Plan: AuthoredL2Plan({
                     extraDeployments: deployments,
                     delegateTo: deployments[0].newAddress,
-                    delegateCalldata: hex"beef",
+                    delegateComposer: _pin(address(delegateComposer)),
                     factoryDepHashes: factoryDeps
                 }),
                 coreRegistry: PinnedContract({addr: address(0), codehash: bytes32(0)}),

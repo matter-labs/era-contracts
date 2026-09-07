@@ -182,7 +182,8 @@ export function transitionInitArgs(
   ctm: any,
   newRelease: string,
   coreRegistry: { addr: string; codehash: string },
-  upgradeTimer: { addr: string; codehash: string }
+  upgradeTimer: { addr: string; codehash: string },
+  delegateComposer: { addr: string; codehash: string }
 ): any {
   // Release provenance is enforced by the CTM's stored `releaseCodehash` at `setCurrentRelease`
   // time, not by the transition manifest — which is why the runner checks the freshly deployed
@@ -216,7 +217,9 @@ export function transitionInitArgs(
     l2Plan: {
       extraDeployments,
       delegateTo: transition.l2Plan.delegateTo,
-      delegateCalldata: transition.l2Plan.delegateCalldata,
+      // Pinned version-specific CODE defines the delegate calldata; the harness pins a fixed
+      // no-op composer deployed alongside the objects (see the runner).
+      delegateComposer,
       factoryDepHashes: transition.l2Plan.factoryDepHashes.map((h: string) => ethers.BigNumber.from(h)),
     },
     // The ecosystem leg and the stage-1 timer are deploy-time objects of this same run (like

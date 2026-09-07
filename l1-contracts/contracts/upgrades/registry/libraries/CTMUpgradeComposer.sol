@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {ICTMTransition} from "../objects/ICTMTransition.sol";
+import {IL2DelegateCalldataComposer} from "../objects/IL2DelegateCalldataComposer.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
 import {IDiamondInit} from "../../../state-transition/chain-interfaces/IDiamondInit.sol";
@@ -61,15 +62,19 @@ library CTMUpgradeComposer {
     ///      the plan has ANY L2 side — deployments or a delegate call; `L2ComplexUpgrader`
     ///      supports an empty deployment list followed by a delegatecall, and transition
     ///      initialization already rejects plans whose data could never execute.
-    function buildL2UpgradeTx(ICTMTransition _transition) internal view returns (L2CanonicalTransaction memory) {
-        return _buildL2UpgradeTx(_transition, _transition.getManifest());
+    function buildL2UpgradeTx(
+        ICTMTransition _transition,
+        address _bridgehub
+    ) internal view returns (L2CanonicalTransaction memory) {
+        return _buildL2UpgradeTx(_transition, _transition.getManifest(), _bridgehub);
     }
 
     /// @dev Manifest-taking form so callers already holding the decoded manifest avoid re-decoding
     ///      it; the FINAL plan (derived deployments included) still comes from the transition.
     function _buildL2UpgradeTx(
         ICTMTransition _transition,
-        TransitionManifest memory _m
+        TransitionManifest memory _m,
+        address _bridgehub
     ) private view returns (L2CanonicalTransaction memory) {
         uint256 newVersion = _m.newProtocolVersion;
         L2UpgradePlan memory plan = _transition.l2Plan();
@@ -90,9 +95,17 @@ library CTMUpgradeComposer {
         transaction.gasLimit = PRIORITY_TX_MAX_GAS_LIMIT;
         transaction.gasPerPubdataByteLimit = REQUIRED_L2_GAS_PRICE_PER_PUBDATA;
         transaction.nonce = protocolUpgradeNonce(newVersion);
+        // What the delegate is called WITH is defined by the pinned version-specific composer
+        // from authoritative inputs — never by authored bytes (see {IL2DelegateCalldataComposer}).
+        bytes memory delegateCalldata = plan.delegateComposer == address(0)
+            ? bytes("")
+            : IL2DelegateCalldataComposer(plan.delegateComposer).composeDelegateCalldata(
+                ICTMRelease(_m.newRelease),
+                _bridgehub
+            );
         transaction.data = abi.encodeCall(
             IComplexUpgrader.forceDeployAndUpgradeUniversal,
-            (plan.deployments, plan.delegateTo, plan.delegateCalldata)
+            (plan.deployments, plan.delegateTo, delegateCalldata)
         );
         transaction.factoryDeps = plan.factoryDepHashes;
         return transaction;
@@ -100,11 +113,12 @@ library CTMUpgradeComposer {
 
     /// @notice Builds the `ProposedUpgrade` embedded in the upgrade cut's init calldata.
     function buildProposedUpgrade(
-        ICTMTransition _transition
+        ICTMTransition _transition,
+        address _bridgehub
     ) internal view returns (ProposedUpgrade memory proposedUpgrade) {
         TransitionManifest memory m = _transition.getManifest();
         proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(m.newProtocolVersion);
-        proposedUpgrade.l2ProtocolUpgradeTx = _buildL2UpgradeTx(_transition, m);
+        proposedUpgrade.l2ProtocolUpgradeTx = _buildL2UpgradeTx(_transition, m, _bridgehub);
         // Straight from the TARGET release, not from `CTM.currentRelease()`: a chain several
         // versions behind executes the transition that names its own next release, and the CTM may
         // already have moved past it.

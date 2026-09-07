@@ -79,7 +79,7 @@ struct ReleaseManifest {
 struct L2UpgradePlan {
     IComplexUpgrader.UniversalContractUpgradeInfo[] deployments;
     address delegateTo;
-    bytes delegateCalldata;
+    address delegateComposer;
     uint256[] factoryDepHashes;
 }
 
@@ -94,10 +94,14 @@ struct L2UpgradePlan {
 ///        version-specific upgrade delegate, force-deployed Unsafe at a bytecode-derived
 ///        address. Appended AFTER the derived set (order between deployments is free; the
 ///        delegatecall always runs last).
+/// @param delegateComposer The codehash-pinned {IL2DelegateCalldataComposer} that DEFINES what the
+///        delegate is called with, from the target release and the ecosystem's Bridgehub — no
+///        authored calldata bytes ride the manifest. Zero means the delegate is called with empty
+///        calldata; nonzero requires a `delegateTo`.
 struct AuthoredL2Plan {
     IComplexUpgrader.UniversalContractUpgradeInfo[] extraDeployments;
     address delegateTo;
-    bytes delegateCalldata;
+    PinnedContract delegateComposer;
     uint256[] factoryDepHashes;
 }
 
@@ -184,7 +188,10 @@ struct CoreRegistryManifest {
 /// @param proxyUpgrades The CTM-domain inventory, indexed by {CTMContract} (same slot semantics
 ///        as {CoreRegistryManifest}): each participating slot applies only if the proxy
 ///        currently points at `expectedOldImpl`, and each `implNew` carries an inline pin. The
-///        CTM's own implementation swap is one of these slots.
+///        CTM's own implementation swap is one of these slots. A row under a FOREIGN admin (the
+///        ServerNotifier's) is left to that administrator: `migrate()` hands onward only
+///        `ctmProxyAdmin`, so a foreign admin must never be transferred to this one-shot object —
+///        hand it to the executor, or keep it and apply the row yourself before stage 2.
 /// @param currentRelease The pinned genesis release installed as `currentRelease`. Its
 ///        `codehash` doubles as the CTM's canonical provenance anchor (`releaseCodehash`):
 ///        every release this CTM ever pins must run exactly that code.

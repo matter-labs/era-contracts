@@ -254,7 +254,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         // when it was committed. Pins cannot have moved since: an `EXTCODEHASH` is fixed for a
         // non-selfdestructible contract.
         _applyDerivedFacetCuts(transition.facetCuts());
-        return upgrade(CTMUpgradeComposer.buildProposedUpgrade(transition));
+        return upgrade(CTMUpgradeComposer.buildProposedUpgrade(transition, s.bridgehub));
     }
 
     /// @notice Placeholder function for custom logic for upgrading L1 contract.

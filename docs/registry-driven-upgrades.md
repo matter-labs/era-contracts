@@ -473,7 +473,7 @@ before chains may upgrade.
 
 **L2 plan.** Checked against the COMBINED plan (table-derived deployments plus authored extras).
 `L2ComplexUpgrader` unconditionally ends with a delegatecall, so a nonempty combined plan requires
-a delegate target; delegate calldata without a target, or factory deps without any L2 side, are
+a delegate target; a delegate composer without a target, or factory deps without any L2 side, are
 rejected as dead payload. The factory-dep count is capped at the same limit execution enforces. A
 table row for a member with no fixed address fails the derivation itself. Extras must be `Unsafe`
 deployments at their bytecode-derived address, the delegate must be one of them, and every installed

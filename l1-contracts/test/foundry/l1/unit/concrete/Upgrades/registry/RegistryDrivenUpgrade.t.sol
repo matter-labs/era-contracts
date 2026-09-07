@@ -29,6 +29,8 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {AcceptingVerifier} from "contracts/dev-contracts/test/AcceptingVerifier.sol";
+import {FixedDelegateCalldataComposer} from "contracts/dev-contracts/FixedDelegateCalldataComposer.sol";
+import {RegistryComposerHarness} from "contracts/dev-contracts/RegistryComposerHarness.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -77,6 +79,11 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     EcosystemUpgradeExecutor internal ecosystemExecutor;
     CTMTransition internal transitionV32;
     CTMTransition internal transitionV33;
+    /// @dev The v33 hop's pinned delegate-calldata composer: a test-only stand-in returning
+    ///      `DELEGATE_CALLDATA` regardless of its inputs (there is no real L2 migration behind the
+    ///      dummy delegate), so what this suite proves is that the chain-side path composes THROUGH
+    ///      the pinned composer — not what a version's composer produces.
+    FixedDelegateCalldataComposer internal delegateComposer;
 
     address internal chainAddress;
     address internal newAdminFacet;
@@ -87,6 +94,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
 
     uint256 internal constant V32 = uint256(32) << 32; // 0.32.0
     uint256 internal constant V33 = uint256(33) << 32; // 0.33.0
+    bytes internal constant DELEGATE_CALLDATA = hex"beef";
 
     // Dummy EVM bytecodes standing in for the v33 hop's L2 artifacts (see {L2PlanFixtures}): the
     // upgrade delegate (authored Unsafe extra) and the L2Bridgehub system-proxy row the v33
@@ -156,6 +164,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         defaultUpgrade = address(new DefaultUpgrade());
         verifierV32 = address(new AcceptingVerifier());
         verifierV33 = address(new AcceptingVerifier());
+        delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
         // The pinned genesisUpgrade must carry real code — the registry's codehash pin rejects a
         // codeless target — so etch a stand-in and pin its actual codehash below.
         genesisUpgradeAddr = makeAddr("genesisUpgrade");
@@ -275,15 +284,19 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             memory deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](hasL2Side ? 1 : 0);
         // A nonempty L2 plan MUST carry a delegate target: `L2ComplexUpgrader` always ends with
         // the final delegatecall, so a deployments-only plan (no target) would revert on L2. The
-        // delegate is the one authored extra, and every bytecode the hop installs (the delegate,
-        // the table row's implementation and proxy shell) is a factory dependency.
+        // delegate is the one authored extra, its calldata is defined by the pinned composer, and
+        // every bytecode the hop installs (the delegate, the table row's implementation and proxy
+        // shell) is a factory dependency.
         AuthoredL2Plan memory l2Plan;
         l2Plan.extraDeployments = deployments;
         l2Plan.factoryDepHashes = new uint256[](0);
         if (hasL2Side) {
             deployments[0] = L2PlanFixtures.unsafeDeployment(L2_DELEGATE_CODE);
             l2Plan.delegateTo = deployments[0].newAddress;
-            l2Plan.delegateCalldata = hex"beef";
+            l2Plan.delegateComposer = PinnedContract({
+                addr: address(delegateComposer),
+                codehash: address(delegateComposer).codehash
+            });
             l2Plan.factoryDepHashes = L2PlanFixtures.factoryDepHashes(
                 L2PlanFixtures.codes(L2_DELEGATE_CODE, L2_BRIDGEHUB_IMPL_CODE, L2_SYSTEM_PROXY_CODE)
             );
@@ -375,20 +388,50 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             plan.deployments[1].upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment
         );
         assertEq(plan.deployments[1].newAddress, plan.delegateTo, "the delegate is the authored Unsafe extra");
+        assertEq(plan.delegateComposer, address(delegateComposer), "the pinned composer defines the delegate calldata");
         assertEq(plan.factoryDepHashes.length, 3, "delegate + implementation + proxy shell");
 
+        // The chain composed on its own Bridgehub (`s.bridgehub`), which is the CTM's — the one
+        // this fixture deployed. Re-composing against it must reproduce the committed transaction.
+        // (Read through the fixture's UtilsFacet: the fixture diamond does not route `getBridgehub`.)
+        assertEq(
+            UtilsFacet(chainAddress).util_getBridgehub(),
+            address(bridgehub),
+            "the chain composes on its Bridgehub"
+        );
+        assertEq(chainContractAddress.BRIDGE_HUB(), address(bridgehub));
+
         // The committed L2 upgrade transaction is exactly the registry-composed one, carrying
-        // the VM's upgrade-transaction type (254 for Era, 126 for ZKsyncOS).
+        // the VM's upgrade-transaction type (254 for Era, 126 for ZKsyncOS) and, as the delegate
+        // calldata, what the pinned composer composed.
         L2CanonicalTransaction memory expectedTx = CTMUpgradeComposer.buildL2UpgradeTx(
-            ICTMTransition(address(transitionV33))
+            ICTMTransition(address(transitionV33)),
+            address(bridgehub)
         );
         assertEq(expectedTx.factoryDeps.length, 3, "the L2 transaction carries every installed bytecode");
         assertEq(expectedTx.txType, _expectedL2UpgradeTxType(), "the upgrade tx must carry the VM's upgrade tx type");
         assertEq(expectedTx.nonce, 33, "upgrade tx nonce must equal the new minor version");
         assertEq(
-            IGetters(chainAddress).getL2SystemContractsUpgradeTxHash(),
+            expectedTx.data,
+            abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (plan.deployments, plan.delegateTo, DELEGATE_CALLDATA)
+            ),
+            "the delegate is called with the composer's calldata"
+        );
+        bytes32 committedHash = IGetters(chainAddress).getL2SystemContractsUpgradeTxHash();
+        assertEq(
+            committedHash,
             keccak256(abi.encode(expectedTx)),
             "the chain must commit the registry-composed L2 upgrade transaction"
+        );
+        // The off-chain tooling's view of the same composition (the anvil runner relays exactly
+        // this) agrees with what the chain committed.
+        RegistryComposerHarness harness = new RegistryComposerHarness();
+        assertEq(
+            harness.l2UpgradeTxHash(ICTMTransition(address(transitionV33)), address(bridgehub)),
+            committedHash,
+            "the harness must reproduce the committed hash"
         );
     }
 

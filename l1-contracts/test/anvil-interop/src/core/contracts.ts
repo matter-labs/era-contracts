@@ -96,6 +96,7 @@ const ARTIFACTS = {
   CommitterFacet: "Committer.sol/CommitterFacet.json",
   MigratorFacet: "Migrator.sol/MigratorFacet.json",
   MockContractDeployer: "MockContractDeployer.sol/MockContractDeployer.json",
+  FixedDelegateCalldataComposer: "FixedDelegateCalldataComposer.sol/FixedDelegateCalldataComposer.json",
   MockL1MessengerHook: "MockL1MessengerHook.sol/MockL1MessengerHook.json",
   MockL2MessageVerification: "MockL2MessageVerification.sol/MockL2MessageVerification.json",
   MockMintBaseTokenHook: "MockMintBaseTokenHook.sol/MockMintBaseTokenHook.json",

@@ -529,7 +529,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       getAbi("RegistryComposerHarness"),
       l1Provider
     );
-    const expectedL2TxHash: string = await composerHarness.l2UpgradeTxHash(objects.transition);
+    const expectedL2TxHash: string = await composerHarness.l2UpgradeTxHash(objects.transition, l1Addresses.bridgehub);
 
     assertEq(
       (await ctm.protocolVersion()).toString(),
@@ -598,7 +598,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
 
     // ── 10. Relay the composed L2 upgrade tx to each target L2 chain ──
     console.log("\n── Relaying the transition-composed L2 upgrade transaction ──");
-    const composedTx = await composerHarness.l2UpgradeTx(objects.transition);
+    const composedTx = await composerHarness.l2UpgradeTx(objects.transition, l1Addresses.bridgehub);
     for (const chain of upgradeChains) {
       const l2Chain = anvilManager.getL2Chains().find((c) => c.chainId === chain.chainId);
       if (!l2Chain) {
@@ -1050,17 +1050,6 @@ async function buildRegistryManifest(
               },
             ],
             delegateTo: delegateAddress,
-            // The mock deliberately has no fallback. Call its explicit no-op method so stale
-            // selectors still fail, while isolating migration semantics from this lifecycle test.
-            delegateCalldata: new ethers.utils.Interface(getAbi("MockContractDeployer")).encodeFunctionData(
-              "setBytecodeDetailsEVM",
-              [
-                delegateAddress,
-                ethers.utils.keccak256(getDeterministicBytecode("MockContractDeployer")),
-                ethers.utils.hexDataLength(getDeterministicBytecode("MockContractDeployer")),
-                ethers.utils.keccak256(getDeterministicBytecode("MockContractDeployer")),
-              ]
-            ),
             factoryDepHashes: [ethers.utils.keccak256(getDeterministicBytecode("MockContractDeployer"))],
           },
         },
@@ -1215,6 +1204,24 @@ async function deployUpgradeObjectsFromManifest(
   );
   const upgradeTimer = await timerFactory.deploy(0, 0, deployed.ctmExecutor, deployer.address);
   await upgradeTimer.deployed();
+  // The delegate's calldata is defined by pinned CODE, not authored bytes: a fixed composer
+  // standing in for a version-specific one. The mock deliberately has no fallback, so the
+  // composed call names its explicit no-op method and a stale selector still fails.
+  const composerFactory = new ethers.ContractFactory(
+    getAbi("FixedDelegateCalldataComposer"),
+    getCreationBytecode("FixedDelegateCalldataComposer"),
+    deployer
+  );
+  const delegateBytecode = getDeterministicBytecode("MockContractDeployer");
+  const delegateComposer = await composerFactory.deploy(
+    new ethers.utils.Interface(getAbi("MockContractDeployer")).encodeFunctionData("setBytecodeDetailsEVM", [
+      upgradeDelegateInfo().address,
+      ethers.utils.keccak256(delegateBytecode),
+      ethers.utils.hexDataLength(delegateBytecode),
+      ethers.utils.keccak256(delegateBytecode),
+    ])
+  );
+  await delegateComposer.deployed();
   const pin = async (addr: string): Promise<{ addr: string; codehash: string }> => ({
     addr,
     codehash: ethers.utils.keccak256(await deployer.provider.getCode(addr)),
@@ -1223,7 +1230,14 @@ async function deployUpgradeObjectsFromManifest(
     release,
     transition: await deployObject(
       "CTMTransition",
-      transitionInitArgs(manifest, ctm, release, await pin(coreRegistry), await pin(upgradeTimer.address)),
+      transitionInitArgs(
+        manifest,
+        ctm,
+        release,
+        await pin(coreRegistry),
+        await pin(upgradeTimer.address),
+        await pin(delegateComposer.address)
+      ),
       deployed.transitionCodehash
     ),
     coreRegistry,

@@ -215,7 +215,9 @@ ChainAdmin's own `ctm_admin_calls` (which protocol-ops runs right after the prep
 `validateApplied()` requires it. Both authority policies are therefore expressible as on-chain
 state: hand the notifier's admin to the executor and the row rides stage 1; keep it with the
 ChainAdmin and the ChainAdmin's own call must land before stage 2. `validate()` on the bootstrap
-accepts a row already at `implNew` for exactly this reason.
+accepts a row already at `implNew` for exactly this reason. One footgun to avoid: never transfer a
+foreign admin to the bootstrap MIGRATION — it hands onward only the CTM-domain `ProxyAdmin`, so an
+admin parked on the spent one-shot object has no way out. The executor is the long-lived owner.
 
 ### 4.5 Bootstrap stays one-shot; the lifecycle starts at the first transition
 
@@ -233,13 +235,17 @@ inputs, shared composition code, no second permanent path.
 
 ### 4.6 L2 migration composition
 
-The manifest stops carrying `delegateTo` and `delegateCalldata`. It pins the delegate's bytecode
-info (which DETERMINES its unsafe-deployment address) and a version-specific L1 composer
-implementing a fixed interface, pinned by codehash; at composition time the composer produces the
-delegate calldata from authoritative inputs (the target release's `fixedForceDeploymentsData`,
-the CTM's Bridgehub for `ctmDeploymentTracker`) — so the arguments are defined by audited code,
-not authored bytes. `L2PlanValidationLib`'s invariants (extras unsafe and bytecode-derived,
-delegate ∈ extras, every installed bytecode in the factory deps, publication at commit) stay.
+Implemented: the manifest carries no delegate calldata. `AuthoredL2Plan.delegateComposer` pins a
+version-specific `IL2DelegateCalldataComposer` by codehash (v34: `L2V34DelegateCalldataComposer`),
+and `CTMUpgradeComposer` asks it for the calldata at composition time from authoritative inputs —
+the target release (`fixedForceDeploymentsData`) and the ecosystem's Bridgehub
+(`l1CtmDeployer`). The delegate's ADDRESS is already determined by its unsafe deployment's
+bytecode info, so the three authored pieces the script used to relate by hand — delegate
+deployment, delegate address, delegate arguments — are now one pinned deployment plus one pinned
+piece of code. Per-chain data stays the ZKsync OS engine's rewrite at execution, unchanged.
+`L2PlanValidationLib`'s invariants (extras unsafe and bytecode-derived, delegate ∈ extras, every
+installed bytecode in the factory deps, publication at commit) stay; a composer without a
+delegate target is malformed.
 
 ### 4.7 Tooling after the migration
 

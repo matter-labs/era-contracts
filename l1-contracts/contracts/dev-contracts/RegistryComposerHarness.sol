@@ -17,15 +17,20 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 ///      registry-driven upgrade executes; this harness only re-exposes it as external views so
 ///      TypeScript tooling does not have to replicate the encoding.
 contract RegistryComposerHarness {
-    /// @notice The L2 protocol upgrade transaction composed from the registry's constants.
-    function l2UpgradeTx(ICTMTransition _transition) public view returns (L2CanonicalTransaction memory) {
-        return CTMUpgradeComposer.buildL2UpgradeTx(_transition);
+    /// @notice The L2 protocol upgrade transaction composed from the registry's constants and the
+    ///         ecosystem's Bridgehub (the delegate calldata comes from the transition's pinned
+    ///         composer, which reads live ecosystem addresses through it).
+    function l2UpgradeTx(
+        ICTMTransition _transition,
+        address _bridgehub
+    ) public view returns (L2CanonicalTransaction memory) {
+        return CTMUpgradeComposer.buildL2UpgradeTx(_transition, _bridgehub);
     }
 
     /// @notice keccak256 of the ABI-encoded composed transaction — the exact value that
     ///         `BaseZkSyncUpgrade._setL2SystemContractUpgrade` stores on the chain diamond as
     ///         `l2SystemContractsUpgradeTxHash`.
-    function l2UpgradeTxHash(ICTMTransition _transition) external view returns (bytes32) {
-        return keccak256(abi.encode(l2UpgradeTx(_transition)));
+    function l2UpgradeTxHash(ICTMTransition _transition, address _bridgehub) external view returns (bytes32) {
+        return keccak256(abi.encode(l2UpgradeTx(_transition, _bridgehub)));
     }
 }
