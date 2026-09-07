@@ -131,7 +131,8 @@ contract EcosystemUpgradeExecutorTest is Test {
                 proxy: _proxy,
                 expectedOldImpl: _expectedOldImpl,
                 implNew: PinnedContract({addr: _implNew, codehash: _implNew.codehash}),
-                callInitializeUpgrade: false
+                callInitializeUpgrade: false,
+                admin: ProxyAdmin(address(0))
             });
     }
 
@@ -194,7 +195,8 @@ contract EcosystemUpgradeExecutorTest is Test {
             proxy: address(bridgehubProxy),
             expectedOldImpl: address(implOld),
             implNew: PinnedContract({addr: address(initImpl), codehash: address(initImpl).codehash}),
-            callInitializeUpgrade: true
+            callInitializeUpgrade: true,
+            admin: ProxyAdmin(address(0))
         });
         // Same audited bytecode as the fixture registry (no immutables), so the executor's
         // codehash pin covers this instance too.

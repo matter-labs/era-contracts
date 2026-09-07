@@ -160,7 +160,8 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
                 proxy: _proxy,
                 expectedOldImpl: Utils.getImplementation(_proxy),
                 implNew: PinnedContract({addr: _implNew, codehash: _implNew.codehash}),
-                callInitializeUpgrade: false
+                callInitializeUpgrade: false,
+                admin: ProxyAdmin(address(0))
             });
     }
 

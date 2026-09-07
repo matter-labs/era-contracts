@@ -193,6 +193,7 @@ export async function bootstrapInitArgs(
           codehash: manifest.bootstrap.ctmImpl.implNewCodehash,
         },
         callInitializeUpgrade: false,
+        admin: ethers.constants.AddressZero,
       },
     }),
     currentRelease: { addr: params.currentRelease, codehash: params.releaseCodehash },

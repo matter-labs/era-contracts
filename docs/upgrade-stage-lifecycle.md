@@ -204,16 +204,18 @@ without any executor-side bookkeeping.
 ### 4.4 ServerNotifier: an explicit row and an authorized path
 
 The notifier is a per-CTM proxy but sits under its OWN `ProxyAdmin`, owned by the CTM's
-`ChainAdmin` — not under `CTM_PROXY_ADMIN`. It must appear in the reviewed upgrade description
-(`CTMContract.ServerNotifier` row in the transition's CTM-domain inventory), and its execution path
-must be explicit rather than assumed. Proposed: each row explicitly names its ProxyAdmin, which reads the proxy's live admin and
-implementation through its admin-only getters. A different ProxyAdmin cannot inspect a transparent
-proxy this way, so the existing CTM ProxyAdmin cannot discover the notifier's admin. The executor
-must own the named admin, and the bootstrap data carries the one-time `transferOwnership` of the notifier's ProxyAdmin
-from the ChainAdmin to the executor as an explicit, bound authorization call. Alternative if the
-ChainAdmin must keep that authority: the row stays in the transition, stage 1 skips rows whose
-admin the executor does not own, and stage 2 REQUIRES them applied — the description still names
-the action, and the differently-owned execution is explicit.
+`ChainAdmin` — not under `CTM_PROXY_ADMIN`. Implemented: `ProxyUpgradeRow.admin` names the
+`ProxyAdmin` administering the row's proxy (zero = the executor's bound admin), reads go through
+it (a transparent proxy answers `implementation()` only to its own admin, so the bound admin
+cannot even inspect the notifier), and the row applies only if the executor OWNS the named admin —
+otherwise stage 1 leaves it to that administrator (`ProxyRowLeftToAdministrator`) and stage 2
+requires it applied. `CTMContract.ServerNotifier` is the row's slot; the v34 bootstrap manifest
+carries the notifier swap under its chainAdmin-owned admin, `migrate()` leaves it to the
+ChainAdmin's own `ctm_admin_calls` (which protocol-ops runs right after the prepares), and
+`validateApplied()` requires it. Both authority policies are therefore expressible as on-chain
+state: hand the notifier's admin to the executor and the row rides stage 1; keep it with the
+ChainAdmin and the ChainAdmin's own call must land before stage 2. `validate()` on the bootstrap
+accepts a row already at `implNew` for exactly this reason.
 
 ### 4.5 Bootstrap stays one-shot; the lifecycle starts at the first transition
 
@@ -272,11 +274,11 @@ Targeted tests:
 
 1. This inventory (baseline) — done.
 2. Object inputs: `coreRegistry` + `upgradeTimer` on the transition — done; CAH pauser holds —
-   done; notifier row — next (needs a per-row admin, see 4.4).
+   done; notifier row with its explicit admin — done (4.4).
 3. `stage0/1/2` on `CTMUpgradeExecutor`; `applyCTMUpgrade` internal — done.
 4. Authority: ecosystem executor's narrow CTM-executor authorization and pauser registration —
    done (both emitted by the v34 CTM prepare's stage 2 as explicit bootstrap-join calls); notifier
-   ProxyAdmin path — next.
+   ProxyAdmin path — done (the row names its admin; the executor applies it only if it owns it).
 5. Bootstrap join: explicit bound authorization calls; no bootstrap machinery on transitions.
 6. Tooling: scripts emit the three calls; the Rust merger stops composing stage bodies; every
    remaining external action listed.

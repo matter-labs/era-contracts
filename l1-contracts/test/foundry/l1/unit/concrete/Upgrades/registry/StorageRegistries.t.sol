@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {CoreRegistry} from "contracts/upgrades/registry/objects/CoreRegistry.sol";
 import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
@@ -68,6 +69,7 @@ import {
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 import {
     CTM_CONTRACT_COUNT,
+    CTMContract,
     L1_ECOSYSTEM_CONTRACT_COUNT,
     L1EcosystemContract,
     L2_ECOSYSTEM_CONTRACT_COUNT,
@@ -148,7 +150,8 @@ contract StorageRegistriesTest is Test {
             proxy: address(0xB001),
             expectedOldImpl: address(0xB101),
             implNew: PinnedContract({addr: coreImplNew, codehash: coreImplNew.codehash}),
-            callInitializeUpgrade: false
+            callInitializeUpgrade: false,
+            admin: ProxyAdmin(address(0))
         });
     }
 
@@ -1079,5 +1082,55 @@ contract StorageRegistriesTest is Test {
             )
         );
         new CoreRegistry(manifest);
+    }
+
+    // ─────────────────────────── CTM-domain inventory ───────────────────────────
+
+    /// @dev The enum is append-only and the inventory length is derived from it: the notifier
+    ///      slot must be the LAST member, and the count must have grown with it.
+    function test_ctmInventoryEndsWithTheServerNotifierSlot() public pure {
+        assertEq(
+            uint256(CTMContract.ServerNotifier),
+            uint256(type(CTMContract).max),
+            "ServerNotifier must be the last member"
+        );
+        assertEq(
+            CTM_CONTRACT_COUNT,
+            uint256(CTMContract.ServerNotifier) + 1,
+            "the inventory length must cover the notifier slot"
+        );
+    }
+
+    /// @dev A row's `admin` rides the manifest into the flattened rows unchanged: zero for rows
+    ///      under the applying executor's bound admin, the named admin otherwise — and it is part
+    ///      of the committed manifest hash.
+    function test_transitionRowsCarryTheirNamedAdmin() public {
+        address ctmImplNew = _pinned("ctmImplNew");
+        address notifierImplNew = _pinned("notifierImplNew");
+        ProxyAdmin notifierAdmin = ProxyAdmin(makeAddr("notifierAdmin"));
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.proxyUpgrades[uint256(CTMContract.ChainTypeManager)] = ProxyUpgradeRow({
+            proxy: address(0xC001),
+            expectedOldImpl: address(0xC101),
+            implNew: PinnedContract({addr: ctmImplNew, codehash: ctmImplNew.codehash}),
+            callInitializeUpgrade: false,
+            admin: ProxyAdmin(address(0))
+        });
+        manifest.proxyUpgrades[uint256(CTMContract.ServerNotifier)] = ProxyUpgradeRow({
+            proxy: address(0xC002),
+            expectedOldImpl: address(0xC102),
+            implNew: PinnedContract({addr: notifierImplNew, codehash: notifierImplNew.codehash}),
+            callInitializeUpgrade: false,
+            admin: notifierAdmin
+        });
+
+        CTMTransition withRows = new CTMTransition(manifest);
+        ProxyUpgradeRow[] memory rows = withRows.ctmProxyRows();
+        assertEq(rows.length, 2, "both participating slots become rows, in inventory order");
+        assertEq(rows[0].proxy, address(0xC001));
+        assertEq(address(rows[0].admin), address(0), "a bound-admin row names no admin");
+        assertEq(rows[1].proxy, address(0xC002));
+        assertEq(address(rows[1].admin), address(notifierAdmin), "the notifier row names its own admin");
+        assertEq(withRows.manifestHash(), keccak256(abi.encode(manifest)), "the admin is part of the commitment");
     }
 }

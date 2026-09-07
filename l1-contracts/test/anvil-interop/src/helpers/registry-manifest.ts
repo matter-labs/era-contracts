@@ -72,6 +72,8 @@ interface ProxyUpgradeRowArg {
   expectedOldImpl: string;
   implNew: { addr: string; codehash: string };
   callInitializeUpgrade: boolean;
+  /** The row's own ProxyAdmin; the zero address means the applying executor's bound admin. */
+  admin: string;
 }
 
 /** An inert inventory slot: the explicit "not upgraded" statement. */
@@ -81,6 +83,7 @@ function zeroProxyUpgradeRow(): ProxyUpgradeRowArg {
     expectedOldImpl: ethers.constants.AddressZero,
     implNew: { addr: ethers.constants.AddressZero, codehash: ethers.constants.HashZero },
     callInitializeUpgrade: false,
+    admin: ethers.constants.AddressZero,
   };
 }
 
@@ -133,6 +136,7 @@ export function coreInitArgs(manifest: any): any {
           codehash: e.implNewCodehash ?? ethers.constants.HashZero,
         },
         callInitializeUpgrade: e.callInitializeUpgrade ?? false,
+        admin: e.admin ?? ethers.constants.AddressZero,
       },
     ])
   );

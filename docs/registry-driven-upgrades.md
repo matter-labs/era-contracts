@@ -52,16 +52,27 @@ cannot fold `type(...).max` in static array-length position):
   L1ChainAssetHandler, L1MessageRoot, L1Nullifier, L1AssetRouter, L1NativeTokenVault,
   L1InteropHandler, CTMDeploymentTracker, ChainRegistrationSender).
 - `TransitionManifest.proxyUpgrades` and `BootstrapManifest.proxyUpgrades` are indexed by
-  `CTMContract`. Only the members that are TUPPs under the CTM-domain ProxyAdmin
-  (ChainTypeManager, ValidatorTimelock, BytecodesSupplier, PermissionlessValidator) can
-  meaningfully participate — a row in a facet or verifier slot can never apply, because the
-  bound admin does not administer it.
+  `CTMContract`. Only the members that are TUPPs can meaningfully participate: those under the
+  CTM-domain ProxyAdmin (ChainTypeManager, ValidatorTimelock, BytecodesSupplier,
+  PermissionlessValidator) through the executor's bound admin, and the `ServerNotifier` through
+  the row's own named admin (below) — a row in a facet or verifier slot can never apply.
 
 Slot `uint256(member)` IS that contract's row; a slot whose `implNew` is zero is the **explicit
 "not upgraded" statement**. The point is audit legibility plus structural completeness: the
 length check means a manifest cannot omit a slot, and the enum — being the same one deployment
-uses — is the single naming scheme end to end. (The `ServerNotifier` has no slot: it sits under
-its own chainAdmin-owned ProxyAdmin for operational upgrades outside this flow.)
+uses — is the single naming scheme end to end.
+
+**A row names its admin.** `ProxyUpgradeRow.admin` is zero for the common case — the applying
+executor's bound `ProxyAdmin` — and set for a proxy administered elsewhere: the `ServerNotifier`
+sits under its own chainAdmin-owned ProxyAdmin, and a transparent proxy answers
+`implementation()` only to its own admin, so nothing but that admin can even read the row's state.
+Such a row is applied by the executor only if it OWNS the named admin; otherwise stage 1 leaves it
+to that administrator (`ProxyRowLeftToAdministrator`) and stage 2 still requires it applied. The
+reviewed description therefore names the action either way, and the two operating modes are
+explicit on-chain state: hand the notifier's admin to the CTM executor and the row rides stage 1;
+keep it with the ChainAdmin and the ChainAdmin's own upgrade call must land before stage 2. A row
+under the bound admin that the executor does not own still reverts — a misbound executor is a
+configuration error, not something to skip past.
 
 The inventory shape exists only at the manifest boundary — the audited constructor calldata.
 `ProxyUpgradeRowLib.toRows` flattens it into the `ProxyUpgradeRow[]` that `ecosystemRows()` /

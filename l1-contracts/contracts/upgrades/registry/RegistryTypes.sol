@@ -150,12 +150,20 @@ struct TransitionManifest {
 ///        implementation itself — constants, or immutables on L1, both pinned by the row's
 ///        codehash (see {IUpgradeInit.sol}). A manifest can therefore never route the init call
 ///        to an arbitrary function or smuggle arguments into it.
+/// @param admin The `ProxyAdmin` administering `proxy`. ZERO means the applying executor's own
+///        bound admin — the common case. A nonzero admin names a proxy administered elsewhere (the
+///        `ServerNotifier` under its chainAdmin-owned admin): reads go through it, because a
+///        transparent proxy answers `implementation()` only to its own admin, and the row applies
+///        only if the applying contract OWNS it — otherwise stage 1 leaves the row to that
+///        administrator (event-logged) and stage 2 still requires it applied. The row therefore
+///        names the action in the reviewed description whoever ends up executing it.
 // solhint-disable-next-line gas-struct-packing
 struct ProxyUpgradeRow {
     address proxy;
     address expectedOldImpl;
     PinnedContract implNew;
     bool callInitializeUpgrade;
+    ProxyAdmin admin;
 }
 
 /// @notice Everything a core registry instance pins, set exactly once at construction.

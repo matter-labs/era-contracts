@@ -202,7 +202,8 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
                 proxy: _proxy,
                 expectedOldImpl: _expectedOldImpl,
                 implNew: _pin(_implNew),
-                callInitializeUpgrade: false
+                callInitializeUpgrade: false,
+                admin: ProxyAdmin(address(0))
             });
     }
 

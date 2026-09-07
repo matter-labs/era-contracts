@@ -17,6 +17,7 @@ import {MockProxyUpgradeInitImpl} from "contracts/dev-contracts/test/MockProxyUp
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
+import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {L2PlanFixtures} from "./L2PlanFixtures.sol";
@@ -66,6 +67,13 @@ contract ImplV32 {
     }
 }
 
+/// @dev An implementation no row knows: neither a source nor a target of the edge under test.
+contract ImplUnknown {
+    function version() external pure returns (uint256) {
+        return 99;
+    }
+}
+
 /// @notice Tests the single source-checked edge from a pre-registry ecosystem into the
 ///         registry-driven model: implementation swaps, provenance anchor + genesis release,
 ///         version edge, and the authority handover to the bound executors.
@@ -83,6 +91,12 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     TransparentUpgradeableProxy internal ecosystemProxy;
     address internal implV31;
     address internal implV32;
+    address internal implUnknown;
+    // The ServerNotifier shape: a per-CTM proxy under its OWN admin, owned by the chain admin
+    // rather than by the CTM domain's ProxyAdmin ({docs/upgrade-stage-lifecycle.md}, section 4.4).
+    address internal chainAdmin;
+    ProxyAdmin internal notifierAdmin;
+    TransparentUpgradeableProxy internal notifierProxy;
     address internal genesisUpgradeAddr;
     address internal upgradeCutInit;
 
@@ -96,8 +110,13 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         implV31 = address(new ImplV31());
         implV32 = address(new ImplV32());
+        implUnknown = address(new ImplUnknown());
         ecosystemProxyAdmin = new ProxyAdmin();
         ecosystemProxy = new TransparentUpgradeableProxy(implV31, address(ecosystemProxyAdmin), hex"");
+        chainAdmin = makeAddr("chainAdmin");
+        notifierAdmin = new ProxyAdmin();
+        notifierAdmin.transferOwnership(chainAdmin);
+        notifierProxy = new TransparentUpgradeableProxy(implV31, address(notifierAdmin), hex"");
 
         genesisUpgradeAddr = makeAddr("genesisUpgrade");
         vm.etch(genesisUpgradeAddr, hex"600042");
@@ -182,7 +201,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
             implNew: PinnedContract({addr: implV32, codehash: implV32.codehash}),
-            callInitializeUpgrade: false
+            callInitializeUpgrade: false,
+            admin: ProxyAdmin(address(0))
         });
         return
             BootstrapManifest({
@@ -206,6 +226,56 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         vm.prank(governor);
         chainContractAddress.transferOwnership(address(migration));
         ecosystemProxyAdmin.transferOwnership(address(migration));
+    }
+
+    /// @dev `_manifest()` plus the notifier row: the same edge, under the admin that actually
+    ///      administers the notifier proxy — which the migration does not own.
+    function _manifestWithNotifierRow() internal view returns (BootstrapManifest memory manifest) {
+        manifest = _manifest();
+        manifest.proxyUpgrades[uint256(CTMContract.ServerNotifier)] = ProxyUpgradeRow({
+            proxy: address(notifierProxy),
+            expectedOldImpl: implV31,
+            implNew: PinnedContract({addr: implV32, codehash: implV32.codehash}),
+            callInitializeUpgrade: false,
+            admin: notifierAdmin
+        });
+    }
+
+    /// @dev Deploys a migration for `_bootstrapManifest` and hands it the authority `_handOverAuthority`
+    ///      hands the fixture's.
+    function _deployAndAuthorize(
+        BootstrapManifest memory _bootstrapManifest
+    ) internal returns (RegistryBootstrapMigration deployed) {
+        deployed = new RegistryBootstrapMigration(_bootstrapManifest);
+        vm.prank(governor);
+        chainContractAddress.transferOwnership(address(deployed));
+        ecosystemProxyAdmin.transferOwnership(address(deployed));
+    }
+
+    function _liveImpl(ProxyAdmin _admin, TransparentUpgradeableProxy _proxy) internal view returns (address) {
+        return _admin.getProxyImplementation(ITransparentUpgradeableProxy(address(_proxy)));
+    }
+
+    /// @dev `validate()` is a view over live authority, and the CTM's two-step accept normally
+    ///      happens inside `migrate()`. Completing it here (as the nominated migration) lets a test
+    ///      read the source check on its own before spending the edge; `migrate()` then finds no
+    ///      pending nomination and proceeds unchanged.
+    function _completeCtmHandover(RegistryBootstrapMigration _migration) internal {
+        vm.prank(address(_migration));
+        chainContractAddress.acceptOwnership();
+        assertEq(chainContractAddress.owner(), address(_migration));
+    }
+
+    function _countLogs(
+        Vm.Log[] memory _logs,
+        address _emitter,
+        bytes32 _topic0
+    ) internal pure returns (uint256 count) {
+        for (uint256 i = 0; i < _logs.length; ++i) {
+            if (_logs[i].emitter == _emitter && _logs[i].topics[0] == _topic0) {
+                ++count;
+            }
+        }
     }
 
     // ─────────────────────────────── happy path ───────────────────────────────
@@ -449,7 +519,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             proxy: address(vtProxy),
             expectedOldImpl: implV31,
             implNew: PinnedContract({addr: address(initImpl), codehash: address(initImpl).codehash}),
-            callInitializeUpgrade: true
+            callInitializeUpgrade: true,
+            admin: ProxyAdmin(address(0))
         });
         RegistryBootstrapMigration withInit = new RegistryBootstrapMigration(manifest);
         vm.prank(governor);
@@ -472,7 +543,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             proxy: address(ecosystemProxy),
             expectedOldImpl: implV31,
             implNew: PinnedContract({addr: implV31, codehash: implV31.codehash}),
-            callInitializeUpgrade: false
+            callInitializeUpgrade: false,
+            admin: ProxyAdmin(address(0))
         });
 
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateProxyRow.selector, address(ecosystemProxy)));
@@ -507,15 +579,115 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     }
 
     function test_revertWhen_proxyIsNotAtTheExpectedImplementation() public {
-        // Someone moved the proxy on before the migration ran: the source check must catch it
-        // instead of silently re-pointing the proxy backwards.
-        ecosystemProxyAdmin.upgrade(ITransparentUpgradeableProxy(address(ecosystemProxy)), implV32);
+        // Someone moved the proxy to an implementation the row does not know before the migration
+        // ran: the source check must catch it instead of silently re-pointing the proxy.
+        ecosystemProxyAdmin.upgrade(ITransparentUpgradeableProxy(address(ecosystemProxy)), implUnknown);
         _handOverAuthority();
 
         vm.expectRevert(
-            abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(ecosystemProxy), implV31, implV32)
+            abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(ecosystemProxy), implV31, implUnknown)
         );
         migration.migrate();
+        assertFalse(migration.executed(), "a refused edge must stay unspent");
+    }
+
+    /// @dev A row whose proxy already sits at `implNew` is one a different administrator applied
+    ///      first: the source check tolerates it, `applyRows` skips it (no re-apply, no event), and
+    ///      the post-state check holds.
+    function test_migrate_acceptsARowAlreadyAtItsNewImplementation() public {
+        ecosystemProxyAdmin.upgrade(ITransparentUpgradeableProxy(address(ecosystemProxy)), implV32);
+        _handOverAuthority();
+        _completeCtmHandover(migration);
+        migration.validate();
+
+        vm.recordLogs();
+        migration.migrate();
+        assertEq(
+            _countLogs(
+                vm.getRecordedLogs(),
+                address(migration),
+                ProxyUpgradeRowLib.ProxyImplementationUpgraded.selector
+            ),
+            0,
+            "an already-applied row must be skipped, not re-applied"
+        );
+        assertEq(_liveImpl(ecosystemProxyAdmin, ecosystemProxy), implV32);
+        assertEq(chainContractAddress.protocolVersion(), newVersion, "the edge must otherwise complete");
+        migration.validateApplied();
+    }
+
+    // ─────────────────────────── rows under a foreign ProxyAdmin ───────────────────────────
+
+    /// @dev The notifier row names an admin the migration does not own: `migrate()` leaves it to
+    ///      that administrator (logged), performs everything else, and the post-state gate holds the
+    ///      bundle open until the administrator's own upgrade lands.
+    function test_migrate_leavesForeignAdminRowToItsAdministrator_validateAppliedWaitsForIt() public {
+        RegistryBootstrapMigration withNotifier = _deployAndAuthorize(_manifestWithNotifierRow());
+
+        vm.expectEmit(true, true, true, true, address(withNotifier));
+        emit ProxyUpgradeRowLib.ProxyRowLeftToAdministrator(address(notifierProxy), address(notifierAdmin));
+        withNotifier.migrate();
+
+        assertTrue(withNotifier.executed(), "the edge is spent");
+        assertEq(_liveImpl(notifierAdmin, notifierProxy), implV31, "the foreign row must be left untouched");
+        assertEq(_liveImpl(ecosystemProxyAdmin, ecosystemProxy), implV32, "the bound-admin row must still apply");
+        assertEq(chainContractAddress.protocolVersion(), newVersion, "the edge must otherwise complete");
+        assertEq(chainContractAddress.owner(), address(ctmExecutor), "authority still lands on the executor");
+        assertEq(notifierAdmin.owner(), chainAdmin, "the foreign admin's ownership is not touched");
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(notifierProxy), implV32, implV31)
+        );
+        withNotifier.validateApplied();
+
+        // The administrator applies its row through its own admin; the gate then passes.
+        vm.prank(chainAdmin);
+        notifierAdmin.upgrade(ITransparentUpgradeableProxy(address(notifierProxy)), implV32);
+        withNotifier.validateApplied();
+    }
+
+    /// @dev The production order: the ChainAdmin's own upgrade call lands BEFORE the bundle (the
+    ///      `ctm_admin_calls` protocol-ops runs right after the prepares), so the migration finds
+    ///      the foreign row already at `implNew` — read through the row's own admin — and both the
+    ///      source check and the post-state gate pass without the migration touching the row.
+    function test_migrate_acceptsForeignAdminRowAppliedByItsAdministratorFirst() public {
+        vm.prank(chainAdmin);
+        notifierAdmin.upgrade(ITransparentUpgradeableProxy(address(notifierProxy)), implV32);
+        RegistryBootstrapMigration withNotifier = _deployAndAuthorize(_manifestWithNotifierRow());
+        _completeCtmHandover(withNotifier);
+        withNotifier.validate();
+
+        vm.recordLogs();
+        withNotifier.migrate();
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        // Not owned, so the row is still the administrator's — and that is all that happens to it.
+        assertEq(
+            _countLogs(logs, address(withNotifier), ProxyUpgradeRowLib.ProxyRowLeftToAdministrator.selector),
+            1,
+            "the unowned row is left to its administrator"
+        );
+        assertEq(
+            _countLogs(logs, address(withNotifier), ProxyUpgradeRowLib.ProxyImplementationUpgraded.selector),
+            1,
+            "only the bound-admin row is applied here"
+        );
+        assertEq(_liveImpl(notifierAdmin, notifierProxy), implV32);
+        withNotifier.validateApplied();
+    }
+
+    /// @dev The source check reads a foreign row through ITS admin: an administrator that moved the
+    ///      proxy somewhere the row does not know is caught before the one-shot edge is spent.
+    function test_revertWhen_foreignAdminRowAtAnUnknownImplementation() public {
+        vm.prank(chainAdmin);
+        notifierAdmin.upgrade(ITransparentUpgradeableProxy(address(notifierProxy)), implUnknown);
+        RegistryBootstrapMigration withNotifier = _deployAndAuthorize(_manifestWithNotifierRow());
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(notifierProxy), implV31, implUnknown)
+        );
+        withNotifier.migrate();
+        assertFalse(withNotifier.executed(), "a refused edge must stay unspent");
+        assertEq(chainContractAddress.protocolVersion(), 0, "a refused edge must not move the CTM");
     }
 
     function test_revertWhen_pinnedImplementationCodehashDrifted() public {

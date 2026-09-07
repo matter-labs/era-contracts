@@ -118,6 +118,8 @@ library DeployCTML1OrGateway {
             return CTMContract.DefaultUpgrade;
         } else if (_compareStrings(_contractName, "L1GenesisUpgrade")) {
             return CTMContract.L1GenesisUpgrade;
+        } else if (_compareStrings(_contractName, "ServerNotifier")) {
+            return CTMContract.ServerNotifier;
         } else {
             revert(string.concat("Contract ", _contractName, " not CTM contract, creation calldata could not be set"));
         }
@@ -157,6 +159,7 @@ library DeployCTML1OrGateway {
         if (_c == CTMContract.DiamondInit) return "DiamondInit";
         if (_c == CTMContract.ValidatorTimelock) return "ValidatorTimelock";
         if (_c == CTMContract.BlobsL1DAValidatorZKsyncOS) return "BlobsL1DAValidatorZKsyncOS";
+        if (_c == CTMContract.ServerNotifier) return "ServerNotifier";
 
         revert("DeployCTML1OrGateway: unknown CTMContract");
     }

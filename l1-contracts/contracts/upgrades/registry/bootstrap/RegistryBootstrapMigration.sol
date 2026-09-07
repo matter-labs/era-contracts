@@ -142,13 +142,17 @@ contract RegistryBootstrapMigration {
         }
 
         // Every implementation swap is source-checked: replaying a stale migration, or running it
-        // against an ecosystem someone already moved, cannot silently re-point a proxy.
+        // against an ecosystem someone already moved, cannot silently re-point a proxy. A row
+        // already at `implNew` is fine — `applyRows` skips it — which is how a row a different
+        // administrator applied first (the ServerNotifier's CTM-admin call) passes.
         ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT);
         uint256 rowsLength = rows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {
             ProxyUpgradeRow memory row = rows[i];
-            address liveImpl = m.ctmProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(row.proxy));
-            if (liveImpl != row.expectedOldImpl) {
+            address liveImpl = ProxyUpgradeRowLib.adminOf(m.ctmProxyAdmin, row).getProxyImplementation(
+                ITransparentUpgradeableProxy(row.proxy)
+            );
+            if (liveImpl != row.expectedOldImpl && liveImpl != row.implNew.addr) {
                 revert ProxyUpgradeRowMismatch(row.proxy, row.expectedOldImpl, liveImpl);
             }
             CodehashPinLib.requirePin(row.implNew);

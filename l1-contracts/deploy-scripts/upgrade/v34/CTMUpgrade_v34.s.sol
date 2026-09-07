@@ -122,8 +122,8 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName);
 
-        // Deliberately OUTSIDE the registry flow (own chainAdmin-owned ProxyAdmin): the notifier
-        // upgrade rides the CTM-admin operational calls, not the bootstrap manifest.
+        // Named in the bootstrap manifest under its own chainAdmin-owned ProxyAdmin (see
+        // `_bootstrapManifest`); the swap itself still rides the CTM-admin operational calls.
         ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier");
 
         // The genesis release deployed by the base pipeline's `deployStateTransitionDiamondFacets`
@@ -202,7 +202,22 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
             proxy: _ctmProxy,
             expectedOldImpl: Utils.getImplementation(_ctmProxy),
             implNew: PinnedContract({addr: implNew, codehash: implNew.codehash}),
-            callInitializeUpgrade: false
+            callInitializeUpgrade: false,
+            admin: ProxyAdmin(address(0))
+        });
+        // The ServerNotifier rides the same reviewed inventory, under the admin that actually
+        // administers it (its own chainAdmin-owned ProxyAdmin). The migration does not own that
+        // admin, so `migrate()` leaves the row to the ChainAdmin — the operational
+        // `ctm_admin_calls` this prepare also emits — and `validateApplied()` requires it applied.
+        address notifierProxy = ctmAddresses.stateTransition.proxies.serverNotifier;
+        address notifierImplNew = ctmAddresses.stateTransition.implementations.serverNotifier;
+        require(notifierImplNew != address(0), "new ServerNotifier implementation not deployed");
+        proxyUpgrades[uint256(CTMContract.ServerNotifier)] = ProxyUpgradeRow({
+            proxy: notifierProxy,
+            expectedOldImpl: Utils.getImplementation(notifierProxy),
+            implNew: PinnedContract({addr: notifierImplNew, codehash: notifierImplNew.codehash}),
+            callInitializeUpgrade: false,
+            admin: ProxyAdmin(Utils.getProxyAdminAddress(notifierProxy))
         });
 
         Diamond.DiamondCutData memory upgradeCut = abi.decode(
