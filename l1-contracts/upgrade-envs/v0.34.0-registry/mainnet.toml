@@ -1,0 +1,26 @@
+# v0.34.0 (registry-driven upgrades) — mainnet upgrade inputs.
+#
+# Ecosystem identities (owner / PUH, Era chain id, CTM addresses) are carried forward from the
+# v0.31.0-interopB mainnet inputs; the CREATE2 salts are fresh for this release (rotate them again
+# if a rehearsal consumes them). The departing version below is informational: the prepare reads
+# the live version from the CTM.
+old_protocol_version = 0x2100000000 # v33.0.0 (informational)
+pre_v32_introspection = false
+era_chain_id = 324
+owner_address = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
+governance_upgrade_timer_initial_delay = 172800
+
+[contracts]
+new_protocol_version = 0x2200000000 # v34.0.0
+latest_protocol_version = 0x2200000000
+create2_factory_salt = "0xa5ddda53d869b01c067f99b741b6aa5874b91f5fb1f4bb0eeef96a3e8576cb0c"
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+
+[legacy_gateway]
+chain_id = 9075
+
+# Per-CTM CREATE2 salts: each CTM prepare deploys contracts whose constructor arguments are
+# env-wide constants, so distinct salts keep their addresses apart (Era CTM, ZKsync OS CTM).
+[create2_factory_salts]
+"0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C" = "0xa6257fdc832dfcf2d0f4d84233e751e0af52d12e2c865af6612d6b8e87d5d3ab"
+"0x1adf137f59949c9081157d5dE1e002D1c992071F" = "0xf0bed6030afa9a6a771576cb009708d1eebf4c5d213c41b906326f89d3e41400"
