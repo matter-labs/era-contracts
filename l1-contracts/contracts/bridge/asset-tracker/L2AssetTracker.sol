@@ -85,6 +85,13 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
         _;
     }
 
+    modifier onlyBaseTokenHolderOrL2BaseToken() {
+        if (msg.sender != L2_BASE_TOKEN_HOLDER_ADDR && msg.sender != address(L2_BASE_TOKEN_SYSTEM_CONTRACT)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @inheritdoc IL2AssetTracker
     function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external reentrancyGuardInitializer onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
@@ -267,7 +274,10 @@ contract L2AssetTracker is IL2AssetTracker, Ownable2StepUpgradeable, PausableUpg
     }
 
     /// @inheritdoc IL2AssetTracker
-    function handleFinalizeBaseTokenBridgingOnL2(uint256 _fromChainId, uint256 _amount) external onlyBaseTokenHolder {
+    function handleFinalizeBaseTokenBridgingOnL2(
+        uint256 _fromChainId,
+        uint256 _amount
+    ) external onlyBaseTokenHolderOrL2BaseToken {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         if (_amount == 0) {
             return;

@@ -4,34 +4,26 @@ pragma solidity ^0.8.20;
 
 // solhint-disable gas-custom-errors
 
-import {StdStorage, Test, console, stdStorage} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {Vm} from "forge-std/Vm.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER,
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
-    L2_CHAIN_ASSET_HANDLER,
-    L2_BOOTLOADER_ADDRESS,
-    L2_BRIDGEHUB,
     L2_COMPLEX_UPGRADER_ADDR,
-    L2_MESSAGE_ROOT,
-    L2_MESSAGE_ROOT_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/common/Config.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
-import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {IL2AssetHandler} from "contracts/bridge/interfaces/IL2AssetHandler.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {L2UtilsBase} from "../l2-tests-in-l1-context/L2UtilsBase.sol";
 import {
     AssetIdNotRegistered,
     BaseTokenNativeToThisChain,
@@ -39,13 +31,9 @@ import {
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
 import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
-import {LogFinder} from "../utils/LogFinder.sol";
 import {SharedL2ContractL1Deployer} from "./_SharedL2ContractL1Deployer.sol";
 
 contract L2AssetTrackerL1Test is Test, SharedL2ContractL1Deployer {
-    using stdStorage for StdStorage;
-    using LogFinder for Vm.Log[];
-
     function test_handleInitiateBridgingOnL2_requiresTokenRegistration() public {
         TestnetERC20Token token = new TestnetERC20Token("NativeToken", "NTV", 18);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
@@ -79,72 +67,60 @@ contract L2AssetTrackerL1Test is Test, SharedL2ContractL1Deployer {
     }
 
     function test_handleFinalizeBaseTokenBridgingOnL2() public {
-        bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
+        _checkFinalizeBaseTokenBridging(L2_BASE_TOKEN_HOLDER_ADDR);
+    }
+
+    function test_handleFinalizeBaseTokenBridgingOnL2_nativeVmCaller() public {
+        _checkFinalizeBaseTokenBridging(address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
+    }
+
+    function _checkFinalizeBaseTokenBridging(address _caller) private {
+        vm.clearMockedCalls();
+        bytes32 baseTokenAssetId = L2AssetTracker(L2_ASSET_TRACKER_ADDR).BASE_TOKEN_ASSET_ID();
+        uint256 l1ChainId = L2AssetTracker(L2_ASSET_TRACKER_ADDR).L1_CHAIN_ID();
         uint256 amount = 300;
-        uint256 l1ChainId = 1;
-        uint256 mockedTotalSupply = 1000;
+        uint256 totalSupply = 1000;
 
-        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
+        // A fresh tracker exercises first registration against the initialized vault.
+        L2AssetTracker tracker = new L2AssetTracker();
+        vm.prank(_caller);
+        tracker.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, 0);
+        assertFalse(tracker.isAssetRegistered(bytes32(0)));
+        (, uint256 uninitializedDeposits) = tracker.interopInfo(bytes32(0));
+        assertEq(uninitializedDeposits, 0);
 
-        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(l1ChainId);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        tracker.initL2(l1ChainId, baseTokenAssetId);
 
-        stdstore
-            .target(L2_ASSET_TRACKER_ADDR)
-            .sig("chainBalance(uint256,bytes32)")
-            .with_key(block.chainid)
-            .with_key(baseTokenAssetId)
-            .checked_write(uint256(0));
-
-        stdstore
-            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
-            .sig("originChainId(bytes32)")
-            .with_key(baseTokenAssetId)
-            .checked_write(l1ChainId);
-
-        // totalSupply mock is needed for the foreign-token supply snapshot taken on first registration.
+        // Isolate VM-provided supply and settlement context absent from the L1 test environment.
         vm.mockCall(
             address(L2_BASE_TOKEN_SYSTEM_CONTRACT),
             abi.encodeWithSelector(IERC20.totalSupply.selector),
-            abi.encode(mockedTotalSupply)
+            abi.encode(totalSupply)
         );
-
-        // Mock currentSettlementLayerChainId to return L1 (not in gateway mode)
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
             abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
             abi.encode(l1ChainId)
         );
 
-        L2AssetTracker tracker = L2AssetTracker(L2_ASSET_TRACKER_ADDR);
-        uint256 depositsBefore = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
-        assertFalse(tracker.isAssetRegistered(baseTokenAssetId), "Asset should not be registered before call");
+        assertFalse(tracker.isAssetRegistered(baseTokenAssetId));
+        vm.prank(_caller);
+        tracker.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, amount);
 
-        // Call as BaseTokenHolder.
-        vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
-        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, amount);
-
-        // The base token's origin is L1, so the block.chainid branch is not taken and the balance stays 0.
-        assertEq(
-            tracker.chainBalance(block.chainid, baseTokenAssetId),
-            0,
-            "Chain balance should remain 0 for foreign tokens"
-        );
-
-        uint256 depositsAfter = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
-        assertEq(depositsAfter - depositsBefore, amount, "totalSuccessfulDepositsFromL1 should increase by amount");
-
-        // First contact triggers _registerLegacyTokenIfNeeded: registration + supply snapshot set.
-        assertTrue(tracker.isAssetRegistered(baseTokenAssetId), "Asset should be registered after call");
+        assertEq(tracker.chainBalance(block.chainid, baseTokenAssetId), 0);
+        (uint256 withdrawals, uint256 deposits) = tracker.interopInfo(baseTokenAssetId);
+        assertEq(withdrawals, 0);
+        assertEq(deposits, amount);
+        assertTrue(tracker.isAssetRegistered(baseTokenAssetId));
         (bool isSaved, uint256 savedAmount) = tracker.totalPreV31TotalSupply(baseTokenAssetId);
-        assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
-        assertEq(savedAmount, mockedTotalSupply, "totalPreV31TotalSupply.amount should equal mocked totalSupply");
-    }
+        assertTrue(isSaved);
+        assertEq(savedAmount, totalSupply);
 
-    /// @notice The base-token system contract was an authorized caller only in the retired Era flow.
-    function test_handleFinalizeBaseTokenBridgingOnL2_revertWhenCalledByL2BaseToken() public {
-        vm.prank(address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(L2_BASE_TOKEN_SYSTEM_CONTRACT)));
-        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(1, 100);
+        vm.prank(_caller);
+        tracker.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, 0);
+        (, deposits) = tracker.interopInfo(baseTokenAssetId);
+        assertEq(deposits, amount);
     }
 
     /// @notice A random address must not be able to call handleFinalizeBaseTokenBridgingOnL2.

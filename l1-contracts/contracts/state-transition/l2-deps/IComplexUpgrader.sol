@@ -23,12 +23,8 @@ interface IComplexUpgrader {
     }
 
     /// @notice Information about the force deployment.
-    /// @dev This struct is used to store the information about the force deployment.
-    /// @dev The `deployedBytecodeInfo` is the abi-encoded tuple of `(bytes32, uint32, bytes32)`.
-    /// @dev Note, that ZKsyncOS does not support constructors, so the `deployedBytecodeInfo` should only describe the
-    /// deployed bytecode.
     /// @param upgradeType the type of the upgrade.
-    /// @param deployedBytecodeInfo the bytecode information for deployment.
+    /// @param deployedBytecodeInfo the bytecode metadata encoded for the selected upgrade type.
     /// @param newAddress the address where the contract should be deployed.
     // solhint-disable-next-line gas-struct-packing
     struct UniversalContractUpgradeInfo {

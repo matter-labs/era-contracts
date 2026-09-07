@@ -252,6 +252,8 @@ to preserve the deployed storage layout.
     is L1 and the chain settles on L1, `totalSuccessfulDepositsFromL1` is increased. For the base token,
     failed deposits are refunded on L2 to the `refundRecipient` rather than claimed on L1, so the gap
     between initiated deposits and this counter is not uniformly "claimable on L1" across asset types.
+    The OS runtime also calls the base-token hook as `L2BaseToken` for L1-transaction minting, operator
+    payments and refunds, including zero-amount prewarming calls; both system callers remain authorized.
   - `assertRecoveryIsAccountingNeutral` (and its base-token wrapper
     `assertBaseTokenRecoveryIsAccountingNeutral`, called by `BaseTokenHolder.recoverBaseToken`) — recovery of
     a failed/timed-out bridge-out. Only L2 -> L2 bridge-outs are recoverable, and beyond the `chainBalance`
