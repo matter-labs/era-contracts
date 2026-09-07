@@ -487,23 +487,29 @@ impl GovernanceStage1Calls {
                 verifiers,
                 result,
             );
-            for (offset, proxy_field, impl_source, display_name) in [
+            // `impl_file` is the AllContractsHashes key each implementation
+            // must have been deployed from. ValidatorTimelock's is
+            // `MultisigCommitter` — the contract behind that proxy in v33.
+            for (offset, proxy_field, impl_field, impl_file, display_name) in [
                 (
                     PER_CTM_OFFSET_UPGRADE_VALIDATOR_TIMELOCK,
                     "validator_timelock_addr",
-                    KeptProxyImplSource::ArtifactField("validator_timelock_implementation_addr"),
+                    Some("validator_timelock_implementation_addr"),
+                    "l1-contracts/MultisigCommitter",
                     "ValidatorTimelock",
                 ),
                 (
                     PER_CTM_OFFSET_UPGRADE_BYTECODES_SUPPLIER,
                     "bytecodes_supplier_addr",
-                    KeptProxyImplSource::Create2File("l1-contracts/BytecodesSupplier"),
+                    None,
+                    "l1-contracts/BytecodesSupplier",
                     "BytecodesSupplier",
                 ),
                 (
                     PER_CTM_OFFSET_UPGRADE_PERMISSIONLESS_VALIDATOR,
                     "permissionless_validator_addr",
-                    KeptProxyImplSource::Create2File("l1-contracts/PermissionlessValidator"),
+                    None,
+                    "l1-contracts/PermissionlessValidator",
                     "PermissionlessValidator",
                 ),
             ] {
@@ -512,7 +518,8 @@ impl GovernanceStage1Calls {
                     block + offset,
                     ctm,
                     proxy_field,
-                    impl_source,
+                    impl_field,
+                    impl_file,
                     display_name,
                     verifiers,
                     result,
@@ -634,20 +641,22 @@ fn verify_ctm_upgrade_call_args(
 /// Payload check for one of the three proxies v33 keeps and re-implements
 /// (ValidatorTimelock, BytecodesSupplier, PermissionlessValidator).
 ///
-/// `impl_field` is the artifact field naming the new implementation. Only
-/// ValidatorTimelock publishes one; for the other two the artifact records
-/// just the proxy, so `impl_source` falls back to this upgrade's CREATE2
-/// deployments and requires that the call points at the single contract of
-/// that name deployed here. That is the stronger check of the two — it ties
-/// the governance call to a contract with verified provenance rather than to
-/// another line of the same file.
+/// `impl_file` is the contract the new implementation must have been
+/// CREATE2-deployed from in this upgrade, and is checked for all three: it is
+/// the only check that establishes what the installed contract actually *is*.
+/// `impl_field` is an artifact field naming the same address, present only for
+/// ValidatorTimelock; when there is one it is compared as well, which catches
+/// an artifact that disagrees with its own calldata. The two are additive, not
+/// alternatives — comparing to an artifact field on its own is self-referential
+/// and would accept any address the artifact named consistently.
 #[allow(clippy::too_many_arguments)]
 fn verify_kept_proxy_upgrade_call_args(
     calls: &CallList,
     index: usize,
     ctm: &CtmArtifact,
     proxy_field: &str,
-    impl_source: KeptProxyImplSource<'_>,
+    impl_field: Option<&str>,
+    impl_file: &str,
     display_name: &str,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
@@ -674,54 +683,53 @@ fn verify_kept_proxy_upgrade_call_args(
                 errors += 1;
             }
 
-            match impl_source {
-                KeptProxyImplSource::ArtifactField(impl_field) => {
-                    if let Some(expected_impl) =
-                        required_ctm_address(ctm, &["state_transition", impl_field], result)
-                    {
-                        errors += expect_address_equal(
-                            result,
-                            verifiers,
-                            &decoded.implementation,
-                            expected_impl,
-                            &format!("{}.{impl_field}", ctm.flavor.label()),
-                        );
-                    } else {
-                        errors += 1;
-                    }
+            // What the installed contract is, from this upgrade's own
+            // deployments. Applies to all three proxies.
+            match verifiers
+                .network_verifier
+                .create2_known_bytecodes
+                .get(&decoded.implementation)
+            {
+                Some(deployed_file) if deployed_file == impl_file => {}
+                Some(deployed_file) => {
+                    result.report_error(&format!(
+                        "{display_name} upgrade points at {}, which this upgrade deployed as {deployed_file}, not {impl_file}",
+                        decoded.implementation,
+                    ));
+                    errors += 1;
                 }
-                KeptProxyImplSource::Create2File(file) => {
-                    match verifiers
-                        .network_verifier
-                        .create2_known_bytecodes
-                        .get(&decoded.implementation)
-                    {
-                        Some(deployed_file) if deployed_file == file => result.report_ok(&format!(
-                            "{display_name} impl {} was deployed by this upgrade as {file}",
-                            decoded.implementation
-                        )),
-                        Some(deployed_file) => {
-                            result.report_error(&format!(
-                                "{display_name} upgrade points at {}, which this upgrade deployed as {deployed_file}, not {file}",
-                                decoded.implementation,
-                            ));
-                            errors += 1;
-                        }
-                        None => {
-                            result.report_error(&format!(
-                                "{display_name} upgrade points at {}, which is not among this upgrade's CREATE2 deployments",
-                                decoded.implementation,
-                            ));
-                            errors += 1;
-                        }
-                    }
+                None => {
+                    result.report_error(&format!(
+                        "{display_name} upgrade points at {}, which is not among this upgrade's CREATE2 deployments",
+                        decoded.implementation,
+                    ));
+                    errors += 1;
+                }
+            }
+
+            // And, where the artifact declares the implementation, that it
+            // agrees with its own calldata.
+            if let Some(impl_field) = impl_field {
+                if let Some(expected_impl) =
+                    required_ctm_address(ctm, &["state_transition", impl_field], result)
+                {
+                    errors += expect_address_equal(
+                        result,
+                        verifiers,
+                        &decoded.implementation,
+                        expected_impl,
+                        &format!("{}.{impl_field}", ctm.flavor.label()),
+                    );
+                } else {
+                    errors += 1;
                 }
             }
 
             if errors == 0 {
                 result.report_ok(&format!(
-                    "{} {display_name} upgrade payload uses expected proxy and implementation",
-                    ctm.flavor.label()
+                    "{} {display_name} upgrade installs {}, deployed by this upgrade as {impl_file}",
+                    ctm.flavor.label(),
+                    decoded.implementation,
                 ));
             }
             errors
@@ -859,15 +867,6 @@ fn verify_set_interop_handler_call_args(
             1
         }
     }
-}
-
-/// Where the expected new implementation for a kept proxy comes from.
-enum KeptProxyImplSource<'a> {
-    /// A `[ctms.<flavor>.state_transition]` field naming the implementation.
-    ArtifactField(&'a str),
-    /// The contract file the implementation must have been CREATE2-deployed
-    /// from in this upgrade, for proxies the artifact records without one.
-    Create2File(&'a str),
 }
 
 async fn verify_set_chain_creation_params_payload(
