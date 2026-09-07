@@ -138,6 +138,26 @@ contract EraMultiProofVerifierTest is Test {
         chain.callVerify(v, _publicInputs(), _default());
     }
 
+    /// The single-word exemption exists for the kill switch and for chains that never enabled the
+    /// lane, and it is keyed on the Airbender mask specifically. Keying it on the Boojum mask would
+    /// leave the suite green while bricking every Boojum-only chain and letting a Boojum-disabled
+    /// call reach an out-of-range `_publicInputs[1:2]`.
+    function test_acceptsOneWordOnlyWhileAirbenderIsDisabled() public {
+        uint256[] memory single = new uint256[](1);
+        single[0] = RAW_PUBLIC_INPUT;
+
+        chain.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+        assertTrue(chain.callVerify(verifier, single, _default()), "one word must settle on Boojum alone");
+
+        chain.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED);
+        vm.expectRevert(InvalidPublicInputsLength.selector);
+        chain.callVerify(verifier, single, _default());
+
+        chain.setDisabledProofSystems(0);
+        vm.expectRevert(InvalidPublicInputsLength.selector);
+        chain.callVerify(verifier, single, _default());
+    }
+
     /// One word per lane, bounded on both sides. The Executor never builds more than two for Era,
     /// but the gate is deployed independently and enforces its own envelope.
     function test_revertsOnWrongPublicInputCount() public {

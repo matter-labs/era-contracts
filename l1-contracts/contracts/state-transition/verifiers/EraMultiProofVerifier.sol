@@ -96,10 +96,13 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
         }
 
         // One word per lane: the two systems commit to different `auxiliaryOutputHash` values, so a
-        // batch has a different transition hash under each. With the Airbender lane switched off the
-        // Executor emits the Boojum word alone for a batch that carries no Airbender commitment, so
-        // a single word is accepted only in that case — the kill switch has to leave Boojum-only
-        // settlement working, and a chain that has not enabled the lane must still be able to prove.
+        // batch has a different transition hash under each.
+        //
+        // A single word is accepted only while the Airbender lane is masked off. That is what lets
+        // the kill switch keep Boojum-only settlement working for batches carrying no Airbender
+        // commitment. It also means the converse: with the lane enabled, such a batch cannot be
+        // proved here at all — so enabling the lane on a chain with committed-but-unproven batches
+        // stalls it until they are drained. `Admin.setDisabledProofSystems` enforces that.
         if (
             _publicInputs.length != 2 && !(disabled & AIRBENDER_PROOF_SYSTEM_DISABLED != 0 && _publicInputs.length == 1)
         ) {

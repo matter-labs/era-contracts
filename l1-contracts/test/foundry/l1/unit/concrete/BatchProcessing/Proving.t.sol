@@ -422,6 +422,66 @@ contract ProvingTest is ExecutorTest {
         _proveWith(_gateProof());
     }
 
+    /// Plants a predecessor at index 0 whose `commitment` and `airbenderCommitment` are distinct and
+    /// non-zero, so the seed rule's choice between them is observable. The genesis batch has both
+    /// zero, which makes every candidate seed produce the same transition hash.
+    function _plantPredecessor(
+        bytes32 _commitment,
+        bytes32 _airbenderCommitment
+    ) internal returns (IExecutor.StoredBatchInfo memory prev) {
+        prev = genesisStoredBatchInfo;
+        prev.commitment = _commitment;
+        prev.airbenderCommitment = _airbenderCommitment;
+        vm.store(address(executor), keccak256(abi.encode(uint256(0), uint256(14))), keccak256(abi.encode(prev)));
+    }
+
+    /// A predecessor with no Airbender commitment seeds from its Boojum commitment — not from zero,
+    /// not from its state root, and not from the field that is absent.
+    function test_seedComesFromThePredecessorBoojumCommitment() public {
+        bytes32 prevCommitment = Utils.randomBytes32("predecessorBoojumCommitment");
+        IExecutor.StoredBatchInfo memory prev = _plantPredecessor(prevCommitment, bytes32(0));
+
+        _installGate(IVerifier(address(new AcceptingLane())), IVerifier(address(new PublicInputRevealingVerifier())));
+
+        uint256 expected = uint256(keccak256(abi.encodePacked(prevCommitment, newStoredBatchInfo.airbenderCommitment)));
+        vm.expectRevert(
+            abi.encodeWithSelector(PublicInputRevealingVerifier.RevealedPublicInput.selector, expected, uint256(0))
+        );
+        _proveWithPrev(prev, _gateProof());
+    }
+
+    /// A predecessor authenticated only under the pre-Airbender form carries an `airbenderCommitment`
+    /// the caller chose, so the seed must ignore it and fall back to the Boojum commitment.
+    function test_seedIgnoresAnUnauthenticatedPredecessorAirbenderCommitment() public {
+        bytes32 prevCommitment = Utils.randomBytes32("predecessorBoojumCommitment");
+
+        IExecutor.StoredBatchInfo memory prev = genesisStoredBatchInfo;
+        prev.commitment = prevCommitment;
+        IExecutor.PreAirbenderStoredBatchInfo memory preForm = IExecutor.PreAirbenderStoredBatchInfo({
+            batchNumber: prev.batchNumber,
+            batchHash: prev.batchHash,
+            indexRepeatedStorageChanges: prev.indexRepeatedStorageChanges,
+            numberOfLayer1Txs: prev.numberOfLayer1Txs,
+            priorityOperationsHash: prev.priorityOperationsHash,
+            dependencyRootsRollingHash: prev.dependencyRootsRollingHash,
+            l2LogsTreeRoot: prev.l2LogsTreeRoot,
+            timestamp: prev.timestamp,
+            commitment: prev.commitment
+        });
+        vm.store(address(executor), keccak256(abi.encode(uint256(0), uint256(14))), keccak256(abi.encode(preForm)));
+
+        // A value the stored hash never covered.
+        prev.airbenderCommitment = Utils.randomBytes32("forgedPredecessorAirbenderCommitment");
+
+        _installGate(IVerifier(address(new AcceptingLane())), IVerifier(address(new PublicInputRevealingVerifier())));
+
+        uint256 expected = uint256(keccak256(abi.encodePacked(prevCommitment, newStoredBatchInfo.airbenderCommitment)));
+        vm.expectRevert(
+            abi.encodeWithSelector(PublicInputRevealingVerifier.RevealedPublicInput.selector, expected, uint256(0))
+        );
+        _proveWithPrev(prev, _gateProof());
+    }
+
     /// The Boojum lane's word under the pair, which every other lane test accepts blindly. A bug
     /// feeding it the Airbender word would leave the Boojum proof unbound to the real batch chain.
     function test_boojumLaneReceivesTheStoredCommitmentTransitionHash() public {
@@ -442,9 +502,11 @@ contract ProvingTest is ExecutorTest {
     function test_seedIsUsedOnlyWhenThePredecessorHasNoAirbenderCommitment() public {
         _installGate(IVerifier(address(new AcceptingLane())), IVerifier(address(new PublicInputRevealingVerifier())));
 
-        IExecutor.StoredBatchInfo memory prev = genesisStoredBatchInfo;
-        prev.airbenderCommitment = Utils.randomBytes32("predecessorAirbenderCommitment");
-        vm.store(address(executor), keccak256(abi.encode(uint256(0), uint256(14))), keccak256(abi.encode(prev)));
+        // Both fields non-zero and distinct, so preferring the wrong one is visible.
+        IExecutor.StoredBatchInfo memory prev = _plantPredecessor(
+            Utils.randomBytes32("predecessorBoojumCommitment"),
+            Utils.randomBytes32("predecessorAirbenderCommitment")
+        );
 
         uint256 expected = uint256(
             keccak256(abi.encodePacked(prev.airbenderCommitment, newStoredBatchInfo.airbenderCommitment))

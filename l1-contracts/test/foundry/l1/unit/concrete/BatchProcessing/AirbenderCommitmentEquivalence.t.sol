@@ -6,6 +6,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {CommitterProvingTest} from "contracts/dev-contracts/test/CommitterProvingTest.sol";
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {StoredBatchHashing} from "contracts/state-transition/chain-deps/StoredBatchHashing.sol";
 
 /// @notice Pins the Airbender-shape batch commitment against values produced by the Rust
 /// implementation the guest runs.
@@ -172,6 +174,50 @@ contract AirbenderCommitmentEquivalenceTest is Test {
 
     function _commitment(bytes32 _auxHash) internal pure returns (bytes32) {
         return keccak256(abi.encode(EXPECTED_PASS_THROUGH_DATA_HASH, EXPECTED_METADATA_HASH, _auxHash));
+    }
+
+    /// The pre-Airbender hash form is the entire back-compat guarantee for batches committed before
+    /// the upgrade: get its field order wrong and every one of them becomes permanently
+    /// unauthenticatable. Pinned against an explicit encoding of the nine historical fields, with a
+    /// distinct non-zero value in every slot so a transposition cannot hide.
+    function test_preAirbenderHashFormMatchesTheHistoricalEncoding() public pure {
+        IExecutor.StoredBatchInfo memory batch = IExecutor.StoredBatchInfo({
+            batchNumber: 7,
+            batchHash: keccak256("batchHash"),
+            indexRepeatedStorageChanges: 11,
+            numberOfLayer1Txs: 13,
+            priorityOperationsHash: keccak256("priorityOperationsHash"),
+            dependencyRootsRollingHash: keccak256("dependencyRootsRollingHash"),
+            l2LogsTreeRoot: keccak256("l2LogsTreeRoot"),
+            timestamp: 17,
+            commitment: keccak256("commitment"),
+            airbenderCommitment: keccak256("airbenderCommitment")
+        });
+
+        bytes32 expected = keccak256(
+            // solhint-disable-next-line func-named-parameters
+            abi.encode(
+                uint64(7),
+                keccak256("batchHash"),
+                uint64(11),
+                uint256(13),
+                keccak256("priorityOperationsHash"),
+                keccak256("dependencyRootsRollingHash"),
+                keccak256("l2LogsTreeRoot"),
+                uint256(17),
+                keccak256("commitment")
+            )
+        );
+
+        assertEq(
+            StoredBatchHashing.hashPreAirbenderStoredBatchInfo(batch),
+            expected,
+            "pre-Airbender hash form diverges from the encoding it must reproduce"
+        );
+        assertTrue(
+            StoredBatchHashing.hashStoredBatchInfo(batch) != expected,
+            "the current form must cover airbenderCommitment and so differ"
+        );
     }
 
     /// The pass-through encoding, which `Committer._batchPassThroughData` and the guest share.

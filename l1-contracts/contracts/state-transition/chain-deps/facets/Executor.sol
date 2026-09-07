@@ -277,7 +277,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             if (i == 0) {
                 // A batch carries an Airbender commitment only if the hash form that covers it
                 // matched; one committed before the lane existed proves on Boojum alone.
-                airbenderLane = provedAirbenderBound && committedBatches[0].airbenderCommitment != bytes32(0);
+                airbenderLane =
+                    !s.zksyncOS &&
+                    provedAirbenderBound &&
+                    committedBatches[0].airbenderCommitment != bytes32(0);
                 proofPublicInput = new uint256[](airbenderLane ? 2 : committedBatchesLength);
             }
 
@@ -320,24 +323,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             );
         }
 
-        _verifyProof(proofPublicInput, proof, airbenderLane);
+        _verifyProof(proofPublicInput, proof);
 
         emit BlocksVerification(s.totalBatchesVerified, currentTotalBatchesVerified);
         s.totalBatchesVerified = currentTotalBatchesVerified;
     }
 
-    function _verifyProof(
-        uint256[] memory proofPublicInput,
-        uint256[] memory _proof,
-        bool _airbenderLane
-    ) internal view {
-        // Era hands the verifier one word per enabled proof system for a single batch: two with the
-        // Airbender lane, one without. Exact, not an upper bound — a longer array would let a second
-        // batch's Boojum transition hash arrive where the Airbender word is expected.
-        if (!s.zksyncOS && proofPublicInput.length != (_airbenderLane ? 2 : 1)) {
-            revert CanOnlyProcessOneBatch();
-        }
-
+    function _verifyProof(uint256[] memory proofPublicInput, uint256[] memory _proof) internal view {
         bool successVerifyProof = s.verifier.verify(proofPublicInput, _proof);
         if (!successVerifyProof) {
             revert InvalidProof();

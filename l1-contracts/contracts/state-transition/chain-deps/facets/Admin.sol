@@ -198,9 +198,20 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (_disabledProofSystems >= ALL_PROOF_SYSTEMS_DISABLED) {
             revert InvalidDisabledProofSystemsMask(_disabledProofSystems);
         }
-        // No `_enforceNoUnverifiedBatchesForChainConfigUpdate()` here: this value never enters a batch
-        // proof public input, and it has to take effect while unproven batches are waiting.
         uint8 oldDisabledProofSystems = s.disabledProofSystems;
+
+        // Disabling a system may happen with unproven batches waiting — that is the point of the
+        // switch, and it only ever widens what the gate accepts.
+        //
+        // Enabling one must not. A batch committed while the Airbender lane was off carries no
+        // Airbender commitment, so the Executor emits a single public input for it and the gate
+        // refuses that once the lane is on: the batch becomes unprovable and the chain stalls
+        // behind it. Draining first is the only ordering that works.
+        bool enablingAProofSystem = (oldDisabledProofSystems & ~_disabledProofSystems) != 0;
+        if (enablingAProofSystem) {
+            _enforceNoUnverifiedBatchesForChainConfigUpdate();
+        }
+
         s.disabledProofSystems = _disabledProofSystems;
         emit NewDisabledProofSystems(oldDisabledProofSystems, _disabledProofSystems);
     }

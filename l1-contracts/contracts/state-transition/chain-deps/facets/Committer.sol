@@ -761,20 +761,38 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         view
         returns (bytes32 metadataHash, bytes32 auxiliaryOutputHash, bytes32 commitment, bytes32 airbenderCommitment)
     {
+        if (_newBatchData.systemLogs.length > MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES) {
+            revert SystemLogsSizeTooBig();
+        }
+
         bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
         metadataHash = keccak256(_batchMetaParameters());
-        auxiliaryOutputHash = keccak256(
-            _batchAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes)
-        );
 
+        // Shared between the two shapes: the logs are hashed once and the blob region built once.
+        bytes32 l2ToL1LogsHash = keccak256(_newBatchData.systemLogs);
+        bytes32[] memory blobAuxOutputWords = _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes);
+
+        // solhint-disable-next-line func-named-parameters
+        auxiliaryOutputHash = _auxiliaryOutputHash(
+            l2ToL1LogsHash,
+            _stateDiffHash,
+            _newBatchData.bootloaderHeapInitialContentsHash,
+            _newBatchData.eventsQueueStateHash,
+            blobAuxOutputWords
+        );
         commitment = keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
 
         // The Airbender shape reuses everything above and differs in exactly two words of the
         // auxiliary output. A chain that does not run the lane supplies no heap hash and gets `0`,
         // which the Executor reads as "this batch has no Airbender commitment".
         if (_newBatchData.airbenderBootloaderHeapHash != bytes32(0)) {
-            bytes32 airbenderAuxiliaryOutputHash = keccak256(
-                _airbenderAuxiliaryOutput(_newBatchData, _stateDiffHash, _blobCommitments, _blobHashes)
+            // solhint-disable-next-line func-named-parameters
+            bytes32 airbenderAuxiliaryOutputHash = _auxiliaryOutputHash(
+                l2ToL1LogsHash,
+                _stateDiffHash,
+                _newBatchData.airbenderBootloaderHeapHash,
+                bytes32(0),
+                blobAuxOutputWords
             );
             airbenderCommitment = keccak256(
                 abi.encode(passThroughDataHash, metadataHash, airbenderAuxiliaryOutputHash)
@@ -782,26 +800,26 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         }
     }
 
-    /// @dev `_batchAuxiliaryOutput` with the two words Airbender does not reproduce substituted: the
-    /// heap hash it computes with Blake2s, and the events queue hash it pins to zero.
-    function _airbenderAuxiliaryOutput(
-        CommitBatchInfo memory _batch,
+    /// @dev The auxiliary output digest, with the two words the two proof systems disagree on left
+    /// as parameters: the bootloader heap hash, which Airbender computes with Blake2s rather than
+    /// Poseidon2, and the events queue hash, which Airbender pins to zero.
+    function _auxiliaryOutputHash(
+        bytes32 _l2ToL1LogsHash,
         bytes32 _stateDiffHash,
-        bytes32[] memory _blobCommitments,
-        bytes32[] memory _blobHashes
-    ) internal pure returns (bytes memory) {
-        if (_batch.systemLogs.length > MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES) {
-            revert SystemLogsSizeTooBig();
-        }
-
+        bytes32 _bootloaderHeapHash,
+        bytes32 _eventsQueueStateHash,
+        bytes32[] memory _blobAuxOutputWords
+    ) internal pure returns (bytes32) {
         return
-            // solhint-disable-next-line func-named-parameters
-            abi.encodePacked(
-                keccak256(_batch.systemLogs),
-                _stateDiffHash,
-                _batch.airbenderBootloaderHeapHash,
-                bytes32(0),
-                _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes)
+            keccak256(
+                // solhint-disable-next-line func-named-parameters
+                abi.encodePacked(
+                    _l2ToL1LogsHash,
+                    _stateDiffHash,
+                    _bootloaderHeapHash,
+                    _eventsQueueStateHash,
+                    _blobAuxOutputWords
+                )
             );
     }
 
@@ -823,29 +841,6 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 s.l2BootloaderBytecodeHash,
                 s.l2DefaultAccountBytecodeHash,
                 s.l2EvmEmulatorBytecodeHash
-            );
-    }
-
-    function _batchAuxiliaryOutput(
-        CommitBatchInfo memory _batch,
-        bytes32 _stateDiffHash,
-        bytes32[] memory _blobCommitments,
-        bytes32[] memory _blobHashes
-    ) internal pure returns (bytes memory) {
-        if (_batch.systemLogs.length > MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES) {
-            revert SystemLogsSizeTooBig();
-        }
-
-        bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
-
-        return
-            // solhint-disable-next-line func-named-parameters
-            abi.encodePacked(
-                l2ToL1LogsHash,
-                _stateDiffHash,
-                _batch.bootloaderHeapInitialContentsHash,
-                _batch.eventsQueueStateHash,
-                _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes)
             );
     }
 
