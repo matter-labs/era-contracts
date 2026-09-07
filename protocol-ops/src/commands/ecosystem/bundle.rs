@@ -80,7 +80,9 @@ const CONTRACT_SOURCE_PATHSPECS: [&str; 12] = [
     "l1-contracts/contracts",
     "l1-contracts/deploy-scripts",
     "l1-contracts/upgrade-envs/permanent-values",
-    "l1-contracts/upgrade-envs/v0.31.0-interopB/*.toml",
+    // Git's default wildcard can cross directory separators. Use glob magic
+    // so generated output/<env>/ecosystem.toml is not mistaken for an input.
+    ":(glob)l1-contracts/upgrade-envs/v0.31.0-interopB/*.toml",
     "l2-contracts/contracts",
     "protocol-ops/src",
     "system-contracts/contracts",
@@ -1038,6 +1040,63 @@ pub fn run_verify_bundle(args: VerifyBundleArgs) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn source_provenance_excludes_generated_outputs_but_tracks_inputs() {
+        let repo = tempfile::tempdir().unwrap();
+        let input = "l1-contracts/upgrade-envs/v0.31.0-interopB/mainnet.toml";
+        let output = "l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet/ecosystem.toml";
+        let source = "l1-contracts/contracts/Example.sol";
+        for path in [input, output, source] {
+            write(&repo.path().join(path), "original\n");
+        }
+        for args in [vec!["init"], vec!["add", "."]] {
+            assert!(try_capture("git", &args, repo.path()).is_some());
+        }
+        assert!(try_capture(
+            "git",
+            &[
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.invalid",
+                "-c",
+                "commit.gpgsign=false",
+                "commit",
+                "-m",
+                "fixture"
+            ],
+            repo.path(),
+        )
+        .is_some());
+        let status = || {
+            try_capture(
+                "git",
+                &[
+                    &["status", "--porcelain", "--"][..],
+                    &CONTRACT_SOURCE_PATHSPECS[..],
+                ]
+                .concat(),
+                repo.path(),
+            )
+            .unwrap()
+        };
+        assert!(status().is_empty());
+        write(&repo.path().join(output), "regenerated\n");
+        assert!(
+            status().is_empty(),
+            "generated TOML must not mark sources dirty"
+        );
+        for path in [input, source] {
+            write(&repo.path().join(path), "changed\n");
+            assert!(
+                status().contains(path),
+                "modified input must mark sources dirty: {path}"
+            );
+            write(&repo.path().join(path), "original\n");
+            assert!(status().is_empty());
+        }
+    }
 
     const TARGET: &str = "0x0000000000000000000000000000000000000002";
 
