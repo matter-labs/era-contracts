@@ -42,7 +42,6 @@ import {
     RegistryDuplicateProxyRow,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
-    RegistryHashChangeToZero,
     RegistryInventoryLengthMismatch,
     RegistryMemberHasNoFixedAddress,
     RegistryPinTargetHasNoCode,
@@ -76,7 +75,7 @@ import {
 } from "../../../../../../../contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @notice Unit tests for the write-once upgrade objects in the DERIVED model: releases carry
-///         explicit routing + inline mandatory pins; transitions derive their facet/hash delta
+///         explicit routing + inline mandatory pins; transitions derive their facet delta
 ///         from the `(fromRelease, newRelease)` pair at initialization.
 contract StorageRegistriesTest is Test {
     CoreRegistry internal coreRegistry;
@@ -98,10 +97,6 @@ contract StorageRegistriesTest is Test {
 
     uint256 internal constant OLD_VERSION = uint256(98) << 32;
     uint256 internal constant NEW_VERSION = uint256(99) << 32;
-
-    bytes32 internal constant BOOTLOADER_FROM = bytes32(uint256(0xb00));
-    bytes32 internal constant BOOTLOADER_NEW = bytes32(uint256(0xbb0));
-    bytes32 internal constant DEFAULT_ACCOUNT_HASH = bytes32(uint256(0xda0));
 
     // Dummy EVM bytecodes standing in for the L2 artifacts a hop installs (see {L2PlanFixtures}):
     // the authored extras (the upgrade delegate and one more Unsafe deployment) and the
@@ -153,10 +148,7 @@ contract StorageRegistriesTest is Test {
         });
     }
 
-    function _releaseManifest(
-        address _adminFacet,
-        bytes32 _bootloaderHash
-    ) internal view returns (ReleaseManifest memory manifest) {
+    function _releaseManifest(address _adminFacet) internal view returns (ReleaseManifest memory manifest) {
         GenesisFacet[] memory facets = new GenesisFacet[](3);
         facets[0] = GenesisFacet({
             facet: PinnedContract({addr: _adminFacet, codehash: _adminFacet.codehash}),
@@ -177,9 +169,6 @@ contract StorageRegistriesTest is Test {
                 genesisUpgrade: PinnedContract({addr: genesisUpgrade, codehash: genesisUpgrade.codehash}),
                 genesisFacets: facets,
                 genesis: ReleaseGenesisData({
-                    bootloaderHash: _bootloaderHash,
-                    defaultAccountHash: DEFAULT_ACCOUNT_HASH,
-                    evmEmulatorHash: bytes32(0),
                     fixedForceDeploymentsData: hex"f1f2",
                     genesisBatchHash: bytes32(uint256(1)),
                     genesisBatchCommitment: bytes32(uint256(1)),
@@ -191,13 +180,13 @@ contract StorageRegistriesTest is Test {
     }
 
     function _fromReleaseManifest() internal view returns (ReleaseManifest memory) {
-        return _releaseManifest(facetOldAdmin, BOOTLOADER_FROM);
+        return _releaseManifest(facetOldAdmin);
     }
 
     function _newReleaseManifest() internal view returns (ReleaseManifest memory) {
-        // The hop replaces the admin facet (new address AND new selector set) and bumps the
-        // bootloader hash; the shared + frozen facets carry over unchanged.
-        return _releaseManifest(facetNewAdmin, BOOTLOADER_NEW);
+        // The hop replaces the admin facet (new address AND new selector set); the shared +
+        // frozen facets carry over unchanged.
+        return _releaseManifest(facetNewAdmin);
     }
 
     /// @dev The well-formed authored remainder: two Unsafe extras at their bytecode-derived
@@ -321,13 +310,6 @@ contract StorageRegistriesTest is Test {
         assertEq(derivedCuts[4].facet, facetShared);
         assertEq(derivedCuts[5].facet, facetFrozen);
         assertTrue(derivedCuts[5].isFreezable);
-
-        // Hash changes derived the same way: only the bootloader differs between the releases.
-        (bytes32 bootloaderChange, bytes32 defaultAccountChange, bytes32 evmEmulatorChange) = transition
-            .baseSystemContractHashChanges();
-        assertEq(bootloaderChange, BOOTLOADER_NEW);
-        assertEq(defaultAccountChange, bytes32(0));
-        assertEq(evmEmulatorChange, bytes32(0));
     }
 
     function test_composerBuildsL2TxAndProposalFromTransition() public view {
@@ -347,7 +329,12 @@ contract StorageRegistriesTest is Test {
         );
         assertEq(proposedUpgrade.newProtocolVersion, NEW_VERSION);
         assertEq(proposedUpgrade.upgradeTimestamp, 1234567);
-        assertEq(proposedUpgrade.bootloaderHash, BOOTLOADER_NEW);
+        assertEq(proposedUpgrade.verifier, verifier);
+        // The frozen `ProposedUpgrade` still carries the EraVM bytecode-hash words; the composer
+        // leaves them zero.
+        assertEq(proposedUpgrade.bootloaderHash, bytes32(0));
+        assertEq(proposedUpgrade.defaultAccountHash, bytes32(0));
+        assertEq(proposedUpgrade.evmEmulatorHash, bytes32(0));
     }
 
     /// @dev Regression: the MINIMAL L2 plan — the delegate's own Unsafe deployment and nothing
@@ -401,8 +388,6 @@ contract StorageRegistriesTest is Test {
         // deployments included, even though the release's table is only read cross-release.
         assertEq(patchTransition.facetCuts().length, 0);
         assertEq(patchTransition.l2Plan().deployments.length, 0, "same-release pair must derive no deployments");
-        (bytes32 bootloaderChange, , ) = patchTransition.baseSystemContractHashChanges();
-        assertEq(bootloaderChange, bytes32(0));
         // Both edges are live releases, so runtime validation holds.
         patchTransition.validate();
         assertTrue(patchTransition.verifyAll());
@@ -512,22 +497,6 @@ contract StorageRegistriesTest is Test {
         manifest.l2Plan.factoryDepHashes = tooManyDeps;
 
         vm.expectRevert(MalformedL2UpgradePlan.selector);
-        new CTMTransition(manifest);
-    }
-
-    /// @dev Regression: a target release that blanks a base-system hash (nonzero -> zero) cannot be
-    ///      executed as an upgrade, because `BaseZkSyncUpgrade` reads a zero change as "leave
-    ///      unchanged". Existing chains would keep the old hash while fresh chains take the release
-    ///      value, so the derivation rejects it instead of storing a silent no-op.
-    function test_revertWhen_transitionBlanksBaseSystemHash() public {
-        // A target release identical to the source except that the bootloader hash goes to zero.
-        ReleaseManifest memory blankingManifest = _releaseManifest(facetNewAdmin, bytes32(0));
-        CTMRelease blankingRelease = new CTMRelease(blankingManifest);
-
-        TransitionManifest memory manifest = _transitionManifest();
-        manifest.newRelease = address(blankingRelease);
-
-        vm.expectRevert(RegistryHashChangeToZero.selector);
         new CTMTransition(manifest);
     }
 

@@ -79,11 +79,6 @@
             "isFreezable": true
           }
         ],
-        "baseSystemContracts": {
-          "bootloader": "0x0000000000000000000000000000000000000000000000000000000000000000",
-          "defaultAccount": "0x0000000000000000000000000000000000000000000000000000000000000000",
-          "evmEmulator": "0x0000000000000000000000000000000000000000000000000000000000000000"
-        },
         "fixedForceDeploymentsData": "0xf1f2",
         "l2BytecodeInfos": {},
         "genesis": {

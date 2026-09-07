@@ -46,7 +46,7 @@ import {
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice The first full registry-driven upgrade, end to end: a real chain diamond is taken
-///         v32 -> v33 entirely through the CTM-bound `CTMUpgradeExecutor`, with the facet/hash
+///         v32 -> v33 entirely through the CTM-bound `CTMUpgradeExecutor`, with the facet
 ///         delta DERIVED from each hop's release pair and actually EXECUTED (facet cuts applied,
 ///         the real `DefaultUpgrade` engine delegatecalled, the L2 protocol upgrade transaction
 ///         committed on the chain).
@@ -192,11 +192,11 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     }
 
     /// @dev One release's full manifest: the fixture's routing (AdminFacet swapped for
-    ///      `_adminFacet` when nonzero), the verifier, carried base-system hashes, genesis params
-    ///      and the L2 bytecode table. Hop 1 changes only the verifier, so its target release
-    ///      differs from genesis in that one field and the DERIVED facet/hash/deployment delta is
-    ///      empty — an L1-only upgrade. The v33 release (nonzero `_adminFacet`) also carries one
-    ///      table row, the L2Bridgehub system-proxy upgrade, which the v33 transition derives.
+    ///      `_adminFacet` when nonzero), the verifier, genesis params and the L2 bytecode table.
+    ///      Hop 1 changes only the verifier, so its target release differs from genesis in that
+    ///      one field and the DERIVED facet/deployment delta is empty — an L1-only upgrade. The
+    ///      v33 release (nonzero `_adminFacet`) also carries one table row, the L2Bridgehub
+    ///      system-proxy upgrade, which the v33 transition derives.
     function _releaseManifest(address _adminFacet, address _verifier) internal returns (ReleaseManifest memory) {
         bytes[] memory l2BytecodeInfos = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
         if (_adminFacet != address(0)) {
@@ -211,12 +211,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
                 verifier: PinnedContract({addr: _verifier, codehash: _verifier.codehash}),
                 genesisUpgrade: PinnedContract({addr: genesisUpgradeAddr, codehash: genesisUpgradeAddr.codehash}),
                 genesisFacets: _releaseFacets(_adminFacet),
-                // Carried unchanged through every hop: the release pins the complete values, so
-                // the derived hash changes are zero.
                 genesis: ReleaseGenesisData({
-                    bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                    defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                    evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                     fixedForceDeploymentsData: hex"f1f2",
                     genesisBatchHash: bytes32(uint256(1)),
                     genesisBatchCommitment: _registryGenesisBatchCommitment(),
@@ -242,13 +237,13 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     }
 
     /// @dev Builds one hop's release + transition. The release describes the COMPLETE post-hop
-    ///      chain state (explicit facet routing, inline pins, carried base-system hashes); the
-    ///      transition's facet delta is DERIVED from `(fromRelease, newRelease)` at
-    ///      initialization — nothing is hand-authored. When `_newAdminFacet` is zero the target
-    ///      release equals the source routing (empty derived delta -> L1-only upgrade with empty
-    ///      cuts); otherwise the derived delta replaces the chain's REAL AdminFacet by the given
-    ///      implementation, and the hop also carries an L2 side — the table-derived L2Bridgehub
-    ///      row plus the authored upgrade delegate — making it a full minor upgrade.
+    ///      chain state (explicit facet routing, inline pins); the transition's facet delta is
+    ///      DERIVED from `(fromRelease, newRelease)` at initialization — nothing is hand-authored.
+    ///      When `_newAdminFacet` is zero the target release equals the source routing (empty
+    ///      derived delta -> L1-only upgrade with empty cuts); otherwise the derived delta replaces
+    ///      the chain's REAL AdminFacet by the given implementation, and the hop also carries an L2
+    ///      side — the table-derived L2Bridgehub row plus the authored upgrade delegate — making
+    ///      it a full minor upgrade.
     function _makeTransition(
         uint256 _oldVersion,
         uint256 _newVersion,
@@ -302,7 +297,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
 
     function test_registryDrivenUpgrade_v32ThenV33_endToEnd() public {
         // Hop 1 (0.0.0 -> 0.32.0): L1-only registry-driven upgrade — the target release differs
-        // from genesis only in the verifier, so the DERIVED facet/hash delta is empty and no L2
+        // from genesis only in the verifier, so the DERIVED facet delta is empty and no L2
         // transaction is composed. The cut executes on the real chain with the real
         // DefaultUpgrade init.
         _runHop(transitionV32);

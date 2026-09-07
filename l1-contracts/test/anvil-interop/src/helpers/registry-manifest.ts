@@ -158,9 +158,6 @@ export function releaseInitArgs(ctm: any): any {
     genesisFacets,
     // `ReleaseGenesisData` — the block a release shares with the deploy-time `GenesisConfig`.
     genesis: {
-      bootloaderHash: release.baseSystemContracts.bootloader,
-      defaultAccountHash: release.baseSystemContracts.defaultAccount,
-      evmEmulatorHash: release.baseSystemContracts.evmEmulator,
       fixedForceDeploymentsData: release.fixedForceDeploymentsData,
       genesisBatchHash: release.genesis.batchHash,
       genesisBatchCommitment: release.genesis.batchCommitment,

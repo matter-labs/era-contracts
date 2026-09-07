@@ -6,8 +6,8 @@ import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {L2UpgradePlan, ProxyUpgradeRow, TransitionManifest} from "../RegistryTypes.sol";
 
 /// @notice Immutable description of how one CTM release becomes another.
-/// @dev The facet cuts and base-system hash CHANGES are NOT authored: they are DERIVED from the
-///      `(fromRelease, newRelease)` pair at initialization and stored. What governance reviews
+/// @dev The facet cuts and table-derived L2 deployments are NOT authored: they are DERIVED from
+///      the `(fromRelease, newRelease)` pair at initialization and stored. What governance reviews
 ///      is two releases and this transition's schedule/engine/L2 plan; the delta is a
 ///      pure function of the release pair, so transition and release state cannot diverge.
 interface ICTMTransition {
@@ -43,9 +43,6 @@ interface ICTMTransition {
     ///         initialization (all `Remove` cuts first, then `Add`), applied verbatim by the
     ///         chain with no re-diffing.
     function facetCuts() external view returns (Diamond.FacetCut[] memory);
-
-    /// @notice The DERIVED base-system hash changes (zero = carried over unchanged).
-    function baseSystemContractHashChanges() external view returns (bytes32, bytes32, bytes32);
 
     /// @notice CTM-domain implementation swaps applied by the bound executor before the commit.
     function ctmProxyRows() external view returns (ProxyUpgradeRow[] memory);

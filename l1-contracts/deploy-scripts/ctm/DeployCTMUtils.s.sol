@@ -259,9 +259,6 @@ abstract contract DeployCTMUtils is DeployUtils {
                 genesis: ReleaseGenesisData({
                     // ZKsync OS has no bootloader, default-account or EVM-emulator bytecode: the
                     // release pins zeros, the same values a fresh chain geneses with.
-                    bootloaderHash: bytes32(0),
-                    defaultAccountHash: bytes32(0),
-                    evmEmulatorHash: bytes32(0),
                     fixedForceDeploymentsData: generatedData.forceDeploymentsData,
                     genesisBatchHash: config.contracts.chainCreationParams.genesisRoot,
                     genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,

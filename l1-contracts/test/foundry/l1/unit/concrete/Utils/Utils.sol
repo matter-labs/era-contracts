@@ -54,7 +54,7 @@ library Utils {
     Vm internal constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     /// @dev The genesis-registry address the mocked CTM fixtures return; the registry itself is
-    ///      mocked too (see `UtilsCallMocker`), pinning no facets and these base system hashes.
+    ///      mocked too (see `UtilsCallMocker`), pinning no facets.
     address internal constant TEST_GENESIS_REGISTRY = address(0x9E8E5157A9);
     /// @dev The audited `CTMRelease` / `CTMTransition` codehashes: THE provenance anchors a CTM
     ///      and a `CTMUpgradeExecutor` pin. `TEST_GENESIS_REGISTRY` is etched with the release
@@ -74,8 +74,6 @@ library Utils {
     function coreRegistryCodehash() internal view returns (bytes32) {
         return keccak256(vm.getDeployedCode("CoreRegistry.sol:CoreRegistry"));
     }
-    bytes32 internal constant TEST_BASE_SYSTEM_CONTRACT_HASH =
-        0x0100000000000000000000000000000000000000000000000000000000000000;
 
     /// @dev DiamondInit derives everything but (chainId, admin) from the CTM — which is simply
     ///      `msg.sender` during the diamond proxy construction. Direct-diamond fixtures prank as

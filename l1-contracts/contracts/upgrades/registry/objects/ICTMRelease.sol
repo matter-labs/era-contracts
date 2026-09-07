@@ -6,7 +6,7 @@ import {GenesisFacet} from "../RegistryTypes.sol";
 
 /// @notice Immutable description of one CTM release: the version-INDEPENDENT, reusable
 ///         genesis / post-upgrade state a chain at this release runs — facets, DiamondInit,
-///         verifier, base-system hashes, force-deployment data and genesis params.
+///         verifier, force-deployment data and genesis params.
 /// @dev A release deliberately carries NO `protocolVersion`: the version schedule is owned by
 ///      `ICTMTransition`, and one release can serve several versions.
 /// @dev A release also carries NO VM flag: VM identity is single-sourced from the pinned
@@ -26,8 +26,6 @@ interface ICTMRelease {
     function verifier() external view returns (address);
 
     function genesisFacets() external view returns (GenesisFacet[] memory);
-
-    function baseSystemContractHashes() external view returns (bytes32, bytes32, bytes32);
 
     function fixedForceDeploymentsData() external view returns (bytes memory);
 

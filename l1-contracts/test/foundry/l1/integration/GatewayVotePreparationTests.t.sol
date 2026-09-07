@@ -271,11 +271,6 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
                     verifier: contracts.stateTransition.verifiers.verifier,
                     genesisUpgrade: contracts.stateTransition.genesisUpgrade,
                     genesis: ReleaseGenesisData({
-                        // ZKsync OS has no bootloader / default account / EVM emulator bytecode,
-                        // so the Gateway deployer config carries no hashes; the release pins zeros.
-                        bootloaderHash: bytes32(0),
-                        defaultAccountHash: bytes32(0),
-                        evmEmulatorHash: bytes32(0),
                         fixedForceDeploymentsData: config.forceDeploymentsData,
                         genesisBatchHash: config.genesisRoot,
                         genesisBatchCommitment: config.genesisBatchCommitment,

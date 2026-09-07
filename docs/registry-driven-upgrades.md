@@ -9,12 +9,12 @@ addresses, not calldata; the contracts hold the data, validate it, and the execu
 
 Two objects, deliberately separate:
 
-|          | **Release**                                                                                                                                 | **Transition**                                                         |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Answers  | what a chain **is**                                                                                                                         | how release A **becomes** release B                                    |
-| Contains | pinned facet set (routing self-described by the facets), `DiamondInit`, verifier, base-system hashes, genesis params, force-deployment data | version edge, upgrade engine, CTM-domain proxy rows, schedule, L2 plan |
-| Version  | none — version-independent, reusable                                                                                                        | owns the `old -> new` version edge                                     |
-| VM flag  | none — read from the pinned `DiamondInit.IS_ZKSYNC_OS`                                                                                      | —                                                                      |
+|          | **Release**                                                                                                             | **Transition**                                                         |
+| -------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Answers  | what a chain **is**                                                                                                     | how release A **becomes** release B                                    |
+| Contains | pinned facet set (routing self-described by the facets), `DiamondInit`, verifier, genesis params, force-deployment data | version edge, upgrade engine, CTM-domain proxy rows, schedule, L2 plan |
+| Version  | none — version-independent, reusable                                                                                    | owns the `old -> new` version edge                                     |
+| VM flag  | none — read from the pinned `DiamondInit.IS_ZKSYNC_OS`                                                                  | —                                                                      |
 
 A release is reusable chain state: everything a chain _runs_ belongs to it, including the verifier
 (the chain stores it as `s.verifier`). What a release does **not** carry is anything about _when_ —
@@ -32,12 +32,12 @@ written.
 All are storage-backed, built once from a manifest they take in the constructor, and commit
 `manifestHash = keccak256(abi.encode(manifest))`.
 
-| Contract                     | Holds                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, pin — routing is read from each pinned facet's own self-description), three base-system hashes, `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed L2 bytecode table)                                                                                         |
-| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine` + pin, `proxyUpgrades` (the `CTMContract`-indexed CTM-domain inventory, incl. the CTM itself), deadline, `upgradeTimestamp`, `AuthoredL2Plan` (delegate leg, extra deployments, factory deps); **derived and stored:** final `Diamond.FacetCut[]`, base-system hash changes, and the L2 force deployments (from the target release's L2 bytecode table) |
-| `CoreRegistry`               | the `L1EcosystemContract`-indexed ecosystem inventory of `(proxy, expectedOldImpl, implNew + pin)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot)                                                                                                                                                                                                                                                |
-| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                                                                                                                                                                     |
+| Contract                     | Holds                                                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMRelease`                 | `diamondInit` + pin, `verifier` + pin, `GenesisFacet[]` (address, freezability, pin — routing is read from each pinned facet's own self-description), `fixedForceDeploymentsData`, genesis params + genesis-upgrade pin, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed L2 bytecode table)                                                                                        |
+| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine` + pin, `proxyUpgrades` (the `CTMContract`-indexed CTM-domain inventory, incl. the CTM itself), deadline, `upgradeTimestamp`, `AuthoredL2Plan` (delegate leg, extra deployments, factory deps); **derived and stored:** final `Diamond.FacetCut[]` and the L2 force deployments (from the target release's L2 bytecode table) |
+| `CoreRegistry`               | the `L1EcosystemContract`-indexed ecosystem inventory of `(proxy, expectedOldImpl, implNew + pin)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot)                                                                                                                                                                                                                     |
+| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                                                                                                                                          |
 
 ### Enum-indexed proxy inventories
 
@@ -286,9 +286,8 @@ names (`transition.newRelease()`), so a lagging chain is never affected by where
 moved since.
 
 When a release is pinned, the CTM validates VM identity against
-`IDiamondInit(release.diamondInit()).IS_ZKSYNC_OS()` and applies its VM-specific genesis rules (Era
-requires a nonzero repeated-storage index and nonzero base-system hashes; ZKsyncOS requires
-`genesisBatchCommitment == 1`).
+`IDiamondInit(release.diamondInit()).IS_ZKSYNC_OS()` (the repository is ZKsync-OS-only, so a release
+pinning an EraVM `DiamondInit` is refused) and requires `genesisBatchCommitment == 1`.
 
 There is no per-version registry map. The upgrade cut itself carries the transition address as its
 init calldata, so the committed cut and the source of the derived facet cuts are the same object.
@@ -301,7 +300,7 @@ init calldata, so the committed cut and the source of the derived facet cuts are
    `initAddress = currentRelease.diamondInit()`, empty `initCalldata`, and deploys the `DiamondProxy`.
 3. `DiamondInit.initialize(chainId, admin)` is delegatecalled from the proxy constructor, so
    `msg.sender` is the CTM. It reads `currentRelease`, installs that release's self-described routing via
-   `ReleaseFacetReader`, and takes the verifier and base-system hashes from the release.
+   `ReleaseFacetReader`, and takes the verifier from the release.
 4. The CTM runs `IAdmin.genesisUpgrade` with the release's `fixedForceDeploymentsData` and genesis
    upgrade address.
 
@@ -370,9 +369,8 @@ that commitment is written exclusively by the CTM-bound executor.
 
 ## What the derivation guarantees
 
-For any representable release pair, the L1-side guarantee is that **the facet routing, verifier and
-base-system hashes an existing chain ends up with are byte-for-byte what a fresh chain at
-`newRelease` gets**. The upgrade path and the genesis path resolve to the same pinned release, so
+For any representable release pair, the L1-side guarantee is that **the facet routing and verifier
+an existing chain ends up with are byte-for-byte what a fresh chain at `newRelease` gets**. The upgrade path and the genesis path resolve to the same pinned release, so
 they cannot drift. There is no second mechanism for any part of installed chain state.
 
 The registry model has an **L2-side leg**: `L2EcosystemRegistry`, a ZKsync OS built-in at
@@ -427,12 +425,11 @@ deployments at their bytecode-derived address, the delegate must be one of them,
 bytecode (implementation and proxy shell of each derived row, each extra) must be among the factory
 dependencies (`L2PlanValidationLib`).
 
-**Base-system hashes.** Zero means "leave unchanged" in an upgrade, so a nonzero → zero change is not
-representable and is rejected at derivation rather than stored as a silent no-op. The Era CTM
-likewise rejects a release carrying a zero base-system hash — the same values `DiamondInit` requires
-for new chains. The verifier follows the same zero-means-unchanged convention on the upgrade path,
-which is how the genesis upgrade runs after `DiamondInit` has already installed it; a release itself
-can never pin a zero verifier.
+**Verifier.** Zero means "leave unchanged" on the upgrade path, which is how the genesis upgrade runs
+after `DiamondInit` has already installed it; a release itself can never pin a zero verifier. ZKsync
+OS chains have no base-system bytecodes: the EraVM bootloader/default-account/EVM-emulator hash slots
+are deprecated (EVM-1643), so releases pin none and transitions derive no hash changes — the frozen
+`ProposedUpgrade` words stay zero.
 
 **Row sets.** Core-registry and bootstrap rows are real, unique edges: all fields nonzero, one row
 per proxy. Duplicates would both pass the source check and the last would silently win, so the

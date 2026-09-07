@@ -141,9 +141,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 genesisUpgrade: PinnedContract({addr: genesisUpgradeAddr, codehash: genesisUpgradeAddr.codehash}),
                 genesisFacets: genesisFacets,
                 genesis: ReleaseGenesisData({
-                    bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                    defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                    evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                     fixedForceDeploymentsData: hex"f1f2",
                     genesisBatchHash: bytes32(uint256(1)),
                     // ZKsyncOSChainTypeManager requires the commitment to be exactly 1.

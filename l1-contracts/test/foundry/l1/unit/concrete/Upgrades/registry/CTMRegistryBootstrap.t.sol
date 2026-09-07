@@ -23,14 +23,10 @@ import {
 
 /// @notice Unit tests for `CTMRegistry` in its BOOTSTRAP (genesis) mode: a freshly deployed CTM
 ///         (L1 deploy scripts or the Gateway CTM deployer) points at one of these so
-///         `DiamondInit` installs a new chain's facet set and reads the base system contract
-///         hashes from it. Exercises the getter surface `RegistryFacetReader` / `DiamondInit`
-///         read and the manifest-hash commitment.
+///         `DiamondInit` installs a new chain's facet set from it. Exercises the getter surface
+///         `RegistryFacetReader` / `DiamondInit` read and the manifest-hash commitment.
 contract CTMRegistryBootstrapTest is Test {
     uint256 internal constant VERSION = 42;
-    bytes32 internal constant BOOTLOADER_HASH = bytes32(uint256(0xB001));
-    bytes32 internal constant DEFAULT_ACCOUNT_HASH = bytes32(uint256(0xDEFA));
-    bytes32 internal constant EVM_EMULATOR_HASH = bytes32(uint256(0xE7E7));
     address internal constant GENESIS_UPGRADE = address(0xABCD);
     address internal constant VERIFIER = address(0xABCE);
 
@@ -82,9 +78,6 @@ contract CTMRegistryBootstrapTest is Test {
                     verifier: VERIFIER,
                     genesisUpgrade: GENESIS_UPGRADE,
                     genesis: ReleaseGenesisData({
-                        bootloaderHash: BOOTLOADER_HASH,
-                        defaultAccountHash: DEFAULT_ACCOUNT_HASH,
-                        evmEmulatorHash: EVM_EMULATOR_HASH,
                         fixedForceDeploymentsData: bytes(""),
                         genesisBatchHash: bytes32(uint256(1)),
                         genesisBatchCommitment: bytes32(uint256(1)),
@@ -121,12 +114,6 @@ contract CTMRegistryBootstrapTest is Test {
         assertEq(adminSelectors.length, 1, "self-described selectors");
         assertEq(adminSelectors[0], bytes4(uint32(0x100)), "admin selector");
 
-        (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash) = release
-            .baseSystemContractHashes();
-        assertEq(bootloaderHash, BOOTLOADER_HASH, "bootloader hash");
-        assertEq(defaultAccountHash, DEFAULT_ACCOUNT_HASH, "default account hash");
-        assertEq(evmEmulatorHash, EVM_EMULATOR_HASH, "evm emulator hash");
-
         // Inline pins captured from live code at build time (the etched synthetic facets carry
         // real, nonempty code) verify against the same live state.
         release.validate();
@@ -144,38 +131,6 @@ contract CTMRegistryBootstrapTest is Test {
 
         vm.expectRevert();
         new CTMRelease(manifest);
-    }
-
-    /// @dev ZKsync OS pins all-zero hashes; the registry must store and serve them as-is (the
-    ///      zero-check lives in DiamondInit and is skipped for ZKsync OS chains).
-    function test_zeroHashesAreServedForPinnedVersion() public {
-        CTMRelease release = new CTMRelease(
-            GenesisManifestLib.buildGenesisManifest(
-                GenesisConfig({
-                    facets: facets,
-                    verifier: VERIFIER,
-                    genesisUpgrade: GENESIS_UPGRADE,
-                    genesis: ReleaseGenesisData({
-                        bootloaderHash: 0,
-                        defaultAccountHash: 0,
-                        evmEmulatorHash: 0,
-                        fixedForceDeploymentsData: bytes(""),
-                        genesisBatchHash: bytes32(uint256(1)),
-                        genesisBatchCommitment: bytes32(uint256(1)),
-                        genesisIndexRepeatedStorageChanges: 1
-                    }),
-                    // Length-checked inventory; content is irrelevant to these fixtures.
-                    l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)
-                })
-            )
-        );
-
-        (bytes32 bootloaderHash, bytes32 defaultAccountHash, bytes32 evmEmulatorHash) = release
-            .baseSystemContractHashes();
-        assertEq(bootloaderHash, bytes32(0), "bootloader hash");
-        assertEq(defaultAccountHash, bytes32(0), "default account hash");
-        assertEq(evmEmulatorHash, bytes32(0), "evm emulator hash");
-        assertEq(release.genesisFacets().length, 6, "facet list");
     }
 
     // ---- L2 bytecode table ----

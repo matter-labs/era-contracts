@@ -410,8 +410,6 @@ error RegistryDuplicateProxyRow(address proxy);
 error RegistryDuplicateSelector(bytes4 selector);
 // 0xba5f0dd8
 error RegistryEmptySelectors(address facet);
-// 0xb130ce79
-error RegistryHashChangeToZero();
 // 0xd79000b2
 error RegistryInventoryLengthMismatch(uint256 expected, uint256 actual);
 // 0xb40929f4

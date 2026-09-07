@@ -42,13 +42,6 @@ contract SetGenesisRegistryTest is ChainTypeManagerTest {
             abi.encode(_genesisUpgrade, _genesisBatchHash, _genesisBatchCommitment, _genesisIndexRepeatedStorageChanges)
         );
         vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
-        // Keep the mocked release structurally complete for the same downstream readers as a real
-        // release, even though VM compatibility is determined by DiamondInit.
-        vm.mockCall(
-            _registry,
-            abi.encodeWithSelector(ICTMRelease.baseSystemContractHashes.selector),
-            abi.encode(bytes32(uint256(0xB0)), bytes32(uint256(0xDA)), bytes32(uint256(0xE)))
-        );
         // VM identity is single-sourced from the release's DiamondInit; the mocked registry's
         // diamondInit placeholder is the registry itself, so mock the flag there.
         vm.mockCall(_registry, abi.encodeWithSelector(ICTMRelease.diamondInit.selector), abi.encode(_registry));

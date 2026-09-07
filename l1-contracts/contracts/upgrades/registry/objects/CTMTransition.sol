@@ -31,7 +31,7 @@ import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
 
 /// @notice Storage-backed, write-once transition between two CTM releases.
-/// @dev The facet cuts and base-system hash changes are NOT part of the manifest: they are
+/// @dev The facet cuts and table-derived L2 deployments are NOT part of the manifest: they are
 ///      DERIVED from the `(fromRelease, newRelease)` pair at initialization (see
 ///      {TransitionDerivationLib}) and stored. Transition and release state cannot diverge because
 ///      the delta is a pure function of the two pinned releases.
@@ -50,9 +50,6 @@ contract CTMTransition is ICTMTransition {
     // Derived at initialization from (fromRelease, newRelease) — never authored, and stored as
     // ready-to-execute cuts the chain applies verbatim (no re-diffing at execution).
     Diamond.FacetCut[] internal derivedFacetCuts;
-    bytes32 internal derivedBootloaderChange;
-    bytes32 internal derivedDefaultAccountChange;
-    bytes32 internal derivedEvmEmulatorChange;
     /// @dev The FINAL L2 force-deployment list — the table-derived set followed by the authored
     ///      extras — stored as its ABI encoding (same reasoning as `encodedManifest`: the legacy
     ///      codegen pipeline cannot copy a struct array with dynamic members into storage).
@@ -163,7 +160,7 @@ contract CTMTransition is ICTMTransition {
         if (_manifest.l2Plan.factoryDepHashes.length > MAX_NEW_FACTORY_DEPS) {
             revert MalformedL2UpgradePlan();
         }
-        // A same-release transition is schedule-only: the derived facet/hash/deployment delta is
+        // A same-release transition is schedule-only: the derived facet/deployment delta is
         // empty by construction, and it must not carry an authored L2 payload either.
         if (_manifest.fromRelease == _manifest.newRelease && hasL2Side) {
             revert SameReleaseTransitionHasPayload();
@@ -181,8 +178,6 @@ contract CTMTransition is ICTMTransition {
         for (uint256 i = 0; i < length; ++i) {
             derivedFacetCuts.push(facetCutsMemory[i]);
         }
-        (derivedBootloaderChange, derivedDefaultAccountChange, derivedEvmEmulatorChange) = TransitionDerivationLib
-            .deriveHashChanges(ICTMRelease(_manifest.fromRelease), ICTMRelease(_manifest.newRelease));
     }
 
     /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment governance compares
@@ -227,10 +222,6 @@ contract CTMTransition is ICTMTransition {
 
     function facetCuts() external view returns (Diamond.FacetCut[] memory) {
         return derivedFacetCuts;
-    }
-
-    function baseSystemContractHashChanges() external view returns (bytes32, bytes32, bytes32) {
-        return (derivedBootloaderChange, derivedDefaultAccountChange, derivedEvmEmulatorChange);
     }
 
     /// @notice The FINAL, executable L2 plan: the stored derived-plus-extra deployments with the

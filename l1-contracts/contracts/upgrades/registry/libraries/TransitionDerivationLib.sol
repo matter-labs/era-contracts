@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
-import {RegistryDuplicateSelector, RegistryHashChangeToZero} from "../../../common/L1ContractErrors.sol";
+import {RegistryDuplicateSelector} from "../../../common/L1ContractErrors.sol";
 import {GenesisFacet} from "../RegistryTypes.sol";
 import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
@@ -14,15 +14,14 @@ import {L2InventoryLib} from "./L2InventoryLib.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice DERIVES a transition's final diamond cuts, base-system hash changes and L2 force
-///         deployments from its `(fromRelease, newRelease)` pair. The delta is a pure function
+/// @notice DERIVES a transition's final diamond cuts and L2 force deployments from its
+///         `(fromRelease, newRelease)` pair. The delta is a pure function
 ///         of the two releases — it is computed once at transition initialization and stored as
 ///         ready-to-execute data, never hand-authored and never re-diffed at execution, so the
 ///         transition path (existing chains) cannot diverge from the release path (new chains)
 ///         by construction, and the chain applies the stored delta verbatim.
 ///
-/// @dev Scope: L1 diamond routing, the three base-system hashes and the table-driven L2 force
-///      deployments. The rest of the L2 payload (delegate target + calldata, factory deps) is
+/// @dev Scope: L1 diamond routing and the table-driven L2 force deployments. The rest of the L2 payload (delegate target + calldata, factory deps) is
 ///      reviewed-and-pinned data — L1 cannot verify L2 execution effects, and the guarantee is
 ///      deliberately not overstated.
 library TransitionDerivationLib {
@@ -96,36 +95,6 @@ library TransitionDerivationLib {
                 ++cursor;
             }
         }
-    }
-
-    /// @notice Derives the base-system hash CHANGES: the target value where the releases differ,
-    ///         zero (= leave unchanged, the `BaseZkSyncUpgrade` convention) where they agree.
-    function deriveHashChanges(
-        ICTMRelease _fromRelease,
-        ICTMRelease _newRelease
-    ) internal view returns (bytes32 bootloaderChange, bytes32 defaultAccountChange, bytes32 evmEmulatorChange) {
-        (bytes32 fromBootloader, bytes32 fromDefaultAccount, bytes32 fromEvmEmulator) = _fromRelease
-            .baseSystemContractHashes();
-        (bytes32 newBootloader, bytes32 newDefaultAccount, bytes32 newEvmEmulator) = _newRelease
-            .baseSystemContractHashes();
-        bootloaderChange = _deriveHashChange(fromBootloader, newBootloader);
-        defaultAccountChange = _deriveHashChange(fromDefaultAccount, newDefaultAccount);
-        evmEmulatorChange = _deriveHashChange(fromEvmEmulator, newEvmEmulator);
-    }
-
-    /// @dev The stored change for one base-system hash: zero when the releases agree.
-    ///      A nonzero -> zero change is NOT representable, because `BaseZkSyncUpgrade` reads zero
-    ///      as "leave unchanged": existing chains would keep the old hash while new chains take the
-    ///      target release's zero, so the two paths would diverge. Reject it at derivation rather
-    ///      than store a silent no-op.
-    function _deriveHashChange(bytes32 _fromHash, bytes32 _newHash) private pure returns (bytes32) {
-        if (_fromHash == _newHash) {
-            return bytes32(0);
-        }
-        if (_newHash == bytes32(0)) {
-            revert RegistryHashChangeToZero();
-        }
-        return _newHash;
     }
 
     /// @notice Derives the transition's L2 force deployments from the target release's L2

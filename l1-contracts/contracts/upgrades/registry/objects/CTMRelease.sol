@@ -88,11 +88,6 @@ contract CTMRelease is ICTMRelease {
         return getManifest().genesisFacets;
     }
 
-    function baseSystemContractHashes() external view returns (bytes32, bytes32, bytes32) {
-        ReleaseManifest memory m = getManifest();
-        return (m.genesis.bootloaderHash, m.genesis.defaultAccountHash, m.genesis.evmEmulatorHash);
-    }
-
     function fixedForceDeploymentsData() external view returns (bytes memory) {
         return getManifest().genesis.fixedForceDeploymentsData;
     }

@@ -102,8 +102,6 @@ library CTMUpgradeComposer {
     function buildProposedUpgrade(
         ICTMTransition _transition
     ) internal view returns (ProposedUpgrade memory proposedUpgrade) {
-        // One decode for every manifest field; only the DERIVED delta (hash changes) lives outside
-        // the manifest and needs its own read.
         TransitionManifest memory m = _transition.getManifest();
         proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(m.newProtocolVersion);
         proposedUpgrade.l2ProtocolUpgradeTx = _buildL2UpgradeTx(_transition, m);
@@ -111,11 +109,8 @@ library CTMUpgradeComposer {
         // versions behind executes the transition that names its own next release, and the CTM may
         // already have moved past it.
         proposedUpgrade.verifier = ICTMRelease(m.newRelease).verifier();
-        (
-            proposedUpgrade.bootloaderHash,
-            proposedUpgrade.defaultAccountHash,
-            proposedUpgrade.evmEmulatorHash
-        ) = _transition.baseSystemContractHashChanges();
+        // The frozen `ProposedUpgrade` still carries the EraVM bytecode-hash words; they stay zero
+        // and `BaseZkSyncUpgrade` no longer reads them.
         proposedUpgrade.upgradeTimestamp = m.upgradeTimestamp;
     }
 

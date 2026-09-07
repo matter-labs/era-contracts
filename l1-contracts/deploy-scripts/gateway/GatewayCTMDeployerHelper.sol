@@ -600,9 +600,6 @@ library GatewayCTMDeployerHelper {
                     verifier: _direct.verifier,
                     genesisUpgrade: _direct.genesisUpgrade,
                     genesis: ReleaseGenesisData({
-                        bootloaderHash: bytes32(0),
-                        defaultAccountHash: bytes32(0),
-                        evmEmulatorHash: bytes32(0),
                         fixedForceDeploymentsData: _baseConfig.forceDeploymentsData,
                         genesisBatchHash: _baseConfig.genesisRoot,
                         genesisBatchCommitment: _baseConfig.genesisBatchCommitment,

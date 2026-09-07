@@ -606,10 +606,6 @@ type LiveUpgradeInputs = {
   messageRootProxy: string;
   /** The proxy's live (pre-upgrade) implementation — the source side of the ecosystem edge. */
   messageRootImplOld: string;
-  /** Base-system hashes pinned by the release — always zero on ZKsync OS. */
-  bootloaderHash: string;
-  defaultAccountHash: string;
-  evmEmulatorHash: string;
 };
 
 /** The probed live facet address by name (see readLiveUpgradeInputs facet probes). */
@@ -689,12 +685,6 @@ async function readLiveUpgradeInputs(
     }
   }
 
-  // ZKsync OS chains carry no base-system bytecodes: the EraVM hash slots are deprecated and
-  // their getters are gone (EVM-1643), so the release pins the three hashes as zero.
-  const bootloaderHash: string = ethers.constants.HashZero;
-  const defaultAccountHash: string = ethers.constants.HashZero;
-  const evmEmulatorHash: string = ethers.constants.HashZero;
-
   const adminFacetView = new ethers.Contract(upgradeChains[0].diamondProxy, getAbi("AdminFacet"), l1Provider);
   const rollupDAManager: string = await adminFacetView.getRollupDAManager();
 
@@ -748,9 +738,6 @@ async function readLiveUpgradeInputs(
     ecosystemProxyAdmin,
     messageRootProxy,
     messageRootImplOld,
-    bootloaderHash,
-    defaultAccountHash,
-    evmEmulatorHash,
   };
 }
 
@@ -984,13 +971,6 @@ async function buildRegistryManifest(
           // genesis path and the upgrade path read it from the release they resolve to.
           verifier: { address: deployed.newVerifier, codehash: await codehash(deployed.newVerifier) },
           genesisFacets,
-          // Complete target values (this bump changes none of them, so they equal the live ones
-          // and the DERIVED hash changes are zero).
-          baseSystemContracts: {
-            bootloader: live.bootloaderHash,
-            defaultAccount: live.defaultAccountHash,
-            evmEmulator: live.evmEmulatorHash,
-          },
           // Chain-creation payload for chains created at this release. No new chain is created
           // in this test, so a synthetic payload (mirroring the foundry e2e test) suffices.
           fixedForceDeploymentsData: "0xf1f2",

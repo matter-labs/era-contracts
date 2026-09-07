@@ -48,7 +48,7 @@ import {
 
 /// @notice Exercises the CTM-BOUND executor against real write-once release and transition
 ///         objects. Release data describes new-chain genesis; transition data describes the one
-///         movement from the fixture's current version to that release — its facet/hash delta is
+///         movement from the fixture's current version to that release — its facet delta is
 ///         DERIVED from the release pair (a facet-neutral hop here; facet-changing hops are
 ///         exercised end-to-end by RegistryDrivenUpgrade.t.sol).
 contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
@@ -123,8 +123,8 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
     /// @param _manifestNonce Differentiates otherwise-identical release manifests (via the
     ///        genesis batch hash — the COMMITMENT must be exactly 1 for the ZKsync OS CTM).
     /// @dev The release describes the complete chain state after the (facet-neutral) hop this
-    ///      suite drives: the fixture's full facet routing (explicit selectors, inline pins) and
-    ///      the carried base-system hashes — the transition derives an EMPTY delta from it.
+    ///      suite drives: the fixture's full facet routing (explicit selectors, inline pins) —
+    ///      the transition derives an EMPTY delta from it.
     function _releaseManifest(uint256 _manifestNonce) internal view returns (ReleaseManifest memory) {
         GenesisFacet[] memory genesisFacets = new GenesisFacet[](facetCuts.length);
         for (uint256 i = 0; i < facetCuts.length; ++i) {
@@ -140,9 +140,6 @@ contract CTMUpgradeExecutorTest is ChainTypeManagerTest {
                 genesisUpgrade: PinnedContract({addr: genesisUpgradeAddr, codehash: genesisUpgradeAddr.codehash}),
                 genesisFacets: genesisFacets,
                 genesis: ReleaseGenesisData({
-                    bootloaderHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                    defaultAccountHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
-                    evmEmulatorHash: Utils.TEST_BASE_SYSTEM_CONTRACT_HASH,
                     fixedForceDeploymentsData: hex"f1f2",
                     genesisBatchHash: bytes32(_manifestNonce),
                     genesisBatchCommitment: bytes32(uint256(1)),

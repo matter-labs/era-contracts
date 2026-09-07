@@ -38,15 +38,12 @@ struct GenesisFacet {
 }
 
 /// @notice The chain state a release pins that is neither a routing row nor a codehash pin: the
-///         base system contract hashes, the force-deployment descriptor and the genesis batch.
+///         force-deployment descriptor and the genesis batch.
 /// @dev Shared by {ReleaseManifest} and {GenesisConfig} so the deploy-time input and the pinned
 ///      manifest cannot drift in these fields — the config carries this verbatim into the
 ///      manifest it builds.
 // solhint-disable-next-line gas-struct-packing
 struct ReleaseGenesisData {
-    bytes32 bootloaderHash;
-    bytes32 defaultAccountHash;
-    bytes32 evmEmulatorHash;
     bytes fixedForceDeploymentsData;
     bytes32 genesisBatchHash;
     bytes32 genesisBatchCommitment;

@@ -248,8 +248,8 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        // The committed cut carries no init payload: DiamondInit reads the base system contract
-        // hashes from the (mocked) genesis registry. The fixture facets still ride in the cut's
+        // The committed cut carries no init payload: DiamondInit reads everything it needs from
+        // the CTM and its (mocked) genesis registry. The fixture facets still ride in the cut's
         // own `facetCuts` since the mocked registry pins none.
         return Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: _diamondInit, initCalldata: ""});
     }
