@@ -112,6 +112,6 @@ CI also regenerates `configs/genesis/zksync-os/latest.json`. On Linux, after bui
 )
 ```
 
-For a same-repository PR, the **Update All Generated Artifacts** workflow updates hashes, `zkstack-out`, selectors, and the selected Anvil fixture set. It does not regenerate the ZKsync OS genesis file.
+For a same-repository PR, the **Update All Generated Artifacts** workflow updates hashes, `zkstack-out`, selectors, ZKsync OS genesis, and the selected Anvil fixture set.
 
 The Anvil `state-generation-check` reconstructs the fixture set selected by `stateVersion` and compares it with the committed snapshots. If it reports drift, use the regeneration workflow; do not edit compressed state files manually.
