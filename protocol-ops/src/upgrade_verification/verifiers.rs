@@ -1,6 +1,6 @@
 use alloy::{
     hex::{self, FromHex},
-    primitives::{Address, Bytes, FixedBytes, U256},
+    primitives::{Address, Bytes, FixedBytes},
     sol,
     sol_types::SolCall,
 };
@@ -12,7 +12,6 @@ use std::panic::Location;
 
 use crate::{
     commands::ecosystem::verify_upgrade::VerifyUpgradeEnv,
-    common::env_config::{ChainInterval, EnvConfig},
     upgrade_verification::{
         artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
         versions::v33::utils::{
@@ -42,19 +41,8 @@ pub(crate) struct Verifiers {
     pub zksync_os_genesis_config: GenesisConfig,
     pub fee_param_verifier: FeeParamVerifier,
     pub era_chain_id: u64,
-    pub legacy_gateway_chain_id: u64,
-    pub legacy_gateway_chain_intervals: Vec<ChainInterval>,
-    /// `None` on a release that brings up no Gateway (v33). Every Gateway-specific check —
-    /// the stage-2 bring-up block and the GW CTM deployment provenance — is skipped then.
-    pub new_gateway_chain_id: Option<u64>,
-    pub new_gateway_representative_chain_id: Option<u64>,
-    pub new_gateway_representative_ctm: Option<Address>,
     pub expected_l1_chain_id: u64,
     pub zk_token_asset_id: FixedBytes<32>,
-    /// CREATE2 salt used by the new-gateway CTM deployer contracts.
-    /// Derived from `[create2_factory_salts]` in the env input TOML,
-    /// keyed by `new_gateway_representative_ctm` (the L1 CTM proxy).
-    pub gateway_ctm_create2_salt: FixedBytes<32>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -77,14 +65,9 @@ impl Verifiers {
         env: VerifyUpgradeEnv,
         artifact: &EcosystemUpgradeArtifact,
         l1_rpc: impl Into<String>,
-        gw_rpc: impl Into<String>,
         contracts_commit: Option<&str>,
         zk_governance_commit: &str,
         era_chain_id: u64,
-        legacy_gateway_chain_id: u64,
-        legacy_gateway_chain_intervals: &[ChainInterval],
-        new_gateway_chain_id: Option<u64>,
-        new_gateway_representative_chain_id: Option<u64>,
         expected_l1_chain_id: u64,
         zk_token_asset_id: FixedBytes<32>,
     ) -> anyhow::Result<Self> {
@@ -109,56 +92,10 @@ impl Verifiers {
         )?;
         let bytecode_verifier =
             BytecodeVerifier::init_v33(contracts_commit, zk_governance_commit).await?;
-        let network_verifier =
-            NetworkVerifier::new_v33(l1_rpc.into(), gw_rpc.into(), era_chain_id).await?;
-        if let Some(expected_gw_chain_id) = new_gateway_chain_id {
-            anyhow::ensure!(
-                network_verifier.get_gateway_chain_id() == expected_gw_chain_id,
-                "gateway RPC chain id {} does not match env [new_gateway].chain_id {}",
-                network_verifier.get_gateway_chain_id(),
-                expected_gw_chain_id,
-            );
-        }
+        let network_verifier = NetworkVerifier::new_v33(l1_rpc.into(), era_chain_id).await?;
         let fee_param_verifier =
             FeeParamVerifier::safe_init(&bridgehub_address, &network_verifier, contracts_commit)
                 .await?;
-        let new_gateway_representative_ctm = match new_gateway_representative_chain_id {
-            Some(chain_id) => {
-                let ctm = network_verifier
-                    .try_get_chain_type_manager_from_bridgehub(
-                        bridgehub_address,
-                        U256::from(chain_id),
-                    )
-                    .await
-                    .map_err(|e| {
-                        anyhow::anyhow!(
-                            "failed to fetch Bridgehub.chainTypeManager({chain_id}) \
-                             for [new_gateway].ctm_representative_chain_id: {e}"
-                        )
-                    })?;
-                anyhow::ensure!(
-                    ctm != Address::ZERO,
-                    "Bridgehub.chainTypeManager({chain_id}) returned zero; \
-                     [new_gateway].ctm_representative_chain_id must point to the CTM hosted by the new Gateway",
-                );
-                Some(ctm)
-            }
-            None => None,
-        };
-
-        // Look up the per-CTM CREATE2 salt for the new gateway's source CTM.
-        // Keyed by L1 CTM proxy address in [create2_factory_salts] of the
-        // env input TOML. Falls back to zero if the env doesn't declare it
-        // (e.g., a legacy env where the gateway used salt 0).
-        let gateway_ctm_create2_salt = {
-            let per_ctm = EnvConfig::load(env.as_str())
-                .and_then(|cfg| cfg.create2_factory_salt_for_upgrade_per_ctm())
-                .unwrap_or_default();
-            new_gateway_representative_ctm
-                .and_then(|ctm| per_ctm.get(&ctm).copied())
-                .unwrap_or_default()
-        };
-
         // `Bridgehub.owner()` is the L1 governance executor (the PUH proxy on
         // PUH-governed envs). It is the authoritative source for the
         // `aliased_protocol_upgrade_handler_proxy` value consumed by the
@@ -200,14 +137,8 @@ impl Verifiers {
             zksync_os_genesis_config,
             fee_param_verifier,
             era_chain_id,
-            legacy_gateway_chain_id,
-            legacy_gateway_chain_intervals: legacy_gateway_chain_intervals.to_vec(),
-            new_gateway_chain_id,
-            new_gateway_representative_chain_id,
-            new_gateway_representative_ctm,
             expected_l1_chain_id,
             zk_token_asset_id,
-            gateway_ctm_create2_salt,
         })
     }
 
@@ -221,10 +152,9 @@ impl Verifiers {
 #[derive(Debug, Clone, Deserialize)]
 pub struct GenesisConfig {
     pub genesis_root: String,
-    #[serde(default)]
-    pub genesis_rollup_leaf_index: Option<u64>,
-    #[serde(default)]
-    pub genesis_batch_commitment: Option<String>,
+    // `genesis_rollup_leaf_index` and `genesis_batch_commitment` are not read:
+    // only an Era CTM's chain-creation params carried them, and ZKsync OS
+    // pins both to constants (0 and bytes32(1)) checked in stage 1.
 }
 
 impl GenesisConfig {

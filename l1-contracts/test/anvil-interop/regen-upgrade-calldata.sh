@@ -16,8 +16,6 @@
 #   L1_FORK_URL                          — L1 RPC URL to fork
 #   DEPLOYER_PK=<0xhex>                  — broadcast signer's private key, OR
 #   DEPLOYER_PK_FILE=<path>              — file holding the same (trimmed)
-#   GW_RPC_URL                           — Gateway RPC; PUVT reads GW-side state through it.
-#                                          Only needed when PUVT runs (see SKIP_PUVT).
 #
 # Usage:
 #   DEPLOYER_PK_FILE=~/.deployer_pk L1_FORK_URL=https://… ./regen-upgrade-calldata.sh testnet
@@ -82,11 +80,6 @@ echo "Deployer EOA: $DEPLOYER"
 ZK_GOV_COMMIT="${ZK_GOVERNANCE_COMMIT:-3e516c5}"
 
 SKIP_PUVT="${SKIP_PUVT:-0}"
-if [[ "$SKIP_PUVT" != "1" && -z "${GW_RPC_URL:-}" ]]; then
-  echo "GW_RPC_URL is required for the PUVT step (or set SKIP_PUVT=1)" >&2
-  exit 1
-fi
-
 # Build with the DEFAULT profile — do not switch this to `anvil-interop`.
 #
 # `anvil-interop` sets `cbor_metadata = false`, which strips the trailing CBOR metadata blob and
@@ -209,7 +202,6 @@ COMBINED_TXLOG="$FORK_DIR/transactions.combined.txt"
   --env "$ENV_NAME" \
   --ecosystem-toml "$OUT/ecosystem.toml" \
   --l1-rpc-url "$RPC" \
-  --gw-rpc-url "$GW_RPC_URL" \
   --transactions-log "$COMBINED_TXLOG" \
   --zk-governance-commit "$ZK_GOV_COMMIT"
 

@@ -58,11 +58,10 @@ use super::{
     CallList, GovernanceStage1Calls,
 };
 
-/// `pauseMigration()` + the eight core proxy upgrades. Always present.
-const STAGE1_CORE_PREFIX_LEN: usize = 9;
-/// The `setL1InteropHandler` pair, present only when this run deployed the
-/// handler — see [`interop_handler_wiring_len`].
-const STAGE1_INTEROP_WIRING_LEN: usize = 2;
+/// `pauseMigration()`, the eight core proxy upgrades, and the two
+/// `setL1InteropHandler` wiring calls. All eleven are unconditional — see
+/// [`require_interop_handler_deployed_here`].
+const STAGE1_CORE_LEN: usize = 11;
 
 /// Offsets within one per-CTM block, mirroring the `allCalls` assembly in
 /// `DefaultCTMUpgrade.prepareStage1GovernanceCalls`. `prepareDAValidatorCall`
@@ -84,30 +83,51 @@ fn ctm_block_start(ctm_index: usize, core_len: usize) -> usize {
     core_len + ctm_index * STAGE1_PER_CTM_LEN
 }
 
+/// Requires that this upgrade deployed the `L1InteropHandler` proxy.
+///
 /// `CoreUpgrade_v33.prepareVersionSpecificStage1GovernanceCallsL1` emits the
-/// two `setL1InteropHandler` calls only when the run deployed the handler
-/// itself. Rather than trust the call list to say so, decide from this
-/// upgrade's own CREATE2 deployments: a handler proxy that was deployed here
-/// must be wired here.
-fn interop_handler_wiring_len(artifact: &EcosystemUpgradeArtifact, verifiers: &Verifiers) -> usize {
-    let deployed_here = optional_core_address(
+/// two `setL1InteropHandler` calls only on the branch that created the proxy,
+/// and the other branch exists for a from-scratch deployment or a re-run —
+/// neither of which protocol-ops produces an upgrade artifact for. So for an
+/// artifact this tool generated the handler is always freshly deployed and
+/// always wired, and that is enforced rather than accommodated: an artifact
+/// whose handler proxy is not among this upgrade's CREATE2 deployments is
+/// rejected, instead of being read as "this release wires nothing".
+fn require_interop_handler_deployed_here(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> usize {
+    match optional_core_address(
         artifact,
         &[
             "upgrade_addresses",
             "bridges",
             "l1_interop_handler_proxy_addr",
         ],
-    )
-    .is_some_and(|addr| {
-        verifiers
-            .network_verifier
-            .create2_known_bytecodes
-            .contains_key(&addr)
-    });
-    if deployed_here {
-        STAGE1_INTEROP_WIRING_LEN
-    } else {
-        0
+    ) {
+        Some(addr)
+            if verifiers
+                .network_verifier
+                .create2_known_bytecodes
+                .contains_key(&addr) =>
+        {
+            0
+        }
+        Some(addr) => {
+            result.report_error(&format!(
+                "core.upgrade_addresses.bridges.l1_interop_handler_proxy_addr is {addr}, which this \
+                 upgrade did not deploy; stage 1 must deploy the handler and wire it into both bridges"
+            ));
+            1
+        }
+        None => {
+            result.report_error(
+                "core.upgrade_addresses.bridges.l1_interop_handler_proxy_addr is missing; v33 \
+                 deploys the L1InteropHandler and wires it in stage 1",
+            );
+            1
+        }
     }
 }
 
@@ -152,9 +172,8 @@ impl GovernanceStage1Calls {
         result.print_info("== Gov stage 1 calls ===");
 
         let ctms = &artifact.ctms;
-        let wiring_len = interop_handler_wiring_len(artifact, verifiers);
-        let core_len = STAGE1_CORE_PREFIX_LEN + wiring_len;
-        let mut errors = 0;
+        let mut errors = require_interop_handler_deployed_here(artifact, verifiers, result);
+        let core_len = STAGE1_CORE_LEN;
 
         // Re-assert the stage-0 migration pause. `PUH.executeEmergencyUpgrade`
         // unpauses migrations as a built-in pre-step, which would make the
@@ -171,10 +190,9 @@ impl GovernanceStage1Calls {
             ("transparent_proxy_admin", "upgrade(address,address)"),
             8,
         ));
-        if wiring_len > 0 {
-            shape.push(("l1_nullifier_proxy", "setL1InteropHandler(address)"));
-            shape.push(("l1_asset_router_proxy", "setL1InteropHandler(address)"));
-        }
+        // Exactly two, always: the handler is one-shot on each bridge.
+        shape.push(("l1_nullifier_proxy", "setL1InteropHandler(address)"));
+        shape.push(("l1_asset_router_proxy", "setL1InteropHandler(address)"));
         for (index, (target, method)) in shape.into_iter().enumerate() {
             errors += verify_call_by_name(&self.calls, index, target, method, verifiers, result);
         }
@@ -367,8 +385,7 @@ impl GovernanceStage1Calls {
         const SET_INTEROP_HANDLER_ON_NULLIFIER: usize = 9;
         const SET_INTEROP_HANDLER_ON_ASSET_ROUTER: usize = 10;
 
-        let wiring_len = interop_handler_wiring_len(artifact, verifiers);
-        let core_len = STAGE1_CORE_PREFIX_LEN + wiring_len;
+        let core_len = STAGE1_CORE_LEN;
         let mut errors = 0;
 
         for (index, proxy_name, implementation_name) in [
@@ -433,19 +450,12 @@ impl GovernanceStage1Calls {
         }
 
         // Both wiring calls must point at the handler proxy this run deployed.
-        if wiring_len > 0 {
-            for (index, caller) in [
-                (SET_INTEROP_HANDLER_ON_NULLIFIER, "L1Nullifier"),
-                (SET_INTEROP_HANDLER_ON_ASSET_ROUTER, "L1AssetRouter"),
-            ] {
-                errors += verify_set_interop_handler_call_args(
-                    &self.calls,
-                    index,
-                    caller,
-                    verifiers,
-                    result,
-                );
-            }
+        for (index, caller) in [
+            (SET_INTEROP_HANDLER_ON_NULLIFIER, "L1Nullifier"),
+            (SET_INTEROP_HANDLER_ON_ASSET_ROUTER, "L1AssetRouter"),
+        ] {
+            errors +=
+                verify_set_interop_handler_call_args(&self.calls, index, caller, verifiers, result);
         }
 
         // Per-CTM block: CTM proxy upgrade, setChainCreationParams,
@@ -638,6 +648,12 @@ fn verify_ctm_upgrade_call_args(
     }
 }
 
+/// Address-book name of a `[ctms.<flavor>.state_transition]` field, as
+/// registered by `AddressVerifier::new_v33_from_artifact`.
+fn ctm_artifact_path(ctm: &CtmArtifact, field: &str) -> String {
+    format!("ctms.{}.state_transition.{field}", ctm.flavor.label())
+}
+
 /// Payload check for one of the three proxies v33 keeps and re-implements
 /// (ValidatorTimelock, BytecodesSupplier, PermissionlessValidator).
 ///
@@ -668,20 +684,15 @@ fn verify_kept_proxy_upgrade_call_args(
 
     match upgradeCall::abi_decode(&call.data) {
         Ok(decoded) => {
-            let mut errors = 0;
-            if let Some(expected_proxy) =
-                required_ctm_address(ctm, &["state_transition", proxy_field], result)
-            {
-                errors += expect_address_equal(
-                    result,
-                    verifiers,
-                    &decoded.proxy,
-                    expected_proxy,
-                    &format!("{}.{proxy_field}", ctm.flavor.label()),
-                );
-            } else {
-                errors += 1;
-            }
+            // The address book already carries every artifact address under its
+            // own path, so name lookup replaces a fetch-then-compare pair here
+            // the same way it does in `verify_set_interop_handler_call_args`.
+            let mut errors = expect_named_address(
+                result,
+                verifiers,
+                &decoded.proxy,
+                &ctm_artifact_path(ctm, proxy_field),
+            );
 
             // What the installed contract is, from this upgrade's own
             // deployments. Applies to all three proxies.
@@ -710,19 +721,12 @@ fn verify_kept_proxy_upgrade_call_args(
             // And, where the artifact declares the implementation, that it
             // agrees with its own calldata.
             if let Some(impl_field) = impl_field {
-                if let Some(expected_impl) =
-                    required_ctm_address(ctm, &["state_transition", impl_field], result)
-                {
-                    errors += expect_address_equal(
-                        result,
-                        verifiers,
-                        &decoded.implementation,
-                        expected_impl,
-                        &format!("{}.{impl_field}", ctm.flavor.label()),
-                    );
-                } else {
-                    errors += 1;
-                }
+                errors += expect_named_address(
+                    result,
+                    verifiers,
+                    &decoded.implementation,
+                    &ctm_artifact_path(ctm, impl_field),
+                );
             }
 
             if errors == 0 {

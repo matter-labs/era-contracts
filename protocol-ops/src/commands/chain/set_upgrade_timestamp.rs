@@ -6,8 +6,9 @@ use serde::{Deserialize, Serialize};
 use alloy::network::Ethereum;
 use alloy::providers::{ProviderBuilder, RootProvider};
 
-use crate::common::abi::{AdminFunctionsAbi, IChainTypeManagerAbi, ZkChainAbi};
+use crate::common::abi::{AdminFunctionsAbi, ZkChainAbi};
 use crate::common::addresses::ZERO_ADDRESS;
+use crate::common::env_config::default_protocol_ops_out_dir;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
@@ -45,12 +46,11 @@ pub struct ChainSetUpgradeTimestampArgs {
     /// `PriorityOpLowerBound` registry address, for the pre-flight that refuses to schedule an
     /// upgrade whose diamond cut would revert `LowerBoundNotRecorded()`.
     ///
-    /// Normally discovered by reading `PRIORITY_OP_LOWER_BOUND()` off the CTM's `defaultUpgrade`.
-    /// That only works while the CTM stores this release's *one-shot* upgrade contract. v33
-    /// deliberately stores the generic `DefaultUpgradeZKsyncOS` there instead — so that later
-    /// verifier-only upgrades can reuse it — and the generic contract has no such immutable.
-    /// Pass the registry explicitly in that case; it is the `priority_op_lower_bound_addr` from
-    /// the release's `ecosystem.toml`.
+    /// Optional when `--env` is set: the registry is then read from that env's release artifact
+    /// (`output/<env>/ecosystem.toml`, key `priority_op_lower_bound_addr`). It cannot be
+    /// discovered from the CTM — the registry address is an immutable of this release's
+    /// *one-shot* upgrade contract, and v33 stores the generic `DefaultUpgradeZKsyncOS` as the
+    /// CTM's `defaultUpgrade` so that later verifier-only upgrades can reuse it.
     #[clap(long)]
     pub priority_op_lower_bound: Option<Address>,
 
@@ -89,17 +89,49 @@ alloy::sol! {
 /// Applies only to a chain currently on v31 (see {VERSION_REQUIRING_PRIORITY_OP_BOUND}). Once it does
 /// apply, every failure — RPC, decoding, an unexpected upgrade contract — is fatal rather than treated
 /// as "nothing to check".
+/// Reads `priority_op_lower_bound_addr` out of `output/<env>/ecosystem.toml`.
+fn registry_from_release_artifact(env: Option<&str>) -> anyhow::Result<Address> {
+    let env = env.ok_or_else(|| {
+        anyhow::anyhow!(
+            "--priority-op-lower-bound is required without --env: the PriorityOpLowerBound \
+             registry cannot be read from the CTM (it is an immutable of the one-shot upgrade \
+             contract, not of the generic DefaultUpgradeZKsyncOS the CTM stores). Take \
+             `priority_op_lower_bound_addr` from the release's ecosystem.toml"
+        )
+    })?;
+    let path = default_protocol_ops_out_dir(env)?.join("ecosystem.toml");
+    let content = std::fs::read_to_string(&path).with_context(|| {
+        format!(
+            "read {} to resolve priority_op_lower_bound_addr; pass --priority-op-lower-bound to \
+             skip this lookup",
+            path.display()
+        )
+    })?;
+    for line in content.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("priority_op_lower_bound_addr") {
+            if let Some(raw) = rest.split('"').nth(1) {
+                return raw.parse::<Address>().with_context(|| {
+                    format!("parse priority_op_lower_bound_addr from {}", path.display())
+                });
+            }
+        }
+    }
+    anyhow::bail!(
+        "{} has no `priority_op_lower_bound_addr`; pass --priority-op-lower-bound explicitly",
+        path.display()
+    )
+}
+
 async fn ensure_priority_op_bound_ready(
     rpc_url: &str,
     bridgehub: Address,
     chain_id: u64,
     explicit_registry: Option<Address>,
+    env: Option<&str>,
 ) -> anyhow::Result<()> {
     let provider: RootProvider<Ethereum> =
         ProviderBuilder::default().connect_http(rpc_url.parse()?);
-    let ctm = crate::common::l1_contracts::resolve_ctm_proxy(rpc_url, bridgehub, chain_id)
-        .await
-        .context("resolve CTM")?;
     let diamond = crate::common::l1_contracts::resolve_zk_chain(rpc_url, bridgehub, chain_id)
         .await
         .context("resolve chain diamond")?;
@@ -122,26 +154,14 @@ async fn ensure_priority_op_bound_ready(
 
     // From here on every failure is fatal: this is a safety check, and an RPC hiccup must not be
     // mistaken for "no precondition to enforce".
+    //
+    // The registry is not discoverable on chain. It is an immutable of the *one-shot* upgrade
+    // contract, and the CTM's `defaultUpgrade` holds the generic `DefaultUpgradeZKsyncOS`
+    // instead, which has no such getter — so the address comes from the release artifact that
+    // recorded the deployment, or from the caller.
     let registry = match explicit_registry {
         Some(addr) => addr,
-        None => {
-            let default_upgrade = IChainTypeManagerAbi::new(ctm, &provider)
-                .defaultUpgrade()
-                .call()
-                .await
-                .context("read CTM defaultUpgrade")?;
-            IPriorityOpLowerBoundGate::new(default_upgrade, &provider)
-                .PRIORITY_OP_LOWER_BOUND()
-                .call()
-                .await
-                .context(
-                    "read PRIORITY_OP_LOWER_BOUND from the CTM's default upgrade. That getter only \
-                     exists on a release whose one-shot upgrade contract is what the CTM stores as \
-                     its defaultUpgrade; v33 stores the generic DefaultUpgradeZKsyncOS instead. \
-                     Pass --priority-op-lower-bound with the registry address from the release's \
-                     ecosystem.toml",
-                )?
-        }
+        None => registry_from_release_artifact(env)?,
     };
 
     let registry = IPriorityOpLowerBoundGate::new(registry, &provider);
@@ -190,6 +210,7 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         bridgehub,
         chain_id,
         args.priority_op_lower_bound,
+        args.topology.ecosystem.env.as_deref(),
     )
     .await?;
 

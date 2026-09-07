@@ -31,10 +31,6 @@ pub struct VerifyUpgradeArgs {
     #[clap(long, default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
 
-    /// Gateway RPC URL used by read-only gateway-side checks.
-    #[clap(long, alias = "gw-rpc")]
-    pub gw_rpc_url: String,
-
     /// Path to the v33 ecosystem upgrade TOML produced by `upgrade-prepare`.
     #[clap(long)]
     pub ecosystem_toml: PathBuf,
@@ -105,14 +101,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.upgrade_input_path.display()
         )
     })?;
-    let legacy_gateway_chain_id = env_cfg.legacy_gateway_chain_id().ok_or_else(|| {
-        anyhow::anyhow!(
-            "{} is missing `[legacy_gateway] chain_id`",
-            env_cfg.permanent_values_path.display()
-        )
-    })?;
     let message_root_era_gateway_chain_id = env_cfg.message_root_era_gateway_chain_id();
-    let legacy_gateway_chain_intervals = env_cfg.legacy_gateway_chain_intervals().to_vec();
     let l1_chain_id = env_cfg.l1_chain_id().ok_or_else(|| {
         anyhow::anyhow!(
             "{} is missing top-level `l1_chain_id`",
@@ -131,12 +120,6 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.permanent_values_path.display()
         )
     })?;
-    // Optional: a release that brings up no Gateway (v33) has no `[new_gateway]` block, and the
-    // Gateway-specific checks — the stage-2 bring-up block and the GW CTM deployment provenance —
-    // are skipped rather than asserted against absent config.
-    let new_gateway = env_cfg.new_gateway();
-    let new_gateway_chain_id = new_gateway.map(|gw| gw.chain_id);
-    let new_gateway_representative_chain_id = new_gateway.map(|gw| gw.ctm_representative_chain_id);
 
     // Collect every pinned CREATE2 salt declared in the env config — the Core
     // salt from `[contracts] create2_factory_salt` plus the per-CTM salts under
@@ -178,7 +161,6 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         transactions_log_path.display()
     ));
     logger::info(format!("L1 RPC URL: {}", args.l1_rpc_url));
-    logger::info(format!("Gateway RPC URL: {}", args.gw_rpc_url));
     if let Some(contracts_commit) = &args.contracts_commit {
         logger::info(format!("Contracts commit: {contracts_commit}"));
     } else {
@@ -190,17 +172,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     ));
     logger::info(format!("Representative ZK chain ID: {era_chain_id}"));
     logger::info(format!(
-        "Legacy Gateway chain ID: {legacy_gateway_chain_id}"
-    ));
-    logger::info(format!(
-        "New Gateway: {}",
-        match new_gateway_chain_id {
-            Some(id) => format!("chain {id}"),
-            None => "none — this release brings up no Gateway".to_string(),
-        }
-    ));
-    logger::info(format!(
-        "New Gateway representative chain ID: {new_gateway_representative_chain_id:?}"
+        "L1MessageRoot ERA_GATEWAY_CHAIN_ID: {message_root_era_gateway_chain_id}"
     ));
     logger::info(format!("L1 chain ID (expected): {l1_chain_id}"));
     logger::info(format!("CREATE2 factory: {create2_factory}"));
@@ -229,15 +201,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         args.env,
         &artifact,
         &args.l1_rpc_url,
-        &args.gw_rpc_url,
         args.contracts_commit.as_deref(),
         args.zk_governance_commit.as_str(),
         era_chain_id,
-        legacy_gateway_chain_id,
         message_root_era_gateway_chain_id,
-        &legacy_gateway_chain_intervals,
-        new_gateway_chain_id,
-        new_gateway_representative_chain_id,
         l1_chain_id,
         &tx_hashes,
         create2_factory,

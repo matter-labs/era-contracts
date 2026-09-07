@@ -696,7 +696,8 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
         logger::info(format!("Acknowledging absent tag {tag}"));
         transactions.push(SimulatorTransaction {
             description: format!(
-                "ACK: {tag} is deliberately absent from this artifact — the per-chain upgrade is                  generated separately by `protocol_ops chain upgrade`. The reviewer is responsible                  for checking that file."
+                "ACK: {tag} is deliberately absent from this artifact and is covered outside it. \
+                 The reviewer is responsible for checking wherever it is covered."
             ),
             network: network.to_string(),
             from: format!("{from:#x}"),

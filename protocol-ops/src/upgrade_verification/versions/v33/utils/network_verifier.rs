@@ -120,8 +120,6 @@ pub struct NetworkVerifier {
     pub l1_provider: RootProvider,
     pub era_chain_id: u64,
     pub l1_chain_id: u64,
-    pub gateway_chain_id: u64,
-    pub gw_provider: RootProvider,
 
     // todo: maybe merge into one struct.
     pub create2_known_bytecodes: HashMap<Address, String>,
@@ -136,29 +134,16 @@ struct ParsedCreate2Deployment {
 }
 
 impl NetworkVerifier {
-    pub async fn new_v33(
-        l1_rpc: String,
-        gw_rpc: String,
-        era_chain_id: u64,
-    ) -> anyhow::Result<Self> {
+    pub async fn new_v33(l1_rpc: String, era_chain_id: u64) -> anyhow::Result<Self> {
         let l1_provider = RootProvider::new_http(l1_rpc.parse().context("invalid L1 RPC URL")?);
         let l1_chain_id = l1_provider
             .get_chain_id()
             .await
             .context("failed to fetch L1 chain id")?;
-        let gw_provider =
-            RootProvider::new_http(gw_rpc.parse().context("invalid gateway RPC URL")?);
-        let gateway_chain_id = gw_provider
-            .get_chain_id()
-            .await
-            .context("failed to fetch gateway chain id")?;
-
         Ok(Self {
             l1_provider,
             era_chain_id,
             l1_chain_id,
-            gateway_chain_id,
-            gw_provider,
             create2_constructor_params: HashMap::new(),
             create2_known_bytecodes: HashMap::new(),
         })
@@ -339,10 +324,6 @@ impl NetworkVerifier {
         self.create2_constructor_params.insert(addr, params);
     }
 
-    pub fn get_gateway_chain_id(&self) -> u64 {
-        self.gateway_chain_id
-    }
-
     pub async fn get_bytecode_hash_at(&self, address: &Address) -> FixedBytes<32> {
         let code = self.l1_provider.get_code_at(*address).await.unwrap();
         if code.is_empty() {
@@ -375,10 +356,6 @@ impl NetworkVerifier {
 
     pub fn get_l1_provider(&self) -> RootProvider {
         self.l1_provider.clone()
-    }
-
-    pub fn get_gw_provider(&self) -> RootProvider {
-        self.gw_provider.clone()
     }
 
     pub async fn try_get_l1_chain_id(&self) -> anyhow::Result<u64> {
@@ -462,19 +439,6 @@ impl NetworkVerifier {
             )
             .await;
         Address::from_slice(&addr_as_bytes[12..])
-    }
-
-    pub async fn try_get_gateway_proxy_admin(&self, addr: Address) -> anyhow::Result<Address> {
-        let slot = FixedBytes::<32>::from_hex(EIP1967_PROXY_ADMIN_SLOT)
-            .context("invalid EIP-1967 admin slot literal")?;
-        let storage = self
-            .gw_provider
-            .get_storage_at(addr, U256::from_be_bytes(slot.0))
-            .await
-            .with_context(|| format!("failed to read Gateway proxy admin slot for {addr}"))?;
-
-        let bytes = FixedBytes::<32>::from_slice(&storage.to_be_bytes_vec());
-        Ok(Address::from_slice(&bytes[12..]))
     }
 }
 

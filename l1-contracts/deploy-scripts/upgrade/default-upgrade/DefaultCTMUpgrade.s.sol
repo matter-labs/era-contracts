@@ -833,13 +833,23 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     }
 
     /// @notice The upgrade contract to leave stored on the CTM as its `defaultUpgrade`.
+    /// @dev Zero means "same as the contract this release's cut delegates to", which is the normal
+    ///      case. A release only sets this when its own cut is one-shot — see
+    ///      {getCtmStoredDefaultUpgrade}.
+    address internal ctmStoredDefaultUpgrade;
+
+    /// @notice The upgrade contract to leave stored on the CTM as its `defaultUpgrade`.
     /// @dev Defaults to this release's own upgrade contract, which is correct whenever that
-    ///      contract carries no one-off logic. A release whose cut *does* carry one-off logic must
-    ///      override this: `setDefaultUpgrade` is what *later* upgrades reuse when they need no
-    ///      custom logic of their own, so storing a one-shot contract there would make every such
-    ///      upgrade revert on preconditions that only ever held during this release.
+    ///      contract carries no one-off logic. A release whose cut *does* carry one-off logic sets
+    ///      {ctmStoredDefaultUpgrade} to a separately deployed generic contract instead:
+    ///      `setDefaultUpgrade` is what *later* upgrades reuse when they need no custom logic of
+    ///      their own, so storing a one-shot contract there would make every such upgrade revert
+    ///      on preconditions that only ever held during this release. v33 is such a release.
     function getCtmStoredDefaultUpgrade() internal virtual returns (address) {
-        return ctmAddresses.stateTransition.defaultUpgrade;
+        return
+            ctmStoredDefaultUpgrade == address(0)
+                ? ctmAddresses.stateTransition.defaultUpgrade
+                : ctmStoredDefaultUpgrade;
     }
 
     function prepareNewChainCreationParamsCall() public virtual returns (Call[] memory calls) {
@@ -1104,6 +1114,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
                 ctmAddresses.stateTransition.implementations.serverNotifier
             );
         }
+        // What the CTM ends up storing. Equal to `default_upgrade_addr` unless this release's
+        // cut is one-shot, in which case the two deliberately differ.
+        vm.serializeAddress("state_transition", "ctm_stored_default_upgrade_addr", getCtmStoredDefaultUpgrade());
         serializeVersionSpecificStateTransition();
         string memory stateTransition = vm.serializeAddress(
             "state_transition",

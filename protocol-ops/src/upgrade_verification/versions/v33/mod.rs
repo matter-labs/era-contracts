@@ -8,7 +8,6 @@ use alloy::primitives::{Address, FixedBytes};
 
 use crate::{
     commands::ecosystem::verify_upgrade::VerifyUpgradeEnv,
-    common::env_config::ChainInterval,
     upgrade_verification::{
         artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
         verifiers::{VerificationResult, Verifiers},
@@ -94,15 +93,10 @@ pub(crate) async fn verify(
     env: VerifyUpgradeEnv,
     artifact: &EcosystemUpgradeArtifact,
     l1_rpc_url: &str,
-    gw_rpc_url: &str,
     contracts_commit: Option<&str>,
     zk_governance_commit: &str,
     era_chain_id: u64,
-    legacy_gateway_chain_id: u64,
     message_root_era_gateway_chain_id: u64,
-    legacy_gateway_chain_intervals: &[ChainInterval],
-    new_gateway_chain_id: Option<u64>,
-    new_gateway_representative_chain_id: Option<u64>,
     l1_chain_id: u64,
     tx_hashes: &[FixedBytes<32>],
     create2_factory: Address,
@@ -115,14 +109,9 @@ pub(crate) async fn verify(
         env,
         artifact,
         l1_rpc_url,
-        gw_rpc_url,
         contracts_commit,
         zk_governance_commit,
         era_chain_id,
-        legacy_gateway_chain_id,
-        legacy_gateway_chain_intervals,
-        new_gateway_chain_id,
-        new_gateway_representative_chain_id,
         l1_chain_id,
         zk_token_asset_id,
     )
@@ -130,10 +119,6 @@ pub(crate) async fn verify(
     result.report_ok(&format!(
         "v33 verifier context loaded with {} named addresses",
         verifiers.address_verifier.name_to_address.len()
-    ));
-    result.report_ok(&format!(
-        "Gateway RPC chain ID: {}",
-        verifiers.network_verifier.get_gateway_chain_id()
     ));
 
     // Populate the create2 maps so deployment provenance can match
