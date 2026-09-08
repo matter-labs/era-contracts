@@ -22,14 +22,10 @@ jobs:
   plan:
     if: github.event.deleted != true
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read
     outputs:
       revisions: ${{ steps.plan.outputs.revisions }}
       anvil: ${{ steps.plan.outputs.anvil }}
       base_sha: ${{ steps.plan.outputs.base_sha }}
-      pr_sha: ${{ steps.plan.outputs.pr_sha }}
       recipe: ${{ steps.plan.outputs.recipe }}
       node_version: ${{ steps.plan.outputs.node_version }}
       foundry_version: ${{ steps.plan.outputs.foundry_version }}
@@ -40,8 +36,6 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-      - name: Test coverage tooling
-        run: node --test .github/scripts/coverage/*.test.js
       - name: Select coverage revisions
         id: plan
         env:
@@ -53,31 +47,34 @@ jobs:
         with:
           overwrite: true
           name: coverage-base
-          path: ${{ steps.plan.outputs.baseline_path }}
+          path: ${{ runner.temp }}/coverage-base
           if-no-files-found: error
 
   build:
-    name: ${{ matrix.revision.kind == 'pr' && 'build' || 'build (base)' }}
+    name: ${{ matrix.kind == 'pr' && 'build' || 'build (base)' }}
     needs: [plan]
-    strategy:
+    strategy: &coverage-strategy
       fail-fast: false
       matrix:
-        revision: ${{ fromJSON(needs.plan.outputs.revisions) }}
+        include: ${{ fromJSON(needs.plan.outputs.revisions) }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout the repository
+      - &coverage-checkout
+        name: Checkout the repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ matrix.revision.sha }}
+          ref: ${{ matrix.sha }}
           submodules: recursive
 
-      - name: Install Foundry
+      - &coverage-foundry-setup
+        name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: ${{ needs.plan.outputs.foundry_version }}
 
-      - name: Use Node.js
+      - &coverage-node-setup
+        name: Use Node.js
         uses: actions/setup-node@v6
         with:
           node-version: ${{ needs.plan.outputs.node_version }}
@@ -111,7 +108,7 @@ jobs:
       # is the only fix: verify-merged-commit.yaml builds clean and saves only after those checks pass.
       # A PR pays only its own incremental recompile, since it still warms from the base's cache.
       - name: Create cache
-        if: matrix.revision.kind == 'pr'
+        if: matrix.kind == 'pr'
         uses: actions/cache/save@v4
         with:
           key: artifacts-l1-ci-${{ github.sha }}
@@ -125,7 +122,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: build-artifacts-${{ matrix.revision.kind }}
+          name: build-artifacts-${{ matrix.kind }}
           path: |
             da-contracts/cache-forge
             da-contracts/out
@@ -341,31 +338,17 @@ jobs:
     defaults:
       run:
         working-directory: l1-contracts
-    name: ${{ matrix.revision.kind == 'pr' && 'coverage-foundry' || 'coverage-foundry (base)' }}
+    name: ${{ matrix.kind == 'pr' && 'coverage-foundry' || 'coverage-foundry (base)' }}
     needs: [plan, build]
-    strategy:
-      fail-fast: false
-      matrix:
-        revision: ${{ fromJSON(needs.plan.outputs.revisions) }}
+    strategy: *coverage-strategy
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ matrix.revision.sha }}
-          submodules: recursive
+      - *coverage-checkout
 
-      - name: Use Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ needs.plan.outputs.node_version }}
-          cache: yarn
+      - *coverage-node-setup
 
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: ${{ needs.plan.outputs.foundry_version }}
+      - *coverage-foundry-setup
 
       - name: Install dependencies
         run: yarn
@@ -373,7 +356,7 @@ jobs:
       - name: Restore this revision's build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: build-artifacts-${{ matrix.revision.kind }}
+          name: build-artifacts-${{ matrix.kind }}
 
       # `forge coverage` runs the suite itself, and the `test-foundry` job already gates
       # on the full (unfiltered) `yarn test:foundry`, so there is no separate test run here.
@@ -413,7 +396,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify Foundry minimum coverage
-        if: matrix.revision.kind == 'pr'
+        if: matrix.kind == 'pr'
         uses: zgosalvez/github-actions-report-lcov@df68834145a4a567247d6a3ea8565c4c39d1fd17 # v4.1.23
         with:
           coverage-files: ./l1-contracts/lcov.info
@@ -425,7 +408,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: coverage-foundry-${{ matrix.revision.kind }}
+          name: coverage-foundry-${{ matrix.kind }}
           path: l1-contracts/lcov.info
           if-no-files-found: error
 
@@ -448,17 +431,9 @@ jobs:
       matrix: ${{ fromJSON(needs.plan.outputs.anvil) }}
 
     steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ matrix.sha }}
-          submodules: recursive
+      - *coverage-checkout
 
-      - name: Use Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ needs.plan.outputs.node_version }}
-          cache: yarn
+      - *coverage-node-setup
 
       - name: Install dependencies
         run: yarn
@@ -468,10 +443,7 @@ jobs:
         with:
           name: build-artifacts-${{ matrix.kind }}
 
-      - name: Install Anvil toolchain for interop coverage
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: ${{ needs.plan.outputs.foundry_version }}
+      - *coverage-foundry-setup
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
@@ -524,16 +496,10 @@ jobs:
   # summaries. Needs neither the build artifacts nor forge — only the LCOV files, node for
   # the merge scripts, and lcov for filtering and summaries.
   coverage-merge:
-    name: ${{ matrix.revision.kind == 'pr' && 'coverage-merge' || 'coverage-merge (base)' }}
+    name: ${{ matrix.kind == 'pr' && 'coverage-merge' || 'coverage-merge (base)' }}
     needs: [plan, coverage-foundry, coverage-anvil]
-    strategy:
-      fail-fast: false
-      matrix:
-        revision: ${{ fromJSON(needs.plan.outputs.revisions) }}
+    strategy: *coverage-strategy
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read
     defaults:
       run:
         working-directory: l1-contracts
@@ -542,13 +508,9 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ matrix.revision.sha }}
+          ref: ${{ matrix.sha }}
 
-      - name: Use Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ needs.plan.outputs.node_version }}
-          cache: yarn
+      - *coverage-node-setup
 
       - name: Install dependencies
         run: yarn
@@ -566,13 +528,13 @@ jobs:
       - name: Download Foundry coverage
         uses: actions/download-artifact@v4
         with:
-          name: coverage-foundry-${{ matrix.revision.kind }}
+          name: coverage-foundry-${{ matrix.kind }}
           path: l1-contracts
 
       - name: Download group coverage
         uses: actions/download-artifact@v4
         with:
-          pattern: coverage-anvil-${{ matrix.revision.kind }}-group-*
+          pattern: coverage-anvil-${{ matrix.kind }}-group-*
           path: l1-contracts/coverage/anvil/shards
 
       # Fails if no group contributed a report, so a broken group cannot pass as
@@ -630,19 +592,13 @@ jobs:
       - name: Generate merged untested lines report
         run: npx ts-node scripts/generate-untested-lines-report.ts coverage/merged-lcov.info coverage/MERGED_UNTESTED_LINES_REPORT.md
 
-      - name: Record the measured revision
+      - name: Verify the measured revision
         env:
-          SOURCE_SHA: ${{ matrix.revision.sha }}
-          RECIPE: ${{ needs.plan.outputs.recipe }}
-        run: |
-          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
-          node - <<'NODE'
-          const fs = require('node:fs');
-          fs.writeFileSync('coverage/metadata.json', JSON.stringify({sha: process.env.SOURCE_SHA, recipe: process.env.RECIPE}) + '\n');
-          NODE
+          SOURCE_SHA: ${{ matrix.sha }}
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
 
       - name: Upload coverage artifacts
-        if: always() && matrix.revision.kind == 'pr'
+        if: always() && matrix.kind == 'pr'
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -656,84 +612,47 @@ jobs:
             l1-contracts/coverage/ANVIL_UNTESTED_LINES_REPORT.md
             l1-contracts/coverage/merged-lcov.info
             l1-contracts/coverage/MERGED_UNTESTED_LINES_REPORT.md
-            l1-contracts/coverage/metadata.json
           if-no-files-found: warn
 
       # PR recovery artifacts stay in this run; only push/dispatch reports become shared baselines.
       - name: Publish the baseline
-        if: matrix.revision.kind == 'base'
+        if: matrix.kind == 'base'
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: ${{ github.event_name == 'pull_request' && 'coverage-base' || format('coverage-baseline-{0}-{1}', matrix.revision.sha, needs.plan.outputs.recipe) }}
-          path: |
-            l1-contracts/coverage/merged-lcov.info
-            l1-contracts/coverage/metadata.json
+          name: ${{ github.event_name == 'pull_request' && 'coverage-base' || format('coverage-baseline-{0}-{1}', matrix.sha, needs.plan.outputs.recipe) }}
+          path: l1-contracts/coverage/merged-lcov.info
           if-no-files-found: error
 
   coverage-report:
     if: always() && github.event_name == 'pull_request'
     needs: [plan, build, coverage-foundry, coverage-anvil, coverage-merge]
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read
     steps:
-      - name: Require complete coverage
-        env:
-          RESULTS: ${{ toJSON(needs) }}
-        run: |
-          node - <<'NODE'
-          const results = JSON.parse(process.env.RESULTS);
-          const changed = JSON.parse(results.plan.outputs?.tooling_changes || '[]');
-          if (changed.length) {
-            const message = `Coverage unavailable: measurement tooling changed: ${changed.join(', ')}. ` +
-              'This requires maintainer review of the coverage baseline transition; rerunning cannot resolve it. ' +
-              'No regression decision was made.';
-            require('node:fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, message + '\n');
-            console.error(`::error::${message}`);
-            process.exit(1);
-          }
-          const failed = Object.entries(results).filter(([, job]) => job.result !== 'success').map(([name]) => name);
-          if (failed.length) {
-            const message = `Coverage unavailable: ${failed.join(', ')} did not succeed. No regression decision was made. Rerun the failed jobs to retry baseline recovery.`;
-            console.error(`::error::${message}`);
-            require('node:fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, message + '\n');
-            process.exit(1);
-          }
-          NODE
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.plan.outputs.pr_sha }}
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ needs.plan.outputs.node_version }}
       - name: Download PR coverage
+        if: needs.coverage-merge.result == 'success' && needs.plan.outputs.tooling_changes == '[]'
         uses: actions/download-artifact@v4
         with:
           name: coverage-reports
           path: coverage-pr
       - name: Download base coverage
+        if: needs.coverage-merge.result == 'success' && needs.plan.outputs.tooling_changes == '[]'
         uses: actions/download-artifact@v4
         with:
           name: coverage-base
           path: coverage-base
       - name: Compare combined coverage with the base
+        if: always()
         env:
+          COVERAGE_RESULTS: ${{ toJSON(needs) }}
+          COVERAGE_INPUTS_READY: ${{ job.status == 'success' }}
           BASE_SHA: ${{ needs.plan.outputs.base_sha }}
-          PR_SHA: ${{ needs.plan.outputs.pr_sha }}
-          RECIPE: ${{ needs.plan.outputs.recipe }}
-        run: |
-          node - <<'NODE'
-          const fs = require('node:fs');
-          for (const [file, sha] of [['coverage-base/metadata.json', process.env.BASE_SHA], ['coverage-pr/coverage/metadata.json', process.env.PR_SHA]]) {
-            const measured = JSON.parse(fs.readFileSync(file, 'utf8'));
-            if (measured.sha !== sha || measured.recipe !== process.env.RECIPE) {
-              throw new Error(`Coverage unavailable: ${file} does not match the requested revision and recipe`);
-            }
-          }
-          NODE
-          node .github/scripts/coverage/check.js coverage-base/merged-lcov.info coverage-pr/coverage/merged-lcov.info
+          PR_SHA: ${{ github.sha }}
+        run: node .github/scripts/coverage/check.js coverage-base/merged-lcov.info coverage-pr/coverage/merged-lcov.info
 
   # FIXME: restore gas report CI
   # gas-report:

@@ -3,9 +3,6 @@
 
 const fs = require("node:fs");
 
-const DISPLAY_DECIMALS = 6;
-const DISPLAY_SCALE = 10n ** BigInt(DISPLAY_DECIMALS);
-
 function totals(_lcov) {
   // The producer validates the full LCOV report before publishing it.
   const fields = (_name) =>
@@ -36,19 +33,6 @@ function compare(_base, _pr) {
   return _pr.hit * _base.found - _base.hit * _pr.found;
 }
 
-function percentage(_numerator, _denominator) {
-  const rounded = (_numerator * 100n * DISPLAY_SCALE + _denominator / 2n) / _denominator;
-  return `${rounded / DISPLAY_SCALE}.${String(rounded % DISPLAY_SCALE).padStart(DISPLAY_DECIMALS, "0")}`;
-}
-
-function delta(_difference, _denominator) {
-  const value = percentage(_difference < 0n ? -_difference : _difference, _denominator);
-  if (_difference !== 0n && Number(value) === 0) {
-    return `less than ${1 / Number(DISPLAY_SCALE)} percentage points ${_difference < 0n ? "decrease" : "increase"}`;
-  }
-  return `${_difference < 0n ? "-" : _difference > 0n ? "+" : ""}${value} percentage points`;
-}
-
 function readReport(_file, _label) {
   try {
     return totals(fs.readFileSync(_file, "utf8"));
@@ -64,6 +48,23 @@ function writeSummary(_text) {
 }
 
 function main() {
+  const results = JSON.parse(process.env.COVERAGE_RESULTS || "{}");
+  const changed = JSON.parse(results.plan?.outputs?.tooling_changes || "[]");
+  if (changed.length) {
+    throw new Error(
+      `Measurement tooling changed: ${changed.join(", ")}. ` +
+        "A maintainer-reviewed baseline transition is required; rerunning cannot resolve this."
+    );
+  }
+  const failed = Object.entries(results)
+    .filter(([, _job]) => _job.result !== "success")
+    .map(([_name]) => _name);
+  if (failed.length) {
+    throw new Error(`${failed.join(", ")} did not succeed. Rerun the failed jobs to retry baseline recovery.`);
+  }
+  if (process.env.COVERAGE_INPUTS_READY === "false") {
+    throw new Error("Coverage setup or artifact download did not succeed. Rerun the failed jobs to retry.");
+  }
   const { BASE_SHA: baseSha, PR_SHA: prSha } = process.env;
   if (process.argv.length !== 4 || ![baseSha, prSha].every((_sha) => /^[a-f0-9]{40}$/i.test(_sha || ""))) {
     throw new Error("Set BASE_SHA and PR_SHA to full commit SHAs, then run check.js <base-lcov> <pr-lcov>");
@@ -71,20 +72,20 @@ function main() {
   const base = readReport(process.argv[2], "Baseline");
   const current = readReport(process.argv[3], "PR coverage");
   const difference = compare(base, current);
-  const summary = [
-    "## Coverage comparison",
-    "",
-    "| Revision | Commit | Covered / total lines | Coverage |",
-    "| --- | --- | ---: | ---: |",
-    `| Base | \`${baseSha}\` | ${base.hit} / ${base.found} | ${percentage(base.hit, base.found)}% |`,
-    `| PR merge | \`${prSha}\` | ${current.hit} / ${current.found} | ${percentage(current.hit, current.found)}% |`,
-    "",
-    `Delta: ${delta(difference, base.found * current.found)}. Exact, unrounded ratios determine the result.`,
-    "",
-    difference < 0n
-      ? "**Failed: combined line coverage decreased.**"
-      : "**Passed: combined line coverage did not decrease.**",
-  ].join("\n");
+  const percent = (_counts) => ((100 * Number(_counts.hit)) / Number(_counts.found)).toFixed(4);
+  const delta = (100 * Number(difference)) / Number(base.found * current.found);
+  const result =
+    difference < 0n ? "Failed: combined line coverage decreased." : "Passed: combined line coverage did not decrease.";
+  const summary = `## Coverage comparison
+
+| Revision | Commit | Covered / total lines | Coverage |
+| --- | --- | ---: | ---: |
+| Base | \`${baseSha}\` | ${base.hit} / ${base.found} | ${percent(base)}% |
+| PR merge | \`${prSha}\` | ${current.hit} / ${current.found} | ${percent(current)}% |
+
+Delta: ${delta.toPrecision(4)} percentage points. Exact, unrounded ratios determine the result.
+
+**${result}**`;
   console.log(summary);
   writeSummary(summary);
   process.exitCode = difference < 0n ? 1 : 0;
@@ -95,9 +96,7 @@ if (require.main === module) {
     main();
   } catch (error) {
     console.error(`Coverage comparison unavailable: ${error.message}`);
-    writeSummary(
-      "## Coverage comparison\n\n**Unavailable: no regression decision was made.** See the job log for details."
-    );
+    writeSummary(`## Coverage comparison\n\n**Unavailable: no regression decision was made.** ${error.message}`);
     process.exitCode = 2;
   }
 }

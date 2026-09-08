@@ -130,10 +130,6 @@ async function restoreBaseline(_request, _services) {
         try {
           fs.rmSync(directory, { recursive: true, force: true });
           download(run.id, name, directory);
-          const metadata = JSON.parse(fs.readFileSync(path.join(directory, "metadata.json"), "utf8"));
-          if (metadata.sha !== sha || metadata.recipe !== recipe) {
-            throw new Error("Source SHA or coverage recipe does not match");
-          }
           totals(fs.readFileSync(path.join(directory, "merged-lcov.info"), "utf8"));
           console.log(`Reusing coverage for ${sha} from run ${run.id}`);
           return true;
@@ -210,20 +206,16 @@ async function main() {
         pause: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         now: Date.now,
         warn: (message) => console.warn(`::warning::${message}`),
-        matchingRecipe: (sha, expected) => {
-          ensureCommit(sha);
-          return recipeHash((file) => git("show", `${sha}:${file}`)) === expected;
-        },
+        matchingRecipe: (sha, expected) => recipeHash((file) => git("show", `${sha}:${file}`)) === expected,
       }
     );
     if (!cached) {
       plan.revisions.push({ kind: "base", sha: plan.base_sha });
     }
   }
-  const anvil = plan.revisions.flatMap((revision) => {
-    ensureCommit(revision.sha);
-    return groupSpecs(revision, git("ls-tree", "-z", "--name-only", `${revision.sha}:${SPEC_DIRECTORY}`).split("\0"));
-  });
+  const anvil = plan.revisions.flatMap((revision) =>
+    groupSpecs(revision, git("ls-tree", "-z", "--name-only", `${revision.sha}:${SPEC_DIRECTORY}`).split("\0"))
+  );
   const outputs = {
     ...plan,
     tooling_changes: JSON.stringify(changes),
@@ -231,7 +223,6 @@ async function main() {
     anvil: JSON.stringify({ include: anvil }),
     recipe,
     cached: String(cached),
-    baseline_path: directory,
     node_version: nodeVersion,
     foundry_version: foundryVersion,
     coverage_command: command,

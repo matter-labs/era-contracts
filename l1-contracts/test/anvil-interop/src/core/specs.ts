@@ -1,5 +1,8 @@
 /**
- * Discovers interop specs and verifies that every spec in the measured checkout ran.
+ * Which interop specs exist, and the check that every one of them ran.
+ *
+ * The `coverage-anvil` groups are discovered from the measured revision. `assertEverySpecRan`
+ * checks what the groups report having executed rather than what the workflow meant to run.
  */
 
 import * as fs from "fs";
@@ -31,7 +34,11 @@ export function discoverSpecs(specDir: string): string[] {
 }
 
 /**
- * Each coverage group records the specs it executed; their union must match the checkout.
+ * Fails unless the specs that actually ran are exactly the specs on disk.
+ *
+ * Checking the workflow matrix alone would only prove what CI *meant* to run. Each group records what it
+ * executed (see writeSpecsRun in run-coverage.ts) and the reporting job unions those records, so a
+ * group that silently skipped a spec fails here too.
  */
 export function assertEverySpecRan(specsOnDisk: string[], specsRun: string[]): void {
   const ran = new Set(specsRun);
