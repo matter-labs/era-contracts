@@ -13,6 +13,11 @@
 # Discriminators:
 #   - `arg0_address`: first 32-byte word after selector, interpreted as
 #     address. Used for `TPA.upgrade(<proxy>, <impl>)` variants.
+# The PUH impl swap carries the new implementation's `initialize` as its
+# `upgradeAndCall` hook, so there are no separate `updateSecurityCouncil` /
+# `updateGuardians` / `updateEmergencyUpgradeBoard` txs to describe: splitting
+# them left the proxy initializable between the swap and the setters.
+#
 #   - `inner_target` / `inner_selector`: for wrappers — `ChainAdmin.multicall`
 #     (`0x69340beb`), legacy `Governance.scheduleTransparent` (`0x2c431917`),
 #     legacy `Governance.executeInstant` (`0x95218ecd`) — match against the
@@ -103,23 +108,23 @@ mn_ntv                              = "0xbeD1EB542f9a5aA6419Ff3deb921A372681111f
 mn_message_root                     = "0x5Ce9257755391D1509cD4eC1899d3F88A57BB4aD"  # L1MessageRoot proxy
 mn_ctm_deployment_tracker           = "0x6078F6B379f103de1Aa912dc46bb8Df0c8809860"  # CTMDeploymentTracker (L1CtmDeployer)
 mn_chain_asset_handler              = "0xDd5CB8B9037357B4cD37391A073798f8aaB61076"  # ChainAssetHandler proxy
-mn_l1_asset_tracker                 = "0x8eF17384A157287921E1ebdb0a08a2f102ba4a92"  # L1AssetTracker proxy (v31)
-mn_chain_registration_sender        = "0x7f60f575640E658CC2A400d59307f90fdEa05176"  # ChainRegistrationSender proxy (v31)
+mn_l1_asset_tracker                 = "0xae273354e73714bc5fb7b15c02c2bc0dc03b4c5e"  # L1AssetTracker proxy (v31)
+mn_chain_registration_sender        = "0xe8536ff0bf73e9245ce5bf58b7e06388fe9dbd52"  # ChainRegistrationSender proxy (v31)
 mn_ecosystem_tpa                    = "0xC2a36181fB524a6bEfE639aFEd37A67e77d62cf1"  # Ecosystem TransparentProxyAdmin (PUH-owned)
 mn_atlas_ctm_proxy_admin            = "0xff3582a0310916cd62442A4CA88Bf1C757D68938"  # Atlas CTM's standalone ProxyAdmin (shared addr w/ stage)
 mn_era_chain_admin                  = "0x2cf3bD6a9056b39999F3883955E183F655345063"  # Era ChainAdmin (owner 0x4e4943…); also the v31 new ChainAdmin for test chains
 mn_atlas_chain_admin                = "0x933dEA2C4241B1537fDD6da277eA62841B490172"  # Atlas ChainAdmin (owner 0x4e4943…; shared addr w/ stage)
 mn_era_ctm                          = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"  # Era CTM proxy (chain 324)
 mn_atlas_ctm                        = "0x1adF137F59949c9081157D5de1e002D1C992071F"  # Atlas (ZKsync OS) CTM proxy
-mn_era_gov_timer                    = "0x05ca47fb335f6Af59115B4A460563a0685799005"  # Era GovernanceUpgradeTimer
-mn_atlas_gov_timer                  = "0x61237a5E77CE7c15776ad4d6E5E9Bf2170e73752"  # Atlas (ZKsync OS) GovernanceUpgradeTimer
-mn_era_rollup_da_manager            = "0x75515F39f2fb9F517d66cb2d6AF8bbBF6923874c"  # Era RollupDAManager (v31-redeployed; DA pair set at deploy time)
+mn_era_gov_timer                    = "0x62b81d072f79ac4118f0d437200857dd34ef139e"  # Era GovernanceUpgradeTimer
+mn_atlas_gov_timer                  = "0x8e7c4857ef5eb1694cdeaf395a23198c4b81c62f"  # Atlas (ZKsync OS) GovernanceUpgradeTimer
+mn_era_rollup_da_manager            = "0x7e7bc292a71b73cebe77633937ddad3dc1f80ed2"  # Era RollupDAManager (v31-redeployed; DA pair set at deploy time)
 mn_atlas_rollup_da_manager          = "0x3F54A35a979Fe576159002B05bE2eDf9b455FAAA"  # Atlas RollupDAManager
-mn_era_upgrade_stage_validator      = "0x8B4DC9a015371Bc9bd7bC38e5dACBA42E842AB92"  # Era UpgradeStageValidator
-mn_atlas_upgrade_stage_validator    = "0x9761e3ec0FBe7377B22091432797f8Bf7bDd3ce0"  # Atlas (ZKsync OS) UpgradeStageValidator
+mn_era_upgrade_stage_validator      = "0x2aebff20070e12433d3453c1c480f512ee4a7e14"  # Era UpgradeStageValidator
+mn_atlas_upgrade_stage_validator    = "0x48d37f8cf60cf2b8f670df9464af84560583de61"  # Atlas (ZKsync OS) UpgradeStageValidator
 mn_era_validator_timelock           = "0x2e5110cF18678Ec99818bFAa849B8C881744b776"  # Era ValidatorTimelock
 mn_atlas_validator_timelock         = "0x18cC381705761aa2d2e8ea62888a4029A0fAd3aB"  # Atlas ValidatorTimelock
-mn_atlas_verifier                   = "0x42b93CA04c5D02e12012a06c941EF1416347034D"  # Atlas (ZKsync OS) verifier
+mn_atlas_verifier                   = "0x9c57f02caea31c95c5caf1d1abce75f14b384b92"  # Atlas (ZKsync OS) verifier
 mn_era_serdnotifier_proxy_admin     = "0x257fc0c3eb02f7ba8c0fd3ed57692a9c1ee6d29b"  # Existing Era ServerNotifier's ProxyAdmin (under Era ChainAdmin)
 mn_era_diamond                      = "0x32400084c286cf3e17e7b677ea9583e60a000324"  # Era chain-324 diamond (test_upgrade target)
 mn_zkos_test_chain                  = "0xb6d615084d7a72bf98c2bd35dd6abe824feb2dc7"  # Atlas (ZKsync OS) chain diamond (test_upgrade target)
@@ -188,22 +193,7 @@ desc = "PUH stage 0: ZKsync OS GovernanceUpgradeTimer.startTimer() — same as a
 [[entries]]
 target = "puh_proxy_admin"  # PUH ProxyAdmin
 selector = "0x9623609d"  # upgradeAndCall(address,address,bytes)
-desc = "PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH_proxy, new_PUH_impl, empty) — upgrades the ProtocolUpgradeHandler proxy itself to a new impl (PUH/Guardians redeploy)."
-
-[[entries]]
-target = "puh"  # PUH (self)
-selector = "0xdbfe3e96"  # updateSecurityCouncil(address)
-desc = "PUH stage 0: PUH.updateSecurityCouncil(new_security_council) — after impl swap, point PUH at the freshly deployed SecurityCouncil (redeployed with the Guardians + EmergencyUpgradeBoard so the board never references a stale council)."
-
-[[entries]]
-target = "puh"  # PUH (self)
-selector = "0x691616c5"  # updateGuardians(address)
-desc = "PUH stage 0: PUH.updateGuardians(new_guardians) — after impl swap, point PUH at the freshly deployed Guardians contract."
-
-[[entries]]
-target = "puh"  # PUH (self)
-selector = "0x7aedf337"  # updateEmergencyUpgradeBoard(address)
-desc = "PUH stage 0: PUH.updateEmergencyUpgradeBoard(new_emergency_upgrade_board) — point PUH at the freshly deployed EmergencyUpgradeBoard, which embeds the new SecurityCouncil + Guardians (completes the consistent governance-set redeploy)."
+desc = "PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH_proxy, new_PUH_impl, initialize(security_council, guardians, emergency_upgrade_board)) — upgrades the ProtocolUpgradeHandler proxy itself to a new impl (PUH/Guardians redeploy)."
 
 [[entries]]
 target = "atlas_ctm"  # Atlas CTM
@@ -293,7 +283,7 @@ desc = "PUH stage 1: Atlas CTM ProxyAdmin.upgrade(Atlas ValidatorTimelock 0x1e42
 target = "puh_proxy_admin"  # PUH ProxyAdmin
 selector = "0x9623609d"  # upgradeAndCall
 arg0_address = "puh"  # PUH proxy
-desc = "PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH proxy 0x8f086275…, newImpl, empty) — upgrades the ProtocolUpgradeHandler proxy itself (PUH/Guardians redeploy)."
+desc = "PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH proxy 0x8f086275…, newImpl, initialize(security_council, guardians, emergency_upgrade_board)) — upgrades the ProtocolUpgradeHandler proxy itself (PUH/Guardians redeploy)."
 
 # ChainRegistrationSender.acceptOwnership — PUH accepts ownership of ChainRegistrationSender that the deployer created+transferred in phase 2.
 [[entries]]
@@ -578,22 +568,7 @@ desc = "Testnet PUH stage 0: Era GovernanceUpgradeTimer.startTimer() — starts 
 target = "tn_puh_proxy_admin"
 selector = "0x9623609d"  # upgradeAndCall(address,address,bytes)
 arg0_address = "tn_puh"
-desc = "Testnet PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH proxy 0x803e5e7a…, new PUH impl 0x21aa63b9…, empty) — upgrades the ProtocolUpgradeHandler proxy itself (PUH/Guardians redeploy)."
-
-[[entries]]
-target = "tn_puh"
-selector = "0xdbfe3e96"  # updateSecurityCouncil(address)
-desc = "Testnet PUH stage 0: PUH.updateSecurityCouncil(0x98d22faa…) — point PUH at the freshly deployed SecurityCouncil."
-
-[[entries]]
-target = "tn_puh"
-selector = "0x691616c5"  # updateGuardians(address)
-desc = "Testnet PUH stage 0: PUH.updateGuardians(0x21f2372b…) — point PUH at the freshly deployed Guardians."
-
-[[entries]]
-target = "tn_puh"
-selector = "0x7aedf337"  # updateEmergencyUpgradeBoard(address)
-desc = "Testnet PUH stage 0: PUH.updateEmergencyUpgradeBoard(0x639b577e…) — point PUH at the freshly deployed EmergencyUpgradeBoard (embeds the new SecurityCouncil + Guardians)."
+desc = "Testnet PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH proxy 0x803e5e7a…, newImpl, initialize(security_council, guardians, emergency_upgrade_board)) — upgrades the ProtocolUpgradeHandler proxy itself (PUH/Guardians redeploy)."
 
 [[entries]]
 target = "tn_atlas_ctm"
@@ -926,22 +901,7 @@ desc = "Mainnet PUH stage 0: Atlas (ZKsync OS) GovernanceUpgradeTimer.startTimer
 target = "mn_puh_proxy_admin"
 selector = "0x9623609d"  # upgradeAndCall(address,address,bytes)
 arg0_address = "mn_puh"
-desc = "Mainnet PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH proxy 0xE30Dca30…, new PUH impl 0x6c0f001c…, empty) — upgrades the ProtocolUpgradeHandler proxy itself (PUH/Guardians redeploy)."
-
-[[entries]]
-target = "mn_puh"
-selector = "0xdbfe3e96"  # updateSecurityCouncil(address)
-desc = "Mainnet PUH stage 0: PUH.updateSecurityCouncil(0x29d2e773…) — point PUH at the freshly deployed SecurityCouncil."
-
-[[entries]]
-target = "mn_puh"
-selector = "0x691616c5"  # updateGuardians(address)
-desc = "Mainnet PUH stage 0: PUH.updateGuardians(0x8f525e55…) — point PUH at the freshly deployed Guardians."
-
-[[entries]]
-target = "mn_puh"
-selector = "0x7aedf337"  # updateEmergencyUpgradeBoard(address)
-desc = "Mainnet PUH stage 0: PUH.updateEmergencyUpgradeBoard(0x91989f9b…) — point PUH at the freshly deployed EmergencyUpgradeBoard (embeds the new SecurityCouncil + Guardians)."
+desc = "Mainnet PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH proxy 0xE30Dca30…, newImpl, initialize(security_council, guardians, emergency_upgrade_board)) — upgrades the ProtocolUpgradeHandler proxy itself (PUH/Guardians redeploy)."
 
 [[entries]]
 target = "mn_atlas_ctm"
