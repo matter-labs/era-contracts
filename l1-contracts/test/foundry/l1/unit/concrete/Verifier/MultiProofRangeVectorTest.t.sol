@@ -39,38 +39,20 @@ contract ExpectSignalPlonkVerifier is IZiskSnarkPlonkVerifier {
     }
 }
 
-/// @notice THE cross-stack aggregated-range binding vector, pinned verbatim
-///         from `zksync-os-zisk/guest-aggregator/BINDING_VECTOR.md` (real
-///         4-batch aggregation session, ZiSK v0.18.0, 2026-08-04).
-/// @dev STALE: this vector is a ZiSK v0.18.0 session, so its program VK pins
-///      disagree with the deployed verifier and the suite is red. The
-///      `fixture-session` workflow produces the ZiSK v1.2.0-alpha replacement.
-///      Every value below rotates together, because they come from one
-///      session.
-/// @dev Three codebases assert these exact values and must stay in lockstep:
-///      the aggregator guest (`cross_stack_binding_vector` host test), the
-///      server's aggregation job validation, and this test. Update all pins
-///      together whenever any input rotates.
-///
-///      This suite deploys the REAL ZiskVerifier (whose baked inner programVK /
-///      rootCVadcopFinal must equal the vector pins) and drives it through
-///      MultiProofVerifier, asserting that the on-chain RECONSTRUCTION of the
-///      ZiSK public values reproduces the pinned digest and the expected PLONK
-///      signal. The signal stand-in is what lets this suite name the exact
-///      expected signal and reject the near-misses below; the real pairing
-///      over this vector's aggregated proof is asserted in
-///      ZiskVerifierRealProofTest.
+/// @notice Range reconstruction with the regenerated ZiSK 1.2.0-alpha pins.
+/// @dev The batch inputs are historical; fresh proof-session values replace
+///      them together with the real pairing fixtures.
 contract MultiProofRangeVectorTest is Test {
     /// @dev Inner state-transition guest programVK: the first field of the
     ///      binding digest. It is NOT the aggregated proof's wire [0..32].
-    bytes32 internal constant INNER_PROGRAM_VK = 0x8168c5d383a50a9c7a40561b82bf679cc6dfdab0308417b4fea653362d78d080;
+    bytes32 internal constant INNER_PROGRAM_VK = 0x189d6b11c50ef1db9885fed376479ed97dde719a59574a7946d8d612e25da97a;
     /// @dev Aggregator guest programVK: the aggregated proof's wire
     ///      public-values bytes [0..32].
     bytes32 internal constant AGGREGATOR_PROGRAM_VK =
-        0xf68b9862e424e377af7b4220a419ce45bc52ce70b0a37aea486a15a5ca38b738;
+        0x10f0e91f54ad66e4e95713a1b4b9fda44ea3b06e51ed3430ef775ba8bef4a7c8;
     /// @dev Vadcop-final root: the second field of the binding digest, and
     ///      wire public-values bytes [544..576].
-    bytes32 internal constant ROOT_C_VADCOP_FINAL = 0xcf2a309856f107b143836ada112806da71ae11567fa3f2d2050baba5381c7b7d;
+    bytes32 internal constant ROOT_C_VADCOP_FINAL = 0x564c2b1bcbd5932c81cfad1fa786a98372eb3d6495257c2d944544334f84382f;
 
     /// @dev The four per-batch commitments (the first eight guest-public slots
     ///      of each per-batch ZiSK proof), in batch order.
@@ -86,7 +68,7 @@ contract MultiProofRangeVectorTest is Test {
     /// @dev keccak256(INNER_PROGRAM_VK || ROOT_C_VADCOP_FINAL || CHAINED_PI):
     ///      the aggregated proof carries it across the first eight guest-public
     ///      slots, public-values bytes [32..96].
-    bytes32 internal constant DIGEST = 0xf29341c341f2622ba86a21bbb36dde9742e1983e531c278fd1cee04c6f823e2c;
+    bytes32 internal constant DIGEST = 0x77808e06c21c5f1608738e0345b0074f0bc67ef937abfc873b2499eab7953ce4;
 
     /// @dev BN254 scalar field modulus (must equal ZiskVerifier._RFIELD).
     uint256 internal constant RFIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;

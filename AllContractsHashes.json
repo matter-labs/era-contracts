@@ -2331,12 +2331,12 @@
   },
   {
     "contractName": "l1-contracts/ZiskVerifier",
-    "zkBytecodeHash": "0x010000c34a28b4ac8df2d78d204a97705b3f6956fbe2fac49fa84dd67f70eda0",
+    "zkBytecodeHash": "0x010000c3a3cbb840df3473cc23538b3b8cbaebe50fef11645c890c79ffbdc1bd",
     "zkBytecodePath": "/l1-contracts/zkout/ZiskVerifier.sol/ZiskVerifier.json",
-    "evmBytecodeHash": "0x8239044af75f2b661dc5a70c1cf7691a3365aa857c3bb69493721d5ac3fb7f3b",
+    "evmBytecodeHash": "0x2628a3a663786ea3c6ca354e7dcc0fa2ec4e49fc5908702207a049cb062a707a",
     "evmBytecodePath": "/l1-contracts/out/ZiskVerifier.sol/ZiskVerifier.json",
-    "evmDeployedBytecodeHash": "0x9abf70afa01b186359933b60072b62470e885642ad27bdb50f93ff63cd4a7498",
-    "evmDeployedBytecodeBlakeHash": "0x0eb0df51c397d95caa6b1e9115fd248889469ba48e9ee3e9b481d4d319c707d1",
+    "evmDeployedBytecodeHash": "0x84405ee08b7f4570cf3ff6f929280e104418e3fbdd500f1a8865cce0711597f0",
+    "evmDeployedBytecodeBlakeHash": "0xaf4793f28dcb9f4ddf97b2be5c02b43616606abcf5548b66ecd10ec1dc2cc773",
     "evmDeployedBytecodeLength": 1801
   },
   {

@@ -40,6 +40,13 @@ and the VK hash `STALE` in the generated source.
 `verificationKeyHash()` is `keccak256` over the three pins in that order, so
 a rotation of any pin rotates the hash.
 
+The current pins come from [guest prerelease 0.0.6-alpha.1](https://github.com/matter-labs/zksync-os-zisk/releases/tag/0.0.6-alpha.1),
+using ZiSK 1.2.0-alpha. Both program VKs were derived from the reproducible
+ELFs by [run 34129543769](https://github.com/matter-labs/zksync-os-zisk/actions/runs/34129543769).
+The inner and aggregator ELF SHA-256 hashes are
+`ffa579142cbc11d87a3122e6d0ecb2c883fee2caba318cc3257b478c373542b0` and
+`c6c591234675f4d08a1edce83d60d64ffe6d69d96da943eb509c28ac8b0b878c`.
+
 ## Generating the snarkJS Plonk verifier
 
 The Plonk verifier is machine-generated from the ZiSK SNARK setup and is
