@@ -36,8 +36,17 @@ server_notifier_pa        = "0xfa181338785BF9427a367FfcE6bfe2C81586b3d9"  # Serv
 # --- deployed by this upgrade (rotate with the CREATE2 salts) ---
 gov_upgrade_timer         = "0xDc03F39823CbDc7Ed2c465674d84948c81fC6ec0"
 upgrade_stage_validator   = "0x732E664132da25DfCE0Bd2FCf4C180aFF96fF500"
-zkos_chain_admin_8022833  = "0x3b7a24e583867ab85694CF55941734653bdfaB9c"  # chain 8022833 ChainAdmin
 l1_interop_handler        = "0xE24e805EDfDCb4e6DA75A44304d488639F25a159"
+
+# --- per-chain ChainAdmins (pre-existing; each chain takes the cut itself) ---
+zkos_chain_admin_1401     = "0x18ce0cfa990c024262257e6e4d1d3b5c9c49bfa9"
+zkos_chain_admin_1913     = "0xa7f9a1a7b6b68fbf68adc938104a096006794ad7"
+zkos_chain_admin_4221     = "0x82b6590f23591a6be0f0434e681a038467f21900"
+zkos_chain_admin_42111    = "0x4e48a5152f8d705073b5accccaf234571b2a0621"
+zkos_chain_admin_88288    = "0xf3b67c6e88bb7ab3721d0cfa47c024f08f0f2476"
+zkos_chain_admin_579029   = "0x0c39098d6a7e7287db4a2ae5bad67c9ef76eb265"
+zkos_chain_admin_8022833  = "0x3b7a24e583867ab85694cf55941734653bdfab9c"
+zkos_chain_admin_8022834  = "0xf87e2fb52ab4769bf60b04d4c7ad311048858230"
 
 # ── Camp-B: CTM admin ceremony ────────────────────────────────────────────────
 [[entries]]
@@ -197,16 +206,103 @@ target = "0x02B1ac1Cf0A592aefD3C2246B2431388365dB272"
 selector = "0x3b6d7534"
 desc = "SIM-ONLY smoke test: apply the v33 diamond cut to chain 8022833 and confirm it reaches protocol version 0x2100000000"
 
-# ── Per-chain upgrade (its own scenario file, from `protocol_ops chain upgrade`) ──────────
-# Both are `ChainAdmin.multicall`, so they are told apart by the inner call's selector.
+# ── Per-chain upgrade (one scenario file each, from `protocol_ops chain upgrade`) ─────────
+# Both calls are `ChainAdmin.multicall`, so they are told apart by the inner call's selector:
+#   0xe2a9d554 = ServerNotifier.setUpgradeTimestamp
+#   0x3b6d7534 = upgradeChainFromVersion
+
+[[entries]]
+target = "zkos_chain_admin_1401"
+selector = "0x69340beb"
+inner_selector = "0xe2a9d554"
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(1401, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v33 cut, which is why this file must run after the ecosystem scenario."
+
+[[entries]]
+target = "zkos_chain_admin_1401"
+selector = "0x69340beb"
+inner_selector = "0x3b6d7534"
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 1401, 0x1f00000001 -> 0x2100000000) plus the DA move to LogsOnly delivered through blobs — THE per-chain diamond cut."
+
+[[entries]]
+target = "zkos_chain_admin_1913"
+selector = "0x69340beb"
+inner_selector = "0xe2a9d554"
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(1913, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v33 cut, which is why this file must run after the ecosystem scenario."
+
+[[entries]]
+target = "zkos_chain_admin_1913"
+selector = "0x69340beb"
+inner_selector = "0x3b6d7534"
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 1913, 0x1f00000001 -> 0x2100000000) plus the DA move to LogsOnly delivered through blobs — THE per-chain diamond cut."
+
+[[entries]]
+target = "zkos_chain_admin_4221"
+selector = "0x69340beb"
+inner_selector = "0xe2a9d554"
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(4221, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v33 cut, which is why this file must run after the ecosystem scenario."
+
+[[entries]]
+target = "zkos_chain_admin_4221"
+selector = "0x69340beb"
+inner_selector = "0x3b6d7534"
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 4221, 0x1f00000001 -> 0x2100000000) (DA left unchanged) — THE per-chain diamond cut."
+
+[[entries]]
+target = "zkos_chain_admin_42111"
+selector = "0x69340beb"
+inner_selector = "0xe2a9d554"
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(42111, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v33 cut, which is why this file must run after the ecosystem scenario."
+
+[[entries]]
+target = "zkos_chain_admin_42111"
+selector = "0x69340beb"
+inner_selector = "0x3b6d7534"
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 42111, 0x1f00000001 -> 0x2100000000) (DA left unchanged) — THE per-chain diamond cut."
+
+[[entries]]
+target = "zkos_chain_admin_88288"
+selector = "0x69340beb"
+inner_selector = "0xe2a9d554"
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(88288, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v33 cut, which is why this file must run after the ecosystem scenario."
+
+[[entries]]
+target = "zkos_chain_admin_88288"
+selector = "0x69340beb"
+inner_selector = "0x3b6d7534"
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 88288, 0x1f00000001 -> 0x2100000000) plus the DA move to LogsOnly delivered through blobs — THE per-chain diamond cut."
+
+[[entries]]
+target = "zkos_chain_admin_579029"
+selector = "0x69340beb"
+inner_selector = "0xe2a9d554"
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(579029, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v33 cut, which is why this file must run after the ecosystem scenario."
+
+[[entries]]
+target = "zkos_chain_admin_579029"
+selector = "0x69340beb"
+inner_selector = "0x3b6d7534"
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 579029, 0x1f00000001 -> 0x2100000000) (DA left unchanged) — THE per-chain diamond cut."
+
 [[entries]]
 target = "zkos_chain_admin_8022833"
 selector = "0x69340beb"
 inner_selector = "0xe2a9d554"
-desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(8022833, …) — announces when the chain may take the cut. Requires stage 1 to have registered the v33 upgrade cut, which is why this file must run after the ecosystem scenario."
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(8022833, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v33 cut, which is why this file must run after the ecosystem scenario."
 
 [[entries]]
 target = "zkos_chain_admin_8022833"
 selector = "0x69340beb"
 inner_selector = "0x3b6d7534"
-desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 8022833, 0x1f00000001 -> 0x2100000000) plus its DA setup — THE per-chain diamond cut."
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 8022833, 0x1f00000001 -> 0x2100000000) (DA left unchanged) — THE per-chain diamond cut."
+
+[[entries]]
+target = "zkos_chain_admin_8022834"
+selector = "0x69340beb"
+inner_selector = "0xe2a9d554"
+desc = "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(8022834, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v33 cut, which is why this file must run after the ecosystem scenario."
+
+[[entries]]
+target = "zkos_chain_admin_8022834"
+selector = "0x69340beb"
+inner_selector = "0x3b6d7534"
+desc = "ChainAdmin.multicall: upgradeChainFromVersion(chain 8022834, 0x1f00000001 -> 0x2100000000) plus the DA move to LogsOnly delivered through blobs — THE per-chain diamond cut."

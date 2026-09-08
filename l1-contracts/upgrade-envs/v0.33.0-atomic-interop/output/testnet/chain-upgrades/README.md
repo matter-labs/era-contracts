@@ -161,13 +161,26 @@ holds. Time the rollout for a moment when it does, or let the executor drain fir
 Each bundle is a Safe Transaction Builder file signed by the ChainAdmin owner in the table above.
 Execute with `protocol_ops dev execute-safe`, or import it into the Safe UI. Run `01_` before `02_`.
 
-To rehearse against a fork first, convert to a transaction-simulator scenario:
+Every chain here already has a committed transaction-simulator scenario, one file per chain, in
+`../simulator/2026-09-04-v33-atomic-interop-testnet-2-chain-<id>.json`. They are regenerated with:
 
 ```bash
 protocol_ops ecosystem manifest-to-simulator --manifest <dir>/manifest.json \
-  --tag chain_upgrade_<id> --emulate-all-batches-executed-for <chain diamond> --out <scenario>.json
+  --network sepolia --tag chain_upgrade_<id> \
+  --descriptions ../../sim-descriptions.toml \
+  --emulate-all-batches-executed-for <chain diamond> --out <scenario>.json
 ```
 
-The simulator shares one fork across scenario files and walks them in alphabetical order, so a
-chain scenario must sort **after** the ecosystem one — otherwise the cut it consumes has not been
-registered yet. That is what the `-1-` / `-2-` prefixes on the committed scenarios are for.
+Three things about those files:
+
+- **Order.** The simulator shares one fork across scenario files and walks them in alphabetical
+  order, so a chain scenario must sort **after** the ecosystem one — otherwise the cut it consumes
+  has not been registered yet. That is what the `-1-` / `-2-` prefixes are for. The chains are
+  independent of each other, so their relative order does not matter.
+- **`emulateAllBatchesExecutedFor`.** Set to the chain's own DiamondProxy, not the `to` of the
+  transaction: the `to` is the ChainAdmin, and the batch counters that precondition 4 reads live on
+  the diamond.
+- **Descriptions.** `sim-descriptions.toml` carries a label per ChainAdmin plus two entries per
+  chain, told apart by the inner selector — `0xe2a9d554` for the timestamp and `0x3b6d7534` for the
+  cut, since both arrive as `ChainAdmin.multicall`. Without them every line reads `[unlabelled]`,
+  which is what a reviewer would have to decode by hand.
