@@ -7,6 +7,7 @@
 //! configuration and every field below can be checked against it.
 
 use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 
 use alloy::primitives::{keccak256, Address, Bytes, FixedBytes, U256};
 use alloy::providers::Provider;
@@ -17,10 +18,10 @@ use blake2::digest::consts::U32;
 use blake2::{Blake2s, Digest};
 
 use crate::common::ethereum::AlloyProvider;
-use crate::deployment_verification::artifact_index::{ArtifactIndex, CodeMatch};
 use crate::deployment_verification::contracts::{
     DiamondCutData, FixedForceDeploymentsData, IEcosystemEvents, StoredBatchInfo,
 };
+use crate::upgrade_verification::versions::v31::utils::bytecode_verifier::ContractHashes;
 
 /// `keccak256("")`, the empty priority-operations hash in batch zero.
 fn empty_string_keccak() -> FixedBytes<32> {
@@ -153,88 +154,142 @@ impl BytecodeInfo {
 /// A force-deployed L2 contract's `(implementation, SystemContractProxy)` pair.
 pub struct ForceDeploymentEntry {
     pub field: &'static str,
-    pub artifact: &'static str,
+    pub contract: &'static str,
     pub implementation: BytecodeInfo,
     pub proxy: BytecodeInfo,
 }
 
-/// How a force-deployment entry compares to the local build.
+/// How a force-deployment entry compares to `AllContractsHashes.json`.
+///
+/// There is no metadata-tolerant verdict here on purpose. These hashes are
+/// taken over L2 bytecode that never lands on L1, so the only reference is the
+/// repo's committed hash record — and against a fixed record an exact match is
+/// achievable, which makes anything else an error rather than a judgement call.
 pub enum BytecodeInfoVerdict {
-    /// blake2s, length and keccak all match the local artifact.
+    /// blake2s, length and keccak all match the committed record.
     Exact,
-    /// The bytecode behind the on-chain hash was recovered from a
-    /// `BytecodesSupplier` publication and differs from the local artifact
-    /// only in its CBOR metadata. Unlike a bare hash comparison this is
-    /// proven, because the preimage was available.
-    MetadataOnlyProven { digests: usize },
-    /// The hashes differ and the preimage is not published on L1, so nothing
-    /// can be concluded: equal lengths do not imply equal code.
-    Unverifiable,
-    /// Length differs, or the recovered preimage is a different contract.
-    Mismatch { local: BytecodeInfo },
-    /// No artifact of that name in the local build.
-    MissingArtifact,
+    /// At least one of the three differs.
+    Mismatch { expected: BytecodeInfo },
+    /// The contract has no entry in `AllContractsHashes.json`.
+    MissingRecord,
+}
+
+/// The committed `(blake2s, length, keccak)` record for every contract, read
+/// from `AllContractsHashes.json`.
+///
+/// This is the reference for L2 bytecode rather than a local `out/` build: the
+/// file is committed and CI-checked, so it does not move with whoever happens
+/// to run `forge build`.
+pub struct L2BytecodeRecord(HashMap<String, BytecodeInfo>);
+
+impl L2BytecodeRecord {
+    pub fn load() -> anyhow::Result<Self> {
+        let hashes = ContractHashes::init_from_local()?;
+        let mut out = HashMap::new();
+        for contract in hashes.hashes {
+            // Era-only entries carry no EVM deployed-bytecode triple.
+            let (Some(blake), Some(length), Some(keccak)) = (
+                contract.evm_deployed_bytecode_blake_hash.as_deref(),
+                contract.evm_deployed_bytecode_length,
+                contract.evm_deployed_bytecode_hash.as_deref(),
+            ) else {
+                continue;
+            };
+            out.insert(
+                contract.contract_name.clone(),
+                BytecodeInfo {
+                    blake: parse_b256(blake)
+                        .with_context(|| format!("{} blake hash", contract.contract_name))?,
+                    length,
+                    keccak: parse_b256(keccak)
+                        .with_context(|| format!("{} keccak hash", contract.contract_name))?,
+                },
+            );
+        }
+        anyhow::ensure!(
+            !out.is_empty(),
+            "AllContractsHashes.json carries no EVM deployed-bytecode hashes; run \
+             `yarn calculate-hashes:fix` from the repository root"
+        );
+        Ok(Self(out))
+    }
+
+    pub fn get(&self, contract: &str) -> Option<&BytecodeInfo> {
+        self.0.get(contract)
+    }
+}
+
+fn parse_b256(value: &str) -> anyhow::Result<FixedBytes<32>> {
+    FixedBytes::<32>::from_str(value.trim_start_matches("0x"))
+        .with_context(|| format!("not a 32-byte hex value: {value}"))
 }
 
 pub fn force_deployment_entries(
     data: &FixedForceDeploymentsData,
 ) -> anyhow::Result<Vec<ForceDeploymentEntry>> {
-    // (event field, L2 contract as `CoreOnGatewayHelper._resolveContractName`
-    // resolves it for ZKsync OS, encoded blob)
+    // (event field, the contract's name in `AllContractsHashes.json`, encoded blob)
     let raw: [(&'static str, &'static str, &Bytes); 10] = [
-        ("bridgehub", "L2Bridgehub", &data.bridgehubBytecodeInfo),
+        (
+            "bridgehub",
+            "l1-contracts/L2Bridgehub",
+            &data.bridgehubBytecodeInfo,
+        ),
         (
             "l2AssetRouter",
-            "L2AssetRouter",
+            "l1-contracts/L2AssetRouter",
             &data.l2AssetRouterBytecodeInfo,
         ),
-        ("l2Ntv", "L2NativeTokenVaultZKOS", &data.l2NtvBytecodeInfo),
+        (
+            "l2Ntv",
+            "l1-contracts/L2NativeTokenVaultZKOS",
+            &data.l2NtvBytecodeInfo,
+        ),
         (
             "messageRoot",
-            "L2MessageRoot",
+            "l1-contracts/L2MessageRoot",
             &data.messageRootBytecodeInfo,
         ),
         (
             "chainAssetHandler",
-            "L2ChainAssetHandler",
+            "l1-contracts/L2ChainAssetHandler",
             &data.chainAssetHandlerBytecodeInfo,
         ),
         (
             "interopCenter",
-            "InteropCenter",
+            "l1-contracts/InteropCenter",
             &data.interopCenterBytecodeInfo,
         ),
         (
             "interopHandler",
-            "L2InteropHandler",
+            "l1-contracts/L2InteropHandler",
             &data.interopHandlerBytecodeInfo,
         ),
         (
             "assetTracker",
-            "L2AssetTracker",
+            "l1-contracts/L2AssetTracker",
             &data.assetTrackerBytecodeInfo,
         ),
         (
             "beaconDeployer",
-            "UpgradeableBeaconDeployer",
+            "l1-contracts/UpgradeableBeaconDeployer",
             &data.beaconDeployerInfo,
         ),
         (
             "baseTokenHolder",
-            "BaseTokenHolder",
+            "l1-contracts/BaseTokenHolder",
             &data.baseTokenHolderBytecodeInfo,
         ),
     ];
 
     raw.into_iter()
-        .map(|(field, artifact, blob)| {
+        .map(|(field, contract, blob)| {
             // `abi.encode(bytes, bytes)` — Solidity's params encoding, not a
             // single wrapped tuple.
             let (implementation, proxy) = <(Bytes, Bytes)>::abi_decode_params(blob)
                 .with_context(|| format!("decoding {field} bytecode info pair"))?;
             Ok(ForceDeploymentEntry {
                 field,
-                artifact,
+                contract,
                 implementation: BytecodeInfo::decode(&implementation)?,
                 proxy: BytecodeInfo::decode(&proxy)?,
             })
@@ -242,77 +297,28 @@ pub fn force_deployment_entries(
         .collect()
 }
 
-/// Compares one force-deployment bytecode info against the local build.
-///
-/// `published` maps a keccak to the bytecode behind it, recovered from
-/// `BytecodesSupplier` publications. Without the preimage a differing hash
-/// pair proves nothing — in particular, equal lengths do not imply equal
-/// executable code — so the verdict is `Unverifiable` rather than a guess.
+/// Compares one force-deployment bytecode info against the committed record.
 pub fn verify_bytecode_info(
-    index: &ArtifactIndex,
-    artifact_name: &str,
+    record: &L2BytecodeRecord,
+    contract: &str,
     on_chain: &BytecodeInfo,
-    published: &HashMap<FixedBytes<32>, Bytes>,
 ) -> BytecodeInfoVerdict {
-    let Some(artifact) = index.get(artifact_name) else {
-        return BytecodeInfoVerdict::MissingArtifact;
-    };
-    let local = BytecodeInfo::of(&artifact.deployed_code);
-    if local == *on_chain {
-        return BytecodeInfoVerdict::Exact;
-    }
-    match published.get(&on_chain.keccak) {
-        Some(preimage) => match artifact.compare(preimage) {
-            // An exact match here would have matched the hashes above, so
-            // reaching it means the artifact hashes differently than its own
-            // bytes — impossible; treat anything but metadata-only as a
-            // divergence.
-            Some(CodeMatch::MetadataOnly { digests }) => {
-                BytecodeInfoVerdict::MetadataOnlyProven { digests }
-            }
-            _ => BytecodeInfoVerdict::Mismatch { local },
+    match record.get(contract) {
+        Some(expected) if expected == on_chain => BytecodeInfoVerdict::Exact,
+        Some(expected) => BytecodeInfoVerdict::Mismatch {
+            expected: expected.clone(),
         },
-        None if local.length != on_chain.length => BytecodeInfoVerdict::Mismatch { local },
-        None => BytecodeInfoVerdict::Unverifiable,
+        None => BytecodeInfoVerdict::MissingRecord,
     }
-}
-
-/// Recovers the bytecode behind published hashes from `BytecodesSupplier`.
-///
-/// `EVMBytecodePublished` carries the full preimage, which is the only way to
-/// tell "same code, different build metadata" from "different code, same
-/// length" for the hashes the chain creation params commit to.
-pub async fn published_bytecodes(
-    provider: &AlloyProvider,
-    supplier: Address,
-    from_block: u64,
-    to_block: u64,
-) -> anyhow::Result<HashMap<FixedBytes<32>, Bytes>> {
-    let filter = Filter::new()
-        .address(supplier)
-        .event_signature(IEcosystemEvents::EVMBytecodePublished::SIGNATURE_HASH)
-        .from_block(from_block)
-        .to_block(to_block);
-    let logs = provider
-        .get_logs(&filter)
-        .await
-        .context("eth_getLogs for EVMBytecodePublished")?;
-    logs.iter()
-        .map(|log| {
-            let event = IEcosystemEvents::EVMBytecodePublished::decode_log_data(log.data())
-                .context("decoding EVMBytecodePublished")?;
-            Ok((event.bytecodeHash, event.bytecode))
-        })
-        .collect()
 }
 
 /// `SystemContractProxy` is force-deployed at every fixed L2 core address,
 /// so a wrong proxy half is as damaging as a wrong implementation.
-pub const SYSTEM_CONTRACT_PROXY_ARTIFACT: &str = "SystemContractProxy";
+pub const SYSTEM_CONTRACT_PROXY_CONTRACT: &str = "l1-contracts/SystemContractProxy";
 
 /// `l2TokenProxyBytecodeHash` is `keccak256` of the deployed `BeaconProxy`
 /// bytecode and is persisted into the L2 native token vault at genesis.
-pub const BEACON_PROXY_ARTIFACT: &str = "BeaconProxy";
+pub const BEACON_PROXY_CONTRACT: &str = "l1-contracts/BeaconProxy";
 
 /// Selectors listed in the cut for one facet, as a set.
 pub fn cut_selectors(selectors: &[alloy::primitives::FixedBytes<4>]) -> HashSet<[u8; 4]> {
@@ -336,72 +342,85 @@ mod tests {
 
     /// Pinned against the live v0.33.0 Sepolia ecosystem: genesis root
     /// 0x959644fb…, ZKsync OS commitment 1, no repeated storage changes.
-    fn index_with(name: &str, code: Vec<u8>) -> ArtifactIndex {
-        ArtifactIndex::from_artifacts(vec![
-            crate::deployment_verification::artifact_index::Artifact::for_test(name, code),
-        ])
+    fn record_of(contract: &str, info: BytecodeInfo) -> L2BytecodeRecord {
+        L2BytecodeRecord(HashMap::from([(contract.to_string(), info)]))
     }
 
-    /// The whole point of the verdict: a hash the local build does not produce
-    /// is not excused by having the right length. Only a published preimage can
-    /// establish a metadata-only difference.
+    /// The reference is a fixed, committed record, so an exact match is
+    /// achievable and anything short of it is an error — in particular a hash
+    /// pair that merely carries the right length.
     #[test]
-    fn same_length_but_different_hashes_is_unverifiable_not_metadata() {
-        let local = vec![0x60u8; 128];
-        let index = index_with("L2Bridgehub", local.clone());
-        let forged = BytecodeInfo {
-            blake: FixedBytes::repeat_byte(0xAB),
-            length: local.len() as u32,
-            keccak: FixedBytes::repeat_byte(0xCD),
-        };
-        assert!(matches!(
-            verify_bytecode_info(&index, "L2Bridgehub", &forged, &HashMap::new()),
-            BytecodeInfoVerdict::Unverifiable
-        ));
+    fn only_an_exact_triple_passes() {
+        let expected = BytecodeInfo::of(&[0x60u8; 128]);
+        let record = record_of("l1-contracts/L2Bridgehub", expected.clone());
 
-        let honest = BytecodeInfo::of(&local);
         assert!(matches!(
-            verify_bytecode_info(&index, "L2Bridgehub", &honest, &HashMap::new()),
+            verify_bytecode_info(&record, "l1-contracts/L2Bridgehub", &expected),
             BytecodeInfoVerdict::Exact
         ));
+
+        for wrong in [
+            BytecodeInfo {
+                blake: FixedBytes::repeat_byte(0xAB),
+                ..expected.clone()
+            },
+            BytecodeInfo {
+                keccak: FixedBytes::repeat_byte(0xCD),
+                ..expected.clone()
+            },
+            BytecodeInfo {
+                length: expected.length + 1,
+                ..expected.clone()
+            },
+        ] {
+            assert!(matches!(
+                verify_bytecode_info(&record, "l1-contracts/L2Bridgehub", &wrong),
+                BytecodeInfoVerdict::Mismatch { .. }
+            ));
+        }
     }
 
     #[test]
-    fn a_different_length_is_always_a_mismatch() {
-        let index = index_with("L2Bridgehub", vec![0x60u8; 128]);
-        let other = BytecodeInfo::of(&[0x60u8; 64]);
+    fn a_contract_absent_from_the_record_is_an_error() {
+        let record = record_of("l1-contracts/L2Bridgehub", BytecodeInfo::of(&[0x60u8; 4]));
         assert!(matches!(
-            verify_bytecode_info(&index, "L2Bridgehub", &other, &HashMap::new()),
-            BytecodeInfoVerdict::Mismatch { .. }
+            verify_bytecode_info(
+                &record,
+                "l1-contracts/InteropCenter",
+                &BytecodeInfo::of(&[])
+            ),
+            BytecodeInfoVerdict::MissingRecord
         ));
     }
 
-    /// With the preimage published, a metadata-only difference becomes provable
-    /// and an unrelated contract behind the same hash stays a mismatch.
+    /// The committed record must actually carry the ZKsync OS force-deployment
+    /// contracts; a rename that silently drops one would turn every entry into
+    /// `MissingRecord`.
     #[test]
-    fn a_published_preimage_settles_the_verdict() {
-        const TAG: [u8; 8] = [0xa2, 0x64, 0x69, 0x70, 0x66, 0x73, 0x58, 0x22];
-        let mut local = vec![0x60u8; 40];
-        local.extend_from_slice(&TAG);
-        local.extend_from_slice(&[0xAA; 34]);
-        let index = index_with("L2Bridgehub", local.clone());
-
-        let mut rebuilt = local.clone();
-        rebuilt[40 + TAG.len()..].fill(0xBB);
-        let info = BytecodeInfo::of(&rebuilt);
-        let published = HashMap::from([(info.keccak, Bytes::from(rebuilt))]);
-        assert!(matches!(
-            verify_bytecode_info(&index, "L2Bridgehub", &info, &published),
-            BytecodeInfoVerdict::MetadataOnlyProven { digests: 1 }
-        ));
-
-        let unrelated = vec![0x5bu8; local.len()];
-        let unrelated_info = BytecodeInfo::of(&unrelated);
-        let published = HashMap::from([(unrelated_info.keccak, Bytes::from(unrelated))]);
-        assert!(matches!(
-            verify_bytecode_info(&index, "L2Bridgehub", &unrelated_info, &published),
-            BytecodeInfoVerdict::Mismatch { .. }
-        ));
+    fn the_committed_record_covers_every_force_deployed_contract() {
+        let Ok(record) = L2BytecodeRecord::load() else {
+            // AllContractsHashes.json is not present in every checkout layout.
+            return;
+        };
+        for contract in [
+            "l1-contracts/L2Bridgehub",
+            "l1-contracts/L2AssetRouter",
+            "l1-contracts/L2NativeTokenVaultZKOS",
+            "l1-contracts/L2MessageRoot",
+            "l1-contracts/L2ChainAssetHandler",
+            "l1-contracts/InteropCenter",
+            "l1-contracts/L2InteropHandler",
+            "l1-contracts/L2AssetTracker",
+            "l1-contracts/UpgradeableBeaconDeployer",
+            "l1-contracts/BaseTokenHolder",
+            SYSTEM_CONTRACT_PROXY_CONTRACT,
+            BEACON_PROXY_CONTRACT,
+        ] {
+            assert!(
+                record.get(contract).is_some(),
+                "{contract} missing from AllContractsHashes.json"
+            );
+        }
     }
 
     #[test]

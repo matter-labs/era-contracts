@@ -1156,104 +1156,58 @@ async fn verify_chain_creation(
     verify_zk_token_asset_id(provider, result, input, core, data.zkTokenAssetId).await?;
 
     // L2 implementations, and the SystemContractProxy each one is installed
-    // behind, that every new chain force-deploys.
-    let published = chain_creation::published_bytecodes(
-        provider,
-        ctm.bytecodes_supplier,
-        input.from_block,
-        to_block,
-    )
-    .await?;
-    if published.is_empty() {
-        result.print_info(
-            "  no bytecode preimages published on L1; hashes that differ can only be reported \
-             as unverifiable",
-        );
-    }
-
-    // Every entry whose hash the local build does not produce and whose
-    // preimage is unpublished is *unverified*, not verified-bad. Reporting
-    // each one separately buries the findings that are; report the set once.
-    let mut unverifiable: Vec<String> = Vec::new();
+    // behind, that every new chain force-deploys. These contracts never land
+    // on L1, so the reference is the repo's committed hash record rather than a
+    // local build — and against a fixed record the match must be exact.
+    let record = chain_creation::L2BytecodeRecord::load()?;
     let mut report_verdict = |what: String, verdict: BytecodeInfoVerdict| match verdict {
-        BytecodeInfoVerdict::Exact => result.report_ok(&format!("{what} (exact)")),
-        BytecodeInfoVerdict::MetadataOnlyProven { digests } => result.report_ok(&format!(
-            "{what} (metadata-only, proven against the published preimage, {digests} cbor \
-             digest(s))"
+        BytecodeInfoVerdict::Exact => result.report_ok(&what),
+        BytecodeInfoVerdict::Mismatch { expected } => result.report_error(&format!(
+            "{what}: AllContractsHashes.json records blake {} / {} bytes / keccak {}",
+            expected.blake, expected.length, expected.keccak
         )),
-        BytecodeInfoVerdict::Unverifiable => unverifiable.push(what),
-        BytecodeInfoVerdict::Mismatch { local } => result.report_error(&format!(
-            "{what}: on chain is a different contract (local build is {} bytes, blake {})",
-            local.length, local.blake
+        BytecodeInfoVerdict::MissingRecord => result.report_error(&format!(
+            "{what}: no entry in AllContractsHashes.json — run `yarn calculate-hashes:fix`"
         )),
-        BytecodeInfoVerdict::MissingArtifact => {
-            result.report_error(&format!("{what}: no such artifact in the local build"))
-        }
     };
 
     for entry in force_deployment_entries(data)? {
         report_verdict(
-            format!("forceDeployments.{} = {}", entry.field, entry.artifact),
-            verify_bytecode_info(index, entry.artifact, &entry.implementation, &published),
+            format!("forceDeployments.{} = {}", entry.field, entry.contract),
+            verify_bytecode_info(&record, entry.contract, &entry.implementation),
         );
         // The proxy half is force-deployed at the fixed L2 address itself, so
         // a wrong one takes over every core contract.
         report_verdict(
             format!("forceDeployments.{} proxy", entry.field),
             verify_bytecode_info(
-                index,
-                chain_creation::SYSTEM_CONTRACT_PROXY_ARTIFACT,
+                &record,
+                chain_creation::SYSTEM_CONTRACT_PROXY_CONTRACT,
                 &entry.proxy,
-                &published,
             ),
         );
     }
 
-    // `l2TokenProxyBytecodeHash` is keccak of the deployed BeaconProxy code and
-    // is written into the L2 native token vault at genesis; a wrong value
+    // `l2TokenProxyBytecodeHash` is the keccak of the deployed BeaconProxy code
+    // and is written into the L2 native token vault at genesis; a wrong value
     // breaks every bridged token the chain ever deploys.
-    match index.get(chain_creation::BEACON_PROXY_ARTIFACT) {
+    match record.get(chain_creation::BEACON_PROXY_CONTRACT) {
         Some(beacon_proxy) => {
-            let local = keccak256(&beacon_proxy.deployed_code);
-            if local == data.l2TokenProxyBytecodeHash {
-                result.report_ok("forceDeployments.l2TokenProxyBytecodeHash = BeaconProxy");
-            } else if published.contains_key(&data.l2TokenProxyBytecodeHash) {
-                let preimage = &published[&data.l2TokenProxyBytecodeHash];
-                result.expect(
-                    matches!(
-                        beacon_proxy.compare(preimage),
-                        Some(CodeMatch::MetadataOnly { .. })
-                    ),
-                    "forceDeployments.l2TokenProxyBytecodeHash = BeaconProxy (metadata-only, \
-                     proven against the published preimage)",
-                    &format!(
-                        "forceDeployments.l2TokenProxyBytecodeHash {} resolves to a published \
-                         bytecode that is not BeaconProxy",
-                        data.l2TokenProxyBytecodeHash
-                    ),
-                );
-            } else {
-                unverifiable.push("forceDeployments.l2TokenProxyBytecodeHash".to_string());
-            }
+            result.expect(
+                data.l2TokenProxyBytecodeHash == beacon_proxy.keccak,
+                "forceDeployments.l2TokenProxyBytecodeHash = BeaconProxy",
+                &format!(
+                    "forceDeployments.l2TokenProxyBytecodeHash is {} but \
+                     AllContractsHashes.json records BeaconProxy as {}",
+                    data.l2TokenProxyBytecodeHash, beacon_proxy.keccak
+                ),
+            );
         }
         None => result.report_error(
-            "no BeaconProxy artifact in the local build; cannot check \
+            "no BeaconProxy entry in AllContractsHashes.json; cannot check \
              forceDeployments.l2TokenProxyBytecodeHash",
         ),
-    }
-
-    if !unverifiable.is_empty() {
-        result.report_error(&format!(
-            "{} L2 bytecode commitment(s) could not be verified: the on-chain hash does not \
-             match this build and the bytecode behind it was never published to the \
-             BytecodesSupplier, so nothing can be concluded — equal length does not imply equal \
-             code. Publish the preimages (`BytecodesSupplier.publishEVMBytecode`) or build the \
-             deployment with `bytecode_hash = \"none\"` so the hashes are reproducible. \
-             Unverified: {}",
-            unverifiable.len(),
-            unverifiable.join(", ")
-        ));
-    }
+    };
 
     Ok(())
 }
