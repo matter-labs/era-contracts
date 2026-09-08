@@ -169,38 +169,6 @@ struct ProxyUpgradeRow {
     ProxyAdmin admin;
 }
 
-/// @notice One member of a CTM domain's CURRENT deployment.
-/// @dev An all-zero row states the member is ABSENT from this domain, the same way a zero
-///      `implNew` states "not upgraded" in an upgrade row. The two row types are deliberately
-///      different: this one describes STATE, {ProxyUpgradeRow} describes an OPERATION, and
-///      conflating them is what made an inert upgrade row read as "this is what is deployed".
-/// @param proxy The proxy address this member is reachable at.
-/// @param admin The `ProxyAdmin` administering `proxy`. ZERO means the CTM domain's own admin —
-///        the one a bound executor holds; a nonzero admin names a member administered elsewhere
-///        (the `ServerNotifier` under its ChainAdmin-owned admin).
-/// @param implementation The implementation the proxy currently points at, with its codehash pin,
-///        so the inventory is CHECKABLE against live state rather than merely asserted.
-struct CTMInventoryRow {
-    address proxy;
-    ProxyAdmin admin;
-    PinnedContract implementation;
-}
-
-/// @notice Everything a CTM registry pins, set exactly once at construction: the CTM domain's
-///         complete current deployment.
-/// @dev Indexed by {CTMContract}, like every other inventory in this model, so slot
-///      `uint256(member)` IS that member and a manifest cannot omit one. Members the RELEASE
-///      authoritatively describes — the facets, `DiamondInit`, the verifiers, the genesis upgrade
-///      — must be EMPTY here: an address described in two objects is two sources that can
-///      disagree, and the release is the one chains actually run.
-/// @param ctm The CTM whose domain this describes. The pointer lives on that CTM, so the binding
-///        is checked rather than assumed.
-/// @param members The enum-indexed rows (length `CTM_CONTRACT_COUNT`).
-struct CTMRegistryManifest {
-    address ctm;
-    CTMInventoryRow[] members;
-}
-
 /// @notice Everything a core registry instance pins, set exactly once at construction.
 /// @dev Carries NO protocol version (version-schedule identity is owned by {CTMTransition})
 ///      and NO proxy admin (the `EcosystemUpgradeExecutor` is bound to its immutable
