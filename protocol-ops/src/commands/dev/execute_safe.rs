@@ -44,19 +44,23 @@ const GAS_ESTIMATE_BUFFER_BPS: u64 = 12_500;
 /// ~30M on a quiet chain; we cap below that so a single tx can never equal
 /// or exceed the block limit (which reth rejects with `gas limit too high`).
 const PER_TX_GAS_LIMIT_CAP: u64 = 20_000_000;
-/// Floor gas price (1 gwei). Used when the node returns `eth_gasPrice` below
-/// it (anvil/reth on a quiet local chain reports near-zero).
-const GAS_PRICE_FLOOR_WEI: u128 = 1_000_000_000;
+/// Floor gas price (5 gwei). Used when the node returns `eth_gasPrice` below
+/// it (anvil/reth on a quiet local chain reports near-zero), and to keep
+/// public-testnet broadcasts from sitting in the mempool when Sepolia's
+/// reported price briefly dips.
+const GAS_PRICE_FLOOR_WEI: u128 = 5_000_000_000;
 /// Multiplier (in basis points) applied to live `eth_gasPrice` so our txs
 /// outbid the base-fee floor on a busy public chain (Sepolia / mainnet). 300%
 /// gives us ~3x headroom over chain median which is what gets txs included
 /// within 1-2 blocks instead of hanging in the mempool for 30+ minutes.
 const GAS_PRICE_MULTIPLIER_BPS: u128 = 30_000;
 
-/// Receipt polling interval. Alloy's default is tuned for public chains;
-/// tighten it so per-tx receipt polling doesn't dominate bundle latency on
-/// anvil's instamine or reth's sub-second block time.
-const RECEIPT_POLL_INTERVAL_MS: u64 = 50;
+/// Receipt polling interval. Kept well above alloy's default only where it
+/// matters: a 50ms poll across a ~100-tx bundle trips per-second compute
+/// limits on hosted RPCs (Alchemy returns HTTP 429), which aborts the
+/// broadcast mid-bundle. 1.5s still resolves a receipt within a block on a
+/// public chain, and local anvil/reth bundles pay a bounded extra wait.
+const RECEIPT_POLL_INTERVAL_MS: u64 = 1_500;
 
 /// Returns a legacy `gasPrice` that's high enough to land within ~1-2 blocks
 /// on busy public chains, but never below `GAS_PRICE_FLOOR_WEI` so local
