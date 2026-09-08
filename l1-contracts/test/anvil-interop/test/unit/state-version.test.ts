@@ -16,13 +16,13 @@ function runnerWithVersion(stateVersion?: string): DeploymentRunner {
 }
 
 test("accepts a canonical snapshot version", () => {
-  assert.equal(runnerWithVersion("v0.34.0").getStateVersion(), "v0.34.0");
+  assert.equal(runnerWithVersion("v0.34.0").getProtocolVersionString(), "v0.34.0");
 });
 
 test("rejects missing and path-like snapshot versions", () => {
-  assert.throws(() => runnerWithVersion().getStateVersion(), /must match/);
-  assert.throws(() => runnerWithVersion("../v0.34.0").getStateVersion(), /must match/);
-  assert.throws(() => runnerWithVersion("v0.34").getStateVersion(), /must match/);
+  assert.throws(() => runnerWithVersion().getProtocolVersionString(), /must match/);
+  assert.throws(() => runnerWithVersion("../v0.34.0").getProtocolVersionString(), /must match/);
+  assert.throws(() => runnerWithVersion("v0.34").getProtocolVersionString(), /must match/);
 });
 
 run();
