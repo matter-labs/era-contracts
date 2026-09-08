@@ -121,6 +121,10 @@ export async function bootstrapInitArgs(
     /** The release the edge installs as the CTM's `currentRelease` (its L2 table is the derived L2 set). */
     currentRelease: string;
     ctmExecutor: string;
+    /** The owner the CTM executor must ALREADY answer to (storage, so outside its codehash pin). */
+    ctmExecutorOwner: string;
+    /** The ecosystem executor the CTM executor must currently point at (also storage). */
+    ecosystemExecutor: string;
     upgradeTimer: string;
     /** The pinned composer that defines the delegate calldata (the harness's fixed no-op composer). */
     delegateComposer: { addr: string; codehash: string };
@@ -176,6 +180,8 @@ export async function bootstrapInitArgs(
     // The executor and timer are deployed by this run (regular build), so their codehashes are
     // read live rather than committed — the manifest pins only cross-machine-stable values.
     ctmExecutor: { addr: params.ctmExecutor, codehash: await codehash(params.ctmExecutor) },
+    ctmExecutorOwner: params.ctmExecutorOwner,
+    ecosystemExecutor: params.ecosystemExecutor,
     upgradeTimer: { addr: params.upgradeTimer, codehash: await codehash(params.upgradeTimer) },
   };
 }

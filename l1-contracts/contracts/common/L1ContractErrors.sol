@@ -61,6 +61,10 @@ error BootstrapAlreadyExecuted();
 error BootstrapAuthorityNotHeld(address target, address actualOwner);
 // 0xb772460f
 error BootstrapExecutorNotBound(address executor, address expectedTarget, address actualTarget);
+// 0x53ec216a
+error BootstrapExecutorOwnerMismatch(address expectedOwner, address actualOwner);
+// 0xc819eb06
+error BootstrapExecutorOwnershipPending(address pendingOwner);
 // 0x447aee1e
 error BootstrapNotYetExecuted();
 // 0x24c8e294

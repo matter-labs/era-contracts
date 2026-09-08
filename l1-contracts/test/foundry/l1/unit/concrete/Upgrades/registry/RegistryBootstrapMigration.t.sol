@@ -6,6 +6,7 @@ import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_Cha
 import {Utils} from "../../Utils/Utils.sol";
 import {Vm} from "forge-std/Vm.sol";
 
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {
     ITransparentUpgradeableProxy,
@@ -47,6 +48,8 @@ import {
     BootstrapAlreadyExecuted,
     BootstrapAuthorityNotHeld,
     BootstrapExecutorNotBound,
+    BootstrapExecutorOwnerMismatch,
+    BootstrapExecutorOwnershipPending,
     BootstrapNotYetExecuted,
     DeadlineNotYetPassed,
     L2BytecodeNotPublished,
@@ -302,6 +305,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 l2Plan: _l2Plan,
                 upgradeTimestamp: 0,
                 ctmExecutor: _pin(address(ctmExecutor)),
+                ctmExecutorOwner: governor,
+                ecosystemExecutor: address(ecoExecutor),
                 upgradeTimer: _pin(address(upgradeTimer))
             });
     }
@@ -883,6 +888,106 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             )
         );
         mismatched.migrate();
+    }
+
+    /// @dev The executor's OWNERSHIP is storage, so the codehash pin does not cover it. An
+    ///      executor whose ownership moved after this manifest was reviewed would otherwise pass
+    ///      every other check and then receive the whole CTM domain on behalf of its new owner.
+    function test_revertWhen_ctmExecutorIsOwnedBySomeoneElse() public {
+        address stranger = makeAddr("stranger");
+        vm.prank(governor);
+        ctmExecutor.transferOwnership(stranger);
+        vm.prank(stranger);
+        ctmExecutor.acceptOwnership();
+        _handOverAuthority();
+
+        vm.expectRevert(abi.encodeWithSelector(BootstrapExecutorOwnerMismatch.selector, governor, stranger));
+        migration.migrate();
+        assertFalse(migration.executed(), "a refused edge must stay unspent");
+    }
+
+    /// @dev The same hole one step removed: a nomination outstanding at handover time lets the
+    ///      nominee claim the domain immediately after `migrate()`.
+    function test_revertWhen_ctmExecutorHasAPendingOwnershipTransfer() public {
+        address nominee = makeAddr("nominee");
+        vm.prank(governor);
+        ctmExecutor.transferOwnership(nominee);
+        _handOverAuthority();
+
+        vm.expectRevert(abi.encodeWithSelector(BootstrapExecutorOwnershipPending.selector, nominee));
+        migration.migrate();
+    }
+
+    /// @dev The ecosystem executor the CTM executor points at is storage too (governance may
+    ///      replace it between upgrades), and it is the route every later transition's ecosystem
+    ///      leg takes.
+    function test_revertWhen_ctmExecutorPointsAtAnotherEcosystemExecutor() public {
+        EcosystemUpgradeExecutor foreignEcoExecutor = new EcosystemUpgradeExecutor(
+            governor,
+            ecosystemProxyAdmin,
+            Utils.coreRegistryCodehash()
+        );
+        CTMUpgradeExecutor redirected = new CTMUpgradeExecutor(
+            governor,
+            IChainTypeManager(address(chainContractAddress)),
+            ecosystemProxyAdmin,
+            foreignEcoExecutor,
+            Utils.transitionCodehash()
+        );
+        BootstrapManifest memory manifest = _manifest();
+        manifest.ctmExecutor = PinnedContract({addr: address(redirected), codehash: address(redirected).codehash});
+
+        RegistryBootstrapMigration mismatched = new RegistryBootstrapMigration(manifest);
+        vm.prank(governor);
+        chainContractAddress.transferOwnership(address(mismatched));
+        ecosystemProxyAdmin.transferOwnership(address(mismatched));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BootstrapExecutorNotBound.selector,
+                address(redirected),
+                address(ecoExecutor),
+                address(foreignEcoExecutor)
+            )
+        );
+        mismatched.migrate();
+    }
+
+    /// @dev A refused edge leaves NOTHING behind. `migrate()` accepts CTM ownership before it
+    ///      validates, so the check has to unwind that too: the CTM must still be owned by
+    ///      governance, the object unspent, and a corrected edge must still be runnable.
+    function test_refusedOwnershipCheckRollsBackTheWholeEdge() public {
+        address stranger = makeAddr("stranger");
+        vm.prank(governor);
+        ctmExecutor.transferOwnership(stranger);
+        vm.prank(stranger);
+        ctmExecutor.acceptOwnership();
+        address ownerBefore = Ownable2Step(address(chainContractAddress)).owner();
+        uint256 versionBefore = chainContractAddress.protocolVersion();
+        _handOverAuthority();
+
+        vm.expectRevert(abi.encodeWithSelector(BootstrapExecutorOwnerMismatch.selector, governor, stranger));
+        migration.migrate();
+
+        // The accept inside `migrate()` is undone with the rest of it: the CTM is still where it
+        // was, merely nominated, and nothing about the edge was applied.
+        assertEq(Ownable2Step(address(chainContractAddress)).owner(), ownerBefore, "CTM ownership must not move");
+        assertEq(
+            Ownable2Step(address(chainContractAddress)).pendingOwner(),
+            address(migration),
+            "the nomination stands"
+        );
+        assertEq(chainContractAddress.protocolVersion(), versionBefore, "no version edge was committed");
+        assertFalse(migration.executed(), "a refused edge must stay unspent");
+
+        // Ownership put back where the manifest says it belongs, the same edge now runs.
+        vm.prank(stranger);
+        ctmExecutor.transferOwnership(governor);
+        vm.prank(governor);
+        ctmExecutor.acceptOwnership();
+        migration.migrate();
+        assertTrue(migration.executed(), "the corrected edge must run");
+        migration.validateApplied();
     }
 
     function test_revertWhen_executorCodehashDrifted() public {

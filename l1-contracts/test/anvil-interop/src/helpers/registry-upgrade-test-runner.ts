@@ -437,6 +437,10 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
         releaseCodehash: ctmAddresses.releaseCodehash,
         currentRelease: deployed.bootstrapRelease,
         ctmExecutor: deployed.ctmExecutor,
+        // The harness deploys the executor owned by the deployer and bound to the ecosystem
+        // executor below; the edge refuses to hand the domain over if either has moved since.
+        ctmExecutorOwner: deployer.address,
+        ecosystemExecutor: deployed.ecoExecutor,
         upgradeTimer: upgradeTimer.address,
         delegateComposer: { addr: deployed.delegateComposer, codehash: await codehashOf(deployed.delegateComposer) },
         l2Delegate: upgradeDelegateInfo(),

@@ -212,6 +212,16 @@ struct CoreRegistryManifest {
 ///        CTM-domain `ProxyAdmin` — the whole CTM domain lands under one executor. It must be
 ///        BOUND to `ctm` AND to `ctmProxyAdmin`, otherwise its fixed entrypoints could never
 ///        drive what it is handed.
+/// @param ctmExecutorOwner The governance the executor must ALREADY answer to. Its codehash pin
+///        covers the executor's code and immutables but NOT its storage, and ownership is
+///        storage: an executor whose ownership moved between deployment and `migrate()` would
+///        receive the whole CTM domain on behalf of whoever owns it now. The edge therefore
+///        names the expected owner and refuses to hand anything over otherwise — and refuses a
+///        PENDING transfer too, which would let a third party claim the domain right after.
+/// @param ecosystemExecutor The `EcosystemUpgradeExecutor` the CTM executor must currently point
+///        at. Also storage rather than an immutable (governance may replace it between
+///        upgrades), so also outside the codehash pin, and it is the route every later
+///        transition's ecosystem leg takes.
 /// @param upgradeTimer The pinned `GovernanceUpgradeTimer` whose `checkDeadline()` gates the
 ///        edge: stage 0 starts the timer, and `migrate()` refuses to run until the operational
 ///        window has passed — the stage sequencing is enforced by the object itself, not by the
@@ -228,6 +238,8 @@ struct BootstrapManifest {
     AuthoredL2Plan l2Plan;
     uint256 upgradeTimestamp;
     PinnedContract ctmExecutor;
+    address ctmExecutorOwner;
+    address ecosystemExecutor;
     PinnedContract upgradeTimer;
 }
 

@@ -19,6 +19,8 @@ import {
     BootstrapAlreadyExecuted,
     BootstrapAuthorityNotHeld,
     BootstrapExecutorNotBound,
+    BootstrapExecutorOwnerMismatch,
+    BootstrapExecutorOwnershipPending,
     BootstrapNotYetExecuted,
     BootstrapReleaseNotInstalled,
     MalformedL2UpgradePlan,
@@ -77,6 +79,8 @@ contract RegistryBootstrapMigration {
             address(_manifest.ctmProxyAdmin) == address(0) ||
             _manifest.currentRelease.addr == address(0) ||
             _manifest.ctmExecutor.addr == address(0) ||
+            _manifest.ctmExecutorOwner == address(0) ||
+            _manifest.ecosystemExecutor == address(0) ||
             _manifest.upgradeTimer.addr == address(0) ||
             _manifest.upgradeEngine.addr == address(0)
         ) {
@@ -202,14 +206,34 @@ contract RegistryBootstrapMigration {
         // drive — and since the edge is one-shot, recovering from that would mean falling back to
         // break-glass, the one authority this design exists to avoid depending on.
         CodehashPinLib.requirePin(m.ctmExecutor);
-        address boundCtm = address(CTMUpgradeExecutor(payable(m.ctmExecutor.addr)).CHAIN_TYPE_MANAGER());
+        CTMUpgradeExecutor ctmExecutor = CTMUpgradeExecutor(payable(m.ctmExecutor.addr));
+        // The codehash pin covers the executor's CODE and its immutables; ownership and the
+        // ecosystem pointer are storage, so they are checked by value. Without this, an executor
+        // whose ownership moved after deployment would still pass every other check and then
+        // receive the whole CTM domain on behalf of whoever owns it now.
+        address executorOwner = ctmExecutor.owner();
+        if (executorOwner != m.ctmExecutorOwner) {
+            revert BootstrapExecutorOwnerMismatch(m.ctmExecutorOwner, executorOwner);
+        }
+        // A nomination outstanding at handover time is the same hole one step removed: the
+        // nominee could accept immediately after `migrate()` and inherit the domain.
+        address executorPendingOwner = ctmExecutor.pendingOwner();
+        if (executorPendingOwner != address(0)) {
+            revert BootstrapExecutorOwnershipPending(executorPendingOwner);
+        }
+        // The route every later transition's ecosystem leg takes.
+        address boundEcosystemExecutor = address(ctmExecutor.ECOSYSTEM_EXECUTOR());
+        if (boundEcosystemExecutor != m.ecosystemExecutor) {
+            revert BootstrapExecutorNotBound(m.ctmExecutor.addr, m.ecosystemExecutor, boundEcosystemExecutor);
+        }
+        address boundCtm = address(ctmExecutor.CHAIN_TYPE_MANAGER());
         if (boundCtm != m.ctm) {
             revert BootstrapExecutorNotBound(m.ctmExecutor.addr, m.ctm, boundCtm);
         }
         // The WHOLE CTM domain lands under the one CTM-bound executor: the CTM proxy and its
         // per-CTM proxies share `ctmProxyAdmin`, and later transitions apply their
         // `ctmProxyRows` through it. Nothing CTM-scoped goes under ecosystem authority.
-        address boundProxyAdmin = address(CTMUpgradeExecutor(payable(m.ctmExecutor.addr)).CTM_PROXY_ADMIN());
+        address boundProxyAdmin = address(ctmExecutor.CTM_PROXY_ADMIN());
         if (boundProxyAdmin != address(m.ctmProxyAdmin)) {
             revert BootstrapExecutorNotBound(m.ctmExecutor.addr, address(m.ctmProxyAdmin), boundProxyAdmin);
         }

@@ -291,6 +291,11 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                 addr: address(ctmUpgradeExecutor),
                 codehash: address(ctmUpgradeExecutor).codehash
             }),
+            // Storage, not immutables, so outside the codehash pin above — named here so the edge
+            // refuses to hand the CTM domain to an executor whose ownership or ecosystem route
+            // moved after this prepare deployed it.
+            ctmExecutorOwner: getOwnerAddress(),
+            ecosystemExecutor: address(ecosystemUpgradeExecutor()),
             upgradeTimer: PinnedContract({
                 addr: upgradeAddresses.upgradeTimer,
                 codehash: upgradeAddresses.upgradeTimer.codehash
