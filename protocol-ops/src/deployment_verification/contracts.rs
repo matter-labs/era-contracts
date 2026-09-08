@@ -186,6 +186,45 @@ sol! {
         event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
         event TransparentOperationScheduled(bytes32 indexed id, uint256 delay, Operation operation);
         event ShadowOperationScheduled(bytes32 indexed id, uint256 delay);
+        event GenesisUpgrade(
+            address indexed zkChain,
+            L2CanonicalTransaction l2Transaction,
+            uint256 indexed protocolVersion,
+            bytes[] factoryDeps
+        );
+    }
+
+    /// The genesis upgrade's L1->L2 transaction. Only `data` is read: it holds
+    /// the force deployments the chain was actually created with.
+    struct L2CanonicalTransaction {
+        uint256 txType;
+        uint256 from;
+        uint256 to;
+        uint256 gasLimit;
+        uint256 gasPerPubdataByteLimit;
+        uint256 maxFeePerGas;
+        uint256 maxPriorityFeePerGas;
+        uint256 paymaster;
+        uint256 nonce;
+        uint256 value;
+        uint256[4] reserved;
+        bytes data;
+        bytes signature;
+        uint256[] factoryDeps;
+        bytes paymasterInput;
+        bytes reservedDynamic;
+    }
+
+    /// The two calls the genesis upgrade nests inside that transaction.
+    interface IGenesisCalls {
+        function upgrade(address delegateTo, bytes calldata data) external;
+        function genesisUpgrade(
+            bool isZKsyncOS,
+            uint256 chainId,
+            address ctmDeployer,
+            bytes calldata fixedForceDeploymentsData,
+            bytes calldata additionalForceDeploymentsData
+        ) external;
         event EVMBytecodePublished(bytes32 indexed bytecodeHash, bytes bytecode);
         event Upgraded(address indexed implementation);
     }

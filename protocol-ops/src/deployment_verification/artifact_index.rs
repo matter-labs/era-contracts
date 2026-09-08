@@ -94,6 +94,10 @@ pub struct Artifact {
     immutables: Vec<Vec<(usize, usize)>>,
     /// Selectors derived from the artifact ABI, independent of `evmole`.
     pub abi_selectors: HashSet<[u8; 4]>,
+    /// `initialize*` / `reinitialize*` entry points, as `(name, input types)`.
+    /// An initializer that is still callable hands ownership to whoever calls
+    /// it first, so the verifier has to be able to try them.
+    pub initializers: Vec<(String, Vec<String>)>,
 }
 
 impl Artifact {
@@ -173,6 +177,7 @@ impl Artifact {
             immutable_slots: Vec::new(),
             immutables: Vec::new(),
             abi_selectors: HashSet::new(),
+            initializers: Vec::new(),
         }
     }
 
@@ -430,6 +435,22 @@ fn read_artifact(source: &str, file: &str, path: &Path) -> anyhow::Result<Option
         .unwrap_or_default()
         .to_string();
 
+    let initializers = raw
+        .abi
+        .iter()
+        .filter(|entry| entry.kind == "function")
+        .filter(|entry| {
+            let name = entry.name.to_ascii_lowercase();
+            name.starts_with("initialize") || name.starts_with("reinitialize")
+        })
+        .map(|entry| {
+            (
+                entry.name.clone(),
+                entry.inputs.iter().map(AbiParam::canonical).collect(),
+            )
+        })
+        .collect();
+
     let abi_selectors = raw
         .abi
         .iter()
@@ -454,6 +475,7 @@ fn read_artifact(source: &str, file: &str, path: &Path) -> anyhow::Result<Option
             .map(|(_, occurrences)| occurrences)
             .collect(),
         abi_selectors,
+        initializers,
     }))
 }
 
@@ -539,6 +561,7 @@ mod tests {
             immutable_slots,
             immutables,
             abi_selectors: HashSet::new(),
+            initializers: Vec::new(),
         }
     }
 

@@ -18,10 +18,11 @@ pub mod roles;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use alloy::primitives::{keccak256, Address, FixedBytes, U256};
+use alloy::dyn_abi::{DynSolType, DynSolValue};
+use alloy::primitives::{keccak256, Address, Bytes, FixedBytes, U256};
 use alloy::providers::Provider;
 use alloy::rpc::types::Filter;
-use alloy::sol_types::{SolEvent, SolValue};
+use alloy::sol_types::{SolCall, SolEvent, SolValue};
 use anyhow::Context;
 use serde::Deserialize;
 
@@ -516,6 +517,18 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
     result.print_section("Privileged state");
     verify_privileged_state(&provider, &mut result, &input, &core, &ctm, to_block).await?;
 
+    // ── initializers ─────────────────────────────────────────────────────
+    result.print_section("Initializers");
+    verify_initializers_consumed(
+        &provider,
+        &mut code_cache,
+        &mut result,
+        &index,
+        &expected,
+        to_block,
+    )
+    .await?;
+
     // ── roles ────────────────────────────────────────────────────────────
     result.print_section("Roles");
     verify_roles(
@@ -544,6 +557,7 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
         &params.diamond_cut.facetCuts,
         &index,
         &mut code_cache,
+        input.from_block,
         to_block,
     )
     .await?;
@@ -1606,33 +1620,40 @@ async fn verify_da(
             allowed.push(pair);
         }
     }
-    // A whitelisted address is only meaningful if it is actually one of the DA
-    // validators: nothing stops an EOA or an arbitrary contract being paired.
-    const DA_VALIDATOR_ARTIFACTS: [&str; 4] = [
-        "RollupL1DAValidator",
-        "BlobsL1DAValidatorZKsyncOS",
-        "ValidiumL1DAValidator",
-        "AvailL1DAValidator",
-    ];
+    // `RollupDAManager` decides which pairs a *permanent rollup* may use, and
+    // `Admin.makePermanentRollup` is the only reader. A validium or external-DA
+    // validator in here would let a chain call itself a permanent rollup while
+    // posting no data to L1, so only the two rollup-grade validators belong.
+    const ROLLUP_GRADE_VALIDATORS: [&str; 2] =
+        ["RollupL1DAValidator", "BlobsL1DAValidatorZKsyncOS"];
+    const OTHER_DA_VALIDATORS: [&str; 2] = ["ValidiumL1DAValidator", "AvailL1DAValidator"];
     for (validator, scheme) in &allowed {
         let code = code_cache.get(provider, *validator, to_block).await?;
-        let identified = index
-            .identify(&code)
-            .into_iter()
-            .find(|(artifact, _)| DA_VALIDATOR_ARTIFACTS.contains(&artifact.name.as_str()));
+        let identified = index.identify(&code).into_iter().find(|(artifact, _)| {
+            ROLLUP_GRADE_VALIDATORS.contains(&artifact.name.as_str())
+                || OTHER_DA_VALIDATORS.contains(&artifact.name.as_str())
+        });
         match identified {
-            Some((artifact, kind)) => result.report_ok(&format!(
-                "allowed DA pair: {validator} scheme {scheme} = {} ({})",
-                artifact.name,
-                kind.label()
+            Some((artifact, kind)) if ROLLUP_GRADE_VALIDATORS.contains(&artifact.name.as_str()) => {
+                result.report_ok(&format!(
+                    "allowed DA pair: {validator} scheme {scheme} = {} ({})",
+                    artifact.name,
+                    kind.label()
+                ))
+            }
+            Some((artifact, _)) => result.report_error(&format!(
+                "allowed DA pair: {validator} scheme {scheme} is a {}. This allowlist is what \
+                 `makePermanentRollup` checks, so a chain could lock itself in as a permanent \
+                 rollup while publishing no data to L1.",
+                artifact.name
             )),
             None if code.is_empty() => result.report_error(&format!(
                 "allowed DA pair: {validator} scheme {scheme} has no code — chains pairing with \
                  it cannot post DA"
             )),
             None => result.report_error(&format!(
-                "allowed DA pair: {validator} scheme {scheme} is not any of {DA_VALIDATOR_ARTIFACTS:?} \
-                 in the local build"
+                "allowed DA pair: {validator} scheme {scheme} is not any of \
+                 {ROLLUP_GRADE_VALIDATORS:?} in the local build"
             )),
         }
     }
@@ -1679,6 +1700,133 @@ async fn verify_da(
         }
     }
     Ok(())
+}
+
+/// Every `initialize*` entry point on every deployed contract must already be
+/// consumed.
+///
+/// A proxy can hold the expected implementation, the expected owner and the
+/// expected wiring while an unconsumed initializer sits there waiting — and
+/// those are permissionless by construction. `MultisigCommitter.initializeV2`
+/// is the live example: it takes `(address newOwner, uint32 delay)`, is
+/// guarded only by `reinitializer(2)`, and hands ownership to whoever calls it
+/// first if the upgrade did not consume version 2.
+///
+/// Each initializer is simulated with `eth_call` from an address with no
+/// standing, using zero-valued arguments. A consumed one reverts. Nothing is
+/// sent, so this is safe against mainnet.
+///
+/// Limitation: an initializer that reverts for an unrelated reason reads as
+/// consumed. The check is therefore sound when it fails and best-effort when
+/// it passes.
+async fn verify_initializers_consumed(
+    provider: &AlloyProvider,
+    code_cache: &mut CodeCache,
+    result: &mut VerificationResult,
+    index: &ArtifactIndex,
+    expected: &[Expected],
+    to_block: u64,
+) -> anyhow::Result<()> {
+    /// An address with no roles anywhere, used as the simulated caller.
+    const NOBODY: Address = Address::new(alloy::hex!("00000000000000000000000000000000deadbeef"));
+
+    let mut checked = 0usize;
+    for entry in expected {
+        // Implementations are behind proxies and have their initializers
+        // disabled in the constructor; the proxy is what an attacker calls.
+        if entry.label.ends_with(" impl") {
+            continue;
+        }
+        let code = code_cache.get(provider, entry.address, to_block).await?;
+        // The initializer surface is the implementation's, reached through the
+        // proxy, so take it from whatever the proxy currently delegates to.
+        let implementation = address_at_slot(
+            provider,
+            entry.address,
+            EIP1967_IMPLEMENTATION_SLOT,
+            to_block,
+        )
+        .await?;
+        let surface = if implementation == Address::ZERO {
+            code
+        } else {
+            code_cache.get(provider, implementation, to_block).await?
+        };
+        let Some((artifact, _)) = index.identify(&surface).into_iter().next() else {
+            continue;
+        };
+        for (name, inputs) in &artifact.initializers {
+            let Some(calldata) = zero_calldata(name, inputs) else {
+                result.report_warn(&format!(
+                    "{}.{name} takes an argument type this check cannot synthesise, so it was \
+                     not tried",
+                    entry.label
+                ));
+                continue;
+            };
+            checked += 1;
+            let call = alloy::rpc::types::TransactionRequest::default()
+                .from(NOBODY)
+                .to(entry.address)
+                .input(calldata.into());
+            match provider.call(call).block(to_block.into()).await {
+                Err(_) => {}
+                Ok(_) => result.report_error(&format!(
+                    "{} at {}: `{name}` is still callable by anyone. Whoever calls it first \
+                     takes whatever it initialises — for a validator timelock that is ownership \
+                     of the contract, on a deployment that otherwise verifies clean.",
+                    entry.label, entry.address
+                )),
+            }
+        }
+    }
+    result.report_ok(&format!(
+        "{checked} initializer entry point(s) are consumed and revert for an arbitrary caller"
+    ));
+    Ok(())
+}
+
+/// ABI-encodes a call to `name` with zero-valued arguments.
+///
+/// Structs and dynamic types are handled too, because the initializers most
+/// worth proving consumed — `ChainTypeManager.initialize`, `DiamondInit
+/// .initialize` — take exactly those.
+fn zero_calldata(name: &str, inputs: &[String]) -> Option<Vec<u8>> {
+    let signature = format!("{name}({})", inputs.join(","));
+    let mut calldata = keccak256(signature.as_bytes())[..4].to_vec();
+    let values = inputs
+        .iter()
+        .map(|input| DynSolType::parse(input).ok().as_ref().and_then(zero_value))
+        .collect::<Option<Vec<_>>>()?;
+    calldata.extend_from_slice(&DynSolValue::Tuple(values).abi_encode_params());
+    Some(calldata)
+}
+
+/// The zero value of an ABI type, for a call that is only ever simulated.
+fn zero_value(ty: &DynSolType) -> Option<DynSolValue> {
+    // Every variant is covered; the `Option` is what `zero_calldata` turns a
+    // type it could not even parse into a reported skip.
+    Some(match ty {
+        DynSolType::Bool => DynSolValue::Bool(false),
+        DynSolType::Int(bits) => DynSolValue::Int(alloy::primitives::I256::ZERO, *bits),
+        DynSolType::Uint(bits) => DynSolValue::Uint(U256::ZERO, *bits),
+        DynSolType::FixedBytes(size) => DynSolValue::FixedBytes(FixedBytes::ZERO, *size),
+        DynSolType::Address => DynSolValue::Address(Address::ZERO),
+        DynSolType::Function => DynSolValue::Function(alloy::primitives::Function::ZERO),
+        DynSolType::Bytes => DynSolValue::Bytes(Vec::new()),
+        DynSolType::String => DynSolValue::String(String::new()),
+        // A zero-length dynamic array is the least likely to revert for a
+        // reason other than "already consumed".
+        DynSolType::Array(_) => DynSolValue::Array(Vec::new()),
+        DynSolType::FixedArray(inner, size) => DynSolValue::FixedArray(
+            std::iter::repeat_with(|| zero_value(inner))
+                .take(*size)
+                .collect::<Option<Vec<_>>>()?,
+        ),
+        DynSolType::Tuple(members) => {
+            DynSolValue::Tuple(members.iter().map(zero_value).collect::<Option<Vec<_>>>()?)
+        }
+    })
 }
 
 /// State that is not code and not wiring, but decides who can do what next:
@@ -2230,9 +2378,15 @@ async fn verify_chains(
     cut_facets: &[contracts::FacetCut],
     index: &ArtifactIndex,
     code_cache: &mut CodeCache,
+    from_block: u64,
     to_block: u64,
 ) -> anyhow::Result<()> {
     let bh = IBridgehubView::new(core.bridgehub, provider);
+    let timelock_view = if ctm.validator_timelock == Address::ZERO {
+        None
+    } else {
+        Some(ITimelockView::new(ctm.validator_timelock, provider))
+    };
     let chain_ids = bh
         .getAllZKChainChainIDs()
         .block(to_block.into())
@@ -2459,6 +2613,72 @@ async fn verify_chains(
             &format!("chain {chain_id} settles on L1"),
             &format!("chain {chain_id} does not settle on L1"),
         );
+        // What the chain was *actually* created with. The CTM stores only the
+        // current parameters, and both live ecosystems have had theirs reset,
+        // so a chain created earlier carries different force deployments than
+        // the ones verified above. The genesis upgrade transaction is the only
+        // on-chain record of what a given chain received.
+        match chain_force_deployments(provider, address, from_block, to_block).await? {
+            Some(force_deployments) => {
+                let hash = keccak256(force_deployments.abi_encode());
+                result.expect(
+                    hash == ctm.initial_force_deployment_hash,
+                    &format!(
+                        "chain {chain_id} was created with the force deployments verified above"
+                    ),
+                    &format!(
+                        "chain {chain_id} was created with force deployments hashing to {hash}, \
+                         but the CTM now holds {}. The parameters were changed after this chain \
+                         was created, so what it actually runs on L2 is not what this report \
+                         verified.",
+                        ctm.initial_force_deployment_hash
+                    ),
+                );
+            }
+            None => result.report_warn(&format!(
+                "chain {chain_id} emitted no GenesisUpgrade event in the scanned range, so what \
+                 it was created with cannot be bound to the parameters verified above"
+            )),
+        }
+
+        // Operational roles are per chain, and with a zero shared threshold a
+        // single extra committer is the sequencer.
+        if let Some(timelock) = timelock_view.as_ref() {
+            let custom = timelock
+                .isCustomSigningSetActive(address)
+                .block(to_block.into())
+                .call()
+                .await?;
+            result.print_info(&format!(
+                "  chain {chain_id} signing set: {}",
+                if custom { "custom" } else { "shared" }
+            ));
+            for (label, role) in VALIDATOR_ROLES {
+                let count = timelock
+                    .getRoleMemberCount(address, keccak256(label.as_bytes()))
+                    .block(to_block.into())
+                    .call()
+                    .await?;
+                let mut members = Vec::new();
+                for index in 0..count.to::<u64>() {
+                    members.push(
+                        timelock
+                            .getRoleMember(address, keccak256(label.as_bytes()), U256::from(index))
+                            .block(to_block.into())
+                            .call()
+                            .await?
+                            .to_string(),
+                    );
+                }
+                if !members.is_empty() {
+                    result.print_info(&format!(
+                        "  chain {chain_id} {role}: {}",
+                        members.join(", ")
+                    ));
+                }
+            }
+        }
+
         // `Admin.makePermanentRollup` re-checks the chain's live DA pair
         // against the manager, so a chain running an un-whitelisted pair can
         // never lock itself in as a rollup.
@@ -2564,6 +2784,50 @@ fn render_immutable(value: &artifact_index::ImmutableValue) -> String {
     }
 }
 
+/// The operational roles `ValidatorTimelock` grants per chain, by the name
+/// they are `keccak256`'d from.
+const VALIDATOR_ROLES: [(&str, &str); 6] = [
+    ("COMMITTER_ROLE", "committers"),
+    ("PROVER_ROLE", "provers"),
+    ("EXECUTOR_ROLE", "executors"),
+    ("REVERTER_ROLE", "reverters"),
+    ("PRECOMMITTER_ROLE", "precommitters"),
+    ("UPGRADER_ROLE", "upgraders"),
+];
+
+/// The force deployments a chain was created with, from its genesis upgrade
+/// transaction.
+///
+/// The transaction calls `ComplexUpgrader.upgrade(genesisUpgrade, calldata)`,
+/// and that inner calldata is `IL2GenesisUpgrade.genesisUpgrade(...)` with the
+/// fixed force deployments as its fourth argument.
+async fn chain_force_deployments(
+    provider: &AlloyProvider,
+    chain: Address,
+    from_block: u64,
+    to_block: u64,
+) -> anyhow::Result<Option<Bytes>> {
+    let filter = Filter::new()
+        .address(chain)
+        .event_signature(IEcosystemEvents::GenesisUpgrade::SIGNATURE_HASH)
+        .from_block(from_block)
+        .to_block(to_block);
+    let logs = provider
+        .get_logs(&filter)
+        .await
+        .context("eth_getLogs for GenesisUpgrade")?;
+    let Some(log) = logs.first() else {
+        return Ok(None);
+    };
+    let event = IEcosystemEvents::GenesisUpgrade::decode_log_data(log.data())
+        .context("decoding GenesisUpgrade")?;
+    let outer = contracts::IGenesisCalls::upgradeCall::abi_decode(&event.l2Transaction.data)
+        .context("decoding ComplexUpgrader.upgrade calldata")?;
+    let inner = contracts::IGenesisCalls::genesisUpgradeCall::abi_decode(&outer.data)
+        .context("decoding L2GenesisUpgrade.genesisUpgrade calldata")?;
+    Ok(Some(inner.fixedForceDeploymentsData))
+}
+
 /// `AddressAliasHelper.applyL1ToL2Alias`.
 fn apply_l1_to_l2_alias(address: Address) -> Address {
     const OFFSET: [u8; 20] = alloy::hex!("1111000000000000000000000000000000001111");
@@ -2580,6 +2844,29 @@ mod tests {
 
     /// Pinned against the live Sepolia ecosystem, where every contract that
     /// carries `ETH_TOKEN_ASSET_ID` reports this value.
+    /// `MultisigCommitter.initializeV2(address,uint32)` is the live example of
+    /// a permissionless initializer, so its calldata must be synthesisable or
+    /// the check silently skips the one entry point that matters most.
+    #[test]
+    fn synthesises_calldata_for_the_initializers_that_matter() {
+        let calldata = zero_calldata("initializeV2", &["address".into(), "uint32".into()])
+            .expect("initializeV2 must be synthesisable");
+        assert_eq!(
+            calldata[..4],
+            keccak256("initializeV2(address,uint32)".as_bytes())[..4]
+        );
+        assert_eq!(calldata.len(), 4 + 64);
+
+        // The CTM's initializer takes a struct of structs and an array; it must
+        // encode too, or the most privileged initializer goes unchecked.
+        let nested = zero_calldata(
+            "initialize",
+            &["(address,address,((address,uint8,bool,bytes4[])[],address,bytes),uint256)".into()],
+        )
+        .expect("a nested struct argument must be synthesisable");
+        assert!(nested.len() > 4);
+    }
+
     #[test]
     fn eth_asset_id_is_recomputed_not_read() {
         assert_eq!(
