@@ -10,7 +10,8 @@ import {
     OwnerWrap,
     OWNER_KIND_NONE,
     OWNER_KIND_LEGACY_GOVERNANCE,
-    OWNER_KIND_OZ_CHAIN_ADMIN
+    OWNER_KIND_OZ_CHAIN_ADMIN,
+    OWNER_KIND_SAFE
 } from "contracts/script-interfaces/IAdminFunctions.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -525,8 +526,18 @@ contract AdminFunctions is Script, IAdminFunctions {
     /// broadcast directly via `vm.startBroadcast`. Contract owners are looked
     /// up in `_wraps` and routed through their wrapping shape (legacy
     /// Governance.sol => `scheduleTransparent` + `executeInstant` from EOA;
-    /// OZ ChainAdmin (Ownable2Step) => `multicall` from EOA). Reverts on
-    /// contract owners that have no registry entry.
+    /// OZ ChainAdmin (Ownable2Step) => `multicall` from EOA; Gnosis Safe =>
+    /// issued as the Safe itself, see below). Reverts on contract owners that
+    /// have no registry entry.
+    ///
+    /// A Safe takes no on-chain wrapper: `execTransaction` needs signatures we
+    /// do not have and must not fabricate. Instead the call is broadcast AS the
+    /// Safe, which on a fork is impersonation (the same fork-only path the PUH
+    /// already uses) and in the emitted manifest becomes a bundle keyed by the
+    /// Safe address — i.e. a `*.safe.json` batch for that Safe's own signers to
+    /// execute. That is exactly what the bundle format is for, and it is the
+    /// only correct shape when the signer set is not ours: ADI's governance is
+    /// owned by a 2-of-3 Safe belonging to ADI.
     function _issueAsOwner(
         address _currentOwner,
         address _target,
@@ -546,6 +557,8 @@ contract AdminFunctions is Script, IAdminFunctions {
             _wrapLegacyGovernance(_currentOwner, _target, _data);
         } else if (kind == OWNER_KIND_OZ_CHAIN_ADMIN) {
             _wrapOzChainAdmin(_currentOwner, _target, _data);
+        } else if (kind == OWNER_KIND_SAFE) {
+            _issueAsSafe(_currentOwner, _target, _data);
         } else {
             revert(
                 string.concat(
@@ -609,6 +622,23 @@ contract AdminFunctions is Script, IAdminFunctions {
         vm.startBroadcast(eoaOwner);
         IChainAdminMulticall(_admin).multicall(calls, true);
         vm.stopBroadcast();
+    }
+
+    /// Issue `_data` against `_target` as the Safe `_safe` itself.
+    ///
+    /// Deliberately not an `execTransaction` wrap: that needs owner signatures,
+    /// which we neither hold nor may fabricate. Broadcasting as the Safe is
+    /// impersonation on a fork, and in the emitted manifest it becomes a bundle
+    /// keyed by `_safe` — a `*.safe.json` batch handed to that Safe's signers.
+    /// Identical in shape to the EOA branch of `_issueAsOwner`; kept separate so
+    /// the intent is explicit at the call site rather than looking like an
+    /// accidental fallthrough.
+    function _issueAsSafe(address _safe, address _target, bytes memory _data) private {
+        _anvilFund(_safe);
+        vm.startBroadcast(_safe);
+        (bool ok, bytes memory ret) = _target.call(_data);
+        vm.stopBroadcast();
+        require(ok, _wrapDecodeRevert(ret));
     }
 
     /// Pull a string-typed revert reason out of `_returndata`. Falls back to a

@@ -146,6 +146,13 @@ pub enum OwnableProxyKind {
     /// OZ `ChainAdmin` (Ownable2Step). Wrap as `multicall([call], true)`
     /// from the EOA owner.
     OzChainAdmin,
+    /// Gnosis Safe. There is no on-chain wrapper to route through —
+    /// `execTransaction` needs owner signatures we do not hold — so the call is
+    /// issued as the Safe itself and lands in a bundle keyed by the Safe for its
+    /// own signers to execute. Use this whenever the signer set is not ours,
+    /// which is the case for every third-party ecosystem (ADI's governance is
+    /// owned by a 2-of-3 Safe belonging to ADI).
+    Safe,
 }
 
 impl OwnableProxyKind {
@@ -155,6 +162,7 @@ impl OwnableProxyKind {
         match self {
             Self::LegacyGovernance => 1,
             Self::OzChainAdmin => 2,
+            Self::Safe => 3,
         }
     }
 }
@@ -607,6 +615,26 @@ mod tests {
         let era_salt = per_ctm.get(&era).expect("Era CTM salt");
         let atlas_salt = per_ctm.get(&atlas).expect("ZKsyncOS CTM salt");
         assert_ne!(era_salt, atlas_salt, "per-CTM salts must be distinct");
+    }
+
+    /// ADI's ValidatorTimelock is owned by ADI's own Safe rather than by the
+    /// ecosystem Governance, so the v31 ownership pre-step needs a registry
+    /// entry for it. Without one the prepare reverts with "ownable contract
+    /// owner without registry entry", which is how this was found.
+    #[test]
+    fn adi_declares_its_governance_safe_as_an_ownable_proxy() {
+        let cfg = EnvConfig::load("adi").expect("load adi env config");
+        let safe: Address = "0xB272B188855128c10a933Edb62CC64c22B1f3754"
+            .parse()
+            .unwrap();
+        let entry = cfg
+            .ownable_proxies()
+            .iter()
+            .find(|e| e.addr == safe)
+            .expect("adi must declare its Governance-owning Safe");
+        assert_eq!(entry.kind, OwnableProxyKind::Safe);
+        // The wrap kind must reach Solidity as OWNER_KIND_SAFE.
+        assert_eq!(entry.kind.to_solidity_u8(), 3);
     }
 
     /// Same as `stage_env_config_reads_create2_salts` but for mainnet —
