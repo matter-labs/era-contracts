@@ -226,20 +226,18 @@ pub async fn chain_init(
         .unwrap_or_else(|| L2DACommitmentScheme::from_da_type(input.chain_params.da_mode));
 
     // The pubdata content is part of every batch's public input (via the ZKsync OS chain config hash),
-    // so it is set here, at creation, before the chain commits its first batch. `None` means the chain
-    // has no such setting (Era) and the call must not be made at all.
+    // so it is set here, at creation, before the chain commits its first batch.
     // Follows from the kind of chain this is: there is no separate knob for it, so the value on
     // L1 cannot drift from what `--da-mode` says the chain is.
-    let pubdata_content = Some(PubdataContent::from_da_type(input.chain_params.da_mode));
+    let pubdata_content = PubdataContent::from_da_type(input.chain_params.da_mode);
     anyhow::ensure!(
-        !(input.make_permanent_rollup && pubdata_content == Some(PubdataContent::LogsOnly)),
+        !(input.make_permanent_rollup && pubdata_content == PubdataContent::LogsOnly),
         "a permanent rollup must publish the full pubdata, so it cannot be created with \
          pubdata content LogsOnly (chain {})",
         input.chain_params.chain_id.as_u64()
     );
     // A fresh chain starts at `FullPubdata`, so only a differing value needs a transaction.
-    let should_set_pubdata_content =
-        pubdata_content.is_some_and(|content| content != PubdataContent::FullPubdata);
+    let should_set_pubdata_content = pubdata_content != PubdataContent::FullPubdata;
 
     logger::step("Finalizing chain admin operations...");
     runner.run(
@@ -254,7 +252,7 @@ pub async fn chain_init(
                     l1DaValidator: input.l1_da_validator,
                     tokenMultiplierSetter: token_multiplier_setter,
                     l2DaCommitmentScheme: commitment_scheme as u8,
-                    pubdataContent: pubdata_content.unwrap_or_default().to_u8(),
+                    pubdataContent: pubdata_content.to_u8(),
                     shouldUnpauseDeposits: should_unpause_deposits,
                     shouldSetDaValidatorPair: should_set_da_validator_pair,
                     shouldSetPubdataContent: should_set_pubdata_content,
