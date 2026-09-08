@@ -457,7 +457,7 @@ contract ProvingTest is ExecutorTest {
 
         IExecutor.StoredBatchInfo memory prev = genesisStoredBatchInfo;
         prev.commitment = prevCommitment;
-        IExecutor.PreAirbenderStoredBatchInfo memory preForm = IExecutor.PreAirbenderStoredBatchInfo({
+        IExecutor.PreAirbenderStoredBatchInfo memory preAirbenderForm = IExecutor.PreAirbenderStoredBatchInfo({
             batchNumber: prev.batchNumber,
             batchHash: prev.batchHash,
             indexRepeatedStorageChanges: prev.indexRepeatedStorageChanges,
@@ -468,7 +468,11 @@ contract ProvingTest is ExecutorTest {
             timestamp: prev.timestamp,
             commitment: prev.commitment
         });
-        vm.store(address(executor), keccak256(abi.encode(uint256(0), uint256(14))), keccak256(abi.encode(preForm)));
+        vm.store(
+            address(executor),
+            keccak256(abi.encode(uint256(0), uint256(14))),
+            keccak256(abi.encode(preAirbenderForm))
+        );
 
         // A value the stored hash never covered.
         prev.airbenderCommitment = Utils.randomBytes32("forgedPredecessorAirbenderCommitment");
