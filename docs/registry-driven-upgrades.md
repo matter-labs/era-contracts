@@ -622,6 +622,9 @@ manifest data stays in storage rather than immutables — see [Provenance and pi
 
 ## Remaining review and script retirement
 
+The detailed [script retirement plan](upgrade-script-retirement.md) specifies deletion batches,
+on-chain replacements, dependencies and verification gates.
+
 The on-chain L2 and bootstrap composers are implemented. Script retirement is still incomplete:
 
 1. **Remove duplicate payload composition.** The v34 prepare still independently builds a cut
