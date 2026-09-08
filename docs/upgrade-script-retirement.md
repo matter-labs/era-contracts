@@ -36,7 +36,43 @@ finish those edits as batch 1 rather than implementing parallel versions. They a
 verified merely because they are present in the worktree. Other generated-file/build changes must
 be kept separate from documentation and reviewed with their owning batch.
 
+**Batch 1 is implemented** (see its section below for what landed and what it uncovered). Batches
+2-5 are unimplemented plan.
+
 ## Batch 1: finish the deletion that current contracts already enable
+
+**Status: implemented.** What landed, against the changes listed below:
+
+- The v34 prepare READS `RegistryBootstrapMigration.upgradeCut()` and writes those bytes out; the
+  script-side proposal, L2 transaction and delegate-calldata composition are gone, and with them
+  `DefaultL2UpgradeStrategy` and most of `CTMUpgradeBase`.
+- The equivalence evidence is field-level and independent, not two calls into one composer: the
+  bootstrap unit suite builds the expected proposal and transaction from the manifest inputs
+  (`RegistryBootstrapMigration.t.sol`), and the in-forge bootstrap integration test decodes the
+  cut the prepare shipped and reads it back field by field against the committed hash, the pinned
+  engine, the release's verifier and the all-zero L2 transaction.
+- `AdminFunctions.upgradeChainFromCTM` and `DefaultChainUpgrade.run` select the modern
+  cut-READING entrypoint FIRST (`UpgradeChainCall.requiresCut`) and reconstruct a cut from the
+  CTM's historical log only for a pre-bootstrap chain. `DefaultChainUpgrade.executeUpgrade` is
+  deleted: the chain diamond's `executeUpgrade` is `onlyChainTypeManager`, so it could not succeed.
+- The upgrade output's `diamond_cut_data` is retired after tracing its consumers; the field is now
+  optional in the verifier (shipped v31-v33 artifacts still carry it) and its cross-check is
+  skipped when absent. `force_deployments_data` and `chain_upgrade_diamond_cut` stay: both have
+  live functional consumers (new-Gateway bring-up; the anvil bootstrap chain leg).
+- Unchanged release members are reused by CODE IDENTITY: the prepare probes what the current
+  sources produce (a local, never-broadcast deployment with this run's constructor arguments — an
+  artifact's `deployedBytecode` has immutable slots zeroed and cannot be compared with live code)
+  and keeps the live member when they match. Every replacement of a live member is printed with
+  both codehashes, so an artifact difference is surfaced rather than silently expanding scope. A
+  release whose members all reused pins an identical manifest, so the live release object is
+  reused too and the transition derives an empty L1 delta.
+- Two findings this batch turned up, fixed here because both brick a lifecycle in production:
+  a codehash pin taken from a build artifact while the object is deployed from the script's own
+  compiled copy can differ (the CBOR metadata records the compilation's remappings), so pinned
+  registry objects are now deployed from the same artifact the pin is read from
+  ({PinnedRegistryObject}) and the CTM prepare re-checks every object it deploys against the live
+  executors' immutables; and reading build artifacts inside the pipeline's own call frame charges
+  memory quadratically, so the member probe runs in its own frame.
 
 ### Changes
 

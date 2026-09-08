@@ -16,6 +16,7 @@ import {ICoreRegistry} from "contracts/upgrades/registry/objects/ICoreRegistry.s
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 import {ExternalActionsLib} from "../default-upgrade/ExternalActionsLib.sol";
+import {PinnedRegistryObject} from "../default-upgrade/PinnedRegistryObject.sol";
 
 /// @notice Core (ecosystem) side of the v34 upgrade: deploys the new shared-singleton
 ///         implementation set, pins it in a write-once `CoreRegistry` (the enum-indexed
@@ -72,8 +73,10 @@ contract CoreUpgrade_v34 is DefaultCoreUpgrade {
                     abi.encode(
                         getOwnerAddress(),
                         ProxyAdmin(coreAddresses.shared.transparentProxyAdmin),
-                        // The audited-object anchor for every registry this executor accepts.
-                        keccak256(vm.getDeployedCode("CoreRegistry.sol:CoreRegistry"))
+                        // The audited-object anchor for every registry this executor accepts,
+                        // taken from the artifact those registries are DEPLOYED from (see
+                        // {PinnedRegistryObject}).
+                        PinnedRegistryObject.codehash("CoreRegistry.sol", "CoreRegistry")
                     ),
                     "EcosystemUpgradeExecutor"
                 )

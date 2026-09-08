@@ -11,7 +11,6 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {Call} from "contracts/governance/Common.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {IL2V34Upgrade} from "contracts/upgrades/IL2V34Upgrade.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
@@ -34,6 +33,7 @@ import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {ExternalActionsLib} from "../default-upgrade/ExternalActionsLib.sol";
+import {PinnedRegistryObject} from "../default-upgrade/PinnedRegistryObject.sol";
 import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
 import {DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {Utils} from "../../utils/Utils.sol";
@@ -63,19 +63,21 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     address public l2DelegateComposer;
 
     /// @notice The bootstrap edge deploys no transition: its objects are the bound executor and the
-    ///         write-once migration, and its cut is still script-composed — the migration's on-chain
-    ///         composition is checked against it byte for byte (see `deployRegistryBootstrap`).
+    ///         write-once migration. The committed cut is READ from the migration — the object
+    ///         composes it on-chain from its pinned inputs, so the prepare has nothing to compose
+    ///         and nothing to keep in step.
     function deployUpgradeObjects() public virtual override {
-        newlyGeneratedData.upgradeCutData = abi.encode(
-            generateUpgradeCutDataFromLocalConfig(ctmAddresses.stateTransition)
-        );
-        upgradeConfig.upgradeCutPrepared = true;
         deployRegistryBootstrap();
         _declareBootstrapActions();
     }
 
-    /// @notice Composed in `deployUpgradeObjects` (the migration must be checked against it).
-    function composeUpgradeCut() public virtual override {}
+    /// @notice The cut chains crossing this edge take by hand, exactly as the migration commits it.
+    ///         Written to the output for tooling; the bytes come from the object.
+    function composeUpgradeCut() public virtual override {
+        require(address(bootstrapMigration) != address(0), "bootstrap migration not deployed");
+        newlyGeneratedData.upgradeCutData = abi.encode(bootstrapMigration.upgradeCut());
+        upgradeConfig.upgradeCutPrepared = true;
+    }
 
     /// @notice The executor this run deploys — the CTM's owner only once `migrate()` has run.
     function boundCTMUpgradeExecutor() public view virtual override returns (address) {
@@ -110,23 +112,6 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         return deploySimpleContract("BootstrapUpgradeZKsyncOS");
     }
 
-    /// @notice The committed (ecosystem-wide) L2 upgrade calldata: the upgrade-time (re)init of
-    ///         the force-deployed system contracts — NOT the genesis path, these chains are
-    ///         already initialized. The additionalForceDeploymentsData placeholder is rewritten
-    ///         per chain by `DefaultUpgradeZKsyncOS.getL2UpgradeTxData` at upgrade time.
-    function getL2UpgradeCalldata() internal returns (bytes memory) {
-        return
-            abi.encodeCall(
-                IL2V34Upgrade.upgrade,
-                (
-                    true, // the repo is ZKsync-OS-only
-                    coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
-                    generatedData.forceDeploymentsData,
-                    ""
-                )
-            );
-    }
-
     /// @notice The L2 delegate's bytecode is a factory dependency of the upgrade transaction like
     ///         the built-ins' — published by this prepare, so the sequencer has its preimage when
     ///         the unsafe deployment below runs. (The bootstrap object refuses a plan that installs
@@ -157,15 +142,6 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         });
     }
 
-    function getL2UpgradeTargetAndData(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
-    ) internal virtual override returns (address, bytes memory) {
-        // The delegate address must match the force-deployed `L2V34Upgrade` entry above.
-        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V34Upgrade.sol", "L2V34Upgrade");
-        address delegateTo = L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo);
-        return getUniversalComplexUpgraderTargetAndData(_deployments, delegateTo, getL2UpgradeCalldata());
-    }
-
     function deployNewCTMContracts() public virtual override {
         super.deployNewCTMContracts();
         // Bootstrap-only: the stage-2 "migrations unpaused" read. Recurring upgrades check pause
@@ -185,7 +161,6 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
     /// @notice Deploys the bound executor and the write-once migration pinned to this prepare
     ///         run's outputs.
     function deployRegistryBootstrap() public virtual {
-        require(upgradeConfig.upgradeCutPrepared, "upgrade cut not prepared");
         address ctmProxy = ctmAddresses.stateTransition.proxies.chainTypeManager;
         require(ctmProxy != address(0), "CTM proxy is zero");
         // The admin that ACTUALLY owns the CTM proxy (and the per-CTM proxies), read from the
@@ -218,9 +193,9 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                         // bound route for every future transition's ecosystem leg.
                         ecosystemUpgradeExecutor(),
                         // The audited-object anchor for every FUTURE transition this executor
-                        // accepts. The registry objects carry no immutables, so the compiled
-                        // runtime code IS the on-chain runtime code.
-                        keccak256(vm.getDeployedCode("CTMTransition.sol:CTMTransition"))
+                        // accepts, taken from the artifact those transitions are DEPLOYED from
+                        // (see {PinnedRegistryObject}).
+                        PinnedRegistryObject.codehash("CTMTransition.sol", "CTMTransition")
                     ),
                     "CTMUpgradeExecutor"
                 )
@@ -235,14 +210,6 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                 abi.encode(_bootstrapManifest(ctmProxy, ctmProxyAdmin)),
                 "RegistryBootstrapMigration"
             )
-        );
-
-        // Behaviour-preservation proof, kept until EVM-1644 retires the script composition: the
-        // cut the migration composes on-chain from its pinned inputs must equal the cut the base
-        // pipeline composed off-chain, byte for byte.
-        require(
-            keccak256(abi.encode(bootstrapMigration.upgradeCut())) == keccak256(newlyGeneratedData.upgradeCutData),
-            "bootstrap: on-chain composed cut differs from the script-composed cut"
         );
     }
 

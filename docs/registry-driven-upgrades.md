@@ -26,6 +26,10 @@ Implemented in this branch:
   action, plus individual facet, verifier and validator-timelock upgrade tests.
 - Owner-only abandonment of a stuck lifecycle. This clears the pending slot and releases the
   executor's hold; it does not roll back any upgrade already executed.
+- Patch transitions that may change the release, validated by what the patch contains rather than
+  by which release it names, with an identical-routing fast path so a non-facet change costs no cut.
+- Prepare scripts that compose no payload: the committed cut is read from the object that composes
+  it on-chain, and an upgrade deploys only the release members whose code it actually changes.
 
 The central security question is whether the reviewed objects and declared external actions
 account for every executable change. Review source/target edges, target identities, code pins,
@@ -54,10 +58,11 @@ the version edge and the schedule are the transition's, and one release can serv
 
 **A transition's facet cuts and hash changes are not authored.** They are derived from its
 `(fromRelease, newRelease)` pair in the constructor and stored: a full reinstall — remove the
-departing release's routing, install the target's (a same-release pair derives empty, so patches
-stay schedule-only). No selector-level diffing: each release redeploys its facets anyway.
-Governance reviews two releases plus the transition's own fields; the cuts are computed, not
-written.
+departing release's routing, install the target's. Two shortcuts to an empty cut, both by value:
+the same release on both edges, and two releases whose routing is byte-identical (what a release
+change that touches no facet costs a chain — nothing). No selector-level diffing beyond that: each
+release redeploys its facets anyway. Governance reviews two releases plus the transition's own
+fields; the cuts are computed, not written.
 
 ## Objects
 
@@ -505,11 +510,26 @@ most one row.
 within `MAX_ALLOWED_MINOR_VERSION_DELTA`. These mirror the rules chains apply at execution, so a
 transition cannot pin successfully and then strand every chain.
 
-**Patches.** A patch is a same-release transition — the only patch representation. A SemVer patch
-bump must reuse the departing release; a same-release transition's derived delta is empty by
-construction and it must carry no L2 payload. `currentRelease` stays put, so genesis keeps resolving.
-Because the verifier is part of a release, changing it is a change of installed state and therefore
-needs a new release — a schedule-only patch cannot rotate the verifier.
+**Patches.** A patch may name a NEW release. A release is the immutable snapshot of the intended
+contracts, so replacing one of its L1 members — the verifier, a facet — is not by itself a change
+of chain-visible L2 state, and should not force a minor bump. What a patch may not do is carry an
+L2 upgrade: `BaseZkSyncUpgrade` refuses an L2 protocol upgrade transaction on a patch edge, and a
+patch deliberately does NOT require an earlier L2 upgrade to be finalized first, so a pending one
+must survive it untouched. The transition therefore validates what a patch CONTAINS rather than
+which release it names: no L2 side (derived or authored), and the target release must carry over
+the departing one's L2 description — the bytecode table, the force-deployment blob, the genesis
+batch and the VM its pinned `DiamondInit` selects. An empty derived deployment list alone is not
+enough: it only proves the two tables agree, and the rest of that description is never executed on
+an existing chain, so a patch changing it would leave chains created afterwards describing a state
+the patched chains never reached. A same-release patch remains valid and is then schedule-only.
+
+A verifier rotation is therefore: deploy the verifier, publish release B copying release A except
+that member, publish the `0.34.0 -> 0.34.1` transition naming `A -> B` with no L2 side, run the
+normal lifecycle. No verifier override field on the transition — that would leave the release
+describing one verifier while chains ran another. Allowing a patch to change releases keeps future
+chain creation and every later upgrade resolving to the same intended state. Mechanical
+permission is not a safety argument: a facet patch still needs the usual compatibility review of
+storage layout, proof handling and L2 interaction.
 
 **Schedule.** `oldProtocolVersionDeadline >= upgradeTimestamp`, so the old protocol is never disabled
 before chains may upgrade.
@@ -623,29 +643,28 @@ manifest data stays in storage rather than immutables — see [Provenance and pi
 ## Remaining review and script retirement
 
 The detailed [script retirement plan](upgrade-script-retirement.md) specifies deletion batches,
-on-chain replacements, dependencies and verification gates.
+on-chain replacements, dependencies and verification gates. **Batch 1 is implemented**: prepare
+scripts compose no payload (the committed cut is read from the object that composes it on-chain),
+the per-chain call selects the modern entrypoint before touching historical logs, the retired
+genesis-cut output field is gone, and an upgrade deploys only the release members whose code it
+actually changes. What remains, mapping onto batches 2-5 of that plan:
 
-The on-chain L2 and bootstrap composers are implemented. Script retirement is still incomplete:
-
-1. **Remove duplicate payload composition.** The v34 prepare still independently builds a cut
-   and compares it with `bootstrapMigration.upgradeCut()`. Preserve equivalence evidence in
-   tests, read the object in production, then remove the obsolete composition inheritance.
-2. **Isolate legacy chain calls.** Per-chain helpers still fetch cuts from historical logs
-   before selecting a modern call that carries no cut. Select the modern path first and keep
-   log reconstruction only for the supported legacy edge.
-3. **Reduce preparation for small changes.** The inherited prepare invokes deployment helpers
-   for the full facet set. Reuse unchanged release members and retire legacy genesis/cut output
-   fields after migrating their consumers. Individual-contract execution tests establish the
-   intended outcome; they do not mean deployment tooling is already minimal.
-4. **Complete fresh-deployment authority setup.** Fresh deployment pins a release but still uses
+1. **Make the deployment inventory authoritative.** An inert upgrade row means "do not upgrade",
+   not "this is the currently deployed contract", so the prepare still reconstructs current
+   addresses from live introspection. A complete, discoverable current inventory per CTM and for
+   the shared ecosystem would let executable rows be derived from a source/target pair instead.
+2. **Complete fresh-deployment authority setup.** Fresh deployment pins a release but still uses
    the older ownership setup. Establish executors and their authorizations directly so its first
    recurring upgrade does not need the legacy bootstrap preparation machinery.
-5. **Review cross-contract follow-up wiring.** A row has a fixed, argument-less reinitializer;
+3. **Review cross-contract follow-up wiring.** A row has a fixed, argument-less reinitializer;
    arbitrary follow-up calls are not part of the row format. Calls outside the existing execution
    paths must remain declared external actions until an audited on-chain path accounts for
    their targets, order and authority. Declaring an action makes it visible; it does not execute
    it or grant permission.
-6. **Resolve deployed-schema compatibility.** A release/transition schema or canonical codehash
+4. **Collapse production preparation.** Once the inventory is authoritative, one reusable prepare
+   client replaces the version-specific prepare hierarchy, with the pre-registry entry edge kept
+   as a small named legacy adapter.
+5. **Resolve deployed-schema compatibility.** A release/transition schema or canonical codehash
    change needs an explicit migration plan if older registry objects are already deployed.
    Regenerating current-source fixtures proves the new-flow test baseline, not an in-place
    migration from such a deployment.

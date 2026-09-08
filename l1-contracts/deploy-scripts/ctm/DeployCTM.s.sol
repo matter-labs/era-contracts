@@ -216,8 +216,13 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         console.log("ChainTypeManager set in ServerNotifier");
     }
 
-    function deployEIP7702Checker() internal {
-        ctmAddresses.admin.eip7702Checker = deploySimpleContract("EIP7702Checker");
+    /// @notice The EIP-7702 checker: a permanent, argument-less CTM-domain singleton that the
+    ///         `MailboxFacet` takes as an immutable. Reused when one is already known and runs the
+    ///         current code — otherwise the fresh checker would change the Mailbox's immutable and
+    ///         force a Mailbox redeploy (and a facet cut on every chain) for an upgrade that
+    ///         changes neither. A fresh deployment has none and deploys one.
+    function deployEIP7702Checker() internal virtual {
+        ctmAddresses.admin.eip7702Checker = _deployReleaseMember("EIP7702Checker", ctmAddresses.admin.eip7702Checker);
     }
 
     function deployDAValidators() internal {

@@ -633,18 +633,22 @@ contract AdminFunctions is Script, IAdminFunctions {
             "AdminFunctions: new protocol version must be greater than current"
         );
 
-        Diamond.DiamondCutData memory diamondCut = GetDiamondCutData.getDiamondCutData(
-            address(ctm),
-            currentProtocolVersion
-        );
+        // Pick the call the chain's CURRENT generation exposes FIRST, and only reconstruct a cut
+        // for the legacy edge that is handed one. A v34+ chain reads the cut from its own CTM, and
+        // a registry-driven edge leaves nothing to reconstruct from (`upgradeCutDataBlock` is
+        // deprecated and zero), so fetching one first would revert on the supported path.
+        bytes memory callData;
+        if (UpgradeChainCall.requiresCut(currentProtocolVersion)) {
+            Diamond.DiamondCutData memory diamondCut = GetDiamondCutData.getDiamondCutData(
+                address(ctm),
+                currentProtocolVersion
+            );
+            callData = UpgradeChainCall.encode(_chainAddress, currentProtocolVersion, diamondCut);
+        } else {
+            callData = UpgradeChainCall.encodeWithoutCut(_chainAddress, currentProtocolVersion);
+        }
 
-        Utils.adminExecute(
-            _adminAddr,
-            _accessControlRestriction,
-            _chainAddress,
-            UpgradeChainCall.encode(_chainAddress, currentProtocolVersion, diamondCut),
-            0
-        );
+        Utils.adminExecute(_adminAddr, _accessControlRestriction, _chainAddress, callData, 0);
 
         console.log("AdminFunctions: upgrade completed successfully");
     }

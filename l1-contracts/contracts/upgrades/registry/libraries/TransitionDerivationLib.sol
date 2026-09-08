@@ -39,8 +39,12 @@ library TransitionDerivationLib {
     ///      self-described routing, facet address zero per `Diamond._removeFunctions`) followed by
     ///      one `Add` cut per arriving facet. There is deliberately no selector-level diffing:
     ///      each release redeploys its facets, so a "minimal" delta re-routes almost everything
-    ///      anyway — the diff engine bought little and cost a routing model. A same-release pair
-    ///      (SemVer patch) derives an empty cut by identity, keeping patches schedule-only.
+    ///      anyway — the diff engine bought little and cost a routing model.
+    /// @dev Two shortcuts to an EMPTY cut, both by value rather than by release identity: the same
+    ///      release on both edges, and two releases whose routing is byte-identical. The latter is
+    ///      what a release change that touches no facet — a verifier replacement, say — costs a
+    ///      chain: nothing. Without it, replacing one non-facet member of the snapshot would
+    ///      remove and re-add every selector to the very same facets.
     function deriveFacetCuts(
         ICTMRelease _fromRelease,
         ICTMRelease _newRelease
@@ -50,6 +54,12 @@ library TransitionDerivationLib {
         }
         FacetRouting[] memory fromFacets = _loadRouting(_fromRelease);
         FacetRouting[] memory newFacets = _loadRouting(_newRelease);
+        // Order-sensitive on purpose: the slot order is canonical ({GenesisManifestLib}), so equal
+        // routing encodes equally, and a reordered-but-equivalent pair simply falls through to the
+        // reinstall it would have got anyway.
+        if (keccak256(abi.encode(fromFacets)) == keccak256(abi.encode(newFacets))) {
+            return facetCuts;
+        }
         // Pre-commit guards: a duplicated selector (or, downstream, an empty cut) would only
         // surface when chains execute — AFTER `applyCTMUpgrade` bumped the CTM version, stranding
         // every chain on an unexecutable transition. Facets with empty routing simply contribute
@@ -103,8 +113,8 @@ library TransitionDerivationLib {
     ///         of that descriptor at its member's fixed address ({L2InventoryLib}).
     /// @dev Same philosophy as {deriveFacetCuts}: the delta is derived from the pair, never
     ///      authored, and members whose bytecode did not change are not touched — a facet-only or
-    ///      verifier-only upgrade derives an empty L2 set. A same-release pair (SemVer patch)
-    ///      derives an empty list by identity. The bootstrap edge has no departing release and
+    ///      verifier-only upgrade derives an empty L2 set. A same-release pair derives an empty
+    ///      list by identity. The bootstrap edge has no departing release and
     ///      installs the target table in full ({deriveL2DeploymentsFromTable}). VM identity is
     ///      single-sourced from the target release's pinned DiamondInit, exactly like the L2
     ///      transaction composition.

@@ -319,13 +319,18 @@ Targeted tests:
 - individual-contract upgrades leave unrelated state untouched: a facet-only edge, a
   verifier-only edge and a ValidatorTimelock-only SemVer patch, each one release (or none) and one
   transition through the three stages, asserting the other facets, the verifier, the CTM
-  implementation, the release and the L2 side (`RegistryIndividualUpgrade.t.sol`).
+  implementation, the release and the L2 side (`RegistryIndividualUpgrade.t.sol`);
+- a verifier replacement as a PATCH — a new release copying the departing one except that member,
+  within the same minor version — including one taken while an earlier minor upgrade's L2
+  transaction is still pending, which the patch must leave untouched
+  (`RegistryIndividualUpgrade.t.sol`).
 
 All of the above are covered: the stage-order, authority, pause and completion cases in
 `CTMUpgradeLifecycle.t.sol`, the bootstrap-then-recurring shape in the chained anvil pipeline
 (`run-v33-to-v34-upgrade-test.ts`), the individual upgrades in `RegistryIndividualUpgrade.t.sol`;
-the scripted-versus-on-chain replay is the v34 prepare's byte-for-byte cut check plus the pipeline's
-end-state assertions.
+the payload evidence is the bootstrap suite's field-level expectations plus the in-forge
+integration test's read-back of the cut the prepare shipped, and the pipeline's end-state
+assertions.
 
 ## 6. Order of work
 

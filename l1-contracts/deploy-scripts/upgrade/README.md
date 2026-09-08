@@ -15,11 +15,13 @@ prepare scripts that drive it. Start a security review from the
   `CTMUpgradeExecutor.stage0/1/2(transition)`. Anything else a version needs governance (or an
   admin) to do goes through `declareExternalAction` (`ExternalActionsLib`) and is listed in the
   output's `external_actions` — protocol-ops refuses a bundle carrying a call that is neither.
-  `DefaultChainUpgrade` is the per-chain leg. A version script inherits these and overrides only
-  what its release changes.
+  `DefaultChainUpgrade` is the per-chain leg, selecting the modern cut-reading call for a v34+
+  chain and reconstructing a cut only for one that predates it. A version script inherits these
+  and overrides only what its release changes.
 - `v35/` — the first registry-driven release: `CoreUpgrade_v35` deploys one fresh
-  `L1MessageRoot`; `CTMUpgrade_v35` overrides nothing. This demonstrates the recurring
-  prepare interface; the inherited pipeline still invokes deployment helpers for the full facet set.
+  `L1MessageRoot`; `CTMUpgrade_v35` overrides nothing. This demonstrates the recurring prepare
+  interface: the inherited pipeline reuses every release member whose code the version does not
+  change, so a CTM-side no-op deploys nothing and reuses the release object itself.
 - `v34/` — the bootstrap edge: `CoreUpgrade_v34` and `CTMUpgrade_v34` deploy the
   `EcosystemUpgradeExecutor`, `CTMUpgradeExecutor` and `RegistryBootstrapMigration`, and declare
   every call of the one-time edge (pause/unpause, timer start, the two handovers, `migrate()`,
@@ -68,23 +70,25 @@ puts the changed built-ins in the L2 leg. See the Transition sections of
 
 ## Script retirement review
 
-The registry contracts now compose the recurring and bootstrap payloads on-chain, and a pinned
-composer defines the L2 delegate arguments. The remaining script cleanup should remove the
-parallel definitions while preserving the supported legacy entry edge:
+The registry contracts compose the recurring and bootstrap payloads on-chain, a pinned composer
+defines the L2 delegate arguments, and the prepare scripts no longer keep a parallel definition of
+any of it. Retirement runs as batches, planned in
+[the retirement plan](../../../docs/upgrade-script-retirement.md); batch 1 has landed:
 
-1. Replace script-generated proposals and cuts with reads from the deployed bootstrap or
-   transition. Move the bootstrap's script/on-chain equivalence assertion into regression tests;
-   then retire the legacy composition inheritance where no caller remains.
-2. Choose the modern per-chain call before retrieving a legacy cut. `AdminFunctions` and
-   `DefaultChainUpgrade` still retrieve a cut from historical logs even when the modern call
-   does not carry it. Keep that retrieval only for supported legacy chains.
-3. Isolate bootstrap authorization, pause/timer calls and compatibility adapters from the
-   recurring prepare path. Retain declared external actions wherever another administrator
-   must execute a row or governance performs a separate operation.
-4. Reuse unchanged release members for small upgrades instead of invoking the full deployment
-   pipeline. Remove legacy genesis/cut output fields after migrating their consumers.
-5. Make fresh deployments establish the executors and their authorizations as part of setup,
-   so their first recurring upgrade does not need the legacy bootstrap preparation machinery.
+- The committed cut is READ from the object that composes it — `RegistryBootstrapMigration` for
+  the bootstrap edge, the transition's composer for a recurring one. The script-side proposal, L2
+  transaction and delegate-calldata composition are gone.
+- The per-chain call selects the modern, cut-READING entrypoint first
+  (`UpgradeChainCall.requiresCut`); a cut is reconstructed from the CTM's historical log only for a
+  chain that predates it.
+- An upgrade deploys only the release members whose code it changes: each member is compared with
+  what the current sources produce, and a replacement of a live member is printed with both
+  codehashes so an artifact difference is visible rather than silently widening the upgrade.
+- Pinned registry objects are deployed from the same build artifact their codehash pin is read
+  from, and the prepare re-checks every object it deploys against the live executors' pins.
+
+What remains: an authoritative deployment inventory, fresh-deployment authority setup, an audited
+path for cross-contract follow-up wiring, and collapsing the version-specific prepare hierarchy.
 
 Compilation, artifact loading, hashing, bytecode publication, simulation, signing and submission
 remain tooling responsibilities. Deleting a wrapper must preserve its authorization and state

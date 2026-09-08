@@ -376,8 +376,10 @@ error OperationMustBePending();
 error OperationMustBeReady();
 // 0xb926450e
 error OriginChainIdNotFound();
-// 0x352cb44f
-error PatchMustReuseRelease(address fromRelease, address newRelease);
+// 0x720432d4
+error PatchCannotCarryL2Upgrade();
+// 0x0f808de6
+error PatchChangesL2GenesisState();
 // 0x97da9c1c
 error PayloadTooShort();
 // 0x688c63e5

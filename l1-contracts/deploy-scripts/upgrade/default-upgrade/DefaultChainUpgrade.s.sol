@@ -52,27 +52,38 @@ contract DefaultChainUpgrade is Script {
         // It is just a wrapper to easily call `upgradeChain`
     }
 
+    /// @notice Upgrades one chain to the version its CTM is on. A v34+ chain takes the modern,
+    ///         cut-READING call; only a chain that predates it needs a cut, which is reconstructed
+    ///         from the CTM's historical `NewUpgradeCutData` log for exactly that legacy edge.
     function run(address ctm, uint256 chainChainId) public virtual {
         setupConfigFromOnchain(ctm, chainChainId);
-        Diamond.DiamondCutData memory diamondCutData = GetDiamondCutData.getDiamondCutData(
-            ctm,
-            config.oldProtocolVersion
-        );
-        upgradeChain(diamondCutData);
+        if (!UpgradeChainCall.requiresCut(config.oldProtocolVersion)) {
+            upgradeChainWithoutCut();
+            return;
+        }
+        upgradeChain(GetDiamondCutData.getDiamondCutData(ctm, config.oldProtocolVersion));
     }
 
-    function upgradeChain(Diamond.DiamondCutData memory diamondCutData) public virtual {
-        bytes memory callData = UpgradeChainCall.encode(
-            config.chainDiamondProxyAddress,
-            config.oldProtocolVersion,
-            diamondCutData
+    /// @notice The modern per-chain call: the chain reads the committed cut from its own CTM.
+    function upgradeChainWithoutCut() public virtual {
+        _adminExecuteOnChain(
+            UpgradeChainCall.encodeWithoutCut(config.chainDiamondProxyAddress, config.oldProtocolVersion)
         );
+    }
 
+    /// @notice The legacy per-chain call: the chain is HANDED the cut it must execute.
+    function upgradeChain(Diamond.DiamondCutData memory diamondCutData) public virtual {
+        _adminExecuteOnChain(
+            UpgradeChainCall.encode(config.chainDiamondProxyAddress, config.oldProtocolVersion, diamondCutData)
+        );
+    }
+
+    function _adminExecuteOnChain(bytes memory _callData) private {
         Utils.adminExecute(
             IZKChain(config.chainDiamondProxyAddress).getAdmin(),
             address(0),
             config.chainDiamondProxyAddress,
-            callData,
+            _callData,
             0
         );
     }
@@ -89,15 +100,6 @@ contract DefaultChainUpgrade is Script {
         });
 
         Utils.adminExecuteCalls(admin, address(0), calls);
-    }
-
-    function executeUpgrade(address ctm, uint256 chainChainId) public {
-        IChainTypeManager chainTypeManager = IChainTypeManager(ctm);
-        config.chainDiamondProxyAddress = chainTypeManager.getZKChain(chainChainId);
-        IZKChain chain = IZKChain(config.chainDiamondProxyAddress);
-        uint256 oldProtocolVersion = chain.getProtocolVersion();
-        Diamond.DiamondCutData memory diamondCutData = GetDiamondCutData.getDiamondCutData(ctm, oldProtocolVersion);
-        chain.executeUpgrade(diamondCutData);
     }
 
     function setupConfigFromOnchain(address ctm, uint256 chainChainId) public {

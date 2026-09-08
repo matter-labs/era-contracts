@@ -167,6 +167,74 @@ contract RegistryIndividualUpgradeTest is ZKsyncOSChainTypeManagerSharedTest, Re
         assertEq(IGetters(chainAddress).getL2SystemContractsUpgradeTxHash(), bytes32(0), "no L2 transaction");
     }
 
+    /// @dev A VERIFIER replacement as a SemVer PATCH. The release is the immutable snapshot of the
+    ///      intended contracts, so replacing the verifier means publishing a new release that
+    ///      copies the departing one except for that member — which is a patch, not a minor bump:
+    ///      no chain-visible L2 state changes, so no L2 upgrade transaction is needed. The routing
+    ///      is identical on both edges, so the patch must not remove and re-add the same facets.
+    function test_verifierPatch_replacesTheVerifierWithinTheSameMinorVersion() public {
+        _runHop(transitionV32);
+        UnrelatedState memory before = _snapshot();
+        address verifierNext = address(new AcceptingVerifier());
+        assertTrue(before.verifier != verifierNext, "the fixture must actually replace the verifier");
+        CTMRelease target = _release(address(0), verifierNext);
+        CTMTransition verifierPatch = _transition(
+            V32,
+            V32_PATCH_1,
+            transitionV32.newRelease(),
+            address(target),
+            _noRows()
+        );
+        assertEq(verifierPatch.facetCuts().length, 0, "identical routing must derive no facet cut");
+        assertEq(verifierPatch.l2Plan().deployments.length, 0, "a verifier patch has no L2 side");
+
+        _runHop(verifierPatch);
+
+        assertEq(IGetters(chainAddress).getProtocolVersion(), V32_PATCH_1, "the chain crossed the patch edge");
+        assertEq(chainContractAddress.protocolVersion(), V32_PATCH_1, "the CTM committed the patch edge");
+        assertEq(address(IGetters(chainAddress).getVerifier()), verifierNext, "the verifier switched on a patch");
+        _assertFacetsUnchanged(before);
+        assertEq(vm.load(address(chainContractAddress), EIP1967_IMPLEMENTATION_SLOT), before.ctmImplementationSlot);
+        assertEq(
+            chainContractAddress.currentRelease(),
+            address(target),
+            "a patch that changes the snapshot moves the CTM to the new release"
+        );
+        assertEq(IGetters(chainAddress).getL2SystemContractsUpgradeTxHash(), bytes32(0), "no L2 transaction");
+    }
+
+    /// @dev The same patch while an EARLIER minor upgrade's L2 transaction is still pending. This
+    ///      is the case a patch exists for: `BaseZkSyncUpgrade` deliberately does not require the
+    ///      previous L2 upgrade to be finalized on a patch edge, and must not overwrite or clear
+    ///      it — a chain that has committed but not yet executed its L2 upgrade can still take a
+    ///      verifier fix.
+    function test_verifierPatch_leavesAPendingL2UpgradeUntouched() public {
+        _runHop(transitionV32);
+        // The v33 hop carries an L2 side, so the chain commits an L2 upgrade transaction that
+        // stays pending until its batches finalize it.
+        _runHop(transitionV33);
+        bytes32 pendingTxHash = IGetters(chainAddress).getL2SystemContractsUpgradeTxHash();
+        assertTrue(pendingTxHash != bytes32(0), "the fixture must leave an L2 upgrade pending");
+        UnrelatedState memory before = _snapshot();
+
+        address verifierNext = address(new AcceptingVerifier());
+        // A copy of the DEPARTING snapshot with the verifier replaced and nothing else — the
+        // v33 release's facet routing and its L2 bytecode table carried over verbatim.
+        CTMRelease target = new CTMRelease(_releaseManifest(newAdminFacet, verifierNext));
+        CTMTransition verifierPatch = _transition(V33, V33 + 1, transitionV33.newRelease(), address(target), _noRows());
+        assertEq(verifierPatch.facetCuts().length, 0, "identical routing must derive no facet cut");
+
+        _runHop(verifierPatch);
+
+        assertEq(address(IGetters(chainAddress).getVerifier()), verifierNext, "the verifier switched on a patch");
+        assertEq(
+            IGetters(chainAddress).getL2SystemContractsUpgradeTxHash(),
+            pendingTxHash,
+            "the pending L2 upgrade transaction must survive the patch"
+        );
+        _assertFacetsUnchanged(before);
+    }
+
     // ── helpers ──
 
     function _snapshot() internal view returns (UnrelatedState memory state) {

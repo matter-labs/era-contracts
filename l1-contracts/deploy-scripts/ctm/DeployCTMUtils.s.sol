@@ -67,6 +67,7 @@ import {
 import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 
 import {CTMDeployedAddresses} from "../utils/Types.sol";
+import {Facets} from "contracts/common/StateTransitionTypes.sol";
 import {GenesisConfig, ReleaseGenesisData, ReleaseManifest} from "../../contracts/upgrades/registry/RegistryTypes.sol";
 
 // solhint-disable-next-line gas-struct-packing
@@ -116,16 +117,51 @@ abstract contract DeployCTMUtils is DeployUtils {
     /// @dev Per-run scratch file for the batch blake2s FFI call.
     string internal _blakeBatchTmpFile;
 
+    /// @notice Deploys the release's L1 members and pins them in a `CTMRelease`. Each member that
+    ///         the live release already runs byte-identical code for is REUSED rather than
+    ///         redeployed (see {_canReuseReleaseMember}), so an upgrade deploys what it changes.
     //slither-disable-next-line reentrancy-benign
     function deployStateTransitionDiamondFacets() internal {
-        ctmAddresses.stateTransition.facets.executorFacet = deploySimpleContract("ExecutorFacet");
-        ctmAddresses.stateTransition.facets.adminFacet = deploySimpleContract("AdminFacet");
-        ctmAddresses.stateTransition.facets.mailboxFacet = deploySimpleContract("MailboxFacet");
-        ctmAddresses.stateTransition.facets.gettersFacet = deploySimpleContract("GettersFacet");
-        ctmAddresses.stateTransition.facets.migratorFacet = deploySimpleContract("MigratorFacet");
-        ctmAddresses.stateTransition.facets.committerFacet = deploySimpleContract("CommitterFacet");
-        ctmAddresses.stateTransition.facets.diamondInit = deploySimpleContract("DiamondInit");
+        Facets memory live = ctmAddresses.stateTransition.facets;
+        ctmAddresses.stateTransition.facets.executorFacet = _deployReleaseMember("ExecutorFacet", live.executorFacet);
+        ctmAddresses.stateTransition.facets.adminFacet = _deployReleaseMember("AdminFacet", live.adminFacet);
+        ctmAddresses.stateTransition.facets.mailboxFacet = _deployReleaseMember("MailboxFacet", live.mailboxFacet);
+        ctmAddresses.stateTransition.facets.gettersFacet = _deployReleaseMember("GettersFacet", live.gettersFacet);
+        ctmAddresses.stateTransition.facets.migratorFacet = _deployReleaseMember("MigratorFacet", live.migratorFacet);
+        ctmAddresses.stateTransition.facets.committerFacet = _deployReleaseMember(
+            "CommitterFacet",
+            live.committerFacet
+        );
+        ctmAddresses.stateTransition.facets.diamondInit = _deployReleaseMember("DiamondInit", live.diamondInit);
         ctmAddresses.stateTransition.currentRelease = deployCurrentRelease();
+    }
+
+    /// @notice Deploys `_name`, or keeps `_live` when it may serve as this release's member.
+    /// @dev Every replacement of a LIVE member is printed with both codehashes. A member is
+    ///      replaced either because this version changed it or because the local build differs
+    ///      from the one that produced the live code; the two are indistinguishable from here, so
+    ///      the decision is surfaced for the operator to recognise rather than absorbed silently.
+    function _deployReleaseMember(string memory _name, address _live) internal returns (address) {
+        if (_canReuseReleaseMember(_name, _live)) {
+            console.log("Release member unchanged, reusing:", _name, _live);
+            return _live;
+        }
+        address deployed = deploySimpleContract(_name);
+        if (_live != address(0) && _live != deployed) {
+            console.log("Release member REPLACED:", _name);
+            console.log("  live:", _live);
+            console.logBytes32(_live.codehash);
+            console.log("  new: ", deployed);
+            console.logBytes32(deployed.codehash);
+        }
+        return deployed;
+    }
+
+    /// @notice Whether the live `_live` may serve as this release's `_name` member. Fresh
+    ///         deployments never reuse — there is no live release to reuse from — so the default
+    ///         is `false`; upgrade prepares override it with a code-identity check.
+    function _canReuseReleaseMember(string memory, address) internal virtual returns (bool) {
+        return false;
     }
 
     /// @dev Virtual so bytecode-light test harnesses can substitute the table: the real builder
@@ -269,6 +305,18 @@ abstract contract DeployCTMUtils is DeployUtils {
                 l2BytecodeInfos: getL2BytecodeInfoTable()
             })
         );
+
+        // An upgrade whose release members all reused (nothing this version changes lives in the
+        // release) pins the SAME manifest, so the live release object serves it: a transition with
+        // `fromRelease == newRelease` derives an empty L1 delta, which is the point — a chain sees
+        // no facet churn for an upgrade that does not touch its facets.
+        address liveRelease = ctmAddresses.stateTransition.currentRelease;
+        if (liveRelease != address(0) && liveRelease.code.length != 0) {
+            if (CTMRelease(liveRelease).manifestHash() == keccak256(abi.encode(manifest))) {
+                console.log("Reusing the live CTMRelease (identical manifest):", liveRelease);
+                return liveRelease;
+            }
+        }
 
         // Via the CREATE2 factory, like every other pipeline deployment — upgrade prepares reach
         // the real chain through the Safe bundle, which replays factory transactions only.

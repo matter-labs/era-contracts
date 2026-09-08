@@ -11,6 +11,7 @@ import {CTM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol";
 import {L2PlanValidationLib} from "../libraries/L2PlanValidationLib.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
+import {IDiamondInit} from "../../../state-transition/chain-interfaces/IDiamondInit.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
 import {
@@ -21,7 +22,8 @@ import {
 } from "../../ZkSyncUpgradeErrors.sol";
 import {
     MalformedL2UpgradePlan,
-    PatchMustReuseRelease,
+    PatchCannotCarryL2Upgrade,
+    PatchChangesL2GenesisState,
     SameReleaseTransitionHasPayload,
     TransitionDeadlineBeforeUpgrade,
     ZeroAddress
@@ -95,17 +97,18 @@ contract CTMTransition is ICTMTransition {
         ICTMRelease(_manifest.newRelease).validate();
         ICTMRelease(_manifest.fromRelease).validate();
 
-        // A SemVer patch bump changes no chain state by definition, so it must reuse the
-        // departing release.
+        bool isPatch;
         {
             // Patch component deliberately ignored: this check is about the major.minor edge.
             // slither-disable-next-line unused-return
             (uint32 oldMajor, uint32 oldMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_manifest.oldProtocolVersion));
             // slither-disable-next-line unused-return
             (uint32 newMajor, uint32 newMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_manifest.newProtocolVersion));
-            if (oldMajor == newMajor && oldMinor == newMinor && _manifest.fromRelease != _manifest.newRelease) {
-                revert PatchMustReuseRelease(_manifest.fromRelease, _manifest.newRelease);
-            }
+            // A SemVer PATCH edge. It may name a NEW release: a release is the immutable snapshot
+            // of the intended contracts, and replacing a verifier or a facet in that snapshot is
+            // not by itself a change of chain-visible L2 state. What a patch may not do is carry
+            // an L2 upgrade transaction — see the patch checks after the plan is combined.
+            isPatch = oldMajor == newMajor && oldMinor == newMinor;
             // The same version-shape rules `BaseZkSyncUpgrade._setNewProtocolVersion` applies per
             // chain. Without them a transition pins fine and `applyCTMUpgrade` bumps the CTM, after
             // which EVERY chain upgrade reverts and only break-glass can recover.
@@ -164,6 +167,24 @@ contract CTMTransition is ICTMTransition {
         if (_manifest.fromRelease == _manifest.newRelease && hasL2Side) {
             revert SameReleaseTransitionHasPayload();
         }
+        // A PATCH edge may move L1 code (the verifier, facets, CTM-domain proxy rows) but never
+        // the chains' L2 side: `BaseZkSyncUpgrade._setL2SystemContractUpgrade` refuses an L2
+        // protocol upgrade transaction on a patch (`PatchCantSetUpgradeTxn`), and a patch
+        // deliberately does NOT require an earlier L2 upgrade to be finalized first — a pending
+        // one must survive the patch untouched. Refused HERE, before governance can commit a
+        // transition that would bump the CTM and then revert on every chain.
+        if (isPatch) {
+            if (hasL2Side) {
+                revert PatchCannotCarryL2Upgrade();
+            }
+            // An empty DERIVED deployment list is not enough on its own: it only proves the two
+            // L2 bytecode tables agree. The rest of the release's L2/genesis description — the
+            // force-deployment blob and the genesis batch a new chain starts from, and the VM the
+            // pinned DiamondInit selects — is never executed on an existing chain, so a patch
+            // changing it would leave chains created after the patch describing a different L2
+            // state from the ones that took it.
+            _requirePatchKeepsL2State(ICTMRelease(_manifest.fromRelease), ICTMRelease(_manifest.newRelease));
+        }
 
         encodedManifest = abi.encode(_manifest);
         encodedL2Deployments = abi.encode(l2Deployments);
@@ -176,6 +197,35 @@ contract CTMTransition is ICTMTransition {
         uint256 length = facetCutsMemory.length;
         for (uint256 i = 0; i < length; ++i) {
             derivedFacetCuts.push(facetCutsMemory[i]);
+        }
+    }
+
+    /// @dev The L2/genesis description a patch must carry over unchanged (see the constructor).
+    ///      Compared by value, not by release identity — the point of allowing a patch to name a
+    ///      new release is that the snapshot may differ in its L1 members.
+    function _requirePatchKeepsL2State(ICTMRelease _fromRelease, ICTMRelease _newRelease) private view {
+        if (address(_fromRelease) == address(_newRelease)) {
+            return;
+        }
+        if (
+            keccak256(abi.encode(_fromRelease.l2BytecodeInfos())) !=
+                keccak256(abi.encode(_newRelease.l2BytecodeInfos())) ||
+            keccak256(_fromRelease.fixedForceDeploymentsData()) != keccak256(_newRelease.fixedForceDeploymentsData())
+        ) {
+            revert PatchChangesL2GenesisState();
+        }
+        // slither-disable-next-line unused-return
+        (, bytes32 fromBatchHash, bytes32 fromCommitment, uint64 fromIndex) = _fromRelease.genesisParams();
+        // slither-disable-next-line unused-return
+        (, bytes32 newBatchHash, bytes32 newCommitment, uint64 newIndex) = _newRelease.genesisParams();
+        if (fromBatchHash != newBatchHash || fromCommitment != newCommitment || fromIndex != newIndex) {
+            revert PatchChangesL2GenesisState();
+        }
+        if (
+            IDiamondInit(_fromRelease.diamondInit()).IS_ZKSYNC_OS() !=
+            IDiamondInit(_newRelease.diamondInit()).IS_ZKSYNC_OS()
+        ) {
+            revert PatchChangesL2GenesisState();
         }
     }
 

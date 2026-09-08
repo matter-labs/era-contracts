@@ -40,7 +40,8 @@ import {
     L2ExtraDeploymentNotBytecodeDerived,
     L2ExtraDeploymentNotUnsafe,
     MalformedL2UpgradePlan,
-    PatchMustReuseRelease,
+    PatchCannotCarryL2Upgrade,
+    PatchChangesL2GenesisState,
     RegistryCodehashMismatch,
     RegistryDuplicateProxyRow,
     RegistryDuplicateSelector,
@@ -477,13 +478,75 @@ contract StorageRegistriesTest is Test {
         new CTMTransition(manifest);
     }
 
-    function test_revertWhen_patchTargetsDifferentRelease() public {
+    /// @dev A PATCH may name a new release: the release is the snapshot of the intended
+    ///      contracts, and replacing an L1 member of it changes no chain-visible L2 state. Here
+    ///      the target release replaces the admin facet, so the patch even derives real cuts.
+    function test_patchMayTargetANewRelease() public {
         TransitionManifest memory manifest = _patchManifest();
         manifest.fromRelease = address(fromRelease);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(PatchMustReuseRelease.selector, address(fromRelease), address(newRelease))
-        );
+        CTMTransition patch = new CTMTransition(manifest);
+
+        assertEq(patch.fromRelease(), address(fromRelease));
+        assertEq(patch.newRelease(), address(newRelease));
+        assertTrue(patch.facetCuts().length != 0, "the target release replaces a facet, so cuts are derived");
+        assertEq(patch.l2Plan().deployments.length, 0, "an unchanged L2 table derives no L2 deployment");
+    }
+
+    /// @dev What a patch may NOT do: carry an L2 upgrade transaction.
+    ///      `BaseZkSyncUpgrade._setL2SystemContractUpgrade` refuses one on a patch edge, and a
+    ///      patch deliberately skips the "previous L2 upgrade finalized" check — so an L2 payload
+    ///      on a patch would commit fine, bump the CTM, and then revert on every chain.
+    function test_revertWhen_patchCarriesAnAuthoredL2Payload() public {
+        TransitionManifest memory manifest = _patchManifest();
+        manifest.fromRelease = address(fromRelease);
+        manifest.l2Plan = _l2Plan();
+
+        vm.expectRevert(PatchCannotCarryL2Upgrade.selector);
+        new CTMTransition(manifest);
+    }
+
+    /// @dev The DERIVED half of the same rule: a patch whose target release changes the L2
+    ///      bytecode table derives force deployments, which is an L2 upgrade by another name. The
+    ///      plan here is otherwise well-formed (delegate, composer, every installed bytecode among
+    ///      the dependencies), so the patch rule is what rejects it.
+    function test_revertWhen_patchDerivesL2DeploymentsFromItsTargetRelease() public {
+        TransitionManifest memory manifest = _patchManifest();
+        manifest.fromRelease = address(fromRelease);
+        manifest.newRelease = address(_tableRelease());
+        manifest.l2Plan = _l2PlanWithTableDeps();
+
+        vm.expectRevert(PatchCannotCarryL2Upgrade.selector);
+        new CTMTransition(manifest);
+    }
+
+    /// @dev The genesis half of the same rule: a patch whose target release describes a different
+    ///      L2 genesis is never executed on existing chains, so chains created after the patch
+    ///      would start from a state the patched chains never reached. An empty DERIVED deployment
+    ///      list does not cover this — only the tables agree there.
+    function test_revertWhen_patchTargetsAReleaseWithDifferentGenesisState() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.genesis.fixedForceDeploymentsData = hex"f1f3";
+        CTMRelease genesisRelease = new CTMRelease(releaseManifest);
+
+        TransitionManifest memory manifest = _patchManifest();
+        manifest.fromRelease = address(fromRelease);
+        manifest.newRelease = address(genesisRelease);
+
+        vm.expectRevert(PatchChangesL2GenesisState.selector);
+        new CTMTransition(manifest);
+    }
+
+    function test_revertWhen_patchTargetsAReleaseWithADifferentGenesisBatch() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.genesis.genesisBatchHash = bytes32(uint256(2));
+        CTMRelease genesisRelease = new CTMRelease(releaseManifest);
+
+        TransitionManifest memory manifest = _patchManifest();
+        manifest.fromRelease = address(fromRelease);
+        manifest.newRelease = address(genesisRelease);
+
+        vm.expectRevert(PatchChangesL2GenesisState.selector);
         new CTMTransition(manifest);
     }
 

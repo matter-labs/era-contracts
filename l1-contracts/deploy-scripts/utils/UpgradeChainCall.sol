@@ -33,6 +33,19 @@ library UpgradeChainCall {
     uint256 internal constant V31_THRESHOLD = uint256(31) << 32;
     uint256 internal constant V34_THRESHOLD = uint256(34) << 32;
 
+    /// @notice Whether a chain on `_protocolVersion` must be HANDED the cut. False from v34: the
+    ///         chain reads it from its own ChainTypeManager, so a caller must not reconstruct one
+    ///         (registry-driven edges commit no `NewUpgradeCutData` log to reconstruct it from).
+    function requiresCut(uint256 _protocolVersion) internal pure returns (bool) {
+        return _protocolVersion < V34_THRESHOLD;
+    }
+
+    /// @notice The cut-READING call of a v34+ chain.
+    function encodeWithoutCut(address _chainAddress, uint256 _protocolVersion) internal pure returns (bytes memory) {
+        require(!requiresCut(_protocolVersion), "chain predates the cut-reading entrypoint");
+        return abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainAddress, _protocolVersion));
+    }
+
     function encode(
         address _chainAddress,
         uint256 _protocolVersion,

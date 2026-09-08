@@ -17,7 +17,7 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "../../utils/Utils.sol";
-import {StateTransitionDeployedAddresses, ChainCreationParamsConfig, ZkChainAddresses} from "../../utils/Types.sol";
+import {ChainCreationParamsConfig, ZkChainAddresses} from "../../utils/Types.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
@@ -48,7 +48,8 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
-import {DefaultL2UpgradeStrategy} from "./DefaultL2UpgradeStrategy.sol";
+import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
+import {PinnedRegistryObject} from "./PinnedRegistryObject.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {CTMUpgradeParams} from "./UpgradeParams.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
@@ -78,7 +79,7 @@ import {ExternalActionsLib} from "./ExternalActionsLib.sol";
 ///         action and listed in the output.
 /// @dev Version scripts inherit and override; the v34 bootstrap edge deploys no transition and
 ///      declares every call of its one-time edge instead.
-contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
+contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     using stdToml for string;
     using ExternalActionsLib for ExternalActionsLib.Ledger;
 
@@ -112,9 +113,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         uint256 chainId;
     }
 
-    // solhint-disable-next-line gas-struct-packing
     struct NewlyGeneratedData {
-        bytes diamondCutData;
+        /// @dev The committed upgrade cut, READ from the upgrade object that composes it on-chain.
         bytes upgradeCutData;
     }
 
@@ -307,6 +307,18 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         if (rollupDAManager != address(0)) {
             ctmAddresses.daAddresses.daContracts.rollupDAManager = rollupDAManager;
         }
+
+        // The CTM domain's live EIP-7702 checker. It is a permanent, argument-less singleton that
+        // the `MailboxFacet` pins as an IMMUTABLE, and the live deployment does not expose it
+        // (`AddressIntrospector` reports zero), so it is an explicit operator input — the previous
+        // prepare recorded it in its output as `[state_transition] eip7702_checker_addr`. Without
+        // it every upgrade deploys a fresh checker, which changes the Mailbox's immutable and so
+        // drags a Mailbox redeploy — and a facet cut on every chain — behind it. Omit it for a
+        // CTM that has none yet and one is deployed. Read AFTER `initializeConfig`, which replaces
+        // `ctmAddresses` wholesale from live introspection.
+        if (toml.keyExists("$.contracts.eip7702_checker")) {
+            setEIP7702Checker(toml.readAddress("$.contracts.eip7702_checker"));
+        }
     }
 
     /// @notice Full default upgrade preparation flow
@@ -362,8 +374,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             coreRegistry: coreRegistryPin,
             upgradeTimer: _pin(upgradeAddresses.upgradeTimer)
         });
+        // From the build ARTIFACT, which is also where the bound executor's `TRANSITION_CODEHASH`
+        // came from — see {PinnedRegistryObject}.
         upgradeAddresses.ctmTransition = deployViaCreate2AndNotify(
-            type(CTMTransition).creationCode,
+            PinnedRegistryObject.creationCode("CTMTransition.sol", "CTMTransition"),
             abi.encode(manifest),
             "CTMTransition"
         );
@@ -372,6 +386,28 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             ICTMTransition(upgradeAddresses.ctmTransition).verifyAll(),
             "transition does not verify against the live deployment"
         );
+        _requireObjectsMatchExecutorPins();
+    }
+
+    /// @notice Checks the objects this prepare hands to the executors against the codehashes those
+    ///         executors were CONSTRUCTED with — the type-provenance gate of `stage0` and
+    ///         `applyL1Upgrade`, evaluated at prepare time.
+    /// @dev These immutables were set when the executors were deployed, possibly by an earlier
+    ///      release's prepare. Nothing keeps a later build's artifact byte-identical to that one, so
+    ///      a drifted object would otherwise only surface as a stage-0 revert with the whole upgrade
+    ///      already reviewed and scheduled.
+    function _requireObjectsMatchExecutorPins() internal view virtual {
+        CTMUpgradeExecutor executor = CTMUpgradeExecutor(payable(boundCTMUpgradeExecutor()));
+        require(
+            upgradeAddresses.ctmTransition.codehash == executor.TRANSITION_CODEHASH(),
+            "the deployed transition does not run the code the bound CTM executor pins"
+        );
+        if (upgradeAddresses.coreRegistry != address(0)) {
+            require(
+                upgradeAddresses.coreRegistry.codehash == executor.ECOSYSTEM_EXECUTOR().CORE_REGISTRY_CODEHASH(),
+                "the core prepare's registry does not run the code the ecosystem executor pins"
+            );
+        }
     }
 
     /// @notice The enum-indexed CTM-domain inventory of this edge: a source-checked row for every
@@ -477,6 +513,45 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         upgradeAddresses.coreRegistry = _coreRegistry;
     }
 
+    /// @notice The CTM domain's live EIP-7702 checker (see `CTMUpgradeParams.eip7702Checker`).
+    ///         Zero leaves it to be deployed fresh.
+    function setEIP7702Checker(address _eip7702Checker) public virtual {
+        ctmAddresses.admin.eip7702Checker = _eip7702Checker;
+    }
+
+    /// @notice A live release member may serve this release when it ALREADY runs the code the
+    ///         current sources produce with this run's constructor arguments — so an upgrade
+    ///         deploys only the members it changes, and one that changes none of them reuses the
+    ///         release object itself.
+    /// @dev The identity check needs a local deployment: an artifact's `deployedBytecode` carries
+    ///      ZEROED immutable slots, so it cannot be compared against live code. The probe is a
+    ///      plain CREATE in the script's own EVM and is never broadcast — nothing reaches the
+    ///      chain — and it is exact, immutables included (the same technique
+    ///      `GatewayCTMDeployerHelper` uses to predict Gateway codehashes).
+    function _canReuseReleaseMember(string memory _name, address _live) internal virtual override returns (bool) {
+        if (_live == address(0) || _live.code.length == 0) {
+            return false;
+        }
+        return _live.codehash == this.probeReleaseMemberCodehash(_name);
+    }
+
+    /// @notice The runtime codehash `_name` gets when deployed from the current sources with this
+    ///         run's constructor arguments.
+    /// @dev External so it runs in its OWN call frame: it reads a build artifact, and a prepare
+    ///      reads dozens of them — memory is charged quadratically and never freed within a frame,
+    ///      so reading them all into the pipeline's frame is what makes a prepare run out of gas.
+    ///      The probe deployment is a plain CREATE and is never broadcast.
+    function probeReleaseMemberCodehash(string memory _name) external returns (bytes32) {
+        bytes memory initCode = abi.encodePacked(getCreationCode(_name), getCreationCalldata(_name));
+        address probe;
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            probe := create(0, add(initCode, 0x20), mload(initCode))
+        }
+        require(probe != address(0), "release member code probe failed to deploy");
+        return probe.codehash;
+    }
+
     /// @notice Declares one governance/admin call this prepare emits that the upgrade objects do
     ///         not describe (see {ExternalActionsLib}).
     function declareExternalAction(
@@ -525,7 +600,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         // Empty by default.
     }
 
-    /// @notice Generate data required for the upgrade
+    /// @notice Generate data required for the upgrade.
+    /// @dev The chain-CREATION cut is deliberately not recomputed here: from v34 the CTM builds it
+    ///      per chain creation from its pinned release, so an upgrade prepare has nothing to say
+    ///      about it (see the retired `diamond_cut_data` output field).
     function generateUpgradeData() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
         // TODO Return the require after getting the version from bridgehub
@@ -534,23 +612,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         // Important, this must come after the initializeExpectedL2Addresses
         getFixedForceDeploymentsData();
         console.log("Generated fixed force deployments data");
-        Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(ctmAddresses.stateTransition);
-        // TODO probably don't need to assign it to diamondCutData
-        config.contracts.diamondCutData = abi.encode(diamondCut);
-        newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
-        console.log("Prepared diamond cut data");
-    }
-
-    function generateUpgradeCutDataFromLocalConfig(
-        StateTransitionDeployedAddresses memory _stateTransition
-    ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
-        upgradeCutData = generateUpgradeCutData(
-            _stateTransition,
-            config.contracts.chainCreationParams,
-            config.l1ChainId,
-            config.ownerAddress,
-            factoryDepsResult
-        );
     }
 
     function getOwnerAddress() public virtual returns (address) {
@@ -1007,8 +1068,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         vm.serializeAddress("admin", "timer_governance_addr", timerGovernance());
         string memory admin = vm.serializeAddress("admin", "ecosystem_admin_addr", newConfig.ecosystemAdminAddress);
 
-        // Serialize generated upgrade data
-        vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
+        // Serialize generated upgrade data. There is no `diamond_cut_data`: the chain-creation cut
+        // is the CTM's own function of its pinned release, not a prepare output.
         vm.serializeBytes("contracts_newConfig", "force_deployments_data", generatedData.forceDeploymentsData);
 
         // Serialize protocol version info (needed for upgrade)
@@ -1057,24 +1118,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     function getChainUpgradeDiamondCutData() public view returns (bytes memory) {
         require(upgradeConfig.upgradeCutPrepared, "upgrade cut data not prepared");
         return newlyGeneratedData.upgradeCutData;
-    }
-
-    /// @dev Test-only: inject pre-computed upgrade cut data to avoid recomputing (memory optimization).
-    function setChainUpgradeDiamondCutData_TestOnly(bytes memory _data) public {
-        newlyGeneratedData.upgradeCutData = _data;
-        upgradeConfig.upgradeCutPrepared = true;
-    }
-
-    /// @dev Test-only: inject pre-computed fixed force deployments data.
-    function setFixedForceDeploymentsData_TestOnly(bytes memory _data) public {
-        generatedData.forceDeploymentsData = _data;
-        upgradeConfig.fixedForceDeploymentsDataGenerated = true;
-    }
-
-    /// @notice Returns the encoded FixedForceDeploymentsData bytes.
-    function getEncodedFixedForceDeploymentsData() public view returns (bytes memory) {
-        require(upgradeConfig.fixedForceDeploymentsDataGenerated, "force deployments data not generated");
-        return generatedData.forceDeploymentsData;
     }
 
     ////////////////////////////// Misc utils /////////////////////////////////

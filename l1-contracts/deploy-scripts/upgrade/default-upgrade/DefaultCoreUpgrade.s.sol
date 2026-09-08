@@ -27,6 +27,7 @@ import {BridgehubAddresses, CoreDeployedAddresses} from "../../utils/Types.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CoreUpgradeParams} from "./UpgradeParams.sol";
+import {PinnedRegistryObject} from "./PinnedRegistryObject.sol";
 import {ExternalActionsLib} from "./ExternalActionsLib.sol";
 import {Utils} from "../../utils/Utils.sol";
 
@@ -128,9 +129,11 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             console.log("No ecosystem implementation deployed: this upgrade has no CoreRegistry");
             return;
         }
+        // From the build ARTIFACT, which is also where the ecosystem executor's
+        // `CORE_REGISTRY_CODEHASH` came from — see {PinnedRegistryObject}.
         coreRegistry = CoreRegistry(
             deployViaCreate2AndNotify(
-                type(CoreRegistry).creationCode,
+                PinnedRegistryObject.creationCode("CoreRegistry.sol", "CoreRegistry"),
                 abi.encode(CoreRegistryManifest({proxyUpgrades: rows})),
                 "CoreRegistry"
             )

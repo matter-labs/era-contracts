@@ -708,12 +708,17 @@ async fn verify_set_chain_creation_params_payload(
         errors += 1;
     }
 
-    errors += expect_hex_equal(
-        result,
-        "chain creation diamond cut",
-        &ctm.contracts_config.diamond_cut_data,
-        &hex::encode(params.diamondCut.abi_encode()),
-    );
+    // Retired output field: a registry-driven prepare no longer restates the chain-creation cut
+    // (the CTM builds it from its pinned release). Shipped v31-v33 artifacts still carry it, and
+    // the facet-set decomposition below reconstructs the expected cut independently either way.
+    if let Some(diamond_cut_data) = ctm.contracts_config.diamond_cut_data.as_deref() {
+        errors += expect_hex_equal(
+            result,
+            "chain creation diamond cut",
+            diamond_cut_data,
+            &hex::encode(params.diamondCut.abi_encode()),
+        );
+    }
     errors += expect_hex_equal(
         result,
         "force deployments data",
