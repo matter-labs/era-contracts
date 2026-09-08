@@ -108,9 +108,15 @@ all come from logs, and "no events found" is otherwise indistinguishable from
 construction event to fall inside the window, and fails if it does not. Hosted
 RPCs reject a scan from genesis, which is why there is no safe default.
 
-Every code, storage and log read is pinned to the block the run started at, so a
-report is not smeared across an upgrade in progress; that block is printed in the
-discovery header.
+Every read — `eth_call`, `eth_getCode`, `eth_getStorageAt`, `eth_getLogs` —
+uses the latest block, captured once at the start of the run. That is always
+current state, never a historical block; holding it fixed for the run only stops
+a transaction landing mid-run from splitting the report across two states. The
+block is printed in the discovery header.
+
+Where a value has been set more than once — chain creation parameters are the
+common case — the newest is the one verified, and the command says how many
+revisions it saw.
 
 What it checks:
 

@@ -38,6 +38,10 @@ pub struct ChainCreationParams {
     pub force_deployments: FixedForceDeploymentsData,
     /// Block the params were last set at, for the report.
     pub block_number: u64,
+    /// Which `NewChainCreationParams` this is, 1-based.
+    pub revision: usize,
+    /// How many times the parameters have been set.
+    pub revisions: usize,
 }
 
 /// `ChainTypeManagerBase._processValidatedChainCreationParams` builds batch
@@ -96,6 +100,7 @@ pub async fn fetch(
         .get_logs(&filter)
         .await
         .context("eth_getLogs for NewChainCreationParams")?;
+    let revisions = logs.len();
     let log = logs.last().ok_or_else(|| {
         anyhow::anyhow!(
             "no NewChainCreationParams event from the CTM at or after block {from_block}. \
@@ -117,6 +122,8 @@ pub async fn fetch(
         force_deployments_raw: decoded.forceDeploymentsData,
         force_deployments,
         block_number: log.block_number.unwrap_or_default(),
+        revision: revisions,
+        revisions,
     })
 }
 

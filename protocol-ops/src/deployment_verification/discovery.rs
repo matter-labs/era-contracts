@@ -104,6 +104,7 @@ pub async fn discover_core(
 
     let asset_router = bh
         .assetRouter()
+        .block(block.into())
         .call()
         .await
         .context("bridgehub.assetRouter()")?;
@@ -116,48 +117,66 @@ pub async fn discover_core(
     let ar = IAssetRouterView::new(asset_router, provider);
     let nullifier = ar
         .L1_NULLIFIER()
+        .block(block.into())
         .call()
         .await
         .context("assetRouter.L1_NULLIFIER()")?;
     let native_token_vault = ar
         .nativeTokenVault()
+        .block(block.into())
         .call()
         .await
         .context("assetRouter.nativeTokenVault()")?;
     let ntv = INativeTokenVaultView::new(native_token_vault, provider);
     let bridged_token_beacon = ntv
         .bridgedTokenBeacon()
+        .block(block.into())
         .call()
         .await
         .context("nativeTokenVault.bridgedTokenBeacon()")?;
     let bridged_standard_erc20 = IBeaconView::new(bridged_token_beacon, provider)
         .implementation()
+        .block(block.into())
         .call()
         .await
         .context("bridgedTokenBeacon.implementation()")?;
 
     Ok(CoreAddresses {
         bridgehub,
-        governance: bh.owner().call().await.context("bridgehub.owner()")?,
-        chain_admin: bh.admin().call().await.context("bridgehub.admin()")?,
+        governance: bh
+            .owner()
+            .block(block.into())
+            .call()
+            .await
+            .context("bridgehub.owner()")?,
+        chain_admin: bh
+            .admin()
+            .block(block.into())
+            .call()
+            .await
+            .context("bridgehub.admin()")?,
         proxy_admin: address_at_slot(provider, bridgehub, EIP1967_ADMIN_SLOT, block).await?,
         message_root: bh
             .messageRoot()
+            .block(block.into())
             .call()
             .await
             .context("bridgehub.messageRoot()")?,
         chain_asset_handler: bh
             .chainAssetHandler()
+            .block(block.into())
             .call()
             .await
             .context("bridgehub.chainAssetHandler()")?,
         ctm_deployment_tracker: bh
             .l1CtmDeployer()
+            .block(block.into())
             .call()
             .await
             .context("bridgehub.l1CtmDeployer()")?,
         chain_registration_sender: bh
             .chainRegistrationSender()
+            .block(block.into())
             .call()
             .await
             .context("bridgehub.chainRegistrationSender()")?,
@@ -166,6 +185,7 @@ pub async fn discover_core(
         native_token_vault,
         interop_handler: ar
             .l1InteropHandler()
+            .block(block.into())
             .call()
             .await
             .context("assetRouter.l1InteropHandler()")?,
@@ -173,27 +193,32 @@ pub async fn discover_core(
         bridged_standard_erc20,
         l1_chain_id: bh
             .L1_CHAIN_ID()
+            .block(block.into())
             .call()
             .await
             .context("bridgehub.L1_CHAIN_ID()")?
             .to::<u64>(),
         max_number_of_zk_chains: bh
             .MAX_NUMBER_OF_ZK_CHAINS()
+            .block(block.into())
             .call()
             .await
             .context("bridgehub.MAX_NUMBER_OF_ZK_CHAINS()")?,
         era_chain_id: ar
             .ERA_CHAIN_ID()
+            .block(block.into())
             .call()
             .await
             .context("assetRouter.ERA_CHAIN_ID()")?,
         l1_weth: ar
             .L1_WETH_TOKEN()
+            .block(block.into())
             .call()
             .await
             .context("assetRouter.L1_WETH_TOKEN()")?,
         eth_token_asset_id: ar
             .ETH_TOKEN_ASSET_ID()
+            .block(block.into())
             .call()
             .await
             .context("assetRouter.ETH_TOKEN_ASSET_ID()")?,
@@ -233,16 +258,19 @@ pub async fn discover_ctm(
     let c = ICtmView::new(ctm, provider);
     let protocol_version = c
         .protocolVersion()
+        .block(block.into())
         .call()
         .await
         .context("ctm.protocolVersion()")?;
     let semver = c
         .getSemverProtocolVersion()
+        .block(block.into())
         .call()
         .await
         .context("ctm.getSemverProtocolVersion()")?;
     let verifier = c
         .protocolVersionVerifier(protocol_version)
+        .block(block.into())
         .call()
         .await
         .context("ctm.protocolVersionVerifier()")?;
@@ -253,33 +281,45 @@ pub async fn discover_ctm(
     );
 
     let v = IVerifierView::new(verifier, provider);
-    let verifier_is_testnet = probe(v.IS_TESTNET_VERIFIER().call().await, "verifier")
-        .await?
-        .unwrap_or(false);
+    let verifier_is_testnet = probe(
+        v.IS_TESTNET_VERIFIER().block(block.into()).call().await,
+        "verifier",
+    )
+    .await?
+    .unwrap_or(false);
     let plonk_verifier = v
         .PLONK_VERIFIER()
+        .block(block.into())
         .call()
         .await
         .context("verifier.PLONK_VERIFIER()")?;
 
     let server_notifier = c
         .serverNotifierAddress()
+        .block(block.into())
         .call()
         .await
         .context("ctm.serverNotifierAddress()")?;
 
     Ok(CtmAddresses {
         ctm,
-        is_zksync_os: c.isZKsyncOS().call().await.context("ctm.isZKsyncOS()")?,
+        is_zksync_os: c
+            .isZKsyncOS()
+            .block(block.into())
+            .call()
+            .await
+            .context("ctm.isZKsyncOS()")?,
         protocol_version,
         semver: (semver._0, semver._1, semver._2),
         genesis_upgrade: c
             .l1GenesisUpgrade()
+            .block(block.into())
             .call()
             .await
             .context("ctm.l1GenesisUpgrade()")?,
         default_upgrade: c
             .defaultUpgrade()
+            .block(block.into())
             .call()
             .await
             .context("ctm.defaultUpgrade()")?,
@@ -293,21 +333,25 @@ pub async fn discover_ctm(
         .await?,
         validator_timelock: c
             .validatorTimelockPostV29()
+            .block(block.into())
             .call()
             .await
             .context("ctm.validatorTimelockPostV29()")?,
         bytecodes_supplier: c
             .L1_BYTECODES_SUPPLIER()
+            .block(block.into())
             .call()
             .await
             .context("ctm.L1_BYTECODES_SUPPLIER()")?,
         permissionless_validator: c
             .PERMISSIONLESS_VALIDATOR()
+            .block(block.into())
             .call()
             .await
             .context("ctm.PERMISSIONLESS_VALIDATOR()")?,
         interop_center: c
             .INTEROP_CENTER()
+            .block(block.into())
             .call()
             .await
             .context("ctm.INTEROP_CENTER()")?,
@@ -316,21 +360,25 @@ pub async fn discover_ctm(
         verifier_is_testnet,
         verification_key_hash: IVerifierView::new(plonk_verifier, provider)
             .verificationKeyHash()
+            .block(block.into())
             .call()
             .await
             .context("plonkVerifier.verificationKeyHash()")?,
         stored_batch_zero: c
             .storedBatchZero()
+            .block(block.into())
             .call()
             .await
             .context("ctm.storedBatchZero()")?,
         initial_cut_hash: c
             .initialCutHash()
+            .block(block.into())
             .call()
             .await
             .context("ctm.initialCutHash()")?,
         initial_force_deployment_hash: c
             .initialForceDeploymentHash()
+            .block(block.into())
             .call()
             .await
             .context("ctm.initialForceDeploymentHash()")?,
@@ -350,25 +398,34 @@ pub struct BridgeWiring {
 pub async fn read_bridge_wiring(
     provider: &AlloyProvider,
     core: &CoreAddresses,
+    block: u64,
 ) -> anyhow::Result<BridgeWiring> {
     let nullifier = INullifierView::new(core.nullifier, provider);
     let ntv = INativeTokenVaultView::new(core.native_token_vault, provider);
     Ok(BridgeWiring {
         nullifier_asset_router: nullifier
             .l1AssetRouter()
+            .block(block.into())
             .call()
             .await
             .context("nullifier.l1AssetRouter()")?,
         nullifier_native_token_vault: nullifier
             .l1NativeTokenVault()
+            .block(block.into())
             .call()
             .await
             .context("nullifier.l1NativeTokenVault()")?,
         nullifier_interop_handler: nullifier
             .l1InteropHandler()
+            .block(block.into())
             .call()
             .await
             .context("nullifier.l1InteropHandler()")?,
-        ntv_weth: ntv.WETH_TOKEN().call().await.context("ntv.WETH_TOKEN()")?,
+        ntv_weth: ntv
+            .WETH_TOKEN()
+            .block(block.into())
+            .call()
+            .await
+            .context("ntv.WETH_TOKEN()")?,
     })
 }

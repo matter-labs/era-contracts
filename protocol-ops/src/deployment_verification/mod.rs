@@ -141,9 +141,10 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
     let mut result = VerificationResult::labelled("verify-deployment");
 
     let chain_id = provider.get_chain_id().await.context("eth_chainId")?;
-    // Pin every code, storage and log read to one block. Without it a report
-    // taken during an upgrade or a role handoff mixes states from different
-    // blocks and is not reproducible.
+    // The latest block, captured once and used for every read. This is always
+    // current state — never a historical block — but holding it fixed for the
+    // run means a transaction landing mid-run cannot split the report across
+    // two states.
     let to_block = provider
         .get_block_number()
         .await
@@ -190,7 +191,7 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
         ));
     }
     result.print_info(&format!(
-        "  block {to_block}  bridgehub {}  ctm {}  protocol {}.{}.{} ({})",
+        "  latest block {to_block}  bridgehub {}  ctm {}  protocol {}.{}.{} ({})",
         core.bridgehub, ctm.ctm, ctm.semver.0, ctm.semver.1, ctm.semver.2, ctm.protocol_version
     ));
     result.print_info(&format!(
@@ -384,7 +385,7 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
             ),
         );
     }
-    verify_wiring(&provider, &mut result, &core, &ctm, &index).await?;
+    verify_wiring(&provider, &mut result, &core, &ctm, &index, to_block).await?;
 
     // ── chain creation ───────────────────────────────────────────────────
     result.print_section("Chain creation parameters");
@@ -421,7 +422,16 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
 
     // ── roles ────────────────────────────────────────────────────────────
     result.print_section("Roles");
-    verify_roles(&provider, &mut result, &input, &core, &ctm, &expected).await?;
+    verify_roles(
+        &provider,
+        &mut result,
+        &input,
+        &core,
+        &ctm,
+        &expected,
+        to_block,
+    )
+    .await?;
 
     // ── registered chains ────────────────────────────────────────────────
     result.print_section("Registered chains");
@@ -442,6 +452,7 @@ pub async fn run(input: VerifyDeploymentInput) -> anyhow::Result<()> {
         &ctm,
         rollup_da_manager,
         &cut_facet_addresses,
+        to_block,
     )
     .await?;
 
@@ -485,6 +496,7 @@ async fn registered_chain_type_managers(
         }
         if bridgehub
             .chainTypeManagerIsRegistered(candidate)
+            .block(to_block.into())
             .call()
             .await?
         {
@@ -783,8 +795,9 @@ async fn verify_wiring(
     core: &discovery::CoreAddresses,
     ctm: &discovery::CtmAddresses,
     _index: &ArtifactIndex,
+    to_block: u64,
 ) -> anyhow::Result<()> {
-    let wiring = discovery::read_bridge_wiring(provider, core).await?;
+    let wiring = discovery::read_bridge_wiring(provider, core, to_block).await?;
     let mut check = |ok: bool, what: &str, detail: String| {
         if ok {
             result.report_ok(what);
@@ -815,8 +828,8 @@ async fn verify_wiring(
     );
 
     let cah = IChainAssetHandlerView::new(core.chain_asset_handler, provider);
-    let cah_message_root = cah.MESSAGE_ROOT().call().await?;
-    let cah_asset_router = cah.ASSET_ROUTER().call().await?;
+    let cah_message_root = cah.MESSAGE_ROOT().block(to_block.into()).call().await?;
+    let cah_asset_router = cah.ASSET_ROUTER().block(to_block.into()).call().await?;
     check(
         cah_message_root == core.message_root && cah_asset_router == core.asset_router,
         "L1ChainAssetHandler.setAddresses was run",
@@ -825,6 +838,7 @@ async fn verify_wiring(
 
     let notifier_ctm = IServerNotifierView::new(ctm.server_notifier, provider)
         .chainTypeManager()
+        .block(to_block.into())
         .call()
         .await?;
     check(
@@ -841,14 +855,22 @@ async fn verify_wiring(
     // CTM registration on the bridgehub: three separate calls, all required
     // before `createNewChain` works.
     let bh = IBridgehubView::new(core.bridgehub, provider);
-    let registered = bh.chainTypeManagerIsRegistered(ctm.ctm).call().await?;
+    let registered = bh
+        .chainTypeManagerIsRegistered(ctm.ctm)
+        .block(to_block.into())
+        .call()
+        .await?;
     check(
         registered,
         "Bridgehub.addChainTypeManager was run",
         "CTM is not registered; createNewChain reverts CTMNotRegistered".to_string(),
     );
 
-    let asset_id = bh.ctmAssetIdFromAddress(ctm.ctm).call().await?;
+    let asset_id = bh
+        .ctmAssetIdFromAddress(ctm.ctm)
+        .block(to_block.into())
+        .call()
+        .await?;
     let expected_asset_id = keccak256(
         (
             U256::from(core.l1_chain_id),
@@ -862,7 +884,11 @@ async fn verify_wiring(
         "CTM asset id derives from (l1ChainId, ctmDeploymentTracker, ctm)",
         format!("got {asset_id}, expected {expected_asset_id}"),
     );
-    let back = bh.ctmAssetIdToAddress(asset_id).call().await?;
+    let back = bh
+        .ctmAssetIdToAddress(asset_id)
+        .block(to_block.into())
+        .call()
+        .await?;
     check(
         back == ctm.ctm,
         "Bridgehub CTM asset id round-trips",
@@ -870,7 +896,11 @@ async fn verify_wiring(
     );
 
     let ar = contracts::IAssetRouterView::new(core.asset_router, provider);
-    let ctm_handler = ar.assetHandlerAddress(asset_id).call().await?;
+    let ctm_handler = ar
+        .assetHandlerAddress(asset_id)
+        .block(to_block.into())
+        .call()
+        .await?;
     check(
         ctm_handler == core.chain_asset_handler,
         "AssetRouter routes the CTM asset to the ChainAssetHandler",
@@ -878,6 +908,7 @@ async fn verify_wiring(
     );
     let eth_handler = ar
         .assetHandlerAddress(core.eth_token_asset_id)
+        .block(to_block.into())
         .call()
         .await?;
     check(
@@ -888,6 +919,7 @@ async fn verify_wiring(
 
     let l1_whitelisted = bh
         .whitelistedSettlementLayers(U256::from(core.l1_chain_id))
+        .block(to_block.into())
         .call()
         .await?;
     check(
@@ -899,7 +931,12 @@ async fn verify_wiring(
     // `setBridgehubParams` registers `baseTokenAssetId(eraChainId)`. On a fresh
     // ecosystem that chain does not exist, so it registers the zero asset id —
     // inert (chain creation rejects a zero asset id) but not what was meant.
-    if bh.assetIdIsRegistered(FixedBytes::ZERO).call().await? {
+    if bh
+        .assetIdIsRegistered(FixedBytes::ZERO)
+        .block(to_block.into())
+        .call()
+        .await?
+    {
         result.report_warn(
             "assetIdIsRegistered[bytes32(0)] is true: `addTokenAssetId(baseTokenAssetId(eraChainId))` \
              ran against a chain that does not exist on this ecosystem, registering the zero asset \
@@ -922,9 +959,17 @@ async fn verify_chain_creation(
     to_block: u64,
 ) -> anyhow::Result<()> {
     result.print_info(&format!(
-        "  parameters last set at block {}",
-        params.block_number
+        "  parameters last set at block {} ({} of {} NewChainCreationParams event(s) — the \
+         newest is the one in force)",
+        params.block_number, params.revision, params.revisions
     ));
+    if params.revisions > 1 {
+        result.report_warn(&format!(
+            "chain creation parameters have been set {} times; the deployment-time values were \
+             superseded at block {}. Chains created before that carry the older parameters.",
+            params.revisions, params.block_number
+        ));
+    }
 
     // Bind the decoded event to the hashes the CTM actually stores. Until
     // these three match, nothing else in this section means anything.
@@ -1153,7 +1198,7 @@ async fn verify_chain_creation(
         ),
     );
 
-    verify_zk_token_asset_id(provider, result, input, core, data.zkTokenAssetId).await?;
+    verify_zk_token_asset_id(provider, result, input, core, data.zkTokenAssetId, to_block).await?;
 
     // L2 implementations, and the SystemContractProxy each one is installed
     // behind, that every new chain force-deploys. These contracts never land
@@ -1222,6 +1267,7 @@ async fn verify_zk_token_asset_id(
     input: &VerifyDeploymentInput,
     core: &discovery::CoreAddresses,
     on_chain: FixedBytes<32>,
+    to_block: u64,
 ) -> anyhow::Result<()> {
     result.expect(
         on_chain != FixedBytes::ZERO,
@@ -1257,6 +1303,7 @@ async fn verify_zk_token_asset_id(
             let registered =
                 contracts::INativeTokenVaultView::new(core.native_token_vault, provider)
                     .tokenAddress(on_chain)
+                    .block(to_block.into())
                     .call()
                     .await?;
             result.report_warn(&format!(
@@ -1461,6 +1508,7 @@ async fn verify_da(
             for (validator, _) in &rollup_only {
                 let live = manager_view
                     .isPairAllowed(*validator, BLOBS_ZKSYNC_OS_SCHEME)
+                    .block(to_block.into())
                     .call()
                     .await?;
                 if live {
@@ -1482,6 +1530,7 @@ async fn verify_roles(
     core: &discovery::CoreAddresses,
     ctm: &discovery::CtmAddresses,
     expected: &[Expected],
+    to_block: u64,
 ) -> anyhow::Result<()> {
     let mut report = roles::RoleReport::default();
 
@@ -1490,10 +1539,10 @@ async fn verify_roles(
         if entry.label.ends_with(" impl") {
             continue;
         }
-        roles::collect_ownable(provider, &mut report, entry.label, entry.address).await?;
+        roles::collect_ownable(provider, &mut report, entry.label, entry.address, to_block).await?;
     }
-    roles::collect_governance(provider, &mut report, core.governance).await?;
-    roles::collect_chain_admin(provider, &mut report, core.chain_admin).await?;
+    roles::collect_governance(provider, &mut report, core.governance, to_block).await?;
+    roles::collect_chain_admin(provider, &mut report, core.chain_admin, to_block).await?;
     roles::collect_admin(
         provider,
         &mut report,
@@ -1501,10 +1550,12 @@ async fn verify_roles(
         core.bridgehub,
         core.chain_admin,
         input.from_block,
+        to_block,
     )
     .await?;
     let ctm_admin = contracts::IBridgehubView::new(ctm.ctm, provider)
         .admin()
+        .block(to_block.into())
         .call()
         .await
         .context("ctm.admin()")?;
@@ -1515,25 +1566,45 @@ async fn verify_roles(
         ctm.ctm,
         ctm_admin,
         input.from_block,
+        to_block,
     )
     .await?;
     // Chain admins control DA, fees and the transaction filterer, so they
     // belong in the same audit as the ecosystem roles.
     let bridgehub = IBridgehubView::new(core.bridgehub, provider);
-    for chain_id in bridgehub.getAllZKChainChainIDs().call().await? {
-        let chain = bridgehub.getZKChain(chain_id).call().await?;
+    for chain_id in bridgehub
+        .getAllZKChainChainIDs()
+        .block(to_block.into())
+        .call()
+        .await?
+    {
+        let chain = bridgehub
+            .getZKChain(chain_id)
+            .block(to_block.into())
+            .call()
+            .await?;
         let admin = contracts::IZKChainView::new(chain, provider)
             .getAdmin()
+            .block(to_block.into())
             .call()
             .await?;
         let label: &'static str = Box::leak(format!("chain {chain_id}").into_boxed_str());
-        roles::collect_admin(provider, &mut report, label, chain, admin, input.from_block).await?;
+        roles::collect_admin(
+            provider,
+            &mut report,
+            label,
+            chain,
+            admin,
+            input.from_block,
+            to_block,
+        )
+        .await?;
         // The admin is itself usually a ChainAdmin contract with an owner.
         let admin_label: &'static str =
             Box::leak(format!("chain {chain_id} ChainAdmin").into_boxed_str());
-        roles::collect_ownable(provider, &mut report, admin_label, admin).await?;
+        roles::collect_ownable(provider, &mut report, admin_label, admin, to_block).await?;
     }
-    roles::classify_holders(provider, &mut report).await?;
+    roles::classify_holders(provider, &mut report, to_block).await?;
 
     for (holder, holdings) in report.by_holder() {
         if holder == Address::ZERO {
@@ -1601,13 +1672,25 @@ async fn verify_roles(
     // validators, is the ordering mistake that bricks the first commit.
     let timelock = ITimelockView::new(ctm.validator_timelock, provider);
     if let Some(threshold) = probe(
-        timelock.sharedSigningThreshold().call().await,
+        timelock
+            .sharedSigningThreshold()
+            .block(to_block.into())
+            .call()
+            .await,
         "timelock.sharedSigningThreshold()",
     )
     .await?
     {
-        let validators = timelock.sharedValidatorsCount().call().await?;
-        let delay = timelock.executionDelay().call().await?;
+        let validators = timelock
+            .sharedValidatorsCount()
+            .block(to_block.into())
+            .call()
+            .await?;
+        let delay = timelock
+            .executionDelay()
+            .block(to_block.into())
+            .call()
+            .await?;
         result.print_info(&format!(
             "  MultisigCommitter: {validators} shared validator(s), threshold {threshold}, \
              executionDelay {delay}"
@@ -1639,19 +1722,32 @@ async fn verify_chains(
     ctm: &discovery::CtmAddresses,
     rollup_da_manager: Option<Address>,
     cut_facet_addresses: &[Address],
+    to_block: u64,
 ) -> anyhow::Result<()> {
     let bh = IBridgehubView::new(core.bridgehub, provider);
-    let chain_ids = bh.getAllZKChainChainIDs().call().await?;
+    let chain_ids = bh
+        .getAllZKChainChainIDs()
+        .block(to_block.into())
+        .call()
+        .await?;
     if chain_ids.is_empty() {
         result.print_info("  no chains registered");
         return Ok(());
     }
     for chain_id in chain_ids {
-        let address = bh.getZKChain(chain_id).call().await?;
+        let address = bh
+            .getZKChain(chain_id)
+            .block(to_block.into())
+            .call()
+            .await?;
         let chain = contracts::IZKChainView::new(address, provider);
         // Comparing a chain against a CTM that is not its own would produce
         // misleading mismatches rather than a real finding.
-        let chain_ctm = bh.chainTypeManager(chain_id).call().await?;
+        let chain_ctm = bh
+            .chainTypeManager(chain_id)
+            .block(to_block.into())
+            .call()
+            .await?;
         if chain_ctm != ctm.ctm {
             result.report_error(&format!(
                 "chain {chain_id} belongs to CTM {chain_ctm}, not the one being verified \
@@ -1660,13 +1756,25 @@ async fn verify_chains(
             ));
             continue;
         }
-        let protocol_version = chain.getProtocolVersion().call().await?;
-        let verifier = chain.getVerifier().call().await?;
-        let stored_zero = chain.storedBatchHash(U256::ZERO).call().await?;
-        let da = chain.getDAValidatorPair().call().await?;
+        let protocol_version = chain
+            .getProtocolVersion()
+            .block(to_block.into())
+            .call()
+            .await?;
+        let verifier = chain.getVerifier().block(to_block.into()).call().await?;
+        let stored_zero = chain
+            .storedBatchHash(U256::ZERO)
+            .block(to_block.into())
+            .call()
+            .await?;
+        let da = chain
+            .getDAValidatorPair()
+            .block(to_block.into())
+            .call()
+            .await?;
         result.print_info(&format!(
             "  chain {chain_id} at {address}: admin {}, DA ({} scheme {})",
-            chain.getAdmin().call().await?,
+            chain.getAdmin().block(to_block.into()).call().await?,
             da._0,
             da._1
         ));
@@ -1686,7 +1794,7 @@ async fn verify_chains(
                 ctm.verifier
             ),
         );
-        let facets = chain.facetAddresses().call().await?;
+        let facets = chain.facetAddresses().block(to_block.into()).call().await?;
         let cut_facets: Vec<Address> = cut_facet_addresses.to_vec();
         let mut live = facets.clone();
         live.sort();
@@ -1700,11 +1808,19 @@ async fn verify_chains(
                  {expected_facets:?} — the chain was upgraded, or created under other params"
             ),
         );
-        let base_token = chain.getBaseTokenAssetId().call().await?;
+        let base_token = chain
+            .getBaseTokenAssetId()
+            .block(to_block.into())
+            .call()
+            .await?;
         // Two copies of the same value drive different halves of fee and
         // bridge processing; if they diverge, L1 routes a different asset than
         // the chain thinks it has.
-        let bridgehub_base_token = bh.baseTokenAssetId(chain_id).call().await?;
+        let bridgehub_base_token = bh
+            .baseTokenAssetId(chain_id)
+            .block(to_block.into())
+            .call()
+            .await?;
         result.expect(
             base_token == bridgehub_base_token,
             &format!("chain {chain_id} base token agrees with the bridgehub"),
@@ -1714,7 +1830,10 @@ async fn verify_chains(
             ),
         );
         result.expect(
-            bh.assetIdIsRegistered(base_token).call().await?,
+            bh.assetIdIsRegistered(base_token)
+                .block(to_block.into())
+                .call()
+                .await?,
             &format!("chain {chain_id} base token asset id is registered on the bridgehub"),
             &format!("chain {chain_id} base token {base_token} is not a registered asset id"),
         );
@@ -1728,7 +1847,11 @@ async fn verify_chains(
             ),
         );
         result.expect(
-            bh.settlementLayer(chain_id).call().await? == U256::from(core.l1_chain_id),
+            bh.settlementLayer(chain_id)
+                .block(to_block.into())
+                .call()
+                .await?
+                == U256::from(core.l1_chain_id),
             &format!("chain {chain_id} settles on L1"),
             &format!("chain {chain_id} does not settle on L1"),
         );
@@ -1738,6 +1861,7 @@ async fn verify_chains(
         if let Some(manager) = rollup_da_manager {
             let allowed = IRollupDAManagerView::new(manager, provider)
                 .isPairAllowed(da._0, da._1)
+                .block(to_block.into())
                 .call()
                 .await?;
             if !allowed {

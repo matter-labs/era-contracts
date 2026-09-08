@@ -138,9 +138,15 @@ pub async fn collect_ownable(
     report: &mut RoleReport,
     name: &str,
     address: Address,
+    block: u64,
 ) -> anyhow::Result<()> {
     let ownable = IOwnableView::new(address, provider);
-    let Some(owner) = probe(ownable.owner().call().await, &format!("{name}.owner()")).await? else {
+    let Some(owner) = probe(
+        ownable.owner().block(block.into()).call().await,
+        &format!("{name}.owner()"),
+    )
+    .await?
+    else {
         return Ok(());
     };
     push(report, name, address, Role::Owner, owner);
@@ -148,7 +154,7 @@ pub async fn collect_ownable(
     // Single-step `Ownable` (OpenZeppelin ProxyAdmin, UpgradeableBeacon) has
     // no pendingOwner, which is why this is a probe rather than a call.
     if let Some(pending) = probe(
-        ownable.pendingOwner().call().await,
+        ownable.pendingOwner().block(block.into()).call().await,
         &format!("{name}.pendingOwner()"),
     )
     .await?
@@ -169,13 +175,15 @@ pub async fn collect_admin(
     address: Address,
     admin: Address,
     from_block: u64,
+    to_block: u64,
 ) -> anyhow::Result<()> {
     push(report, name, address, Role::Admin, admin);
 
     let filter = Filter::new()
         .address(address)
         .event_signature(IEcosystemEvents::NewPendingAdmin::SIGNATURE_HASH)
-        .from_block(from_block);
+        .from_block(from_block)
+        .to_block(to_block);
     let logs = provider
         .get_logs(&filter)
         .await
@@ -196,11 +204,13 @@ pub async fn collect_governance(
     provider: &AlloyProvider,
     report: &mut RoleReport,
     address: Address,
+    block: u64,
 ) -> anyhow::Result<()> {
-    collect_ownable(provider, report, "Governance", address).await?;
+    collect_ownable(provider, report, "Governance", address, block).await?;
     if let Some(council) = probe(
         IGovernanceView::new(address, provider)
             .securityCouncil()
+            .block(block.into())
             .call()
             .await,
         "governance.securityCouncil()",
@@ -222,11 +232,13 @@ pub async fn collect_chain_admin(
     provider: &AlloyProvider,
     report: &mut RoleReport,
     address: Address,
+    block: u64,
 ) -> anyhow::Result<()> {
-    collect_ownable(provider, report, "ChainAdminOwnable", address).await?;
+    collect_ownable(provider, report, "ChainAdminOwnable", address, block).await?;
     if let Some(setter) = probe(
         IChainAdminView::new(address, provider)
             .tokenMultiplierSetter()
+            .block(block.into())
             .call()
             .await,
         "chainAdmin.tokenMultiplierSetter()",
@@ -248,6 +260,7 @@ pub async fn collect_chain_admin(
 pub async fn classify_holders(
     provider: &AlloyProvider,
     report: &mut RoleReport,
+    block: u64,
 ) -> anyhow::Result<()> {
     let holders: Vec<Address> = report
         .holdings
@@ -261,6 +274,7 @@ pub async fn classify_holders(
         }
         let code = provider
             .get_code_at(holder)
+            .block_id(block.into())
             .await
             .with_context(|| format!("eth_getCode({holder})"))?;
         report.holder_is_contract.insert(holder, !code.is_empty());
