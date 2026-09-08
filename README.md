@@ -35,6 +35,42 @@ live ecosystems still depend on them.
 - Wider system specs live in the [zksync-era repository](https://github.com/matter-labs/zksync-era/blob/main/docs/src/specs/contracts).
 - Working conventions for contributors and AI agents are in [`AGENTS.md`](./AGENTS.md).
 
+## Reviewing registry-driven upgrades
+
+Start with [the architecture](./docs/registry-driven-upgrades.md), then read
+[the stage lifecycle and authority model](./docs/upgrade-stage-lifecycle.md). The
+[upgrade tooling README](./l1-contracts/deploy-scripts/upgrade/README.md) explains how the
+production prepare builds and submits these objects.
+
+The current branch includes the following review surfaces:
+
+| Review area                     | Implementation and evidence                                                                                                                                                                                                                                                                                                     |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Upgrade description             | [RegistryTypes](./l1-contracts/contracts/upgrades/registry/RegistryTypes.sol): releases, transitions, ecosystem rows, inline codehash pins, timer and L2 plan inputs.                                                                                                                                                           |
+| Execution and recovery          | [CTMUpgradeExecutor](./l1-contracts/contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol) and [lifecycle tests](./l1-contracts/test/foundry/l1/unit/concrete/Upgrades/registry/CTMUpgradeLifecycle.t.sol): stages, pause holds, ecosystem authorization, executor succession and abandonment.                           |
+| Separately administered proxies | [ProxyUpgradeRowLib](./l1-contracts/contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol): explicit per-row ProxyAdmin, including ServerNotifier; application and completion checks.                                                                                                                                    |
+| L2 and bootstrap payloads       | [CTMUpgradeComposer](./l1-contracts/contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol), [L2V34DelegateCalldataComposer](./l1-contracts/contracts/upgrades/L2V34DelegateCalldataComposer.sol), and [RegistryBootstrapMigration](./l1-contracts/contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol). |
+| Individual-contract changes     | [RegistryIndividualUpgrade tests](./l1-contracts/test/foundry/l1/unit/concrete/Upgrades/registry/RegistryIndividualUpgrade.t.sol): facet-only, verifier-only and validator-timelock-only upgrades assert that unrelated state is unchanged.                                                                                     |
+| Production proposal generation  | [v35 prepare scripts](./l1-contracts/deploy-scripts/upgrade/v35): recurring upgrades emit the three executor stage calls; other actions must be declared in the output.                                                                                                                                                         |
+
+Security review should focus on the full authority and execution path:
+
+- Check the source and target release/version edges, proxy identities, implementation pins,
+  initialization behavior, and the code of each upgrade engine and L2 delegate/composer.
+- Check every declared external action. A row under a separately owned ProxyAdmin still needs
+  its administrator to act; naming the row does not grant the executor that authority.
+- Review governance's recovery powers alongside the normal stages. Abandoning a pending
+  lifecycle releases its hold and clears its bookkeeping; it does not reverse an executed upgrade.
+- Stage 2 checks the applied L1 state. It does not prove that every chain has completed its L2
+  upgrade. Bytecode publication checks likewise do not establish the safety of the bytecode.
+
+Remaining work includes retiring duplicate script-side composition, isolating legacy bootstrap
+and chain-call adapters, reducing unconditional deployment work for small patches, and making
+fresh deployments establish the executor authority setup directly. Compatibility with any
+already-deployed older registry schema needs an explicit migration decision; regenerated
+current-source fixtures do not prove that compatibility. These items are distinct from the
+implemented on-chain lifecycle and payload composition.
+
 ## Building and testing
 
 The repository builds and tests with upstream Foundry. The pinned version is the single source of truth in

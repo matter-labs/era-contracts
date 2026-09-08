@@ -1,7 +1,9 @@
 # Upgrade Scripts
 
 The upgrade model (releases, transitions, executors, the v34 bootstrap edge) is described in
-`docs/registry-driven-upgrades.md`; this directory holds the prepare scripts that drive it.
+[the architecture document](../../../docs/registry-driven-upgrades.md); this directory holds the
+prepare scripts that drive it. Start a security review from the
+[root README review guide](../../../README.md#reviewing-registry-driven-upgrades).
 
 ## Layout
 
@@ -16,8 +18,8 @@ The upgrade model (releases, transitions, executors, the v34 bootstrap edge) is 
   `DefaultChainUpgrade` is the per-chain leg. A version script inherits these and overrides only
   what its release changes.
 - `v35/` — the first registry-driven release: `CoreUpgrade_v35` deploys one fresh
-  `L1MessageRoot`; `CTMUpgrade_v35` overrides nothing. This is what a facet/verifier-level
-  upgrade costs in script code.
+  `L1MessageRoot`; `CTMUpgrade_v35` overrides nothing. This demonstrates the recurring
+  prepare interface; the inherited pipeline still invokes deployment helpers for the full facet set.
 - `v34/` — the bootstrap edge: `CoreUpgrade_v34` and `CTMUpgrade_v34` deploy the
   `EcosystemUpgradeExecutor`, `CTMUpgradeExecutor` and `RegistryBootstrapMigration`, and declare
   every call of the one-time edge (pause/unpause, timer start, the two handovers, `migrate()`,
@@ -63,3 +65,29 @@ A release whose L2 built-ins change must also author the L2 remainder
 factory dependencies — the v34 bootstrap shows the shape) because the release-pair derivation
 puts the changed built-ins in the L2 leg. See the Transition sections of
 `docs/registry-driven-upgrades.md` and `docs/upgrade-stage-lifecycle.md` §4.7.
+
+## Script retirement review
+
+The registry contracts now compose the recurring and bootstrap payloads on-chain, and a pinned
+composer defines the L2 delegate arguments. The remaining script cleanup should remove the
+parallel definitions while preserving the supported legacy entry edge:
+
+1. Replace script-generated proposals and cuts with reads from the deployed bootstrap or
+   transition. Move the bootstrap's script/on-chain equivalence assertion into regression tests;
+   then retire the legacy composition inheritance where no caller remains.
+2. Choose the modern per-chain call before retrieving a legacy cut. `AdminFunctions` and
+   `DefaultChainUpgrade` still retrieve a cut from historical logs even when the modern call
+   does not carry it. Keep that retrieval only for supported legacy chains.
+3. Isolate bootstrap authorization, pause/timer calls and compatibility adapters from the
+   recurring prepare path. Retain declared external actions wherever another administrator
+   must execute a row or governance performs a separate operation.
+4. Reuse unchanged release members for small upgrades instead of invoking the full deployment
+   pipeline. Remove legacy genesis/cut output fields after migrating their consumers.
+5. Make fresh deployments establish the executors and their authorizations as part of setup,
+   so their first recurring upgrade does not need the legacy bootstrap preparation machinery.
+
+Compilation, artifact loading, hashing, bytecode publication, simulation, signing and submission
+remain tooling responsibilities. Deleting a wrapper must preserve its authorization and state
+checks in the contract or in the explicit bootstrap path. The end-to-end gates are the frozen
+bootstrap pipeline and the recurring prepare pipeline listed above; individual-contract tests
+also check that unrelated installed state is preserved.
