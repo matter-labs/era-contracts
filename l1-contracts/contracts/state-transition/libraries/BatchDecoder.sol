@@ -23,7 +23,7 @@ library BatchDecoder {
     /// @notice The currently supported encoding version for commit, prove and execute payloads.
     /// @dev Bumped from `1` when `StoredBatchInfo` and `CommitBatchInfo` gained their Airbender
     /// fields. A client still emitting the previous layout is rejected by name rather than
-    /// mis-decoded: the old commit payload's array offset word would otherwise land in
+    /// misdecoded: the old commit payload's array offset word would otherwise land in
     /// `airbenderCommitment` and the struct would half-decode before the arrays failed.
     uint8 internal constant SUPPORTED_ENCODING_VERSION = 5;
     /// @notice The currently supported encoding version for ZKSync OS commit data.
