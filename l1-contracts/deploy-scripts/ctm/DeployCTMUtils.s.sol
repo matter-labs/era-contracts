@@ -68,7 +68,29 @@ struct Config {
     address ownerAddress;
     bytes32 zkTokenAssetId;
     bool testnetVerifier;
+    MultiProofConfig multiProof;
     ContractsConfig contracts;
+}
+
+/// @notice Deploy-time settings of the ZiSK multi-proof lane. They sit in
+///         their own struct so that `Config` stays within the stack budget the
+///         optimizer-free coverage build allows.
+// solhint-disable-next-line gas-struct-packing
+struct MultiProofConfig {
+    bool enabled;
+    address ziskPlonkVerifierAddr;
+    address ziskRangeVerifierAddr;
+}
+
+/// @notice Addresses of the ZiSK multi-proof verifiers. They stay outside
+///         `CTMDeployedAddresses` because only the L1 CTM deployment creates
+///         them: the Gateway CTM deployer has no ZiSK lane.
+// solhint-disable-next-line gas-struct-packing
+struct MultiProofAddresses {
+    address airbenderVerifier;
+    address ziskVerifier;
+    address ziskTestnetVerifier;
+    address multiProofVerifier;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -100,6 +122,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     // Note: This variable is initialized by concrete implementations before use
     GeneratedData internal generatedData; //slither-disable-line uninitialized-state
     CTMDeployedAddresses internal ctmAddresses;
+    MultiProofAddresses internal multiProofAddresses;
     // Note: Addresses discovered from already deployed core contracts (Bridgehub, AssetRouter, etc.)
     // This variable is initialized by concrete implementations before use
     CoreDeployedAddresses internal coreAddresses; //slither-disable-line uninitialized-state
@@ -127,6 +150,16 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
 
+        if (toml.keyExists("$.multi_proof_verifier")) {
+            config.multiProof.enabled = toml.readBool("$.multi_proof_verifier");
+        }
+        if (toml.keyExists("$.zisk_plonk_verifier_addr")) {
+            config.multiProof.ziskPlonkVerifierAddr = toml.readAddress("$.zisk_plonk_verifier_addr");
+        }
+        // When set, deploy uses this verifier instead of deploying the default ZiskVerifier.
+        if (toml.keyExists("$.zisk_range_verifier_addr")) {
+            config.multiProof.ziskRangeVerifierAddr = toml.readAddress("$.zisk_range_verifier_addr");
+        }
         if (toml.keyExists("$.zk_token_asset_id")) {
             config.zkTokenAssetId = toml.readBytes32("$.zk_token_asset_id");
         }
@@ -269,6 +302,25 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "ZiskVerifier")) {
+            // The standalone snarkJS Plonk verifier this wraps; deployed
+            // beforehand (see verifiers/README.md) and passed by address.
+            return abi.encode(config.multiProof.ziskPlonkVerifierAddr);
+        } else if (compareStrings(contractName, "ZiskTestnetVerifier")) {
+            address ziskRangeVerifier = multiProofAddresses.ziskVerifier;
+            return abi.encode(ziskRangeVerifier);
+        } else if (compareStrings(contractName, "MultiProofVerifier")) {
+            // The Airbender side is the ZKsync OS dual verifier, so the
+            // sub-verifier registry has one home.
+            // An operator may supply a range verifier of their own; otherwise
+            // the one deployed alongside this wrapper is used.
+            address ziskRangeVerifier = multiProofAddresses.ziskVerifier;
+            if (config.testnetVerifier) {
+                ziskRangeVerifier = multiProofAddresses.ziskTestnetVerifier;
+            }
+            return abi.encode(multiProofAddresses.airbenderVerifier, ziskRangeVerifier);
+        } else if (compareStrings(contractName, "MultiProofTestnetVerifier")) {
+            return abi.encode(multiProofAddresses.multiProofVerifier);
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
