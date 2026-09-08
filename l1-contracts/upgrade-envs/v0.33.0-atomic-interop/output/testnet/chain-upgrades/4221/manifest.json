@@ -1,0 +1,26 @@
+{
+  "bundles": [
+    {
+      "file": "01_chain.upgrade_0x5555555590930f501c88b73ea43b3eeb5a71643c.safe.json",
+      "index": 1,
+      "steps": ["chain.upgrade"],
+      "target": "0x5555555590930f501c88b73ea43b3eeb5a71643c",
+      "tx_count": 1
+    }
+  ],
+  "metadata": [
+    {
+      "command": "chain.upgrade",
+      "input": {},
+      "output": {
+        "access_control_restriction": "0x0000000000000000000000000000000000000000",
+        "admin_address": "0x82b6590f23591a6be0f0434e681a038467f21900",
+        "chain_address": "0xf8ed76fa41624355f56bc6885e76a208fe039170",
+        "da_move": {
+          "pair": null,
+          "pubdata_content": null
+        }
+      }
+    }
+  ]
+}

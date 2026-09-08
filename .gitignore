@@ -47,6 +47,14 @@ l1-contracts/upgrade-envs/**/output/**/manifest.json
 # can be reproduced from git on any machine (see the fix-calldata-bug skill).
 !l1-contracts/upgrade-envs/**/output/**/sim-inputs/manifest.json
 !l1-contracts/upgrade-envs/**/output/**/sim-inputs/*.safe.json
+# Exception: `chain-upgrades/<chainId>/` holds the per-chain cut bundles, which
+# are a deliverable rather than a debug artifact — the ecosystem ceremony
+# registers the cut but moves no chain, so these are what each ChainAdmin
+# actually executes. They carry no machine-specific paths and no timestamp
+# (see that directory's README for why the timestamp step is generated at
+# rollout time instead).
+!l1-contracts/upgrade-envs/**/output/**/chain-upgrades/**/manifest.json
+!l1-contracts/upgrade-envs/**/output/**/chain-upgrades/**/*.safe.json
 # Regen / broadcast scratch artifacts (executed.json, anvil.log, raw forge
 # script outputs). Not the canonical governance.toml.
 l1-contracts/upgrade-envs/**/output/**/regen/
