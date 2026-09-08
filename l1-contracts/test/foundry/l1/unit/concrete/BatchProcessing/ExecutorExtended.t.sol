@@ -99,7 +99,7 @@ contract ExecutorExtendedTest is ExecutorTest {
 
     function test_PrecommitSharedBridge_EmptyPrecommitData() public {
         bytes memory precommitData = bytes.concat(
-            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
+            bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_PRECOMMIT),
             abi.encode(uint256(0), bytes(""))
         );
 
