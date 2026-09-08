@@ -19,8 +19,8 @@
 //! - Hardcodes `aggregatorProgramVK` (ROM Merkle root of the aggregator guest
 //!   ELF — it enters public-values bytes [0..32] only)
 //! - Hardcodes `rootCVadcopFinal` (vadcop final root — changes on SNARK circuit
-//!   regen; one value serves the digest and public-values bytes [288..320])
-//! - Reconstructs the 320-byte public values from those pins and the batch
+//!   regen; one value serves the digest and public-values bytes [544..576])
+//! - Reconstructs the 576-byte public values from those pins and the batch
 //!   public inputs, then computes `sha256(publicValues) % RFIELD`
 //! - Calls the inner snarkJS PlonkVerifier for the actual SNARK check
 
@@ -107,7 +107,7 @@ pub fn generate_zisk_verifier(
 
     // Compute VK hash = keccak256(innerProgramVK || aggregatorProgramVK ||
     // rootCVadcopFinal), u64 limbs serialized big-endian — the same byte order
-    // the 320-byte public values use on the wire. Every pin enters the hash, so
+    // the 576-byte public values use on the wire. Every pin enters the hash, so
     // a rotation of any one of them rotates the hash.
     let mut vk_hash_preimage = Vec::with_capacity(96);
     extend_with_limbs(&mut vk_hash_preimage, &vk.inner_program_vk);
