@@ -12,7 +12,7 @@ import {PriorityQueueNotReady, ZeroAddress} from "../common/L1ContractErrors.sol
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
-import {L2DACommitmentScheme} from "../common/Config.sol";
+import {AIRBENDER_PROOF_SYSTEM_DISABLED, L2DACommitmentScheme} from "../common/Config.sol";
 import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
 
 /// @author Matter Labs
@@ -77,6 +77,15 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
         // It will have to be backfilled.
         if (!s.zksyncOS) {
             s.baseTokenHasTotalSupply = true;
+
+            // The upgrade may install the multi-proof gate, which requires both proof systems by
+            // default. Batches committed before this point carry no Airbender commitment, so the
+            // chain has to come out of the upgrade single-proof: the lane is masked off and
+            // `multiProofEnabled` stays false. The admin brings it up afterwards, on a drained
+            // pipeline, with `setMultiProofEnabled` followed by `setDisabledProofSystems`. Doing it
+            // here rather than in governance calldata means no chain can be upgraded into a
+            // configuration where its in-flight batches have become unprovable.
+            s.disabledProofSystems = AIRBENDER_PROOF_SYSTEM_DISABLED;
         }
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;

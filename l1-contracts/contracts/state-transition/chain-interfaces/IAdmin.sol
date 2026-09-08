@@ -51,6 +51,16 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _disabledProofSystems Bit mask: 0 = both required, 1 = Boojum off, 2 = Airbender off.
     function setDisabledProofSystems(uint8 _disabledProofSystems) external;
 
+    /// @notice Sets whether this chain runs the multi-proof gate.
+    /// @dev Capability, not incident state: it declares which verifier the chain is configured
+    /// against, and `Committer` requires the Airbender heap hash exactly when it is set. Separate
+    /// from `setDisabledProofSystems`, which only says a system is temporarily down.
+    /// @dev Only changeable with a drained pipeline. Batches committed under one setting carry a
+    /// different number of public inputs from those committed under the other, so a backlog
+    /// spanning the change would hold batches the configured verifier cannot accept.
+    /// @param _multiProofEnabled Whether the chain commits Airbender data and proves both lanes.
+    function setMultiProofEnabled(bool _multiProofEnabled) external;
+
     /// @notice Change the fee params for L1->L2 transactions
     /// @param _newFeeParams The new fee params
     function changeFeeParams(FeeParams calldata _newFeeParams) external;
@@ -159,6 +169,11 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice The set of proof systems this chain does not require has changed
     event NewDisabledProofSystems(uint8 oldDisabledProofSystems, uint8 newDisabledProofSystems);
+
+    /// @notice Whether the chain runs the multi-proof gate was changed.
+    /// @param oldMultiProofEnabled The previous setting.
+    /// @param newMultiProofEnabled The new setting.
+    event NewMultiProofEnabled(bool oldMultiProofEnabled, bool newMultiProofEnabled);
 
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);

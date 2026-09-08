@@ -45,6 +45,8 @@ import {
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {
+    AirbenderCommitmentNotSupported,
+    AirbenderCommitmentRequired,
     BatchNumberMismatch,
     BatchTimestampGreaterThanLastL2BlockTimestamp,
     CanOnlyProcessOneBatch,
@@ -783,8 +785,21 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         commitment = keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
 
         // The Airbender shape reuses everything above and differs in exactly two words of the
-        // auxiliary output. A chain that does not run the lane supplies no heap hash and gets `0`,
-        // which the Executor reads as "this batch has no Airbender commitment".
+        // auxiliary output.
+        //
+        // Whether a batch carries it is the chain's configuration, not the operator's choice. A
+        // chain running the gate needs one on every batch or the batch is unprovable; a chain not
+        // running it must have none, or the Executor emits a public input its verifier cannot
+        // consume. Both mismatches are refused here, at commit, rather than surfacing a batch or
+        // more later as an unexplained verification failure.
+        if (s.multiProofEnabled) {
+            if (_newBatchData.airbenderBootloaderHeapHash == bytes32(0)) {
+                revert AirbenderCommitmentRequired();
+            }
+        } else if (_newBatchData.airbenderBootloaderHeapHash != bytes32(0)) {
+            revert AirbenderCommitmentNotSupported();
+        }
+
         if (_newBatchData.airbenderBootloaderHeapHash != bytes32(0)) {
             // solhint-disable-next-line func-named-parameters
             bytes32 airbenderAuxiliaryOutputHash = _auxiliaryOutputHash(

@@ -8,6 +8,7 @@ import {CommitterProvingTest} from "contracts/dev-contracts/test/CommitterProvin
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {StoredBatchHashing} from "contracts/state-transition/chain-deps/StoredBatchHashing.sol";
+import {AirbenderCommitmentNotSupported, AirbenderCommitmentRequired} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Pins the Airbender-shape batch commitment against values produced by the Rust
 /// implementation the guest runs.
@@ -85,12 +86,10 @@ contract AirbenderCommitmentEquivalenceTest is Test {
 
     function setUp() public {
         committer = new CommitterProvingTest();
-        // `_batchMetaParameters` reads these from storage; the recorded batch was built with the
-        // emulator hash equal to the default-AA hash (Rust's `None` substitution).
-        vm.store(address(committer), bytes32(uint256(23)), BOOTLOADER_CODE_HASH);
-        vm.store(address(committer), bytes32(uint256(24)), DEFAULT_AA_CODE_HASH);
-        vm.store(address(committer), bytes32(uint256(25)), bytes32(0)); // zkPorterIsAvailable
-        vm.store(address(committer), bytes32(uint256(58)), DEFAULT_AA_CODE_HASH);
+        // The recorded batch was built with the emulator hash equal to the default-AA hash, which is
+        // what Rust substitutes for `None`.
+        committer.setBatchMetaParameters(false, BOOTLOADER_CODE_HASH, DEFAULT_AA_CODE_HASH, DEFAULT_AA_CODE_HASH);
+        committer.setMultiProofEnabled(true);
     }
 
     function _callableBatch() internal pure returns (CommitBatchInfo memory batch) {
@@ -130,8 +129,31 @@ contract AirbenderCommitmentEquivalenceTest is Test {
         );
     }
 
-    /// The `0` sentinel suppresses the lane rather than producing a commitment over a zero heap.
-    function test_committerEmitsNoAirbenderCommitmentWithoutAHeapHash() public {
+    /// A chain running the gate needs Airbender data on every batch: without it the batch carries no
+    /// Airbender commitment and could never be proved, so the commit is refused rather than the
+    /// failure surfacing later as an unexplained verification error.
+    function test_multiProofChainRequiresAirbenderData() public {
+        (bytes32[] memory commitments, bytes32[] memory hashes) = _callableBlobs();
+        CommitBatchInfo memory batch = _callableBatch();
+        batch.airbenderBootloaderHeapHash = bytes32(0);
+
+        vm.expectRevert(AirbenderCommitmentRequired.selector);
+        committer.createAirbenderBatchCommitment(batch, CALLABLE_STATE_DIFF_HASH, commitments, hashes);
+    }
+
+    /// And the converse: a chain that does not run the gate must not commit Airbender data, or the
+    /// Executor would emit a public input its configured verifier cannot consume.
+    function test_singleProofChainRefusesAirbenderData() public {
+        committer.setMultiProofEnabled(false);
+        (bytes32[] memory commitments, bytes32[] memory hashes) = _callableBlobs();
+
+        vm.expectRevert(AirbenderCommitmentNotSupported.selector);
+        committer.createAirbenderBatchCommitment(_callableBatch(), CALLABLE_STATE_DIFF_HASH, commitments, hashes);
+    }
+
+    /// A chain that does not run the gate commits no Airbender commitment at all.
+    function test_singleProofChainCommitsNoAirbenderCommitment() public {
+        committer.setMultiProofEnabled(false);
         (bytes32[] memory commitments, bytes32[] memory hashes) = _callableBlobs();
         CommitBatchInfo memory batch = _callableBatch();
         batch.airbenderBootloaderHeapHash = bytes32(0);
@@ -139,7 +161,7 @@ contract AirbenderCommitmentEquivalenceTest is Test {
         assertEq(
             committer.createAirbenderBatchCommitment(batch, CALLABLE_STATE_DIFF_HASH, commitments, hashes),
             bytes32(0),
-            "no heap hash must mean no Airbender commitment"
+            "a single-proof chain must carry no Airbender commitment"
         );
     }
 

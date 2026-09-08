@@ -311,6 +311,14 @@ contract UtilsFacet is ZKChainBase {
         return s.disabledProofSystems;
     }
 
+    function util_setMultiProofEnabled(bool _multiProofEnabled) external {
+        s.multiProofEnabled = _multiProofEnabled;
+    }
+
+    function util_getMultiProofEnabled() external view returns (bool) {
+        return s.multiProofEnabled;
+    }
+
     function util_getZKsyncOSMaxTxGasLimit() external view returns (uint64) {
         return s.zksyncOSMaxTxGasLimit;
     }

@@ -10,6 +10,25 @@ import {CommitBatchInfo} from "../../state-transition/chain-interfaces/ICommitte
 contract CommitterProvingTest is CommitterFacet {
     constructor() CommitterFacet(block.chainid) {}
 
+    /// @dev Test-only configuration. `_batchMetaParameters` and the commitment derivation read these
+    /// from diamond storage, which a test would otherwise have to write by raw slot.
+    function setBatchMetaParameters(
+        bool _zkPorterIsAvailable,
+        bytes32 _bootloaderHash,
+        bytes32 _defaultAccountHash,
+        bytes32 _evmEmulatorHash
+    ) external {
+        s.zkPorterIsAvailable = _zkPorterIsAvailable;
+        s.l2BootloaderBytecodeHash = _bootloaderHash;
+        s.l2DefaultAccountBytecodeHash = _defaultAccountHash;
+        s.l2EvmEmulatorBytecodeHash = _evmEmulatorHash;
+    }
+
+    /// @dev Test-only: declares whether this chain commits Airbender data.
+    function setMultiProofEnabled(bool _multiProofEnabled) external {
+        s.multiProofEnabled = _multiProofEnabled;
+    }
+
     function createBatchCommitment(
         CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,

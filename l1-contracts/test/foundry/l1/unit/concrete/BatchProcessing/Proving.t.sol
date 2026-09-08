@@ -92,8 +92,14 @@ contract ProvingTest is ExecutorTest {
 
         bytes memory l2Logs = Utils.encodePacked(correctL2Logs);
 
-        // Commit with Airbender data, so the batch carries the sibling commitment and the prove
-        // path builds the `[boojum, airbender]` pair. Suites that leave this zero stay Boojum-only.
+        // This suite exercises a multi-proof chain, brought up through the real activation sequence: a
+        // new chain starts with the Airbender lane masked off, the capability is declared first, and
+        // only then is the lane required. `Committer` then wants Airbender data on every batch.
+        vm.startPrank(owner);
+        IAdmin(address(committer)).setMultiProofEnabled(true);
+        IAdmin(address(committer)).setDisabledProofSystems(0);
+        vm.stopPrank();
+
         airbenderHeapHash = Utils.randomBytes32("airbenderBootloaderHeapHash");
         newCommitBatchInfo.airbenderBootloaderHeapHash = airbenderHeapHash;
         newCommitBatchInfo.timestamp = uint64(currentTimestamp);

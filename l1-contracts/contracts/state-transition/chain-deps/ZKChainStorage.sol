@@ -272,4 +272,13 @@ struct ZKChainStorage {
     /// calling chain, since one verifier instance serves every chain of a protocol version.
     /// @dev STORAGE SLOT: 68 (offset 9). Packed with the two fields above: 1 + 8 + 1 of 32 bytes.
     uint8 disabledProofSystems;
+    /// @dev Whether this Era chain runs the multi-proof gate, and so must commit the Airbender data
+    /// every batch needs to be proved by it.
+    /// @dev This is capability, not incident state: it says which verifier the chain is configured
+    /// against, and `Committer` requires the Airbender heap hash exactly when it is set. It is kept
+    /// separate from `disabledProofSystems`, which says only that a system is temporarily down.
+    /// @dev Defaults to `false`, so a chain that never enables it commits no Airbender data and is
+    /// unaffected by the lane existing.
+    /// @dev STORAGE SLOT: 68 (offset 10). Packed with the three fields above.
+    bool multiProofEnabled;
 }

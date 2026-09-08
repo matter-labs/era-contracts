@@ -15,6 +15,18 @@ error AddressHasNoCode(address);
 error AddressMismatch(address expected, address supplied);
 // 0x42573d7a
 error AddressNotZero();
+// 0x957ca95e
+/// @notice The chain does not run the multi-proof gate, so a batch must not commit Airbender data:
+/// it would make the Executor emit a public input the configured verifier cannot consume.
+error AirbenderCommitmentNotSupported();
+// 0x615e82fc
+/// @notice The chain runs the multi-proof gate, so every batch must commit the Airbender bootloader
+/// heap hash. Without it the batch carries no Airbender commitment and could never be proved.
+error AirbenderCommitmentRequired();
+// 0xf4a67ff1
+/// @notice The Airbender lane cannot be required while the chain does not commit Airbender data:
+/// every batch would be committed with a single public input the enabled lane has nothing to read.
+error AirbenderLaneRequiresMultiProof();
 // 0xb577eb6c
 error AlreadyDangerousContract(address);
 // 0x2a5989a0
@@ -274,6 +286,10 @@ error MockVerifierNotSupported();
 error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 // 0xb385a3da
 error MsgValueTooLow(uint256 required, uint256 provided);
+// 0x7a2f0785
+/// @notice The chain still requires the Airbender lane, so it must keep committing Airbender data.
+/// Mask the lane off with `setDisabledProofSystems` before withdrawing the capability.
+error MultiProofRequiredWhileAirbenderLaneEnabled();
 // 0xedd74330
 error MustBeEraChain();
 // 0x8b7e144a

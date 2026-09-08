@@ -16,7 +16,8 @@ import {
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
     ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT,
-    ALL_PROOF_SYSTEMS_DISABLED
+    ALL_PROOF_SYSTEMS_DISABLED,
+    AIRBENDER_PROOF_SYSTEM_DISABLED
 } from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
@@ -50,6 +51,8 @@ import {
     ProtocolIdNotGreater,
     TokenMultiplierChangeTooFrequent,
     InvalidDisabledProofSystemsMask,
+    AirbenderLaneRequiresMultiProof,
+    MultiProofRequiredWhileAirbenderLaneEnabled,
     TooMuchGas,
     Unauthorized,
     UpgradeTimestampNotReached,
@@ -194,6 +197,26 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
+    function setMultiProofEnabled(bool _multiProofEnabled) external onlyAdmin onlySettlementLayer onlyEra {
+        // Withdrawing the capability while the Airbender lane is still required would commit every
+        // subsequent batch with a single public input that lane has nothing to read. The lane has to
+        // be masked off first, which is the reverse of the order in which it was brought up.
+        if (!_multiProofEnabled && s.disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
+            revert MultiProofRequiredWhileAirbenderLaneEnabled();
+        }
+
+        // Both directions need a drained pipeline. Turning it on leaves already-committed batches
+        // without the Airbender commitment the gate now expects; turning it off means subsequent
+        // batches carry none while the gate still expects one. Either way a backlog spanning the
+        // change holds batches the configured verifier cannot accept.
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+
+        bool oldMultiProofEnabled = s.multiProofEnabled;
+        s.multiProofEnabled = _multiProofEnabled;
+        emit NewMultiProofEnabled(oldMultiProofEnabled, _multiProofEnabled);
+    }
+
+    /// @inheritdoc IAdmin
     function setDisabledProofSystems(uint8 _disabledProofSystems) external onlyAdmin onlySettlementLayer onlyEra {
         if (_disabledProofSystems >= ALL_PROOF_SYSTEMS_DISABLED) {
             revert InvalidDisabledProofSystemsMask(_disabledProofSystems);
@@ -212,13 +235,20 @@ contract AdminFacet is ZKChainBase, IAdmin {
             _enforceNoUnverifiedBatchesForChainConfigUpdate();
         }
 
+        // Requiring the Airbender lane is only meaningful once the chain commits the data that lane
+        // is proved against. Without the capability the batches committed from here on carry a single
+        // public input, and the gate would refuse every one of them.
+        if (_disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0 && !s.multiProofEnabled) {
+            revert AirbenderLaneRequiresMultiProof();
+        }
+
         s.disabledProofSystems = _disabledProofSystems;
         emit NewDisabledProofSystems(oldDisabledProofSystems, _disabledProofSystems);
     }
 
     /// @dev The runtime chain config is read from storage when the batch proof public input is
     /// computed, so it must not change while committed-but-unverified batches exist: those batches
-    /// were executed by ZKsync OS under the old config and would become unprovable.
+    /// were committed under the old config and would become unprovable.
     function _enforceNoUnverifiedBatchesForChainConfigUpdate() internal view {
         if (s.totalBatchesCommitted != s.totalBatchesVerified) {
             revert ZKsyncOSChainConfigUpdateWithUnverifiedBatches(s.totalBatchesVerified, s.totalBatchesCommitted);

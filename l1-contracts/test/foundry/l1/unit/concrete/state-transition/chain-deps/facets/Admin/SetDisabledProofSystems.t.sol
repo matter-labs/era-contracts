@@ -3,7 +3,12 @@ pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
 
-import {InvalidDisabledProofSystemsMask, MustBeEraChain, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {
+    AirbenderLaneRequiresMultiProof,
+    InvalidDisabledProofSystemsMask,
+    MustBeEraChain,
+    Unauthorized
+} from "contracts/common/L1ContractErrors.sol";
 import {AIRBENDER_PROOF_SYSTEM_DISABLED, BOOJUM_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
 
 /// @notice Unit tests for the per-chain `disabledProofSystems` setting.
@@ -13,8 +18,11 @@ import {AIRBENDER_PROOF_SYSTEM_DISABLED, BOOJUM_PROOF_SYSTEM_DISABLED} from "con
 contract SetDisabledProofSystemsTest is AdminTest {
     event NewDisabledProofSystems(uint8 oldDisabledProofSystems, uint8 newDisabledProofSystems);
 
-    function test_defaultsToBothRequired() public view {
-        assertEq(utilsFacet.util_getDisabledProofSystems(), 0);
+    /// A new chain starts with the Airbender lane masked off, because it also starts without the
+    /// capability that lane needs: its batches carry no Airbender commitment until an admin declares
+    /// otherwise, and the lane cannot be required before then.
+    function test_defaultsToTheAirbenderLaneMaskedOff() public view {
+        assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_DISABLED);
     }
 
     function test_revertWhen_calledByNonAdmin() public {
@@ -33,7 +41,11 @@ contract SetDisabledProofSystemsTest is AdminTest {
         adminFacet.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
     }
 
+    /// The kill switch, exercised from a chain that has the lane brought up.
     function test_disablesAirbender() public {
+        utilsFacet.util_setMultiProofEnabled(true);
+        utilsFacet.util_setDisabledProofSystems(0);
+
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectEmit(true, true, true, true);
         emit NewDisabledProofSystems(0, AIRBENDER_PROOF_SYSTEM_DISABLED);
@@ -43,6 +55,9 @@ contract SetDisabledProofSystemsTest is AdminTest {
     }
 
     function test_disablesBoojum() public {
+        // Leaving the Airbender lane required means the chain has to be committing Airbender data.
+        utilsFacet.util_setMultiProofEnabled(true);
+
         vm.startPrank(utilsFacet.util_getAdmin());
         adminFacet.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED);
 
@@ -50,6 +65,8 @@ contract SetDisabledProofSystemsTest is AdminTest {
     }
 
     function test_restoresBothRequired() public {
+        utilsFacet.util_setMultiProofEnabled(true);
+
         vm.startPrank(utilsFacet.util_getAdmin());
         adminFacet.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
         adminFacet.setDisabledProofSystems(0);
@@ -74,6 +91,21 @@ contract SetDisabledProofSystemsTest is AdminTest {
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, _mask));
         adminFacet.setDisabledProofSystems(_mask);
+    }
+
+    /// Requiring the Airbender lane before the chain commits Airbender data would stall it on the very
+    /// next batch: the Executor emits one public input and the enabled lane has nothing to read.
+    function test_revertWhen_requiringAirbenderWithoutMultiProof() public {
+        vm.startPrank(utilsFacet.util_getAdmin());
+        vm.expectRevert(AirbenderLaneRequiresMultiProof.selector);
+        adminFacet.setDisabledProofSystems(0);
+    }
+
+    /// Same guard, reached by swapping which lane is masked rather than by clearing the mask.
+    function test_revertWhen_swappingTheMaskedLaneWithoutMultiProof() public {
+        vm.startPrank(utilsFacet.util_getAdmin());
+        vm.expectRevert(AirbenderLaneRequiresMultiProof.selector);
+        adminFacet.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED);
     }
 
     /// The setting exists for the case where committed batches cannot be proved, so it has to take effect
