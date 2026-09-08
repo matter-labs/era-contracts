@@ -1,14 +1,32 @@
 {
   "bundles": [
     {
-      "file": "01_chain.upgrade_0x397aa1340b514cb3ef8f474db72b7e62c9159c63.safe.json",
+      "file": "01_chain.set-upgrade-timestamp_0x397aa1340b514cb3ef8f474db72b7e62c9159c63.safe.json",
       "index": 1,
+      "steps": ["chain.set-upgrade-timestamp"],
+      "target": "0x397aa1340b514cb3ef8f474db72b7e62c9159c63",
+      "tx_count": 1
+    },
+    {
+      "file": "02_chain.upgrade_0x397aa1340b514cb3ef8f474db72b7e62c9159c63.safe.json",
+      "index": 2,
       "steps": ["chain.upgrade"],
       "target": "0x397aa1340b514cb3ef8f474db72b7e62c9159c63",
       "tx_count": 1
     }
   ],
   "metadata": [
+    {
+      "command": "chain.set-upgrade-timestamp",
+      "input": {},
+      "output": {
+        "access_control_restriction": "0x0000000000000000000000000000000000000000",
+        "admin_address": "0x4e48a5152f8d705073b5accccaf234571b2a0621",
+        "bridgehub": "0xc4fd2580c3487bba18d63f50301020132342fdbd",
+        "chain_id": 42111,
+        "upgrade_timestamp": "1"
+      }
+    },
     {
       "command": "chain.upgrade",
       "input": {},

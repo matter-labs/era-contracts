@@ -21,9 +21,9 @@
       "input": {},
       "output": {
         "access_control_restriction": "0x0000000000000000000000000000000000000000",
-        "admin_address": "0x0c39098d6a7e7287db4a2ae5bad67c9ef76eb265",
+        "admin_address": "0xf87e2fb52ab4769bf60b04d4c7ad311048858230",
         "bridgehub": "0xc4fd2580c3487bba18d63f50301020132342fdbd",
-        "chain_id": 579029,
+        "chain_id": 8022834,
         "upgrade_timestamp": "1"
       }
     },
@@ -32,11 +32,14 @@
       "input": {},
       "output": {
         "access_control_restriction": "0x0000000000000000000000000000000000000000",
-        "admin_address": "0x0c39098d6a7e7287db4a2ae5bad67c9ef76eb265",
-        "chain_address": "0x03d8bd99d7a66d38ab66c2ec488a727a8bec55cc",
+        "admin_address": "0xf87e2fb52ab4769bf60b04d4c7ad311048858230",
+        "chain_address": "0xdecf49e3818f40539268897eadbbb39fabedf839",
         "da_move": {
-          "pair": null,
-          "pubdata_content": null
+          "pair": {
+            "l1_da_validator": "0x5df2db3eaf761f2fb5c1ba045222310b9cd1457f",
+            "l2_da_commitment_scheme": "BlobsZKSyncOS"
+          },
+          "pubdata_content": "LogsOnly"
         }
       }
     }
