@@ -40,6 +40,11 @@ remappings = [
   "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
   "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
   "test-utils/=test/foundry/l1/integration/utils/",
+  # Every remapping is recorded in each contract's CBOR metadata, so the set must not depend on the
+  # machine. Two OpenZeppelin submodules each vendor `erc4626-tests`; auto-detection keeps whichever
+  # the directory scan meets first, which differs between Linux and macOS and made every locally
+  # regenerated hash and the genesis image diverge from CI. Pin the copy CI resolves to.
+  "erc4626-tests/=lib/openzeppelin-contracts-upgradeable-v4/lib/erc4626-tests/",
 ]
 optimizer = true
 optimizer_runs = 9999999

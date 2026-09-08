@@ -27,6 +27,10 @@ echo "==> [2/5] regenerating zkstack-out"
 yarn copy-to-zkstack-out
 
 echo "==> [3/5] regenerating anvil-interop chain states (port offset ${PORT_OFFSET})"
+# Mirror the state-generation job: the DA contracts are deployed too and their CREATE2 addresses
+# depend on their bytecode, so they must come from the same no-metadata profile the harness builds
+# l1-contracts with (setup-and-dump-state.ts sets FOUNDRY_PROFILE=anvil-interop for its own build).
+(cd ../da-contracts && FOUNDRY_PROFILE=anvil-interop yarn build:foundry)
 (cd test/anvil-interop && ANVIL_INTEROP_PORT_OFFSET="${PORT_OFFSET}" npx ts-node setup-and-dump-state.ts)
 
 echo "==> [4/5] regenerating the registry manifest from the fresh chain states"
