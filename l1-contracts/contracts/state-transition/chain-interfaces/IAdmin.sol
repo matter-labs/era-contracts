@@ -125,6 +125,10 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _pubdataContent The new pubdata content.
     function setPubdataContent(PubdataContent _pubdataContent) external;
 
+    /// @notice Sets the disabled proof systems for a ZKsync OS chain.
+    /// @param _disabledProofSystems Zero enables ZiSK; ZISK_PROOF_SYSTEM_DISABLED selects Airbender-only proofs.
+    function setDisabledProofSystems(uint8 _disabledProofSystems) external;
+
     /// @notice Makes the chain as permanent rollup.
     /// @dev This is a security feature needed for chains that should be
     /// trusted to keep their data available even if the chain admin becomes malicious
@@ -191,6 +195,9 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice New pubdata content set
     event NewPubdataContent(PubdataContent indexed oldPubdataContent, PubdataContent indexed newPubdataContent);
+
+    /// @notice The set of proof systems the chain does not require changed
+    event NewDisabledProofSystems(uint8 indexed oldDisabledProofSystems, uint8 indexed newDisabledProofSystems);
 
     event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
 
