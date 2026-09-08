@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import "./_Executor_Shared.t.sol";
 
 import {Utils} from "../Utils/Utils.sol";
-import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {
@@ -145,32 +144,6 @@ contract ExecutorExtendedTest is ExecutorTest {
 
 /// @title Extended tests for ExecutorFacet revert batches functionality
 contract ExecutorRevertBatchesTest is ExecutorTest {
-    UtilsFacet internal utilsFacet;
-
-    constructor() {
-        // Add UtilsFacet to the diamond to manipulate state
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: address(new UtilsFacet()),
-            action: Diamond.Action.Add,
-            isFreezable: true,
-            selectors: Utils.getUtilsFacetSelectors()
-        });
-
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(0),
-            initCalldata: bytes("")
-        });
-
-        // Execute the upgrade as chainTypeManager
-        address chainTypeManager = getters.getChainTypeManager();
-        vm.prank(chainTypeManager);
-        admin.executeUpgrade(diamondCutData);
-
-        utilsFacet = UtilsFacet(address(executor));
-    }
-
     function test_RevertBatches_RevertWhen_RevertedBatchNotAfterNewLastBatch() public {
         // Try to revert to a batch number greater than totalBatchesCommitted
         // This should revert with RevertedBatchNotAfterNewLastBatch

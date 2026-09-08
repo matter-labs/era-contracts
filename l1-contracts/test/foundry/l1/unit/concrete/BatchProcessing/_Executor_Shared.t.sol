@@ -47,6 +47,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
@@ -61,6 +62,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     TestExecutor internal executor;
     TestCommitter internal committer;
     GettersFacet internal getters;
+    UtilsFacet internal utilsFacet;
     MailboxFacet internal mailbox;
     bytes32 internal newCommittedBlockBatchHash;
     bytes32 internal newCommittedBlockCommitment;
@@ -127,10 +129,11 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](34);
+        bytes4[] memory selectors = new bytes4[](35);
         uint256 i = 0;
         selectors[i++] = getters.getVerifier.selector;
         selectors[i++] = getters.disabledProofSystems.selector;
+        selectors[i++] = getters.multiProofEnabled.selector;
         selectors[i++] = getters.getAdmin.selector;
         selectors[i++] = getters.getPendingAdmin.selector;
         selectors[i++] = getters.getTotalBlocksCommitted.selector;
@@ -340,7 +343,7 @@ contract ExecutorTest is UtilsCallMockerTest {
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](5);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(admin),
             action: Diamond.Action.Add,
@@ -372,6 +375,15 @@ contract ExecutorTest is UtilsCallMockerTest {
             selectors: getMailboxSelectors()
         });
 
+        // Lets a test reach chain state that no legitimate call can produce — a fabricated stored batch
+        // hash, say — through Solidity rather than raw slot arithmetic.
+        facetCuts[5] = Diamond.FacetCut({
+            facet: address(new UtilsFacet()),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getUtilsFacetSelectors()
+        });
+
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(diamondInit),
@@ -384,6 +396,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         executor = TestExecutor(address(diamondProxy));
         committer = TestCommitter(address(diamondProxy));
         getters = GettersFacet(address(diamondProxy));
+        utilsFacet = UtilsFacet(address(diamondProxy));
         mailbox = MailboxFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));
         chainTypeManager.setZKChain(l2ChainId, address(diamondProxy));

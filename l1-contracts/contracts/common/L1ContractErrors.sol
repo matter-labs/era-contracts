@@ -23,10 +23,20 @@ error AirbenderCommitmentNotSupported();
 /// @notice The chain runs the multi-proof gate, so every batch must commit the Airbender bootloader
 /// heap hash. Without it the batch carries no Airbender commitment and could never be proved.
 error AirbenderCommitmentRequired();
+// 0x8422173f
+/// @notice Whether the chain commits Airbender data may only change while the Airbender lane is
+/// masked off. Changing it under a lane that is required would commit the next batch in a shape the
+/// gate cannot accept, in whichever direction the change goes.
+error AirbenderLaneMustBeDisabled();
 // 0xf4a67ff1
 /// @notice The Airbender lane cannot be required while the chain does not commit Airbender data:
 /// every batch would be committed with a single public input the enabled lane has nothing to read.
 error AirbenderLaneRequiresMultiProof();
+// 0x860e6d46
+/// @notice The Airbender lane cannot be required until a batch of this chain's own has settled. Its
+/// first batch would otherwise be chained to the genesis commitment, which is a configured value
+/// with no preimage the guest can open.
+error AirbenderLaneRequiresSettledBatch();
 // 0xb577eb6c
 error AlreadyDangerousContract(address);
 // 0x2a5989a0
@@ -286,10 +296,6 @@ error MockVerifierNotSupported();
 error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 // 0xb385a3da
 error MsgValueTooLow(uint256 required, uint256 provided);
-// 0x7a2f0785
-/// @notice The chain still requires the Airbender lane, so it must keep committing Airbender data.
-/// Mask the lane off with `setDisabledProofSystems` before withdrawing the capability.
-error MultiProofRequiredWhileAirbenderLaneEnabled();
 // 0xedd74330
 error MustBeEraChain();
 // 0x8b7e144a
@@ -492,6 +498,10 @@ error ValidateTxnNotEnoughGas();
 error ValueMismatch(uint256 expected, uint256 actual);
 // 0xe1022469
 error VerifiedBatchesExceedsCommittedBatches();
+// 0x0f4d47fb
+/// @notice The chain's installed verifier is not the multi-proof gate, so it cannot consume the
+/// second public input that committing Airbender data would make the Executor emit.
+error VerifierDoesNotSupportMultiProof();
 // 0xae899454
 error WithdrawalAlreadyFinalized();
 // 0x750b219c

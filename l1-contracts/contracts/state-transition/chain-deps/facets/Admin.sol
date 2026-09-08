@@ -51,8 +51,10 @@ import {
     ProtocolIdNotGreater,
     TokenMultiplierChangeTooFrequent,
     InvalidDisabledProofSystemsMask,
+    AirbenderLaneMustBeDisabled,
     AirbenderLaneRequiresMultiProof,
-    MultiProofRequiredWhileAirbenderLaneEnabled,
+    AirbenderLaneRequiresSettledBatch,
+    VerifierDoesNotSupportMultiProof,
     TooMuchGas,
     Unauthorized,
     UpgradeTimestampNotReached,
@@ -61,6 +63,8 @@ import {
     ZKsyncOSMaxTxGasLimitTooHigh,
     ZKsyncOSMaxTxGasLimitTooLow
 } from "../../../common/L1ContractErrors.sol";
+import {IEraMultiProofVerifier} from "../../chain-interfaces/IEraMultiProofVerifier.sol";
+import {IVerifier} from "../../chain-interfaces/IVerifier.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {
@@ -198,22 +202,39 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setMultiProofEnabled(bool _multiProofEnabled) external onlyAdmin onlySettlementLayer onlyEra {
-        // Withdrawing the capability while the Airbender lane is still required would commit every
-        // subsequent batch with a single public input that lane has nothing to read. The lane has to
-        // be masked off first, which is the reverse of the order in which it was brought up.
-        if (!_multiProofEnabled && s.disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
-            revert MultiProofRequiredWhileAirbenderLaneEnabled();
+        // Only while the Airbender lane is masked off, in either direction. Masked off, the gate takes
+        // both the one- and the two-input shape, so a backlog spanning the change settles batch by
+        // batch: `ExecutorFacet` reads the shape from each batch's own authenticated `StoredBatchInfo`
+        // and never from this setting. That is what makes a drained pipeline unnecessary here — the
+        // change only ever reaches batches committed after it. Under a required lane the same change
+        // would put the very next batch in a shape the gate rejects.
+        if (s.disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
+            revert AirbenderLaneMustBeDisabled();
         }
 
-        // Both directions need a drained pipeline. Turning it on leaves already-committed batches
-        // without the Airbender commitment the gate now expects; turning it off means subsequent
-        // batches carry none while the gate still expects one. Either way a backlog spanning the
-        // change holds batches the configured verifier cannot accept.
-        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+        // Declaring the capability is not enough to have it: the chain has to be running a verifier
+        // with an Airbender lane, or `Committer` would start requiring Airbender data whose second
+        // public input the installed verifier cannot consume. Checked against the verifier actually
+        // installed rather than trusted from the caller.
+        if (_multiProofEnabled) {
+            _enforceVerifierHasAnAirbenderLane();
+        }
 
         bool oldMultiProofEnabled = s.multiProofEnabled;
         s.multiProofEnabled = _multiProofEnabled;
         emit NewMultiProofEnabled(oldMultiProofEnabled, _multiProofEnabled);
+    }
+
+    /// @dev A single-system router does not answer `AIRBENDER_VERIFIER()`, so a staticcall that
+    /// reverts — or one answering the zero address — is the negative answer.
+    function _enforceVerifierHasAnAirbenderLane() internal view {
+        try IEraMultiProofVerifier(address(s.verifier)).AIRBENDER_VERIFIER() returns (IVerifier airbender) {
+            if (address(airbender) == address(0)) {
+                revert VerifierDoesNotSupportMultiProof();
+            }
+        } catch {
+            revert VerifierDoesNotSupportMultiProof();
+        }
     }
 
     /// @inheritdoc IAdmin
@@ -235,11 +256,21 @@ contract AdminFacet is ZKChainBase, IAdmin {
             _enforceNoUnverifiedBatchesForChainConfigUpdate();
         }
 
-        // Requiring the Airbender lane is only meaningful once the chain commits the data that lane
-        // is proved against. Without the capability the batches committed from here on carry a single
-        // public input, and the gate would refuse every one of them.
-        if (_disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0 && !s.multiProofEnabled) {
-            revert AirbenderLaneRequiresMultiProof();
+        if (_disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
+            // Requiring the Airbender lane is only meaningful once the chain commits the data that
+            // lane is proved against. Without the capability the batches committed from here on carry
+            // a single public input, and the gate would refuse every one of them.
+            if (!s.multiProofEnabled) {
+                revert AirbenderLaneRequiresMultiProof();
+            }
+
+            // The lane's first batch is chained to the last settled batch. At genesis that is the
+            // configured `storedBatchZero`, whose commitment is a bare configuration value with no
+            // preimage the guest can open, so the batch would be unprovable. One settled batch of the
+            // chain's own is enough: its commitment is one the sequencer built and can open.
+            if (s.totalBatchesVerified == 0) {
+                revert AirbenderLaneRequiresSettledBatch();
+            }
         }
 
         s.disabledProofSystems = _disabledProofSystems;

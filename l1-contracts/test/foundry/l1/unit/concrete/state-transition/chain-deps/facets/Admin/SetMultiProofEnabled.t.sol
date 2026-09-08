@@ -4,12 +4,14 @@ pragma solidity 0.8.28;
 import {AdminTest} from "./_Admin_Shared.t.sol";
 
 import {
-    MultiProofRequiredWhileAirbenderLaneEnabled,
+    AirbenderLaneMustBeDisabled,
     MustBeEraChain,
     Unauthorized,
-    ZKsyncOSChainConfigUpdateWithUnverifiedBatches
+    VerifierDoesNotSupportMultiProof
 } from "contracts/common/L1ContractErrors.sol";
 import {AIRBENDER_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
+import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 /// @notice Unit tests for the per-chain multi-proof capability.
 /// @dev The setting says whether the chain commits the extra Airbender data every batch needs to be
@@ -18,6 +20,15 @@ import {AIRBENDER_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
 /// verify a batch already committed.
 contract SetMultiProofEnabledTest is AdminTest {
     event NewMultiProofEnabled(bool oldMultiProofEnabled, bool newMultiProofEnabled);
+
+    /// A gate is what the capability claims is installed, so the tests that declare it install one.
+    function _installGate() internal {
+        utilsFacet.util_setVerifier(
+            IVerifier(
+                address(new EraMultiProofVerifier(IVerifier(makeAddr("boojum")), IVerifier(makeAddr("airbender"))))
+            )
+        );
+    }
 
     function test_defaultsToDisabled() public view {
         assertFalse(utilsFacet.util_getMultiProofEnabled());
@@ -41,6 +52,8 @@ contract SetMultiProofEnabledTest is AdminTest {
     }
 
     function test_enables() public {
+        _installGate();
+
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectEmit(true, true, true, true);
         emit NewMultiProofEnabled(false, true);
@@ -50,63 +63,71 @@ contract SetMultiProofEnabledTest is AdminTest {
     }
 
     function test_disables() public {
+        _installGate();
+
         vm.startPrank(utilsFacet.util_getAdmin());
         adminFacet.setMultiProofEnabled(true);
-        adminFacet.setDisabledProofSystems(0);
-
-        // The lane has to stop being required before the data behind it is withdrawn.
-        adminFacet.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
         adminFacet.setMultiProofEnabled(false);
 
         assertFalse(utilsFacet.util_getMultiProofEnabled());
     }
 
-    /// Withdrawing the capability while the gate still requires the Airbender lane would stall the chain
-    /// on the next batch, so the two settings can only be unwound in the order they were set.
+    /// Declaring the capability on a chain whose verifier has no Airbender lane would make `Committer`
+    /// require data whose second public input that verifier cannot consume. The claim is checked
+    /// against the verifier actually installed.
+    function test_revertWhen_verifierHasNoAirbenderLane() public {
+        vm.startPrank(utilsFacet.util_getAdmin());
+        vm.expectRevert(VerifierDoesNotSupportMultiProof.selector);
+        adminFacet.setMultiProofEnabled(true);
+    }
+
+    /// A verifier that answers the marker with the zero address is not a working gate either.
+    function test_revertWhen_verifierReportsNoAirbenderVerifier() public {
+        utilsFacet.util_setVerifier(
+            IVerifier(address(new EraMultiProofVerifier(IVerifier(makeAddr("boojum")), IVerifier(address(0)))))
+        );
+
+        vm.startPrank(utilsFacet.util_getAdmin());
+        vm.expectRevert(VerifierDoesNotSupportMultiProof.selector);
+        adminFacet.setMultiProofEnabled(true);
+    }
+
+    /// Withdrawing the capability under a required lane would put the next batch in a shape the gate
+    /// rejects, so the lane has to be masked off first — the reverse of how it was brought up.
     function test_revertWhen_disablingWhileAirbenderLaneRequired() public {
         utilsFacet.util_setMultiProofEnabled(true);
         utilsFacet.util_setDisabledProofSystems(0);
 
         vm.startPrank(utilsFacet.util_getAdmin());
-        vm.expectRevert(MultiProofRequiredWhileAirbenderLaneEnabled.selector);
+        vm.expectRevert(AirbenderLaneMustBeDisabled.selector);
         adminFacet.setMultiProofEnabled(false);
     }
 
-    /// Turning the capability on while batches are still in flight would strand them: they were
-    /// committed without Airbender data, so the gate they now face has no second public input to give
-    /// its Airbender lane.
-    function test_revertWhen_enablingWithUnverifiedBatches() public {
-        utilsFacet.util_setTotalBatchesCommitted(5);
-        utilsFacet.util_setTotalBatchesVerified(1);
+    /// And the same rule in the enable direction, so the guard reads as one symmetric condition
+    /// rather than two special cases.
+    function test_revertWhen_enablingWhileAirbenderLaneRequired() public {
+        _installGate();
+        utilsFacet.util_setMultiProofEnabled(true);
+        utilsFacet.util_setDisabledProofSystems(0);
+        utilsFacet.util_setMultiProofEnabled(false);
 
         vm.startPrank(utilsFacet.util_getAdmin());
-        vm.expectRevert(abi.encodeWithSelector(ZKsyncOSChainConfigUpdateWithUnverifiedBatches.selector, 1, 5));
+        vm.expectRevert(AirbenderLaneMustBeDisabled.selector);
         adminFacet.setMultiProofEnabled(true);
     }
 
-    /// And turning it off strands them the other way: the committed batches carry an Airbender
-    /// commitment, but batches committed after the change would not, so the two cannot be proved under
-    /// one configuration.
-    function test_revertWhen_disablingWithUnverifiedBatches() public {
-        utilsFacet.util_setMultiProofEnabled(true);
-        utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+    /// A pipeline still holding unproven batches is fine: the lane is masked off, so the gate takes
+    /// both shapes, and `ExecutorFacet` reads each batch's shape from its own stored data rather than
+    /// from this setting. Requiring a drain here would stop commitment for no reason.
+    function test_appliesWithCommittedButUnverifiedBatches() public {
+        _installGate();
         utilsFacet.util_setTotalBatchesCommitted(5);
         utilsFacet.util_setTotalBatchesVerified(1);
-
-        vm.startPrank(utilsFacet.util_getAdmin());
-        vm.expectRevert(abi.encodeWithSelector(ZKsyncOSChainConfigUpdateWithUnverifiedBatches.selector, 1, 5));
-        adminFacet.setMultiProofEnabled(false);
-    }
-
-    /// A drained pipeline is the whole precondition: with every committed batch verified, the change
-    /// applies to future batches only.
-    function test_appliesOnADrainedPipeline() public {
-        utilsFacet.util_setTotalBatchesCommitted(5);
-        utilsFacet.util_setTotalBatchesVerified(5);
 
         vm.startPrank(utilsFacet.util_getAdmin());
         adminFacet.setMultiProofEnabled(true);
 
         assertTrue(utilsFacet.util_getMultiProofEnabled());
+        assertEq(utilsFacet.util_getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_DISABLED);
     }
 }

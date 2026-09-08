@@ -26,6 +26,7 @@ import {
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
+import {EraMultiProofTestnetVerifier} from "contracts/state-transition/verifiers/EraMultiProofTestnetVerifier.sol";
 import {
     AIRBENDER_PROOF_SYSTEM_DISABLED,
     AIRBENDER_SNARK_PROOF_LENGTH,
@@ -71,6 +72,7 @@ contract PublicInputCountRevealingVerifier is IVerifier {
 contract ProvingTest is ExecutorTest {
     bytes32 l2DAValidatorOutputHash;
     bytes32 airbenderHeapHash;
+    IExecutor.StoredBatchInfo internal bootstrapStoredBatchInfo;
     bytes32 committedStateDiffHash;
     bytes32 committedBlobLinearHash;
     bytes32[] blobVersionedHashes;
@@ -82,29 +84,65 @@ contract ProvingTest is ExecutorTest {
         vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1);
         currentTimestamp = block.timestamp;
 
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        correctL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+        // The chain is brought up the way a real one is, because the contracts now require that order
+        // and a suite that wrote the end state would not be exercising it.
+        //
+        // 1. It starts single-proof — `DiamondInit` masks the Airbender lane off — and settles a batch
+        //    of its own. That batch is what the lane's first batch chains to: the genesis commitment is
+        //    a configured value with no preimage the guest could open, so activating before this point
+        //    is refused.
+        bootstrapStoredBatchInfo = _commitBatch(genesisStoredBatchInfo, bytes32(0), 1);
+        _prove(genesisStoredBatchInfo, bootstrapStoredBatchInfo, proofInput);
+
+        // 2. The upgrade installs the gate. The testnet variant is the production gate with an empty
+        //    proof short-circuited, so the chain answers the capability check as a real one does.
+        vm.etch(
+            getters.getVerifier(),
+            address(new EraMultiProofTestnetVerifier(IVerifier(makeAddr("boojum")), IVerifier(makeAddr("airbender"))))
+                .code
         );
 
-        bytes memory l2Logs = Utils.encodePacked(correctL2Logs);
-
-        // This suite exercises a multi-proof chain, brought up through the real activation sequence: a
-        // new chain starts with the Airbender lane masked off, the capability is declared first, and
-        // only then is the lane required. `Committer` then wants Airbender data on every batch.
+        // 3. Only then the capability, and only then the lane.
         vm.startPrank(owner);
         IAdmin(address(committer)).setMultiProofEnabled(true);
         IAdmin(address(committer)).setDisabledProofSystems(0);
         vm.stopPrank();
 
+        // 4. The batch under test is the first one committed with Airbender data.
         airbenderHeapHash = Utils.randomBytes32("airbenderBootloaderHeapHash");
-        newCommitBatchInfo.airbenderBootloaderHeapHash = airbenderHeapHash;
+        newStoredBatchInfo = _commitBatch(bootstrapStoredBatchInfo, airbenderHeapHash, 2);
+    }
+
+    /// Commits one batch on top of `_prev`, returning what the chain stored for it.
+    function _commitBatch(
+        IExecutor.StoredBatchInfo memory _prev,
+        bytes32 _airbenderHeapHash,
+        uint64 _batchNumber
+    ) internal returns (IExecutor.StoredBatchInfo memory stored) {
+        currentTimestamp = block.timestamp;
+
+        bytes[] memory logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
+        logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+        );
+        logs[uint256(SystemLogKey.PREV_BATCH_HASH_KEY)] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PREV_BATCH_HASH_KEY),
+            _prev.batchHash
+        );
+
+        newCommitBatchInfo.batchNumber = _batchNumber;
+        newCommitBatchInfo.airbenderBootloaderHeapHash = _airbenderHeapHash;
         newCommitBatchInfo.timestamp = uint64(currentTimestamp);
-        newCommitBatchInfo.systemLogs = l2Logs;
+        newCommitBatchInfo.systemLogs = Utils.encodePacked(logs);
         newCommitBatchInfo.operatorDAInput = operatorDAInput;
+        // A distinct state root per batch — `randomBytes32` mixes in `block.timestamp`, which the
+        // warp at the end of this helper has already moved on.
+        newCommitBatchInfo.newStateRoot = Utils.randomBytes32("newStateRoot");
 
         CommitBatchInfo[] memory commitBatchInfoArray = new CommitBatchInfo[](1);
         commitBatchInfoArray[0] = newCommitBatchInfo;
@@ -113,14 +151,14 @@ contract ProvingTest is ExecutorTest {
         vm.blobhashes(blobVersionedHashes);
         vm.recordLogs();
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
+            _prev,
             commitBatchInfoArray
         );
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        newStoredBatchInfo = IExecutor.StoredBatchInfo({
-            batchNumber: 1,
+        stored = IExecutor.StoredBatchInfo({
+            batchNumber: _batchNumber,
             batchHash: entries[EVENT_INDEX].topics[2],
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
@@ -129,11 +167,29 @@ contract ProvingTest is ExecutorTest {
             dependencyRootsRollingHash: bytes32(0),
             timestamp: currentTimestamp,
             commitment: entries[EVENT_INDEX].topics[3],
-            airbenderCommitment: _committedAirbenderCommitment()
+            airbenderCommitment: _airbenderHeapHash == bytes32(0) ? bytes32(0) : _committedAirbenderCommitment()
         });
+
+        // Batches must not share a timestamp, so the next one lands strictly later.
+        vm.warp(block.timestamp + 1);
     }
 
-    /// The Airbender-shape commitment the Committer produced for the batch just committed.
+    function _prove(
+        IExecutor.StoredBatchInfo memory _prev,
+        IExecutor.StoredBatchInfo memory _batch,
+        uint256[] memory _proof
+    ) internal {
+        IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+        storedBatchInfoArray[0] = _batch;
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
+            _prev,
+            storedBatchInfoArray,
+            _proof
+        );
+        vm.prank(validator);
+        executor.proveBatchesSharedBridge(address(0), proveBatchFrom, proveBatchTo, proveData);
+    }
+
     function _committedAirbenderCommitment() internal view returns (bytes32) {
         bytes32[] memory blobHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
         blobHashes[0] = committedBlobLinearHash;
@@ -185,8 +241,8 @@ contract ProvingTest is ExecutorTest {
     }
 
     function test_RevertWhen_ProvingWithWrongPreviousBlockData() public {
-        IExecutor.StoredBatchInfo memory wrongPreviousStoredBatchInfo = genesisStoredBatchInfo;
-        wrongPreviousStoredBatchInfo.batchNumber = 10; // Correct is 0
+        IExecutor.StoredBatchInfo memory wrongPreviousStoredBatchInfo = bootstrapStoredBatchInfo;
+        wrongPreviousStoredBatchInfo.batchNumber = 10; // Correct is 1
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         storedBatchInfoArray[0] = newStoredBatchInfo;
@@ -196,7 +252,7 @@ contract ProvingTest is ExecutorTest {
         vm.expectRevert(
             abi.encodeWithSelector(
                 BatchHashMismatch.selector,
-                keccak256(abi.encode(genesisStoredBatchInfo)),
+                keccak256(abi.encode(bootstrapStoredBatchInfo)),
                 keccak256(abi.encode(wrongPreviousStoredBatchInfo))
             )
         );
@@ -225,7 +281,7 @@ contract ProvingTest is ExecutorTest {
             )
         );
         (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
-            genesisStoredBatchInfo,
+            bootstrapStoredBatchInfo,
             storedBatchInfoArray,
             proofInput
         );
@@ -233,8 +289,9 @@ contract ProvingTest is ExecutorTest {
     }
 
     function test_RevertWhen_ProvingRevertedBlockWithoutCommittingAgain() public {
+        // Back to the settled bootstrap batch, discarding the one under test.
         vm.prank(validator);
-        executor.revertBatchesSharedBridge(address(0), 0);
+        executor.revertBatchesSharedBridge(address(0), 1);
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         storedBatchInfoArray[0] = newStoredBatchInfo;
@@ -243,7 +300,7 @@ contract ProvingTest is ExecutorTest {
 
         vm.expectRevert(VerifiedBatchesExceedsCommittedBatches.selector);
         (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
-            genesisStoredBatchInfo,
+            bootstrapStoredBatchInfo,
             storedBatchInfoArray,
             proofInput
         );
@@ -256,14 +313,14 @@ contract ProvingTest is ExecutorTest {
 
         vm.prank(validator);
         (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
-            genesisStoredBatchInfo,
+            bootstrapStoredBatchInfo,
             storedBatchInfoArray,
             proofInput
         );
         executor.proveBatchesSharedBridge(address(0), proveBatchFrom, proveBatchTo, proveData);
 
         uint256 totalBlocksVerified = getters.getTotalBlocksVerified();
-        assertEq(totalBlocksVerified, 1);
+        assertEq(totalBlocksVerified, 2);
     }
 
     // For accurate measuring of gas usage via snapshot cheatcodes, isolation mode has to be enabled.
@@ -274,7 +331,7 @@ contract ProvingTest is ExecutorTest {
 
         vm.prank(validator);
         (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
-            genesisStoredBatchInfo,
+            bootstrapStoredBatchInfo,
             storedBatchInfoArray,
             proofInput
         );
@@ -294,7 +351,7 @@ contract ProvingTest is ExecutorTest {
         vm.etch(getters.getVerifier(), address(revealer).code);
 
         uint256 expectedRaw = uint256(
-            keccak256(abi.encodePacked(genesisStoredBatchInfo.commitment, newStoredBatchInfo.commitment))
+            keccak256(abi.encodePacked(bootstrapStoredBatchInfo.commitment, newStoredBatchInfo.commitment))
         );
 
         uint256[] memory proof = new uint256[](2);
@@ -304,7 +361,7 @@ contract ProvingTest is ExecutorTest {
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         storedBatchInfoArray[0] = newStoredBatchInfo;
         (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
-            genesisStoredBatchInfo,
+            bootstrapStoredBatchInfo,
             storedBatchInfoArray,
             proof
         );
@@ -346,7 +403,7 @@ contract ProvingTest is ExecutorTest {
         vm.prank(owner);
         IAdmin(address(executor)).setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
         _proveWith(proof);
-        assertEq(getters.getTotalBlocksVerified(), 1);
+        assertEq(getters.getTotalBlocksVerified(), 2);
     }
 
     /// Era proves one batch per call, unconditionally. Making this depend on the Airbender lane let
@@ -360,7 +417,7 @@ contract ProvingTest is ExecutorTest {
         batches[1].batchNumber = 2;
 
         (uint256 from, uint256 to, bytes memory proveData) = Utils.encodeProveBatchesData(
-            genesisStoredBatchInfo,
+            bootstrapStoredBatchInfo,
             batches,
             _gateProof()
         );
@@ -379,14 +436,46 @@ contract ProvingTest is ExecutorTest {
     function test_batchWithoutAirbenderDataEmitsOnePublicInput() public {
         IExecutor.StoredBatchInfo memory laneOff = newStoredBatchInfo;
         laneOff.airbenderCommitment = bytes32(0);
-        vm.store(address(executor), keccak256(abi.encode(uint256(1), uint256(14))), keccak256(abi.encode(laneOff)));
+        utilsFacet.util_setStoredBatchHashes(2, keccak256(abi.encode(laneOff)));
 
         vm.etch(getters.getVerifier(), address(new PublicInputCountRevealingVerifier()).code);
 
         vm.expectRevert(
             abi.encodeWithSelector(PublicInputCountRevealingVerifier.RevealedPublicInputCount.selector, uint256(1))
         );
-        _proveWithPrev(genesisStoredBatchInfo, _gateProof(), laneOff);
+        _proveWithPrev(bootstrapStoredBatchInfo, _gateProof(), laneOff);
+    }
+
+    /// The whole bring-up in one place, since each piece of it is enforced by a different contract and
+    /// only the sequence shows they compose: a single-proof batch settles, the gate goes in, the
+    /// capability is declared, the lane is required, and the next batch settles across both lanes.
+    /// `setUp` performs the first four steps; this asserts what they produced and finishes the story.
+    function test_bootstrapThenActivationThenDualLaneSettlement() public {
+        // The bootstrap batch settled with no Airbender commitment.
+        assertEq(bootstrapStoredBatchInfo.airbenderCommitment, bytes32(0));
+        assertEq(getters.getTotalBlocksVerified(), 1);
+
+        // Activation left both settings on, and the batch committed after it carries the second
+        // commitment that the lane is proved against.
+        assertTrue(getters.multiProofEnabled());
+        assertEq(getters.disabledProofSystems(), 0);
+        assertTrue(newStoredBatchInfo.airbenderCommitment != bytes32(0));
+        assertTrue(newStoredBatchInfo.airbenderCommitment != newStoredBatchInfo.commitment);
+
+        // Both lanes run, each against its own transition hash, and the batch settles.
+        uint256 expectedBoojum = uint256(
+            keccak256(abi.encodePacked(bootstrapStoredBatchInfo.commitment, newStoredBatchInfo.commitment))
+        );
+        uint256 expectedAirbender = uint256(
+            keccak256(abi.encodePacked(bootstrapStoredBatchInfo.commitment, newStoredBatchInfo.airbenderCommitment))
+        );
+        LaneRecordingVerifier boojum = new LaneRecordingVerifier(expectedBoojum);
+        LaneRecordingVerifier airbender = new LaneRecordingVerifier(expectedAirbender);
+        _installGate(IVerifier(address(boojum)), IVerifier(address(airbender)));
+
+        _proveWithPrev(bootstrapStoredBatchInfo, _gateProof());
+
+        assertEq(getters.getTotalBlocksVerified(), 2);
     }
 
     /// The mirror: a batch that does carry one makes the Executor build the pair.
@@ -419,7 +508,7 @@ contract ProvingTest is ExecutorTest {
         // The genesis predecessor carries no Airbender commitment, so the chain seeds from its
         // Boojum commitment — which is authenticated and openable by the guest.
         uint256 expected = uint256(
-            keccak256(abi.encodePacked(genesisStoredBatchInfo.commitment, newStoredBatchInfo.airbenderCommitment))
+            keccak256(abi.encodePacked(bootstrapStoredBatchInfo.commitment, newStoredBatchInfo.airbenderCommitment))
         );
 
         vm.expectRevert(
@@ -428,17 +517,16 @@ contract ProvingTest is ExecutorTest {
         _proveWith(_gateProof());
     }
 
-    /// Plants a predecessor at index 0 whose `commitment` and `airbenderCommitment` are distinct and
-    /// non-zero, so the seed rule's choice between them is observable. The genesis batch has both
-    /// zero, which makes every candidate seed produce the same transition hash.
+    /// Re-points the stored predecessor at one whose `commitment` and `airbenderCommitment` are
+    /// distinct and non-zero, so the seed rule's choice between them is observable.
     function _plantPredecessor(
         bytes32 _commitment,
         bytes32 _airbenderCommitment
     ) internal returns (IExecutor.StoredBatchInfo memory prev) {
-        prev = genesisStoredBatchInfo;
+        prev = bootstrapStoredBatchInfo;
         prev.commitment = _commitment;
         prev.airbenderCommitment = _airbenderCommitment;
-        vm.store(address(executor), keccak256(abi.encode(uint256(0), uint256(14))), keccak256(abi.encode(prev)));
+        utilsFacet.util_setStoredBatchHashes(1, keccak256(abi.encode(prev)));
     }
 
     /// A predecessor with no Airbender commitment seeds from its Boojum commitment — not from zero,
@@ -461,7 +549,7 @@ contract ProvingTest is ExecutorTest {
     function test_seedIgnoresAnUnauthenticatedPredecessorAirbenderCommitment() public {
         bytes32 prevCommitment = Utils.randomBytes32("predecessorBoojumCommitment");
 
-        IExecutor.StoredBatchInfo memory prev = genesisStoredBatchInfo;
+        IExecutor.StoredBatchInfo memory prev = bootstrapStoredBatchInfo;
         prev.commitment = prevCommitment;
         IExecutor.PreAirbenderStoredBatchInfo memory preAirbenderForm = IExecutor.PreAirbenderStoredBatchInfo({
             batchNumber: prev.batchNumber,
@@ -474,11 +562,7 @@ contract ProvingTest is ExecutorTest {
             timestamp: prev.timestamp,
             commitment: prev.commitment
         });
-        vm.store(
-            address(executor),
-            keccak256(abi.encode(uint256(0), uint256(14))),
-            keccak256(abi.encode(preAirbenderForm))
-        );
+        utilsFacet.util_setStoredBatchHashes(1, keccak256(abi.encode(preAirbenderForm)));
 
         // A value the stored hash never covered.
         prev.airbenderCommitment = Utils.randomBytes32("forgedPredecessorAirbenderCommitment");
@@ -498,7 +582,7 @@ contract ProvingTest is ExecutorTest {
         _installGate(IVerifier(address(new PublicInputRevealingVerifier())), IVerifier(address(new AcceptingLane())));
 
         uint256 expected = uint256(
-            keccak256(abi.encodePacked(genesisStoredBatchInfo.commitment, newStoredBatchInfo.commitment))
+            keccak256(abi.encodePacked(bootstrapStoredBatchInfo.commitment, newStoredBatchInfo.commitment))
         );
 
         vm.expectRevert(
@@ -547,11 +631,7 @@ contract ProvingTest is ExecutorTest {
             timestamp: newStoredBatchInfo.timestamp,
             commitment: newStoredBatchInfo.commitment
         });
-        vm.store(
-            address(executor),
-            keccak256(abi.encode(uint256(1), uint256(14))),
-            keccak256(abi.encode(preAirbender))
-        );
+        utilsFacet.util_setStoredBatchHashes(2, keccak256(abi.encode(preAirbender)));
 
         // One public input, so the gate refuses it — the lane is off for this batch.
         vm.expectRevert(InvalidPublicInputsLength.selector);
@@ -578,13 +658,34 @@ contract ProvingTest is ExecutorTest {
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         storedBatchInfoArray[0] = newStoredBatchInfo;
         (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
-            genesisStoredBatchInfo,
+            bootstrapStoredBatchInfo,
             storedBatchInfoArray,
             _proof
         );
         vm.prank(validator);
         executor.proveBatchesSharedBridge(address(0), proveBatchFrom, proveBatchTo, proveData);
     }
+}
+
+/// @notice A lane that accepts only the public input it was constructed with, so a test asserting a
+/// batch settled is also asserting each lane saw the right transition hash.
+contract LaneRecordingVerifier is IVerifier {
+    uint256 internal immutable EXPECTED;
+
+    constructor(uint256 _expected) {
+        EXPECTED = _expected;
+    }
+
+    function verify(uint256[] calldata _publicInputs, uint256[] calldata) external view returns (bool) {
+        return _publicInputs.length == 1 && _publicInputs[0] == EXPECTED;
+    }
+
+    function verificationKeyHash() external pure returns (bytes32) {
+        return bytes32(0);
+    }
+
+    // add this to be excluded from coverage report
+    function test() internal {}
 }
 
 contract AcceptingLane is IVerifier {

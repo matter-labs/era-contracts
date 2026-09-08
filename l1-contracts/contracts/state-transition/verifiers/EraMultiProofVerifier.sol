@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IEraDualVerifier} from "../chain-interfaces/IEraDualVerifier.sol";
+import {IEraMultiProofVerifier} from "../chain-interfaces/IEraMultiProofVerifier.sol";
 import {IGetters} from "../chain-interfaces/IGetters.sol";
 import {
     EmptyProofLength,
@@ -43,14 +44,15 @@ import {
 ///
 /// @dev The batch public inputs reach both lanes whole and untruncated, because each lane applies
 /// `PUBLIC_INPUT_SHIFT` itself. Shifting here would double-shift them.
-contract EraMultiProofVerifier is IVerifier, IEraDualVerifier {
+contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVerifier {
     /// @notice The Boojum router (`EraDualVerifier`), which dispatches the FFLONK and PLONK wrappers.
     /// @dev Immutable: the two lanes are fixed at deployment, so the pair of proof systems a batch is
     /// checked against is a property of the deployed gate rather than of mutable state.
     IVerifier public immutable BOOJUM_VERIFIER;
 
-    /// @notice The Airbender verifier, which owns that lane's public-input derivation.
-    /// @dev Immutable for the same reason as `BOOJUM_VERIFIER`.
+    /// @inheritdoc IEraMultiProofVerifier
+    /// @dev Immutable for the same reason as `BOOJUM_VERIFIER`. Doubles as the marker a chain checks
+    /// before declaring itself multi-proof: a single-system router does not answer this call.
     IVerifier public immutable AIRBENDER_VERIFIER;
 
     error BoojumVerificationFailed();

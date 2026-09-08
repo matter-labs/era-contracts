@@ -5,6 +5,7 @@ import {AdminTest} from "./_Admin_Shared.t.sol";
 
 import {
     AirbenderLaneRequiresMultiProof,
+    AirbenderLaneRequiresSettledBatch,
     InvalidDisabledProofSystemsMask,
     MustBeEraChain,
     Unauthorized
@@ -45,6 +46,8 @@ contract SetDisabledProofSystemsTest is AdminTest {
     function test_disablesAirbender() public {
         utilsFacet.util_setMultiProofEnabled(true);
         utilsFacet.util_setDisabledProofSystems(0);
+        utilsFacet.util_setTotalBatchesCommitted(1);
+        utilsFacet.util_setTotalBatchesVerified(1);
 
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectEmit(true, true, true, true);
@@ -55,8 +58,11 @@ contract SetDisabledProofSystemsTest is AdminTest {
     }
 
     function test_disablesBoojum() public {
-        // Leaving the Airbender lane required means the chain has to be committing Airbender data.
+        // Leaving the Airbender lane required means the chain has to be committing Airbender data,
+        // and to have settled a batch the lane's first one can chain to.
         utilsFacet.util_setMultiProofEnabled(true);
+        utilsFacet.util_setTotalBatchesCommitted(1);
+        utilsFacet.util_setTotalBatchesVerified(1);
 
         vm.startPrank(utilsFacet.util_getAdmin());
         adminFacet.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED);
@@ -66,6 +72,8 @@ contract SetDisabledProofSystemsTest is AdminTest {
 
     function test_restoresBothRequired() public {
         utilsFacet.util_setMultiProofEnabled(true);
+        utilsFacet.util_setTotalBatchesCommitted(1);
+        utilsFacet.util_setTotalBatchesVerified(1);
 
         vm.startPrank(utilsFacet.util_getAdmin());
         adminFacet.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
@@ -96,6 +104,9 @@ contract SetDisabledProofSystemsTest is AdminTest {
     /// Requiring the Airbender lane before the chain commits Airbender data would stall it on the very
     /// next batch: the Executor emits one public input and the enabled lane has nothing to read.
     function test_revertWhen_requiringAirbenderWithoutMultiProof() public {
+        utilsFacet.util_setTotalBatchesCommitted(1);
+        utilsFacet.util_setTotalBatchesVerified(1);
+
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(AirbenderLaneRequiresMultiProof.selector);
         adminFacet.setDisabledProofSystems(0);
@@ -103,9 +114,37 @@ contract SetDisabledProofSystemsTest is AdminTest {
 
     /// Same guard, reached by swapping which lane is masked rather than by clearing the mask.
     function test_revertWhen_swappingTheMaskedLaneWithoutMultiProof() public {
+        utilsFacet.util_setTotalBatchesCommitted(1);
+        utilsFacet.util_setTotalBatchesVerified(1);
+
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(AirbenderLaneRequiresMultiProof.selector);
         adminFacet.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED);
+    }
+
+    /// A chain that has settled nothing has only its genesis batch to chain the lane's first batch
+    /// to, and the genesis commitment is a configured value with no preimage the guest can open. The
+    /// drained-pipeline check does not catch this: at genesis both counters are zero, so it passes.
+    function test_revertWhen_requiringAirbenderBeforeAnyBatchHasSettled() public {
+        utilsFacet.util_setMultiProofEnabled(true);
+        assertEq(utilsFacet.util_getTotalBatchesVerified(), 0);
+
+        vm.startPrank(utilsFacet.util_getAdmin());
+        vm.expectRevert(AirbenderLaneRequiresSettledBatch.selector);
+        adminFacet.setDisabledProofSystems(0);
+    }
+
+    /// One settled batch of the chain's own is enough: its commitment is one the sequencer built and
+    /// can open.
+    function test_requiresAirbenderOnceABatchHasSettled() public {
+        utilsFacet.util_setMultiProofEnabled(true);
+        utilsFacet.util_setTotalBatchesCommitted(1);
+        utilsFacet.util_setTotalBatchesVerified(1);
+
+        vm.startPrank(utilsFacet.util_getAdmin());
+        adminFacet.setDisabledProofSystems(0);
+
+        assertEq(utilsFacet.util_getDisabledProofSystems(), 0);
     }
 
     /// The setting exists for the case where committed batches cannot be proved, so it has to take effect
