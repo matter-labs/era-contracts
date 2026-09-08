@@ -32,6 +32,7 @@ sol! {
         function whitelistedSettlementLayers(uint256 chainId) external view returns (bool);
         function baseTokenAssetId(uint256 chainId) external view returns (bytes32);
         function settlementLayer(uint256 chainId) external view returns (uint256);
+        function paused() external view returns (bool);
         function chainTypeManager(uint256 chainId) external view returns (address);
     }
 
@@ -54,6 +55,7 @@ sol! {
         function L1_BYTECODES_SUPPLIER() external view returns (address);
         function PERMISSIONLESS_VALIDATOR() external view returns (address);
         function getChainAdmin(uint256 chainId) external view returns (address);
+        function upgradeCutHash(uint256 protocolVersion) external view returns (bytes32);
     }
 
     #[sol(rpc)]
@@ -86,6 +88,13 @@ sol! {
     interface IChainAssetHandlerView {
         function MESSAGE_ROOT() external view returns (address);
         function ASSET_ROUTER() external view returns (address);
+        function paused() external view returns (bool);
+        function migrationPaused() external view returns (bool);
+    }
+
+    #[sol(rpc)]
+    interface IPausableView {
+        function paused() external view returns (bool);
     }
 
     #[sol(rpc)]
@@ -110,12 +119,17 @@ sol! {
         function executionDelay() external view returns (uint32);
         function sharedValidatorsCount() external view returns (uint256);
         function sharedSigningThreshold() external view returns (uint256);
+        function sharedValidatorsMember(uint256 index) external view returns (address);
+        function isCustomSigningSetActive(address chainAddress) external view returns (bool);
+        function getRoleMemberCount(address chainAddress, bytes32 role) external view returns (uint256);
+        function getRoleMember(address chainAddress, bytes32 role, uint256 index) external view returns (address);
     }
 
     #[sol(rpc)]
     interface IGovernanceView {
         function securityCouncil() external view returns (address);
         function minDelay() external view returns (uint256);
+        function isOperationPending(bytes32 id) external view returns (bool);
     }
 
     #[sol(rpc)]
@@ -131,6 +145,15 @@ sol! {
     #[sol(rpc)]
     interface IZKChainView {
         function getDAValidatorPair() external view returns (address, uint8);
+        function getPendingAdmin() external view returns (address);
+        function getTransactionFilterer() external view returns (address);
+        function isDiamondStorageFrozen() external view returns (bool);
+        function getBridgehub() external view returns (address);
+        function getChainTypeManager() external view returns (address);
+        function getChainId() external view returns (uint256);
+        function getPriorityTxMaxGasLimit() external view returns (uint256);
+        function getPubdataPricingMode() external view returns (uint8);
+        function facets() external view returns (Facet[] memory);
         function getBaseTokenAssetId() external view returns (bytes32);
         function getVerifier() external view returns (address);
         function getProtocolVersion() external view returns (uint256);
@@ -159,8 +182,32 @@ sol! {
             bytes32 forceDeploymentHash
         );
         event DAPairUpdated(address indexed l1DAValidator, uint8 indexed l2Scheme, bool status);
+        event SettlementLayerRegistered(uint256 indexed chainId, bool indexed isWhitelisted);
+        event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
+        event TransparentOperationScheduled(bytes32 indexed id, uint256 delay, Operation operation);
+        event ShadowOperationScheduled(bytes32 indexed id, uint256 delay);
         event EVMBytecodePublished(bytes32 indexed bytecodeHash, bytes bytecode);
         event Upgraded(address indexed implementation);
+    }
+
+    /// One facet and the selectors the live diamond routes to it.
+    struct Facet {
+        address addr;
+        bytes4[] selectors;
+    }
+
+    /// `Governance.Operation`, needed only so the transparent-schedule event
+    /// decodes; the verifier reads the id, not the calls.
+    struct Call {
+        address target;
+        uint256 value;
+        bytes data;
+    }
+
+    struct Operation {
+        Call[] calls;
+        bytes32 predecessor;
+        bytes32 salt;
     }
 
     struct FacetCut {

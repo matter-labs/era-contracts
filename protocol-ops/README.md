@@ -128,8 +128,8 @@ What it checks:
 | **Chain creation**       | Recomputes `storedBatchZero`, `initialCutHash` and `initialForceDeploymentHash` from the `NewChainCreationParams` event and binds them to what the CTM stores; then checks the diamond cut (exactly the six canonical facets, selectors against the deployed facets' dispatchers, freezability, no collisions) and every force-deployments field, including each L2 implementation, the `SystemContractProxy` it sits behind, and `l2TokenProxyBytecodeHash` — all three checked against `AllContractsHashes.json`, exactly. |
 | **Verifier and genesis** | Which verifier flavour is deployed, and the deployed genesis root and prover VK hash against `configs/genesis/zksync-os/latest.json`.                                                                                                                                                                                                                                                                                                                                                                                        |
 | **Data availability**    | The `RollupDAManager` whitelist — each allowed validator identified against the `da-contracts` build, since nothing stops an EOA being paired — and whether each live chain's DA pair is one `makePermanentRollup()` would accept.                                                                                                                                                                                                                                                                                           |
-| **Roles**                | `owner` / `pendingOwner` / `admin` / `pendingAdmin` / `securityCouncil` / `tokenMultiplierSetter` across the ecosystem and every registered chain, grouped by holder. Fails on stalled two-step handoffs, warns on `transferOwnership(currentOwner)` no-ops and on roles held by an EOA.                                                                                                                                                                                                                                     |
-| **Registered chains**    | Each chain's protocol version, verifier, facet set, base token registration, genesis batch and settlement layer against the CTM.                                                                                                                                                                                                                                                                                                                                                                                             |
+| **Roles**                | `owner` / `pendingOwner` / `admin` / `pendingAdmin` / `securityCouncil` / `tokenMultiplierSetter` across the ecosystem and every registered chain. Every internal holder is **asserted** against the topology the deploy scripts establish, not merely listed; the ecosystem root comes in on `--expected-ecosystem-owner` / `--expected-security-council` / `--expected-min-delay`. Fails on stalled two-step handoffs and on a second Governance owning the CTM.                                                           |
+| **Registered chains**    | Each chain's protocol version, verifier, full selector-to-facet routing, `DiamondProxy` bytecode, base token (against `Bridgehub.baseTokenAssetId`), genesis batch, settlement layer, pending admin, diamond-freeze state, priority-tx gas limit and self-reported identity. A transaction filterer is flagged as a censorship lever.                                                                                                                                                                                        |
 
 Expectations the tool cannot derive from chain state are flags:
 `--era-chain-id`, `--weth`, `--max-number-of-zk-chains` (default 100),
@@ -145,6 +145,16 @@ bridgehub and era chain id from `permanent-values/<env>.toml`.
 > where the deployed bytecode is in hand and the difference can be shown to be
 > confined to the CBOR digest. Run `yarn calculate-hashes:fix` if the record is
 > stale.
+
+> **What the tool assumes.** It proves that the bytes on chain are the bytes in
+> this checkout and that the right parties hold every role. It does not judge
+> whether the checkout itself is trustworthy — that is what code review is for —
+> and it cannot recover the calls inside a _shadow_ governance operation, which
+> publishes only its id by design. A pending shadow operation therefore fails
+> the run without the tool being able to say what it would do. Verifying that an
+> expected holder is itself sound (a multisig's signer set, say) is out of scope:
+> the expected address is the trust anchor you supply, so the tool prints each
+> holder's code hash and leaves recognising it to you.
 
 > **Era CTMs are not supported.** Their force deployments use the Era
 > bytecode-hash encoding rather than the ZKsync OS `(bytes, bytes)` pair. The

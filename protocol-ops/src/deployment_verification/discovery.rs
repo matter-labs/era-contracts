@@ -93,6 +93,10 @@ pub struct CoreAddresses {
     pub era_chain_id: U256,
     pub l1_weth: Address,
     pub eth_token_asset_id: FixedBytes<32>,
+    /// The Era chain's diamond proxy, or zero when the ecosystem hosts no such
+    /// chain. Baked into `L1AssetRouter` as an immutable, so it has to be
+    /// derived rather than trusted.
+    pub era_diamond_proxy: Address,
 }
 
 pub async fn discover_core(
@@ -140,6 +144,13 @@ pub async fn discover_core(
         .call()
         .await
         .context("bridgedTokenBeacon.implementation()")?;
+
+    let era_chain_id = ar
+        .ERA_CHAIN_ID()
+        .block(block.into())
+        .call()
+        .await
+        .context("assetRouter.ERA_CHAIN_ID()")?;
 
     Ok(CoreAddresses {
         bridgehub,
@@ -204,12 +215,7 @@ pub async fn discover_core(
             .call()
             .await
             .context("bridgehub.MAX_NUMBER_OF_ZK_CHAINS()")?,
-        era_chain_id: ar
-            .ERA_CHAIN_ID()
-            .block(block.into())
-            .call()
-            .await
-            .context("assetRouter.ERA_CHAIN_ID()")?,
+        era_chain_id,
         l1_weth: ar
             .L1_WETH_TOKEN()
             .block(block.into())
@@ -222,6 +228,12 @@ pub async fn discover_core(
             .call()
             .await
             .context("assetRouter.ETH_TOKEN_ASSET_ID()")?,
+        era_diamond_proxy: bh
+            .getZKChain(era_chain_id)
+            .block(block.into())
+            .call()
+            .await
+            .context("bridgehub.getZKChain(eraChainId)")?,
     })
 }
 

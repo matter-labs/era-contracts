@@ -60,6 +60,23 @@ pub struct VerifyDeploymentArgs {
     #[clap(long, help_heading = "Expectations")]
     pub zk_token_l1_address: Option<Address>,
 
+    /// Who should own `Governance` and `ChainAdminOwnable` — the root of the
+    /// whole ecosystem. Every other owner and admin is derived from the deploy
+    /// scripts and asserted regardless; without this flag the root itself is
+    /// only reported, which is precisely what a deployer keeping control would
+    /// exploit.
+    #[clap(long, help_heading = "Expectations")]
+    pub expected_ecosystem_owner: Option<Address>,
+
+    /// Expected `Governance.securityCouncil()`. It can `executeInstant`, so it
+    /// is as privileged as the owner.
+    #[clap(long, help_heading = "Expectations")]
+    pub expected_security_council: Option<Address>,
+
+    /// Expected `Governance.minDelay()` in seconds.
+    #[clap(long, help_heading = "Expectations")]
+    pub expected_min_delay: Option<u64>,
+
     /// Compute units per second to pace the RPC client with. Hosted
     /// endpoints throttle a full run otherwise; lower it if you still see 429s.
     #[clap(long, default_value_t = 200, help_heading = "Input")]
@@ -91,6 +108,9 @@ pub async fn run(args: VerifyDeploymentArgs) -> anyhow::Result<()> {
         expected_max_number_of_zk_chains: args.max_number_of_zk_chains,
         expect_testnet_verifier: args.expect_testnet_verifier,
         zk_token_l1_address: args.zk_token_l1_address,
+        expected_ecosystem_owner: args.expected_ecosystem_owner,
+        expected_security_council: args.expected_security_council,
+        expected_min_delay: args.expected_min_delay.map(alloy::primitives::U256::from),
         genesis_config: args.genesis_config,
         compute_units_per_second: args.compute_units_per_second,
     })
