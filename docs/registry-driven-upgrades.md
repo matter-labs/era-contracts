@@ -650,10 +650,10 @@ the per-chain call selects the modern entrypoint before touching historical logs
 genesis-cut output field is gone, and an upgrade deploys only the release members whose code it
 actually changes. What remains, mapping onto batches 2-5 of that plan:
 
-1. **Make the deployment inventory authoritative.** An inert upgrade row means "do not upgrade",
-   not "this is the currently deployed contract", so the prepare still reconstructs current
-   addresses from live introspection. A complete, discoverable current inventory per CTM and for
-   the shared ecosystem would let executable rows be derived from a source/target pair instead.
+1. **Move the remaining script-defined actions into the existing flow.** Some upgrade actions are
+   still decided by prepare-script logic rather than described by an object, and the prepare still
+   reconstructs addresses that existing getters could answer. Both shrink within the current
+   object model: no new permanent registry, and no separate current-deployment inventory.
 2. **Complete fresh-deployment authority setup.** Fresh deployment pins a release but still uses
    the older ownership setup. Establish executors and their authorizations directly so its first
    recurring upgrade does not need the legacy bootstrap preparation machinery.
