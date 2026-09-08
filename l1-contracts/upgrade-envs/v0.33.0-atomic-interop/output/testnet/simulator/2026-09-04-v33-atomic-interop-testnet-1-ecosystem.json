@@ -20,7 +20,7 @@
     "tag": "stage0"
   },
   {
-    "description": "[unlabelled] stage0 call 2 to=0x5d44431d82a2bd0b4f4dc4d38d5349aeaa194cfe sel=0xa39f7449",
+    "description": "GovernanceUpgradeTimer.startTimer(): open the 1200s window chains get to upgrade before stage 1 may run",
     "network": "sepolia",
     "from": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",
     "to": "0x5d44431d82a2bd0b4f4dc4d38d5349aeaa194cfe",
@@ -128,7 +128,7 @@
     "tag": "stage1"
   },
   {
-    "description": "[unlabelled] stage1 call 12 to=0x5d44431d82a2bd0b4f4dc4d38d5349aeaa194cfe sel=0x43bf9936",
+    "description": "GovernanceUpgradeTimer.checkDeadline(): assert the stage-0 window has elapsed (reverts if stage 1 runs too early)",
     "network": "sepolia",
     "from": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",
     "to": "0x5d44431d82a2bd0b4f4dc4d38d5349aeaa194cfe",
@@ -138,7 +138,7 @@
     "tag": "stage1"
   },
   {
-    "description": "[unlabelled] stage1 call 13 to=0x6faf42bb1cccf5b2a9495ce66224bdf1f8e7e6ec sel=0x386584cf",
+    "description": "UpgradeStageValidator.checkMigrationsPaused(): assert migrations are still paused mid-upgrade",
     "network": "sepolia",
     "from": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",
     "to": "0x6faf42bb1cccf5b2a9495ce66224bdf1f8e7e6ec",
@@ -220,7 +220,7 @@
     "tag": "stage2"
   },
   {
-    "description": "[unlabelled] stage2 call 2 to=0x6faf42bb1cccf5b2a9495ce66224bdf1f8e7e6ec sel=0x37076ce3",
+    "description": "UpgradeStageValidator.checkProtocolUpgradePresence(): assert the new protocol version is registered on the CTM",
     "network": "sepolia",
     "from": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",
     "to": "0x6faf42bb1cccf5b2a9495ce66224bdf1f8e7e6ec",
@@ -229,7 +229,7 @@
     "tag": "stage2"
   },
   {
-    "description": "[unlabelled] stage2 call 3 to=0x6faf42bb1cccf5b2a9495ce66224bdf1f8e7e6ec sel=0x407a5a0b",
+    "description": "UpgradeStageValidator.checkMigrationsUnpaused(): assert migrations were re-enabled",
     "network": "sepolia",
     "from": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",
     "to": "0x6faf42bb1cccf5b2a9495ce66224bdf1f8e7e6ec",

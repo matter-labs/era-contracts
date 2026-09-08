@@ -34,9 +34,8 @@ server_notifier_proxy     = "0xd9a3c35f2dc092e6cd390a01aa9ffb3c23533c96"
 server_notifier_pa        = "0xfa181338785BF9427a367FfcE6bfe2C81586b3d9"  # ServerNotifier's ProxyAdmin, under the CTM ChainAdmin
 
 # --- deployed by this upgrade (rotate with the CREATE2 salts) ---
-gov_upgrade_timer         = "0xDc03F39823CbDc7Ed2c465674d84948c81fC6ec0"
-upgrade_stage_validator   = "0x732E664132da25DfCE0Bd2FCf4C180aFF96fF500"
-l1_interop_handler        = "0xE24e805EDfDCb4e6DA75A44304d488639F25a159"
+gov_upgrade_timer         = "0x5D44431D82A2Bd0b4f4Dc4d38D5349AeAA194Cfe"
+upgrade_stage_validator   = "0x6fAF42BB1cccf5B2a9495ce66224bdF1F8e7e6eC"
 
 # --- per-chain ChainAdmins (pre-existing; each chain takes the cut itself) ---
 zkos_chain_admin_1401     = "0x18ce0cfa990c024262257e6e4d1d3b5c9c49bfa9"
@@ -200,11 +199,6 @@ desc = "ChainTypeManager.setNewVersionUpgrade(cut, 0x1f00000001 -> 0x2100000000,
 target = "bridgehub"
 selector = "0xf113c88b"
 desc = "SIM-ONLY smoke test: create a fresh ZKsync OS chain against the new chain-creation params"
-
-[[entries]]
-target = "0x02B1ac1Cf0A592aefD3C2246B2431388365dB272"
-selector = "0x3b6d7534"
-desc = "SIM-ONLY smoke test: apply the v33 diamond cut to chain 8022833 and confirm it reaches protocol version 0x2100000000"
 
 # ── Per-chain upgrade (one scenario file each, from `protocol_ops chain upgrade`) ─────────
 # Both calls are `ChainAdmin.multicall`, so they are told apart by the inner call's selector:

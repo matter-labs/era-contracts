@@ -717,6 +717,8 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
         });
     }
 
+    reject_unlabelled(&transactions, descriptions_path.as_deref())?;
+
     let body = serde_json::to_string_pretty(&transactions)?;
 
     if let Some(out) = args.out {
@@ -879,6 +881,47 @@ pub struct ManifestToSimulatorArgs {
     pub out: Option<PathBuf>,
 }
 
+/// Marker the emitters use when no `sim-descriptions.toml` entry matched a call.
+const UNLABELLED: &str = "[unlabelled]";
+
+/// Refuses to emit a scenario in which any call is still `[unlabelled]`.
+///
+/// Passing `--descriptions` is a statement that every call should be named, so a leftover
+/// `[unlabelled]` is a gap in that file, not an acceptable default. It is also silent: the usual
+/// cause is a label whose address rotated with the CREATE2 salts, which still parses and still
+/// matches nothing, so the scenario emits fine and the missing description is only noticed by
+/// someone reading the JSON. Failing here turns that into an error at generation time, with the
+/// target and selector needed to write the entry.
+fn reject_unlabelled(
+    transactions: &[SimulatorTransaction],
+    descriptions: Option<&Path>,
+) -> anyhow::Result<()> {
+    let Some(descriptions) = descriptions else {
+        return Ok(());
+    };
+    let gaps: Vec<&SimulatorTransaction> = transactions
+        .iter()
+        .filter(|t| t.description.contains(UNLABELLED))
+        .collect();
+    if gaps.is_empty() {
+        return Ok(());
+    }
+    let mut msg = format!(
+        "{} call(s) matched no entry in {} — add one per line below, or drop --descriptions to \
+         accept auto-generated text:",
+        gaps.len(),
+        descriptions.display()
+    );
+    for t in gaps {
+        let selector = t.data.get(..10).unwrap_or("0x");
+        msg.push_str(&format!(
+            "\n  target = \"{}\"  selector = \"{selector}\"   (tag {})",
+            t.to, t.tag
+        ));
+    }
+    anyhow::bail!(msg)
+}
+
 /// `1e18`, as the divisor between wei and whole ETH.
 const WEI_PER_ETH: u64 = 1_000_000_000_000_000_000;
 
@@ -954,6 +997,8 @@ pub async fn run_manifest_to_simulator(args: ManifestToSimulatorArgs) -> anyhow:
             tx.emulate_all_batches_executed_for = Some(format!("{diamond:#x}"));
         }
     }
+    reject_unlabelled(&transactions, args.descriptions.as_deref())?;
+
     let body = serde_json::to_string_pretty(&transactions)?;
     match args.out {
         Some(out) => {
