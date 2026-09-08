@@ -5,15 +5,40 @@ name: Build contract artifacts
 on:
   workflow_call:
     inputs:
+      cache-key:
+        description: "Key this build saves its artifacts under. Must be writable by this run alone."
+        required: true
+        type: string
+      reuse-key:
+        description: >
+          Optional key to restore before building. On a hit the whole compile is skipped and this
+          key is returned as `cache-key` — that is how pre-merge-checks reuses the artifacts
+          l1-contracts-ci already built for the same commit.
+        required: false
+        type: string
+        default: ""
       upload-artifacts:
         description: "Also upload the artifacts for manual download"
         required: false
         type: boolean
         default: false
+    outputs:
+      cache-key:
+        description: >
+          The key consumer jobs must restore: the reused key when the reuse hit, otherwise the key
+          this build saved. Never a key another workflow might still be uploading.
+        value: ${{ jobs.build.outputs.cache-key }}
+
+# Called workflows inherit the caller's permissions and may only narrow them; l1-contracts-ci
+# grants itself `pull-requests: write`, which a build has no use for.
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      cache-key: ${{ steps.reuse.outputs.cache-hit == 'true' && inputs.reuse-key || inputs.cache-key }}
 
     steps:
       - name: Checkout the repository
@@ -21,24 +46,17 @@ jobs:
         with:
           submodules: recursive
 
-      # Both callers build the same commit into the same key, so whichever runs second reuses the
-      # first's artifacts instead of compiling again. Concurrent callers both miss here and both
-      # build; the losing save is silently dropped, which is safe because consumers retry their
-      # restore until the winning upload finalizes (see restore-ci-artifacts).
+      # A hit here means another workflow already built this exact commit and finalized the entry
+      # (we just downloaded it), so consumers can restore the same key with no upload in flight.
+      # A miss means we build and save under our own caller-scoped key, which no other run writes.
+      # That is what keeps concurrent callers from racing: neither ever waits on the other's save.
       - name: Reuse this commit's artifacts if already built
         id: reuse
-        uses: actions/cache/restore@v4
+        if: inputs.reuse-key != ''
+        uses: ./.github/actions/restore-ci-artifacts
         with:
-          key: artifacts-l1-ci-${{ github.sha }}
-          path: |
-            da-contracts/cache-forge
-            da-contracts/out
-            l1-contracts/cache-forge
-            l1-contracts/out
-            l1-contracts/zkout
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout
+          key: ${{ inputs.reuse-key }}
+          fail-on-miss: "false"
 
       - name: Install foundry-zksync
         if: steps.reuse.outputs.cache-hit != 'true'
@@ -100,7 +118,7 @@ jobs:
         if: steps.reuse.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          key: artifacts-l1-ci-${{ github.sha }}
+          key: ${{ inputs.cache-key }}
           path: |
             da-contracts/cache-forge
             da-contracts/out

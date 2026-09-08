@@ -3,25 +3,58 @@
 ## Relevant files
 
 - `.github/workflows/lint.yaml` — Solidity / TS lint, codespell, typos, `cargo fmt --check`, `cargo clippy -D warnings` for `protocol-ops`.
-- `.github/workflows/l1-contracts-ci.yaml` — l1-contracts build, `check-zkstack-out`, `check-hashes`, `check-selectors`, `check-legacy-bridge-sol`.
+- `.github/workflows/l1-contracts-ci.yaml` — l1-contracts build, foundry tests, verifier-generator check, coverage.
+- `.github/workflows/pre-merge-checks.yaml` — `check-hashes`, `check-selectors`, `check-zkstack-out`, `state-generation-check`, and the `pre-merge-verified` gate. Skipped while a PR is a draft (see "CI tiers" below).
+- `.github/workflows/build-contract-artifacts.yaml` — the shared `build` job (`workflow_call`) both of the above use; `.github/actions/restore-ci-artifacts` is how their other jobs read what it built.
 - `.github/workflows/l1-contracts-foundry-ci.yaml` — foundry test build + contract-size check.
-- `.github/workflows/anvil-interop-ci.yaml` — interop integration test, v31→v32 upgrade test.
+- `.github/workflows/anvil-interop-ci.yaml` — interop integration test, v31→v33 upgrade test.
 - `.github/workflows/l2-contracts-ci.yaml`, `system-contracts-ci.yaml` — peer projects.
-- `.github/workflows/update-hashes-on-demand.yaml` — manual workflow to push hash updates back into a PR.
+- `.github/workflows/update-generated-artifacts.yaml` — the one-dispatch regen (hashes + selectors + zkstack-out, then chain states) that clears every pre-merge check.
 - `recompute_hashes.sh` — one-shot rebuild + recompute + write hashes.
 - `package.json`, `l1-contracts/package.json`, `system-contracts/package.json`, `l2-contracts/package.json` — top-level scripts referenced below.
+
+## CI tiers: per-commit vs pre-merge
+
+- **Per-commit** (`l1-contracts-ci`, `anvil-interop-ci`, `lint`, `slither`, …): builds, tests, and
+  static checks. They run on every push, drafts included.
+- **Pre-merge** (`pre-merge-checks`): the checks of committed _generated_ artifacts —
+  `AllContractsHashes.json`, `l1-contracts/selectors`, `l1-contracts/zkstack-out`, and the
+  anvil-interop chain-state snapshots (`state-generation-check`). Any bytecode change invalidates
+  these and the only fix is a regen + commit, so they **skip while the PR is a draft** and run once
+  it is marked ready for review (plus on every later push while it stays non-draft). They also skip
+  on PRs that touch no artifact-affecting paths (docs-only, protocol-ops-only). `pre-merge-verified`
+  is the aggregate job that reports the tier's verdict and is the one to require on the base branch.
+
+So: **iterate on a draft PR, regenerate once at the end.** Red pre-merge checks on a draft are
+expected and are not worth debugging — steps 3-5 below are exactly what the single regen fixes.
+`AGENTS.md` carries the same policy for agents.
+
+Two consequences worth internalizing while iterating on a draft:
+
+- The anvil-interop `integration-test` loads bytecode from the committed chain-state snapshots. After
+  a genesis-affecting contract change it can fail — or silently exercise the old code — until the
+  snapshots are regenerated. Suspect snapshot staleness before debugging the contracts, and use
+  `ANVIL_INTEROP_FRESH_DEPLOY=1` locally to run the suite against your actual code.
+- `check-hashes` / `check-selectors` / `check-zkstack-out` failing after a contract change means
+  exactly one thing: regenerate. It is not a signal about your code.
+
+When the PR is done: dispatch **Update All Generated Artifacts** with the PR number (one dispatch
+commits hashes + selectors + zkstack-out, then the chain states), then mark the PR ready for review
+and merge once `pre-merge-verified` is green.
 
 ## TL;DR — the order to fix things
 
 CI checks form a dependency chain. Fix in this order:
 
 ```
-1. Tests       ← foundry, anvil-interop, v31→v32 upgrade. Biggest signal; bytecode-shaping bugs surface here.
+1. Tests       ← foundry, anvil-interop, v31→v33 upgrade. Biggest signal; bytecode-shaping bugs surface here.
 2. Linting     ← solhint, eslint, prettier, errors-lint, cargo fmt, cargo clippy, codespell, typos.
 3. Selectors   ← yarn l1 selectors --fix. Depends on final bytecode.
 4. zkstack-out ← regenerated JSON ABIs. Depends on final compile output.
 5. Hashes      ← ./recompute_hashes.sh. Depends on final bytecode hashes — the most sensitive of all.
 ```
+
+Steps 3-5 are the pre-merge tier: do them **once**, at the end, via the dispatch above.
 
 **Why this order matters:** every step further down consumes outputs of an earlier one. Regenerating selectors / zkstack-out / hashes on top of code that still has bugs means doing all three again after each test fix. Linting comes after tests because a real fix often shifts code around, and re-running linters on the stable post-test code is cheaper than re-running them after every test iteration. Hashes go last because they're the most expensive to regenerate and the most fragile to subsequent change.
 
@@ -29,7 +62,7 @@ Doing steps 3-5 before step 1 is the most common time-sink.
 
 ## 1. Tests
 
-This is where the bulk of regressions surface — get this green first. Three test suites in CI: **foundry** (per-project), **anvil-interop** (full L1↔L2 flow), and **v31 → v32 upgrade** (real-state replay).
+This is where the bulk of regressions surface — get this green first. Three test suites in CI: **foundry** (per-project), **anvil-interop** (full L1↔L2 flow), and **v31 → v33 upgrade** (real-state replay).
 
 ### Install foundry-zksync (the version CI uses)
 
@@ -110,9 +143,9 @@ cd test/anvil-interop
 npx ts-node setup-and-dump-state.ts
 ```
 
-Commit the regenerated `chain-states/` files alongside the contract change. CI currently does not regenerate states on PRs — it expects committed states to match the current mock contracts.
+Commit the regenerated `chain-states/` files alongside the contract change. CI never regenerates them on a PR by itself: the pre-merge `state-generation-check` only _verifies_ that a from-scratch regeneration matches what is committed, and the **Regenerate Anvil Interop Chain States** dispatch (also driven by **Update All Generated Artifacts**) is what pushes fresh ones onto the PR branch. Prefer the dispatch — local generation depends on the pinned foundry version.
 
-### 1c. Upgrade tests (v31→v32)
+### 1c. Upgrade tests (v31→v33)
 
 This exercises the full upgrade flow against the captured v31 chain states. It uses protocol-ops's split flow: `ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, `ecosystem stage3` to register bridged tokens and populate `bridgedOut`, then `chain upgrade` per chain. In production a chain's priority-op lower bound must also be recorded (`RecordPriorityOpLowerBound.s.sol`) well before its `chain upgrade`; the test harness models the draft-v31 backfill prerequisite instead (see `harness-shims.ts`).
 
@@ -128,7 +161,7 @@ Prerequisites: same as anvil-interop tests (all foundry builds done). Plus:
 
 Common failures:
 
-- **"Script not found: deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol"** or **`CTMUpgrade_v31.s.sol`** — `yarn l1 build:foundry` not run, or the test override path is wrong.
+- **"Script not found: deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol"** or **`CTMUpgrade_v33.s.sol`** — `yarn l1 build:foundry` not run, or the test override path is wrong.
 - **"call to non-contract address 0x0…"** — usually the upgrade script reading an address before the contract is deployed/registered. Use `cast run <txhash>` against the still-running anvil to get the trace; see `AGENTS.md` "Debugging Failed Transactions with cast run" for the recipe.
 - **"vm.writeToml: path not allowed"** — script-out path concatenation issue. Check that `vm.projectRoot()` is concatenated once, not twice.
 
@@ -236,7 +269,7 @@ If you forget `yarn prettier:fix`, `check-zkstack-out` will still fail because t
 
 ## 5. Hashes (LAST)
 
-Bytecode hashes for genesis system contracts and force-deployed contracts are committed in `system-contracts/SystemContractsHashes.json` and similar. CI regenerates and diffs. **Don't fix until everything else above is green** — every contract change invalidates these, so doing it last avoids redoing work.
+Bytecode hashes for genesis system contracts and force-deployed contracts are committed in `AllContractsHashes.json`. CI regenerates and diffs. **Don't fix until everything else above is green** — every contract change invalidates these, so doing it last avoids redoing work.
 
 > ⚠️ `recompute_hashes.sh` is **strictly version-pinned** to a specific foundry-zksync version (currently `v0.1.5`, commit `807f47ace`). The script refuses to run on any other version. If your local foundry is newer (e.g. `v0.1.9`), you cannot regenerate hashes locally without first downgrading via `foundryup-zksync -i 0.1.5`. For most contributors the easier path is to push your branch and run `update-hashes-on-demand.yaml` (see "When CI is failing on a PR you didn't push" below).
 
@@ -246,7 +279,7 @@ Bytecode hashes for genesis system contracts and force-deployed contracts are co
 
 # Alternative (also requires the pinned forge version under the hood):
 yarn calculate-hashes:fix
-git add system-contracts/SystemContractsHashes.json     # plus any other hash files
+git add AllContractsHashes.json
 ```
 
 Verify your local result matches CI's expectation:
@@ -297,7 +330,7 @@ git status
 
 ## When CI is failing on a PR you didn't push
 
-`update-hashes-on-demand.yaml` is a `workflow_dispatch` workflow that regenerates hashes + zkstack-out and pushes to the PR branch. It only works on PRs from the same repo (not forks), and requires `RELEASE_TOKEN`. Use it when a peer's PR is merge-blocked solely on stale artifacts and they don't have time to regenerate locally.
+`update-generated-artifacts.yaml` is the `workflow_dispatch` workflow to reach for: it regenerates hashes + selectors + zkstack-out (via `update-hashes-on-demand.yaml`) and then the chain-state snapshots, pushing both commits to the PR branch. It only works on PRs from the same repo (not forks), and requires `RELEASE_TOKEN`. Use it when a peer's PR is merge-blocked solely on stale artifacts and they don't have time to regenerate locally.
 
 ## Things to NOT do when chasing green
 

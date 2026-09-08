@@ -1,14 +1,21 @@
 # Checks that validate committed generated artifacts (AllContractsHashes.json,
 # l1-contracts/selectors, l1-contracts/zkstack-out, anvil-interop chain-state
 # snapshots). Any bytecode change invalidates them and the fix is a regen +
-# commit, so they skip on draft PRs and run once the PR is ready for review
-# (plus unconditionally on merge_group / workflow_dispatch). Flow: see
-# "CI tiers" in .github/workflows/README.md.
+# commit, so they skip on draft PRs and run once the PR is ready for review.
+# Flow: see "CI tiers" in docs/ai-review/docs/ci-green.md.
+#
+# `pre-merge-verified` is the job to add to the base branch's required checks:
+# it always runs and fails unless every check below either passed or was
+# legitimately skipped. Requiring the individual checks would not work —
+# GitHub counts a skipped required check as satisfied, so a failed producer
+# would silently let a PR merge unverified.
 name: Pre-merge checks
 
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
+  # Inert today: the repo has no merge queue. Kept so enabling one needs no
+  # workflow change — a queued merge must re-verify the artifacts.
   merge_group:
   workflow_dispatch:
 
@@ -16,14 +23,67 @@ permissions:
   contents: read
 
 jobs:
-  # Shares the artifacts cache with l1-contracts-ci: on a plain push both build
-  # concurrently, but on the ready_for_review transition — where this workflow
-  # runs alone — it reuses the artifacts l1-contracts-ci already built for this
-  # commit. (merge_group/workflow_dispatch runs build their own: caches are
-  # ref-scoped, so a PR's entries are invisible there.)
+  # Every check here derives from compiled bytecode, so a PR that touches none of
+  # its inputs cannot invalidate the artifacts. Skipping those PRs keeps a 9-minute
+  # state regeneration off docs- and protocol-ops-only changes. Exclusion-based on
+  # purpose: an unrecognized path counts as relevant, so a new directory runs the
+  # checks rather than silently bypassing them.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      contracts: ${{ steps.filter.outputs.contracts }}
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Decide whether the artifacts can be affected
+        id: filter
+        run: |
+          set -euo pipefail
+
+          # merge_group / workflow_dispatch have no PR diff to inspect: verify everything.
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "contracts=true" >> "$GITHUB_OUTPUT"
+            echo "Event ${{ github.event_name }}: running the full pre-merge tier."
+            exit 0
+          fi
+
+          # HEAD is the PR's merge commit, so HEAD^1 is the base tip.
+          changed=$(git diff --name-only HEAD^1 HEAD)
+          echo "Changed files:"
+          echo "$changed"
+
+          relevant=$(printf '%s\n' "$changed" | grep -vE \
+            -e '^docs/' \
+            -e '^protocol-ops/' \
+            -e '^\.vscode/' \
+            -e '^\.github/(ISSUE_TEMPLATE|PULL_REQUEST_TEMPLATE)' \
+            -e '\.md$' \
+            -e '^(LICENSE|_typos\.toml|\.codespellrc|\.gitignore|CODEOWNERS)$' \
+            || true)
+
+          if [ -z "$relevant" ]; then
+            echo "contracts=false" >> "$GITHUB_OUTPUT"
+            echo "No artifact-affecting paths changed: skipping the pre-merge tier."
+          else
+            echo "contracts=true" >> "$GITHUB_OUTPUT"
+            echo "Artifact-affecting paths changed:"
+            echo "$relevant"
+          fi
+
+  # Saves under a key scoped to this run, so no other workflow can be mid-upload on
+  # it when the checks below restore it. `reuse-key` is the cheap path: on the
+  # ready_for_review transition, where this workflow runs alone, l1-contracts-ci has
+  # already built this commit, so the build collapses to a cache download.
   build:
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    needs: [changes]
+    if: needs.changes.outputs.contracts == 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     uses: ./.github/workflows/build-contract-artifacts.yaml
+    with:
+      cache-key: artifacts-l1-pre-merge-${{ github.sha }}-${{ github.run_id }}
+      reuse-key: artifacts-l1-ci-${{ github.sha }}
 
   check-hashes:
     needs: [build]
@@ -43,6 +103,8 @@ jobs:
 
       - name: Restore this commit's artifacts
         uses: ./.github/actions/restore-ci-artifacts
+        with:
+          key: ${{ needs.build.outputs.cache-key }}
 
       - name: Check hashes
         run: yarn calculate-hashes:check
@@ -67,6 +129,8 @@ jobs:
 
       - name: Restore this commit's artifacts
         uses: ./.github/actions/restore-ci-artifacts
+        with:
+          key: ${{ needs.build.outputs.cache-key }}
 
       - name: Install foundry-zksync
         uses: ./.github/actions/install-zksync-foundry
@@ -100,6 +164,8 @@ jobs:
 
       - name: Restore this commit's artifacts
         uses: ./.github/actions/restore-ci-artifacts
+        with:
+          key: ${{ needs.build.outputs.cache-key }}
 
       - name: Build and check zkstack-out
         working-directory: l1-contracts
@@ -126,10 +192,10 @@ jobs:
   # ignores block.number and storage slots that just hold a block number (values
   # ≤ block height), plus the block-indexed MessageRoot storage. Everything else
   # (balances, roots, addresses, code, protocol version) must match exactly, so
-  # this still catches real drift. To block merges, add "state-generation-check"
-  # to the branch protection required checks.
+  # this still catches real drift.
   state-generation-check:
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    needs: [changes]
+    if: needs.changes.outputs.contracts == 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -170,3 +236,63 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: |
           bash cleanup.sh
+
+  # THE required check. It always reports, so it cannot be bypassed by a run that
+  # never happened, and it distinguishes the two reasons a check can be skipped:
+  # deliberately (draft PR, or no artifact-affecting paths) versus because its
+  # producer failed — the case a per-check requirement would wave through.
+  pre-merge-verified:
+    needs: [changes, build, check-hashes, check-selectors, check-zkstack-out, state-generation-check]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify every pre-merge check ran or was legitimately skipped
+        env:
+          EXPECTED_SKIP: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft) || needs.changes.outputs.contracts != 'true' }}
+          CHANGES: ${{ needs.changes.result }}
+          BUILD: ${{ needs.build.result }}
+          HASHES: ${{ needs.check-hashes.result }}
+          SELECTORS: ${{ needs.check-selectors.result }}
+          ZKSTACK_OUT: ${{ needs.check-zkstack-out.result }}
+          STATE_GENERATION: ${{ needs.state-generation-check.result }}
+        run: |
+          set -uo pipefail
+
+          if [ "$CHANGES" != "success" ]; then
+            echo "::error::the changed-files gate did not succeed ($CHANGES), so no verdict is possible."
+            exit 1
+          fi
+
+          if [ "$EXPECTED_SKIP" = "true" ]; then
+            echo "Draft PR or no artifact-affecting changes: the artifact checks are expected to skip."
+          fi
+
+          status=0
+          for check in BUILD HASHES SELECTORS ZKSTACK_OUT STATE_GENERATION; do
+            result="${!check}"
+            case "$result" in
+              success)
+                echo "$check: success"
+                ;;
+              skipped)
+                if [ "$EXPECTED_SKIP" = "true" ]; then
+                  echo "$check: skipped (expected)"
+                else
+                  echo "::error::$check was skipped on a PR that must be verified — its producer probably failed."
+                  status=1
+                fi
+                ;;
+              *)
+                echo "::error::$check reported '$result'."
+                status=1
+                ;;
+            esac
+          done
+
+          if [ "$status" -ne 0 ]; then
+            echo "::error::pre-merge verification incomplete. Dispatch 'Update All Generated Artifacts' for this PR if the artifacts are simply stale."
+          else
+            echo "Pre-merge verification complete."
+          fi
+          exit "$status"

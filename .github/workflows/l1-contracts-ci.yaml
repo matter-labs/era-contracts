@@ -12,6 +12,8 @@ jobs:
   build:
     uses: ./.github/workflows/build-contract-artifacts.yaml
     with:
+      # The key restore-ci-artifacts reads by default, and the one pre-merge-checks reuses.
+      cache-key: artifacts-l1-ci-${{ github.sha }}
       upload-artifacts: true
 
   # check-hashes, check-selectors, and check-zkstack-out live in
