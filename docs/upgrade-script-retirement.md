@@ -113,6 +113,94 @@ check both installed state and the deployment list: unchanged members must not b
 
 ## Batch 2: make the deployment inventory authoritative
 
+### Specification (worked through before coding)
+
+Four scenarios settle the model. Each is a real upgrade shape, and between them they force every
+decision the design has to make.
+
+**Where an address lives.** Three objects, no address described twice.
+
+- `CTMRelease` keeps what a chain RUNS and what a new chain geneses from: the facet set,
+  `DiamondInit`, the verifier, the genesis upgrade, the genesis batch, the force-deployment blob
+  and the L2 bytecode table. Nothing here belongs in an inventory. The verifier is the test case:
+  it is installed chain state, so a verifier change is a new RELEASE, and putting it in the
+  inventory as well would create two sources that can disagree.
+- `CTMRegistry` is new and holds the CTM domain's CURRENT deployment: per `CTMContract` member,
+  the proxy, the `ProxyAdmin` that administers it, and the live implementation with its codehash.
+  Plus the domain's non-proxy singletons that no getter exposes — the EIP-7702 checker is the
+  standing example, since the `MailboxFacet` pins it as an immutable and nothing on-chain reads it
+  back, which is why it is an upgrade-env input today.
+- The ecosystem needs the same split the CTM domain now gets. `CoreRegistry` today is an
+  OPERATION set, and that is the root of the confusion this batch exists to remove: an inert row
+  means "not upgraded", never "this is what is deployed". So the shared singletons get an
+  inventory object of their own, and operations stop being authored at all.
+
+**How operations are determined.** Per member slot, from the source and target inventories, the
+same way facet cuts already derive from a release pair. Nothing authored, nothing to review twice.
+
+| source | target                        | operation                                                                              |
+| ------ | ----------------------------- | -------------------------------------------------------------------------------------- |
+| absent | absent                        | none                                                                                   |
+| set    | set, same implementation      | none, the member is reused                                                             |
+| set    | set, different implementation | upgrade through the recorded `ProxyAdmin`, source-checked against the source inventory |
+| absent | set                           | REGISTER: not derivable as a proxy upgrade, needs an explicit instruction              |
+| set    | absent                        | refused: removing a live member is not a proxy operation                               |
+| any    | `ProxyAdmin` differs          | refused: an admin change is a separate authority operation                             |
+
+Reinitialization instructions stay on the transition, keyed by member, as the existing fixed
+argument-less boolean. The inventory describes state; what to RUN is the transition's.
+
+**When the pointer advances.** Three distinct states, and the pointer is the last of them:
+
+- the target inventory a transition names is a PROPOSAL until stage 1 commits it;
+- stage 1 applies every operation it has authority for and records the target as PENDING;
+- `currentInventory` advances in stage 2, and only once every derived operation verifies against
+  live state. A foreign-admin member its administrator has not applied keeps the upgrade pending
+  rather than making the pointer lie. If that administrator never acts, the existing owner-only
+  abandonment clears the lifecycle and leaves `currentInventory` where it was, which is accurate:
+  the target was not reached.
+
+**How emergency changes are detected.** Pins describe intended state and are not proof, so the
+inventory has to be checkable and its staleness has to surface:
+
+- a `verifyInventory()` view any monitor can call, comparing every pinned implementation and
+  codehash against the live proxies;
+- the next transition's source check fails on its own, because a member whose live implementation
+  no longer matches the source inventory is exactly the mismatch a source-checked row already
+  rejects — now covering the whole address book rather than one row;
+- so a recovery call through `forward` has a defined follow-up: publish a corrected inventory and
+  advance the pointer to it, as an explicit reconciliation rather than a silent divergence.
+
+**Shared ecosystem across several CTMs.** The ecosystem inventory has one pointer and several CTMs
+that may each be mid-upgrade. A CTM's stage 2 may advance the ecosystem pointer only to the target
+its own transition named, and only if that target is not older than the live one; it must never
+claim another CTM's chain upgrades completed. Two CTMs naming the same ecosystem target is the
+normal case and must be idempotent.
+
+**The four scenarios, resolved.**
+
+1. **Timelock-only.** Target inventory is the source with one implementation replaced. One derived
+   upgrade through the CTM-domain admin. The release is untouched, so `fromRelease == newRelease`,
+   no facet cuts and no L2 side, and the version edge may be a patch. The pointer advances once the
+   proxy reads the new implementation.
+2. **Verifier-only.** The inventory does not change at all; the RELEASE does. Publish release B
+   copying A except that member and name `A -> B` with no L2 side. This is the shape already
+   implemented and tested as a patch, and it is why the verifier must not appear in the inventory.
+3. **Adding a contract.** A slot absent in the source and present in the target. The deployment
+   itself stays off-chain, but making the ecosystem USE it is a registration call, which today's
+   row format cannot express. The transition carries an explicit register instruction for that
+   member, and stage 2 requires it live and matching before the pointer advances.
+4. **Foreign-admin upgrade.** The `ServerNotifier` under its ChainAdmin-owned admin. Stage 1
+   applies it only if the executor owns that admin, otherwise logs and leaves it; stage 2 requires
+   it applied. The inventory model turns "not yet applied" into a first-class pending state
+   instead of an implicit one, and the reviewed description names the action and its authority
+   either way.
+
+**Acceptance criterion**, unchanged from the plan's own: given the deployed executor and the
+proposed objects, governance can determine every privileged effect without trusting prepare-script
+logic. Compilation, artifact loading, hashing, publication, simulation, signing and submission stay
+off-chain.
+
 ### Design and changes
 
 The current release describes chain code; upgrade rows describe operations. An inert row means
