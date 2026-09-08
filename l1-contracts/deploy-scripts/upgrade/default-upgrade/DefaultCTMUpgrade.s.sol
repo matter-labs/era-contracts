@@ -50,6 +50,7 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
 import {PinnedRegistryObject} from "./PinnedRegistryObject.sol";
+import {ReleaseMemberProbe} from "./ReleaseMemberProbe.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {CTMUpgradeParams} from "./UpgradeParams.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
@@ -57,6 +58,7 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
 import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
@@ -84,6 +86,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     using ExternalActionsLib for ExternalActionsLib.Ledger;
 
     uint256 internal constant ZKSYNC_OS_TEST_CREATE_CHAIN_ID = 556;
+
+    /// @dev Deployed on first use; see {ReleaseMemberProbe} for why it is a separate contract.
+    ReleaseMemberProbe internal releaseMemberProbe;
 
     // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
@@ -519,6 +524,45 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         ctmAddresses.admin.eip7702Checker = _eip7702Checker;
     }
 
+    /// @notice The release members this version SETS OUT to change. Everything else must come
+    ///         through unchanged, and the prepare refuses to replace anything not named here — so
+    ///         "change one contract" cannot quietly become "replace the facet set" because the
+    ///         local build differs from the one that produced the live code.
+    /// @dev Names are the `deploySimpleContract` names of the members that pass through
+    ///      {DeployCTMUtils._deployReleaseMember}: the six facets, `DiamondInit` and
+    ///      `EIP7702Checker`. The verifier is not among them — a version that replaces it does so
+    ///      by overriding the deploy step, which IS the declaration. The default is EMPTY: a
+    ///      recurring upgrade that changes nothing about the release reuses all of it, and the
+    ///      release object itself.
+    function changedReleaseMembers() internal view virtual returns (string[] memory) {
+        return new string[](0);
+    }
+
+    /// @notice Refuses a replacement this version did not declare (see {changedReleaseMembers}).
+    function _requireDeclaredReleaseMemberChange(string memory _name, address _live) internal virtual override {
+        string[] memory declared = changedReleaseMembers();
+        uint256 length = declared.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (compareStrings(declared[i], _name)) {
+                return;
+            }
+        }
+        console.log("Undeclared release member change:", _name);
+        console.log("  live:", _live);
+        console.logBytes32(_live.codehash);
+        // The two causes are indistinguishable from here, so the message names both.
+        require(
+            false,
+            string.concat(
+                "release member '",
+                _name,
+                "' would be replaced but this version does not declare it as changed. Either add it to "
+                "`changedReleaseMembers()`, or the local build differs from the one that produced the live "
+                "code (for the Mailbox, a missing `[contracts] eip7702_checker` input is the usual cause)."
+            )
+        );
+    }
+
     /// @notice A live release member may serve this release when it ALREADY runs the code the
     ///         current sources produce with this run's constructor arguments — so an upgrade
     ///         deploys only the members it changes, and one that changes none of them reuses the
@@ -532,24 +576,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         if (_live == address(0) || _live.code.length == 0) {
             return false;
         }
-        return _live.codehash == this.probeReleaseMemberCodehash(_name);
-    }
-
-    /// @notice The runtime codehash `_name` gets when deployed from the current sources with this
-    ///         run's constructor arguments.
-    /// @dev External so it runs in its OWN call frame: it reads a build artifact, and a prepare
-    ///      reads dozens of them — memory is charged quadratically and never freed within a frame,
-    ///      so reading them all into the pipeline's frame is what makes a prepare run out of gas.
-    ///      The probe deployment is a plain CREATE and is never broadcast.
-    function probeReleaseMemberCodehash(string memory _name) external returns (bytes32) {
-        bytes memory initCode = abi.encodePacked(getCreationCode(_name), getCreationCalldata(_name));
-        address probe;
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            probe := create(0, add(initCode, 0x20), mload(initCode))
+        if (address(releaseMemberProbe) == address(0)) {
+            // Plain CREATE, never broadcast: it lives only inside this run's simulation.
+            releaseMemberProbe = new ReleaseMemberProbe();
         }
-        require(probe != address(0), "release member code probe failed to deploy");
-        return probe.codehash;
+        return _live.codehash == releaseMemberProbe.codehashOf(_name, getCreationCalldata(_name));
     }
 
     /// @notice Declares one governance/admin call this prepare emits that the upgrade objects do
@@ -700,6 +731,16 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         }
 
         config.ownerAddress = ctmAddresses.admin.governance;
+
+        // `DiamondInit` is the genesis cut's INIT target, not a routed facet, so a chain's routing
+        // cannot expose it and introspection leaves it zero. Its canonical source is the CTM's own
+        // current release — without reading it there, every upgrade deploys a fresh one and moves
+        // the release even when nothing about the release changed. A pre-registry CTM has no
+        // release, so the bootstrap edge still deploys one.
+        address liveRelease = ctmAddresses.stateTransition.currentRelease;
+        if (liveRelease != address(0) && liveRelease.code.length != 0) {
+            ctmAddresses.stateTransition.facets.diamondInit = ICTMRelease(liveRelease).diamondInit();
+        }
 
         address representativeChain = AddressIntrospector.getRepresentativeZkChain(bridgehubAddr);
         if (representativeChain != address(0)) {

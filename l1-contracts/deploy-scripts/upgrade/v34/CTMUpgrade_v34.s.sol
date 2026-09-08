@@ -79,6 +79,21 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
         upgradeConfig.upgradeCutPrepared = true;
     }
 
+    /// @notice The bootstrap edge authors a COMPLETE release for a pre-registry ecosystem, so
+    ///         every member is expected to be new — the live ones belong to the departing,
+    ///         pre-v34 deployment.
+    function changedReleaseMembers() internal view virtual override returns (string[] memory members) {
+        members = new string[](8);
+        members[0] = "ExecutorFacet";
+        members[1] = "AdminFacet";
+        members[2] = "MailboxFacet";
+        members[3] = "GettersFacet";
+        members[4] = "MigratorFacet";
+        members[5] = "CommitterFacet";
+        members[6] = "DiamondInit";
+        members[7] = "EIP7702Checker";
+    }
+
     /// @notice The executor this run deploys — the CTM's owner only once `migrate()` has run.
     function boundCTMUpgradeExecutor() public view virtual override returns (address) {
         require(address(ctmUpgradeExecutor) != address(0), "CTM executor not deployed");

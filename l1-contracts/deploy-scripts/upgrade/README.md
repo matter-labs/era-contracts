@@ -52,9 +52,13 @@ Per-environment inputs live in `upgrade-envs/<version>/<env>.toml` (see
 - `test/foundry/l1/integration/UpgradeTestv34_Local.t.sol` — the bootstrap edge through the real
   prepare pipeline, in-forge.
 - `test/anvil-interop/run-v33-to-v34-upgrade-test.ts` — the same edge driven end to end by
-  protocol-ops against the frozen departing-version chain states, followed on the same chains
-  by the v35 registry-driven hop through the real `v35/` prepares: the merged artifact is
-  asserted to be exactly the three executor calls.
+  protocol-ops against the frozen departing-version chain states, followed on the same chains by
+  two registry-driven hops through real prepares: a same-minor VERIFIER PATCH (run with the
+  bootstrap's L2 transaction still pending, which it must not disturb, and required to derive no
+  facet cut), then the v35 minor hop, whose prepare is required to REUSE the live release. Each
+  hop's merged artifact is asserted to be exactly the three executor calls, and the EIP-7702
+  checker is carried from one hop's output into the next hop's input the way a production env file
+  does.
 - `test/anvil-interop/run-v34-to-v35-upgrade-test.ts` — the registry-driven hop through the
   bound executors with the objects deployed by the harness itself (the object-level test).
 
@@ -82,8 +86,9 @@ any of it. Retirement runs as batches, planned in
   (`UpgradeChainCall.requiresCut`); a cut is reconstructed from the CTM's historical log only for a
   chain that predates it.
 - An upgrade deploys only the release members whose code it changes: each member is compared with
-  what the current sources produce, and a replacement of a live member is printed with both
-  codehashes so an artifact difference is visible rather than silently widening the upgrade.
+  what the current sources produce. Replacing a live member additionally requires the version to
+  name it in `changedReleaseMembers()`, so an artifact difference cannot widen the upgrade — it
+  fails the prepare instead.
 - Pinned registry objects are deployed from the same build artifact their codehash pin is read
   from, and the prepare re-checks every object it deploys against the live executors' pins.
 

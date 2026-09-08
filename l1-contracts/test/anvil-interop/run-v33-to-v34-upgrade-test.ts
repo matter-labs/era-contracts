@@ -38,16 +38,37 @@ runPipelineUpgradeScenario({
   // registry model cannot bump yet (no EraVM-deployable release). Chain 10 (L1-settled) and 11
   // (the gateway itself, which settles on L1) are the supported shapes.
   targetRoles: ["directSettled", "gateway"],
-  // Then the FIRST registry-driven upgrade on the bootstrapped ecosystem ("v34 -> v35"), driven
-  // by the base prepare pipeline: one fresh ecosystem implementation pinned in a CoreRegistry, a
-  // fresh release pinned by a CTMTransition, and exactly three governance calls.
-  followUp: {
-    label: "v35-registry-driven",
-    upgradeInputTemplatePath: "test/anvil-interop/config/recurring-upgrade.toml",
-    expectedProtocolVersion: "0x2300000000",
-    coreScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v35.sol:CoreUpgradeForTests_v35",
-    ctmScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v35.sol:CTMUpgradeForTests_v35",
-  },
+  // Then two registry-driven hops on the bootstrapped ecosystem, each departing from the state the
+  // previous one left, both driven by the base prepare pipeline and both emitting exactly three
+  // governance calls.
+  followUps: [
+    // A same-minor PATCH first: one fresh verifier, published as a release that copies the
+    // bootstrap's except that member. It runs while the bootstrap's L2 upgrade transaction is
+    // still pending, which a patch is allowed to do and must not disturb, and its routing is
+    // identical on both edges so it must derive no facet cut.
+    {
+      label: "v34-verifier-patch",
+      upgradeInputTemplatePath: "test/anvil-interop/config/patch-upgrade.toml",
+      expectedProtocolVersion: "0x2200000001",
+      coreScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v35_1.sol:CoreUpgradeForTests_v35_1",
+      ctmScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v35_1.sol:CTMUpgradeForTests_v35_1",
+      keepsPendingL2Upgrade: true,
+      expectsEmptyFacetDelta: true,
+    },
+    // Then an ordinary MINOR upgrade on top of the patch ("v34 -> v35"): one fresh ecosystem
+    // implementation pinned in a CoreRegistry and a transition naming it. Its only change is on
+    // the ecosystem side, so the CTM release is untouched and the prepare must reuse it rather
+    // than redeploy the facet set.
+    {
+      label: "v35-registry-driven",
+      upgradeInputTemplatePath: "test/anvil-interop/config/recurring-upgrade.toml",
+      expectedProtocolVersion: "0x2300000000",
+      coreScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v35.sol:CoreUpgradeForTests_v35",
+      ctmScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v35.sol:CTMUpgradeForTests_v35",
+      expectsReusedRelease: true,
+      expectsFreshMessageRoot: true,
+    },
+  ],
 })
   .then(() => {
     process.exit(0);

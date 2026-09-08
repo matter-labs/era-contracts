@@ -29,7 +29,8 @@ Implemented in this branch:
 - Patch transitions that may change the release, validated by what the patch contains rather than
   by which release it names, with an identical-routing fast path so a non-facet change costs no cut.
 - Prepare scripts that compose no payload: the committed cut is read from the object that composes
-  it on-chain, and an upgrade deploys only the release members whose code it actually changes.
+  it on-chain, and an upgrade deploys only the release members whose code it actually changes —
+  refusing to replace any member the version did not declare as changed.
 
 The central security question is whether the reviewed objects and declared external actions
 account for every executable change. Review source/target edges, target identities, code pins,

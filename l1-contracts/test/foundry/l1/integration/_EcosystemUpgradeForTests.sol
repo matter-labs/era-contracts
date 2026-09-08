@@ -67,6 +67,7 @@ contract CTMUpgradeForTests is CTMUpgrade_v34 {
             outputPath,
             getChainUpgradeDiamondCutData(),
             getAddresses().stateTransition.defaultUpgrade,
+            getAddresses().admin.eip7702Checker,
             TrimmedUpgradeOutput.Registry({
                 ctmTransition: address(0),
                 ctmUpgradeExecutor: address(0),
@@ -86,13 +87,19 @@ library TrimmedUpgradeOutput {
         address coreRegistry;
     }
 
+    /// @param _eip7702Checker The CTM domain's EIP-7702 checker, carried forward exactly as a
+    ///        production prepare's output carries it: the MailboxFacet pins it as an immutable and
+    ///        nothing on-chain exposes it, so the NEXT upgrade's input has to name it or it deploys
+    ///        a fresh one and drags a Mailbox replacement behind it.
     function write(
         Vm _vm,
         string memory _outputPath,
         bytes memory _upgradeCutData,
         address _defaultUpgrade,
+        address _eip7702Checker,
         Registry memory _registry
     ) internal {
+        _vm.serializeAddress("state_transition", "eip7702_checker_addr", _eip7702Checker);
         string memory stateTransition = _vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",

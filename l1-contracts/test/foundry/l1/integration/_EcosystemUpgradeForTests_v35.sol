@@ -50,6 +50,7 @@ contract CTMUpgradeForTests_v35 is CTMUpgrade_v35 {
             outputPath,
             getChainUpgradeDiamondCutData(),
             getAddresses().stateTransition.defaultUpgrade,
+            getAddresses().admin.eip7702Checker,
             TrimmedUpgradeOutput.Registry({
                 ctmTransition: upgradeAddresses.ctmTransition,
                 ctmUpgradeExecutor: boundCTMUpgradeExecutor(),

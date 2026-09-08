@@ -62,10 +62,17 @@ be kept separate from documentation and reviewed with their owning batch.
 - Unchanged release members are reused by CODE IDENTITY: the prepare probes what the current
   sources produce (a local, never-broadcast deployment with this run's constructor arguments — an
   artifact's `deployedBytecode` has immutable slots zeroed and cannot be compared with live code)
-  and keeps the live member when they match. Every replacement of a live member is printed with
-  both codehashes, so an artifact difference is surfaced rather than silently expanding scope. A
-  release whose members all reused pins an identical manifest, so the live release object is
-  reused too and the transition derives an empty L1 delta.
+  and keeps the live member when they match. A release whose members all reused pins an identical
+  manifest, so the live release object is reused too and the transition derives an empty L1 delta.
+- Replacing a live member is a change of SCOPE and must be INTENDED: the prepare refuses to
+  replace any member the version does not name in `changedReleaseMembers()`. A version that
+  changes one ecosystem contract therefore cannot quietly become one that replaces the facet set
+  because the local build disagrees with whatever produced the live code. The v34 bootstrap
+  declares the whole set, since it authors a complete release for a pre-registry ecosystem.
+- `DiamondInit` gets its address from the CTM's current RELEASE. It is the genesis cut's init
+  target rather than a routed facet, so a chain's routing cannot expose it and introspection left
+  it zero — which made every upgrade deploy a fresh one and move the release even when nothing
+  about the release changed. Found by the pipeline's reuse assertion, not by reading the code.
 - Two findings this batch turned up, fixed here because both brick a lifecycle in production:
   a codehash pin taken from a build artifact while the object is deployed from the script's own
   compiled copy can differ (the CBOR metadata records the compilation's remappings), so pinned

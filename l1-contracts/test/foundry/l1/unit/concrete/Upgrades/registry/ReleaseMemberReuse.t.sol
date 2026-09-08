@@ -12,6 +12,18 @@ contract ReleaseMemberReuseHarness is DefaultCTMUpgrade {
     function canReuseReleaseMember(string memory _name, address _live) public returns (bool) {
         return _canReuseReleaseMember(_name, _live);
     }
+
+    function requireDeclaredReleaseMemberChange(string memory _name, address _live) public {
+        _requireDeclaredReleaseMemberChange(_name, _live);
+    }
+}
+
+/// @dev A version that sets out to change exactly one member.
+contract DeclaredMemberHarness is ReleaseMemberReuseHarness {
+    function changedReleaseMembers() internal view virtual override returns (string[] memory members) {
+        members = new string[](1);
+        members[0] = "ExecutorFacet";
+    }
 }
 
 /// @notice The rule that lets a small upgrade deploy only what it changes: a live release member is
@@ -61,6 +73,30 @@ contract ReleaseMemberReuseTest is Test {
             harness.canReuseReleaseMember("ExecutorFacet", address(0xdead)),
             "a codeless member must be deployed"
         );
+    }
+
+    /// @dev Replacing a live member is a change of SCOPE, so it must be intended. A version that
+    ///      declares nothing — the shape of "change one ecosystem contract" — must not be able to
+    ///      replace a facet because the local build disagrees with what produced the live code.
+    function test_revertWhen_replacingAnUndeclaredMember() public {
+        address live = _deployFromArtifact("Getters.sol", "GettersFacet", "");
+        vm.expectRevert();
+        harness.requireDeclaredReleaseMemberChange("ExecutorFacet", live);
+    }
+
+    /// @dev The same replacement, expressly included by the version.
+    function test_permitsReplacingADeclaredMember() public {
+        DeclaredMemberHarness declaring = new DeclaredMemberHarness();
+        address live = _deployFromArtifact("Getters.sol", "GettersFacet", "");
+        declaring.requireDeclaredReleaseMemberChange("ExecutorFacet", live);
+    }
+
+    /// @dev Declaring one member does not license another.
+    function test_revertWhen_replacingAMemberOtherThanTheDeclaredOne() public {
+        DeclaredMemberHarness declaring = new DeclaredMemberHarness();
+        address live = _deployFromArtifact("Executor.sol", "ExecutorFacet", "");
+        vm.expectRevert();
+        declaring.requireDeclaredReleaseMemberChange("GettersFacet", live);
     }
 
     /// @dev Why the predicate DEPLOYS a probe instead of comparing artifacts: a member whose code

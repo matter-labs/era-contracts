@@ -130,7 +130,7 @@ export type PipelineUpgradeScenario = {
    * `CTMUpgradeExecutor.stageN(transition)` calls, and every chain crosses through the
    * cut-READING `upgradeChainFromVersion` (see runRecurringHop).
    */
-  followUp?: RecurringUpgradeHop;
+  followUps?: RecurringUpgradeHop[];
 };
 
 export type RecurringUpgradeHop = {
@@ -140,6 +140,28 @@ export type RecurringUpgradeHop = {
   expectedProtocolVersion: string;
   coreScriptPath: string;
   ctmScriptPath: string;
+  /**
+   * Assert that the prepare REUSED the live release. Set it for a hop that changes no CTM release
+   * member: the prepare then pins an identical manifest, so the live release object must serve it
+   * and the derived facet delta must be empty — no chain sees facet churn for an upgrade that
+   * changed no facet.
+   */
+  expectsReusedRelease?: boolean;
+  /**
+   * Assert an empty derived facet delta while allowing a NEW release. Set it for a hop that
+   * replaces a non-facet release member (a verifier): the routing is identical on both edges, so
+   * the transition must not remove and re-add every selector onto the same facets.
+   */
+  expectsEmptyFacetDelta?: boolean;
+  /**
+   * Run this hop with the previous upgrade's L2 transaction still PENDING, and assert it survives
+   * untouched. Only a patch edge may do this: `BaseZkSyncUpgrade` deliberately skips the
+   * "previous upgrade finalized" check when the minor version does not change. Every other hop
+   * has the pending hash cleared first, since these sequencer-less chains never finalize it.
+   */
+  keepsPendingL2Upgrade?: boolean;
+  /** Assert this hop re-pointed the MessageRoot proxy at a freshly deployed implementation. */
+  expectsFreshMessageRoot?: boolean;
 };
 
 // ── Main entry point ─────────────────────────────────────────────────
@@ -265,13 +287,17 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     });
     console.log("✅ Pipeline upgrade scenario verified successfully!\n");
 
-    if (scenario.followUp) {
-      await runRecurringHop(scenario, scenario.followUp, {
+    // Each hop departs from the state the previous one left, and carries the EIP-7702 checker
+    // forward the way a production env file does.
+    let reportedEip7702Checker = readReportedEip7702Checker(mergedEcosystemToml);
+    for (const hop of scenario.followUps ?? []) {
+      reportedEip7702Checker = await runRecurringHop(scenario, hop, {
         l1Provider,
         rpcUrl: l1Chain.rpcUrl,
         l1Addresses,
         ctmAddresses,
         upgradeChainAddresses,
+        eip7702Checker: reportedEip7702Checker,
       });
     }
   } finally {
@@ -285,6 +311,50 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
 }
 
 // ── Registry-driven follow-up hop ─────────────────────────────────────
+
+/**
+ * Which members two releases disagree on. Used to explain a failed reuse assertion: "the prepare
+ * deployed a new release" is only actionable with the member that forced it.
+ */
+async function describeReleaseDifference(
+  provider: ethers.providers.JsonRpcProvider,
+  fromRelease: string,
+  newRelease: string
+): Promise<string> {
+  const a = new ethers.Contract(fromRelease, getAbi("CTMRelease"), provider);
+  const b = new ethers.Contract(newRelease, getAbi("CTMRelease"), provider);
+  const differences: string[] = [];
+  const compare = async (name: string, read: (c: ethers.Contract) => Promise<unknown>): Promise<void> => {
+    const [left, right] = [await read(a), await read(b)];
+    const encode = (v: unknown): string => JSON.stringify(v);
+    if (encode(left) !== encode(right)) {
+      differences.push(`${name}: ${encode(left)} -> ${encode(right)}`);
+    }
+  };
+  await compare("diamondInit", (c) => c.diamondInit());
+  await compare("verifier", (c) => c.verifier());
+  await compare("genesisFacets", (c) => c.genesisFacets());
+  await compare("genesisParams", (c) => c.genesisParams());
+  await compare("fixedForceDeploymentsData", async (c) => ethers.utils.keccak256(await c.fixedForceDeploymentsData()));
+  await compare("l2BytecodeInfos", async (c) =>
+    ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["bytes[]"], [await c.l2BytecodeInfos()]))
+  );
+  return differences.length === 0 ? "no member differs (identical manifests)" : differences.join("; ");
+}
+
+/**
+ * The CTM domain's EIP-7702 checker as the previous prepare reported it. Production carries this
+ * forward through the next upgrade's env input for a reason: the `MailboxFacet` pins it as an
+ * immutable and nothing on-chain exposes it, so a prepare that is not told the live one deploys a
+ * fresh checker — which moves the Mailbox and, with it, the whole release.
+ */
+function readReportedEip7702Checker(mergedEcosystemTomlPath: string): string | undefined {
+  const merged = parseToml(fs.readFileSync(mergedEcosystemTomlPath, "utf8")) as {
+    ctms?: { zksync_os?: { state_transition?: { eip7702_checker_addr?: string } } };
+  };
+  const reported = merged.ctms?.zksync_os?.state_transition?.eip7702_checker_addr;
+  return reported && reported !== ethers.constants.AddressZero ? reported : undefined;
+}
 
 /** `abi.decode(Call[])` of a governance bundle's hex. */
 function decodeGovernanceCalls(hex: string): Array<{ target: string; value: ethers.BigNumber; data: string }> {
@@ -325,16 +395,32 @@ async function runRecurringHop(
     l1Addresses: { bridgehub: string; governance: string; messageRoot: string };
     ctmAddresses: { chainTypeManager: string };
     upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>;
+    /** The live EIP-7702 checker as the previous hop's prepare reported it. */
+    eip7702Checker?: string;
   }
-): Promise<void> {
+): Promise<string | undefined> {
   console.log(`\n══ Registry-driven follow-up hop: ${hop.label} ══`);
   const { l1Provider, upgradeChainAddresses } = ctx;
   const ctm = new ethers.Contract(ctx.ctmAddresses.chainTypeManager, getAbi("IChainTypeManager"), l1Provider);
   const oldVersion: ethers.BigNumber = await ctm.protocolVersion();
   console.log(`  departing protocol version: ${oldVersion.toHexString()}`);
 
-  // The bootstrap's L2 leg is still "pending" on these sequencer-less chains (see module docs).
-  await clearGenesisUpgradeTxHash(l1Provider, upgradeChainAddresses);
+  // The previous hop's L2 leg is still "pending" on these sequencer-less chains (see module docs),
+  // which blocks a MINOR upgrade. A patch hop deliberately keeps it, to prove it survives.
+  const pendingL2TxHashes = new Map<number, string>();
+  if (hop.keepsPendingL2Upgrade) {
+    for (const chain of upgradeChainAddresses) {
+      const getters = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), l1Provider);
+      pendingL2TxHashes.set(chain.chainId, await getters.getL2SystemContractsUpgradeTxHash());
+    }
+    const anyPending = [...pendingL2TxHashes.values()].some((h) => h !== ethers.constants.HashZero);
+    if (!anyPending) {
+      throw new Error(`hop ${hop.label} is meant to run with a pending L2 upgrade, but none is recorded`);
+    }
+    console.log("  keeping the pending L2 upgrade transaction: a patch must not disturb it");
+  } else {
+    await clearGenesisUpgradeTxHash(l1Provider, upgradeChainAddresses);
+  }
 
   const hopScenario: PipelineUpgradeScenario = {
     ...scenario,
@@ -343,12 +429,13 @@ async function runRecurringHop(
     expectedProtocolVersion: hop.expectedProtocolVersion,
     coreScriptPath: hop.coreScriptPath,
     ctmScriptPath: hop.ctmScriptPath,
-    followUp: undefined,
+    followUps: undefined,
   };
   const inputs = prepareUpgradeHarnessInputs(hopScenario, {
     l1Addresses: ctx.l1Addresses,
     ctmAddresses: ctx.ctmAddresses,
     chainAddresses: upgradeChainAddresses,
+    eip7702Checker: ctx.eip7702Checker,
   });
   try {
     console.log("\n── Preparing the registry-driven upgrade via protocol-ops ──");
@@ -452,6 +539,28 @@ async function runRecurringHop(
     if (currentRelease.toLowerCase() !== newRelease.toLowerCase()) {
       throw new Error(`CTM currentRelease ${currentRelease} is not the transition's target release ${newRelease}`);
     }
+    // Read off the OBJECT rather than the prepare's logs: this is what governance and the chains
+    // read, and it is the only evidence that unchanged contracts were not silently redeployed.
+    if (hop.expectsReusedRelease) {
+      const fromRelease: string = await transition.fromRelease();
+      if (fromRelease.toLowerCase() !== newRelease.toLowerCase()) {
+        const difference = await describeReleaseDifference(l1Provider, fromRelease, newRelease);
+        throw new Error(
+          `hop ${hop.label} changes no release member, so the prepare must reuse the live release; ` +
+            `got ${fromRelease} -> ${newRelease}. Differing members: ${difference}`
+        );
+      }
+      console.log("  ✓ the prepare reused the live release: same release on both edges");
+    }
+    if (hop.expectsReusedRelease || hop.expectsEmptyFacetDelta) {
+      const facetCuts: unknown[] = await transition.facetCuts();
+      if (facetCuts.length !== 0) {
+        throw new Error(
+          `hop ${hop.label} changes no facet, so its derived facet delta must be empty (got ${facetCuts.length} cut(s))`
+        );
+      }
+      console.log("  ✓ identical routing on both edges derived an empty facet delta");
+    }
     const executor = new ethers.Contract(executorAddr, getAbi("CTMUpgradeExecutor"), l1Provider);
     const pending: string = await executor.pendingTransition();
     if (pending !== ethers.constants.AddressZero) {
@@ -463,29 +572,44 @@ async function runRecurringHop(
     if (await cah.migrationPaused()) {
       throw new Error("stage 2 did not release the migration pause");
     }
-    const expectedMessageRootImpl = merged.core.upgrade_addresses?.bridgehub?.message_root_implementation_addr;
-    if (!expectedMessageRootImpl) {
-      throw new Error("the core prepare did not report the fresh L1MessageRoot implementation");
-    }
-    const implSlot = await l1Provider.getStorageAt(ctx.l1Addresses.messageRoot, EIP1967_IMPL_SLOT);
-    const liveMessageRootImpl = ethers.utils.getAddress("0x" + implSlot.slice(26));
-    if (liveMessageRootImpl.toLowerCase() !== expectedMessageRootImpl.toLowerCase()) {
-      throw new Error(
-        `MessageRoot proxy points at ${liveMessageRootImpl}, expected the fresh ${expectedMessageRootImpl}`
-      );
+    if (hop.expectsFreshMessageRoot) {
+      const expectedMessageRootImpl = merged.core.upgrade_addresses?.bridgehub?.message_root_implementation_addr;
+      if (!expectedMessageRootImpl) {
+        throw new Error("the core prepare did not report the fresh L1MessageRoot implementation");
+      }
+      const implSlot = await l1Provider.getStorageAt(ctx.l1Addresses.messageRoot, EIP1967_IMPL_SLOT);
+      const liveMessageRootImpl = ethers.utils.getAddress("0x" + implSlot.slice(26));
+      if (liveMessageRootImpl.toLowerCase() !== expectedMessageRootImpl.toLowerCase()) {
+        throw new Error(
+          `MessageRoot proxy points at ${liveMessageRootImpl}, expected the fresh ${expectedMessageRootImpl}`
+        );
+      }
     }
     for (const chain of upgradeChainAddresses) {
       const getters = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), l1Provider);
       const recorded: string = await getters.getL2SystemContractsUpgradeTxHash();
-      if (recorded !== ethers.constants.HashZero) {
+      if (hop.keepsPendingL2Upgrade) {
+        // The whole point of a patch edge: it may not carry an L2 upgrade, and it may not disturb
+        // one that is already committed and unfinalized.
+        const before = pendingL2TxHashes.get(chain.chainId);
+        if (recorded !== before) {
+          throw new Error(
+            `chain ${chain.chainId}: the patch changed the pending L2 upgrade transaction (${before} -> ${recorded})`
+          );
+        }
+      } else if (recorded !== ethers.constants.HashZero) {
         throw new Error(
           `chain ${chain.chainId}: an L1-only edge must not record an L2 upgrade transaction (${recorded})`
         );
       }
     }
+    if (hop.keepsPendingL2Upgrade) {
+      console.log("  ✓ the pending L2 upgrade transaction survived the patch untouched");
+    }
     console.log(
       `✅ Registry-driven hop ${hop.label} verified: three calls, one transition, chains at ${hop.expectedProtocolVersion}\n`
     );
+    return readReportedEip7702Checker(mergedEcosystemToml) ?? ctx.eip7702Checker;
   } finally {
     inputs.cleanup();
   }
@@ -1296,6 +1420,8 @@ export function prepareUpgradeHarnessInputs(
     l1Addresses: { bridgehub: string; governance: string };
     ctmAddresses: { chainTypeManager: string };
     chainAddresses: Array<{ chainId: number }>;
+    /** The live EIP-7702 checker, when a previous prepare reported one. */
+    eip7702Checker?: string;
   }
 ): {
   envVars: Record<string, string>;
@@ -1333,6 +1459,11 @@ export function prepareUpgradeHarnessInputs(
   upgradeInput = replaceTomlStringValue(upgradeInput, "bridgehub_proxy_address", state.l1Addresses.bridgehub);
   upgradeInput = replaceTomlStringValue(upgradeInput, "owner_address", state.l1Addresses.governance);
   upgradeInput = replaceTomlBareValue(upgradeInput, "sample_chain_id", String(primaryChainId));
+  if (state.eip7702Checker) {
+    // Exactly what a production env file carries forward from the previous prepare's output; see
+    // `readReportedEip7702Checker`.
+    upgradeInput = upgradeInput.replace(/^\[contracts\]$/m, `[contracts]\neip7702_checker = "${state.eip7702Checker}"`);
+  }
   fs.writeFileSync(upgradeInputPath, upgradeInput);
 
   const permanentValuesToml = parseToml(permanentValues) as {

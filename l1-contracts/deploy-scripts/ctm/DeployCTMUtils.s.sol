@@ -137,25 +137,27 @@ abstract contract DeployCTMUtils is DeployUtils {
     }
 
     /// @notice Deploys `_name`, or keeps `_live` when it may serve as this release's member.
-    /// @dev Every replacement of a LIVE member is printed with both codehashes. A member is
-    ///      replaced either because this version changed it or because the local build differs
-    ///      from the one that produced the live code; the two are indistinguishable from here, so
-    ///      the decision is surfaced for the operator to recognise rather than absorbed silently.
+    /// @dev Replacing a LIVE member is a change to the upgrade's scope, so it must be INTENDED:
+    ///      `_requireDeclaredReleaseMemberChange` refuses a replacement the run did not ask for.
+    ///      A member is replaced either because this version changed it or because the local build
+    ///      differs from the one that produced the live code, and those are indistinguishable from
+    ///      here — which is exactly why the answer cannot be "deploy it anyway and log a line".
     function _deployReleaseMember(string memory _name, address _live) internal returns (address) {
         if (_canReuseReleaseMember(_name, _live)) {
             console.log("Release member unchanged, reusing:", _name, _live);
             return _live;
         }
-        address deployed = deploySimpleContract(_name);
-        if (_live != address(0) && _live != deployed) {
-            console.log("Release member REPLACED:", _name);
-            console.log("  live:", _live);
-            console.logBytes32(_live.codehash);
-            console.log("  new: ", deployed);
-            console.logBytes32(deployed.codehash);
+        if (_live != address(0) && _live.code.length != 0) {
+            _requireDeclaredReleaseMemberChange(_name, _live);
+            console.log("Release member changed by this version, replacing:", _name, _live);
         }
-        return deployed;
+        return deploySimpleContract(_name);
     }
+
+    /// @notice Reverts unless replacing the live `_name` is part of what this run set out to do.
+    ///         Fresh deployment has no live member to replace, so the default permits everything;
+    ///         an upgrade prepare overrides it with the version's declared scope.
+    function _requireDeclaredReleaseMemberChange(string memory, address) internal virtual {}
 
     /// @notice Whether the live `_live` may serve as this release's `_name` member. Fresh
     ///         deployments never reuse — there is no live release to reuse from — so the default

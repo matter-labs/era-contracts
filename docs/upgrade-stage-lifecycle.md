@@ -323,7 +323,11 @@ Targeted tests:
 - a verifier replacement as a PATCH — a new release copying the departing one except that member,
   within the same minor version — including one taken while an earlier minor upgrade's L2
   transaction is still pending, which the patch must leave untouched
-  (`RegistryIndividualUpgrade.t.sol`).
+  (`RegistryIndividualUpgrade.t.sol`), and the same edge end to end through the production
+  toolchain in the chained anvil pipeline: bootstrap, then a verifier patch that runs with the
+  bootstrap's L2 transaction pending and derives no facet cut, then an ordinary minor upgrade on
+  top of it whose prepare is required to REUSE the live release rather than redeploy the facet set
+  (`run-v33-to-v34-upgrade-test.ts`).
 
 All of the above are covered: the stage-order, authority, pause and completion cases in
 `CTMUpgradeLifecycle.t.sol`, the bootstrap-then-recurring shape in the chained anvil pipeline
