@@ -6,6 +6,37 @@ them. Declared external actions and governance recovery calls must also be revie
 
 **Scope:** L1 + L2 era-contracts, upgrade tooling, governance proposal shape.
 
+## Review starting point
+
+This document describes the current implementation on PR #2270. Read the
+[objects](#objects), [authority](#authority), [upgrade flow](#flow-upgrading), and
+[bootstrap](#bootstrap) sections in that order. The stage-by-stage specification and recovery
+paths are in [the lifecycle document](upgrade-stage-lifecycle.md).
+
+Implemented in this branch:
+
+- Release/transition derivation, source-checked proxy inventories and inline codehash pins.
+- The three-stage CTM executor, transition-pinned ecosystem participation and timer,
+  independently held migration pauses, and ecosystem-executor replacement between upgrades.
+- Explicit ProxyAdmin rows, including ServerNotifier. A separately administered row remains
+  that administrator's responsibility unless the executor owns its ProxyAdmin.
+- L2 delegate arguments composed by pinned code, and bootstrap payload composition using the
+  same on-chain composer as recurring transitions.
+- A recurring prepare path that emits the three executor calls and declares every external
+  action, plus individual facet, verifier and validator-timelock upgrade tests.
+- Owner-only abandonment of a stuck lifecycle. This clears the pending slot and releases the
+  executor's hold; it does not roll back any upgrade already executed.
+
+The central security question is whether the reviewed objects and declared external actions
+account for every executable change. Review source/target edges, target identities, code pins,
+initializers, delegate/composer code and ownership changes together. Include governance's
+`forward`, abandonment and executor-replacement powers in that review. Stage 2 verifies the
+applied L1 state, not completion on every L2 chain; publication checks do not establish the
+safety of the published code.
+
+See [remaining work](#remaining-review-and-script-retirement) for the boundary between the
+implemented model and the work still required to retire scripts or support older deployments.
+
 ## Model
 
 Two objects, deliberately separate:
@@ -589,20 +620,37 @@ Codehash checks depend on reproducible bytecode: pinned implementations are buil
 CBOR-metadata-free profile so hashes are byte-identical across platforms. For the same reason,
 manifest data stays in storage rather than immutables — see [Provenance and pinning](#provenance-and-pinning).
 
-## Planned: follow-up calls live in the upgrade impl (v35)
+## Remaining review and script retirement
 
-Per-proxy reinitializers are already code, not calldata (see "Reinitializers: a fixed call,
-pinned data" above): the selector is fixed, and the parameters are pinned data the audited
-implementation fetches and decodes itself. What remains inexpressible is CROSS-CONTRACT
-follow-up wiring after a swap (`setAddresses`-style calls between contracts) — the other half
-of the v31 incident shape.
+The on-chain L2 and bootstrap composers are implemented. Script retirement is still incomplete:
 
-The planned v35 model moves that into audited code too: a **default upgrade impl** that
-performs the enumerated proxy swaps and nothing else, which a release with follow-up work
-**inherits** — the subclass overrides a hook and makes the wiring calls as typed Solidity
-(`abi.encodeCall`), pinned by codehash in the manifest like every other object. Auditors then
-review the whole upgrade as a contract; a forgotten call is a missing line in an audited diff.
-Tracked in Linear (v35 project).
+1. **Remove duplicate payload composition.** The v34 prepare still independently builds a cut
+   and compares it with `bootstrapMigration.upgradeCut()`. Preserve equivalence evidence in
+   tests, read the object in production, then remove the obsolete composition inheritance.
+2. **Isolate legacy chain calls.** Per-chain helpers still fetch cuts from historical logs
+   before selecting a modern call that carries no cut. Select the modern path first and keep
+   log reconstruction only for the supported legacy edge.
+3. **Reduce preparation for small changes.** The inherited prepare invokes deployment helpers
+   for the full facet set. Reuse unchanged release members and retire legacy genesis/cut output
+   fields after migrating their consumers. Individual-contract execution tests establish the
+   intended outcome; they do not mean deployment tooling is already minimal.
+4. **Complete fresh-deployment authority setup.** Fresh deployment pins a release but still uses
+   the older ownership setup. Establish executors and their authorizations directly so its first
+   recurring upgrade does not need the legacy bootstrap preparation machinery.
+5. **Review cross-contract follow-up wiring.** A row has a fixed, argument-less reinitializer;
+   arbitrary follow-up calls are not part of the row format. Calls outside the existing execution
+   paths must remain declared external actions until an audited on-chain path accounts for
+   their targets, order and authority. Declaring an action makes it visible; it does not execute
+   it or grant permission.
+6. **Resolve deployed-schema compatibility.** A release/transition schema or canonical codehash
+   change needs an explicit migration plan if older registry objects are already deployed.
+   Regenerating current-source fixtures proves the new-flow test baseline, not an in-place
+   migration from such a deployment.
+
+Compilation, artifact loading, hashing, bytecode publication, simulation, signing and submission
+remain off-chain tooling responsibilities. Bootstrap handovers and separately administered
+contracts also retain explicit authorization steps. Removing scripts must preserve those
+boundaries and the frozen bootstrap and recurring-prepare end-to-end tests.
 
 ## Related
 
