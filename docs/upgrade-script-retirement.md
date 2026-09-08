@@ -1,5 +1,10 @@
 # Deployment and upgrade script retirement plan
 
+> **Temporary plan — delete after implementation.** Once all retirement batches are complete
+> and their verification gates pass, move any lasting architectural decisions into the canonical
+> documentation, delete this file, and remove links to it from the architecture document and PR
+> description. Do not retain it as a permanent description of the implemented system.
+
 Companion to [the registry architecture](registry-driven-upgrades.md). This is an implementation
 plan for PR #2270, not a claim that the proposed inventory and deployment changes are implemented.
 The objective is to delete script-defined protocol behavior while retaining a small artifact and
