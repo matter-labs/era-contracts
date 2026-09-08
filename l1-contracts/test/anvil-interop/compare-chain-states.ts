@@ -18,6 +18,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as zlib from "zlib";
+import { utils } from "ethers";
 
 // Read a chain-state file, transparently gunzipping the compressed `.json.gz`
 // dumps (see deployment-runner.ts). `addresses.json` stays plain text.
@@ -75,6 +76,31 @@ function collectSkipStorageAccounts(versionDir: string): Set<string> {
   return skip;
 }
 
+// `ChainTypeManagerBase.upgradeCutDataBlock` and `.newChainCreationParamsBlock` (storage indices 166
+// and 167, per `forge inspect ChainTypeManagerBase storage-layout`) map a *packed* protocol version
+// to the block at which that version's data was registered. The stored value is a block number, so
+// it drifts run-to-run like the slots below — and the keccak slot itself moves on every genesis
+// protocol-version bump, since the version is the mapping key: the v31 and v32 keys were listed here
+// as raw hashes and the bump to v33 (#2429) broke the check again. Derive the slots from the version
+// instead, over a range wide enough that the next bump needs no new hash here.
+const CTM_VERSION_KEYED_BLOCK_SLOT_INDICES = [166, 167];
+const CTM_VERSION_KEYED_MINOR_FROM = 25;
+const CTM_VERSION_KEYED_MINOR_TO = 45;
+
+function ctmVersionKeyedBlockSlots(): string[] {
+  const slots: string[] = [];
+  for (let minor = CTM_VERSION_KEYED_MINOR_FROM; minor <= CTM_VERSION_KEYED_MINOR_TO; minor++) {
+    // SemVer.packSemVer(0, minor, 0) — the mapping key.
+    const packedProtocolVersion = minor * 2 ** 32;
+    for (const slotIndex of CTM_VERSION_KEYED_BLOCK_SLOT_INDICES) {
+      slots.push(
+        utils.keccak256(utils.defaultAbiCoder.encode(["uint256", "uint256"], [packedProtocolVersion, slotIndex]))
+      );
+    }
+  }
+  return slots;
+}
+
 // Keccak-derived slots (collision-free across contracts) holding an L2 block/batch number in the
 // interop bookkeeping contracts. These were the only common-slot value diffs between two fresh
 // runs, each differing by exactly the block-count delta. Ignored in whichever account they appear.
@@ -82,12 +108,11 @@ const BLOCK_NUMBER_STORAGE_SLOTS = new Set([
   "0x22157c206018468b45ae7922bc7a0b0cb8feed201dac3c6fb5e7876aa94e11e9",
   "0xcae482817da5739a72d01cb9874e04d330e5e8dc74bc0bece220f5b3532c14b8",
   "0xe12917faa952038297cceeb966eb4f054126fd0f1307df22b19432454cb24b37",
-  "0xa1a0bcd6e1eb10e34e86589f0737ed295f21e2780238b04598ea22e184199ff6",
-  // Appears on the L1 ChainTypeManager and one L2 bookkeeping contract. This check compares
-  // committed against freshly generated state for the SAME tree, so a difference here can only be
-  // run-to-run drift; observed as 44 -> 53 (L1) and 197 -> 222 (L2 chain 11), i.e. the block-count
-  // delta between the two generations, matching the other entries in this set.
-  "0xcbb92218c6fa6b4bbce0fd2138701a2aa354649a9f1f834c324c529c16aca477",
+  // The CTM version-keyed block slots, on the L1 ChainTypeManager and the gateway's L2 one. This
+  // check compares committed against freshly generated state for the SAME tree, so a difference here
+  // can only be run-to-run drift; `newChainCreationParamsBlock` was observed as 44 -> 53 (L1) and
+  // 197 -> 222 (L2 chain 11) under the v32 key, and 43 -> 46 / 192 -> 203 under the v33 one.
+  ...ctmVersionKeyedBlockSlots(),
 ]);
 
 // Slots holding a gas-cost-dependent ETH amount (the harness bridges a gas-dependent mintValue on

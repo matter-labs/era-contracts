@@ -8,7 +8,7 @@ use crate::common::addresses::ZERO_ADDRESS;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
-use crate::types::L2DACommitmentScheme;
+use crate::types::{DAValidatorType, L2DACommitmentScheme};
 
 #[derive(Serialize)]
 struct SetDaValidatorPairOutput {
@@ -51,12 +51,19 @@ pub struct ChainSetDaValidatorPairArgs {
     #[clap(long)]
     pub l1_da_validator: Address,
 
-    /// L2 DA commitment scheme. For L1-settling ZKsync OS rollups:
-    /// `blobs-z-k-sync-os`. For gateway-settling chains:
-    /// `blobs-and-pubdata-keccak256`. For no-DA validium chains:
-    /// `empty-no-d-a`. Etc.
-    #[clap(long, value_enum)]
-    pub l2_da_commitment_scheme: L2DACommitmentScheme,
+    /// What the chain does with its pubdata. The L2 DA commitment scheme follows from this and the
+    /// VM the chain runs, which is read from its CTM — a ZKsync OS rollup or logs-only validium
+    /// publishes through blobs (`blobs-zksync-os`), an Era rollup commits blobs and the pubdata hash
+    /// (`blobs-and-pubdata-keccak256`), an Era validium commits nothing (`empty-no-da`) and a
+    /// custom-DA chain commits the hash of the pubdata it hands over (`pubdata-keccak256`).
+    #[clap(long, value_enum, default_value_t = DAValidatorType::Rollup)]
+    pub da_mode: DAValidatorType,
+
+    /// Override the L2 DA commitment scheme derived from `--da-mode` and the chain's VM. Needed
+    /// only for a gateway-settling chain, which relays its pubdata and commits it as
+    /// `blobs-and-pubdata-keccak256` whatever its VM.
+    #[clap(long, value_enum, help_heading = "Advanced input")]
+    pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
 
     #[clap(flatten)]
     #[serde(flatten)]
@@ -71,6 +78,27 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
         crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
             .await
             .context("resolving chain admin from L1")?;
+
+    // The commitment scheme is a function of the DA mode and the VM, and the VM is on L1 already, so
+    // the caller only has to say what the chain does with its pubdata.
+    let l2_da_commitment_scheme = match args.l2_da_commitment_scheme {
+        Some(scheme) => scheme,
+        None => {
+            let ctm_proxy = crate::common::l1_contracts::resolve_ctm_proxy(
+                &runner.rpc_url,
+                bridgehub,
+                chain_id,
+            )
+            .await
+            .context("resolving the chain's CTM from L1")?;
+            anyhow::ensure!(
+                crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
+                    .await?,
+                "Only ZKsync OS chains are supported"
+            );
+            L2DACommitmentScheme::from_da_type(args.da_mode)
+        }
+    };
     // `AdminFunctions.setDAValidatorPair` → `Utils.adminExecuteCalls` internally
     // `vm.startBroadcast(adminOwner)` (or the AccessControlRestriction default
     // admin when `--access-control-restriction` is set), so Forge's sender must
@@ -85,7 +113,7 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
             _accessControlRestriction: args.access_control_restriction,
             _chainId: U256::from(chain_id),
             _l1DaValidator: args.l1_da_validator,
-            _l2DaCommitmentScheme: args.l2_da_commitment_scheme as u8,
+            _l2DaCommitmentScheme: l2_da_commitment_scheme as u8,
             _shouldSend: true,
         })
         .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
@@ -98,9 +126,10 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
     logger::info(format!("Chain ID: {chain_id}"));
     logger::info(format!("Admin address: {:#x}", admin_address));
     logger::info(format!("L1 DA validator: {:#x}", args.l1_da_validator));
+    logger::info(format!("DA mode: {:?}", args.da_mode));
     logger::info(format!(
         "L2 DA commitment scheme: {} ({})",
-        args.l2_da_commitment_scheme, args.l2_da_commitment_scheme as u8,
+        l2_da_commitment_scheme, l2_da_commitment_scheme as u8,
     ));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
 
@@ -117,7 +146,7 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
             chain_id,
             admin_address,
             l1_da_validator: args.l1_da_validator,
-            l2_da_commitment_scheme: args.l2_da_commitment_scheme,
+            l2_da_commitment_scheme,
         },
     )
     .await?;

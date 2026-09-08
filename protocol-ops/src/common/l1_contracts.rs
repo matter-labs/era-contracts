@@ -367,6 +367,53 @@ pub async fn resolve_is_zksync_os(l1_rpc_url: &str, ctm_proxy: Address) -> anyho
         .context("ctm.isZKsyncOS() call failed")
 }
 
+/// Resolve `chain.getPubdataPricingMode()` — `Rollup` (0) or `Validium` (1). Available on every
+/// version of the diamond, unlike the pubdata-content getter.
+pub async fn resolve_pubdata_pricing_mode(
+    l1_rpc_url: &str,
+    chain_address: Address,
+) -> anyhow::Result<u8> {
+    use crate::common::abi::ZkChainAbi;
+
+    ZkChainAbi::new(chain_address, provider(l1_rpc_url)?)
+        .getPubdataPricingMode()
+        .call()
+        .await
+        .context("chain.getPubdataPricingMode() call failed")
+}
+
+/// Resolve the L2 DA commitment scheme the chain currently commits with — the second half of
+/// `chain.getDAValidatorPair()`.
+pub async fn resolve_l2_da_commitment_scheme(
+    l1_rpc_url: &str,
+    chain_address: Address,
+) -> anyhow::Result<crate::types::L2DACommitmentScheme> {
+    use crate::common::abi::ZkChainAbi;
+
+    let pair = ZkChainAbi::new(chain_address, provider(l1_rpc_url)?)
+        .getDAValidatorPair()
+        .call()
+        .await
+        .context("chain.getDAValidatorPair() call failed")?;
+    crate::types::L2DACommitmentScheme::try_from(pair._1)
+        .map_err(|e| anyhow::anyhow!("chain reports an unknown L2 DA commitment scheme: {e}"))
+}
+
+/// Resolve the minor component of `ctm.protocolVersion()` — the version chains upgrading from this
+/// CTM land on. The version is packed as `major << 64 | minor << 32 | patch`.
+pub async fn resolve_ctm_minor_protocol_version(
+    l1_rpc_url: &str,
+    ctm_proxy: Address,
+) -> anyhow::Result<u64> {
+    let version = IChainTypeManagerAbi::new(ctm_proxy, provider(l1_rpc_url)?)
+        .protocolVersion()
+        .call()
+        .await
+        .context("ctm.protocolVersion() call failed")?;
+    let minor: alloy::primitives::U256 = (version >> 32) & alloy::primitives::U256::from(u32::MAX);
+    Ok(minor.to::<u64>())
+}
+
 /// Resolve whether the current verifier is a testnet verifier by querying
 /// `isTestnetVerifier()` (v34+) or the legacy `IS_TESTNET_VERIFIER()` constant
 /// (pre-v34 testnet verifiers) on the verifier contract.

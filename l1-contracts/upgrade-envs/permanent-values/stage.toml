@@ -5,6 +5,10 @@ l1_chain_id = 11155111
 # token asset ID for chain 499.
 zk_token_asset_id = "0xd7912bfd25000ee1b3355167866f960a61787b79cd2c7e791036fe6e85a73823"
 
+# Whether this environment's CTM verifier is the testnet one. Env-wide, not per-CTM.
+# Non-mainnet envs run `ZKsyncOSTestnetVerifier`, which accepts unproven batches.
+testnet_verifier = true
+
 [permanent_contracts]
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 # `create2_factory_salt` lives in the v31 input TOML
@@ -35,6 +39,7 @@ rollup_da_manager = "0x5af0d94e50b271005AF1687e363FD104771EAe9d"
 # Era CTM (witness chain: 270)
 proxy = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"
 is_zk_sync_os = false
+
 bytecodes_supplier = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
 rollup_da_manager = "0x5af0d94e50b271005AF1687e363FD104771EAe9d"
 

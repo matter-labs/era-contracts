@@ -1,0 +1,14 @@
+# Upgrade input for the Foundry integration harness (`UpgradeTestv33_Local`), which upgrades the
+# locally deployed ecosystem one minor version past the current genesis.
+#
+# Only the keys something actually reads are here:
+#   - `contracts.new_protocol_version` — read by `UpgradeTestv33_Local` and by
+#     `CoreUpgradeV33ForTests.initializeWithArgs` as the harness's upgrade target. Note the nesting:
+#     it is `$.contracts.new_protocol_version`, not a top-level key.
+#   - `pre_v32_introspection` — read by `DefaultCTMUpgrade` to pin the introspection path instead of
+#     auto-detecting it on a synthetic fixture.
+
+pre_v32_introspection = false
+
+[contracts]
+new_protocol_version = 0x2200000000  # v34.0.0 — one minor past the v33 genesis this suite builds on
