@@ -254,6 +254,14 @@ error InvalidThreshold(uint256 max, uint256 got);
 error InvalidTxCountInPriorityMode(uint256 l2TxCount, uint256 l1TxCount);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
+// 0x343ca235
+error InventoryAdminChanged(uint256 member, address sourceAdmin, address targetAdmin);
+// 0xb96ee707
+error InventoryMemberAdded(uint256 member, address proxy);
+// 0x6e0820ec
+error InventoryMemberRemoved(uint256 member, address proxy);
+// 0x741e5176
+error InventoryProxyChanged(uint256 member, address sourceProxy, address targetProxy);
 // 0x8d7ebf52
 error L2BytecodeNotInFactoryDeps(bytes32 bytecodeHash);
 // 0xb07238db
@@ -428,6 +436,10 @@ error RegistryDuplicateSelector(bytes4 selector);
 error RegistryEmptySelectors(address facet);
 // 0xd79000b2
 error RegistryInventoryLengthMismatch(uint256 expected, uint256 actual);
+// 0x55d605ee
+error RegistryInventoryRowMalformed(uint256 member);
+// 0x43ac6849
+error RegistryInventorySlotNotOwnedHere(uint256 member);
 // 0xb40929f4
 error RegistryMemberHasNoFixedAddress(uint256 member);
 // 0xa0c88a92
