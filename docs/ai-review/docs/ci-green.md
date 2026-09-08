@@ -118,7 +118,7 @@ This exercises the full upgrade flow against the captured v31 chain states. It u
 
 ```bash
 cd l1-contracts/test/anvil-interop
-npx ts-node run-v31-to-v32-upgrade-test.ts
+npx ts-node run-upgrade-test.ts
 ```
 
 Prerequisites: same as anvil-interop tests (all foundry builds done). Plus:

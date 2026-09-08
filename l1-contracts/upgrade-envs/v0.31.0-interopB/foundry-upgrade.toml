@@ -6,7 +6,7 @@
 # Genesis is at v33.0.0, so the fixture exercises a v33 -> v34 upgrade.
 #
 # The real v31 -> v32 transition is still covered: the anvil harness pins its own `stateVersion` and
-# `run-v31-to-v32-upgrade-test.ts` drives it from the committed `chain-states/v0.31.0` snapshots,
+# `run-upgrade-test.ts` drives it from the committed `chain-states/v0.31.0` snapshots,
 # independent of this genesis version.
 
 old_protocol_version = 0x2100000000  # v33.0.0 (current genesis)

@@ -6,6 +6,10 @@ l1_chain_id = 11155111
 # bail without it.
 # zk_token_asset_id = "0x..." # TODO
 
+# Whether this environment's CTM verifier is the testnet one. Env-wide, not per-CTM.
+# Non-mainnet envs run `ZKsyncOSTestnetVerifier`, which accepts unproven batches.
+testnet_verifier = true
+
 [permanent_contracts]
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 # `create2_factory_salt` lives in the v31 input TOML
@@ -39,6 +43,7 @@ rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 # v0.30.0-zksync-os-blobs/testnet.toml `l1_bytecodes_supplier_addr`).
 proxy = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
 is_zk_sync_os = true
+
 bytecodes_supplier = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
 rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 

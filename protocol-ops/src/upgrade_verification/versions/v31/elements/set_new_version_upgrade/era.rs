@@ -32,7 +32,7 @@ use crate::upgrade_verification::{
     verifiers::{VerificationResult, Verifiers},
 };
 
-use super::{verify_l2_v31_upgrade_inner_calldata, IComplexUpgrader};
+use super::{verify_l2_upgrade_inner_calldata, IComplexUpgrader};
 
 /// How to validate the `input` field of an Era force deployment entry.
 enum EraFdInput {
@@ -388,7 +388,7 @@ pub(super) async fn verify_era_force_deploy_and_upgrade(
 
     verify_v31_era_force_deployments(verifiers, result, &decoded._forceDeployments).await?;
 
-    verify_l2_v31_upgrade_inner_calldata(
+    verify_l2_upgrade_inner_calldata(
         verifiers,
         result,
         &decoded._calldata,

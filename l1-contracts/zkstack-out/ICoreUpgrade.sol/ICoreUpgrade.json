@@ -1,0 +1,42 @@
+[
+  {
+    "type": "function",
+    "name": "noGovernancePrepare",
+    "inputs": [
+      {
+        "name": "_params",
+        "type": "tuple",
+        "internalType": "struct CoreUpgradeParams",
+        "components": [
+          {
+            "name": "bridgehubProxyAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "isZKsyncOS",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "create2FactorySalt",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "upgradeInputPath",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "outputPath",
+            "type": "string",
+            "internalType": "string"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]

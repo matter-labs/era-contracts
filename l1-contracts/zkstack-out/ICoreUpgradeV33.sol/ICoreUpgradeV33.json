@@ -44,7 +44,7 @@
     "name": "stage3",
     "inputs": [
       {
-        "name": "bridgehubProxy",
+        "name": "_bridgehubProxy",
         "type": "address",
         "internalType": "address"
       }

@@ -6,7 +6,7 @@
 //!
 //! When `--env` is passed, every other env-derived arg (CTM list, deployer,
 //! era chain id, output dir, …) is auto-filled from the env's permanent-values
-//! TOML + the v31 upgrade input TOML, unless an explicit CLI flag overrides.
+//! TOML + the release upgrade input TOML, unless an explicit CLI flag overrides.
 
 use alloy::primitives::Address;
 use clap::Args;

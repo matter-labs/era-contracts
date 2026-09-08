@@ -1,4 +1,4 @@
-# Upgrade input for the v31 -> v32 scenario. `bridgehub_proxy_address` and `owner_address` are substituted
+# Upgrade input for the v31 -> v33 scenario. `bridgehub_proxy_address` and `owner_address` are substituted
 # by the harness from the loaded chain states; everything else, including `[chain] chain_id`, is a literal
 # that has to match the fixture.
 
@@ -27,5 +27,8 @@ recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000
 bootloader_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 default_aa_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 evm_emulator_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-latest_protocol_version = 0x2000000000
-new_protocol_version = 0x2000000000
+latest_protocol_version = 0x2100000000  # v33.0.0
+# The version this scenario upgrades to. Must stay in step with `TARGET_PROTOCOL_VERSION` in
+# `src/helpers/upgrade-test-runner.ts` and with `configs/genesis/zksync-os/latest.json`, which is
+# where the production flow reads the target from.
+new_protocol_version = 0x2100000000  # v33.0.0

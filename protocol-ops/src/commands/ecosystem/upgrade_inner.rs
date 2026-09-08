@@ -1,13 +1,13 @@
-//! Canonical v31 prepare-phase orchestration.
+//! Canonical prepare-phase orchestration.
 //!
-//! `V31UpgradeInner::prepare` fires `CoreUpgrade_v31.noGovernancePrepare`
-//! once and `CTMUpgrade_v31.noGovernancePrepare` once per target CTM, all on
+//! `UpgradeInner::prepare` fires the core script's `noGovernancePrepare`
+//! once and the CTM script's `noGovernancePrepare` once per target CTM, all on
 //! the supplied `ForgeRunner` so deployer broadcasts merge into one Safe
 //! bundle.
 //!
 //! Real-world ecosystems also need governance-owned proxy preconditions and
 //! operational admin call execution around prepare; those live in
-//! [`super::v31_upgrade_full::V31UpgradeFull`], which composes this.
+//! [`super::upgrade_full::UpgradeFull`], which composes this.
 //!
 //! The governance phase is not on this struct — it's a free helper in
 //! [`super::upgrade`] because it has no state of its own (just file IO + ABI
@@ -21,7 +21,11 @@ use alloy::primitives::{Address, Bytes, B256};
 use alloy::sol_types::SolCall;
 use anyhow::Context;
 
-use crate::common::abi::{ICTMUpgradeV31Abi, ICoreUpgradeV31Abi};
+// The v31 and v33 entry points are calldata-compatible (`noGovernancePrepare(CoreUpgradeParams)` /
+// `(CTMUpgradeParams)`), so this one driver serves both script generations; which one actually runs is
+// decided by the `--core-script-path` / `--ctm-script-path` inputs. Encoding against the v33 types
+// keeps the current release's interface authoritative.
+use crate::common::abi::{ICTMUpgradeAbi, ICoreUpgradeAbi};
 use crate::common::wallets::Wallet;
 use crate::common::{forge::ForgeRunner, logger};
 
@@ -43,7 +47,7 @@ pub struct CtmInputs {
 }
 
 /// Inputs to the prepare phase. The CLI handler builds this from clap args.
-pub struct V31PrepareInputs {
+pub struct PrepareInputs {
     /// Target CTMs. One forge invocation per entry.
     pub ctms: Vec<CtmInputs>,
     /// Optional CREATE2 salt for the Core prepare; random if `None`.
@@ -53,7 +57,7 @@ pub struct V31PrepareInputs {
     /// (notably `GovernanceUpgradeTimer`) have env-wide identical constructor
     /// args — same salt + same factory + same init code → same address →
     /// gov-replay's second `startTimer()` would revert. Supplied via the
-    /// `[create2_factory_salts]` table in `upgrade-envs/v0.31.0-interopB/
+    /// `[create2_factory_salts]` table in `upgrade-envs/<release-env-dir>/
     /// <env>.toml`; missing entries fall back to a random salt (legacy
     /// local-fixture path).
     pub create2_factory_salt_per_ctm: Option<HashMap<Address, B256>>,
@@ -61,9 +65,9 @@ pub struct V31PrepareInputs {
     pub upgrade_input_path: String,
     /// Output TOML path for the core forge call (relative to l1-contracts/).
     pub core_output_path: String,
-    /// `CoreUpgrade_v31` script path (relative to `l1-contracts/`).
+    /// Core upgrade script path (relative to `l1-contracts/`).
     pub core_script_path: String,
-    /// `CTMUpgrade_v31` script path (relative to `l1-contracts/`).
+    /// CTM upgrade script path (relative to `l1-contracts/`).
     pub ctm_script_path: String,
     /// Override for `isZKsyncOS` used by the CORE prepare (separate from
     /// per-CTM overrides because Core itself is CTM-agnostic but the script
@@ -74,12 +78,17 @@ pub struct V31PrepareInputs {
     /// `upgrade-envs/permanent-values/<env>.toml`; otherwise it is explicitly
     /// supplied or falls back only for networks with a canonical value.
     pub zk_token_asset_id: B256,
+    /// Whether the CTM's verifier is the testnet one, which accepts unproven batches. Declared per
+    /// environment in `permanent-values/<env>.toml`; passed through rather than read in Solidity,
+    /// because only the testnet verifiers expose `IS_TESTNET_VERIFIER` and probing for it would need
+    /// a try/catch the contracts forbid.
+    pub testnet_verifier: bool,
 }
 
 /// Output of the prepare phase: the TOMLs each forge invocation wrote, in
 /// the order the governance phase should replay them (core first, then per
 /// CTM in input order, then the optional new-Gateway bring-up bundle).
-pub struct V31PrepareOutput {
+pub struct PrepareOutput {
     pub core_toml: PathBuf,
     pub ctm_tomls: Vec<CtmPrepareEntry>,
     /// Empty when the env's `[new_gateway]` block isn't set. When present,
@@ -101,12 +110,12 @@ pub struct CtmPrepareEntry {
 
 // ── struct ────────────────────────────────────────────────────────────────
 
-pub struct V31UpgradeInner<'a> {
+pub struct UpgradeInner<'a> {
     contracts_path: &'a Path,
     bridgehub: Address,
 }
 
-impl<'a> V31UpgradeInner<'a> {
+impl<'a> UpgradeInner<'a> {
     pub fn new(contracts_path: &'a Path, bridgehub: Address) -> Self {
         Self {
             contracts_path,
@@ -118,22 +127,22 @@ impl<'a> V31UpgradeInner<'a> {
         self.bridgehub
     }
 
-    /// Run `CoreUpgrade_v31.noGovernancePrepare` then
-    /// `CTMUpgrade_v31.noGovernancePrepare` once per CTM, all on the
+    /// Run the core script's `noGovernancePrepare` then
+    /// the CTM script's `noGovernancePrepare` once per CTM, all on the
     /// supplied runner. Returns the per-step output TOML paths.
     ///
     /// `pub(super)` so production callers must go through
-    /// [`super::v31_upgrade_full::V31UpgradeFull::prepare`] — that wrapper
+    /// [`super::upgrade_full::UpgradeFull::prepare`] — that wrapper
     /// runs the governance-owned proxy precondition first and executes
     /// operational admin calls afterwards.
     pub(super) async fn prepare(
         &self,
         runner: &mut ForgeRunner,
         deployer: &Wallet,
-        inputs: &V31PrepareInputs,
-    ) -> anyhow::Result<V31PrepareOutput> {
+        inputs: &PrepareInputs,
+    ) -> anyhow::Result<PrepareOutput> {
         if inputs.ctms.is_empty() {
-            anyhow::bail!("V31UpgradeInner::prepare requires at least one CTM");
+            anyhow::bail!("UpgradeInner::prepare requires at least one CTM");
         }
 
         let core_toml = self
@@ -143,8 +152,7 @@ impl<'a> V31UpgradeInner<'a> {
 
         let mut ctm_tomls = Vec::with_capacity(inputs.ctms.len());
         for ctm in &inputs.ctms {
-            // Only ZKsync OS chains can be upgraded onto this release: `CTMUpgrade_v31`'s
-            // `deployUsedUpgradeContract` rejects Era CTMs outright. The flavor is always
+            // Only ZKsync OS chains can be upgraded onto this release: `CTMUpgrade_v33` rejects Era CTMs outright. The flavor is always
             // resolved from L1; the optional config hint (`list-ctms` deliberately leaves it
             // unset) is treated as an assertion only — a wrong hint must never be able to select
             // an incompatible CTM implementation for governance calldata.
@@ -180,7 +188,7 @@ impl<'a> V31UpgradeInner<'a> {
             anyhow::bail!("no ZKsync OS CTMs to prepare — every configured CTM is Era");
         }
 
-        Ok(V31PrepareOutput {
+        Ok(PrepareOutput {
             core_toml,
             ctm_tomls,
             new_gateway_tomls: Vec::new(),
@@ -191,7 +199,7 @@ impl<'a> V31UpgradeInner<'a> {
         &self,
         runner: &mut ForgeRunner,
         deployer: &Wallet,
-        inputs: &V31PrepareInputs,
+        inputs: &PrepareInputs,
     ) -> anyhow::Result<PathBuf> {
         ensure_script_exists(self.contracts_path, &inputs.core_script_path)?;
 
@@ -244,8 +252,8 @@ impl<'a> V31UpgradeInner<'a> {
                 Path::new(inputs.core_script_path.trim_start_matches('/')),
             )
             .with_calldata(&Bytes::from(
-                ICoreUpgradeV31Abi::noGovernancePrepareCall {
-                    _params: ICoreUpgradeV31Abi::CoreUpgradeParams {
+                ICoreUpgradeAbi::noGovernancePrepareCall {
+                    _params: ICoreUpgradeAbi::CoreUpgradeParams {
                         bridgehubProxyAddress: self.bridgehub,
                         isZKsyncOS: is_zk_sync_os,
                         create2FactorySalt: create2_salt,
@@ -261,10 +269,10 @@ impl<'a> V31UpgradeInner<'a> {
             .with_disable_labels()
             .with_wallet(deployer);
 
-        logger::step("Running v31 core prepare");
+        logger::step("Running core prepare");
         runner
             .run(script)
-            .context("Failed to execute CoreUpgrade_v31.noGovernancePrepare")?;
+            .context("Failed to execute the core upgrade script's noGovernancePrepare")?;
 
         Ok(core_output_path)
     }
@@ -273,7 +281,7 @@ impl<'a> V31UpgradeInner<'a> {
         &self,
         runner: &mut ForgeRunner,
         deployer: &Wallet,
-        inputs: &V31PrepareInputs,
+        inputs: &PrepareInputs,
         ctm: &CtmInputs,
     ) -> anyhow::Result<(PathBuf, bool)> {
         ensure_script_exists(self.contracts_path, &inputs.ctm_script_path)?;
@@ -393,7 +401,7 @@ impl<'a> V31UpgradeInner<'a> {
         // same address. The downstream gov-replay then calls
         // `startTimer()` twice on the same contract and the second one
         // reverts. The CLI / env config plumbs a distinct salt per CTM
-        // proxy from `upgrade-envs/v0.31.0-interopB/<env>.toml
+        // proxy from `upgrade-envs/v0.33.0-atomic-interop/<env>.toml
         // [create2_salts.per_ctm]`; if not provided we fall back to a
         // fresh random (legacy local-fixture path).
         let create2_salt = inputs
@@ -406,7 +414,7 @@ impl<'a> V31UpgradeInner<'a> {
         ));
 
         // Per-CTM output path so back-to-back prepares don't clobber each other.
-        let output_path_str = format!("/script-out/v31-upgrade-ctm-{ctm_proxy:#x}.toml");
+        let output_path_str = format!("/script-out/v33-upgrade-ctm-{ctm_proxy:#x}.toml");
         let ctm_output_path = self
             .contracts_path
             .join(output_path_str.trim_start_matches('/'));
@@ -418,8 +426,8 @@ impl<'a> V31UpgradeInner<'a> {
                 Path::new(inputs.ctm_script_path.trim_start_matches('/')),
             )
             .with_calldata(&Bytes::from(
-                ICTMUpgradeV31Abi::noGovernancePrepareCall {
-                    _params: ICTMUpgradeV31Abi::CTMUpgradeParams {
+                ICTMUpgradeAbi::noGovernancePrepareCall {
+                    _params: ICTMUpgradeAbi::CTMUpgradeParams {
                         ctmProxy: ctm_proxy,
                         bytecodesSupplier: bytecodes_supplier,
                         isZKsyncOS: is_zk_sync_os,
@@ -430,6 +438,7 @@ impl<'a> V31UpgradeInner<'a> {
                         governance,
                         chainRegistrationSender: chain_registration_sender,
                         zkTokenAssetId: inputs.zk_token_asset_id,
+                        testnetVerifier: inputs.testnet_verifier,
                     },
                 }
                 .abi_encode(),
@@ -440,10 +449,10 @@ impl<'a> V31UpgradeInner<'a> {
             .with_disable_labels()
             .with_wallet(deployer);
 
-        logger::step(format!("Running v31 ctm prepare for {ctm_proxy:#x}"));
+        logger::step(format!("Running CTM prepare for {ctm_proxy:#x}"));
         runner
             .run(script)
-            .context("Failed to execute CTMUpgrade_v31.noGovernancePrepare")?;
+            .context("Failed to execute the CTM upgrade script's noGovernancePrepare")?;
 
         Ok((ctm_output_path, is_zk_sync_os))
     }

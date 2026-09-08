@@ -44,6 +44,9 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {DefaultL2UpgradeStrategy} from "./DefaultL2UpgradeStrategy.sol";
+import {ICTMUpgrade} from "contracts/script-interfaces/ICTMUpgrade.sol";
+import {CTMUpgradeParams} from "./UpgradeParams.sol";
+import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
@@ -54,7 +57,7 @@ interface IAdminPreV31 {
 
 /// @notice Script used for default CTM upgrade flow. Should be run after Ecosystem upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
+contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     using stdToml for string;
 
     uint256 internal constant ERA_TEST_CREATE_CHAIN_ID = 555;
@@ -108,6 +111,13 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         ///      MUST be non-zero — `InteropCenter.initL2` reverts otherwise, which would abort the
         ///      L2 upgrade transaction.
         bytes32 zkTokenAssetId;
+        /// @dev Whether the CTM's verifier is the testnet one, which accepts unproven batches.
+        ///      Supplied by the caller alongside `isZKsyncOS`; protocol-ops reads it from
+        ///      `upgrade-envs/permanent-values/<env>.toml` (true for every env except mainnet).
+        ///      Not introspected off the deployed verifier: only the *testnet* verifiers declare
+        ///      `IS_TESTNET_VERIFIER`, so the call reverts on a production one, and probing for that
+        ///      would need the try/catch this repo forbids.
+        bool testnetVerifier;
     }
 
     // The output of the script
@@ -135,7 +145,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         string memory newConfigPath,
         string memory _outputPath,
         address governance,
-        bytes32 zkTokenAssetId
+        bytes32 zkTokenAssetId,
+        bool testnetVerifier
     ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
@@ -147,7 +158,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             create2FactorySalt,
             newConfigPath,
             governance,
-            zkTokenAssetId
+            zkTokenAssetId,
+            testnetVerifier
         );
 
         console.log("Initialized config from %s", newConfigPath);
@@ -193,15 +205,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
             ctmAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
-        // FIXME: need to provide the params as the input for the function, since
-        // on mainnet testnetVerifier must be false. Right now the introspection is not available
-        // due to the previous version being v29.
-        // TODO: restore introspection when L1 state is regenerated with ZKsyncOSTestnetVerifier.IS_TESTNET_VERIFIER
-        // (bool ok, bytes memory data) = ctmAddresses.stateTransition.verifiers.verifier.staticcall(
-        //     abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
-        // );
-        // config.testnetVerifier = ok;
-        config.testnetVerifier = true;
+        // Declared per environment rather than introspected off the deployed verifier: pre-v31 L1
+        // state predates `ZKsyncOSTestnetVerifier.IS_TESTNET_VERIFIER`. Getting this wrong on
+        // mainnet would install a verifier that accepts unproven batches, so it is a required key
+        // with no default.
+        config.testnetVerifier = permanentConfig.testnetVerifier;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
@@ -213,7 +221,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         bytes32 create2FactorySalt,
         string memory newConfigPath,
         address governance,
-        bytes32 zkTokenAssetId
+        bytes32 zkTokenAssetId,
+        bool testnetVerifier
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
@@ -226,7 +235,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             bytecodesSupplier: bytecodesSupplier,
             isZKsyncOS: isZKsyncOS,
             create2FactorySalt: create2FactorySalt,
-            zkTokenAssetId: zkTokenAssetId
+            zkTokenAssetId: zkTokenAssetId,
+            testnetVerifier: testnetVerifier
         });
         // Set config.isZKsyncOS before getChainCreationParamsConfig.
         config.isZKsyncOS = isZKsyncOS;
@@ -272,11 +282,94 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
     }
 
-    /// @notice Deploy everything that should be deployed
+    /// @notice Single-call entry point invoked by the protocol-ops CLI's `ecosystem
+    ///         upgrade-prepare-all`, once per CTM proxy. Drives the whole CTM-side prepare phase
+    ///         (deploy + bytecode publish + upgrade-cut generation + call serialization).
+    function noGovernancePrepare(CTMUpgradeParams memory _params) public virtual {
+        initializeWithArgs(
+            _params.ctmProxy,
+            _params.bytecodesSupplier,
+            _params.isZKsyncOS,
+            _params.rollupDAManager,
+            _params.create2FactorySalt,
+            _params.upgradeInputPath,
+            _params.outputPath,
+            _params.governance,
+            _params.zkTokenAssetId,
+            _params.testnetVerifier
+        );
+        prepareCTMUpgrade();
+        prepareDefaultGovernanceCalls();
+        prepareDefaultCTMAdminCalls();
+        // Emit test-only calls (`test_create_chain`, `test_upgrade_chain`) into the CTM output TOML so
+        // protocol-ops can lift them into merged `ecosystem.toml` for tx-simulator checks.
+        prepareDefaultTestUpgradeCalls();
+    }
+
+    /// @notice Deploy everything that should be deployed.
+    /// @dev Every release refreshes the same CTM-side set, so it lives here; the per-chain upgrade
+    ///      contract is release-specific and comes from {deployUsedUpgradeContract}.
     function deployNewCTMContracts() public virtual {
+        (ctmAddresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
+        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
+
+        deployVerifiers();
+
+        deployEIP7702Checker();
         deployUpgradeStageValidator();
         deployGovernanceUpgradeTimer();
+
+        // Both proxies were introduced by the v31 upgrade, so every ecosystem this release can upgrade
+        // already has them: only their implementations are redeployed, and stage 1 points the discovered
+        // proxies at them. Deploying fresh proxies would move the addresses the new CTM implementation is
+        // constructed with, leaving each upgraded chain's `s.priorityModeInfo.permissionlessValidator`
+        // (written at its v31 upgrade) pointing at the old validator while new chains get the new one.
+        require(
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier != address(0),
+            "CTM has no BytecodesSupplier registered; it is expected from v31 on"
+        );
+        require(
+            ctmAddresses.stateTransition.proxies.permissionlessValidator != address(0),
+            "CTM has no PermissionlessValidator registered; it is expected from v31 on"
+        );
+        ctmAddresses.stateTransition.implementations.bytecodesSupplier = deploySimpleContract(
+            "BytecodesSupplier",
+            false
+        );
+        ctmAddresses.stateTransition.implementations.permissionlessValidator = deploySimpleContract(
+            "PermissionlessValidator",
+            false
+        );
+
+        // The constructor receives the new BytecodesSupplier and PermissionlessValidator proxy addresses.
+        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(
+            config.isZKsyncOS,
+            CTMContract.ChainTypeManager
+        );
+        console.log("Deploying ChainTypeManager:", ctmContractName);
+        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
+
+        ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier", false);
+
+        // Deploy `MultisigCommitter` (a superset of ValidatorTimelock) as the default validator impl so the
+        // upgrade does NOT downgrade proxies that already run a MultisigCommitter.
+        ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract(
+            "MultisigCommitter",
+            false
+        );
+
+        deployStateTransitionDiamondFacets();
     }
+
+    /// @notice Extension point for a release that needs extra `[state_transition]` output keys.
+    /// @dev Empty by default; a release that deploys something of its own serializes it here.
+    function serializeVersionSpecificStateTransition() internal virtual {}
+
+    /// @notice Extension point for a release that needs stage-1 calls no other release does.
+    /// @dev Empty by design. Nothing in the default flow is version specific: anything that will also
+    ///      apply to v34 and beyond belongs in the generic sections (see {prepareUpgradeCTMCalls}),
+    ///      and anything that genuinely cannot belongs in that release's own script.
+    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual returns (Call[] memory calls) {}
 
     function deployUpgradeSpecificContractsL1() internal virtual {
         // Empty by default.
@@ -630,11 +723,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         return calls;
     }
 
-    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual returns (Call[] memory calls) {
-        // Empty by default.
-        return calls;
-    }
-
     function prepareVersionSpecificStage2GovernanceCallsL1() public virtual returns (Call[] memory calls) {
         // Empty by default.
         return calls;
@@ -788,29 +876,57 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     /// @notice Update implementations in proxies
+    /// @notice Point every CTM-side proxy this flow keeps at its freshly deployed implementation.
+    /// @dev Plain `ProxyAdmin.upgrade` (not `upgradeAndCall`) throughout: the new implementations are
+    ///      deployed with no reinitializer call. For the validator timelock in particular, proxies already
+    ///      running a `MultisigCommitter` are at `_initialized=2` with their multisig storage intact, so the
+    ///      swap just restores the multisig code; calling `reinitializeV2()` again would revert "already
+    ///      initialized".
     function prepareUpgradeCTMCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](1);
+        calls = new Call[](4);
 
-        calls[0] = _buildCallProxyUpgrade(
+        calls[0] = _buildProxyUpgrade(
             ctmAddresses.stateTransition.proxies.chainTypeManager,
-            ctmAddresses.stateTransition.implementations.chainTypeManager
+            ctmAddresses.stateTransition.implementations.chainTypeManager,
+            "chainTypeManager"
+        );
+        calls[1] = _buildProxyUpgrade(
+            ctmAddresses.stateTransition.proxies.validatorTimelock,
+            ctmAddresses.stateTransition.implementations.validatorTimelock,
+            "validatorTimelock"
+        );
+        calls[2] = _buildProxyUpgrade(
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier,
+            ctmAddresses.stateTransition.implementations.bytecodesSupplier,
+            "bytecodesSupplier"
+        );
+        calls[3] = _buildProxyUpgrade(
+            ctmAddresses.stateTransition.proxies.permissionlessValidator,
+            ctmAddresses.stateTransition.implementations.permissionlessValidator,
+            "permissionlessValidator"
         );
     }
 
-    function _buildCallProxyUpgrade(
-        address proxyAddress,
-        address newImplementationAddress
-    ) internal virtual returns (Call memory call) {
-        require(ctmAddresses.admin.transparentProxyAdmin != address(0), "ctm transparentProxyAdmin not set");
+    /// @dev Resolves the `ProxyAdmin` per proxy. That is required for the three kept proxies, which
+    ///      have their own admin instances, and equally correct for the CTM proxy, whose admin is the
+    ///      CTM-wide one — so there is no need for a second variant that hard-codes it.
+    function _buildProxyUpgrade(
+        address _proxy,
+        address _implementation,
+        string memory _name
+    ) private view returns (Call memory) {
+        require(_proxy != address(0), string.concat("ctm upgrade: ", _name, " proxy not set"));
+        require(_implementation != address(0), string.concat("ctm upgrade: ", _name, " impl not deployed"));
 
-        call = Call({
-            target: ctmAddresses.admin.transparentProxyAdmin,
-            data: abi.encodeCall(
-                ProxyAdmin.upgrade,
-                (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress)
-            ),
-            value: 0
-        });
+        return
+            Call({
+                target: Utils.getProxyAdminAddress(_proxy),
+                data: abi.encodeCall(
+                    ProxyAdmin.upgrade,
+                    (ITransparentUpgradeableProxy(payable(_proxy)), _implementation)
+                ),
+                value: 0
+            });
     }
 
     /// @notice Additional calls to newConfigure contracts
@@ -965,9 +1081,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
                 ctmAddresses.stateTransition.implementations.serverNotifier
             );
         }
-        if (priorityOpLowerBound != address(0)) {
-            vm.serializeAddress("state_transition", "priority_op_lower_bound_addr", priorityOpLowerBound);
-        }
+        serializeVersionSpecificStateTransition();
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",

@@ -46,6 +46,10 @@ struct CTMUpgradeParams {
     address governance;
     /// @notice Optional v31 core output override. Pre-v31 Bridgehub introspection cannot discover this address.
     address chainRegistrationSender;
+    /// @notice Whether the CTM's verifier is the testnet one, which accepts unproven batches.
+    ///         Declared per environment in `upgrade-envs/permanent-values/<env>.toml`: true
+    ///         everywhere except mainnet.
+    bool testnetVerifier;
     /// @notice Asset ID of the ZK token used by the InteropCenter for fixed-fee bundles.
     ///         MUST be non-zero — `InteropCenter.initL2` enforces it, and that runs on the genesis path of
     ///         `performForceDeployedContractsInit`, so a zero value breaks the genesis of chains created

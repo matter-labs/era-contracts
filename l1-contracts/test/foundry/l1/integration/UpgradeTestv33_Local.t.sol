@@ -5,8 +5,8 @@ pragma solidity ^0.8.24;
 
 import {console2 as console} from "forge-std/Script.sol";
 
-import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
-import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
+import {CTMUpgrade_v33} from "../../../../deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
+import {CoreUpgrade_v33} from "../../../../deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
@@ -27,16 +27,23 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 
 /// @notice Test-only CTM upgrade that mocks large bytecode reads to avoid MemoryOOG
-contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
-    /// @notice This fixture is an Era ecosystem, which this release refuses to generate a per-chain upgrade
-    ///         for (`deployUsedUpgradeContract` reverts). The fixture exists to exercise the ecosystem-side
-    ///         flow — proxy upgrades, stage calls, wiring — so it falls back to the plain `DefaultUpgrade`
-    ///         for the chain step rather than skipping the chain upgrade entirely. The per-chain
-    ///         force-deployments-data substitution that ZKsync OS chains get is covered by the anvil
-    ///         v31 -> v32 scenario.
+contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
+    /// @notice This fixture is an Era ecosystem, and this release's per-chain upgrade
+    ///         (`V32UpgradeZKsyncOS`) is ZKsync OS-only. The fixture exists to exercise the
+    ///         ecosystem-side flow — proxy upgrades, stage calls, wiring — so it falls back to the plain
+    ///         `DefaultUpgrade` for the chain step rather than skipping the chain upgrade entirely. The
+    ///         per-chain force-deployments-data substitution that ZKsync OS chains get is covered by the
+    ///         anvil v31 -> v33 scenario (`test/anvil-interop/run-upgrade-test.ts`).
     function deployUsedUpgradeContract() internal override returns (address) {
         return deploySimpleContract("DefaultUpgrade", false);
     }
+
+    /// @dev Substituting `DefaultUpgrade` above means no `PriorityOpLowerBound` registry is deployed —
+    ///      it exists only to be embedded as an immutable in `V32UpgradeZKsyncOS`. There is therefore no
+    ///      address to record, so this fixture records none. The production hook keeps its
+    ///      `require(priorityOpLowerBound != address(0))`: on a real ZKsync OS run a missing registry
+    ///      means the upgrade contract was built against address zero, which must fail loudly.
+    function serializeVersionSpecificStateTransition() internal override {}
 
     /// @notice Override to return dummy bytecode hashes instead of reading huge JSON files
     function getL2BytecodeHash(string memory /* contractName */) public view override returns (bytes32) {
@@ -92,18 +99,12 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
     }
 }
 
-/// @notice Test-only Core upgrade that skips governance calls the local fixture cannot satisfy.
-contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
-    /// @notice Override to skip the ownership-acceptance and `setAddresses` calls, which need ownership
-    ///         hand-offs the fixture does not perform.
-    /// @dev The interop-handler wiring is kept: it is what makes a v31 ecosystem match a from-scratch v32
-    ///      one. In this fixture it collapses to nothing — the ecosystem already has a wired handler — so
-    ///      the calls themselves are covered by `PreV32ParityCalls.t.sol`, not here.
-    function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
-        console.log("Test mode: keeping only the L1InteropHandler wiring in stage 1");
-        return _buildL1InteropHandlerWiringCalls();
-    }
-}
+/// @notice Test-only Core upgrade.
+/// @dev v33's stage-1 override is already only the `L1InteropHandler` wiring — the core-proxy
+///      upgrades moved into `DefaultCoreUpgrade` — so there is nothing left for the fixture to skip
+///      and no override is needed. On this fixture the wiring collapses to nothing anyway (the
+///      ecosystem already has a handler); the calls themselves are covered by `PreV32ParityCalls.t.sol`.
+contract CoreUpgrade_v33_Test is CoreUpgrade_v33 {}
 
 // Note: there is no longer a separate `EcosystemUpgrade_v31_Test` orchestrator subclass.
 // The local-fork integration test injects mocked Core and CTM upgrades by overriding
@@ -145,13 +146,13 @@ contract UpgradeIntegrationTest_Local is
     address private _expectedServerNotifierProxyAdminOwner;
 
     /// @notice Override to inject the mocked Core upgrade (keeps only the interop-handler wiring in stage 1).
-    function createCoreUpgrade() internal override returns (CoreUpgrade_v31) {
-        return new CoreUpgrade_v31_Test();
+    function createCoreUpgrade() internal override returns (CoreUpgrade_v33) {
+        return new CoreUpgrade_v33_Test();
     }
 
     /// @notice Override to inject the mocked CTM upgrade (skips bytecode-heavy reads).
-    function createCTMUpgrade() internal override returns (CTMUpgrade_v31) {
-        return new CTMUpgrade_v31_Test();
+    function createCTMUpgrade() internal override returns (CTMUpgrade_v33) {
+        return new CTMUpgrade_v33_Test();
     }
 
     /// @notice Bump the CTM's protocol version from the upgrade input TOML so the local fixture
@@ -198,7 +199,7 @@ contract UpgradeIntegrationTest_Local is
         chainId = eraZKChainId;
         acceptPendingAdmin();
         console.log("setUp: Pending admin accepted");
-        ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml";
+        ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.33.0-atomic-interop/foundry-upgrade.toml";
         ECOSYSTEM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
         ECOSYSTEM_OUTPUT = "/script-out/foundry-upgrade/local-core.toml";
         CTM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml";

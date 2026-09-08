@@ -283,7 +283,6 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             "zk_token_asset_id",
             bytes32(0x01000000000000000000000000000000000000000000000000000000000a2a6f)
         );
-        vm.serializeUint("gw_vote_prep", "gateway_settlement_fee", 0);
         string memory toml = vm.serializeString("gw_vote_prep", "contracts", contractsToml);
 
         string memory path = string.concat(vm.projectRoot(), GATEWAY_VOTE_PREPARATION_CONFIG_PATH);

@@ -50,7 +50,7 @@ import * as path from "path";
 import { ethers } from "ethers";
 
 const CONTRACTS_DIR = path.resolve(__dirname, "..");
-const ENV_DIR = "upgrade-envs/v0.31.0-interopB";
+const ENV_DIR = "upgrade-envs/v0.33.0-atomic-interop";
 const OUT_DIR_HOST = path.join(CONTRACTS_DIR, "l1-contracts", ENV_DIR, "output");
 const OUT_DIR_CONTAINER = `/contracts/l1-contracts/${ENV_DIR}/output`;
 const IMAGE = process.env.PROTOCOL_OPS_IMAGE ?? "ghcr.io/matter-labs/protocol-ops:v31-camp-split";

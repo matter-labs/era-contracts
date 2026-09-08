@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {CoreUpgrade_v31} from "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
+import {CoreUpgrade_v33} from "deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
 import {AddressIntrospector} from "deploy-scripts/utils/AddressIntrospector.sol";
 import {BridgesDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 
@@ -21,21 +21,46 @@ import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 /// @dev Exposes the pre-v32 parity call builder and lets the test place the discovered addresses, which the
 /// script normally fills in from on-chain introspection.
-contract CoreUpgradeParityHarness is CoreUpgrade_v31 {
-    function setDiscoveredAddresses(
-        address _l1Nullifier,
-        address _l1AssetRouter,
-        address _l1InteropHandler,
-        bool _deployedL1InteropHandler
-    ) external {
+contract CoreUpgradeParityHarness is CoreUpgrade_v33 {
+    function setDiscoveredAddresses(address _l1Nullifier, address _l1AssetRouter, address _l1InteropHandler) external {
         coreAddresses.bridges.proxies.l1Nullifier = _l1Nullifier;
         coreAddresses.bridges.proxies.l1AssetRouter = _l1AssetRouter;
         coreAddresses.bridges.proxies.l1InteropHandler = _l1InteropHandler;
-        deployedL1InteropHandler = _deployedL1InteropHandler;
+    }
+
+    function deployVersionSpecific() external {
+        deployVersionSpecificEcosystemContractsL1();
+    }
+
+    /// @dev The initializer the deploy step hands the handler's proxy. Exposed so a test can deploy a
+    ///      proxy exactly as the script does and assert the resulting owner.
+    function interopHandlerInitializer() external returns (bytes memory) {
+        return getInitializeCalldata("L1InteropHandler", false);
+    }
+
+    function setOwner(address _owner) external {
+        config.ownerAddress = _owner;
     }
 
     function buildInteropHandlerWiringCalls() external returns (Call[] memory) {
-        return _buildL1InteropHandlerWiringCalls();
+        return prepareVersionSpecificStage1GovernanceCallsL1();
+    }
+
+    /// @dev The state the deploy step leaves behind on a v31 ecosystem: the proxy it just created, plus
+    ///      the flag that tells stage 1 the one-shot bridge setters still have to be issued. Set here
+    ///      rather than by calling the deploy step, which needs the full script machinery (bytecode
+    ///      publishing, a CREATE2 factory) that a unit test does not stand up.
+    function setFreshlyDeployedInteropHandler(address _l1InteropHandler) external {
+        coreAddresses.bridges.proxies.l1InteropHandler = _l1InteropHandler;
+        deployedL1InteropHandler = true;
+    }
+
+    function getDiscoveredInteropHandlerProxy() external view returns (address) {
+        return coreAddresses.bridges.proxies.l1InteropHandler;
+    }
+
+    function getDiscoveredInteropHandlerImplementation() external view returns (address) {
+        return coreAddresses.bridges.implementations.l1InteropHandler;
     }
 }
 
@@ -121,42 +146,73 @@ contract PreV32ParityCallsTest is Test {
     }
 
     function test_wiresTheNewInteropHandler() public {
-        // Ownership of the freshly deployed handler is pending for governance, as the deploy step leaves it.
-        interopHandler.transferOwnership(owner);
-
-        upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(interopHandler), true);
+        upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(0));
+        // The v31 case: the deploy step created this proxy, so stage 1 owes the bridges their setters.
+        upgradeScript.setFreshlyDeployedInteropHandler(address(interopHandler));
 
         Call[] memory calls = upgradeScript.buildInteropHandlerWiringCalls();
-        assertEq(calls.length, 3, "handler ownership + the two wirings");
+        // Two calls, not three: the deploy step initializes the handler's proxy straight to the
+        // governance address, so there is no pending owner for stage 1 to accept.
+        assertEq(calls.length, 2, "the two wirings");
 
         assertEq(l1Nullifier.l1InteropHandler(), address(0), "v31 nullifier starts unwired");
         assertEq(assetRouter.l1InteropHandler(), address(0), "v31 asset router starts unwired");
 
         _executeAsOwners(calls);
 
-        assertEq(interopHandler.owner(), owner, "handler ownership accepted by governance");
         assertEq(l1Nullifier.l1InteropHandler(), address(interopHandler), "nullifier wired to the handler");
         assertEq(assetRouter.l1InteropHandler(), address(interopHandler), "asset router wired to the handler");
     }
 
-    function test_emitsNothingForAnAlreadyUpgradedEcosystem() public {
-        // Re-running the upgrade on a v32 ecosystem: the handler already exists, so the script did not
-        // deploy one and emits no wiring calls.
+    /// @notice A handler deployed the way the script deploys it ends up owned by governance.
+    /// @dev An outcome check, not a calldata one: the proxy is built with the initializer the script
+    ///      supplies and then asked who owns it. That is the property the upgrade depends on — there
+    ///      is no `acceptOwnership` in stage 1 to fall back on if the initializer is wrong.
+    function test_deployedInteropHandlerIsOwnedByGovernance() public {
+        upgradeScript.setOwner(owner);
 
-        upgradeScript.setDiscoveredAddresses(
-            address(l1Nullifier),
-            address(assetRouter),
-            address(interopHandler),
-            false
+        L1InteropHandler impl = new L1InteropHandler(IMessageRootBase(makeAddr("messageRoot")), address(assetRouter));
+        L1InteropHandler deployed = L1InteropHandler(
+            payable(
+                new TransparentUpgradeableProxy(
+                    address(impl),
+                    makeAddr("proxyAdminForHandler"),
+                    upgradeScript.interopHandlerInitializer()
+                )
+            )
         );
 
-        assertEq(upgradeScript.buildInteropHandlerWiringCalls().length, 0, "nothing left to wire");
+        assertEq(deployed.owner(), owner, "governance owns the handler with no further calls");
+    }
+
+    /// @notice An ecosystem that already has the handler keeps its proxy and only gets a new
+    ///         implementation, and emits none of the one-shot wiring calls.
+    /// @dev This is the shape a from-scratch deployment of these contracts has, which the integration
+    ///      suite upgrades in place. Replacing the proxy would abandon the handler's state, and
+    ///      re-issuing the setters would revert because both are one-shot — so the run must be a
+    ///      no-op apart from refreshing the implementation behind the existing proxy.
+    function test_refreshesImplementationWhenHandlerAlreadyExists() public {
+        upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(interopHandler));
+
+        upgradeScript.deployVersionSpecific();
+
+        assertEq(
+            upgradeScript.getDiscoveredInteropHandlerProxy(),
+            address(interopHandler),
+            "the existing handler proxy must be kept: it holds the handler's state"
+        );
+        address refreshedImpl = upgradeScript.getDiscoveredInteropHandlerImplementation();
+        assertTrue(refreshedImpl != address(0), "a fresh implementation must be deployed");
+        assertTrue(refreshedImpl != address(interopHandler), "the implementation is not the proxy");
+
+        Call[] memory calls = upgradeScript.buildInteropHandlerWiringCalls();
+        assertEq(calls.length, 0, "the one-shot setters must not be re-issued on an already-wired ecosystem");
     }
 
     function test_revertWhen_NoInteropHandlerAddress() public {
         // The handler must either be discovered or deployed by the upgrade; a zero address would silently
         // leave interop finalization dead.
-        upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(0), false);
+        upgradeScript.setDiscoveredAddresses(address(l1Nullifier), address(assetRouter), address(0));
 
         vm.expectRevert("L1InteropHandler proxy not deployed");
         upgradeScript.buildInteropHandlerWiringCalls();

@@ -9,11 +9,11 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
-import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
-import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
+import {CoreUpgrade_v33} from "../../../../deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
+import {CTMUpgrade_v33} from "../../../../deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
 import {IOwnableSingleStep, IChainAdminMulticall} from "../../../../deploy-scripts/AdminFunctions.s.sol";
 import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
-import {ChainUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol";
+import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
 import {UpgradeUtils} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeUtils.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -32,15 +32,15 @@ contract UpgradeIntegrationTestBase is Test {
 
     uint256 chainId;
 
-    CoreUpgrade_v31 coreUpgrade;
-    CTMUpgrade_v31 ctmUpgrade;
-    ChainUpgrade_v31 chainUpgrade;
+    CoreUpgrade_v33 coreUpgrade;
+    CTMUpgrade_v33 ctmUpgrade;
+    DefaultChainUpgrade chainUpgrade;
 
     /// @notice Per-test fixed paths for the deploy outputs the upgrade scripts read.
     string public ECOSYSTEM_INPUT = "file_1.toml";
-    string public ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/shared.toml";
+    string public ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.33.0-atomic-interop/foundry-upgrade.toml";
     string public ECOSYSTEM_OUTPUT = "file_3.toml";
-    string public CTM_INPUT = "/upgrade-envs/v0.31.0-interopB/shared.toml";
+    string public CTM_INPUT = "/upgrade-envs/v0.33.0-atomic-interop/foundry-upgrade.toml";
     string public CORE_OUTPUT = "/script-out/foundry-upgrade/upgrade-core.toml";
     string public CTM_OUTPUT = "/script-out/foundry-upgrade/mainnet-gateway.toml";
     string public CHAIN_INPUT;
@@ -57,7 +57,7 @@ contract UpgradeIntegrationTestBase is Test {
     bool internal _ctmAdminCallsPrepared;
 
     function setupUpgrade(bool skipFactoryDepsCheck) public virtual {
-        console.log("setupUpgrade: Creating CoreUpgrade_v31 and CTMUpgrade_v31");
+        console.log("setupUpgrade: Creating CoreUpgrade_v33 and CTMUpgrade_v33");
         coreUpgrade = createCoreUpgrade();
         ctmUpgrade = createCTMUpgrade();
 
@@ -87,14 +87,16 @@ contract UpgradeIntegrationTestBase is Test {
             params.upgradeInputPath,
             CTM_OUTPUT,
             params.governance,
-            params.zkTokenAssetId
+            params.zkTokenAssetId,
+            // Anvil fixtures run the testnet verifier, as every non-mainnet env does.
+            true
         );
 
         console.log("setupUpgrade: Deploying new ecosystem contracts");
         coreUpgrade.deployNewEcosystemContractsL1();
 
-        console.log("setupUpgrade: Creating ChainUpgrade_v31");
-        chainUpgrade = new ChainUpgrade_v31();
+        console.log("setupUpgrade: Creating DefaultChainUpgrade");
+        chainUpgrade = new DefaultChainUpgrade();
 
         // Hook for child classes to mutate Core/CTM state after init but before prepare
         // (e.g. local test needs to bump CTM's protocol version from the upgrade input).
@@ -114,13 +116,13 @@ contract UpgradeIntegrationTestBase is Test {
     }
 
     /// @notice Override in child classes to use mocked versions.
-    function createCoreUpgrade() internal virtual returns (CoreUpgrade_v31) {
-        return new CoreUpgrade_v31();
+    function createCoreUpgrade() internal virtual returns (CoreUpgrade_v33) {
+        return new CoreUpgrade_v33();
     }
 
     /// @notice Override in child classes to use mocked versions.
-    function createCTMUpgrade() internal virtual returns (CTMUpgrade_v31) {
-        return new CTMUpgrade_v31();
+    function createCTMUpgrade() internal virtual returns (CTMUpgrade_v33) {
+        return new CTMUpgrade_v33();
     }
 
     /// @notice Hook for test-specific setup before chain upgrade.

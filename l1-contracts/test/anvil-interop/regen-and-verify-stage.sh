@@ -26,7 +26,7 @@ fi
 PORT=29545
 RPC="http://localhost:$PORT"
 # Write per-run artifacts (prepare bundles, executed.json, anvil log)
-# directly to `upgrade-envs/v0.31.0-interopB/output/<env>/` so the merged
+# directly to `upgrade-envs/v0.33.0-atomic-interop/output/<env>/` so the merged
 # `ecosystem.toml` produced by `upgrade-prepare-all` lands at the tracked
 # path (`output/stage/ecosystem.toml`) — the canonical artifact reviewers
 # diff. `.gitignore` already excludes `output/**/*.safe.json` +

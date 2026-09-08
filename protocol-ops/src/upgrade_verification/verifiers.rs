@@ -145,7 +145,7 @@ impl Verifiers {
         // (e.g., a legacy env where the gateway used salt 0).
         let gateway_ctm_create2_salt = {
             let per_ctm = EnvConfig::load(env.as_str())
-                .and_then(|cfg| cfg.v31_create2_factory_salt_per_ctm())
+                .and_then(|cfg| cfg.create2_factory_salt_for_upgrade_per_ctm())
                 .unwrap_or_default();
             per_ctm
                 .get(&new_gateway_representative_ctm)
