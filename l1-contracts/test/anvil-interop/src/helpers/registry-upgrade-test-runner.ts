@@ -79,7 +79,7 @@
  * `L2ComplexUpgrader` execution — runs through unpatched production code paths.
  */
 
-import { execSync, spawnSync } from "child_process";
+import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { ethers } from "ethers";
@@ -1255,11 +1255,16 @@ async function buildRegistryManifest(
  */
 function buildDeterministicArtifacts(): void {
   console.log(`  compiling pinned sources with FOUNDRY_PROFILE=${DETERMINISTIC_FOUNDRY_PROFILE}…`);
-  execSync(`forge build ${DETERMINISTIC_SOURCES.join(" ")}`, {
+  // No shell: the argument list is passed through directly, so nothing here can be word-split or
+  // interpreted, whatever the paths look like.
+  const result = spawnSync("forge", ["build", ...DETERMINISTIC_SOURCES], {
     cwd: l1ContractsDir,
     stdio: "inherit",
     env: { ...process.env, FOUNDRY_PROFILE: DETERMINISTIC_FOUNDRY_PROFILE },
   });
+  if (result.status !== 0) {
+    throw new Error(`forge build failed for the ${DETERMINISTIC_FOUNDRY_PROFILE} profile (status ${result.status})`);
+  }
 }
 
 function staleRegistriesError(cause: unknown): Error {
