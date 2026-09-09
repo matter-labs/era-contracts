@@ -14,7 +14,7 @@ import {PUBLIC_INPUT_SHIFT} from "../../common/Config.sol";
 /// @notice This contract wraps the two Boojum verifier contracts and routes zk-SNARK proof verification
 /// to the correct verifier based on the provided proof type. It reuses the same interface as on the original `Verifier`
 /// contract, while abusing one of the fields (`_recursiveAggregationInput`) for proof verification type. The contract is
-/// needed for the smooth transition between verifier versions (e.g. Boojum PLONK → Boojum FFLONK → Airbender).
+/// needed for the smooth transition between verifier versions (e.g. Boojum PLONK → Boojum FFLONK).
 contract EraDualVerifier is IVerifier, IEraDualVerifier {
     /// @notice The Boojum FFLONK verifier contract.
     IVerifierV2 public immutable FFLONK_VERIFIER;

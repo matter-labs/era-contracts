@@ -55,9 +55,11 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @dev Capability, not incident state: it declares which verifier the chain is configured
     /// against, and `Committer` requires the Airbender heap hash exactly when it is set. Separate
     /// from `setDisabledProofSystems`, which only says a system is temporarily down.
-    /// @dev Only changeable with a drained pipeline. Batches committed under one setting carry a
-    /// different number of public inputs from those committed under the other, so a backlog
-    /// spanning the change would hold batches the configured verifier cannot accept.
+    /// @dev Only changeable while the Airbender lane is masked off, in either direction. A masked-off
+    /// gate accepts both the one- and two-input shape and `ExecutorFacet` reads a batch's shape from
+    /// its own authenticated `StoredBatchInfo`, so a backlog spanning the change still settles and no
+    /// drained pipeline is needed. Under a required lane the change would put the next batch in a
+    /// shape the gate rejects. Declaring the capability also requires a verifier that has the lane.
     /// @param _multiProofEnabled Whether the chain commits Airbender data and proves both lanes.
     function setMultiProofEnabled(bool _multiProofEnabled) external;
 
