@@ -22,7 +22,7 @@
   anvil-interop chain-state snapshots (`state-generation-check`). Any bytecode change invalidates
   these and the only fix is a regen + commit, so they **skip while the PR is a draft** and run once
   it is marked ready for review (plus on every later push while it stays non-draft). They also skip
-  on PRs that touch no artifact-affecting paths (docs-only, protocol-ops-only). `pre-merge-verified`
+  on PRs that touch no artifact-affecting paths (documentation only). `pre-merge-verified`
   is the aggregate job that reports the tier's verdict and is the one to require on the base branch.
 
 So: **iterate on a draft PR, regenerate once at the end.** Red pre-merge checks on a draft are
