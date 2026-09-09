@@ -310,6 +310,18 @@ object "EvmEmulator" {
             }
         }
         
+        // EVM allows any offset for an empty memory region, so `expandMemory` doesn't validate
+        // the offset if the size is zero. Such an offset must never reach a heap pointer:
+        // EraVM panics if the pointer doesn't fit into uint32, and the raw offset can also
+        // wrap around into the emulator's own memory region.
+        function getMemPointer(rawOffset, size) -> pointer {
+            pointer := MEM_OFFSET()
+            if size {
+                // expandMemory has already ensured that this doesn't overflow
+                pointer := add(MEM_OFFSET(), rawOffset)
+            }
+        }
+        
         function insufficientBalance(value) -> res {
             if value {
                 res := gt(value, selfbalance())
@@ -742,9 +754,9 @@ object "EvmEmulator" {
                 addr,
                 gasToPass,
                 value,
-                add(argsOffset, MEM_OFFSET()),
+                getMemPointer(argsOffset, argsSize),
                 argsSize,
-                add(retOffset, MEM_OFFSET()),
+                getMemPointer(retOffset, retSize),
                 retSize,
                 isStatic
             )
@@ -773,9 +785,9 @@ object "EvmEmulator" {
                 addr,
                 gasToPass,
                 0,
-                add(MEM_OFFSET(), argsOffset),
+                getMemPointer(argsOffset, argsSize),
                 argsSize,
-                add(MEM_OFFSET(), retOffset),
+                getMemPointer(retOffset, retSize),
                 retSize,
                 true
             )
@@ -805,8 +817,8 @@ object "EvmEmulator" {
             let success
             let frameGasLeft := gasToPass
         
-            let retOffset := add(MEM_OFFSET(), rawRetOffset)
-            let argsOffset := add(MEM_OFFSET(), rawArgsOffset)
+            let retOffset := getMemPointer(rawRetOffset, retSize)
+            let argsOffset := getMemPointer(rawArgsOffset, argsSize)
         
             let rawCodeHash := getRawCodeHash(addr)
             switch isHashOfConstructedEvmContract(rawCodeHash)
@@ -1255,7 +1267,7 @@ object "EvmEmulator" {
             let err := insufficientBalance(value)
         
             if iszero(err) {
-                offset := add(MEM_OFFSET(), offset) // caller must ensure that it doesn't overflow
+                offset := getMemPointer(offset, size)
                 evmGasLeft, addr := _executeCreate(offset, size, value, evmGasLeft, isCreate2, salt)
             }
         }
@@ -1848,7 +1860,7 @@ object "EvmEmulator" {
                     let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                    dstOffset := add(dstOffset, MEM_OFFSET())
+                    dstOffset := getMemPointer(dstOffset, len)
             
                     // EraVM will revert if offset + length overflows uint32
                     if gt(sourceOffset, MAX_POINTER_READ_OFFSET()) {
@@ -1889,7 +1901,7 @@ object "EvmEmulator" {
                     let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                    dstOffset := add(dstOffset, MEM_OFFSET())
+                    dstOffset := getMemPointer(dstOffset, len)
             
                     if gt(sourceOffset, MAX_UINT64()) {
                         sourceOffset := MAX_UINT64()
@@ -1969,7 +1981,7 @@ object "EvmEmulator" {
             
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                    dstOffset := add(dstOffset, MEM_OFFSET())
+                    dstOffset := getMemPointer(dstOffset, len)
             
                     if gt(srcOffset, MAX_UINT64()) {
                         srcOffset := MAX_UINT64()
@@ -2015,7 +2027,7 @@ object "EvmEmulator" {
                     }
             
                     swapActivePointerWithEvmReturndataPointer()
-                    copyActivePtrData(add(MEM_OFFSET(), dstOffset), sourceOffset, len)
+                    copyActivePtrData(getMemPointer(dstOffset, len), sourceOffset, len)
                     swapActivePointerWithEvmReturndataPointer()
                     ip := add(ip, 1)
                 }
@@ -2383,7 +2395,7 @@ object "EvmEmulator" {
             
                     evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
             
-                    mcopy(add(destOffset, MEM_OFFSET()), add(offset, MEM_OFFSET()), size)
+                    mcopy(getMemPointer(destOffset, size), getMemPointer(offset, size), size)
                     ip := add(ip, 1)
                 }
                 case 0x5F { // OP_PUSH0
@@ -3387,6 +3399,18 @@ object "EvmEmulator" {
                 }
             }
             
+            // EVM allows any offset for an empty memory region, so `expandMemory` doesn't validate
+            // the offset if the size is zero. Such an offset must never reach a heap pointer:
+            // EraVM panics if the pointer doesn't fit into uint32, and the raw offset can also
+            // wrap around into the emulator's own memory region.
+            function getMemPointer(rawOffset, size) -> pointer {
+                pointer := MEM_OFFSET()
+                if size {
+                    // expandMemory has already ensured that this doesn't overflow
+                    pointer := add(MEM_OFFSET(), rawOffset)
+                }
+            }
+            
             function insufficientBalance(value) -> res {
                 if value {
                     res := gt(value, selfbalance())
@@ -3819,9 +3843,9 @@ object "EvmEmulator" {
                     addr,
                     gasToPass,
                     value,
-                    add(argsOffset, MEM_OFFSET()),
+                    getMemPointer(argsOffset, argsSize),
                     argsSize,
-                    add(retOffset, MEM_OFFSET()),
+                    getMemPointer(retOffset, retSize),
                     retSize,
                     isStatic
                 )
@@ -3850,9 +3874,9 @@ object "EvmEmulator" {
                     addr,
                     gasToPass,
                     0,
-                    add(MEM_OFFSET(), argsOffset),
+                    getMemPointer(argsOffset, argsSize),
                     argsSize,
-                    add(MEM_OFFSET(), retOffset),
+                    getMemPointer(retOffset, retSize),
                     retSize,
                     true
                 )
@@ -3882,8 +3906,8 @@ object "EvmEmulator" {
                 let success
                 let frameGasLeft := gasToPass
             
-                let retOffset := add(MEM_OFFSET(), rawRetOffset)
-                let argsOffset := add(MEM_OFFSET(), rawArgsOffset)
+                let retOffset := getMemPointer(rawRetOffset, retSize)
+                let argsOffset := getMemPointer(rawArgsOffset, argsSize)
             
                 let rawCodeHash := getRawCodeHash(addr)
                 switch isHashOfConstructedEvmContract(rawCodeHash)
@@ -4332,7 +4356,7 @@ object "EvmEmulator" {
                 let err := insufficientBalance(value)
             
                 if iszero(err) {
-                    offset := add(MEM_OFFSET(), offset) // caller must ensure that it doesn't overflow
+                    offset := getMemPointer(offset, size)
                     evmGasLeft, addr := _executeCreate(offset, size, value, evmGasLeft, isCreate2, salt)
                 }
             }
@@ -4913,7 +4937,7 @@ object "EvmEmulator" {
                         let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
-                        dstOffset := add(dstOffset, MEM_OFFSET())
+                        dstOffset := getMemPointer(dstOffset, len)
                 
                         // EraVM will revert if offset + length overflows uint32
                         if gt(sourceOffset, MAX_POINTER_READ_OFFSET()) {
@@ -4954,7 +4978,7 @@ object "EvmEmulator" {
                         let dynamicGas := add(mul(3, shr(5, add(len, 31))), expandMemory(dstOffset, len))
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
-                        dstOffset := add(dstOffset, MEM_OFFSET())
+                        dstOffset := getMemPointer(dstOffset, len)
                 
                         if gt(sourceOffset, MAX_UINT64()) {
                             sourceOffset := MAX_UINT64()
@@ -5034,7 +5058,7 @@ object "EvmEmulator" {
                 
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
-                        dstOffset := add(dstOffset, MEM_OFFSET())
+                        dstOffset := getMemPointer(dstOffset, len)
                 
                         if gt(srcOffset, MAX_UINT64()) {
                             srcOffset := MAX_UINT64()
@@ -5080,7 +5104,7 @@ object "EvmEmulator" {
                         }
                 
                         swapActivePointerWithEvmReturndataPointer()
-                        copyActivePtrData(add(MEM_OFFSET(), dstOffset), sourceOffset, len)
+                        copyActivePtrData(getMemPointer(dstOffset, len), sourceOffset, len)
                         swapActivePointerWithEvmReturndataPointer()
                         ip := add(ip, 1)
                     }
@@ -5448,7 +5472,7 @@ object "EvmEmulator" {
                 
                         evmGasLeft := chargeGas(evmGasLeft, dynamicGas)
                 
-                        mcopy(add(destOffset, MEM_OFFSET()), add(offset, MEM_OFFSET()), size)
+                        mcopy(getMemPointer(destOffset, size), getMemPointer(offset, size), size)
                         ip := add(ip, 1)
                     }
                     case 0x5F { // OP_PUSH0
