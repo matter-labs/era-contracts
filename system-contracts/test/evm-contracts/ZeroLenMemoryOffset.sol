@@ -85,9 +85,11 @@ contract ZeroLenMemoryOffset {
         return MARKER;
     }
 
-    function testCreate2(uint256 offset) external returns (uint256) {
+    /// @dev `salt` is a parameter because the init code is empty and every case shares one
+    /// deployment: a repeated salt resolves to the same address and would collide.
+    function testCreate2(uint256 offset, uint256 salt) external returns (uint256) {
         assembly {
-            if iszero(create2(0, offset, 0, 0)) {
+            if iszero(create2(0, offset, 0, salt)) {
                 revert(0, 0)
             }
         }
