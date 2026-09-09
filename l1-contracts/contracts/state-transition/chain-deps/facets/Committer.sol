@@ -523,7 +523,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             dependencyRootsRollingHash: _newBatch.dependencyRootsRollingHash,
             timestamp: 0,
             commitment: batchOutputHash,
-            // ZKsync OS chains have no Airbender lane.
+            // Era-specific: the second commitment exists for Era's multi-proof gate.
             airbenderCommitment: bytes32(0)
         });
 
@@ -775,17 +775,10 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         bytes32 l2ToL1LogsHash = keccak256(_newBatchData.systemLogs);
         bytes32[] memory blobAuxOutputWords = _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes);
 
-        // The two words only the Boojum lane reproduces. With that lane masked nothing verifies them,
-        // and they would otherwise carry operator-chosen entropy into a commitment that stays in the
-        // chain for good, so they are pinned to zero instead. Everything else in this commitment is
-        // shared with the Airbender one and checked there.
-        bool boojumRequired = s.disabledProofSystems & BOOJUM_PROOF_SYSTEM_DISABLED == 0;
-        // solhint-disable-next-line func-named-parameters
-        auxiliaryOutputHash = _auxiliaryOutputHash(
+        auxiliaryOutputHash = _boojumAuxiliaryOutputHash(
+            _newBatchData,
             l2ToL1LogsHash,
             _stateDiffHash,
-            boojumRequired ? _newBatchData.bootloaderHeapInitialContentsHash : bytes32(0),
-            boojumRequired ? _newBatchData.eventsQueueStateHash : bytes32(0),
             blobAuxOutputWords
         );
         commitment = keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
@@ -802,12 +795,10 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 revert AirbenderCommitmentRequired();
             }
 
-            // solhint-disable-next-line func-named-parameters
-            bytes32 airbenderAuxiliaryOutputHash = _auxiliaryOutputHash(
+            bytes32 airbenderAuxiliaryOutputHash = _airbenderAuxiliaryOutputHash(
+                _newBatchData,
                 l2ToL1LogsHash,
                 _stateDiffHash,
-                _newBatchData.airbenderBootloaderHeapHash,
-                bytes32(0),
                 blobAuxOutputWords
             );
             airbenderCommitment = keccak256(
@@ -817,9 +808,48 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         // Left at zero otherwise, which is what makes `ExecutorFacet` emit the single-input shape.
     }
 
-    /// @dev The auxiliary output digest, with the two words the two proof systems disagree on left
-    /// as parameters: the bootloader heap hash, which Airbender computes with Blake2s rather than
-    /// Poseidon2, and the events queue hash, which Airbender pins to zero.
+    /// @dev The Boojum lane's auxiliary output. The two words only this lane reproduces are pinned to
+    /// zero while it is masked: nothing verifies them then, and they would otherwise carry
+    /// operator-chosen entropy into a commitment that stays in the chain for good. Everything else is
+    /// shared with the Airbender shape and covered by its proof.
+    function _boojumAuxiliaryOutputHash(
+        CommitBatchInfo memory _batch,
+        bytes32 _l2ToL1LogsHash,
+        bytes32 _stateDiffHash,
+        bytes32[] memory _blobAuxOutputWords
+    ) internal view returns (bytes32) {
+        bool boojumRequired = s.disabledProofSystems & BOOJUM_PROOF_SYSTEM_DISABLED == 0;
+        return
+            // solhint-disable-next-line func-named-parameters
+            _auxiliaryOutputHash(
+                _l2ToL1LogsHash,
+                _stateDiffHash,
+                boojumRequired ? _batch.bootloaderHeapInitialContentsHash : bytes32(0),
+                boojumRequired ? _batch.eventsQueueStateHash : bytes32(0),
+                _blobAuxOutputWords
+            );
+    }
+
+    /// @dev The Airbender lane's auxiliary output: the heap hash computed with Blake2s rather than
+    /// Poseidon2, and the events queue pinned to zero.
+    function _airbenderAuxiliaryOutputHash(
+        CommitBatchInfo memory _batch,
+        bytes32 _l2ToL1LogsHash,
+        bytes32 _stateDiffHash,
+        bytes32[] memory _blobAuxOutputWords
+    ) internal pure returns (bytes32) {
+        return
+            // solhint-disable-next-line func-named-parameters
+            _auxiliaryOutputHash(
+                _l2ToL1LogsHash,
+                _stateDiffHash,
+                _batch.airbenderBootloaderHeapHash,
+                bytes32(0),
+                _blobAuxOutputWords
+            );
+    }
+
+    /// @dev The shared digest both lanes build, over the words they agree on plus the two they do not.
     function _auxiliaryOutputHash(
         bytes32 _l2ToL1LogsHash,
         bytes32 _stateDiffHash,

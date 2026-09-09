@@ -80,11 +80,11 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
 
             // The upgrade may install the multi-proof gate, which requires both proof systems by
             // default. Batches committed before this point carry no Airbender commitment, so the
-            // chain has to come out of the upgrade single-proof: the lane is masked off and
-            // The admin brings the lane up afterwards, on a drained pipeline, with
-            // `setProofSystemStatus`. Doing it
-            // here rather than in governance calldata means no chain can be upgraded into a
-            // configuration where its in-flight batches have become unprovable.
+            // chain has to come out of the upgrade with the lane masked off, or its in-flight batches
+            // become unprovable and `Committer` starts demanding a heap hash the sequencer is not
+            // sending. The admin brings the lane up afterwards with `setProofSystemStatus`, on a
+            // drained pipeline. Done here rather than in governance calldata so that no chain can be
+            // upgraded into that state in the first place.
             s.disabledProofSystems = AIRBENDER_PROOF_SYSTEM_DISABLED;
         }
 
