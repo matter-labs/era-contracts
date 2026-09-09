@@ -1,0 +1,3 @@
+Throwaway PR for #2437: demonstrates pre-merge draft gating.
+
+Step 1 (this commit, draft): every pre-merge check must skip and pre-merge-verified must pass.
