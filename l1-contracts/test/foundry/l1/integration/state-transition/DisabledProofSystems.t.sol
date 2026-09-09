@@ -33,7 +33,7 @@ import {
     ZKSYNC_OS_PLONK_VERIFICATION_TYPE,
     L2DACommitmentScheme
 } from "contracts/common/Config.sol";
-import {InvalidDisabledProofSystemsMask, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {InvalidProofSystem, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {NotZKsyncOS} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 /// @notice Exercises the per-chain switch through production facets and verifier wrappers.
@@ -72,7 +72,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
     function test_nonAdmin_cannotDisable() public {
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, validator));
-        IAdmin(chain).setDisabledProofSystems(ZISK_PROOF_SYSTEM_DISABLED);
+        IAdmin(chain).setProofSystemStatus(ZISK_PROOF_SYSTEM_DISABLED, false);
         assertEq(IGetters(chain).disabledProofSystems(), 0);
     }
 
@@ -80,18 +80,28 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         address eraChain = _deployChain(false, 11);
         vm.prank(owner);
         vm.expectRevert(NotZKsyncOS.selector);
-        IAdmin(eraChain).setDisabledProofSystems(ZISK_PROOF_SYSTEM_DISABLED);
+        IAdmin(eraChain).setProofSystemStatus(ZISK_PROOF_SYSTEM_DISABLED, false);
         assertEq(IGetters(eraChain).disabledProofSystems(), 0);
     }
 
-    function testFuzz_invalidMask_preservesState(uint8 _mask, bool _initiallyDisabled) public {
-        vm.assume(_mask != 0 && _mask != ZISK_PROOF_SYSTEM_DISABLED);
+    function testFuzz_invalidProofSystem_preservesState(
+        uint8 _proofSystem,
+        bool _enabled,
+        bool _initiallyDisabled
+    ) public {
+        vm.assume(_proofSystem != ZISK_PROOF_SYSTEM_DISABLED);
         uint8 initialMask = _initiallyDisabled ? ZISK_PROOF_SYSTEM_DISABLED : 0;
         _setMask(chain, initialMask);
         vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, _mask));
-        IAdmin(chain).setDisabledProofSystems(_mask);
+        vm.expectRevert(abi.encodeWithSelector(InvalidProofSystem.selector, _proofSystem));
+        IAdmin(chain).setProofSystemStatus(_proofSystem, _enabled);
         assertEq(IGetters(chain).disabledProofSystems(), initialMask);
+    }
+
+    function testFuzz_setProofSystemStatus_reportsRepeatedStatus(bool _enabled) public {
+        uint8 mask = _enabled ? 0 : ZISK_PROOF_SYSTEM_DISABLED;
+        _setMask(chain, mask);
+        _setMask(chain, mask);
     }
 
     function test_pendingBatches_disableAndReenable() public {
@@ -208,7 +218,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         vm.expectEmit(true, true, false, true, _chain);
         emit IAdmin.NewDisabledProofSystems(oldMask, _mask);
         vm.prank(owner);
-        IAdmin(_chain).setDisabledProofSystems(_mask);
+        IAdmin(_chain).setProofSystemStatus(ZISK_PROOF_SYSTEM_DISABLED, _mask == 0);
         assertEq(IGetters(_chain).disabledProofSystems(), _mask);
     }
 
@@ -233,7 +243,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
 
         Diamond.FacetCut[] memory cuts = new Diamond.FacetCut[](4);
         bytes4[] memory selectors = new bytes4[](2);
-        selectors[0] = IAdmin.setDisabledProofSystems.selector;
+        selectors[0] = IAdmin.setProofSystemStatus.selector;
         selectors[1] = IAdmin.setDAValidatorPair.selector;
         cuts[0] = _cut(address(new AdminFacet(block.chainid, RollupDAManager(address(0)))), selectors);
         selectors = new bytes4[](1);

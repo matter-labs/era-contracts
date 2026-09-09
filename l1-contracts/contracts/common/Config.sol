@@ -96,7 +96,7 @@ uint256 constant ZISK_SNARK_PROOF_LENGTH = 24;
 uint8 constant AIRBENDER_PROOF_SYSTEM_DISABLED = 2;
 
 /// @dev Bit in `ZKChainStorage.disabledProofSystems` switching the ZiSK proof system off. The only bit a
-/// ZKsync OS chain accepts (see `Admin.setDisabledProofSystems`).
+/// ZKsync OS chain accepts (see `Admin.setProofSystemStatus`).
 uint8 constant ZISK_PROOF_SYSTEM_DISABLED = 4;
 
 /// @dev Padding value for empty/unused leaves in an {IndexedMerkleTree}. Deliberately NOT a valid
