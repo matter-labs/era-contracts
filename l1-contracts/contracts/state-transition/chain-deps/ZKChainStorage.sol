@@ -260,4 +260,10 @@ struct ZKChainStorage {
     /// except for ZKsync OS chains that have existed before the v31 upgrade.
     /// @dev STORAGE SLOT: 68
     bool baseTokenHasTotalSupply;
+    /// @dev The ZKsync OS single-transaction gas limit (EIP-7825), committed into each batch proof
+    /// public input. A chain may raise the cap above the Ethereum limit but must not set it below.
+    /// `0` means the default (`ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`) for chains that existed before
+    /// this field was introduced.
+    /// @dev STORAGE SLOT: 68
+    uint64 zksyncOSMaxTxGasLimit;
 }

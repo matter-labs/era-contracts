@@ -13,7 +13,9 @@ import {
     PRICE_REFERENCE_L1_GAS,
     PRICE_UPDATE_INTERVAL,
     PRIORITY_EXPIRATION,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
+    ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT
 } from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
@@ -49,7 +51,10 @@ import {
     TooMuchGas,
     Unauthorized,
     UpgradeTimestampNotReached,
-    NotCompatibleWithPriorityMode
+    NotCompatibleWithPriorityMode,
+    ZKsyncOSChainConfigUpdateWithUnverifiedBatches,
+    ZKsyncOSMaxTxGasLimitTooHigh,
+    ZKsyncOSMaxTxGasLimitTooLow
 } from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
@@ -167,6 +172,32 @@ contract AdminFacet is ZKChainBase, IAdmin {
         uint256 oldPriorityTxMaxGasLimit = s.priorityTxMaxGasLimit;
         s.priorityTxMaxGasLimit = _newPriorityTxMaxGasLimit;
         emit NewPriorityTxMaxGasLimit(oldPriorityTxMaxGasLimit, _newPriorityTxMaxGasLimit);
+    }
+
+    /// @inheritdoc IAdmin
+    function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external onlyAdmin onlySettlementLayer onlyZKsyncOS {
+        // The cap may only be raised above Ethereum's EIP-7825 single-tx gas limit, never below.
+        if (_newMaxTxGasLimit < ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT) {
+            revert ZKsyncOSMaxTxGasLimitTooLow();
+        }
+        // The cap must not exceed the ZKsync OS block gas limit: a higher value will halt the block production.
+        if (_newMaxTxGasLimit > ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT) {
+            revert ZKsyncOSMaxTxGasLimitTooHigh();
+        }
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+
+        uint64 oldMaxTxGasLimit = _getZKsyncOSMaxTxGasLimit();
+        s.zksyncOSMaxTxGasLimit = _newMaxTxGasLimit;
+        emit NewZKsyncOSMaxTxGasLimit(oldMaxTxGasLimit, _newMaxTxGasLimit);
+    }
+
+    /// @dev The runtime chain config is read from storage when the batch proof public input is
+    /// computed, so it must not change while committed-but-unverified batches exist: those batches
+    /// were executed by ZKsync OS under the old config and would become unprovable.
+    function _enforceNoUnverifiedBatchesForChainConfigUpdate() internal view {
+        if (s.totalBatchesCommitted != s.totalBatchesVerified) {
+            revert ZKsyncOSChainConfigUpdateWithUnverifiedBatches(s.totalBatchesVerified, s.totalBatchesCommitted);
+        }
     }
 
     /// @inheritdoc IAdmin

@@ -84,7 +84,6 @@ contract TransactionValidatorTest is Test {
             50, // calldataLength
             0, // numberOfFactoryDependencies
             800, // l2GasPricePerPubdata
-            1 gwei, // maxFeePerGas
             false // zksyncOS
         );
 
@@ -97,7 +96,6 @@ contract TransactionValidatorTest is Test {
             50, // calldataLength
             0, // numberOfFactoryDependencies
             800, // l2GasPricePerPubdata
-            1 gwei, // maxFeePerGas
             true // zksyncOS
         );
 
@@ -105,23 +103,9 @@ contract TransactionValidatorTest is Test {
     }
 
     function test_getMinimalPriorityTransactionGasLimit_withFactoryDeps() public pure {
-        uint256 minGasNoDeps = TransactionValidator.getMinimalPriorityTransactionGasLimit(
-            100,
-            50,
-            0,
-            800,
-            1 gwei,
-            false
-        );
+        uint256 minGasNoDeps = TransactionValidator.getMinimalPriorityTransactionGasLimit(100, 50, 0, 800, false);
 
-        uint256 minGasWithDeps = TransactionValidator.getMinimalPriorityTransactionGasLimit(
-            100,
-            50,
-            5,
-            800,
-            1 gwei,
-            false
-        );
+        uint256 minGasWithDeps = TransactionValidator.getMinimalPriorityTransactionGasLimit(100, 50, 5, 800, false);
 
         // More factory deps should require more gas
         assertGt(minGasWithDeps, minGasNoDeps);
@@ -129,29 +113,15 @@ contract TransactionValidatorTest is Test {
 
     function test_getMinimalPriorityTransactionGasLimit_zeroMaxFeePerGas() public pure {
         // Zero max fee is possible for upgrade/service transactions
-        uint256 minGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(100, 50, 0, 800, 0, true);
+        uint256 minGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(100, 50, 0, 800, true);
 
         assertGt(minGas, 0);
     }
 
     function test_getMinimalPriorityTransactionGasLimit_largerEncodingRequiresMoreOrEqualGas() public pure {
-        uint256 minGasSmall = TransactionValidator.getMinimalPriorityTransactionGasLimit(
-            100,
-            50,
-            0,
-            800,
-            1 gwei,
-            false
-        );
+        uint256 minGasSmall = TransactionValidator.getMinimalPriorityTransactionGasLimit(100, 50, 0, 800, false);
 
-        uint256 minGasLarge = TransactionValidator.getMinimalPriorityTransactionGasLimit(
-            1000,
-            500,
-            0,
-            800,
-            1 gwei,
-            false
-        );
+        uint256 minGasLarge = TransactionValidator.getMinimalPriorityTransactionGasLimit(1000, 500, 0, 800, false);
 
         // Larger encoding should require at least as much gas
         assertGe(minGasLarge, minGasSmall);

@@ -42,14 +42,23 @@ contract GatewayCTMDeployerVerifiers {
         result.verifierFflonk = address(new EraVerifierFflonk{salt: salt}());
         result.verifierPlonk = address(new EraVerifierPlonk{salt: salt}());
 
-        // Deploy main verifier
+        // Deploy main verifier. The Airbender PLONK verifier slot is left empty (address(0)) by the
+        // default gateway deploy flow; chains that want Airbender support must deploy their own EraDualVerifier.
         if (_config.testnetVerifier) {
             result.verifier = address(
-                new EraTestnetVerifier{salt: salt}(IVerifierV2(result.verifierFflonk), IVerifier(result.verifierPlonk))
+                new EraTestnetVerifier{salt: salt}(
+                    IVerifierV2(result.verifierFflonk),
+                    IVerifier(result.verifierPlonk),
+                    IVerifier(address(0))
+                )
             );
         } else {
             result.verifier = address(
-                new EraDualVerifier{salt: salt}(IVerifierV2(result.verifierFflonk), IVerifier(result.verifierPlonk))
+                new EraDualVerifier{salt: salt}(
+                    IVerifierV2(result.verifierFflonk),
+                    IVerifier(result.verifierPlonk),
+                    IVerifier(address(0))
+                )
             );
         }
 

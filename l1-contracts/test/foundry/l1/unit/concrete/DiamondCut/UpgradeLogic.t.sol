@@ -65,7 +65,9 @@ contract UpgradeLogicTest is DiamondCutTest {
         permissionlessValidator = new PermissionlessValidator();
 
         // Mock CTM to return a verifier for protocol version 0
-        address testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+        address testnetVerifier = address(
+            new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), IVerifier(address(0)))
+        );
         vm.mockCall(
             chainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, uint256(0)),
