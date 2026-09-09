@@ -6,15 +6,15 @@ import {AdminTest} from "foundry-test/l1/unit/concrete/state-transition/chain-de
 import {AIRBENDER_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
 
 /// @notice Pins the byte offsets of the packed tail of `ZKChainStorage`.
-/// @dev `ZKChainStorage` is the diamond's storage, so its members sit at fixed slots that every
-/// deployed chain already carries. Appending a member is safe; inserting one in the middle of a
-/// packed slot silently re-points every member after it at a neighbour's bytes, and the read
-/// succeeds — there is no revert to notice. Slot 68 is where that is most likely to happen, because
-/// it is the slot with room left in it, so it is the one lanes developed in parallel keep landing in.
+/// @dev A diamond upgrade replaces facet code and keeps the storage, so `ZKChainStorage` members sit
+/// at offsets every already-deployed chain carries. Appending is therefore safe and reordering is
+/// not: inserting a member into a packed slot re-points every member after it at a neighbour's
+/// bytes, and the read still succeeds — there is no revert to notice. Slot 68 is the slot with room
+/// left in it, so it is where new members land and where this is worth pinning.
 ///
-/// A concrete case: `disabledProofSystems` is a proof-system mask, and the byte it would collide
-/// with holds small integers. A chain reading the mask off the wrong byte does not fail, it settles
-/// under a proof-system policy nobody chose.
+/// What that costs, concretely: `disabledProofSystems` is a proof-system mask sharing a slot with
+/// small integers, so a chain reading it off the wrong byte does not fail. It settles under a
+/// proof-system policy nobody chose.
 contract ZKChainStorageLayoutTest is AdminTest {
     /// @dev `s` is the first state variable of `ZKChainBase`, so a `ZKChainStorage` member documented
     /// as slot N is at absolute slot N.
