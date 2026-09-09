@@ -106,7 +106,7 @@ contract ProvingTest is ExecutorTest {
         // 3. Only then the capability, and only then the lane.
         vm.startPrank(owner);
         IAdmin(address(committer)).setMultiProofEnabled(true);
-        IAdmin(address(committer)).setDisabledProofSystems(0);
+        IAdmin(address(committer)).setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, true);
         vm.stopPrank();
 
         // 4. The batch under test is the first one committed with Airbender data.
@@ -402,7 +402,7 @@ contract ProvingTest is ExecutorTest {
 
         // With Airbender switched off by the chain admin, the same batch settles on Boojum alone.
         vm.prank(owner);
-        IAdmin(address(executor)).setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+        IAdmin(address(executor)).setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, false);
         _proveWith(proof);
         assertEq(getters.getTotalBlocksVerified(), 2);
     }
@@ -479,7 +479,7 @@ contract ProvingTest is ExecutorTest {
         assertEq(getters.getTotalBlocksVerified(), 2);
     }
 
-    /// `setDisabledProofSystems` refuses to require the lane until a batch has settled, but that is a
+    /// `setProofSystemStatus` refuses to require the lane until a batch has settled, but that is a
     /// check on the configuration at one moment. `revertBatches` may take `totalBatchesVerified` back
     /// to zero afterwards, putting the genesis batch — whose commitment is a configured value with no
     /// preimage the guest can open — back in the predecessor position. The prove path refuses it there

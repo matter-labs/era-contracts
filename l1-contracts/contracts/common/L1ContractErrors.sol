@@ -15,31 +15,31 @@ error AddressHasNoCode(address);
 error AddressMismatch(address expected, address supplied);
 // 0x42573d7a
 error AddressNotZero();
-// 0x957ca95e
 /// @notice The chain does not run the multi-proof gate, so a batch must not commit Airbender data:
 /// it would make the Executor emit a public input the configured verifier cannot consume.
+// 0x957ca95e
 error AirbenderCommitmentNotSupported();
-// 0x615e82fc
 /// @notice The chain runs the multi-proof gate, so every batch must commit the Airbender bootloader
 /// heap hash. Without it the batch carries no Airbender commitment and could never be proved.
+// 0x615e82fc
 error AirbenderCommitmentRequired();
-// 0x8422173f
 /// @notice Whether the chain commits Airbender data may only change while the Airbender lane is
 /// masked off. Changing it under a lane that is required would commit the next batch in a shape the
 /// gate cannot accept, in whichever direction the change goes.
+// 0x8422173f
 error AirbenderLaneMustBeDisabled();
-// 0xf7821506
 /// @notice The Airbender lane cannot chain a batch to the genesis batch: the genesis commitment is a
 /// configured value with no preimage the guest can open, so such a batch could never be proved.
+// 0xf7821506
 error AirbenderLaneCannotChainToGenesis();
-// 0xf4a67ff1
 /// @notice The Airbender lane cannot be required while the chain does not commit Airbender data:
 /// every batch would be committed with a single public input the enabled lane has nothing to read.
+// 0xf4a67ff1
 error AirbenderLaneRequiresMultiProof();
-// 0x860e6d46
 /// @notice The Airbender lane cannot be required until a batch of this chain's own has settled. Its
 /// first batch would otherwise be chained to the genesis commitment, which is a configured value
 /// with no preimage the guest can open.
+// 0x860e6d46
 error AirbenderLaneRequiresSettledBatch();
 // 0xb577eb6c
 error AlreadyDangerousContract(address);
@@ -240,6 +240,10 @@ error InvalidPublicInputsLength();
 error InvalidProofFormat();
 // 0x48c5fa28
 error InvalidProofLengthForFinalNode();
+/// @notice The argument names no single proof system this chain runs. It is one
+/// `*_PROOF_SYSTEM_DISABLED` bit, not a mask, a bit index or a proof-envelope type.
+// 0xb846fbd8
+error InvalidProofSystem(uint8 proofSystem);
 // 0x5428eae7
 error InvalidProtocolVersion();
 // 0x6f1cf752
@@ -300,10 +304,10 @@ error MockVerifierNotSupported();
 error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 // 0xb385a3da
 error MsgValueTooLow(uint256 required, uint256 provided);
-// 0x379ac44c
 /// @notice A chain that settles behind both proof systems cannot migrate settlement layers: the
 /// multi-proof settings are not carried in `ZKChainCommitment`, so the destination would bring the
 /// chain up single-proof. Withdraw the capability first.
+// 0x379ac44c
 error MultiProofChainCannotMigrate();
 // 0xedd74330
 error MustBeEraChain();
@@ -507,9 +511,9 @@ error ValidateTxnNotEnoughGas();
 error ValueMismatch(uint256 expected, uint256 actual);
 // 0xe1022469
 error VerifiedBatchesExceedsCommittedBatches();
-// 0x0f4d47fb
 /// @notice The chain's installed verifier is not the multi-proof gate, so it cannot consume the
 /// second public input that committing Airbender data would make the Executor emit.
+// 0x0f4d47fb
 error VerifierDoesNotSupportMultiProof();
 // 0xae899454
 error WithdrawalAlreadyFinalized();

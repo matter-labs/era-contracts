@@ -82,7 +82,7 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
             // default. Batches committed before this point carry no Airbender commitment, so the
             // chain has to come out of the upgrade single-proof: the lane is masked off and
             // `multiProofEnabled` stays false. The admin brings it up afterwards, on a drained
-            // pipeline, with `setMultiProofEnabled` followed by `setDisabledProofSystems`. Doing it
+            // pipeline, with `setMultiProofEnabled` followed by `setProofSystemStatus`. Doing it
             // here rather than in governance calldata means no chain can be upgraded into a
             // configuration where its in-flight batches have become unprovable.
             s.disabledProofSystems = AIRBENDER_PROOF_SYSTEM_DISABLED;

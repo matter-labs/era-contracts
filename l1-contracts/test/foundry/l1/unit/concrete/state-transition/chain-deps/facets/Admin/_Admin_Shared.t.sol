@@ -31,7 +31,7 @@ contract AdminTest is UtilsCallMockerTest {
         selectors[i++] = IAdmin.setPorterAvailability.selector;
         selectors[i++] = IAdmin.setPriorityTxMaxGasLimit.selector;
         selectors[i++] = IAdmin.setZKsyncOSMaxTxGasLimit.selector;
-        selectors[i++] = IAdmin.setDisabledProofSystems.selector;
+        selectors[i++] = IAdmin.setProofSystemStatus.selector;
         selectors[i++] = IAdmin.setMultiProofEnabled.selector;
         selectors[i++] = IAdmin.changeFeeParams.selector;
         selectors[i++] = IAdmin.setTokenMultiplier.selector;

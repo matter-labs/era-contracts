@@ -103,7 +103,7 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
         // the kill switch keep Boojum-only settlement working for batches carrying no Airbender
         // commitment. It also means the converse: with the lane enabled, such a batch cannot be
         // proved here at all — so enabling the lane on a chain with committed-but-unproven batches
-        // stalls it until they are drained. `Admin.setDisabledProofSystems` enforces that.
+        // stalls it until they are drained. `Admin.setProofSystemStatus` enforces that.
         //
         // A two-word batch stays acceptable under a masked lane, and its Airbender segment then rides
         // along unverified. Deliberate, and the opposite of the ZKsync OS lane, which refuses an

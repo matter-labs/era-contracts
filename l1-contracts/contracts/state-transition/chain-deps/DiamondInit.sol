@@ -134,7 +134,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         // also the only order that can work — the Airbender lane needs a predecessor whose commitment
         // the guest can open, and the genesis commitment is a config value with no supplyable
         // preimage. The admin brings the lane up later, once real batches have settled, with
-        // `setMultiProofEnabled` followed by `setDisabledProofSystems`.
+        // `setMultiProofEnabled` followed by `setProofSystemStatus`.
         if (!IS_ZKSYNC_OS) {
             s.disabledProofSystems = AIRBENDER_PROOF_SYSTEM_DISABLED;
         }

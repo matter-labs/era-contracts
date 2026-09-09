@@ -17,7 +17,7 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 /// @notice Unit tests for the per-chain multi-proof capability.
 /// @dev The setting says whether the chain commits the extra Airbender data every batch needs to be
 /// provable on that lane. It is a deployment property rather than an incident switch: it decides what
-/// `Committer` accepts at commit time, whereas `setDisabledProofSystems` decides which lanes have to
+/// `Committer` accepts at commit time, whereas `setProofSystemStatus` decides which lanes have to
 /// verify a batch already committed.
 contract SetMultiProofEnabledTest is AdminTest {
     event NewMultiProofEnabled(bool oldMultiProofEnabled, bool newMultiProofEnabled);

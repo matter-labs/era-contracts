@@ -93,7 +93,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = admin.setValidator.selector;
         selectors[i++] = admin.setPorterAvailability.selector;
         selectors[i++] = admin.setPriorityTxMaxGasLimit.selector;
-        selectors[i++] = admin.setDisabledProofSystems.selector;
+        selectors[i++] = admin.setProofSystemStatus.selector;
         selectors[i++] = admin.setMultiProofEnabled.selector;
         selectors[i++] = admin.changeFeeParams.selector;
         selectors[i++] = admin.setTokenMultiplier.selector;

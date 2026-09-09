@@ -17,7 +17,8 @@ import {
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
     ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT,
     ALL_PROOF_SYSTEMS_DISABLED,
-    AIRBENDER_PROOF_SYSTEM_DISABLED
+    AIRBENDER_PROOF_SYSTEM_DISABLED,
+    BOOJUM_PROOF_SYSTEM_DISABLED
 } from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
@@ -51,6 +52,7 @@ import {
     ProtocolIdNotGreater,
     TokenMultiplierChangeTooFrequent,
     InvalidDisabledProofSystemsMask,
+    InvalidProofSystem,
     AirbenderLaneMustBeDisabled,
     AirbenderLaneRequiresMultiProof,
     AirbenderLaneRequiresSettledBatch,
@@ -240,11 +242,23 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setDisabledProofSystems(uint8 _disabledProofSystems) external onlyAdmin onlySettlementLayer onlyEra {
-        if (_disabledProofSystems >= ALL_PROOF_SYSTEMS_DISABLED) {
-            revert InvalidDisabledProofSystemsMask(_disabledProofSystems);
+    function setProofSystemStatus(uint8 _proofSystem, bool _enabled) external onlyAdmin onlySettlementLayer onlyEra {
+        // One system per call, named by its own bit. A mask would let a single call cross through a
+        // state no chain may occupy, and an unknown bit names no proof system at all.
+        if (_proofSystem != BOOJUM_PROOF_SYSTEM_DISABLED && _proofSystem != AIRBENDER_PROOF_SYSTEM_DISABLED) {
+            revert InvalidProofSystem(_proofSystem);
         }
+
         uint8 oldDisabledProofSystems = s.disabledProofSystems;
+        uint8 newDisabledProofSystems = _enabled
+            ? oldDisabledProofSystems & ~_proofSystem
+            : oldDisabledProofSystems | _proofSystem;
+
+        // Switching the second one off would settle a batch behind no proof at all. Checked on the
+        // result rather than the argument, since one bit alone cannot say what the pair becomes.
+        if (newDisabledProofSystems >= ALL_PROOF_SYSTEMS_DISABLED) {
+            revert InvalidDisabledProofSystemsMask(newDisabledProofSystems);
+        }
 
         // Disabling a system may happen with unproven batches waiting — that is the point of the
         // switch, and it only ever widens what the gate accepts.
@@ -252,13 +266,13 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // Enabling one must not. A batch committed while the Airbender lane was off carries no
         // Airbender commitment, so the Executor emits a single public input for it and the gate
         // refuses that once the lane is on: the batch becomes unprovable and the chain stalls
-        // behind it. Draining first is the only ordering that works.
-        bool enablingAProofSystem = (oldDisabledProofSystems & ~_disabledProofSystems) != 0;
-        if (enablingAProofSystem) {
+        // behind it. Draining first is the only ordering that works. A call that leaves the system
+        // as it already was changes nothing, so it does not need the drain.
+        if (_enabled && (oldDisabledProofSystems & _proofSystem) != 0) {
             _enforceNoUnverifiedBatchesForChainConfigUpdate();
         }
 
-        if (_disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
+        if (newDisabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
             // Requiring the Airbender lane is only meaningful once the chain commits the data that
             // lane is proved against. Without the capability the batches committed from here on carry
             // a single public input, and the gate would refuse every one of them.
@@ -287,8 +301,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
             // an admin call, which is the work the lane itself exists to do.
         }
 
-        s.disabledProofSystems = _disabledProofSystems;
-        emit NewDisabledProofSystems(oldDisabledProofSystems, _disabledProofSystems);
+        s.disabledProofSystems = newDisabledProofSystems;
+        emit NewDisabledProofSystems(oldDisabledProofSystems, newDisabledProofSystems);
     }
 
     /// @dev The runtime chain config is read from storage when the batch proof public input is
