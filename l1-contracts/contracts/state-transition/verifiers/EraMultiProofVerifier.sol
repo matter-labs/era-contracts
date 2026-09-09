@@ -6,6 +6,7 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IEraDualVerifier} from "../chain-interfaces/IEraDualVerifier.sol";
 import {IEraMultiProofVerifier} from "../chain-interfaces/IEraMultiProofVerifier.sol";
+import {IEraVerifier} from "../chain-interfaces/IEraVerifier.sol";
 import {IGetters} from "../chain-interfaces/IGetters.sol";
 import {
     EmptyProofLength,
@@ -89,13 +90,11 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
         }
 
         // One verifier instance serves every chain of a protocol version, so the policy is read from the
-        // calling chain, which in settlement is that chain's diamond.
-        uint8 disabled = IGetters(msg.sender).disabledProofSystems();
-        // Re-checked with the setter's own predicate, so the both-required property holds here on its own
-        // rather than depending on a value written elsewhere.
-        if (disabled >= ALL_PROOF_SYSTEMS_DISABLED) {
-            revert InvalidDisabledProofSystemsMask(disabled);
-        }
+        // calling chain, which in settlement is that chain's diamond. Resolved through the same function
+        // callers use to ask what this gate would require, so settlement and discovery cannot disagree —
+        // and that function re-checks the mask, keeping the both-required property here on its own rather
+        // than depending on a value written elsewhere.
+        uint8 required = requiredProofSystems(IGetters(msg.sender).disabledProofSystems());
 
         // One word per lane: the two systems commit to different `auxiliaryOutputHash` values, so a
         // batch has a different transition hash under each.
@@ -106,12 +105,12 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
         // proved here at all — so enabling the lane on a chain with committed-but-unproven batches
         // stalls it until they are drained. `Admin.setDisabledProofSystems` enforces that.
         if (
-            _publicInputs.length != 2 && !(disabled & AIRBENDER_PROOF_SYSTEM_DISABLED != 0 && _publicInputs.length == 1)
+            _publicInputs.length != 2 && !(required & AIRBENDER_PROOF_SYSTEM_DISABLED == 0 && _publicInputs.length == 1)
         ) {
             revert InvalidPublicInputsLength();
         }
 
-        if (disabled & BOOJUM_PROOF_SYSTEM_DISABLED == 0) {
+        if (required & BOOJUM_PROOF_SYSTEM_DISABLED != 0) {
             // An enabled lane must carry a proof: a zero-length slice reaches a router that treats an empty
             // proof as "skip", which would leave the lane unverified.
             if (boojumLength == 0) {
@@ -122,13 +121,56 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
             }
         }
 
-        if (disabled & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
+        if (required & AIRBENDER_PROOF_SYSTEM_DISABLED != 0) {
             if (!AIRBENDER_VERIFIER.verify(_publicInputs[1:2], _proof[2 + boojumLength:])) {
                 revert AirbenderVerificationFailed();
             }
         }
 
         return true;
+    }
+
+    /// @notice The pair of systems this contract is built to check, before deployment wiring.
+    /// @dev The requirement policy is derived from this rather than from `supportedProofSystems`, and the
+    /// difference matters. A lane left at the zero address is missing, not exempt: deriving the policy
+    /// from what is wired would answer that such a lane is not required and let `verify` skip it, turning
+    /// a broken deployment into a silently single-proof chain. Derived from the constant, the lane stays
+    /// required and the call to a zero address reverts. `Admin` is what stops the pairing arising.
+    uint8 internal constant GATE_PROOF_SYSTEMS = BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED;
+
+    /// @inheritdoc IEraMultiProofVerifier
+    /// @dev Reports what this deployment can actually check, so a lane left unwired is absent from the
+    /// answer. That makes it the capability check a chain wants before declaring itself multi-proof.
+    function supportedProofSystems() public view virtual returns (uint8) {
+        uint8 supported;
+        if (address(BOOJUM_VERIFIER) != address(0)) {
+            supported |= BOOJUM_PROOF_SYSTEM_DISABLED;
+        }
+        if (address(AIRBENDER_VERIFIER) != address(0)) {
+            supported |= AIRBENDER_PROOF_SYSTEM_DISABLED;
+        }
+        return supported;
+    }
+
+    /// @inheritdoc IEraMultiProofVerifier
+    function requiredProofSystems(uint8 _disabledProofSystems) public pure virtual returns (uint8) {
+        // The mask that switches off everything this gate checks would settle a batch behind no proof
+        // at all. Refused here as well as in the setter, so the answer given to a caller is the same one
+        // settlement would act on.
+        if (_disabledProofSystems >= ALL_PROOF_SYSTEMS_DISABLED) {
+            revert InvalidDisabledProofSystemsMask(_disabledProofSystems);
+        }
+        return GATE_PROOF_SYSTEMS & ~_disabledProofSystems;
+    }
+
+    /// @inheritdoc IEraMultiProofVerifier
+    function acceptedProofType() external pure virtual returns (uint256) {
+        return ERA_MULTI_PROOF_TYPE;
+    }
+
+    /// @inheritdoc IEraVerifier
+    function isTestnetVerifier() external view virtual returns (bool) {
+        return false;
     }
 
     /// @inheritdoc IEraDualVerifier

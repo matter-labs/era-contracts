@@ -225,11 +225,13 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit NewMultiProofEnabled(oldMultiProofEnabled, _multiProofEnabled);
     }
 
-    /// @dev A single-system router does not answer `AIRBENDER_VERIFIER()`, so a staticcall that
-    /// reverts — or one answering the zero address — is the negative answer.
+    /// @dev Asks the verifier which proof systems it supports rather than testing whether some getter
+    /// answers. A verifier predating the interface does not implement the call at all, so a reverting
+    /// staticcall is still the negative answer — but for one that does implement it the answer is the
+    /// verifier's own statement of capability, not an inference drawn from its ABI.
     function _enforceVerifierHasAnAirbenderLane() internal view {
-        try IEraMultiProofVerifier(address(s.verifier)).AIRBENDER_VERIFIER() returns (IVerifier airbender) {
-            if (address(airbender) == address(0)) {
+        try IEraMultiProofVerifier(address(s.verifier)).supportedProofSystems() returns (uint8 supported) {
+            if (supported & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
                 revert VerifierDoesNotSupportMultiProof();
             }
         } catch {

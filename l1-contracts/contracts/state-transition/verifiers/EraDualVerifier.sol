@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IEraDualVerifier} from "../chain-interfaces/IEraDualVerifier.sol";
+import {IEraVerifier} from "../chain-interfaces/IEraVerifier.sol";
 import {EmptyProofLength, InvalidPublicInputsLength, UnknownVerifierType} from "../../common/L1ContractErrors.sol";
 import {PUBLIC_INPUT_SHIFT} from "../../common/Config.sol";
 
@@ -33,6 +34,11 @@ contract EraDualVerifier is IVerifier, IEraDualVerifier {
     constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
         FFLONK_VERIFIER = _fflonkVerifier;
         PLONK_VERIFIER = _plonkVerifier;
+    }
+
+    /// @inheritdoc IEraVerifier
+    function isTestnetVerifier() external view virtual returns (bool) {
+        return false;
     }
 
     /// @notice Routes zk-SNARK proof verification to the appropriate verifier based on the proof type.

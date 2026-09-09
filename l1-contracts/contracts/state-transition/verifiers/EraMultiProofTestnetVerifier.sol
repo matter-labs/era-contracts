@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {EraMultiProofVerifier} from "./EraMultiProofVerifier.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
+import {IEraVerifier} from "../chain-interfaces/IEraVerifier.sol";
 import {MAINNET_CHAIN_ID} from "../../common/Config.sol";
 
 /// @author Matter Labs
@@ -14,6 +15,7 @@ import {MAINNET_CHAIN_ID} from "../../common/Config.sol";
 /// gate would take the mask off the wrapper rather than off the chain's diamond. Inheriting keeps the
 /// diamond as the caller, so a testnet chain exercises the same code path as mainnet.
 contract EraMultiProofTestnetVerifier is EraMultiProofVerifier {
+    /// @dev Kept alongside `isTestnetVerifier()` for tooling that predates the getter.
     bool public constant IS_TESTNET_VERIFIER = true;
 
     constructor(
@@ -21,6 +23,11 @@ contract EraMultiProofTestnetVerifier is EraMultiProofVerifier {
         IVerifier _airbenderVerifier
     ) EraMultiProofVerifier(_boojumVerifier, _airbenderVerifier) {
         assert(block.chainid != MAINNET_CHAIN_ID);
+    }
+
+    /// @inheritdoc IEraVerifier
+    function isTestnetVerifier() external pure override returns (bool) {
+        return true;
     }
 
     /// @inheritdoc IVerifier

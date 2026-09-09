@@ -314,4 +314,64 @@ contract EraMultiProofVerifierTest is Test {
         );
         chain.callVerify(verifier, _publicInputs(), _default());
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // Policy discovery
+    // ---------------------------------------------------------------------------------------------
+
+    function test_reportsBothSystemsSupported() public view {
+        assertEq(verifier.supportedProofSystems(), BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED);
+    }
+
+    /// A lane left unwired is missing, not merely off, so it drops out of the capability answer. This is
+    /// what `Admin` reads before letting a chain declare itself multi-proof.
+    function test_unwiredLaneIsNotReportedAsSupported() public {
+        EraMultiProofVerifier noAirbender = new EraMultiProofVerifier(
+            IVerifier(address(boojum)),
+            IVerifier(address(0))
+        );
+        assertEq(noAirbender.supportedProofSystems(), BOOJUM_PROOF_SYSTEM_DISABLED);
+    }
+
+    /// The requirement policy comes from the pair the gate is built to check, not from what is wired, so
+    /// an unwired lane stays required. Deriving it from the wiring instead would answer that the missing
+    /// lane is not required and let `verify` skip it — a broken deployment settling single-proof.
+    function test_unwiredLaneStaysRequired() public {
+        EraMultiProofVerifier noAirbender = new EraMultiProofVerifier(
+            IVerifier(address(boojum)),
+            IVerifier(address(0))
+        );
+        assertEq(noAirbender.requiredProofSystems(0), BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED);
+    }
+
+    function test_requiredSystemsFollowTheMask() public view {
+        assertEq(
+            verifier.requiredProofSystems(0),
+            BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED,
+            "an empty mask requires both"
+        );
+        assertEq(
+            verifier.requiredProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED),
+            BOOJUM_PROOF_SYSTEM_DISABLED,
+            "masking Airbender leaves Boojum"
+        );
+        assertEq(
+            verifier.requiredProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED),
+            AIRBENDER_PROOF_SYSTEM_DISABLED,
+            "masking Boojum leaves Airbender"
+        );
+    }
+
+    /// Discovery refuses the mask settlement refuses, so a caller is never told a policy the gate would
+    /// not honour.
+    function test_requiredSystemsRejectsTheAllDisabledMask() public {
+        uint8 mask = BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED;
+        vm.expectRevert(abi.encodeWithSelector(InvalidDisabledProofSystemsMask.selector, mask));
+        verifier.requiredProofSystems(mask);
+    }
+
+    function test_reportsAcceptedProofTypeAndProductionFlag() public view {
+        assertEq(verifier.acceptedProofType(), ERA_MULTI_PROOF_TYPE);
+        assertFalse(verifier.isTestnetVerifier(), "the production gate must answer the flag, not omit it");
+    }
 }
