@@ -55,7 +55,6 @@ import {
     InvalidProofSystem,
     AirbenderLaneMustBeDisabled,
     AirbenderLaneRequiresMultiProof,
-    AirbenderLaneRequiresSettledBatch,
     TooMuchGas,
     Unauthorized,
     UpgradeTimestampNotReached,
@@ -248,18 +247,11 @@ contract AdminFacet is ZKChainBase, IAdmin {
                 revert AirbenderLaneRequiresMultiProof();
             }
 
-            // The lane's first batch chains to the last settled one. At genesis that is `storedBatchZero`,
-            // a configured value with no preimage the guest can open. One batch of the chain's own is
-            // enough: its commitment is one the sequencer built.
-            if (s.totalBatchesVerified == 0) {
-                revert AirbenderLaneRequiresSettledBatch();
-            }
-
-            // That batch's `airbenderCommitment` came from a heap hash nothing verified — `Committer`
-            // only requires it to be present — so a wrong one leaves the next batch unprovable. Not a
-            // soundness problem, since Boojum verified the batch, and recoverable: masking the lane again
-            // needs no drain and the stalled batch settles Boojum-only, so activation can be retried
-            // later. Guarding it here would mean verifying an Airbender proof inside an admin call.
+            // The predecessor supplying the lane's seed may carry an `airbenderCommitment` derived from
+            // a heap hash nothing verified — `Committer` only requires it to be present — so a wrong one
+            // leaves the next batch unprovable. Not a soundness problem, since Boojum verified that
+            // batch, and recoverable: masking the lane again needs no drain and the stalled batch
+            // settles Boojum-only, so activation can be retried later.
         }
 
         s.disabledProofSystems = newDisabledProofSystems;

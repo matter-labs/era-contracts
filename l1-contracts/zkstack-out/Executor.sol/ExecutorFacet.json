@@ -168,11 +168,6 @@
   },
   {
     "type": "error",
-    "name": "AirbenderLaneCannotChainToGenesis",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "BatchHashMismatch",
     "inputs": [
       {

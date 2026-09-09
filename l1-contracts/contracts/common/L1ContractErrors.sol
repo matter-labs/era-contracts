@@ -21,12 +21,8 @@ error AirbenderCommitmentNotSupported();
 error AirbenderCommitmentRequired();
 // 0x8422173f
 error AirbenderLaneMustBeDisabled();
-// 0xf7821506
-error AirbenderLaneCannotChainToGenesis();
 // 0xf4a67ff1
 error AirbenderLaneRequiresMultiProof();
-// 0x860e6d46
-error AirbenderLaneRequiresSettledBatch();
 // 0xb577eb6c
 error AlreadyDangerousContract(address);
 // 0x2a5989a0

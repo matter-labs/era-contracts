@@ -20,7 +20,6 @@ import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/IComm
 import {
     BatchHashMismatch,
     CanOnlyProcessOneBatch,
-    AirbenderLaneCannotChainToGenesis,
     InvalidPublicInputsLength,
     VerifiedBatchesExceedsCommittedBatches
 } from "contracts/common/L1ContractErrors.sol";
@@ -479,12 +478,12 @@ contract ProvingTest is ExecutorTest {
         assertEq(getters.getTotalBlocksVerified(), 2);
     }
 
-    /// `setProofSystemStatus` refuses to require the lane until a batch has settled, but that is a
-    /// check on the configuration at one moment. `revertBatches` may take `totalBatchesVerified` back
-    /// to zero afterwards, putting the genesis batch — whose commitment is a configured value with no
-    /// preimage the guest can open — back in the predecessor position. The prove path refuses it there
-    /// too, so the invariant does not depend on how the chain reached this state.
-    function test_airbenderLaneRefusesTheGenesisPredecessor() public {
+    /// Genesis is an ordinary predecessor for the lane. The guest opens it the way the Boojum
+    /// scheduler opens its own: pass-through derived from execution, metadata and auxiliary hashes
+    /// taken as witness — and genesis carries both, which is what lets Boojum prove batch 1.
+    /// Reachable after `revertBatches` rewinds `totalBatchesVerified` to zero, so the prove path has
+    /// to accept it however the chain arrived here.
+    function test_airbenderLaneChainsToTheGenesisPredecessor() public {
         // Unwind everything the bring-up settled, which is what makes genesis the predecessor again.
         vm.prank(validator);
         executor.revertBatchesSharedBridge(address(0), 0);
@@ -495,8 +494,8 @@ contract ProvingTest is ExecutorTest {
 
         _installGate(IVerifier(address(new AcceptingLane())), IVerifier(address(new AcceptingLane())));
 
-        vm.expectRevert(AirbenderLaneCannotChainToGenesis.selector);
         _proveWithPrev(genesisStoredBatchInfo, _gateProof(), onGenesis);
+        assertEq(getters.getTotalBlocksVerified(), 1);
     }
 
     /// The mirror: a batch that does carry one makes the Executor build the pair.

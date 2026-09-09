@@ -12,7 +12,6 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {GW_ASSET_TRACKER} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {
-    AirbenderLaneCannotChainToGenesis,
     CanOnlyProcessOneBatch,
     CantExecuteUnprovenBatches,
     InvalidMessageRoot,
@@ -310,17 +309,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             //
             // A predecessor with no Airbender commitment of its own — one committed before the lane
             // was enabled, or during a period with it switched off — seeds the chain from its Boojum
-            // commitment instead. That value is authenticated, publicly recomputable, and openable
-            // by the guest, whose binding needs only some `(meta, aux)` pair reproducing it; the
-            // sequencer holds the Boojum pair for its own batch. So seeding needs no extra input and
-            // no separate protocol, and it still pins the predecessor's state.
-            // `setProofSystemStatus` checks this too, but only at the moment it runs: `revertBatches`
-            // can later take `totalBatchesVerified` back to zero and put genesis back in the predecessor
-            // position. Enforced here as well, where the value is used.
-            if (prevBatch.batchNumber == 0) {
-                revert AirbenderLaneCannotChainToGenesis();
-            }
-
+            // commitment instead. The guest opens that value the same way the Boojum scheduler opens
+            // its own predecessor: it derives the pass-through hash from execution and takes the
+            // metadata and auxiliary hashes as witness. Genesis is not a special case for it.
             bytes32 previousAirbenderCommitment = (prevAirbenderBound && prevBatch.airbenderCommitment != bytes32(0))
                 ? prevBatch.airbenderCommitment
                 : prevBatch.commitment;

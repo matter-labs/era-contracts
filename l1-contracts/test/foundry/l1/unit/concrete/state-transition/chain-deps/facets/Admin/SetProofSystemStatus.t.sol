@@ -5,7 +5,6 @@ import {AdminTest} from "./_Admin_Shared.t.sol";
 
 import {
     AirbenderLaneRequiresMultiProof,
-    AirbenderLaneRequiresSettledBatch,
     ZKsyncOSChainConfigUpdateWithUnverifiedBatches,
     InvalidDisabledProofSystemsMask,
     InvalidProofSystem,
@@ -140,20 +139,18 @@ contract SetProofSystemStatusTest is AdminTest {
         adminFacet.setProofSystemStatus(BOOJUM_PROOF_SYSTEM_DISABLED, false);
     }
 
-    /// A chain that has settled nothing has only its genesis batch to chain the lane's first batch
-    /// to, and the genesis commitment is a configured value with no preimage the guest can open. The
-    /// drained-pipeline check does not catch this: at genesis both counters are zero, so it passes.
-    function test_revertWhen_requiringAirbenderBeforeAnyBatchHasSettled() public {
+    /// A chain that has settled nothing may still require the lane: its genesis batch is an ordinary
+    /// predecessor, opened by the guest the same way the Boojum scheduler opens its own.
+    function test_requiresAirbenderBeforeAnyBatchHasSettled() public {
         utilsFacet.util_setMultiProofEnabled(true);
         assertEq(utilsFacet.util_getTotalBatchesVerified(), 0);
 
         vm.startPrank(utilsFacet.util_getAdmin());
-        vm.expectRevert(AirbenderLaneRequiresSettledBatch.selector);
         adminFacet.setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, true);
+
+        assertEq(utilsFacet.util_getDisabledProofSystems(), 0);
     }
 
-    /// One settled batch of the chain's own is enough: its commitment is one the sequencer built and
-    /// can open.
     function test_requiresAirbenderOnceABatchHasSettled() public {
         _readyForTheAirbenderLane();
 
