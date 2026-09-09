@@ -7,9 +7,6 @@ pragma solidity ^0.8.20;
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface for the BaseTokenHolder contract that holds the chain's base-token reserve.
 /// See {protocol-docs/bridging.md#base-token-handling}.
-/// @dev On ZK OS the holder's initial 2^127 - 1 balance is minted by `L2BaseToken.initL2()` via the
-/// MINT_BASE_TOKEN_HOOK — a raw call with the amount abi-encoded as uint256, which credits the caller and
-/// only accepts calls from the L2BaseToken address — and is then transferred here.
 interface IBaseTokenHolder {
     /// @notice Emitted when base tokens are given out from the holder via interop bridging.
     /// @dev Only emitted for inbound bridging through `give`; L1 deposits mint without this

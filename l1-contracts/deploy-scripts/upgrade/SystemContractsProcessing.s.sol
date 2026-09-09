@@ -106,8 +106,7 @@ library SystemContractsProcessing {
         ids[0] = L2SystemContract.L2BaseToken;
         ids[1] = L2SystemContract.L1Messenger;
         ids[2] = L2SystemContract.SystemContext;
-        // Existing OS chains entered this release through the previous ComplexUpgrader implementation.
-        // Upgrade its proxy as part of the same loop so subsequent upgrades cannot reach retired Era paths.
+        // See {protocol-docs/chain-lifecycle.md} for the ComplexUpgrader transition.
         ids[3] = L2SystemContract.L2ComplexUpgrader;
     }
 

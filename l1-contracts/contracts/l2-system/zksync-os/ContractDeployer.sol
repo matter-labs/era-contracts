@@ -6,7 +6,8 @@ import {
     SET_BYTECODE_ON_ADDRESS_HOOK
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ISystemContractDeployer} from "./interfaces/ISystemContractDeployer.sol";
-import {SetBytecodeOnAddressHookFailed, Unauthorized} from "./errors/SystemContractErrors.sol";
+import {SetBytecodeOnAddressHookFailed} from "./errors/SystemContractErrors.sol";
+import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
 /// @title ContractDeployer
 /// @notice Minimal wrapper that forwards to the set bytecode on address system hook at a hardcoded address.

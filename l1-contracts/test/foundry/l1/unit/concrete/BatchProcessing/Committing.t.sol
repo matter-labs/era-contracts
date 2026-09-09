@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "forge-std/console.sol";
-
 import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {CommitBatchInfoZKsyncOS, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {BatchHashMismatch} from "contracts/common/L1ContractErrors.sol";
-import {InteropRoot} from "contracts/common/Messaging.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {MismatchL2DACommitmentScheme} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
@@ -64,6 +61,8 @@ contract CommittingTest is ExecutorTest {
             .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, correctCommitBatchInfoArray);
         vm.prank(validator);
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+
+        assertEq(getters.getTotalBlocksCommitted(), commitBatchTo);
     }
 
     function test_SuccessfullyCommitBatchWithBlobs() public {
@@ -101,6 +100,8 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
         vm.blobhashes(blobVersionedHashes);
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+
+        assertEq(getters.getTotalBlocksCommitted(), commitBatchTo);
     }
 
     function test_SuccessfullyCommitBatchWithBlobsPrepublished() public {
@@ -141,6 +142,8 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
         vm.blobhashes(new bytes32[](0));
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+
+        assertEq(getters.getTotalBlocksCommitted(), commitBatchTo);
     }
 
     function test_SuccessfullyCommitBatchValidium() public {
@@ -169,6 +172,8 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+
+        assertEq(getters.getTotalBlocksCommitted(), commitBatchTo);
     }
 
     function test_RevertWhen_CommittingWithWrongL2DACommitmentScheme() public {
@@ -205,7 +210,13 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.blobhashes(blobVersionedHashes);
-        vm.expectRevert(abi.encodeWithSelector(MismatchL2DACommitmentScheme.selector, 3, 4));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                MismatchL2DACommitmentScheme.selector,
+                uint256(L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256),
+                uint256(L2DACommitmentScheme.BLOBS_ZKSYNC_OS)
+            )
+        );
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
@@ -544,6 +555,8 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+
+        assertEq(getters.getTotalBlocksCommitted(), commitBatchTo);
     }
 
     /// @dev Switches the chain to the validium (no-DA) scheme so a protocol-version test can commit without pubdata.
@@ -669,54 +682,5 @@ contract CommittingTest is ExecutorTest {
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
             .encodeCommitBatchesDataZKsyncOS(wrongGenesisStoredBatchInfo, commitInfos);
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_recalculateinteropRootRollingHash() public {
-        InteropRoot[] memory interopRoots = new InteropRoot[](2);
-        InteropRoot memory interopRoot1 = InteropRoot({
-            chainId: 260,
-            blockOrBatchNumber: 1,
-            timestamp: 1700000001,
-            sides: new bytes32[](1)
-        });
-        interopRoot1.sides[0] = 0xfb2eb93318710c98f501f6ff6b11c373baccd0ffcaefe15f97debe09cb7939e1;
-        interopRoots[0] = interopRoot1;
-        InteropRoot memory interopRoot2 = InteropRoot({
-            chainId: 506,
-            blockOrBatchNumber: 17,
-            timestamp: 1700000017,
-            sides: new bytes32[](1)
-        });
-        interopRoot2.sides[0] = 0xf83b13aa476ef3253e6acff5779276da7924fabaec9a8c39274cf021efe1255a;
-        interopRoots[1] = interopRoot2;
-        bytes32 rollingHash = 0x0000000000000000000000000000000000000000000000000000000000000000;
-        for (uint256 i = 0; i < interopRoots.length; i++) {
-            InteropRoot memory interopRoot = interopRoots[i];
-            // The `uint256(128)` is the ABI head offset of `sides` inside `abi.encode(InteropRoot)`
-            // (4 fields: chainId, blockOrBatchNumber, timestamp, sides pointer).
-            console.logBytes(
-                abi.encodePacked(
-                    rollingHash,
-                    interopRoot.chainId,
-                    interopRoot.blockOrBatchNumber,
-                    interopRoot.timestamp,
-                    uint256(128),
-                    interopRoot.sides.length,
-                    interopRoot.sides
-                )
-            );
-            rollingHash = keccak256(
-                abi.encodePacked(
-                    rollingHash,
-                    interopRoot.chainId,
-                    interopRoot.blockOrBatchNumber,
-                    interopRoot.timestamp,
-                    uint256(128),
-                    interopRoot.sides.length,
-                    interopRoot.sides
-                )
-            );
-        }
-        console.logBytes32(rollingHash);
     }
 }

@@ -29,9 +29,6 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
             revert InvalidChainId();
         }
 
-        // Note: on ZKsync OS the chain id is an implicit block property, so unlike the historical
-        // EraVM genesis there is nothing to write into the system context here.
-
         // solhint-disable-next-line func-named-parameters
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
             _ctmDeployer,

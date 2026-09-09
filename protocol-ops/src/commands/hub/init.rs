@@ -31,6 +31,10 @@ pub struct HubInitArgs {
     /// CREATE2 factory salt
     #[clap(long, help_heading = "Advanced input")]
     pub create2_factory_salt: Option<B256>,
+    /// L1 WETH token address (default: mainnet WETH). Set this on any other
+    /// L1, since it is immutable in the deployed bridge contracts.
+    #[clap(long, help_heading = "Advanced input")]
+    pub token_weth_address: Option<Address>,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
@@ -43,6 +47,7 @@ pub async fn run(args: HubInitArgs) -> anyhow::Result<()> {
     let input = HubInitInput {
         owner: owner.address,
         create2_factory_salt: args.create2_factory_salt,
+        token_weth_address: args.token_weth_address,
     };
     let output = hub_init(&mut runner, &sender, &owner, &input).await?;
     let bridgehub_addr = output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
@@ -59,6 +64,7 @@ pub async fn run(args: HubInitArgs) -> anyhow::Result<()> {
 pub struct HubInitInput {
     pub owner: Address,
     pub create2_factory_salt: Option<B256>,
+    pub token_weth_address: Option<Address>,
 }
 
 /// Initialize hub: deploy contracts and accept ownership.
@@ -72,6 +78,7 @@ pub async fn hub_init(
     let deploy_input = DeployInput {
         owner: input.owner,
         create2_factory_salt: input.create2_factory_salt,
+        token_weth_address: input.token_weth_address,
     };
     let t = std::time::Instant::now();
     let output = deploy(runner, deployer, &deploy_input)?;

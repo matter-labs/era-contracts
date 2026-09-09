@@ -100,7 +100,7 @@ contract V31L2ComplexUpgrader {
 /// deployment actually requests (keyed by the entry's observable code hash), so the fresh
 /// implementation-deployment branch of `upgradeSystemContractProxy` is exercised for real instead of
 /// being bypassed with pre-etched code.
-contract FaithfulZKOSDeployer {
+contract FaithfulContractDeployer {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
 
     mapping(bytes32 observableHash => bytes bytecode) internal registered;
@@ -162,7 +162,7 @@ contract RemovedTrackerNeutralizationTest is Test {
         // Real proxy admin, wired exactly like production: the ComplexUpgrader address owns the
         // admin, so the dispatcher's proxy swaps run with the production caller. The deployer
         // materializes exactly the bytecode each entry requests.
-        vm.etch(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, address(new FaithfulZKOSDeployer()).code);
+        vm.etch(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, address(new FaithfulContractDeployer()).code);
         vm.etch(
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
             BytecodeUtils.readDeployedBytecodeL1("SystemContractProxyAdmin.sol", "SystemContractProxyAdmin")
@@ -235,7 +235,7 @@ contract RemovedTrackerNeutralizationTest is Test {
         // The deployer materializes each entry's requested bytecode: the real proxy for fresh
         // proxies, EmptyContract wherever an entry's implementation info asks for it, and an inert
         // placeholder implementation for the other (never-called-here) core contracts.
-        FaithfulZKOSDeployer deployer = FaithfulZKOSDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
+        FaithfulContractDeployer deployer = FaithfulContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
         {
             // The expected Blake hashes are derived independently from the raw artifacts (not from
             // the entries under test), so a list builder emitting a wrong Blake hash fails here.

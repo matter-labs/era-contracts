@@ -20,7 +20,7 @@ import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 
 /// @dev Calls to L2 contracts whose address is below this threshold are only allowed from whitelisted
 /// senders. The protected low-address space covers precompiles, the system/built-in contract range
-/// (0x8000–0xffff, e.g. the contract deployer hook) and the reserved predeploy user-space range
+/// (0x8000–0xffff, e.g. ContractDeployer) and the reserved predeploy user-space range
 /// (0x10000–0x1ffff), which can deploy arbitrary bytecode. Contracts predeployed during ZKsync OS
 /// genesis that sit *above* this threshold (e.g. the Arachnid deterministic-deployment-proxy) are
 /// handled separately via the `dangerousContracts` mapping.

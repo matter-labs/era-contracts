@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-/// @dev No VM-flavor field: this release only accepts ZKsync OS CTMs. The version-scoped v31
-///      preparation flow verifies the source CTM onchain, so a caller-supplied flag could only
-///      restate or contradict that check.
 /// @notice Parameters for the ecosystem upgrade entry point.
 ///         Passed as a struct to avoid stack-depth issues as the parameter list grows.
 // solhint-disable-next-line gas-struct-packing
@@ -45,6 +42,10 @@ struct CTMUpgradeParams {
     address governance;
     /// @notice Optional v31 core output override. Pre-v31 Bridgehub introspection cannot discover this address.
     address chainRegistrationSender;
+    /// @notice Whether the CTM's verifier is the testnet one, which accepts unproven batches.
+    ///         Declared per environment in `upgrade-envs/permanent-values/<env>.toml`: true
+    ///         everywhere except mainnet.
+    bool testnetVerifier;
     /// @notice Asset ID of the ZK token used by the InteropCenter for fixed-fee bundles.
     ///         MUST be non-zero — `InteropCenter.initL2` enforces it, and that runs on the genesis path of
     ///         `performForceDeployedContractsInit`, so a zero value breaks the genesis of chains created

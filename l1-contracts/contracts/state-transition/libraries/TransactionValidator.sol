@@ -45,8 +45,7 @@ library TransactionValidator {
             revert PubdataGreaterThanLimit(_priorityTxMaxPubdata, l2GasForTxBody / _transaction.gasPerPubdataByteLimit);
         }
 
-        // Ensuring that the transaction covers the minimal costs for its processing:
-        // hashing its content, publishing the factory dependencies, etc.
+        // Ensuring that the transaction covers the minimal costs for its processing.
         if (
             getMinimalPriorityTransactionGasLimit(_transaction.data.length, _transaction.gasPerPubdataByteLimit) >
             l2GasForTxBody

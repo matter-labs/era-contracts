@@ -27,9 +27,8 @@ library BatchDecoder {
     /// @notice The currently supported encoding version for execute data.
     /// @dev A breaking re-encoding of the execute wire must bump this version, never reuse an old byte.
     uint8 internal constant SUPPORTED_ENCODING_VERSION_EXECUTE = 2;
-    /// @notice The currently supported encoding version for ZKSync OS commit data.
-    /// @dev Only commit has an OS-specific encoding; the prove/execute wire formats predate
-    /// ZKsync OS and their version bytes stay reserved — never reuse a retired byte.
+    /// @notice The currently supported encoding version for commit data.
+    /// @dev Retired commit encoding versions remain reserved.
     uint8 internal constant SUPPORTED_ENCODING_VERSION_COMMIT = 4;
 
     /// @notice Decodes commit data from a calldata bytes into the last committed batch data and an

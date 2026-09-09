@@ -5,7 +5,7 @@
 //! - `--bridgehub <addr> --chain-id <u64>` for chain-targeted commands.
 //!
 //! When `--env` is passed, each command fills the inputs it supports from the
-//! env's permanent-values TOML and, for version-scoped operations, the v31
+//! env's permanent-values TOML and, for version-scoped operations, the release
 //! upgrade input TOML. Explicit CLI flags override those defaults.
 
 use alloy::primitives::Address;

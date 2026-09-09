@@ -5,7 +5,7 @@
 - `.github/workflows/lint.yaml` — repository lint, error lint, formatting for all Rust crates, protocol-ops Clippy and tests, codespell, and typos.
 - `.github/workflows/l1-contracts-ci.yaml` — DA/L1 builds and tests, generated ABI, genesis, hash, selector, and coverage checks.
 - `.github/workflows/l1-contracts-foundry-ci.yaml` — deploy-script compilation, contract-size checks, and deployment-script smoke tests.
-- `.github/workflows/anvil-interop-ci.yaml` — interop tests, the v31 to v32 upgrade test, and chain-state determinism.
+- `.github/workflows/anvil-interop-ci.yaml` — interop tests, the v31 to v33 upgrade test, and chain-state determinism.
 - `.github/workflows/update-generated-artifacts.yaml` — manual workflow for regenerating artifacts on a same-repository PR.
 - `.github/foundry-versions.env` — the Foundry pin used by CI and local regeneration.
 - `package.json`, `l1-contracts/package.json`, and `da-contracts/package.json` — supported local commands.
@@ -68,7 +68,7 @@ yarn l1 build:anvil-interop-dev-artifacts
 )
 ```
 
-To reproduce the v31 to v32 upgrade job after `yarn build-all-contracts`:
+To reproduce the v31 to v33 upgrade job after `yarn build-all-contracts`:
 
 ```bash
 (
@@ -76,7 +76,7 @@ To reproduce the v31 to v32 upgrade job after `yarn build-all-contracts`:
   cd l1-contracts/test/anvil-interop
   trap 'bash cleanup.sh' EXIT
   yarn install
-  yarn ts-node run-v31-to-v32-upgrade-test.ts
+  yarn ts-node run-upgrade-test.ts
 )
 ```
 

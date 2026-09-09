@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
 // solhint-disable-next-line no-unused-import
-import {MAX_NUMBER_OF_BLOBS} from "system-contracts/contracts/Constants.sol";
+import {MAX_NUMBER_OF_BLOBS} from "../../common/Config.sol";
 
 /// @dev The number of blobs that must be present in the commitment to a batch.
 /// It represents the maximal number of blobs that circuits can support and can be larger

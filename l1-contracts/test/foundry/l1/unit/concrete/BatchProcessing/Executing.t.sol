@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {StdStorage, Test, Vm, stdStorage} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {Utils} from "../Utils/Utils.sol";
 
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
@@ -13,8 +13,7 @@ import {
     BatchHashMismatch,
     CantExecuteUnprovenBatches,
     NonSequentialBatch,
-    PriorityOperationsRollingHashMismatch,
-    QueueIsEmpty
+    PriorityOperationsRollingHashMismatch
 } from "contracts/common/L1ContractErrors.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
@@ -232,11 +231,6 @@ contract ExecutingTest is ExecutorTest {
             executor.proveBatchesSharedBridge(address(0), processBatchFrom, processBatchTo, processData);
         }
 
-        bytes32 randomFactoryDeps0 = Utils.randomBytes32("randomFactoryDeps0");
-
-        bytes[] memory factoryDeps = new bytes[](1);
-        factoryDeps[0] = bytes.concat(randomFactoryDeps0);
-
         uint256 gasPrice = 1000000000;
         uint256 l2GasLimit = 1000000;
         uint256 baseCost = mailbox.l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
@@ -252,7 +246,7 @@ contract ExecutingTest is ExecutorTest {
                 l2Calldata: bytes(""),
                 l2GasLimit: l2GasLimit,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-                factoryDeps: factoryDeps,
+                factoryDeps: new bytes[](0),
                 refundRecipient: address(0)
             })
         );

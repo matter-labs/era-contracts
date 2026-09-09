@@ -365,11 +365,11 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function test_validateMigrationToL2() public {
-        address expectedAddress = L2ContractHelper.computeCreateAddress(L2_FACTORY_ADDR, uint256(0));
+        address expectedAddress = L2ContractHelper.computeCreateAddress(L2_FACTORY_ADDR, uint256(1));
 
         vm.expectEmit(true, false, false, true);
         emit IPermanentRestriction.AllowL2Admin(expectedAddress);
-        permRestriction.allowL2Admin(uint256(0));
+        permRestriction.allowL2Admin(uint256(1));
 
         Call memory call = _encodeMigraationCall(true, true, true, true, true, expectedAddress);
 
@@ -489,13 +489,13 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
     function test_allowL2Admin_AlreadyWhitelisted() public {
         // First, whitelist an admin
-        permRestriction.allowL2Admin(0);
+        permRestriction.allowL2Admin(1);
 
-        address expectedAddress = L2ContractHelper.computeCreateAddress(L2_FACTORY_ADDR, 0);
+        address expectedAddress = L2ContractHelper.computeCreateAddress(L2_FACTORY_ADDR, 1);
 
         // Try to whitelist the same admin again
         vm.expectRevert(abi.encodeWithSelector(AlreadyWhitelisted.selector, expectedAddress));
-        permRestriction.allowL2Admin(0);
+        permRestriction.allowL2Admin(1);
     }
 
     function test_validateRemoveRestriction_ShortData() public {

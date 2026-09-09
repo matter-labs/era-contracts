@@ -5,9 +5,9 @@ pragma solidity ^0.8.24;
 
 import {console2 as console} from "forge-std/Script.sol";
 
-import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
-import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
+import {CTMUpgrade_v33} from "../../../../deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol";
+import {CoreUpgrade_v33} from "../../../../deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
@@ -36,7 +36,7 @@ import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.
 import {Bytes} from "contracts/vendor/Bytes.sol";
 
 /// @notice Test-only CTM upgrade that mocks large bytecode reads to avoid MemoryOOG
-contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
+contract CTMUpgrade_v33_Test is CTMUpgrade_v33 {
     /// @notice Exposes the deployed PriorityOpLowerBound registry for the test's chain-upgrade precondition.
     function exposedPriorityOpLowerBound() external view returns (address) {
         return priorityOpLowerBound;
@@ -89,7 +89,7 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
 }
 
 /// @notice Test-only Core upgrade that skips governance calls the local fixture cannot satisfy.
-contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
+contract CoreUpgrade_v33_Test is CoreUpgrade_v33 {
     /// @notice Override to skip the ownership-acceptance and `setAddresses` calls, which need ownership
     ///         hand-offs the fixture does not perform.
     /// @dev The interop-handler wiring is kept: it is what makes a v31 ecosystem match a from-scratch v32
@@ -97,7 +97,7 @@ contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
     ///      the calls themselves are covered by `PreV32ParityCalls.t.sol`, not here.
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
         console.log("Test mode: keeping only the L1InteropHandler wiring in stage 1");
-        return _buildL1InteropHandlerWiringCalls();
+        return super.prepareVersionSpecificStage1GovernanceCallsL1();
     }
 }
 
@@ -144,13 +144,13 @@ contract UpgradeIntegrationTest_Local is
     bytes32 private _expectedRewrittenUpgradeTxHash;
 
     /// @notice Override to inject the mocked Core upgrade (keeps only the interop-handler wiring in stage 1).
-    function createCoreUpgrade() internal override returns (CoreUpgrade_v31) {
-        return new CoreUpgrade_v31_Test();
+    function createCoreUpgrade() internal override returns (CoreUpgrade_v33) {
+        return new CoreUpgrade_v33_Test();
     }
 
     /// @notice Override to inject the mocked CTM upgrade (skips bytecode-heavy reads).
-    function createCTMUpgrade() internal override returns (CTMUpgrade_v31) {
-        return new CTMUpgrade_v31_Test();
+    function createCTMUpgrade() internal override returns (CTMUpgrade_v33) {
+        return new CTMUpgrade_v33_Test();
     }
 
     /// @notice Bump the CTM's protocol version from the upgrade input TOML so the local fixture
@@ -181,7 +181,7 @@ contract UpgradeIntegrationTest_Local is
 
         // v32 upgrade precondition: the chain's priority-op lower bound must be recorded before the
         // upgrade executes (permissionless; production runs RecordPriorityOpLowerBound.s.sol).
-        IPriorityOpLowerBound(CTMUpgrade_v31_Test(address(ctmUpgrade)).exposedPriorityOpLowerBound())
+        IPriorityOpLowerBound(CTMUpgrade_v33_Test(address(ctmUpgrade)).exposedPriorityOpLowerBound())
             .lowerBoundPriorityOp(sourceChainDiamond);
     }
 

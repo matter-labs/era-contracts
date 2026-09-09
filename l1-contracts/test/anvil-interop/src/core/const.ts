@@ -101,10 +101,9 @@ export const INTEROP_BUNDLE_SENT_TOPIC = utils.id(INTEROP_BUNDLE_SENT_SIGNATURE)
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 
 // Merkle tree constants for processLogsAndMessages
-// From l1-contracts/frozen-system-constants/Constants.sol: L2_TO_L1_LOGS_MERKLE_TREE_DEPTH = 14 + 1
 export const L2_TO_L1_LOGS_MERKLE_TREE_DEPTH = 15;
 
-// keccak256(new bytes(88)) — from Constants.sol:107
+// keccak256(new bytes(88)) — from contracts/common/Config.sol.
 export const L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba";
 
 // From IMessageRoot.sol — keccak256(abi.encodePacked(new bytes(96)))

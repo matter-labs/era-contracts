@@ -18,6 +18,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {
     DEFAULT_L2_LOGS_TREE_ROOT_HASH,
     EMPTY_STRING_KECCAK,
+    GENESIS_BATCH_COMMITMENT,
     L2_TO_L1_LOG_SERIALIZE_SIZE,
     MAX_ALLOWED_MINOR_VERSION_DELTA
 } from "../common/Config.sol";
@@ -240,7 +241,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
             revert GenesisBatchHashZero();
         }
-        if (_chainCreationParams.genesisBatchCommitment != bytes32(uint256(1))) {
+        if (_chainCreationParams.genesisBatchCommitment != GENESIS_BATCH_COMMITMENT) {
             revert GenesisBatchCommitmentIncorrect();
         }
 
@@ -746,15 +747,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// param _depositSender the address of that sent the deposit
     /// param _ctmData the data of the migration
     function forwardedBridgeConfirmTransferResult(
-        uint256,
-        /* _chainId */
-        TxStatus,
-        /* _txStatus */
-        bytes32,
-        /* _assetInfo */
-        address,
-        /* _depositSender */
-        bytes calldata /* _ctmData */
+        uint256, // _chainId
+        TxStatus, // _txStatus
+        bytes32, // _assetInfo
+        address, // _depositSender
+        bytes calldata // _ctmData
     ) external onlyChainAssetHandler {
         // Function is empty due to the fact that when calling `forwardedBridgeBurn` there are no
         // state updates that occur.

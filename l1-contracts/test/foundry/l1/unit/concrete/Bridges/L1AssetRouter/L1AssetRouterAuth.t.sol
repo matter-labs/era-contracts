@@ -6,9 +6,10 @@ import {Test} from "forge-std/Test.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
-/// @notice Pins Bridgehub-only authorization after removing the `onlyBridgehubOrEra` exception
-/// that admitted `ERA_DIAMOND_PROXY` for `ERA_CHAIN_ID` on base-token deposits.
+/// @notice Only Bridgehub can submit deposits to the L1 asset router.
 contract L1AssetRouterAuthTest is Test {
+    uint256 internal constant DEST_CHAIN_ID = 271;
+
     L1AssetRouter internal router;
 
     address internal bridgehub = makeAddr("bridgehub");
@@ -20,11 +21,11 @@ contract L1AssetRouterAuthTest is Test {
 
     function test_RevertWhen_NonBridgehubCallsBridgehubDepositBaseToken() public {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        router.bridgehubDepositBaseToken(271, bytes32("assetId"), originalCaller, 1 ether);
+        router.bridgehubDepositBaseToken(DEST_CHAIN_ID, bytes32("assetId"), originalCaller, 1 ether);
     }
 
     function test_RevertWhen_NonBridgehubCallsBridgehubDeposit() public {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        router.bridgehubDeposit(271, originalCaller, 0, hex"");
+        router.bridgehubDeposit(DEST_CHAIN_ID, originalCaller, 0, hex"");
     }
 }

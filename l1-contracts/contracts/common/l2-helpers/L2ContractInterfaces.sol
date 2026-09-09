@@ -19,13 +19,9 @@ import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 
 // solhint-disable no-unused-import
 import {
-    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-    L2_FORCE_DEPLOYER_ADDR,
-    L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-    L2_COMPRESSOR_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_ASSET_ROUTER_ADDR,
@@ -39,10 +35,7 @@ import {
     L2_INTEROP_HANDLER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
-    L2_INTEROP_COMMITMENT_TREE_ADDR,
-    L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
-    MAX_BUILT_IN_CONTRACT_ADDR,
-    L2_BOOTLOADER_ADDRESS
+    L2_INTEROP_ATTRIBUTE_PARSER_ADDR
 } from "./L2ContractAddresses.sol";
 
 /// @dev The address of the special smart contract that can send arbitrary length message as an L2 log

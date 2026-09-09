@@ -111,7 +111,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             revert EmptyAddress();
         }
         bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
-        emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), L2_TOKEN_PROXY_BYTECODE_HASH());
+        emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), keccak256(type(BeaconProxy).runtimeCode));
     }
 
     /// @notice Registers the base token in the L2AssetTracker during genesis deployment, if needed.
@@ -173,14 +173,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         }
     }
 
-    /// @inheritdoc IL2NativeTokenVault
-    /// @dev Kept for selector compatibility with the former public storage getter. The value is now
-    /// derived from the exact bytecode used by `_deployBeaconProxy`, rather than supplied by governance.
-    // solhint-disable-next-line func-name-mixedcase
-    function L2_TOKEN_PROXY_BYTECODE_HASH() public pure override returns (bytes32) {
-        return keccak256(type(BeaconProxy).runtimeCode);
-    }
-
     /// @dev Records the token in the L2AssetTracker (total-supply / outbound bookkeeping).
     function _registerTokenInAssetTracker(bytes32 _assetId, uint256 _originChainId) internal override {
         L2_ASSET_TRACKER.registerNewTokenIfNeeded(_assetId, _originChainId);
@@ -193,8 +185,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         bytes32 _salt,
         uint256 /* _tokenOriginChainId */
     ) internal virtual override returns (BeaconProxy proxy) {
-        // `L2_LEGACY_SHARED_BRIDGE` is zero on every chain of this line, so L2NativeTokenVault
-        // is the sole deployer of all bridged tokens.
         address proxyAddress = Create2.deploy(
             0,
             _salt,

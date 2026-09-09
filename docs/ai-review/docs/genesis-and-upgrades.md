@@ -9,10 +9,9 @@
 ## Context
 
 Every chain this repository can deploy or upgrade runs ZKsync OS. EraVM chains are not
-deployable, configurable, or upgradable from this codebase; the only Era remnants are
-deliberately retained storage tombstones, wire-format reservations, and version-scoped
-verification of already-executed historical upgrades (see the v31 verification module in
-protocol-ops).
+deployable, configurable, or upgradable from this codebase. Runtime compatibility retains
+storage tombstones and wire-format reservations. Version-scoped upgrade tooling remains
+under its historical version directories.
 
 ### Genesis
 
@@ -60,7 +59,7 @@ take this upgrade.
 
 ## Common pitfalls
 
-- Reintroducing Era-generation patterns (ContractDeployer force deployments, Era bytecode-hash
+- Reintroducing Era-generation patterns (`forceDeployOnAddresses`, Era bytecode-hash
   computation) into scripts or contracts: nothing in the current tree may depend on them.
 - Deviations between genesis and upgrades (mentioned above). Please review the code and verify exhaustively that the contracts/state force deployed, upgraded, initialized, or assumed during the upgrade correctly correspond to the genesis gen, and vice versa.
 

@@ -2,8 +2,8 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-// solhint-disable-next-line no-unused-import
-import {SYSTEM_CONTRACTS_OFFSET} from "system-contracts/contracts/Constants.sol";
+/// @dev The offset for system contract addresses.
+uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000;
 
 /// @dev the offset for the system hooks for ZKsync OS
 uint160 constant SYSTEM_HOOKS_OFFSET = 0x7000;
@@ -40,12 +40,6 @@ uint160 constant MAX_BUILT_IN_CONTRACT_ADDR = BUILT_IN_CONTRACTS_OFFSET + 0x1fff
 /// @dev The formal address of the initial program of the system: the bootloader
 address constant L2_BOOTLOADER_ADDRESS = address(SYSTEM_CONTRACTS_OFFSET + 0x01);
 
-/// @dev The address of the AccountCodeStorage system contract
-address constant L2_ACCOUNT_CODE_STORAGE_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x02);
-
-/// @dev The address of the known code storage system contract
-address constant L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x04);
-
 /// @dev The address of the L2 deployer system contract.
 address constant L2_DEPLOYER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x06);
 
@@ -61,20 +55,11 @@ address constant L2_FORCE_DEPLOYER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x07
 /// @dev The address of the L2ToL1Messenger system contract
 address constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x08);
 
-/// @dev the address of the msg value system contract
-address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
-
 /// @dev The address of the eth token system contract
 address constant L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0a);
 
 /// @dev The address of the context system contract
 address constant L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0b);
-
-/// @dev The address of the pubdata chunk publisher contract
-address constant L2_PUBDATA_CHUNK_PUBLISHER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x11);
-
-// @dev The address of the compressor contract.
-address constant L2_COMPRESSOR_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0e);
 
 /// @dev The address used to execute complex upgrades, also used for the genesis upgrade
 address constant L2_COMPLEX_UPGRADER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0f);

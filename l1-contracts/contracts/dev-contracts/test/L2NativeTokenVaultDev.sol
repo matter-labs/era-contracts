@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
@@ -20,7 +21,7 @@ contract L2NativeTokenVaultDev is L2NativeTokenVault {
 
         tokenBeacon.transferOwnership(owner());
         bridgedTokenBeacon = IBeacon(address(tokenBeacon));
-        emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), L2_TOKEN_PROXY_BYTECODE_HASH());
+        emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), keccak256(type(BeaconProxy).runtimeCode));
     }
 
     function test() external pure {

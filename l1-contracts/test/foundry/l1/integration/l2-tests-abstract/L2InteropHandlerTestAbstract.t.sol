@@ -28,7 +28,6 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";

@@ -421,8 +421,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         );
     }
 
-    /// @dev Mocks the rollup L1 DA validator's `checkDA` for the given batch: an all-zero blob
-    /// output, which the ZKsync OS commit path accepts (it verifies DA out of band).
+    /// @dev Isolates batch-processing tests from DA validation with an accepted all-zero blob output.
     function _mockDAForCommit(uint256 batchNumber) internal {
         bytes32[] memory blobHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
         bytes32[] memory blobCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);

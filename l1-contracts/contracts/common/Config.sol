@@ -2,26 +2,52 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-// solhint-disable no-unused-import
-import {
-    L2DACommitmentScheme,
-    PubdataContent,
-    L2_TO_L1_LOG_SERIALIZE_SIZE,
-    L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
-    SUPPORTED_PROOF_METADATA_VERSION,
-    HARD_CODED_CHAIN_ID
-} from "system-contracts/contracts/Constants.sol";
-// solhint-enable no-unused-import
-
 /// @dev `keccak256("")`
 bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
+/// @dev Prefixes and address length for the EVM CREATE address's RLP encoding.
 uint8 constant RLP_SHORT_STRING_PREFIX = 0x80;
 uint8 constant RLP_SHORT_LIST_PREFIX = 0xc0;
 bytes1 constant RLP_ADDRESS_PREFIX = 0x94;
 uint256 constant RLP_ENCODED_ADDRESS_LENGTH = 21;
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = bytes32(0);
+
+/// @dev Required commitment for the genesis batch.
+bytes32 constant GENESIS_BATCH_COMMITMENT = bytes32(uint256(1));
+
+/// @dev Serialized size of `(uint8 shardId, bool isService, uint16 txNumberInBlock, address sender, bytes32 key, bytes32 value)`.
+uint256 constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
+
+/// @dev `keccak256(new bytes(L2_TO_L1_LOG_SERIALIZE_SIZE))`.
+bytes32 constant L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = 0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba;
+
+/// @dev Supported L2->L1 log proof metadata version.
+uint256 constant SUPPORTED_PROOF_METADATA_VERSION = 1;
+
+/// @dev Chain ID reserved on Ethereum Mainnet and Sepolia.
+uint256 constant HARD_CODED_CHAIN_ID = 270;
+
+/// @dev Pubdata capacity of a blob: 4096 field elements with 31 bytes of data each.
+uint256 constant BLOB_SIZE_BYTES = 126_976;
+
+/// @dev Maximum supported blobs per batch.
+uint256 constant MAX_NUMBER_OF_BLOBS = 6;
+
+/// @notice Pubdata commitment mechanism. See {protocol-docs/atomicity/security.md#data-availability}.
+enum L2DACommitmentScheme {
+    NONE,
+    EMPTY_NO_DA,
+    PUBDATA_KECCAK256,
+    BLOBS_AND_PUBDATA_KECCAK256,
+    BLOBS_ZKSYNC_OS
+}
+
+/// @notice Portion of pubdata committed by a batch. See {protocol-docs/atomicity/security.md#data-availability}.
+enum PubdataContent {
+    FULL_PUBDATA,
+    LOGS_ONLY
+}
 
 /// @dev Denotes the type of the ZKsync OS transaction that came from L1.
 uint256 constant ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE = 127;
@@ -91,7 +117,7 @@ uint256 constant MAX_GAS_PER_TRANSACTION = 80_000_000;
 /// value.
 uint256 constant L1_GAS_PER_PUBDATA_BYTE = 17;
 
-/// @dev The number of pubdata an L1->L2 transaction requires with each new factory dependency
+/// @dev Maximum number of factory dependencies in a system upgrade transaction.
 uint256 constant MAX_NEW_FACTORY_DEPS = 64;
 
 /// @dev The L2 gasPricePerPubdata required to be used in bridges.

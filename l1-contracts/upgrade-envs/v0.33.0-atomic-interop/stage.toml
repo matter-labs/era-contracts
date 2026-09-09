@@ -1,0 +1,72 @@
+# Upgrade input for the stage environment on the v33 release.
+#
+# Copied from the v0.31.0-interopB entry of the same name: these values describe the
+# *environment* (bridgehub address, chain id, create2 salt), not the release. The target
+# protocol version and chain-creation params come from
+# `configs/genesis/zksync-os/latest.json`.
+#
+# The file must exist for `--env <name>` to work at all: `upgrade-prepare-all` refuses to fall
+# back to the local default, which would silently substitute local's values for the keys this
+# file does supply.
+#
+# ⚠ Salts, `owner_address` and `era_chain_id` are NOT read from this file yet.
+# `EnvConfig` still resolves them from `upgrade-envs/v0.31.0-interopB/<env>.toml`
+# (`env_config.rs`'s `V31_UPGRADE_DIR`), so editing them here has no effect — and a v33
+# prepare consequently reuses the v31 CREATE2 salt, which the salt is explicitly not
+# supposed to be (it rotates per regen, or CREATE2 returns the previously deployed
+# contract). Moving that namespace per release also moves the canonical review-artifact
+# directory (`output/<env>/`), so it is left as a follow-up decision rather than folded
+# into this PR.
+#
+# Pruned for v33: the EraVM chain-creation params and v29-era leftovers earlier envs carried
+# (bootloader / default-AA / EVM-emulator hashes, `recursion_*_vk_hash`, `genesis_*`,
+# `diamond_init_*`, `v28_protocol_version`, the priority-tx gas knobs) are gone — v33 is
+# ZKsync OS-only and nothing on this path reads them. Chain-creation params come from
+# `configs/genesis/zksync-os/latest.json`.
+
+era_chain_id = 270
+testnet_verifier = true
+governance_upgrade_timer_initial_delay = 1200
+owner_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
+
+support_l2_legacy_shared_bridge_test = false
+
+# v31 -> v33.
+old_protocol_version = 0x1f00000000
+
+
+[contracts]
+governance_min_delay = 0
+
+max_number_of_chains = 100
+create2_factory_salt = "0xb41d84fc2f6ddcedd3b7f5ca9e2cb874316fb32e63a2bbf9ad406dac384bf4d8"
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+legacy_gov_salt = "0x0abb3e6da2ba65373370237dce4f0092f09f2f75d6d9af5cc7185f4404e8269a"
+validator_timelock_execution_delay = 0
+bridgehub_proxy_address = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
+rollup_da_manager = "0xeb7c0daaddfb52afa05400b489e7497b271d6122"
+
+governance_security_council_address = "0xed04b1ac422251851a3EC953Ff4395e5c2443647"
+latest_protocol_version = 0x2100000000
+l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
+protocol_upgrade_handler_proxy_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
+
+[tokens]
+token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
+
+# Kept deliberately: read into `config.legacyGatewayChainId`, which is baked into the redeployed
+# `L1MessageRoot` as its `ERA_GATEWAY_CHAIN_ID` immutable — dropping it would redeploy that
+# implementation with 0. (mainnet spells the same value `[gateway] chain_id`; both keys are read.)
+[legacy_gateway]
+chain_id = 123
+
+[state_transition]
+diamond_init_addr = "0x721035F2420fEc7EF12229ceF4A55DC0C7CB19EA"
+executor_facet_addr = "0xDdFB1d1403fA94c7bA810e4Abf790fC73b5A3B9D"
+genesis_upgrade_addr = "0x65dAd0914338b7b99bB70CD2c62A3BC7BcC26a81"
+getters_facet_addr = "0xb4bBbbA20Ebc8d4E0aCcD7EBBA04AD887ACCf783"
+
+
+[create2_factory_salts]
+"0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b" = "0x472581f2aaccdbba79ab5e964cb28eb8d5937fae2bd4aa87c52c453478da9890"
+"0x73bee414c6e006525f3cceedf6d8004c0370502e" = "0xe2fa245eeb7a45aaf8e4add75c988abe4019abc7fd81e2f8593bafc52cb43099"
