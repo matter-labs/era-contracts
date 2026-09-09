@@ -485,6 +485,15 @@ object "EvmEmulator" {
         }
         
         function build_farcall_abi(isSystemCall, gas, dataStart, dataLength) -> farCallAbi {
+            // dataStart and dataLength are 32 bits wide each. A wider value would silently overlap
+            // the neighbouring fields: bits above 32 of dataStart land in dataLength, so an empty
+            // slice could be packed as a non-empty one. Callers derive dataStart from a memory
+            // pointer, which getMemPointer() and MAX_POSSIBLE_MEM_LEN() keep well inside 32 bits,
+            // so this is unreachable and only pins the field widths down.
+            if or(gt(dataStart, MAX_UINT32()), gt(dataLength, MAX_UINT32())) {
+                panic()
+            }
+        
             farCallAbi := shl(248, isSystemCall)
             // dataOffset is 0
             farCallAbi := or(farCallAbi, shl(64, dataStart))
@@ -3574,6 +3583,15 @@ object "EvmEmulator" {
             }
             
             function build_farcall_abi(isSystemCall, gas, dataStart, dataLength) -> farCallAbi {
+                // dataStart and dataLength are 32 bits wide each. A wider value would silently overlap
+                // the neighbouring fields: bits above 32 of dataStart land in dataLength, so an empty
+                // slice could be packed as a non-empty one. Callers derive dataStart from a memory
+                // pointer, which getMemPointer() and MAX_POSSIBLE_MEM_LEN() keep well inside 32 bits,
+                // so this is unreachable and only pins the field widths down.
+                if or(gt(dataStart, MAX_UINT32()), gt(dataLength, MAX_UINT32())) {
+                    panic()
+                }
+            
                 farCallAbi := shl(248, isSystemCall)
                 // dataOffset is 0
                 farCallAbi := or(farCallAbi, shl(64, dataStart))
