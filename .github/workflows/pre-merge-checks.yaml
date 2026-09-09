@@ -250,11 +250,21 @@ jobs:
     needs: [changes, build-artifacts, check-hashes, check-selectors, check-zkstack-out, state-generation-check]
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # To re-read the PR's draft state; see below.
+      pull-requests: read
 
     steps:
+      # Draft state is read live rather than from github.event, because a re-run replays the
+      # original event payload: re-running a draft-era run after the PR was marked ready would
+      # otherwise skip every validator and still report this gate — the required check — as a
+      # successful verification of the current head.
       - name: Verify every pre-merge check ran or was legitimately skipped
         env:
-          EXPECTED_SKIP: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft) || needs.changes.outputs.contracts != 'true' }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CONTRACTS: ${{ needs.changes.outputs.contracts }}
           CHANGES: ${{ needs.changes.result }}
           BUILD: ${{ needs.build-artifacts.result }}
           HASHES: ${{ needs.check-hashes.result }}
@@ -269,8 +279,21 @@ jobs:
             exit 1
           fi
 
-          if [ "$EXPECTED_SKIP" = "true" ]; then
+          # Fail closed: if the PR's current state cannot be read, demand real results.
+          draft_now=false
+          if [ -n "${PR_NUMBER:-}" ]; then
+            if ! draft_now=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .draft); then
+              echo "::warning::could not read the PR's draft state; requiring real results."
+              draft_now=false
+            fi
+          fi
+          echo "Draft right now: $draft_now (payload said ${{ github.event.pull_request.draft }})"
+
+          if [ "$draft_now" = "true" ] || [ "$CONTRACTS" != "true" ]; then
+            EXPECTED_SKIP=true
             echo "Draft PR or no artifact-affecting changes: the artifact checks are expected to skip."
+          else
+            EXPECTED_SKIP=false
           fi
 
           status=0
