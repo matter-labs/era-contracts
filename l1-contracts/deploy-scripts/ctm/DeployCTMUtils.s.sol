@@ -82,17 +82,6 @@ struct MultiProofConfig {
     address ziskRangeVerifierAddr;
 }
 
-/// @notice Addresses of the ZiSK multi-proof verifiers. They stay outside
-///         `CTMDeployedAddresses` because only the L1 CTM deployment creates
-///         them: the Gateway CTM deployer has no ZiSK lane.
-// solhint-disable-next-line gas-struct-packing
-struct MultiProofAddresses {
-    address airbenderVerifier;
-    address ziskVerifier;
-    address ziskTestnetVerifier;
-    address multiProofVerifier;
-}
-
 // solhint-disable-next-line gas-struct-packing
 struct ContractsConfig {
     address multicall3Addr;
@@ -122,7 +111,6 @@ abstract contract DeployCTMUtils is DeployUtils {
     // Note: This variable is initialized by concrete implementations before use
     GeneratedData internal generatedData; //slither-disable-line uninitialized-state
     CTMDeployedAddresses internal ctmAddresses;
-    MultiProofAddresses internal multiProofAddresses;
     // Note: Addresses discovered from already deployed core contracts (Bridgehub, AssetRouter, etc.)
     // This variable is initialized by concrete implementations before use
     CoreDeployedAddresses internal coreAddresses; //slither-disable-line uninitialized-state
@@ -307,20 +295,20 @@ abstract contract DeployCTMUtils is DeployUtils {
             // beforehand (see verifiers/README.md) and passed by address.
             return abi.encode(config.multiProof.ziskPlonkVerifierAddr);
         } else if (compareStrings(contractName, "ZiskTestnetVerifier")) {
-            address ziskRangeVerifier = multiProofAddresses.ziskVerifier;
+            address ziskRangeVerifier = ctmAddresses.multiProof.ziskVerifier;
             return abi.encode(ziskRangeVerifier);
         } else if (compareStrings(contractName, "MultiProofVerifier")) {
             // The Airbender side is the ZKsync OS dual verifier, so the
             // sub-verifier registry has one home.
             // An operator may supply a range verifier of their own; otherwise
             // the one deployed alongside this wrapper is used.
-            address ziskRangeVerifier = multiProofAddresses.ziskVerifier;
+            address ziskRangeVerifier = ctmAddresses.multiProof.ziskVerifier;
             if (config.testnetVerifier) {
-                ziskRangeVerifier = multiProofAddresses.ziskTestnetVerifier;
+                ziskRangeVerifier = ctmAddresses.multiProof.ziskTestnetVerifier;
             }
-            return abi.encode(multiProofAddresses.airbenderVerifier, ziskRangeVerifier);
+            return abi.encode(ctmAddresses.multiProof.airbenderVerifier, ziskRangeVerifier);
         } else if (compareStrings(contractName, "MultiProofTestnetVerifier")) {
-            return abi.encode(multiProofAddresses.multiProofVerifier);
+            return abi.encode(ctmAddresses.multiProof.multiProofVerifier);
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {

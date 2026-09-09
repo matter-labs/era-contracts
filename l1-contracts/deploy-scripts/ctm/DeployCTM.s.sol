@@ -220,20 +220,19 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName);
 
+        delete ctmAddresses.multiProof;
+        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
+        address airbenderVerifier = deploySimpleContract(verifierName);
         if (config.multiProof.enabled) {
-            deployMultiProofVerifiers();
+            deployMultiProofVerifiers(airbenderVerifier);
         } else {
-            (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
-            ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName);
+            ctmAddresses.stateTransition.verifiers.verifier = airbenderVerifier;
         }
     }
 
-    /// @notice Deploy the multi-proof verifier lane, which requires BOTH an
-    ///         Airbender proof and a ZiSK proof for each state transition.
-    ///         The Airbender side is the ZKsync OS verifier, which holds the
-    ///         PLONK sub-verifier that the deployment and upgrade tooling
-    ///         introspects.
-    function deployMultiProofVerifiers() internal {
+    /// @notice Deploys the multiproof verifier and its ZiSK components.
+    /// @param _airbenderVerifier Deployed Airbender component.
+    function deployMultiProofVerifiers(address _airbenderVerifier) internal {
         // ZiskVerifier wraps a pre-deployed standalone snarkJS Plonk verifier
         // (see verifiers/README.md for its generation and deployment) passed
         // in by address.
@@ -259,23 +258,22 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
                 "zisk_range_verifier_addr holds no code: deploy the range verifier first"
             );
         }
-        (, string memory airbenderVerifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
-        multiProofAddresses.airbenderVerifier = deploySimpleContract(airbenderVerifierName);
-        multiProofAddresses.ziskVerifier = config.multiProof.ziskRangeVerifierAddr;
-        if (multiProofAddresses.ziskVerifier == address(0)) {
-            multiProofAddresses.ziskVerifier = deploySimpleContract("ZiskVerifier");
+        ctmAddresses.multiProof.airbenderVerifier = _airbenderVerifier;
+        ctmAddresses.multiProof.ziskVerifier = config.multiProof.ziskRangeVerifierAddr;
+        if (ctmAddresses.multiProof.ziskVerifier == address(0)) {
+            ctmAddresses.multiProof.ziskVerifier = deploySimpleContract("ZiskVerifier");
         }
         if (config.testnetVerifier) {
-            multiProofAddresses.ziskTestnetVerifier = deploySimpleContract("ZiskTestnetVerifier");
+            ctmAddresses.multiProof.ziskTestnetVerifier = deploySimpleContract("ZiskTestnetVerifier");
         }
-        multiProofAddresses.multiProofVerifier = deploySimpleContract("MultiProofVerifier");
+        ctmAddresses.multiProof.multiProofVerifier = deploySimpleContract("MultiProofVerifier");
 
         if (config.testnetVerifier) {
             // Testnet: wrap MultiProofVerifier with MultiProofTestnetVerifier for mock proof support.
             ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract("MultiProofTestnetVerifier");
         } else {
             // Prod: use MultiProofVerifier directly.
-            ctmAddresses.stateTransition.verifiers.verifier = multiProofAddresses.multiProofVerifier;
+            ctmAddresses.stateTransition.verifiers.verifier = ctmAddresses.multiProof.multiProofVerifier;
         }
     }
 
@@ -380,24 +378,28 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.proxies.chainTypeManager
         );
         vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
-        if (multiProofAddresses.airbenderVerifier != address(0)) {
-            vm.serializeAddress("state_transition", "airbender_verifier_addr", multiProofAddresses.airbenderVerifier);
+        if (ctmAddresses.multiProof.airbenderVerifier != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "airbender_verifier_addr",
+                ctmAddresses.multiProof.airbenderVerifier
+            );
         }
-        if (multiProofAddresses.ziskVerifier != address(0)) {
-            vm.serializeAddress("state_transition", "zisk_verifier_addr", multiProofAddresses.ziskVerifier);
+        if (ctmAddresses.multiProof.ziskVerifier != address(0)) {
+            vm.serializeAddress("state_transition", "zisk_verifier_addr", ctmAddresses.multiProof.ziskVerifier);
         }
-        if (multiProofAddresses.ziskTestnetVerifier != address(0)) {
+        if (ctmAddresses.multiProof.ziskTestnetVerifier != address(0)) {
             vm.serializeAddress(
                 "state_transition",
                 "zisk_testnet_verifier_addr",
-                multiProofAddresses.ziskTestnetVerifier
+                ctmAddresses.multiProof.ziskTestnetVerifier
             );
         }
-        if (multiProofAddresses.multiProofVerifier != address(0)) {
+        if (ctmAddresses.multiProof.multiProofVerifier != address(0)) {
             vm.serializeAddress(
                 "state_transition",
                 "multi_proof_verifier_addr",
-                multiProofAddresses.multiProofVerifier
+                ctmAddresses.multiProof.multiProofVerifier
             );
         }
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
