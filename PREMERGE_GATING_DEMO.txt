@@ -1,3 +1,0 @@
-Temporary marker: proves the pre-merge tier skips on a draft push while the
-changed-files gate says the artifacts COULD be affected (this path is not excluded).
-Removed in the commit that follows the ready_for_review transition.
