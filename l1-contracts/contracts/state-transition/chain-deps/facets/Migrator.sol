@@ -10,7 +10,8 @@ import {
     CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
     CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET,
     PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
-    PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET
+    PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET,
+    AIRBENDER_PROOF_SYSTEM_DISABLED
 } from "../../../common/Config.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
@@ -164,9 +165,11 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         if (_originalCaller != s.admin) {
             revert NotChainAdmin(_originalCaller, s.admin);
         }
-        // The multi-proof settings are not carried in `ZKChainCommitment`, so the destination would
-        // bring the chain up single-proof, silently. Withdraw the capability first.
-        if (s.multiProofEnabled) {
+        // `disabledProofSystems` is not carried in `ZKChainCommitment`, and the destination
+        // initialises Era chains with the Airbender lane masked. Migrating from any other posture
+        // would silently change which proof systems the chain settles behind, so require the one
+        // the destination will come up in.
+        if (!s.zksyncOS && s.disabledProofSystems != AIRBENDER_PROOF_SYSTEM_DISABLED) {
             revert MultiProofChainCannotMigrate();
         }
 

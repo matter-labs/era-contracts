@@ -129,12 +129,9 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
         s.zksyncOS = IS_ZKSYNC_OS;
 
-        // A new Era chain starts single-proof: `multiProofEnabled` is false, so its batches carry no
-        // Airbender commitment, and the lane has to be masked off for the gate to accept them. It is
-        // also the only order that can work — the Airbender lane needs a predecessor whose commitment
-        // the guest can open, and the genesis commitment is a config value with no supplyable
-        // preimage. The admin brings the lane up later, once real batches have settled, with
-        // `setMultiProofEnabled` followed by `setProofSystemStatus`.
+        // A new Era chain starts single-proof, so its batches carry no Airbender commitment and the
+        // lane is masked off. The admin brings it up later with `setProofSystemStatus`, on a drained
+        // pipeline.
         if (!IS_ZKSYNC_OS) {
             s.disabledProofSystems = AIRBENDER_PROOF_SYSTEM_DISABLED;
         }

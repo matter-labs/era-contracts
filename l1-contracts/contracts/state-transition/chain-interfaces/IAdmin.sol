@@ -49,13 +49,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _enabled Whether the selected proof system is enabled.
     function setProofSystemStatus(uint8 _proofSystem, bool _enabled) external;
 
-    /// @notice Sets whether this Era chain runs the multi-proof gate and commits Airbender data.
-    /// @dev A capability rather than incident state, unlike `setProofSystemStatus`. Changeable only
-    /// while the Airbender lane is disabled. The chain's verifier is expected to have that lane; the
-    /// deployment is what guarantees it.
-    /// @param _multiProofEnabled Whether the chain commits Airbender data and proves both lanes.
-    function setMultiProofEnabled(bool _multiProofEnabled) external;
-
     /// @notice Change the fee params for L1->L2 transactions
     /// @param _newFeeParams The new fee params
     function changeFeeParams(FeeParams calldata _newFeeParams) external;
@@ -168,11 +161,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// values would sit in topics on one lane and in the data field on the other, and a consumer decoding
     /// from the wrong place reads zeros rather than failing.
     event NewDisabledProofSystems(uint8 indexed oldDisabledProofSystems, uint8 indexed newDisabledProofSystems);
-
-    /// @notice Whether the chain runs the multi-proof gate was changed.
-    /// @param oldMultiProofEnabled The previous setting.
-    /// @param newMultiProofEnabled The new setting.
-    event NewMultiProofEnabled(bool oldMultiProofEnabled, bool newMultiProofEnabled);
 
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);

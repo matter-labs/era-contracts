@@ -141,8 +141,6 @@ interface IGetters is IZKChainBase {
     function disabledProofSystems() external view returns (uint8);
 
     /// @return Whether this Era chain settles behind both proof systems, and so commits the Airbender
-    /// data every batch needs to be provable on that lane.
-    function multiProofEnabled() external view returns (bool);
 
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.

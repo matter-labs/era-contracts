@@ -15,14 +15,8 @@ error AddressHasNoCode(address);
 error AddressMismatch(address expected, address supplied);
 // 0x42573d7a
 error AddressNotZero();
-// 0x957ca95e
-error AirbenderCommitmentNotSupported();
 // 0x615e82fc
 error AirbenderCommitmentRequired();
-// 0x8422173f
-error AirbenderLaneMustBeDisabled();
-// 0xf4a67ff1
-error AirbenderLaneRequiresMultiProof();
 // 0xb577eb6c
 error AlreadyDangerousContract(address);
 // 0x2a5989a0

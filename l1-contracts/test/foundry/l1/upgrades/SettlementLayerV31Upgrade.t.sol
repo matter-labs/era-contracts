@@ -64,10 +64,6 @@ contract DummySettlementLayerV31Upgrade is EraSettlementLayerV31Upgrade, BaseUpg
         return s.disabledProofSystems;
     }
 
-    function getMultiProofEnabled() public view returns (bool) {
-        return s.multiProofEnabled;
-    }
-
     function getL2SystemContractsUpgradeTxHash() public view returns (bytes32) {
         return s.l2SystemContractsUpgradeTxHash;
     }
@@ -370,7 +366,6 @@ contract SettlementLayerV31UpgradeSharedTest is SettlementLayerV31UpgradeTestBas
         upgrade.upgrade(proposedUpgrade);
 
         assertEq(upgrade.getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_DISABLED);
-        assertFalse(upgrade.getMultiProofEnabled());
     }
 
     function test_SetsDeprecatedL2DAValidatorToZero() public {

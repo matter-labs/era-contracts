@@ -104,7 +104,6 @@ contract ProvingTest is ExecutorTest {
 
         // 3. Only then the capability, and only then the lane.
         vm.startPrank(owner);
-        IAdmin(address(committer)).setMultiProofEnabled(true);
         IAdmin(address(committer)).setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, true);
         vm.stopPrank();
 
@@ -457,7 +456,7 @@ contract ProvingTest is ExecutorTest {
 
         // Activation left both settings on, and the batch committed after it carries the second
         // commitment that the lane is proved against.
-        assertTrue(getters.multiProofEnabled());
+        assertEq(getters.disabledProofSystems(), 0);
         assertEq(getters.disabledProofSystems(), 0);
         assertTrue(newStoredBatchInfo.airbenderCommitment != bytes32(0));
         assertTrue(newStoredBatchInfo.airbenderCommitment != newStoredBatchInfo.commitment);

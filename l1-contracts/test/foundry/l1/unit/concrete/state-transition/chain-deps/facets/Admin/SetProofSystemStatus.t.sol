@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 import {AdminTest} from "./_Admin_Shared.t.sol";
 
 import {
-    AirbenderLaneRequiresMultiProof,
     ZKsyncOSChainConfigUpdateWithUnverifiedBatches,
     InvalidDisabledProofSystemsMask,
     InvalidProofSystem,
@@ -25,7 +24,6 @@ contract SetProofSystemStatusTest is AdminTest {
     /// Brings the chain to the state where the Airbender lane may be required: committing Airbender data,
     /// with one settled batch for the lane's first batch to chain to, and nothing in flight.
     function _readyForTheAirbenderLane() internal {
-        utilsFacet.util_setMultiProofEnabled(true);
         utilsFacet.util_setTotalBatchesCommitted(1);
         utilsFacet.util_setTotalBatchesVerified(1);
     }
@@ -116,33 +114,9 @@ contract SetProofSystemStatusTest is AdminTest {
         adminFacet.setProofSystemStatus(BOOJUM_PROOF_SYSTEM_DISABLED, false);
     }
 
-    /// Requiring the Airbender lane before the chain commits Airbender data would stall it on the very
-    /// next batch: the Executor emits one public input and the enabled lane has nothing to read.
-    function test_revertWhen_requiringAirbenderWithoutMultiProof() public {
-        utilsFacet.util_setTotalBatchesCommitted(1);
-        utilsFacet.util_setTotalBatchesVerified(1);
-
-        vm.startPrank(utilsFacet.util_getAdmin());
-        vm.expectRevert(AirbenderLaneRequiresMultiProof.selector);
-        adminFacet.setProofSystemStatus(AIRBENDER_PROOF_SYSTEM_DISABLED, true);
-    }
-
-    /// The Airbender preconditions are read off the resulting mask, not off the bit the call names, so a
-    /// call that leaves the lane required has to satisfy them even when it never touches that bit.
-    function test_revertWhen_aCallLeavesAirbenderRequiredWithoutMultiProof() public {
-        utilsFacet.util_setDisabledProofSystems(0);
-        utilsFacet.util_setTotalBatchesCommitted(1);
-        utilsFacet.util_setTotalBatchesVerified(1);
-
-        vm.startPrank(utilsFacet.util_getAdmin());
-        vm.expectRevert(AirbenderLaneRequiresMultiProof.selector);
-        adminFacet.setProofSystemStatus(BOOJUM_PROOF_SYSTEM_DISABLED, false);
-    }
-
     /// A chain that has settled nothing may still require the lane: its genesis batch is an ordinary
     /// predecessor, opened by the guest the same way the Boojum scheduler opens its own.
     function test_requiresAirbenderBeforeAnyBatchHasSettled() public {
-        utilsFacet.util_setMultiProofEnabled(true);
         assertEq(utilsFacet.util_getTotalBatchesVerified(), 0);
 
         vm.startPrank(utilsFacet.util_getAdmin());
@@ -164,7 +138,6 @@ contract SetProofSystemStatusTest is AdminTest {
     /// was off carry a single public input the lane has nothing to read, so the gate refuses them and
     /// the chain stalls behind the oldest. Draining first is the only order that works.
     function test_revertWhen_requiringAirbenderWithUnverifiedBatches() public {
-        utilsFacet.util_setMultiProofEnabled(true);
         utilsFacet.util_setTotalBatchesCommitted(5);
         utilsFacet.util_setTotalBatchesVerified(1);
 
@@ -176,7 +149,6 @@ contract SetProofSystemStatusTest is AdminTest {
     /// The same guard on the other lane, so it is the enable direction being tested and not the
     /// Airbender bit specifically.
     function test_revertWhen_requiringBoojumWithUnverifiedBatches() public {
-        utilsFacet.util_setMultiProofEnabled(true);
         utilsFacet.util_setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED);
         utilsFacet.util_setTotalBatchesCommitted(5);
         utilsFacet.util_setTotalBatchesVerified(1);

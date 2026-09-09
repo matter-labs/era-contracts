@@ -53,8 +53,6 @@ import {
     TokenMultiplierChangeTooFrequent,
     InvalidDisabledProofSystemsMask,
     InvalidProofSystem,
-    AirbenderLaneMustBeDisabled,
-    AirbenderLaneRequiresMultiProof,
     TooMuchGas,
     Unauthorized,
     UpgradeTimestampNotReached,
@@ -199,21 +197,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setMultiProofEnabled(bool _multiProofEnabled) external onlyAdmin onlySettlementLayer onlyEra {
-        // Only while the Airbender lane is masked off, in either direction. A masked-off gate takes both
-        // input shapes and `ExecutorFacet` reads each batch's shape from its own `StoredBatchInfo`, so a
-        // backlog spanning the change still settles and no drain is needed. Under a required lane the
-        // change would put the next batch in a shape the gate rejects.
-        if (s.disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
-            revert AirbenderLaneMustBeDisabled();
-        }
-
-        bool oldMultiProofEnabled = s.multiProofEnabled;
-        s.multiProofEnabled = _multiProofEnabled;
-        emit NewMultiProofEnabled(oldMultiProofEnabled, _multiProofEnabled);
-    }
-
-    /// @inheritdoc IAdmin
     function setProofSystemStatus(uint8 _proofSystem, bool _enabled) external onlyAdmin onlySettlementLayer onlyEra {
         // One system per call, named by its own bit; an unknown bit names no proof system.
         if (_proofSystem != BOOJUM_PROOF_SYSTEM_DISABLED && _proofSystem != AIRBENDER_PROOF_SYSTEM_DISABLED) {
@@ -237,21 +220,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // A call that leaves the system as it was changes nothing and needs no drain.
         if (_enabled && (oldDisabledProofSystems & _proofSystem) != 0) {
             _enforceNoUnverifiedBatchesForChainConfigUpdate();
-        }
-
-        if (newDisabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
-            // Requiring the Airbender lane is only meaningful once the chain commits the data that
-            // lane is proved against. Without the capability the batches committed from here on carry
-            // a single public input, and the gate would refuse every one of them.
-            if (!s.multiProofEnabled) {
-                revert AirbenderLaneRequiresMultiProof();
-            }
-
-            // The predecessor supplying the lane's seed may carry an `airbenderCommitment` derived from
-            // a heap hash nothing verified — `Committer` only requires it to be present — so a wrong one
-            // leaves the next batch unprovable. Not a soundness problem, since Boojum verified that
-            // batch, and recoverable: masking the lane again needs no drain and the stalled batch
-            // settles Boojum-only, so activation can be retried later.
         }
 
         s.disabledProofSystems = newDisabledProofSystems;

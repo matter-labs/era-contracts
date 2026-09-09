@@ -24,9 +24,9 @@ contract CommitterProvingTest is CommitterFacet {
         s.l2EvmEmulatorBytecodeHash = _evmEmulatorHash;
     }
 
-    /// @dev Test-only: declares whether this chain commits Airbender data.
-    function setMultiProofEnabled(bool _multiProofEnabled) external {
-        s.multiProofEnabled = _multiProofEnabled;
+    /// @dev Test-only: sets which proof systems this chain does not require.
+    function setDisabledProofSystems(uint8 _disabledProofSystems) external {
+        s.disabledProofSystems = _disabledProofSystems;
     }
 
     function createBatchCommitment(

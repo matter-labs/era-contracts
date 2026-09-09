@@ -22,7 +22,6 @@ contract ZKChainStorageLayoutTest is AdminTest {
         utilsFacet.util_setBaseTokenHasTotalSupply(true);
         utilsFacet.util_setZKsyncOSMaxTxGasLimit(GAS_LIMIT);
         utilsFacet.util_setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
-        utilsFacet.util_setMultiProofEnabled(true);
 
         uint256 slot = uint256(vm.load(address(utilsFacet), bytes32(PACKED_TAIL_SLOT)));
 
@@ -33,18 +32,10 @@ contract ZKChainStorageLayoutTest is AdminTest {
             AIRBENDER_PROOF_SYSTEM_DISABLED,
             "disabledProofSystems moved off offset 9 -- a chain would read its proof-system mask off another field"
         );
-        assertEq((slot >> 80) & 0xff, 1, "multiProofEnabled moved off offset 10");
-
-        // The whole word, so that a member inserted anywhere below offset 11 fails here even if the
-        // per-offset checks above were updated to follow it.
-        uint256 expected = 1 |
-            (uint256(GAS_LIMIT) << 8) |
-            (uint256(AIRBENDER_PROOF_SYSTEM_DISABLED) << 72) |
-            (uint256(1) << 80);
+        // The whole word, so that a member inserted anywhere below offset 10 fails here even if the
+        // per-offset checks above were updated to follow it, and so that nothing above offset 9 is
+        // set — the rest of the slot is still free to append into.
+        uint256 expected = 1 | (uint256(GAS_LIMIT) << 8) | (uint256(AIRBENDER_PROOF_SYSTEM_DISABLED) << 72);
         assertEq(slot, expected, "slot 68 is not packed as documented");
-
-        // Nothing above offset 10, so the four members account for the whole written word and the
-        // rest of the slot is still free to append into.
-        assertEq(slot >> 88, 0, "slot 68 is documented as having free bytes from offset 11");
     }
 }

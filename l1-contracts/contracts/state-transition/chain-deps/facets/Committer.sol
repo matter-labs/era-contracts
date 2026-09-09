@@ -14,7 +14,8 @@ import {
     PACKED_NUMBER_OF_L1_TRANSACTIONS_LOG_MASK,
     PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS,
     TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
-    DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH
+    DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH,
+    AIRBENDER_PROOF_SYSTEM_DISABLED
 } from "../../../common/Config.sol";
 import {
     IExecutor,
@@ -45,7 +46,6 @@ import {
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {
-    AirbenderCommitmentNotSupported,
     AirbenderCommitmentRequired,
     BatchNumberMismatch,
     BatchTimestampGreaterThanLastL2BlockTimestamp,
@@ -787,20 +787,15 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         // The Airbender shape reuses everything above and differs in exactly two words of the
         // auxiliary output.
         //
-        // Whether a batch carries it is the chain's configuration, not the operator's choice. A
-        // chain running the gate needs one on every batch or the batch is unprovable; a chain not
-        // running it must have none, or the Executor emits a public input its verifier cannot
-        // consume. Both mismatches are refused here, at commit, rather than surfacing a batch or
-        // more later as an unexplained verification failure.
-        if (s.multiProofEnabled) {
+        // A batch carries one exactly when the lane is required. Required and missing is refused here
+        // rather than surfacing later as an unprovable batch. Not required, and the heap hash is
+        // ignored rather than rejected: the kill switch takes effect on the next commit, so a
+        // sequencer still sending the old shape must not be locked out of committing.
+        if (s.disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
             if (_newBatchData.airbenderBootloaderHeapHash == bytes32(0)) {
                 revert AirbenderCommitmentRequired();
             }
-        } else if (_newBatchData.airbenderBootloaderHeapHash != bytes32(0)) {
-            revert AirbenderCommitmentNotSupported();
-        }
 
-        if (_newBatchData.airbenderBootloaderHeapHash != bytes32(0)) {
             // solhint-disable-next-line func-named-parameters
             bytes32 airbenderAuxiliaryOutputHash = _auxiliaryOutputHash(
                 l2ToL1LogsHash,
@@ -813,6 +808,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 abi.encode(passThroughDataHash, metadataHash, airbenderAuxiliaryOutputHash)
             );
         }
+        // Left at zero otherwise, which is what makes `ExecutorFacet` emit the single-input shape.
     }
 
     /// @dev The auxiliary output digest, with the two words the two proof systems disagree on left
