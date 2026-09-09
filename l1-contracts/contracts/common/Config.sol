@@ -152,6 +152,33 @@ uint256 constant MEMORY_OVERHEAD_GAS = 10;
 /// @dev The maximum gas limit for a priority transaction in L2.
 uint256 constant PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 
+/// @dev The gas limit used by the two protocol-authored L1->L2 transactions that pass through
+/// `Mailbox._requestL2TransactionFree`: service transactions (`requestL2ServiceTransaction`) and the
+/// Gateway relay wrap (`_wrapRequest`).
+/// @dev The gas limit on these is fixed by the protocol rather than supplied by a caller, so they
+/// are exempt from `USER_PRIORITY_TX_MAX_GAS_LIMIT` and remain bounded only by the chain's
+/// `priorityTxMaxGasLimit`.
+/// @dev Upgrade and genesis transactions are authored too, but carry their own gas limit; see
+/// `PRIORITY_TX_MAX_GAS_LIMIT`.
+uint256 constant SERVICE_TX_MAX_GAS_LIMIT = 72_000_000;
+
+/// @dev The maximum transaction *body* gas that a caller-supplied L1->L2 transaction may request on
+/// an EraVM chain.
+/// @dev L1->L2 transactions must eventually be included by the operator (priority expiration and
+/// priority mode) and a single transaction cannot be split across batches, so the work a single one
+/// can impose on execution and proving has to be bounded at admission. This cap provides that bound
+/// for gas limits that come from the caller. It is enforced in addition to the per-chain
+/// `priorityTxMaxGasLimit`, whichever of the two is lower.
+/// @dev The bound is on the transaction body, i.e. on `l2GasLimit` after
+/// `TransactionValidator.getTransactionBodyGasLimit` subtracts the batch overhead, so the largest
+/// accepted `l2GasLimit` exceeds this constant by that overhead (at least
+/// `TX_SLOT_OVERHEAD_L2_GAS`). Execution is still bounded by this constant.
+/// @dev Two kinds of transaction are deliberately exempt: protocol-authored ones (see
+/// `SERVICE_TX_MAX_GAS_LIMIT`) and those on ZKsync OS chains, where the bootloader clamps an L1
+/// transaction's native computational resources independently of its gas limit, so raising the gas
+/// limit buys no additional work.
+uint256 constant USER_PRIORITY_TX_MAX_GAS_LIMIT = 15_000_000;
+
 /// @dev the address used to identify eth as the base token for chains.
 address constant ETH_TOKEN_ADDRESS = address(1);
 

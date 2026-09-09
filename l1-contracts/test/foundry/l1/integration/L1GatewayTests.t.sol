@@ -21,7 +21,7 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, USER_PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {
     L2CanonicalTransaction,
@@ -270,7 +270,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             migratingChainId,
             expectedValue,
             0, // l2Value
-            72000000, // l2GasLimit
+            USER_PRIORITY_TX_MAX_GAS_LIMIT, // l2GasLimit
             800, // l2GasPerPubdataByteLimit
             "0x"
         );

@@ -9,7 +9,7 @@ import * as path from "path";
 import { Provider } from "zksync-ethers";
 import { REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT } from "zksync-ethers/build/utils";
 import { web3Provider } from "../../l1-contracts/scripts/utils";
-import { getAddressFromEnv, getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
+import { getAddressFromEnv, userPriorityTxMaxGasLimit } from "../../l1-contracts/src.ts/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { awaitPriorityOps, computeL2Create2Address, create2DeployFromL1, getL1TxInfo } from "./utils";
 
@@ -58,7 +58,7 @@ function validateUpgradeInfo(info: UpgradeInfo) {
   checkSupportedContract(info.contract);
 }
 
-const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"));
+const l2TxGasLimit = BigNumber.from(userPriorityTxMaxGasLimit);
 const l2SharedBridgeProxyAddress = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR");
 const l1Erc20BridgeProxyAddress = getAddressFromEnv("CONTRACTS_L1_SHARED_BRIDGE_PROXY_ADDR");
 const EIP1967_IMPLEMENTATION_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
@@ -104,15 +104,7 @@ async function getTransparentProxyUpgradeTxInfo(
   gasPrice: BigNumber
 ) {
   const l2Calldata = await getTransparentProxyUpgradeCalldata(target);
-  return await getL1TxInfo(
-    deployer,
-    proxyAddress,
-    l2Calldata,
-    refundRecipient,
-    gasPrice,
-    priorityTxMaxGasLimit,
-    provider
-  );
+  return await getL1TxInfo(deployer, proxyAddress, l2Calldata, refundRecipient, gasPrice, l2TxGasLimit, provider);
 }
 
 async function getTokenBeaconUpgradeTxInfo(
@@ -124,7 +116,7 @@ async function getTokenBeaconUpgradeTxInfo(
 ) {
   const l2Calldata = await getBeaconProxyUpgradeCalldata(target);
 
-  return await getL1TxInfo(deployer, proxy, l2Calldata, refundRecipient, gasPrice, priorityTxMaxGasLimit, provider);
+  return await getL1TxInfo(deployer, proxy, l2Calldata, refundRecipient, gasPrice, l2TxGasLimit, provider);
 }
 
 async function getL1BridgeUpgradeTxInfo(proxyTarget: string) {
@@ -222,7 +214,7 @@ async function main() {
         bridgeImplBytecode,
         "0x",
         salt,
-        priorityTxMaxGasLimit,
+        l2TxGasLimit,
         gasPrice
       );
       console.log("L1 tx hash: ", tx.hash);
@@ -348,7 +340,7 @@ async function main() {
       const neededValue = await zksync.l2TransactionBaseCost(
         chainId,
         gasPrice,
-        priorityTxMaxGasLimit,
+        l2TxGasLimit,
         REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT
       );
 
