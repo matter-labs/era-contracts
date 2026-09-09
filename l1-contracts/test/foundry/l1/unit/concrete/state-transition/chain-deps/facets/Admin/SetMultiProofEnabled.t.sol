@@ -9,6 +9,7 @@ import {
     Unauthorized,
     VerifierDoesNotSupportMultiProof
 } from "contracts/common/L1ContractErrors.sol";
+import {NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {AIRBENDER_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -113,6 +114,16 @@ contract SetMultiProofEnabledTest is AdminTest {
 
         vm.startPrank(utilsFacet.util_getAdmin());
         vm.expectRevert(AirbenderLaneMustBeDisabled.selector);
+        adminFacet.setMultiProofEnabled(true);
+    }
+
+    /// Proof-system policy belongs to the layer the chain settles on.
+    function test_revertWhen_notOnTheSettlementLayer() public {
+        _installGate();
+        utilsFacet.util_setSettlementLayer(makeAddr("settlementLayer"));
+
+        vm.startPrank(utilsFacet.util_getAdmin());
+        vm.expectRevert(NotSettlementLayer.selector);
         adminFacet.setMultiProofEnabled(true);
     }
 

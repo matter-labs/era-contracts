@@ -6,10 +6,12 @@ import {AdminTest} from "./_Admin_Shared.t.sol";
 import {
     AirbenderLaneRequiresMultiProof,
     AirbenderLaneRequiresSettledBatch,
+    ZKsyncOSChainConfigUpdateWithUnverifiedBatches,
     InvalidDisabledProofSystemsMask,
     MustBeEraChain,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
+import {NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {AIRBENDER_PROOF_SYSTEM_DISABLED, BOOJUM_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
 
 /// @notice Unit tests for the per-chain `disabledProofSystems` setting.
@@ -145,6 +147,42 @@ contract SetDisabledProofSystemsTest is AdminTest {
         adminFacet.setDisabledProofSystems(0);
 
         assertEq(utilsFacet.util_getDisabledProofSystems(), 0);
+    }
+
+    /// Requiring a lane again is the one direction that can strand batches: those committed while it
+    /// was off carry a single public input the lane has nothing to read, so the gate refuses them and
+    /// the chain stalls behind the oldest. Draining first is the only order that works.
+    function test_revertWhen_requiringAirbenderWithUnverifiedBatches() public {
+        utilsFacet.util_setMultiProofEnabled(true);
+        utilsFacet.util_setTotalBatchesCommitted(5);
+        utilsFacet.util_setTotalBatchesVerified(1);
+
+        vm.startPrank(utilsFacet.util_getAdmin());
+        vm.expectRevert(abi.encodeWithSelector(ZKsyncOSChainConfigUpdateWithUnverifiedBatches.selector, 1, 5));
+        adminFacet.setDisabledProofSystems(0);
+    }
+
+    /// The same guard on the other lane, so it is the enable direction that is being tested and not
+    /// the Airbender bit specifically.
+    function test_revertWhen_requiringBoojumWithUnverifiedBatches() public {
+        utilsFacet.util_setMultiProofEnabled(true);
+        utilsFacet.util_setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED);
+        utilsFacet.util_setTotalBatchesCommitted(5);
+        utilsFacet.util_setTotalBatchesVerified(1);
+
+        vm.startPrank(utilsFacet.util_getAdmin());
+        vm.expectRevert(abi.encodeWithSelector(ZKsyncOSChainConfigUpdateWithUnverifiedBatches.selector, 1, 5));
+        adminFacet.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
+    }
+
+    /// Proof-system policy belongs to the layer the chain settles on. Written anywhere else it would
+    /// sit stale and take effect on return.
+    function test_revertWhen_notOnTheSettlementLayer() public {
+        utilsFacet.util_setSettlementLayer(makeAddr("settlementLayer"));
+
+        vm.startPrank(utilsFacet.util_getAdmin());
+        vm.expectRevert(NotSettlementLayer.selector);
+        adminFacet.setDisabledProofSystems(AIRBENDER_PROOF_SYSTEM_DISABLED);
     }
 
     /// The setting exists for the case where committed batches cannot be proved, so it has to take effect
