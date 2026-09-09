@@ -664,7 +664,7 @@ contract ValidatorTimelockTest is Test {
     /// @dev The cap is inclusive.
     function test_increaseChainExecutionDelay_upToMax() public {
         uint32 maxDelay = validator.MAX_EXECUTION_DELAY();
-        assertEq(maxDelay, 7 days);
+        assertEq(maxDelay, 30 days);
 
         _setChainAdmin(bob);
         vm.prank(bob);
