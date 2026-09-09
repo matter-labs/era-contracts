@@ -271,6 +271,18 @@ contract AdminFacet is ZKChainBase, IAdmin {
             if (s.totalBatchesVerified == 0) {
                 revert AirbenderLaneRequiresSettledBatch();
             }
+
+            // That settled batch supplies the seed, and its `airbenderCommitment` was derived from a
+            // heap hash the sequencer supplied while the lane was off, so nothing has verified it:
+            // `Committer` only requires it to be present. A wrong one is not a soundness problem —
+            // Boojum verified the batch either way — but the lane cannot open it, so the next batch
+            // is unprovable and the chain stops behind it.
+            //
+            // Recoverable, and deliberately not guarded against here. Masking the lane again needs no
+            // drained pipeline, and the stalled batch already carries both public inputs, so it
+            // settles Boojum-only the moment the mask is back on. Activation is then retried against
+            // a later batch. Guarding it instead would mean verifying an Airbender proof from inside
+            // an admin call, which is the work the lane itself exists to do.
         }
 
         s.disabledProofSystems = _disabledProofSystems;
