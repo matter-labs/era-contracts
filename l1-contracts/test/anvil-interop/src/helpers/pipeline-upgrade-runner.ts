@@ -1492,6 +1492,15 @@ export function prepareUpgradeHarnessInputs(
     create2FactorySalt: permanentValuesToml.permanent_contracts?.create2_factory_salt ?? ethers.constants.HashZero,
     isZKsyncOS: scenario.isZKsyncOS,
     ctmProxyAddress: state.ctmAddresses.chainTypeManager,
-    cleanup: () => fs.rmSync(tempDir, { recursive: true, force: true }),
+    // Kept alongside the chains: debugging a run needs the INPUTS that produced it (the
+    // merged prepare TOML is also what `protocol-ops ecosystem verify-bootstrap` consumes),
+    // and they are worthless once the chains they describe are gone.
+    cleanup: () => {
+      if (process.env.ANVIL_INTEROP_KEEP_CHAINS === "1") {
+        console.log(`  ℹ kept prepare inputs for debugging: ${tempDir}`);
+        return;
+      }
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    },
   };
 }

@@ -17,6 +17,7 @@ use crate::{
     commands::ecosystem::init::EcosystemInitArgs,
     commands::ecosystem::simulator::GovernanceTomlToSimulatorArgs,
     commands::ecosystem::upgrade::{ListCtmsArgs, UpgradeGovernanceArgs, UpgradePrepareAllArgs},
+    commands::ecosystem::verify_bootstrap::VerifyBootstrapArgs,
     commands::ecosystem::verify_upgrade::VerifyUpgradeArgs,
 };
 
@@ -27,6 +28,7 @@ pub mod simulator;
 pub mod upgrade;
 pub mod upgrade_full;
 pub mod upgrade_inner;
+pub mod verify_bootstrap;
 pub mod verify_upgrade;
 pub mod zk_governance;
 
@@ -52,6 +54,11 @@ pub enum EcosystemCommands {
     /// Verify ecosystem upgrade artifacts produced by upgrade-prepare.
     #[command(name = "verify-upgrade")]
     VerifyUpgrade(VerifyUpgradeArgs),
+    /// Verify a v34 registry-BOOTSTRAP package: object provenance, the manifest's inline pins
+    /// against live code, the authority binding and the owner it lands on, every proxy row's
+    /// departing implementation, and the stage-1 calldata shape. Read-only.
+    #[command(name = "verify-bootstrap")]
+    VerifyBootstrap(VerifyBootstrapArgs),
     /// Broadcast the bundles produced by `upgrade-prepare-all` to a real (or
     /// fork) RPC under the supplied EOA keys. Multi-bundle dispatcher around
     /// `dev execute-safe`: reads `manifest.json`, replays each bundle in order
@@ -74,6 +81,7 @@ pub async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
         EcosystemCommands::UpgradePrepareAll(args) => upgrade::run_upgrade_prepare_all(args).await,
         EcosystemCommands::UpgradeGovernance(args) => upgrade::run_upgrade_governance(args).await,
         EcosystemCommands::VerifyUpgrade(args) => verify_upgrade::run(args).await,
+        EcosystemCommands::VerifyBootstrap(args) => verify_bootstrap::run(args).await,
         EcosystemCommands::UpgradeBroadcast(args) => broadcast::run(args).await,
         EcosystemCommands::ListCtms(args) => upgrade::run_list_ctms(args).await,
         EcosystemCommands::GovernanceTomlToSimulator(args) => simulator::run(args).await,
