@@ -492,8 +492,6 @@ error ValidateTxnNotEnoughGas();
 error ValueMismatch(uint256 expected, uint256 actual);
 // 0xe1022469
 error VerifiedBatchesExceedsCommittedBatches();
-// 0x0f4d47fb
-error VerifierDoesNotSupportMultiProof();
 // 0xae899454
 error WithdrawalAlreadyFinalized();
 // 0x750b219c

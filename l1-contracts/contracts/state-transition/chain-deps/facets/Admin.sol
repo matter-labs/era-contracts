@@ -56,7 +56,6 @@ import {
     AirbenderLaneMustBeDisabled,
     AirbenderLaneRequiresMultiProof,
     AirbenderLaneRequiresSettledBatch,
-    VerifierDoesNotSupportMultiProof,
     TooMuchGas,
     Unauthorized,
     UpgradeTimestampNotReached,
@@ -65,7 +64,6 @@ import {
     ZKsyncOSMaxTxGasLimitTooHigh,
     ZKsyncOSMaxTxGasLimitTooLow
 } from "../../../common/L1ContractErrors.sol";
-import {IEraMultiProofVerifier} from "../../chain-interfaces/IEraMultiProofVerifier.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {
@@ -211,28 +209,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert AirbenderLaneMustBeDisabled();
         }
 
-        // Without a verifier that has the lane, `Committer` would start requiring Airbender data whose
-        // second public input the installed verifier cannot consume.
-        if (_multiProofEnabled) {
-            _enforceVerifierHasAnAirbenderLane();
-        }
-
         bool oldMultiProofEnabled = s.multiProofEnabled;
         s.multiProofEnabled = _multiProofEnabled;
         emit NewMultiProofEnabled(oldMultiProofEnabled, _multiProofEnabled);
-    }
-
-    /// @dev Asks the verifier what it supports instead of inferring it from which getters answer. A
-    /// verifier predating the interface does not implement the call, so a reverting staticcall is still
-    /// the negative answer.
-    function _enforceVerifierHasAnAirbenderLane() internal view {
-        try IEraMultiProofVerifier(address(s.verifier)).supportedProofSystems() returns (uint8 supported) {
-            if (supported & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
-                revert VerifierDoesNotSupportMultiProof();
-            }
-        } catch {
-            revert VerifierDoesNotSupportMultiProof();
-        }
     }
 
     /// @inheritdoc IAdmin

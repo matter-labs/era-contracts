@@ -51,7 +51,8 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice Sets whether this Era chain runs the multi-proof gate and commits Airbender data.
     /// @dev A capability rather than incident state, unlike `setProofSystemStatus`. Changeable only
-    /// while the Airbender lane is disabled, and only on a chain whose verifier has that lane.
+    /// while the Airbender lane is disabled. The chain's verifier is expected to have that lane; the
+    /// deployment is what guarantees it.
     /// @param _multiProofEnabled Whether the chain commits Airbender data and proves both lanes.
     function setMultiProofEnabled(bool _multiProofEnabled) external;
 
