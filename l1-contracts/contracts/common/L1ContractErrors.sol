@@ -135,6 +135,8 @@ error EmptyPublicInputsLength();
 error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
+// 0xba87a28b
+error FactoryDepsNotSupported();
 // 0x3fce21be
 error FeeParamsChangeTooLarge(uint256 oldPrice, uint256 newPrice, uint256 maxAllowedPrice);
 // 0xc91cf3b1

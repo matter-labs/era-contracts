@@ -198,8 +198,14 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         bytes memory factoryDep = hex"6001600055";
         proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps = new uint256[](1);
         proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps[0] = uint256(ZKSyncOSBytecodeInfo.hashEVMBytecode(factoryDep));
+        bytes32 expectedTxHash = keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx));
 
-        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+        vm.expectEmit(true, true, false, true, address(baseZkSyncUpgrade));
+        emit BaseZkSyncUpgrade.UpgradeComplete(proposedUpgrade.newProtocolVersion, expectedTxHash, proposedUpgrade);
+        bytes32 txHash = baseZkSyncUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(txHash, expectedTxHash);
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
     }
 
     // The EraVM bytecode-hash fields of ProposedUpgrade are dead on the ZKsync OS line. These values

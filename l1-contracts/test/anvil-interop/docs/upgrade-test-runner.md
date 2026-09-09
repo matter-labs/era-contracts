@@ -1,18 +1,16 @@
-# V31 Upgrade Test Runner
+# Upgrade Test Runner
 
 ## Overview
 
-The v31 upgrade test runner (`v31-upgrade-test-runner.ts`) tests the full v31->v32 protocol upgrade
-flow on local Anvil chains. It is named after the v31 upgrade scripts it drives
-(`CoreUpgrade_v31` / `CTMUpgrade_v31`), which this release still uses. It exercises the **production Solidity upgrade scripts**
-end-to-end, but patches around Anvil EVM limitations that prevent the real L2 ZKsync execution
-environment from working.
+The upgrade test runner (`upgrade-test-runner.ts`) exercises the v31→v33 scenario on local
+Anvil chains through the production `CoreUpgrade_v33` / `CTMUpgrade_v33` scripts. It patches
+around Anvil EVM limitations that prevent the real L2 ZKsync OS execution environment from working.
 
 ## Production upgrade flow (what the test reproduces)
 
-In production, a v31 protocol upgrade proceeds as:
+The v31→v33 upgrade proceeds as:
 
-1. **Deploy new L1 contracts**: `CoreUpgrade_v31` / `CTMUpgrade_v31` deploy new implementation contracts
+1. **Deploy new L1 contracts**: `CoreUpgrade_v33` / `CTMUpgrade_v33` deploy new implementation contracts
    (Bridgehub, MessageRoot, Nullifier, AssetRouter, NTV, CTM, facets, etc.)
    via Create2. The ChainRegistrationSender proxy is reused; only a fresh implementation is deployed.
 
@@ -24,10 +22,8 @@ In production, a v31 protocol upgrade proceeds as:
 
 4. **Governance stage 2**: Unpause gateway migrations, version-specific post-upgrade calls.
 
-5. **Stage 3**: Post-governance, pre-chain-upgrade. Registers legacy bridged tokens in the NTV
-   bridged-tokens list (`TokenMigrationUtils`) and populates the NTV's `bridgedOut` accounting
-   (`BridgedOutPopulationLib`). Must run before per-chain upgrades so L1-native withdrawals work
-   as soon as a chain is on v32.
+5. **Stage 3**: Post-governance, pre-chain-upgrade. Populates the NTV's `bridgedOut` accounting
+   (`BridgedOutPopulationLib`) before the per-chain upgrades.
 
 6. **Per-chain upgrade**: For each ZK chain, the chain admin calls
    `upgradeChainFromVersion()` on the diamond proxy. This records an L2 upgrade transaction
@@ -40,7 +36,7 @@ In production, a v31 protocol upgrade proceeds as:
    - Delegatecalls to `L2V32Upgrade.upgrade()` which initializes new contracts (NTV, Bridgehub,
      AssetRouter, L2AssetTracker, ChainAssetHandler, InteropCenter, BaseToken, etc.)
 
-8. **Verification**: Protocol version on each chain is now `0x2000000000` (v32).
+8. **Verification**: Protocol version on each chain is now `0x2100000000` (v33).
 
 ## Architecture notes
 
@@ -121,12 +117,12 @@ No patches here -- this is equivalent to having a live chain at v31.
 - Test: The state dumps have the deployer address as the admin. The runner deploys a fresh
   `ChainAdminOwnable` for each target chain, then calls `setPendingAdmin()` +
   `acceptAdmin()` on the diamond proxy to install it.
-- Why: `ChainUpgrade_v31` calls the upgrade through the chain admin's `multicall`. Without
+- Why: `DefaultChainUpgrade` calls the upgrade through the chain admin's `multicall`. Without
   a real ChainAdmin contract, the per-chain upgrade would fail.
 
 ### 3. Run production L1 upgrade scripts (Forge)
 
-The test calls the **real** `CoreUpgrade_v31` / `CTMUpgrade_v31` scripts via Forge.
+The test calls the **real** `CoreUpgrade_v33` / `CTMUpgrade_v33` scripts via Forge.
 
 **Patch: Script splitting** (step1 + step2)
 
@@ -136,25 +132,25 @@ The test calls the **real** `CoreUpgrade_v31` / `CTMUpgrade_v31` scripts via For
 - Why: Anvil with `--block-time 1` has a broadcast deadlock when too many transactions are
   queued in a single Forge script invocation. Splitting ensures each batch completes before
   the next starts.
-- Mechanism: `_EcosystemUpgradeV31ForTests.sol` exposes `step1()` and `step2()` entry points.
+- Mechanism: `_EcosystemUpgradeV33ForTests.sol` exposes `step1()` and `step2()` entry points.
 
-**Patch: Idempotent core upgrade** (`CoreUpgradeV31Idempotent`)
+**Patch: Idempotent core upgrade** (`CoreUpgradeV33Idempotent`)
 
-- Production: `CoreUpgrade_v31.deployNewEcosystemContractsL1()` deploys contracts AND calls
+- Production: `CoreUpgrade_v33.deployNewEcosystemContractsL1()` deploys contracts AND calls
   `updateContractConnections()` (which hands a freshly deployed L1InteropHandler proxy's
   ownership to governance).
 - Test: step1 runs the full flow. step2 needs to re-populate `coreAddresses` (Create2 deploys
   are no-ops since contracts already exist) but must NOT re-run `updateContractConnections()`
   because `transferOwnership()` is `onlyOwner` and ownership was already handed to governance
   in step1.
-- Mechanism: `CoreUpgradeV31Idempotent` overrides `deployNewEcosystemContractsL1()` to call
+- Mechanism: `CoreUpgradeV33Idempotent` overrides `deployNewEcosystemContractsL1()` to call
   `deployNewEcosystemContractsL1NoConnections()` -- deploys only, no side effects.
 
-**Patch: Skip factory deps check** (`CTMUpgradeV31ForTests`)
+**Patch: Skip factory deps check** (`CTMUpgradeV33ForTests`)
 
-- Production: `CTMUpgrade_v31.prepareCTMUpgrade()` validates that factory dependency bytecodes
+- Production: `CTMUpgrade_v33.prepareCTMUpgrade()` validates that factory dependency bytecodes
   match expected lengths (ZK bytecodes have specific size constraints).
-- Test: `CTMUpgradeV31ForTests` calls `setSkipFactoryDepsCheck_TestOnly(true)` before running
+- Test: `CTMUpgradeV33ForTests` calls `setSkipFactoryDepsCheck_TestOnly(true)` before running
   the CTM upgrade.
 - Why: The test uses EVM-compiled bytecodes which have completely different sizes from ZK
   bytecodes. The length check would always fail.
@@ -181,10 +177,9 @@ functions.
 - Mechanism: `anvil_setStorageAt(diamondProxy, "0x22", HashZero)` -- directly clears storage
   slot 0x22 which holds `l2SystemContractsUpgradeTxHash`.
 
-### 6. Stage 3: post-governance registration
+### 6. Stage 3: post-governance balance population
 
-Runs the production `stage3()` Forge script, which uses `TokenMigrationUtils` to register
-legacy bridged tokens in the NTV bridged-tokens list and then `BridgedOutPopulationLib` to
+Runs the production `stage3()` Forge script, which uses `BridgedOutPopulationLib` to
 populate the NTV's `bridgedOut` accounting for every L1-native asset. Runs before the
 per-chain upgrades, matching the production ordering. On a fixture with no legacy accounting
 left the population is a no-op, so step 8 does not assert its amounts — they are covered by
@@ -193,7 +188,7 @@ the foundry tests instead.
 
 ### 7. Per-chain L1 upgrade + L2 relay
 
-The L1 side runs the **production** `ChainUpgrade_v31` Forge script -- no patches needed.
+The L1 side runs the **production** `DefaultChainUpgrade` Forge script -- no patches needed.
 
 The L2 relay is the **biggest deviation from production**. In production, the bootloader sends
 a system transaction to ComplexUpgrader, which force-deploys new L2 bytecodes through the ZKsync OS
@@ -247,7 +242,7 @@ No patches. Reads on-chain state to assert:
 - `L2AssetTracker.L1_CHAIN_ID` is set correctly on each L2 chain
 - The base token's bookkeeping is initialized in the L2AssetTracker of each L2 chain
 - `getProtocolVersion()` on each diamond proxy returns the scenario's `expectedProtocolVersion`
-  (`0x2000000000` for v32)
+  (`0x2100000000` for v33)
 - The recorded `getL2SystemContractsUpgradeTxHash()` equals the hash of the upgrade transaction the
   harness relayed to L2, i.e. the per-chain data really was substituted on L1. This one is asserted during
   step 7, inside `runChainUpgradesAndRelayL2`, and only on the single-CTM path
@@ -258,9 +253,9 @@ No patches. Reads on-chain state to assert:
 | --- | ---------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | 1   | Ownership transfers                            | `transferL1Ownership`               | Governance already owns contracts                                | Transfer from deployer to governance                                                                                                                        | `transferOwnership()` + `acceptOwnership()`                   |
 | 2   | ChainAdmin deployment                          | `deployChainAdmins`                 | Chain admins already exist                                       | Deploy fresh ChainAdminOwnable                                                                                                                              | `new ChainAdminOwnable()` + `setPendingAdmin` + `acceptAdmin` |
-| 3   | Script splitting                               | `_EcosystemUpgradeV31ForTests.sol`  | Single `run()` call                                              | Split into step1 + step2                                                                                                                                    | Separate Forge invocations                                    |
-| 4   | Idempotent core upgrade                        | `CoreUpgradeV31Idempotent`          | N/A (single run)                                                 | step2 skips `updateContractConnections()`                                                                                                                   | Override `deployNewEcosystemContractsL1()`                    |
-| 5   | Skip factory deps check                        | `CTMUpgradeV31ForTests`             | Validates ZK bytecode lengths                                    | Skip validation                                                                                                                                             | `setSkipFactoryDepsCheck_TestOnly(true)`                      |
+| 3   | Script splitting                               | `_EcosystemUpgradeV33ForTests.sol`  | Single `run()` call                                              | Split into step1 + step2                                                                                                                                    | Separate Forge invocations                                    |
+| 4   | Idempotent core upgrade                        | `CoreUpgradeV33Idempotent`          | N/A (single run)                                                 | step2 skips `updateContractConnections()`                                                                                                                   | Override `deployNewEcosystemContractsL1()`                    |
+| 5   | Skip factory deps check                        | `CTMUpgradeV33ForTests`             | Validates ZK bytecode lengths                                    | Skip validation                                                                                                                                             | `setSkipFactoryDepsCheck_TestOnly(true)`                      |
 | 6   | Clear genesis upgrade hash                     | `clearGenesisUpgradeTxHash`         | Server clears after batch processing                             | Clear via storage write                                                                                                                                     | `anvil_setStorageAt(proxy, 0x22, 0x0)`                        |
 | 7   | Pre-deploy L2 contracts + MockContractDeployer | `deployL2Contracts`                 | ZKsync OS bytecode deployer force-deploys bytecodes              | `anvil_setCode` places EVM bytecodes at addresses from the force deployment calldata; typed MockContractDeployer at 0x8006 makes force-deploy calls succeed | `anvil_setCode` for each address in calldata                  |
 | 8   | L2BaseToken                                    | `deployL2Contracts`                 | ZKsyncOS: `L2BaseToken` behind proxy                             | Same as production. On Anvil, MINT_BASE_TOKEN_HOOK is empty (no-op)                                                                                         | `anvil_setCode` + `deployBehindSystemProxy` for ZKsyncOS      |
@@ -271,10 +266,10 @@ No patches. Reads on-chain state to assert:
 
 ## What IS tested end-to-end (unpatched production code)
 
-- All L1 Solidity upgrade scripts (`CoreUpgrade_v31`, `CTMUpgrade_v31`, `ChainUpgrade_v31`)
+- All L1 Solidity upgrade scripts (`CoreUpgrade_v33`, `CTMUpgrade_v33`, `DefaultChainUpgrade`)
 - Governance call generation and execution (stages 0-2)
 - Proxy upgrades for all L1 core contracts
 - L2 upgrade initialization logic (`L2V32Upgrade.upgrade()` delegatecall path)
 - New contract configuration (ownership transfers for newly deployed proxies)
-- Bridged-token registration in the NTV (stage 3 via `TokenMigrationUtils.registerBridgedTokensInNTV`)
+- Legacy balance population in the NTV (stage 3 via `BridgedOutPopulationLib`)
 - Protocol version advancement on all target chains

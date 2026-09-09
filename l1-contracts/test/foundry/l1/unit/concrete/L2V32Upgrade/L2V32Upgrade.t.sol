@@ -225,7 +225,7 @@ contract L2V32UpgradeUnitTest is Test {
     /// @dev The atomic-interop built-ins arrive with the upgrade's force deployments and are
     /// initialized here for the first time (the tree gets its sentinel leaf, the flow manager the
     /// L1 chain id).
-    function test_UpgradeViaComplexUpgrader_ZKOSInitializesAtomicInteropBuiltIns() public {
+    function test_UpgradeViaComplexUpgrader_InitializesAtomicInteropBuiltIns() public {
         vm.etch(L2_INTEROP_COMMITMENT_TREE_ADDR, address(new L2InteropCommitmentTree()).code);
         vm.etch(L2_ATOMIC_FLOW_MANAGER_ADDR, address(new AtomicFlowManager()).code);
 

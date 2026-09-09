@@ -183,11 +183,10 @@ not follow from swapping implementations are:
 - **Atomic-interop built-ins** exist on ZKsync OS chains only. New chains get them from genesis and
   pre-existing ones from this upgrade's force deployments (next section).
 
-Scope of this release's upgrade: **ZKsync OS chains that settle on L1**. Era chains are not supported —
-`CTMUpgrade_v31.deployUsedUpgradeContract` refuses to produce a per-chain upgrade for them rather than
-emitting one that redoes v31's one-time work — and neither are gateway-settled chains, whose upgrade takes
-the `s.settlementLayer != address(0)` path through their settlement layer instead of recording the L2
-upgrade transaction on L1.
+Scope of this release's upgrade: **ZKsync OS chains that settle on L1**. `DefaultCTMUpgrade.initializeConfig`
+rejects non-OS CTMs. Gateway-settled chains are also outside this scope: their upgrade takes the
+`s.settlementLayer != address(0)` path through their settlement layer instead of recording the L2 upgrade
+transaction on L1.
 
 Each chain's upgrade requires every outstanding batch to have been processed first. This is good practice
 for a generic upgrade rather than an invariant, but it does catch the case that matters here: the upgrade

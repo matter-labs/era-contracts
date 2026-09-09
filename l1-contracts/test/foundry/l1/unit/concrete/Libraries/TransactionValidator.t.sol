@@ -26,11 +26,11 @@ contract TransactionValidatorTest is Test {
     function test_getMinimalPriorityTransactionGasLimit_zeroCalldata() public pure {
         uint256 minGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(0, 800);
         // The intrinsic native (pubdata-driven) term dominates the plain intrinsic gas here.
-        assertTrue(minGas >= L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS);
+        assertGt(minGas, L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS);
     }
 
     function test_getMinimalPriorityTransactionGasLimit_calldataFloor() public pure {
-        // With free pubdata, the calldata floor price is the marginal cost per byte.
+        // At the minimum pubdata price, calldata cost determines the gas limit.
         uint256 baseGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(0, 1);
         uint256 minGas = TransactionValidator.getMinimalPriorityTransactionGasLimit(100_000, 1);
         assertEq(minGas - baseGas, L1_TX_CALLDATA_FLOOR_PRICE_L2_GAS_ZKSYNC_OS * 100_000);

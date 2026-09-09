@@ -1,4 +1,4 @@
-# Upgrade input for the v31 -> v32 scenario. `bridgehub_proxy_address` and `owner_address` are substituted
+# Upgrade input for the v31 -> v33 scenario. `bridgehub_proxy_address` and `owner_address` are substituted
 # by the harness from the loaded chain states; everything else, including `[chain] chain_id`, is a literal
 # that has to match the fixture.
 
@@ -17,4 +17,4 @@ pre_v32_introspection = true
 chain_id = 10
 
 [contracts]
-new_protocol_version = 0x2000000000
+new_protocol_version = 0x2100000000

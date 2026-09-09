@@ -79,6 +79,13 @@ returns `bridgeMintData`; the destination-side handler's `bridgeMint` consumes t
   handler but records nothing, because a failed transaction refunds the base token to the L2
   `refundRecipient` rather than being claimable on L1.
 
+### Priority-transaction factory dependencies
+
+ZKsync OS does not support factory dependencies in priority transactions. The Mailbox requires
+`factoryDeps` to be empty. The shared canonical transaction format retains the field because system
+upgrade transactions use it to identify bytecode preimages. Contract deployment in ordinary priority
+transactions uses EVM execution.
+
 ### Refund-recipient resolution
 
 A priority transaction's `refundRecipient` names the L2 account credited if the transaction fails (and
@@ -160,9 +167,8 @@ tokens) and rejects fee-on-transfer tokens (`TokensWithFeesNotSupported`).
   (`calculateCreate2TokenAddress`); the deployed address is checked against the expectation. The salt is
   `keccak256(abi.encode(originChainId, originToken))`, except on L2 for L1-origin tokens where it is the
   plain L1 token address (legacy compatibility). On L2 the NTV uses plain CREATE2 over the canonical
-  `BeaconProxy` creation code and the current beacon constructor argument. The compatibility getter
-  `L2_TOKEN_PROXY_BYTECODE_HASH()` derives the deployed-code hash from that same contract; governance no
-  longer supplies or stores an independent hash.
+  `BeaconProxy` creation code and the current beacon constructor argument. `L2TokenBeaconUpdated`
+  reports that proxy's runtime-code hash; governance no longer supplies or stores an independent hash.
 - **L1 accounting**: `L1NativeTokenVault.bridgedOut[assetId]` is the net amount of each L1-native token
   currently bridged out of L1. It increases on outbound flows and decreases on inbound ones, so unlike raw
   `balanceOf` it cannot be skewed by direct transfers into the vault, and it is bounded by the actually
@@ -213,13 +219,17 @@ is nothing to fold in for them, now or later).
   tokens; transfers from the holder replace minting (better EVM/Foundry compatibility). `give` (interop
   handler only) pays out inbound value; `burnAndStartBridging` (InteropCenter or NTV) receives outbound
   value; both notify the `L2AssetTracker` first. Its balance means "funds the chain can still mint";
-  force-sent funds (refund recipient, selfdestruct on ZK OS) only skew the `totalSupply()` view, never
+  force-sent funds (refund recipient, selfdestruct) only skew the `totalSupply()` view, never
   bridging accounting.
   - The operator must keep the base-token total supply below `2^127`, otherwise the holder's balance
     could underflow; overflow is impossible since users can only gain what the holder loses.
-  - On ZKsync OS the holder's initial balance is minted by `L2BaseToken.initL2()` via a raw call to
+  - The holder's initial balance is minted by `L2BaseToken.initL2()` via a raw call to
     `MINT_BASE_TOKEN_HOOK` with the amount abi-encoded as a `uint256`; the hook credits the caller and
     only accepts calls from the L2 base-token address.
+  - `totalSupply()` adds the historical `zkosPreV31TotalSupply` baseline to the initial reserve before
+    subtracting the holder's balance. Returning historical circulating tokens can raise that balance
+    above the initial reserve, but never above the sum of the reserve and the historical supply:
+    subsequent issuance draws from the holder. This keeps the subtraction valid even after a net burn.
 - In `NativeTokenVaultBase._getTokenAndBridgeToChain`, a base-token burn requires `amount == msg.value`.
   If the base token is bridged (always the case on L2), the value goes through
   `BaseTokenHolder.burnAndStartBridging`; the native branch (plain accounting) only occurs on L1 for ETH.

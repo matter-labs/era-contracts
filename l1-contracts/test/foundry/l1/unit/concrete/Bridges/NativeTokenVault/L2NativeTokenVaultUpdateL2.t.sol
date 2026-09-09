@@ -59,11 +59,9 @@ contract L2NativeTokenVaultUpdateL2Test is Test {
         _updateL2As(L2_COMPLEX_UPGRADER_ADDR, ASSET_B);
     }
 
-    function test_updateL2_preservesDeprecatedProxyHashSlotAndNeighbors() external {
+    function test_updateL2_preservesBaseTokenMetadataSlots() external {
         _updateL2As(L2_COMPLEX_UPGRADER_ADDR, ASSET_A);
 
-        assertEq(vm.load(address(ntv), bytes32(uint256(254))), bytes32(0), "legacy bridge tombstone moved");
-        assertEq(vm.load(address(ntv), bytes32(uint256(255))), bytes32(0), "proxy hash tombstone written");
         assertEq(
             vm.load(address(ntv), bytes32(uint256(256))),
             bytes32(uint256(uint160(baseOriginToken))),
@@ -72,13 +70,10 @@ contract L2NativeTokenVaultUpdateL2Test is Test {
         assertEq(vm.load(address(ntv), bytes32(uint256(259))), bytes32(uint256(18)), "decimals slot moved");
     }
 
-    function test_proxyBytecodeHashGetterAndBeaconEventUseActualRuntimeHash() external {
+    function test_beaconEventUsesActualRuntimeHash() external {
         UpgradeableBeacon beacon = new UpgradeableBeacon(address(ntv));
         BeaconProxy proxy = new BeaconProxy(address(beacon), "");
         bytes32 expectedProxyBytecodeHash = address(proxy).codehash;
-
-        assertEq(IL2NativeTokenVault.L2_TOKEN_PROXY_BYTECODE_HASH.selector, bytes4(0x2149ed74));
-        assertEq(ntv.L2_TOKEN_PROXY_BYTECODE_HASH(), expectedProxyBytecodeHash);
 
         vm.expectEmit(true, true, false, false, address(ntv));
         emit IL2NativeTokenVault.L2TokenBeaconUpdated(address(beacon), expectedProxyBytecodeHash);

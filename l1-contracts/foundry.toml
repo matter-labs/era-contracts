@@ -34,9 +34,6 @@ remappings = [
   "forge-std/=lib/forge-std/src/",
   "murky/=lib/murky/src/",
   "foundry-test/=test/foundry/",
-  # The audited L1 sources import the frozen system constants by their historical
-  # `system-contracts/...` path; the workspace is gone, the file lives in-tree.
-  "system-contracts/contracts/Constants.sol=frozen-system-constants/Constants.sol",
   "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
   "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
   "test-utils/=test/foundry/l1/integration/utils/",

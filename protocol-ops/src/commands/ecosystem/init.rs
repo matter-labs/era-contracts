@@ -52,6 +52,10 @@ pub struct EcosystemInitArgs {
     /// CREATE2 factory salt (random by default).
     #[clap(long, help_heading = "Advanced input")]
     pub create2_factory_salt: Option<B256>,
+    /// L1 WETH token address (default: mainnet WETH). Set this on any other
+    /// L1, since it is immutable in the deployed bridge contracts.
+    #[clap(long, help_heading = "Advanced input")]
+    pub token_weth_address: Option<Address>,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
@@ -79,6 +83,7 @@ pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
         with_testnet_verifier: args.with_testnet_verifier,
         zk_token_asset_id,
         create2_factory_salt: args.create2_factory_salt,
+        token_weth_address: args.token_weth_address,
     };
     let output = ecosystem_init(&mut runner, &sender, &owner, &input).await?;
 
@@ -114,6 +119,7 @@ pub async fn ecosystem_init(
     let hub_input = HubInitInput {
         owner: owner.address,
         create2_factory_salt: input.create2_factory_salt,
+        token_weth_address: input.token_weth_address,
     };
     let hub_output = hub_init(runner, sender, owner, &hub_input).await?;
     let bridgehub_addr = hub_output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
@@ -144,6 +150,7 @@ pub struct EcosystemInitInput {
     pub with_testnet_verifier: bool,
     pub zk_token_asset_id: Option<B256>,
     pub create2_factory_salt: Option<B256>,
+    pub token_weth_address: Option<Address>,
 }
 
 #[derive(Serialize)]

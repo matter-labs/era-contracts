@@ -397,6 +397,11 @@
   },
   {
     "type": "error",
+    "name": "FactoryDepsNotSupported",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "GasPerPubdataMismatch",
     "inputs": []
   },
@@ -461,11 +466,6 @@
   {
     "type": "error",
     "name": "Reentrancy",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "TooManyFactoryDeps",
     "inputs": []
   },
   {

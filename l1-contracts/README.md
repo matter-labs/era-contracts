@@ -5,9 +5,9 @@
 The settlement, bridging and governance contracts for ZKsync chains running
 [ZKsync OS](https://docs.zksync.io/zksync-protocol) — zero-knowledge rollups that scale Ethereum
 without compromising on security or decentralization. Every chain deployable or upgradable from
-this repository runs ZKsync OS; the retired EraVM stack survives only as storage tombstones,
-wire-format reservations and version-scoped verification of already-executed upgrades. (The
-repository keeps its historical `era-contracts` name.)
+this repository runs ZKsync OS. Runtime compatibility retains storage tombstones and wire-format
+reservations; version-scoped upgrade tooling remains under its historical version directories. The repository
+keeps its historical `era-contracts` name.
 
 ## L1 Contracts
 

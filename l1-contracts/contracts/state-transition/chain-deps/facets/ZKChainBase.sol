@@ -153,9 +153,6 @@ contract ZKChainBase is ReentrancyGuard {
     modifier onlyServiceTransaction() {
         IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
         if (
-            /// Purposes.
-            /// 1. Allow EVM emulation.
-            msg.sender != address(this) &&
             /// For registering chains in the L2Bridgehub. This is used for interop initiation.
             msg.sender != bridgehub.chainRegistrationSender() &&
             /// For sending the deposit-pause request to the settlement layer's L2ChainAssetHandler

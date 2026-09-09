@@ -35,10 +35,8 @@ import {MismatchL2DACommitmentScheme, SettlementLayerChainIdMismatch} from "../.
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 
-/// @dev The version that is used for the `Executor` calldata used for relaying the
-/// ZKSync OS stored batch info.
-/// @dev Version 0 was the EraVM relay encoding; the value 1 is kept because relay
-/// consumers on the settlement layer distinguish the encodings by this leading byte.
+/// @dev Encoding version of StoredBatchInfo messages sent to L1 from the settlement layer.
+/// Version 0 is reserved for the retired EraVM format.
 uint8 constant RELAYED_EXECUTOR_VERSION_ZKSYNC_OS = 1;
 
 /// @title ZK chain Committer contract responsible for batch commitment operations.

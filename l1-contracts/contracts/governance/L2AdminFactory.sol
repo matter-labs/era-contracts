@@ -11,7 +11,6 @@ import {RestrictionValidator} from "./restriction/RestrictionValidator.sol";
 /// @dev It can be used to ensure that certain L2 admins are deployed with
 /// predefined restrictions. E.g. it can be used to deploy admins that ensure that
 /// a chain is a permanent rollup.
-/// @dev This contract is expected to be deployed in zkEVM (L2) environment.
 /// @dev The contract is immutable, in case the restrictions need to be changed,
 /// a new contract should be deployed.
 contract L2AdminFactory {
@@ -19,8 +18,7 @@ contract L2AdminFactory {
     /// @param admin The address of the newly deployed admin.
     event AdminDeployed(address indexed admin);
 
-    /// @dev We use storage instead of immutable variables due to the
-    /// specifics of the zkEVM environment, where storage is actually cheaper.
+    /// @notice Restrictions included in every deployed admin.
     address[] public requiredRestrictions;
 
     constructor(address[] memory _requiredRestrictions) {

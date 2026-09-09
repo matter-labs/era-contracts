@@ -13,6 +13,8 @@ import {
 } from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
@@ -103,6 +105,17 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
 
         // NewPriorityRequest from the mailbox proves the registration service transaction was queued.
         logs.requireOne(NEW_PRIORITY_REQUEST_SIGNATURE);
+    }
+
+    function test_serviceTransaction_revertWhenCalledByDiamond() public {
+        address chain = getZKChainAddress(zkChainIds[0]);
+        bytes32 priorityRoot = IGetters(chain).getPriorityTreeRoot();
+
+        vm.prank(chain);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chain));
+        MailboxFacet(chain).requestL2ServiceTransaction(l2ContractAddresses[0], "");
+
+        assertEq(IGetters(chain).getPriorityTreeRoot(), priorityRoot);
     }
 
     function test_chainRegistrationSender_revertWhen_alreadyRegistered() public {

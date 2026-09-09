@@ -3,9 +3,9 @@
 ## Relevant files
 
 - `.github/workflows/lint.yaml` — Solidity / TS lint, codespell, typos, `cargo fmt --check` for all Rust crates, and `cargo clippy -D warnings` for `protocol-ops`.
-- `.github/workflows/l1-contracts-ci.yaml` — l1-contracts build, `check-zkstack-out`, `check-hashes`, `check-selectors`, `check-legacy-bridge-sol`.
+- `.github/workflows/l1-contracts-ci.yaml` — l1-contracts build, `check-zkstack-out`, `check-zksync-os-genesis`, `check-hashes`, `check-selectors`.
 - `.github/workflows/l1-contracts-foundry-ci.yaml` — foundry test build + contract-size check.
-- `.github/workflows/anvil-interop-ci.yaml` — interop integration test, v31→v32 upgrade test.
+- `.github/workflows/anvil-interop-ci.yaml` — interop integration test, v31→v33 upgrade test.
 - `.github/workflows/update-hashes-on-demand.yaml` — manual workflow to push hash updates back into a PR.
 - `recompute_hashes.sh` — one-shot rebuild + recompute + write hashes.
 - `package.json`, `l1-contracts/package.json`, `da-contracts/package.json` — top-level scripts referenced below.
@@ -15,7 +15,7 @@
 CI checks form a dependency chain. Fix in this order:
 
 ```
-1. Tests       ← foundry, anvil-interop, v31→v32 upgrade. Biggest signal; bytecode-shaping bugs surface here.
+1. Tests       ← foundry, anvil-interop, v31→v33 upgrade. Biggest signal; bytecode-shaping bugs surface here.
 2. Linting     ← solhint, eslint, prettier, errors-lint, cargo fmt, cargo clippy, codespell, typos.
 3. Selectors   ← yarn l1 selectors --fix. Depends on final bytecode.
 4. zkstack-out ← regenerated JSON ABIs. Depends on final compile output.
@@ -28,7 +28,7 @@ Doing steps 3-5 before step 1 is the most common time-sink.
 
 ## 1. Tests
 
-This is where the bulk of regressions surface — get this green first. Three test suites in CI: **foundry** (per-project), **anvil-interop** (full L1↔L2 flow), and **v31 → v32 upgrade** (real-state replay).
+This is where the bulk of regressions surface — get this green first. Three test suites in CI: **foundry** (per-project), **anvil-interop** (full L1↔L2 flow), and **v31 → v33 upgrade** (real-state replay).
 
 ### Install the pinned Foundry release
 
@@ -97,13 +97,13 @@ npx ts-node setup-and-dump-state.ts
 
 Commit the regenerated `chain-states/` files alongside the contract change. CI currently does not regenerate states on PRs — it expects committed states to match the current mock contracts.
 
-### 1c. Upgrade tests (v31→v32)
+### 1c. Upgrade tests (v31→v33)
 
-This exercises the full upgrade flow against the captured v31 chain states. It uses protocol-ops's split flow: `ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, `ecosystem stage3` to register bridged tokens and populate `bridgedOut`, then `chain upgrade` per chain. In production a chain's priority-op lower bound must also be recorded (`RecordPriorityOpLowerBound.s.sol`) well before its `chain upgrade`; the test harness models the draft-v31 backfill prerequisite instead (see `harness-shims.ts`).
+This exercises the full upgrade flow against the captured v31 chain states. It uses protocol-ops's split flow: `ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, `ecosystem stage3` to populate `bridgedOut`, then `chain upgrade` per chain. In production a chain's priority-op lower bound must also be recorded (`RecordPriorityOpLowerBound.s.sol`) well before its `chain upgrade`; the test harness models the draft-v31 backfill prerequisite instead (see `harness-shims.ts`).
 
 ```bash
 cd l1-contracts/test/anvil-interop
-npx ts-node run-v31-to-v32-upgrade-test.ts
+npx ts-node run-upgrade-test.ts
 ```
 
 Prerequisites: same as anvil-interop tests (both foundry builds done). Plus:
@@ -113,7 +113,7 @@ Prerequisites: same as anvil-interop tests (both foundry builds done). Plus:
 
 Common failures:
 
-- **"Script not found: deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol"** or **`CTMUpgrade_v31.s.sol`** — `yarn l1 build:foundry` not run, or the test override path is wrong.
+- **"Script not found: deploy-scripts/upgrade/v33/CoreUpgrade_v33.s.sol"** or **`CTMUpgrade_v33.s.sol`** — `yarn l1 build:foundry` not run, or the test override path is wrong.
 - **"call to non-contract address 0x0…"** — usually the upgrade script reading an address before the contract is deployed/registered. Use `cast run <txhash>` against the still-running anvil to get the trace; see `AGENTS.md` "Debugging Failed Transactions with cast run" for the recipe.
 - **"vm.writeToml: path not allowed"** — script-out path concatenation issue. Check that `vm.projectRoot()` is concatenated once, not twice.
 

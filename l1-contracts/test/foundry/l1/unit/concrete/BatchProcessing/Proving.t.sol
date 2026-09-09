@@ -104,8 +104,7 @@ contract ProvingTest is ExecutorTest {
         assertEq(totalBlocksVerified, 1);
     }
 
-    /// @notice ZKsync OS allows proving several batches in one call (the EraVM one-proof-per-call
-    /// restriction is gone). Commits a second batch and proves both together.
+    /// @notice Commits a second batch and proves both batches together.
     function test_SuccessfulProveMultipleBatches() public {
         CommitBatchInfoZKsyncOS memory secondCommitInfo = newCommitBatchInfoZKsyncOS;
         secondCommitInfo.batchNumber = 2;

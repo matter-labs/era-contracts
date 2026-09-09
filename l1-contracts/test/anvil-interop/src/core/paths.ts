@@ -19,4 +19,4 @@ export const ANVIL_INTEROP_GATEWAY_VOTE_CONFIG_RELATIVE =
   "/test/anvil-interop/outputs/gateway-vote-preparation-config.toml";
 export const ANVIL_INTEROP_GATEWAY_VOTE_OUTPUT_RELATIVE = "/test/anvil-interop/outputs/gateway-vote-output.toml";
 export const ANVIL_INTEROP_GATEWAY_VOTE_SCRIPT_PATH =
-  "deploy-scripts/gateway/GatewayVotePreparation.s.sol:GatewayVotePreparation";
+  "test/foundry/l1/integration/_GatewayVotePreparationForTests.sol:GatewayVotePreparationForTests";

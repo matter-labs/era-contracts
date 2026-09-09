@@ -39,14 +39,10 @@ enum CoreContract {
     AtomicFlowManager
 }
 
-/// @notice Fixed-address L2 system contracts implemented in this repository.
-/// @dev Their EVM bytecodes come from `l1-contracts/out`; the upgrade path uses a subset behind
-/// `SystemContractProxy`.
+/// @notice Fixed-address L2 system contracts upgraded through `SystemContractProxy`.
 enum L2SystemContract {
     L2BaseToken,
     L1Messenger,
     SystemContext,
-    ContractDeployer,
-    // Appended to preserve the ordinals of the existing script-facing enum members.
     L2ComplexUpgrader
 }

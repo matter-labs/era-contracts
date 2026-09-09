@@ -27,7 +27,6 @@ import {
     L2_NTV_BEACON_DEPLOYER_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_VERSION_SPECIFIC_UPGRADER_ADDR,
     L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
@@ -236,9 +235,6 @@ library CoreOnGatewayHelper {
         if (_c == L2SystemContract.SystemContext) {
             return "SystemContext";
         }
-        if (_c == L2SystemContract.ContractDeployer) {
-            return "ContractDeployer";
-        }
         if (_c == L2SystemContract.L2ComplexUpgrader) {
             return "L2ComplexUpgrader";
         }
@@ -255,9 +251,6 @@ library CoreOnGatewayHelper {
         }
         if (_c == L2SystemContract.SystemContext) {
             return L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR;
-        }
-        if (_c == L2SystemContract.ContractDeployer) {
-            return L2_DEPLOYER_SYSTEM_CONTRACT_ADDR;
         }
         if (_c == L2SystemContract.L2ComplexUpgrader) {
             return L2_COMPLEX_UPGRADER_ADDR;

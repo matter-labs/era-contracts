@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 
-import "forge-std/console.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
@@ -23,31 +22,21 @@ import {
 } from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {
-    IExecutor,
-    MAX_NUMBER_OF_BLOBS,
-    TOTAL_BLOBS_IN_COMMITMENT
-} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {InteropRoot, L2CanonicalTransaction, L2Log} from "contracts/common/Messaging.sol";
+import {InteropRoot, L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
-import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
 import {Utils as DeployUtils} from "deploy-scripts/utils/Utils.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
-address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
 address constant L2_BOOTLOADER_ADDRESS = 0x0000000000000000000000000000000000008001;
-address constant L2_KNOWN_CODE_STORAGE_ADDRESS = 0x0000000000000000000000000000000000008004;
-address constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008;
 // constant in tests, but can be arbitrary address in real environments
 L2DACommitmentScheme constant L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.PUBDATA_KECCAK256;
 // Owner of the RollupDAManager in tests
 address constant TEST_ROLLUP_DA_MANAGER_OWNER = address(0x1234567890DEADBEEF);
-
-uint256 constant EVENT_INDEX = 0;
 
 library Utils {
     function randomBytes32(bytes memory seed) public view returns (bytes32) {
@@ -360,14 +349,6 @@ library Utils {
         uint256 chainId = block.chainid;
         DiamondProxy diamondProxy = new DiamondProxy(chainId, diamondCutData);
         return address(diamondProxy);
-    }
-
-    /// @dev Historical alias from the dual-VM era; identical to {makeDiamondProxy}.
-    function makeZKsyncOSDiamondProxy(
-        Diamond.FacetCut[] memory _facetCuts,
-        address _bridgehub
-    ) public returns (address) {
-        return makeDiamondProxy(_facetCuts, _bridgehub);
     }
 
     function makeEmptyL2CanonicalTransaction() public returns (L2CanonicalTransaction memory) {
