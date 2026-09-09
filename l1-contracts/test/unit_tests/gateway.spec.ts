@@ -12,7 +12,7 @@ import {
   registerZKChainWithBridgeRegistration,
 } from "../../src.ts/deploy-test-process";
 import { ethTestConfig, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L2_BRIDGEHUB_ADDRESS } from "../../src.ts/constants";
-import { priorityTxMaxGasLimit } from "../../src.ts/utils";
+import { priorityTxMaxGasLimit, userPriorityTxMaxGasLimit } from "../../src.ts/utils";
 import { SYSTEM_CONFIG } from "../../scripts/utils";
 
 import type { Deployer } from "../../src.ts/deploy";
@@ -85,7 +85,12 @@ describe("Gateway", function () {
     const ctm = migratingDeployer.chainTypeManagerContract(migratingDeployer.deployWallet);
     const gasPrice = await migratingDeployer.deployWallet.provider.getGasPrice();
     const value = (
-      await bridgehub.l2TransactionBaseCost(chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
+      await bridgehub.l2TransactionBaseCost(
+        chainId,
+        gasPrice,
+        userPriorityTxMaxGasLimit,
+        REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+      )
     ).mul(10);
 
     const ctmDeploymentTracker = migratingDeployer.ctmDeploymentTracker(migratingDeployer.deployWallet);
@@ -100,7 +105,7 @@ describe("Gateway", function () {
           chainId,
           mintValue: value,
           l2Value: 0,
-          l2GasLimit: priorityTxMaxGasLimit,
+          l2GasLimit: userPriorityTxMaxGasLimit,
           l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
           refundRecipient: migratingDeployer.deployWallet.address,
           secondBridgeAddress: assetRouter.address,
@@ -119,7 +124,7 @@ describe("Gateway", function () {
           chainId,
           mintValue: value,
           l2Value: 0,
-          l2GasLimit: priorityTxMaxGasLimit,
+          l2GasLimit: userPriorityTxMaxGasLimit,
           l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
           refundRecipient: migratingDeployer.deployWallet.address,
           secondBridgeAddress: ctmDeploymentTracker.address,
@@ -141,7 +146,7 @@ describe("Gateway", function () {
         l2Contract: ethers.constants.AddressZero,
         l2Value: 0,
         l2Calldata: "0x",
-        l2GasLimit: priorityTxMaxGasLimit,
+        l2GasLimit: userPriorityTxMaxGasLimit,
         l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
         factoryDeps: [],
         refundRecipient: ethers.constants.AddressZero,

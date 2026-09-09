@@ -4,7 +4,7 @@ import * as hre from "hardhat";
 import { Command } from "commander";
 import { Wallet, ethers } from "ethers";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
-import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA, provider, priorityTxMaxGasLimit } from "./utils";
+import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA, provider, userPriorityTxMaxGasLimit } from "./utils";
 import { ethTestConfig } from "./deploy-shared-bridge-on-l2-through-l1";
 
 function getContractBytecode(contractName: string) {
@@ -47,7 +47,7 @@ async function main() {
           mintValue: 0,
           l2Value: 0,
           l2Calldata: "0x",
-          l2GasLimit: priorityTxMaxGasLimit,
+          l2GasLimit: userPriorityTxMaxGasLimit,
           l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
           factoryDeps: [getContractBytecode("L2SharedBridge")],
           refundRecipient: wallet.address,

@@ -47,7 +47,7 @@ import {
   applyL1ToL2Alias,
   encodeNTVAssetId,
   computeL2Create2Address,
-  priorityTxMaxGasLimit,
+  userPriorityTxMaxGasLimit,
   isCurrentNetworkLocal,
 } from "./utils";
 import {
@@ -1307,8 +1307,8 @@ export class Deployer {
     const protocolVersion = packSemver(...unpackStringSemVer(process.env.CONTRACTS_GENESIS_PROTOCOL_SEMANTIC_VERSION));
     const chainData = ethers.utils.defaultAbiCoder.encode(["uint256"], [protocolVersion]);
     const bridgehub = this.bridgehubContract(this.deployWallet);
-    // Just some large gas limit that should always be enough
-    const l2GasLimit = ethers.BigNumber.from(72_000_000);
+    // The body-gas cap on caller-supplied L1->L2 transactions.
+    const l2GasLimit = ethers.BigNumber.from(userPriorityTxMaxGasLimit);
     const expectedCost = (
       await bridgehub.l2TransactionBaseCost(gatewayChainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
     ).mul(5);
@@ -1649,7 +1649,7 @@ export class Deployer {
       l2SharedBridgeImplementationBytecode,
       ethers.utils.defaultAbiCoder.encode(["uint256"], [eraChainId]),
       ethers.constants.HashZero,
-      priorityTxMaxGasLimit,
+      userPriorityTxMaxGasLimit,
       gasPrice,
       [L2_STANDARD_TOKEN_PROXY.bytecode],
       this.addresses.Bridgehub.BridgehubProxy,
@@ -1702,7 +1702,7 @@ export class Deployer {
       L2_SHARED_BRIDGE_PROXY.bytecode,
       l2SharedBridgeProxyConstructorData,
       ethers.constants.HashZero,
-      priorityTxMaxGasLimit,
+      userPriorityTxMaxGasLimit,
       gasPrice,
       undefined,
       this.addresses.Bridgehub.BridgehubProxy,

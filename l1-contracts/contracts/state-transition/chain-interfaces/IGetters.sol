@@ -125,7 +125,10 @@ interface IGetters is IZKChainBase {
     /// executed (i.e. finalized).
     function getL2SystemContractsUpgradeBatchNumber() external view returns (uint256);
 
-    /// @return The maximum number of L2 gas that a user can request for L1 -> L2 transactions
+    /// @return The chain-configured maximum transaction body gas for L1 -> L2 transactions.
+    /// @dev This is the limit protocol-authored transactions are validated against. Caller-supplied
+    /// transactions on an EraVM chain are additionally capped by `USER_PRIORITY_TX_MAX_GAS_LIMIT`,
+    /// so the effective ceiling for them is the lower of the two and may be below this value.
     function getPriorityTxMaxGasLimit() external view returns (uint256);
 
     /// @return The effective ZKsync OS single-transaction gas limit (EIP-7825), with the default

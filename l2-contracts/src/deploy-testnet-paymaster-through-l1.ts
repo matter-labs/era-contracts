@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
-import { computeL2Create2Address, create2DeployFromL1, priorityTxMaxGasLimit, provider } from "./utils";
+import { computeL2Create2Address, create2DeployFromL1, userPriorityTxMaxGasLimit, provider } from "./utils";
 import { ethTestConfig } from "./deploy-utils";
 
 import * as hre from "hardhat";
@@ -41,7 +41,7 @@ async function main() {
           testnetPaymasterBytecode,
           "0x",
           create2Salt,
-          priorityTxMaxGasLimit
+          userPriorityTxMaxGasLimit
         )
       ).wait();
 

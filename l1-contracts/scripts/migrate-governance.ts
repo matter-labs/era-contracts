@@ -9,7 +9,7 @@ import { BigNumber, ethers, Wallet } from "ethers";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
 import * as fs from "fs";
 import { Deployer } from "../src.ts/deploy";
-import { applyL1ToL2Alias, getAddressFromEnv, getNumberFromEnv } from "../src.ts/utils";
+import { applyL1ToL2Alias, getAddressFromEnv, userPriorityTxMaxGasLimit } from "../src.ts/utils";
 import { GAS_MULTIPLIER, web3Provider } from "./utils";
 
 import type { TxInfo } from "../../l2-contracts/src/utils";
@@ -19,7 +19,7 @@ import { Provider } from "zksync-ethers";
 import { UpgradeableBeaconFactory } from "../../l2-contracts/typechain/UpgradeableBeaconFactory";
 
 const provider = web3Provider();
-const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"));
+const l2TxGasLimit = BigNumber.from(userPriorityTxMaxGasLimit);
 
 const l2SharedBridgeABI = JSON.parse(
   fs
@@ -139,7 +139,7 @@ async function main() {
         l2SharedBridgeCalldata,
         refundRecipient,
         gasPrice,
-        priorityTxMaxGasLimit,
+        l2TxGasLimit,
         provider
       );
       displayTx("L2 ERC20 bridge changeAdmin: ", l2TxForErc20Bridge);
@@ -155,7 +155,7 @@ async function main() {
         l2WethUpgradeCalldata,
         refundRecipient,
         gasPrice,
-        priorityTxMaxGasLimit,
+        l2TxGasLimit,
         provider
       );
       displayTx("L2 Weth upgrade: ", l2TxForWethUpgrade);
@@ -172,7 +172,7 @@ async function main() {
         l2Erc20BeaconCalldata,
         refundRecipient,
         gasPrice,
-        priorityTxMaxGasLimit,
+        l2TxGasLimit,
         provider
       );
       displayTx("L2 ERC20 beacon upgrade: ", l2TxForErc20BeaconUpgrade);

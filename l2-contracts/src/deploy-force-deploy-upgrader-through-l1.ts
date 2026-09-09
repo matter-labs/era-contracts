@@ -3,7 +3,7 @@ import * as hre from "hardhat";
 
 import { Command } from "commander";
 import { ethers, Wallet } from "ethers";
-import { computeL2Create2Address, create2DeployFromL1, priorityTxMaxGasLimit, provider } from "./utils";
+import { computeL2Create2Address, create2DeployFromL1, userPriorityTxMaxGasLimit, provider } from "./utils";
 import { ethTestConfig } from "./deploy-utils";
 
 // Script to deploy the force deploy upgrader contract and output its address.
@@ -43,7 +43,7 @@ async function main() {
       forceDeployUpgraderBytecode,
       "0x",
       create2Salt,
-      priorityTxMaxGasLimit
+      userPriorityTxMaxGasLimit
     );
 
     console.log(`CONTRACTS_L2_DEFAULT_UPGRADE_ADDR=${forceDeployUpgraderAddress}`);
