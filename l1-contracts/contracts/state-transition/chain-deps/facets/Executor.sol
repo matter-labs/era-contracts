@@ -12,6 +12,7 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {GW_ASSET_TRACKER} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {
+    AirbenderLaneCannotChainToGenesis,
     CanOnlyProcessOneBatch,
     CantExecuteUnprovenBatches,
     InvalidMessageRoot,
@@ -313,6 +314,15 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // by the guest, whose binding needs only some `(meta, aux)` pair reproducing it; the
             // sequencer holds the Boojum pair for its own batch. So seeding needs no extra input and
             // no separate protocol, and it still pins the predecessor's state.
+            // `setDisabledProofSystems` will not require the lane until a batch has settled, but that
+            // is a check on the configuration at one moment: `revertBatches` may later take
+            // `totalBatchesVerified` back to zero, putting the genesis batch back in the predecessor
+            // position. Enforced here too, where the value is actually used, so the invariant holds
+            // however the chain arrived at this state.
+            if (prevBatch.batchNumber == 0) {
+                revert AirbenderLaneCannotChainToGenesis();
+            }
+
             bytes32 previousAirbenderCommitment = (prevAirbenderBound && prevBatch.airbenderCommitment != bytes32(0))
                 ? prevBatch.airbenderCommitment
                 : prevBatch.commitment;

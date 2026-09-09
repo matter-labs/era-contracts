@@ -28,6 +28,10 @@ error AirbenderCommitmentRequired();
 /// masked off. Changing it under a lane that is required would commit the next batch in a shape the
 /// gate cannot accept, in whichever direction the change goes.
 error AirbenderLaneMustBeDisabled();
+// 0xf7821506
+/// @notice The Airbender lane cannot chain a batch to the genesis batch: the genesis commitment is a
+/// configured value with no preimage the guest can open, so such a batch could never be proved.
+error AirbenderLaneCannotChainToGenesis();
 // 0xf4a67ff1
 /// @notice The Airbender lane cannot be required while the chain does not commit Airbender data:
 /// every batch would be committed with a single public input the enabled lane has nothing to read.
@@ -296,6 +300,11 @@ error MockVerifierNotSupported();
 error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 // 0xb385a3da
 error MsgValueTooLow(uint256 required, uint256 provided);
+// 0x379ac44c
+/// @notice A chain that settles behind both proof systems cannot migrate settlement layers: the
+/// multi-proof settings are not carried in `ZKChainCommitment`, so the destination would bring the
+/// chain up single-proof. Withdraw the capability first.
+error MultiProofChainCannotMigrate();
 // 0xedd74330
 error MustBeEraChain();
 // 0x8b7e144a

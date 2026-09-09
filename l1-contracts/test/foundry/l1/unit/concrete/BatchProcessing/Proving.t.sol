@@ -20,6 +20,7 @@ import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/IComm
 import {
     BatchHashMismatch,
     CanOnlyProcessOneBatch,
+    AirbenderLaneCannotChainToGenesis,
     InvalidPublicInputsLength,
     VerifiedBatchesExceedsCommittedBatches
 } from "contracts/common/L1ContractErrors.sol";
@@ -476,6 +477,26 @@ contract ProvingTest is ExecutorTest {
         _proveWithPrev(bootstrapStoredBatchInfo, _gateProof());
 
         assertEq(getters.getTotalBlocksVerified(), 2);
+    }
+
+    /// `setDisabledProofSystems` refuses to require the lane until a batch has settled, but that is a
+    /// check on the configuration at one moment. `revertBatches` may take `totalBatchesVerified` back
+    /// to zero afterwards, putting the genesis batch — whose commitment is a configured value with no
+    /// preimage the guest can open — back in the predecessor position. The prove path refuses it there
+    /// too, so the invariant does not depend on how the chain reached this state.
+    function test_airbenderLaneRefusesTheGenesisPredecessor() public {
+        // Unwind everything the bring-up settled, which is what makes genesis the predecessor again.
+        vm.prank(validator);
+        executor.revertBatchesSharedBridge(address(0), 0);
+        assertEq(getters.getTotalBlocksVerified(), 0);
+
+        // Re-commit the batch under test directly on top of genesis, carrying Airbender data.
+        IExecutor.StoredBatchInfo memory onGenesis = _commitBatch(genesisStoredBatchInfo, airbenderHeapHash, 1);
+
+        _installGate(IVerifier(address(new AcceptingLane())), IVerifier(address(new AcceptingLane())));
+
+        vm.expectRevert(AirbenderLaneCannotChainToGenesis.selector);
+        _proveWithPrev(genesisStoredBatchInfo, _gateProof(), onGenesis);
     }
 
     /// The mirror: a batch that does carry one makes the Executor build the pair.

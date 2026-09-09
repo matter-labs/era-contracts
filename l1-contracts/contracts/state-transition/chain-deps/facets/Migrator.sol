@@ -40,6 +40,7 @@ import {
     MigrationInProgress
 } from "../../L1StateTransitionErrors.sol";
 import {
+    MultiProofChainCannotMigrate,
     NotAZKChain,
     NotCompatibleWithPriorityMode,
     RemovingPermanentRestriction
@@ -162,6 +163,14 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         }
         if (_originalCaller != s.admin) {
             revert NotChainAdmin(_originalCaller, s.admin);
+        }
+        // The multi-proof settings are not part of `ZKChainCommitment`, so a migrating chain would be
+        // re-initialised on the destination as single-proof: it would settle behind Boojum alone, with
+        // no event and no governance action, while its sequencer kept committing Airbender data that
+        // the destination refuses. Withdraw the capability first — deliberately, through the guarded
+        // transition — rather than have a migration silently drop it.
+        if (s.multiProofEnabled) {
+            revert MultiProofChainCannotMigrate();
         }
 
         /// We require that all the priority transactions are processed.
