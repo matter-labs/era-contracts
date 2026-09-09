@@ -11,16 +11,18 @@ import {
     MigrationPaused,
     ChainMigrationsDisabled,
     NotUpgradePauser,
-    UpgradePauseAlreadyHeld,
-    UpgradePauseNotHeld,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 
-/// @notice The migration pause of `ChainAssetHandlerBase` as two composable sources: the owner's
-///         own flag (`pauseMigration` / `unpauseMigration`) and per-pauser HOLDS taken by
-///         owner-registered upgrade pausers (`acquireMigrationPause` / `releaseMigrationPause`).
-///         `migrationPaused()` is the OR of both; a pauser can only ever release its own hold and
-///         the owner can clear a stuck one. See {docs/upgrade-stage-lifecycle.md}, section 4.3.
+/// @notice The migration pause of `ChainAssetHandlerBase`: ONE flag, written by the owner or by
+///         any address the owner registered as an upgrade pauser (`setUpgradePauser`). There is no
+///         per-pauser hold and no counter — an upgrade executor calls the same
+///         `pauseMigration` / `unpauseMigration` governance calls. See
+///         {docs/upgrade-stage-lifecycle.md}, section 4.3.
+/// @dev The tests below deliberately pin the CONSEQUENCE of a single flag: any authorized caller
+///      can lift a pause any other authorized caller set, so coordinating overlapping upgrades and
+///      incident pauses is governance's responsibility rather than something this contract
+///      enforces.
 /// @dev Runs against a real `L1ChainAssetHandler` deployed directly (its constructor sets the
 ///      owner). The pause surface touches no other contract, so the Bridgehub is a bare address —
 ///      except in the one `bridgeBurn` test, where the two Bridgehub getters `setAddresses` reads
@@ -46,19 +48,14 @@ contract L1ChainAssetHandlerMigrationPauseTest is Test {
         handler.setUpgradePauser(_pauser, true);
     }
 
-    function _acquire(address _pauser) internal {
-        vm.prank(_pauser);
-        handler.acquireMigrationPause();
+    function _pause(address _caller) internal {
+        vm.prank(_caller);
+        handler.pauseMigration();
     }
 
-    function _release(address _pauser) internal {
-        vm.prank(_pauser);
-        handler.releaseMigrationPause();
-    }
-
-    function _assertHold(address _pauser, bool _held, uint256 _holds) internal view {
-        assertEq(handler.upgradePauseHeld(_pauser), _held, "unexpected hold state");
-        assertEq(handler.upgradePauseHolds(), _holds, "unexpected hold count");
+    function _unpause(address _caller) internal {
+        vm.prank(_caller);
+        handler.unpauseMigration();
     }
 
     // ─────────────────────────────── registration ───────────────────────────────
@@ -92,221 +89,108 @@ contract L1ChainAssetHandlerMigrationPauseTest is Test {
         handler.setUpgradePauser(address(0), true);
     }
 
-    // ─────────────────────────────── acquire / release ───────────────────────────────
+    // ─────────────────────────────── authorization ───────────────────────────────
 
-    function test_acquireMigrationPause_takesTheHoldAndPauses() public {
+    function test_pauseMigration_byOwner() public {
+        vm.expectEmit(true, true, true, true, address(handler));
+        emit IChainAssetHandlerBase.PausedMigration(owner);
+        _pause(owner);
+        assertTrue(handler.migrationPaused());
+
+        vm.expectEmit(true, true, true, true, address(handler));
+        emit IChainAssetHandlerBase.UnpausedMigration(owner);
+        _unpause(owner);
+        assertFalse(handler.migrationPaused());
+    }
+
+    /// @dev A registered pauser drives the SAME calls the owner does — that is the whole point of
+    ///      the allowlist: stage 0 pauses and stage 2 unpauses through governance's own entrypoints.
+    function test_pauseMigration_byRegisteredPauser() public {
         _register(pauserA);
 
         vm.expectEmit(true, true, true, true, address(handler));
-        emit IChainAssetHandlerBase.MigrationPauseAcquired(pauserA);
-        _acquire(pauserA);
+        emit IChainAssetHandlerBase.PausedMigration(pauserA);
+        _pause(pauserA);
+        assertTrue(handler.migrationPaused());
 
-        _assertHold(pauserA, true, 1);
-        assertTrue(handler.migrationPaused(), "a hold must pause migrations");
+        vm.expectEmit(true, true, true, true, address(handler));
+        emit IChainAssetHandlerBase.UnpausedMigration(pauserA);
+        _unpause(pauserA);
+        assertFalse(handler.migrationPaused());
     }
 
-    function test_revertWhen_acquireByUnregisteredPauser() public {
+    function test_revertWhen_pauseByUnauthorizedCaller() public {
         vm.expectRevert(abi.encodeWithSelector(NotUpgradePauser.selector, stranger));
-        vm.prank(stranger);
-        handler.acquireMigrationPause();
-        _assertHold(stranger, false, 0);
+        _pause(stranger);
         assertFalse(handler.migrationPaused());
 
-        // The owner is not implicitly a pauser either: the owner's route is `pauseMigration`.
-        vm.expectRevert(abi.encodeWithSelector(NotUpgradePauser.selector, owner));
-        vm.prank(owner);
-        handler.acquireMigrationPause();
+        vm.expectRevert(abi.encodeWithSelector(NotUpgradePauser.selector, stranger));
+        _unpause(stranger);
     }
 
-    function test_revertWhen_acquireTwice() public {
+    function test_revertWhen_pauseByRevokedPauser() public {
         _register(pauserA);
-        _acquire(pauserA);
-
-        // One hold per pauser: a second acquire would let one release leave a phantom count.
-        vm.expectRevert(abi.encodeWithSelector(UpgradePauseAlreadyHeld.selector, pauserA));
-        vm.prank(pauserA);
-        handler.acquireMigrationPause();
-        _assertHold(pauserA, true, 1);
-    }
-
-    function test_releaseMigrationPause_releasesOwnHoldAndUnpauses() public {
-        _register(pauserA);
-        _acquire(pauserA);
-
-        vm.expectEmit(true, true, true, true, address(handler));
-        emit IChainAssetHandlerBase.MigrationPauseReleased(pauserA);
-        _release(pauserA);
-
-        _assertHold(pauserA, false, 0);
-        assertFalse(handler.migrationPaused(), "the last hold released must unpause");
-    }
-
-    function test_revertWhen_releaseWithoutHold() public {
-        _register(pauserA);
-
-        vm.expectRevert(abi.encodeWithSelector(UpgradePauseNotHeld.selector, pauserA));
-        vm.prank(pauserA);
-        handler.releaseMigrationPause();
-
-        // Releasing is gated on the HOLD, not on the allowlist, so a stranger fails the same way.
-        vm.expectRevert(abi.encodeWithSelector(UpgradePauseNotHeld.selector, stranger));
-        vm.prank(stranger);
-        handler.releaseMigrationPause();
-    }
-
-    function test_revertWhen_releasingAnotherPausersHold() public {
-        _register(pauserA);
-        _register(pauserB);
-        _acquire(pauserA);
-
-        // B holds nothing; A's hold is not B's to release.
-        vm.expectRevert(abi.encodeWithSelector(UpgradePauseNotHeld.selector, pauserB));
-        vm.prank(pauserB);
-        handler.releaseMigrationPause();
-        _assertHold(pauserA, true, 1);
-        assertTrue(handler.migrationPaused());
-    }
-
-    /// @dev A pauser de-registered mid-lifecycle (a retired executor) can still let go of what it
-    ///      holds, so de-registration never strands a pause.
-    function test_release_worksAfterDeregistration() public {
-        _register(pauserA);
-        _acquire(pauserA);
+        _pause(pauserA);
         vm.prank(owner);
         handler.setUpgradePauser(pauserA, false);
 
-        // It cannot take a NEW hold any more...
+        // Revocation is immediate, and it does not strand the pause: the owner still holds it.
         vm.expectRevert(abi.encodeWithSelector(NotUpgradePauser.selector, pauserA));
-        vm.prank(pauserA);
-        handler.acquireMigrationPause();
+        _unpause(pauserA);
+        assertTrue(handler.migrationPaused());
 
-        // ...but it can release the one it has.
-        _release(pauserA);
-        _assertHold(pauserA, false, 0);
+        _unpause(owner);
         assertFalse(handler.migrationPaused());
     }
 
-    // ─────────────────────────────── owner recovery ───────────────────────────────
-
-    function test_clearMigrationPauseHold_ownerReleasesAStuckHold() public {
+    /// @dev Setting the flag twice is a no-op rather than a revert: a lifecycle that retries its
+    ///      stage 0 must not be blocked by a pause that is already in place.
+    function test_pauseAndUnpause_areIdempotent() public {
         _register(pauserA);
-        _acquire(pauserA);
+        _pause(pauserA);
+        _pause(pauserA);
+        assertTrue(handler.migrationPaused());
 
-        vm.expectEmit(true, true, true, true, address(handler));
-        emit IChainAssetHandlerBase.MigrationPauseReleased(pauserA);
-        vm.prank(owner);
-        handler.clearMigrationPauseHold(pauserA);
-
-        _assertHold(pauserA, false, 0);
+        _unpause(pauserA);
+        _unpause(pauserA);
         assertFalse(handler.migrationPaused());
     }
 
-    function test_revertWhen_clearMigrationPauseHoldByStranger() public {
-        _register(pauserA);
-        _acquire(pauserA);
+    // ─────────────────── one flag: the coordination consequence ───────────────────
 
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(stranger);
-        handler.clearMigrationPauseHold(pauserA);
-        _assertHold(pauserA, true, 1);
-    }
-
-    function test_revertWhen_clearMigrationPauseHoldOfNonHolder() public {
-        vm.expectRevert(abi.encodeWithSelector(UpgradePauseNotHeld.selector, pauserA));
-        vm.prank(owner);
-        handler.clearMigrationPauseHold(pauserA);
-    }
-
-    // ─────────────────────────────── composition ───────────────────────────────
-
-    function test_overlappingHolds_oneReleaseKeepsMigrationsPaused() public {
+    /// @dev EXPLICIT accepted behavior. Two overlapping upgrades share one flag, so the first to
+    ///      finish unpauses migrations while the second is still running. This is not defended
+    ///      against in the contract: it protects against accident, not against malicious
+    ///      governance, which controls the executors anyway. Governance must therefore not run
+    ///      overlapping upgrade lifecycles — see {docs/upgrade-stage-lifecycle.md}.
+    function test_onePauserUnpauseLiftsAnothersPause() public {
         _register(pauserA);
         _register(pauserB);
-        _acquire(pauserA);
-        _acquire(pauserB);
-        assertEq(handler.upgradePauseHolds(), 2);
 
-        _release(pauserA);
-        _assertHold(pauserA, false, 1);
-        assertTrue(handler.upgradePauseHeld(pauserB), "the other upgrade's hold must stay");
-        assertTrue(handler.migrationPaused(), "one upgrade's completion must not lift another's pause");
-
-        _release(pauserB);
-        _assertHold(pauserB, false, 0);
-        assertFalse(handler.migrationPaused());
-    }
-
-    function test_ownerPauseAndHold_releasingTheHoldKeepsTheOwnerPause() public {
-        vm.prank(owner);
-        handler.pauseMigration();
-        _register(pauserA);
-        _acquire(pauserA);
+        _pause(pauserA);
+        _pause(pauserB);
         assertTrue(handler.migrationPaused());
 
-        _release(pauserA);
-        assertTrue(handler.migrationPaused(), "the owner's pause is not a pauser's to lift");
-        _assertHold(pauserA, false, 0);
-
-        vm.prank(owner);
-        handler.unpauseMigration();
-        assertFalse(handler.migrationPaused());
+        _unpause(pauserA);
+        assertFalse(handler.migrationPaused(), "one flag: A's unpause lifts the pause B still needs");
     }
 
-    function test_ownerUnpauseWithAHold_keepsMigrationsPaused() public {
-        vm.prank(owner);
-        handler.pauseMigration();
+    /// @dev The same consequence in the other direction: an authorized executor can lift the
+    ///      owner's own pause, so an incident pause must not be left to coexist with an upgrade.
+    function test_pauserUnpauseLiftsTheOwnersPause() public {
         _register(pauserA);
-        _acquire(pauserA);
+        _pause(owner);
 
-        vm.prank(owner);
-        handler.unpauseMigration();
-        assertTrue(handler.migrationPaused(), "a hold outlives the owner's unpause");
-        _assertHold(pauserA, true, 1);
-
-        _release(pauserA);
-        assertFalse(handler.migrationPaused());
-    }
-
-    function test_ownerPauseAndUnpause_doNotTouchHolds() public {
-        _register(pauserA);
-        _acquire(pauserA);
-
-        vm.prank(owner);
-        handler.pauseMigration();
-        _assertHold(pauserA, true, 1);
-        vm.prank(owner);
-        handler.unpauseMigration();
-        _assertHold(pauserA, true, 1);
-        assertTrue(handler.migrationPaused());
-    }
-
-    /// @dev The hold count is exactly the number of distinct holders: every registered pauser
-    ///      acquires once, and migrations unpause only when the last one has released.
-    function testFuzz_holdCountTracksDistinctHolders(uint8 _pauserCount) public {
-        uint256 count = bound(_pauserCount, 1, 16);
-        address[] memory pausers = new address[](count);
-        for (uint256 i = 0; i < count; ++i) {
-            pausers[i] = makeAddr(string(abi.encodePacked("pauser", i)));
-            _register(pausers[i]);
-            _acquire(pausers[i]);
-            assertEq(handler.upgradePauseHolds(), i + 1);
-        }
-        assertTrue(handler.migrationPaused());
-
-        for (uint256 i = 0; i < count; ++i) {
-            _release(pausers[i]);
-            assertEq(handler.upgradePauseHolds(), count - i - 1);
-            assertEq(handler.migrationPaused(), i + 1 < count, "paused exactly while a hold remains");
-        }
+        _unpause(pauserA);
+        assertFalse(handler.migrationPaused(), "one flag: a pauser's unpause lifts the owner's pause");
     }
 
     // ─────────────────────────────── effect on the guarded flow ───────────────────────────────
 
-    /// @dev A hold is honored by `whenMigrationsNotPaused` exactly like the owner's flag: the
-    ///      migration entrypoint refuses while any hold is in place, and admits the call once the
-    ///      hold is released (the flow then fails later, on the migration data, which is not what
-    ///      this test is about).
-    function test_bridgeBurn_revertWhen_pausedByAHold() public {
+    /// @dev The flag is honored by `whenMigrationsNotPaused` whoever set it: the migration
+    ///      entrypoint refuses while paused, and admits the call once unpaused (the flow then
+    ///      fails later, on the release-level migration ban, which is not what this test is about).
+    function test_bridgeBurn_revertWhen_paused() public {
         address assetRouter = makeAddr("assetRouter");
         // MOCKED: the two Bridgehub getters `setAddresses` copies; nothing else of the Bridgehub
         // is touched before the pause gate.
@@ -316,14 +200,14 @@ contract L1ChainAssetHandlerMigrationPauseTest is Test {
         handler.setAddresses();
 
         _register(pauserA);
-        _acquire(pauserA);
+        _pause(pauserA);
 
         vm.expectRevert(MigrationPaused.selector);
         vm.prank(assetRouter);
         handler.bridgeBurn(1, 0, bytes32(0), address(0), hex"");
 
-        _release(pauserA);
-        // Releasing the hold opens the pause gate, but production migrations remain disabled.
+        _unpause(pauserA);
+        // Unpausing opens the pause gate, but production migrations remain disabled.
         vm.expectRevert(ChainMigrationsDisabled.selector);
         vm.prank(assetRouter);
         handler.bridgeBurn(1, 0, bytes32(0), address(0), hex"");

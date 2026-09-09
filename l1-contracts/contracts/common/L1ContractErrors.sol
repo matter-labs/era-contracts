@@ -542,10 +542,6 @@ error UpgradeBatchNumberIsNotZero();
 error UpgradeLifecycleBusy(address pendingTransition);
 // 0xd7f878f7
 error UpgradeNotPermissionlessYet(uint256 deadline);
-// 0xc5796df7
-error UpgradePauseAlreadyHeld(address pauser);
-// 0x085b6b1f
-error UpgradePauseNotHeld(address pauser);
 // 0xdc5e276c
 error UpgradeStageOutOfOrder(uint8 currentStage, uint8 expectedStage);
 // 0x04d91f9d

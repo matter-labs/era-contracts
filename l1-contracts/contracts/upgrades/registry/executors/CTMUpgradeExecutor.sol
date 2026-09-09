@@ -160,10 +160,12 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     /// @notice Break-glass for a lifecycle that cannot complete: a stage 1 that keeps reverting (a
     ///         row at an unexpected implementation, an edge the CTM has departed from) or a stage 2
     ///         whose completion check can never pass (a foreign-admin row its administrator never
-    ///         applies). Clears the lifecycle slot and releases this executor's migration pause
-    ///         hold if it still holds one, so a corrected transition can be prepared.
+    ///         applies). Clears the lifecycle slot so a corrected transition can be prepared.
     /// @dev Governance's explicit, logged decision. Whatever stage 1 already committed on the CTM
     ///      stands — abandoning is bookkeeping, not a rollback; chains still cross a committed edge.
+    /// @dev Migrations are deliberately LEFT PAUSED: an abandoned lifecycle is an ecosystem in an
+    ///      unintended state, and whether it is safe to resume migrations is governance's call, not
+    ///      a side effect of clearing bookkeeping. Unpause with `ChainAssetHandler.unpauseMigration`.
     function abandonPendingTransition() external onlyOwner {
         ICTMTransition transition = pendingTransition;
         if (address(transition) == address(0)) {
@@ -172,10 +174,6 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         UpgradeStage stage = pendingStage;
         delete pendingTransition;
         pendingStage = UpgradeStage.None;
-        IChainAssetHandlerBase chainAssetHandler = _chainAssetHandler();
-        if (chainAssetHandler.upgradePauseHeld(address(this))) {
-            chainAssetHandler.releaseMigrationPause();
-        }
         emit UpgradeAbandoned(address(transition), stage);
     }
 
@@ -291,7 +289,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         pendingTransition = _transition;
         pendingStage = UpgradeStage.Prepared;
 
-        _chainAssetHandler().acquireMigrationPause();
+        _chainAssetHandler().pauseMigration();
         timer.startTimer();
         emit UpgradePrepared(address(_transition), timer.deadline());
     }
@@ -320,8 +318,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     }
 
     /// @notice Stage 2 — completion. Requires the executed transition; runs the applied-state
-    ///         checks for both legs, then releases the migration pause held since `stage0` and
-    ///         clears the lifecycle slot.
+    ///         checks for both legs, then unpauses migrations and clears the lifecycle slot.
     /// @dev Completion checks come BEFORE restoration: a failed check leaves migrations paused
     ///      and the lifecycle open. Stage 2 means exactly this — the L1 edge is complete and the
     ///      operational restrictions are lifted; it does not attest that every chain has finished
@@ -336,7 +333,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         }
         delete pendingTransition;
         pendingStage = UpgradeStage.None;
-        _chainAssetHandler().releaseMigrationPause();
+        _chainAssetHandler().unpauseMigration();
         emit UpgradeCompleted(address(_transition));
     }
 

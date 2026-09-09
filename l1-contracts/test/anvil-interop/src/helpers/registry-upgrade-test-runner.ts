@@ -398,7 +398,8 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     );
 
     // One migration-pause window across both edges (`setNewVersionUpgrade` inside `migrate()`
-    // and the CTM leg of `stage1` both require it).
+    // and the CTM leg of `stage1` both require it). There is a single pause flag, so stage 0
+    // re-setting it is a no-op and stage 2's unpause ends this window too.
     console.log("\n── Pausing chain migrations ──");
     await setMigrationPaused(l1Provider, live.chainAssetHandler, true);
 
@@ -560,8 +561,8 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       ctmExecutor.stage0(objects.transition, { gasLimit: DEFAULT_GAS_LIMIT }),
       "ctmExecutor.stage0(transition)"
     );
-    assertTrue(await cah.upgradePauseHeld(deployed.ctmExecutor), "stage 0 holds the migration pause");
-    console.log("  ✓ stage0 executed (pending transition recorded, pause held, timer started)");
+    assertTrue(await cah.migrationPaused(), "stage 0 leaves migrations paused");
+    console.log("  ✓ stage0 executed (pending transition recorded, migrations paused, timer started)");
     await sendAndCheck(
       l1Provider,
       ctmExecutor.stage1(objects.transition, { gasLimit: DEFAULT_GAS_LIMIT }),
@@ -577,18 +578,16 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       console.log(`  ✓ chain ${chain.chainId} upgraded`);
     }
 
-    // ── 8. Stage 2: completion checks, then the executor releases ITS hold; the harness's own
-    //       owner pause from the bootstrap window is lifted by the owner, as in production ──
+    // ── 8. Stage 2: completion checks, then the executor unpauses migrations. One flag, so this
+    //       also ends the owner pause opened for the bootstrap window — no separate unpause ──
     await sendAndCheck(
       l1Provider,
       ctmExecutor.stage2(objects.transition, { gasLimit: DEFAULT_GAS_LIMIT }),
       "ctmExecutor.stage2(transition)"
     );
-    assertTrue(!(await cah.upgradePauseHeld(deployed.ctmExecutor)), "stage 2 released the executor's hold");
+    assertTrue(!(await cah.migrationPaused()), "stage 2 unpaused migrations");
     assertEq(await ctmExecutor.pendingTransition(), ethers.constants.AddressZero, "stage 2 cleared the lifecycle slot");
-    console.log("  ✓ stage2 executed (applied-state checks, hold released)");
-    console.log("\n── Unpausing chain migrations ──");
-    await setMigrationPaused(l1Provider, live.chainAssetHandler, false);
+    console.log("  ✓ stage2 executed (applied-state checks, migrations unpaused)");
 
     // ── 9. L1 assertions ──
     console.log("\n── Verifying L1 end state ──");

@@ -338,8 +338,8 @@ contract UpgradeIntegrationTest_v34_Local is
             ecosystemExecutor.isAuthorizedCTMExecutor(executor),
             "the executor must be authorized on the ecosystem executor after stage 2"
         );
-        // The join is wiring only: no hold is taken until a transition's stage 0.
-        assertFalse(IChainAssetHandlerBase(chainAssetHandler).upgradePauseHeld(executor), "no hold before stage 0");
+        // The join is wiring only: nothing pauses migrations until a transition's stage 0.
+        assertFalse(IChainAssetHandlerBase(chainAssetHandler).migrationPaused(), "no pause before stage 0");
     }
 
     /// @dev Decodes an `upgrade(ProposedUpgrade)` init payload; external so the selector can be

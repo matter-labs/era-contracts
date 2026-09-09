@@ -492,7 +492,7 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         );
         assertEq(address(ctmExecutor.pendingTransition()), address(unpublished), "the lifecycle must stay open");
         _assertStage(ICTMUpgradeExecutor.UpgradeStage.Prepared);
-        assertTrue(chainAssetHandler.upgradePauseHeld(address(ctmExecutor)), "the pause must stay held");
+        assertTrue(chainAssetHandler.migrationPaused(), "migrations must stay paused");
 
         L2PlanFixtures.publish(bytecodesSupplier, L2PlanFixtures.codes(unpublishedDelegate));
 

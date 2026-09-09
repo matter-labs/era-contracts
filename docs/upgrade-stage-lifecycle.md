@@ -175,9 +175,9 @@ pause bookkeeping of 4.3.
 
 | Entrypoint           | Behaviour migrated                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `stage0(transition)` | `onlyOwner`. Reject if another transition is mid-lifecycle. Genuine-object check, `validate()`, both edges (release + version), the named `coreRegistry`'s pin, this executor's authorization on the ecosystem executor, and the timer's binding — so a wrong object or a missing bootstrap join fails BEFORE anything is recorded. Record `pendingTransition`. Take this executor's hold on the migration pause (4.3). `timer.startTimer()`.                  |
+| `stage0(transition)` | `onlyOwner`. Reject if another transition is mid-lifecycle. Genuine-object check, `validate()`, both edges (release + version), the named `coreRegistry`'s pin, this executor's authorization on the ecosystem executor, and the timer's binding — so a wrong object or a missing bootstrap join fails BEFORE anything is recorded. Record `pendingTransition`. Pause migrations (4.3). `timer.startTimer()`.                                                  |
 | `stage1(transition)` | `onlyOwner`. Same transition, stage `Prepared`. `timer.checkDeadline()`. Migrations must be paused. Ecosystem leg FIRST (`ECOSYSTEM_EXECUTOR.applyL1Upgrade(coreRegistry)` when referenced — the order the merged bundle has today). Then the existing `applyCTMUpgrade` body, made internal: publication check, CTM-domain rows (incl. the notifier row, 4.4), `setNewVersionUpgradeFromTransition`, `setCurrentRelease`. Any revert reverts the whole stage. |
-| `stage2(transition)` | `onlyOwner`. Same transition, stage `Executed`. Completion checks: `validateTransitionApplied` (committed edge, version, CTM-domain rows) and `ECOSYSTEM_EXECUTOR.validateUpgradeApplied(coreRegistry)` when referenced. Then restoration: release THIS upgrade's migration pause (4.3). Mark `Completed`, clear the pending slot.                                                                                                                             |
+| `stage2(transition)` | `onlyOwner`. Same transition, stage `Executed`. Completion checks: `validateTransitionApplied` (committed edge, version, CTM-domain rows) and `ECOSYSTEM_EXECUTOR.validateUpgradeApplied(coreRegistry)` when referenced. Then restoration: unpause migrations (4.3). Mark `Completed`, clear the pending slot.                                                                                                                                                 |
 
 Rejected explicitly: a different transition at stage 1 or 2, a skipped stage, a duplicate stage, an
 unauthorized caller. `applyCTMUpgrade` disappears as a public entrypoint so the lifecycle cannot
@@ -187,27 +187,40 @@ redefined as "every chain has finalized its L2 upgrade" (a separate policy decis
 One owner-only break-glass, `abandonPendingTransition()`, exists for a lifecycle that cannot
 complete — a stage 1 that keeps reverting (a row at an unexpected implementation, an edge the CTM
 has departed from) or a stage 2 whose completion check can never pass (a foreign-admin row its
-administrator never applies). It clears the slot and releases the executor's own pause hold if it
-still holds one, so a corrected transition can be prepared. Whatever stage 1 already committed on
-the CTM stands; without it the executor would be bricked for every later upgrade (`forward` can
-release the hold but cannot clear the executor's own storage).
+administrator never applies). It clears the slot so a corrected transition can be prepared.
+Whatever stage 1 already committed on the CTM stands; without it the executor would be bricked for
+every later upgrade (`forward` can reach the ChainAssetHandler but cannot clear the executor's own
+storage). Migrations are deliberately LEFT PAUSED: an abandoned lifecycle is an ecosystem in an
+unintended state, so whether it is safe to resume migrations is governance's separate decision,
+made with `unpauseMigration`.
 
-### 4.3 Migration pause: narrow route, shared flag
+### 4.3 Migration pause: ordinary pause/unpause, one flag
 
-`pauseMigration`/`unpauseMigration` are `onlyOwner` on the shared `L1ChainAssetHandler`, whose
-owner is governance. The stages need a route that (a) does not hand a CTM executor unrestricted
-ecosystem authority, (b) cannot let one upgrade's stage 2 clear a pause another upgrade still
-needs, and (c) preserves a pre-existing governance pause.
+The stages need a route to the shared `L1ChainAssetHandler`'s migration pause that does not hand a
+CTM executor unrestricted ecosystem authority.
 
-Implemented: the ChainAssetHandler has an owner-managed allowlist of UPGRADE PAUSERS
-(`setUpgradePauser`) and per-pauser holds (`acquireMigrationPause` / `releaseMigrationPause`).
-`migrationPaused()` is `ownerPaused || upgradePauseHolds != 0`; a pauser can only acquire and
-release ITS OWN hold, releasing is gated on the hold rather than the allowlist (a de-registered
-executor can still let go), and the owner has `clearMigrationPauseHold(pauser)` for a stuck one.
-The owner's own `pauseMigration` / `unpauseMigration` touch only the owner's flag. A CTM executor
-is registered once — an explicit governance call the v34 CTM prepare emits in its stage 2, bound
-to the bootstrap's pinned executor. Overlapping upgrades and a pre-existing pause then compose
-without any executor-side bookkeeping.
+Implemented as plain authorization: the ChainAssetHandler keeps ONE `migrationPaused` flag and an
+owner-managed allowlist of addresses permitted to write it (`setUpgradePauser`). An allowlisted
+address calls the same `pauseMigration` / `unpauseMigration` governance already uses — there is no
+per-pauser hold, no counter, and no executor-side pause bookkeeping. Stage 0 pauses, stage 1
+refuses to commit unless migrations are paused (read live, so an unpause in between is caught),
+stage 2 unpauses. A CTM executor is registered once — an explicit governance call the v34 CTM
+prepare emits in its stage 2, bound to the bootstrap's pinned executor.
+
+An earlier design gave each executor its own hold with a reference count, so one upgrade's stage 2
+could not lift a pause another upgrade — or the owner — still required. That was withdrawn: the
+only failure it prevents is two upgrade lifecycles running concurrently and the first to finish
+unpausing under the second, which is an accident, not an attack. It is no defense against
+malicious governance, which controls the executors anyway. Enforcing coordination that governance
+is already responsible for is not worth the storage and the API.
+
+Two consequences are therefore explicit, and are pinned by tests rather than prevented:
+
+- **Governance must coordinate overlapping upgrades and incident pauses.** Any authorized caller
+  can lift a pause any other authorized caller set, in either direction. Do not run two upgrade
+  lifecycles concurrently, and do not leave an incident pause to overlap one.
+- **Abandoning an upgrade leaves migrations paused.** `abandonPendingTransition` clears bookkeeping
+  only; governance decides when to unpause.
 
 ### 4.4 ServerNotifier: an explicit row and an authorized path
 
@@ -312,8 +325,9 @@ Targeted tests:
   whole stage — no partial commit;
 - cross-executor authority: the CTM executor can drive the ecosystem leg only for the registry its
   pending transition names; a stranger cannot;
-- overlapping upgrades and a pre-existing governance pause: stage 2 of one upgrade leaves the
-  other's hold and the owner's flag in place;
+- the single-flag consequence, asserted rather than prevented: stage 2 of one upgrade unpauses
+  migrations even while another upgrade — or an owner pause — still needs them paused, in both
+  directions (4.3);
 - completion checks failing BEFORE restoration (no unpause when the applied-state check fails);
 - bootstrap followed by a normal registry-driven upgrade (the pipeline's shape);
 - individual-contract upgrades leave unrelated state untouched: a facet-only edge, a
@@ -339,8 +353,8 @@ assertions.
 ## 6. Order of work
 
 1. This inventory (baseline) — done.
-2. Object inputs: `coreRegistry` + `upgradeTimer` on the transition — done; CAH pauser holds —
-   done; notifier row with its explicit admin — done (4.4).
+2. Object inputs: `coreRegistry` + `upgradeTimer` on the transition — done; CAH pauser
+   allowlist — done; notifier row with its explicit admin — done (4.4).
 3. `stage0/1/2` on `CTMUpgradeExecutor`; `applyCTMUpgrade` internal — done.
 4. Authority: ecosystem executor's narrow CTM-executor authorization and pauser registration —
    done (both emitted by the v34 CTM prepare's stage 2 as explicit bootstrap-join calls); notifier
@@ -361,7 +375,7 @@ an immutable dependency: `setEcosystemExecutor` is owner-only, requires no pendi
 and requires the successor to name the same ecosystem ProxyAdmin. Governance transfers that
 ProxyAdmin through the old executor's owner-gated `forward`, authorizes the existing CTM executor
 on the successor, and updates the binding. A single governance transaction can perform the whole
-handover. Stage 0 still checks authorization before taking a pause hold.
+handover. Stage 0 still checks authorization before pausing migrations.
 
 This changes neither the CTM executor's bound CTM nor its transition provenance anchor. Replacing
 an object schema or its accepted codehash is a separate migration and must not be simulated by

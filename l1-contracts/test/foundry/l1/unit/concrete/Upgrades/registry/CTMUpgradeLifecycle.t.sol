@@ -44,7 +44,6 @@ import {
     TransitionNotPending,
     Unauthorized,
     UpgradeLifecycleBusy,
-    UpgradePauseNotHeld,
     UpgradeStageOutOfOrder
 } from "contracts/common/L1ContractErrors.sol";
 import {
@@ -147,7 +146,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
             implNew
         );
         assertEq(address(ctmExecutor.pendingTransition()), address(0));
-        assertFalse(chainAssetHandler.upgradePauseHeld(address(ctmExecutor)));
+        assertFalse(chainAssetHandler.migrationPaused());
     }
 
     function test_rejectEcosystemReplacementDuringLifecycle() public {
@@ -254,10 +253,9 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     }
 
     /// @dev The lifecycle-slot and pause invariants that must hold while a transition is pending.
-    function _assertPendingWithHold(CTMTransition _transition, ICTMUpgradeExecutor.UpgradeStage _stage) internal view {
+    function _assertPendingAndPaused(CTMTransition _transition, ICTMUpgradeExecutor.UpgradeStage _stage) internal view {
         assertEq(address(ctmExecutor.pendingTransition()), address(_transition), "the lifecycle must stay open");
         _assertStage(_stage);
-        assertTrue(chainAssetHandler.upgradePauseHeld(address(ctmExecutor)), "the executor's hold must stay");
         assertTrue(chainAssetHandler.migrationPaused(), "migrations must stay paused");
     }
 
@@ -270,7 +268,6 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     function _assertLifecycleIdle() internal view {
         assertEq(address(ctmExecutor.pendingTransition()), address(0), "no transition may be recorded");
         _assertStage(ICTMUpgradeExecutor.UpgradeStage.None);
-        assertFalse(chainAssetHandler.upgradePauseHeld(address(ctmExecutor)), "no hold may be taken");
     }
 
     // ─────────────────────────────── happy path ───────────────────────────────
@@ -281,17 +278,16 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         uint256 oldVersion = chainContractAddress.protocolVersion();
         assertFalse(chainAssetHandler.migrationPaused(), "fixture: migrations start unpaused");
 
-        // Stage 0: the hold is taken, the timer started and the transition recorded.
+        // Stage 0: migrations pause, the timer starts and the transition is recorded.
         vm.expectEmit(true, true, true, true, address(chainAssetHandler));
-        emit IChainAssetHandlerBase.MigrationPauseAcquired(address(ctmExecutor));
+        emit IChainAssetHandlerBase.PausedMigration(address(ctmExecutor));
         vm.expectEmit(true, true, true, true, address(timer));
         emit GovernanceUpgradeTimer.TimerStarted(block.timestamp, block.timestamp);
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
         emit CTMUpgradeExecutor.UpgradePrepared(address(full), block.timestamp);
         _stage0(full);
 
-        _assertPendingWithHold(full, ICTMUpgradeExecutor.UpgradeStage.Prepared);
-        assertEq(chainAssetHandler.upgradePauseHolds(), 1);
+        _assertPendingAndPaused(full, ICTMUpgradeExecutor.UpgradeStage.Prepared);
         assertEq(timer.deadline(), block.timestamp, "a zero-delay timer is due in the same block");
         // Nothing moved yet.
         _assertCtmUntouched();
@@ -313,7 +309,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         emit CTMUpgradeExecutor.UpgradeExecuted(address(full));
         _stage1(full);
 
-        _assertPendingWithHold(full, ICTMUpgradeExecutor.UpgradeStage.Executed);
+        _assertPendingAndPaused(full, ICTMUpgradeExecutor.UpgradeStage.Executed);
         assertEq(chainContractAddress.protocolVersion(), newVersion);
         assertEq(chainContractAddress.upgradeTransition(oldVersion), address(full));
         assertEq(chainContractAddress.currentRelease(), address(release));
@@ -322,14 +318,13 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
 
         // Stage 2: the applied-state checks pass, then restoration.
         vm.expectEmit(true, true, true, true, address(chainAssetHandler));
-        emit IChainAssetHandlerBase.MigrationPauseReleased(address(ctmExecutor));
+        emit IChainAssetHandlerBase.UnpausedMigration(address(ctmExecutor));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
         emit CTMUpgradeExecutor.UpgradeCompleted(address(full));
         _stage2(full);
 
         _assertLifecycleIdle();
-        assertFalse(chainAssetHandler.migrationPaused(), "the executor's hold was the only pause");
-        assertEq(chainAssetHandler.upgradePauseHolds(), 0);
+        assertFalse(chainAssetHandler.migrationPaused(), "stage 2 unpauses migrations");
         // The post-state checks keep holding on their own after completion.
         ctmExecutor.validateTransitionApplied(ICTMTransition(address(full)));
         ecosystemExecutor.validateUpgradeApplied(ICoreRegistry(address(coreRegistry)));
@@ -344,7 +339,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.expectRevert(abi.encodeWithSelector(TransitionNotPending.selector, address(other), address(transition)));
         vm.prank(governor);
         ctmExecutor.stage1(ICTMTransition(address(other)));
-        _assertPendingWithHold(transition, ICTMUpgradeExecutor.UpgradeStage.Prepared);
+        _assertPendingAndPaused(transition, ICTMUpgradeExecutor.UpgradeStage.Prepared);
     }
 
     function test_revertWhen_stage2NamesADifferentTransition() public {
@@ -354,7 +349,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.expectRevert(abi.encodeWithSelector(TransitionNotPending.selector, address(other), address(transition)));
         vm.prank(governor);
         ctmExecutor.stage2(ICTMTransition(address(other)));
-        _assertPendingWithHold(transition, ICTMUpgradeExecutor.UpgradeStage.Executed);
+        _assertPendingAndPaused(transition, ICTMUpgradeExecutor.UpgradeStage.Executed);
     }
 
     function test_revertWhen_stage1OrStage2BeforeStage0() public {
@@ -380,7 +375,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         );
         vm.prank(governor);
         ctmExecutor.stage2(ICTMTransition(address(transition)));
-        _assertPendingWithHold(transition, ICTMUpgradeExecutor.UpgradeStage.Prepared);
+        _assertPendingAndPaused(transition, ICTMUpgradeExecutor.UpgradeStage.Prepared);
         _assertCtmUntouched();
     }
 
@@ -396,7 +391,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         );
         vm.prank(governor);
         ctmExecutor.stage1(ICTMTransition(address(transition)));
-        _assertPendingWithHold(transition, ICTMUpgradeExecutor.UpgradeStage.Executed);
+        _assertPendingAndPaused(transition, ICTMUpgradeExecutor.UpgradeStage.Executed);
         assertEq(chainContractAddress.protocolVersion(), newVersion, "the committed edge must stand");
     }
 
@@ -407,7 +402,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.expectRevert(abi.encodeWithSelector(TransitionNotPending.selector, address(transition), address(0)));
         vm.prank(governor);
         ctmExecutor.stage2(ICTMTransition(address(transition)));
-        assertFalse(chainAssetHandler.upgradePauseHeld(address(ctmExecutor)));
+        assertFalse(chainAssetHandler.migrationPaused());
     }
 
     function test_revertWhen_stagesCalledByStranger() public {
@@ -427,7 +422,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.prank(stranger);
         vm.expectRevert("Ownable: caller is not the owner");
         ctmExecutor.stage2(t);
-        _assertPendingWithHold(transition, ICTMUpgradeExecutor.UpgradeStage.Executed);
+        _assertPendingAndPaused(transition, ICTMUpgradeExecutor.UpgradeStage.Executed);
     }
 
     function test_revertWhen_stage0WhileAnotherTransitionIsPending() public {
@@ -444,7 +439,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.expectRevert(abi.encodeWithSelector(UpgradeLifecycleBusy.selector, address(transition)));
         vm.prank(governor);
         ctmExecutor.stage0(ICTMTransition(address(other)));
-        assertEq(chainAssetHandler.upgradePauseHolds(), 1, "the busy check must run before any hold is taken");
+        assertTrue(chainAssetHandler.migrationPaused(), "the busy check must not disturb the pause");
 
         // Completion frees the slot: the next hop (departing from the new release and version)
         // prepares normally.
@@ -460,9 +455,10 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
     // ─────────────────────────── abandoning a stuck lifecycle ───────────────
 
     /// @dev A prepared transition whose stage 1 can never run (here: a CTM-domain row moved to an
-    ///      unexpected implementation) is abandoned: the slot frees, the hold is released, and a
-    ///      corrected transition prepares normally.
-    function test_abandon_afterStage0_releasesTheHoldAndFreesTheSlot() public {
+    ///      unexpected implementation) is abandoned: the slot frees and a corrected transition
+    ///      prepares normally. Migrations stay PAUSED — an abandoned lifecycle left the ecosystem
+    ///      in an unintended state, so resuming them is governance's separate decision.
+    function test_abandon_afterStage0_freesTheSlotAndLeavesMigrationsPaused() public {
         CTMTransition full = _deployFullTransition();
         _stage0(full);
         vm.prank(governor);
@@ -473,15 +469,13 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.prank(governor);
         ctmExecutor.stage1(ICTMTransition(address(full)));
 
-        vm.expectEmit(true, true, true, true, address(chainAssetHandler));
-        emit IChainAssetHandlerBase.MigrationPauseReleased(address(ctmExecutor));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
         emit CTMUpgradeExecutor.UpgradeAbandoned(address(full), ICTMUpgradeExecutor.UpgradeStage.Prepared);
         vm.prank(governor);
         ctmExecutor.abandonPendingTransition();
 
         _assertLifecycleIdle();
-        assertFalse(chainAssetHandler.migrationPaused(), "the abandoned upgrade's hold is released");
+        assertTrue(chainAssetHandler.migrationPaused(), "abandoning must not resume migrations");
         _assertCtmUntouched();
         // The corrected transition (the row now departs from where the proxy actually is).
         TransitionManifest memory corrected = _fullManifest();
@@ -492,11 +486,11 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         );
         CTMTransition next = new CTMTransition(corrected);
         _stage0(next);
-        _assertPendingWithHold(next, ICTMUpgradeExecutor.UpgradeStage.Prepared);
+        _assertPendingAndPaused(next, ICTMUpgradeExecutor.UpgradeStage.Prepared);
     }
 
     /// @dev Abandoning after stage 1 is bookkeeping only: the edge stage 1 committed on the CTM
-    ///      stands, the slot frees and the hold is released.
+    ///      stands and the slot frees, with migrations still paused.
     function test_abandon_afterStage1_keepsTheCommittedEdge() public {
         uint256 oldVersion = chainContractAddress.protocolVersion();
         _stage0(transition);
@@ -508,24 +502,25 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         ctmExecutor.abandonPendingTransition();
 
         _assertLifecycleIdle();
-        assertFalse(chainAssetHandler.migrationPaused());
+        assertTrue(chainAssetHandler.migrationPaused(), "abandoning must not resume migrations");
         assertEq(chainContractAddress.protocolVersion(), newVersion, "the committed version bump stands");
         assertEq(chainContractAddress.upgradeTransition(oldVersion), address(transition), "the commit stands");
         assertEq(chainContractAddress.currentRelease(), address(release), "the release pin stands");
     }
 
-    /// @dev The hold is released only if the executor still holds it: the owner may already have
-    ///      cleared it through the ChainAssetHandler's own break-glass.
-    function test_abandon_withoutAHoldOnlyFreesTheSlot() public {
+    /// @dev Abandoning touches the pause flag not at all, so it also works from an ecosystem the
+    ///      owner already unpaused mid-lifecycle: only the lifecycle slot is cleared.
+    function test_abandon_afterTheOwnerUnpaused_onlyFreesTheSlot() public {
         _stage0(transition);
         vm.prank(governor);
-        chainAssetHandler.clearMigrationPauseHold(address(ctmExecutor));
-        assertFalse(chainAssetHandler.upgradePauseHeld(address(ctmExecutor)));
+        chainAssetHandler.unpauseMigration();
+        assertFalse(chainAssetHandler.migrationPaused());
 
         vm.prank(governor);
         ctmExecutor.abandonPendingTransition();
 
         _assertLifecycleIdle();
+        assertFalse(chainAssetHandler.migrationPaused(), "abandoning must not pause either");
     }
 
     function test_revertWhen_abandonWithoutAPendingTransition() public {
@@ -539,7 +534,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.prank(makeAddr("stranger"));
         vm.expectRevert("Ownable: caller is not the owner");
         ctmExecutor.abandonPendingTransition();
-        _assertPendingWithHold(transition, ICTMUpgradeExecutor.UpgradeStage.Prepared);
+        _assertPendingAndPaused(transition, ICTMUpgradeExecutor.UpgradeStage.Prepared);
     }
 
     // ─────────────────────────── stage-0 join conditions ───────────────────────────
@@ -578,7 +573,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.prank(governor);
         chainAssetHandler.setUpgradePauser(address(ctmExecutor), true);
         _stage0(transition);
-        _assertPendingWithHold(transition, ICTMUpgradeExecutor.UpgradeStage.Prepared);
+        _assertPendingAndPaused(transition, ICTMUpgradeExecutor.UpgradeStage.Prepared);
     }
 
     function test_revertWhen_stage0ExecutorNotAuthorizedOnEcosystemExecutor() public {
@@ -594,7 +589,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.prank(governor);
         ecosystemExecutor.setCTMExecutorAuthorization(address(ctmExecutor), true);
         _stage0(transition);
-        _assertPendingWithHold(transition, ICTMUpgradeExecutor.UpgradeStage.Prepared);
+        _assertPendingAndPaused(transition, ICTMUpgradeExecutor.UpgradeStage.Prepared);
     }
 
     function test_revertWhen_stage0NamesANonGenuineCoreRegistry() public {
@@ -673,14 +668,14 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         assertEq(chainContractAddress.protocolVersion(), newVersion);
     }
 
-    /// @dev The owner's recovery `clearMigrationPauseHold` lifts the executor's hold; stage 1
-    ///      then refuses to commit until migrations are paused again, and stage 2 refuses to
-    ///      complete until the executor holds the pause it is supposed to release. Both are
-    ///      recoverable with owner calls only.
-    function test_revertWhen_stage1MigrationsNotPaused_afterTheOwnerClearedTheHold() public {
+    /// @dev Stage 1 reads the pause flag live rather than trusting that stage 0 set it: if the
+    ///      owner unpauses in between, the commit refuses until migrations are paused again.
+    ///      Recovering needs one owner call, and stage 2 then completes normally — with one flag,
+    ///      stage 2 has nothing of its own to release.
+    function test_revertWhen_stage1MigrationsNotPaused_afterTheOwnerUnpaused() public {
         _stage0(transition);
         vm.prank(governor);
-        chainAssetHandler.clearMigrationPauseHold(address(ctmExecutor));
+        chainAssetHandler.unpauseMigration();
         assertFalse(chainAssetHandler.migrationPaused());
 
         vm.expectRevert(MigrationsNotPaused.selector);
@@ -689,27 +684,15 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         _assertCtmUntouched();
         _assertStage(ICTMUpgradeExecutor.UpgradeStage.Prepared);
 
-        // The owner's own pause makes the commit admissible again.
+        // Pausing again makes the commit admissible.
         vm.prank(governor);
         chainAssetHandler.pauseMigration();
         _stage1(transition);
         assertEq(chainContractAddress.protocolVersion(), newVersion);
 
-        // Stage 2 releases THIS executor's hold, which is gone.
-        vm.expectRevert(abi.encodeWithSelector(UpgradePauseNotHeld.selector, address(ctmExecutor)));
-        vm.prank(governor);
-        ctmExecutor.stage2(ICTMTransition(address(transition)));
-        _assertStage(ICTMUpgradeExecutor.UpgradeStage.Executed);
-
-        // The owner re-takes the hold on the executor's behalf through the escape hatch (the
-        // handler sees the executor as the caller) and completes.
-        vm.prank(governor);
-        ctmExecutor.forward(
-            _singleCall(address(chainAssetHandler), abi.encodeCall(IChainAssetHandlerBase.acquireMigrationPause, ()))
-        );
         _stage2(transition);
         _assertLifecycleIdle();
-        assertTrue(chainAssetHandler.migrationPaused(), "the owner's pause is untouched by completion");
+        assertFalse(chainAssetHandler.migrationPaused(), "stage 2 unpauses migrations");
     }
 
     // ─────────────────────────── all-or-nothing stage 1 ───────────────────────────
@@ -735,12 +718,12 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         assertEq(_liveImpl(ecosystemProxyAdmin, ecosystemProxy), implOld, "the ecosystem leg must be rolled back");
         assertEq(_liveImpl(ctmProxyAdmin, ctmDomainProxy), implOther, "the offending proxy is left where it was");
         _assertCtmUntouched();
-        _assertPendingWithHold(full, ICTMUpgradeExecutor.UpgradeStage.Prepared);
+        _assertPendingAndPaused(full, ICTMUpgradeExecutor.UpgradeStage.Prepared);
     }
 
     // ─────────────────────────── checks before restoration ───────────────────────────
 
-    function test_revertWhen_stage2CtmRowNoLongerApplied_keepsThePauseHeld() public {
+    function test_revertWhen_stage2CtmRowNoLongerApplied_keepsMigrationsPaused() public {
         CTMTransition full = _deployFullTransition();
         _prepareAndExecute(full);
 
@@ -753,10 +736,10 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         );
         vm.prank(governor);
         ctmExecutor.stage2(ICTMTransition(address(full)));
-        _assertPendingWithHold(full, ICTMUpgradeExecutor.UpgradeStage.Executed);
+        _assertPendingAndPaused(full, ICTMUpgradeExecutor.UpgradeStage.Executed);
     }
 
-    function test_revertWhen_stage2EcosystemRowNoLongerApplied_keepsThePauseHeld() public {
+    function test_revertWhen_stage2EcosystemRowNoLongerApplied_keepsMigrationsPaused() public {
         CTMTransition full = _deployFullTransition();
         _prepareAndExecute(full);
 
@@ -770,7 +753,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         );
         vm.prank(governor);
         ctmExecutor.stage2(ICTMTransition(address(full)));
-        _assertPendingWithHold(full, ICTMUpgradeExecutor.UpgradeStage.Executed);
+        _assertPendingAndPaused(full, ICTMUpgradeExecutor.UpgradeStage.Executed);
     }
 
     // ─────────────────────────── cross-executor authority ───────────────────────────
@@ -840,63 +823,52 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.prank(governor);
         ctmExecutor.stage1(ICTMTransition(address(full)));
         _assertCtmUntouched();
-        _assertPendingWithHold(full, ICTMUpgradeExecutor.UpgradeStage.Prepared);
+        _assertPendingAndPaused(full, ICTMUpgradeExecutor.UpgradeStage.Prepared);
     }
 
     // ─────────────────────────── pause composition ───────────────────────────
 
-    function test_stage2LeavesAnotherPausersHoldInPlace() public {
-        // A second upgrade (another CTM's executor) holds the pause across this whole lifecycle.
+    /// @dev EXPLICIT accepted behavior. There is ONE pause flag, so this lifecycle's stage 2
+    ///      unpauses migrations even though a second upgrade still requires them paused.
+    ///      Governance must not run overlapping upgrade lifecycles; the contract does not enforce
+    ///      it, because per-executor holds would only have defended against accident and
+    ///      governance already controls every executor.
+    function test_stage2UnpausesEvenWhileAnotherUpgradeNeedsThePause() public {
+        // A second upgrade (another CTM's executor) pauses across this whole lifecycle.
         address otherExecutor = makeAddr("otherCtmExecutor");
         vm.prank(governor);
         chainAssetHandler.setUpgradePauser(otherExecutor, true);
         vm.prank(otherExecutor);
-        chainAssetHandler.acquireMigrationPause();
+        chainAssetHandler.pauseMigration();
 
-        _stage0(transition);
-        assertEq(chainAssetHandler.upgradePauseHolds(), 2);
-        _stage1(transition);
-        _stage2(transition);
+        _runLifecycle(transition);
 
-        assertFalse(chainAssetHandler.upgradePauseHeld(address(ctmExecutor)), "this upgrade's hold is released");
-        assertTrue(chainAssetHandler.upgradePauseHeld(otherExecutor), "the other upgrade's hold stays");
-        assertEq(chainAssetHandler.upgradePauseHolds(), 1);
-        assertTrue(chainAssetHandler.migrationPaused(), "migrations stay paused for the other upgrade");
-
-        vm.prank(otherExecutor);
-        chainAssetHandler.releaseMigrationPause();
-        assertFalse(chainAssetHandler.migrationPaused());
+        assertFalse(
+            chainAssetHandler.migrationPaused(),
+            "one flag: this upgrade's completion lifts the pause the other upgrade still needs"
+        );
     }
 
-    function test_stage2LeavesTheOwnerPauseInPlace() public {
+    /// @dev The same consequence for an owner-set pause: completion lifts it too, so an incident
+    ///      pause must not be left to overlap an upgrade lifecycle.
+    function test_stage2UnpausesTheOwnersPauseToo() public {
         vm.prank(governor);
         chainAssetHandler.pauseMigration();
 
         _runLifecycle(transition);
 
-        assertFalse(chainAssetHandler.upgradePauseHeld(address(ctmExecutor)));
-        assertEq(chainAssetHandler.upgradePauseHolds(), 0);
-        assertTrue(chainAssetHandler.migrationPaused(), "the owner's pause is not the executor's to lift");
-
-        vm.prank(governor);
-        chainAssetHandler.unpauseMigration();
-        assertFalse(chainAssetHandler.migrationPaused());
+        assertFalse(chainAssetHandler.migrationPaused(), "one flag: completion lifts the owner's pause");
     }
 
-    function test_ownerUnpauseDoesNotLiftTheExecutorsHold() public {
-        vm.prank(governor);
-        chainAssetHandler.pauseMigration();
+    /// @dev And in the other direction: the owner's unpause mid-lifecycle really does unpause, so
+    ///      stage 1 refuses until migrations are paused again
+    ///      (see {test_revertWhen_stage1MigrationsNotPaused_afterTheOwnerUnpaused}).
+    function test_ownerUnpauseDuringLifecycleUnpauses() public {
         _stage0(transition);
+        assertTrue(chainAssetHandler.migrationPaused());
 
         vm.prank(governor);
         chainAssetHandler.unpauseMigration();
-        assertTrue(chainAssetHandler.migrationPaused(), "the hold keeps migrations paused");
-        assertTrue(chainAssetHandler.upgradePauseHeld(address(ctmExecutor)));
-
-        // The stage-1 commit is still admissible on the strength of the hold alone.
-        _stage1(transition);
-        assertEq(chainContractAddress.protocolVersion(), newVersion);
-        _stage2(transition);
-        assertFalse(chainAssetHandler.migrationPaused());
+        assertFalse(chainAssetHandler.migrationPaused(), "one flag: the owner's unpause takes effect");
     }
 }

@@ -393,7 +393,7 @@ sequenceDiagram
 
     G->>E: stage0(transition)
     Note over E: codehash-check, validate, both edges,<br/>coreRegistry pin, timer bound to E
-    E->>H: acquireMigrationPause()
+    E->>H: pauseMigration()
     E->>T: startTimer()
     G->>E: stage1(transition)
     E->>T: checkDeadline()
@@ -407,7 +407,7 @@ sequenceDiagram
     Note over D: apply derived facetCuts verbatim,<br/>then run composed ProposedUpgrade
     G->>E: stage2(transition)
     Note over E: validateTransitionApplied +<br/>X.validateUpgradeApplied(coreRegistry)
-    E->>H: releaseMigrationPause()
+    E->>H: unpauseMigration()
 ```
 
 The three governance calls above are ALL a registry-driven prepare emits. `DefaultCoreUpgrade`

@@ -44,8 +44,6 @@ import {
     MigrationPaused,
     ZeroAddress,
     NotUpgradePauser,
-    UpgradePauseAlreadyHeld,
-    UpgradePauseNotHeld,
     NotAssetRouter
 } from "../../common/L1ContractErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
@@ -80,10 +78,11 @@ abstract contract ChainAssetHandlerBase is
 
     function _assetRouter() internal view virtual returns (IAssetRouterBase);
 
-    /// @dev The owner's migration pause. `migrationPaused()` also reflects the upgrade pausers'
-    ///      holds below; this flag is only ever written by the owner. Same slot as the former
-    ///      public `migrationPaused` variable.
-    bool internal ownerMigrationPaused;
+    /// @notice Used to pause the migrations of chains. Used for upgrades.
+    /// @dev Written by the owner and by any registered upgrade pauser (`isUpgradePauser`); there
+    ///      is one flag, so overlapping upgrades and incident pauses are governance's to
+    ///      coordinate. See {docs/upgrade-stage-lifecycle.md}.
+    bool public migrationPaused;
 
     /// @dev The assetId of the ETH.
     /// @dev Kept here for storage layout compatibility with previous versions.
@@ -112,26 +111,17 @@ abstract contract ChainAssetHandlerBase is
     /// NOTE: this mapping may be deprecated in the future, don't rely on it!
     mapping(uint256 chainId => uint256 migrationNumber) public migrationNumber;
 
-    /// @notice Upgrade executors allowed to HOLD migrations paused for the duration of an
-    ///         upgrade lifecycle (see {docs/upgrade-stage-lifecycle.md}). Set by the owner, one
-    ///         explicit call per executor.
+    /// @notice Addresses allowed to pause and unpause migrations alongside the owner — the
+    ///         upgrade executors that drive an upgrade lifecycle. Set by the owner, one explicit
+    ///         call per address.
     mapping(address pauser => bool allowed) public isUpgradePauser;
-
-    /// @notice Whether a pauser currently holds migrations paused.
-    mapping(address pauser => bool held) public upgradePauseHeld;
-
-    /// @notice The number of holds currently in place. Migrations are paused while it is nonzero
-    ///         or the owner's own pause is set; a pauser can only ever release ITS OWN hold, so
-    ///         one upgrade's completion never lifts a pause another upgrade — or the owner —
-    ///         still requires.
-    uint256 public upgradePauseHolds;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[40] private __gap;
+    uint256[42] private __gap;
 
     /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {
@@ -143,16 +133,16 @@ abstract contract ChainAssetHandlerBase is
 
     /// @notice Only when migrations are not paused.
     modifier whenMigrationsNotPaused() {
-        if (migrationPaused()) {
+        if (migrationPaused) {
             revert MigrationPaused();
         }
         _;
     }
 
-    /// @notice Only an owner-registered upgrade pauser.
-    modifier onlyUpgradePauser() {
-        if (!isUpgradePauser[msg.sender]) {
-            revert NotUpgradePauser(msg.sender);
+    /// @notice Only the owner or an owner-registered upgrade pauser.
+    modifier onlyOwnerOrUpgradePauser() {
+        if (_msgSender() != owner() && !isUpgradePauser[_msgSender()]) {
+            revert NotUpgradePauser(_msgSender());
         }
         _;
     }
@@ -457,20 +447,14 @@ abstract contract ChainAssetHandlerBase is
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IChainAssetHandlerBase
-    function migrationPaused() public view returns (bool) {
-        return ownerMigrationPaused || upgradePauseHolds != 0;
-    }
-
-    /// @inheritdoc IChainAssetHandlerBase
-    function pauseMigration() external onlyOwner {
-        ownerMigrationPaused = true;
+    function pauseMigration() external onlyOwnerOrUpgradePauser {
+        migrationPaused = true;
         emit PausedMigration(_msgSender());
     }
 
     /// @inheritdoc IChainAssetHandlerBase
-    /// @dev Clears the OWNER's pause only; upgrade holds stay in place.
-    function unpauseMigration() external onlyOwner {
-        ownerMigrationPaused = false;
+    function unpauseMigration() external onlyOwnerOrUpgradePauser {
+        migrationPaused = false;
         emit UnpausedMigration(_msgSender());
     }
 
@@ -481,37 +465,6 @@ abstract contract ChainAssetHandlerBase is
         }
         isUpgradePauser[_pauser] = _allowed;
         emit UpgradePauserSet(_pauser, _allowed);
-    }
-
-    /// @inheritdoc IChainAssetHandlerBase
-    function acquireMigrationPause() external onlyUpgradePauser {
-        if (upgradePauseHeld[msg.sender]) {
-            revert UpgradePauseAlreadyHeld(msg.sender);
-        }
-        upgradePauseHeld[msg.sender] = true;
-        ++upgradePauseHolds;
-        emit MigrationPauseAcquired(msg.sender);
-    }
-
-    /// @inheritdoc IChainAssetHandlerBase
-    /// @dev Gated on the hold, not on the allowlist: a pauser de-registered mid-lifecycle can
-    ///      still release what it holds.
-    function releaseMigrationPause() external {
-        _releaseMigrationPause(msg.sender);
-    }
-
-    /// @inheritdoc IChainAssetHandlerBase
-    function clearMigrationPauseHold(address _pauser) external onlyOwner {
-        _releaseMigrationPause(_pauser);
-    }
-
-    function _releaseMigrationPause(address _pauser) private {
-        if (!upgradePauseHeld[_pauser]) {
-            revert UpgradePauseNotHeld(_pauser);
-        }
-        upgradePauseHeld[_pauser] = false;
-        --upgradePauseHolds;
-        emit MigrationPauseReleased(_pauser);
     }
 
     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.

@@ -54,8 +54,9 @@ library CTMUpgradeComposer {
             });
     }
 
-    /// @notice The L1 -> L2 protocol upgrade transaction a transition composes for the ecosystem
-    ///         whose Bridgehub is `_bridgehub` (see {buildL2UpgradeTxFromPlan}).
+    /// @notice The composed transaction ALONE for a transition (see {buildL2UpgradeTxFromPlan}).
+    /// @dev For off-chain tooling holding a transition rather than a plan; an executing upgrade
+    ///      wants the surrounding `ProposedUpgrade` and enters at {buildProposedUpgrade}.
     function buildL2UpgradeTx(
         ICTMTransition _transition,
         address _bridgehub
@@ -73,8 +74,9 @@ library CTMUpgradeComposer {
     /// @notice The L1 -> L2 protocol upgrade transaction for a FINAL L2 plan: the force
     ///         deployments, the delegate call the `L2ComplexUpgrader` performs after them (its
     ///         calldata defined by the plan's pinned composer from `_newRelease` and `_bridgehub`)
-    ///         and the factory dependencies. Shared by transitions and the bootstrap edge, so both
-    ///         compose the same transaction from the same inputs.
+    ///         and the factory dependencies. Every caller reaches this one function, so the
+    ///         transition path and the bootstrap edge compose the same transaction from the same
+    ///         inputs; the bootstrap has a plan and a release but no transition object to unpack.
     function buildL2UpgradeTxFromPlan(
         L2UpgradePlan memory _plan,
         ICTMRelease _newRelease,
