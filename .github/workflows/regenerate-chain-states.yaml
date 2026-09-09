@@ -74,10 +74,6 @@ jobs:
       - name: Build anvil-interop artifacts
         uses: ./.github/actions/build-anvil-interop-artifacts
 
-      - name: Save committed chain states
-        working-directory: l1-contracts/test/anvil-interop
-        run: cp -r chain-states chain-states-committed
-
       - name: Generate chain state
         working-directory: l1-contracts/test/anvil-interop
         run: |
@@ -89,26 +85,16 @@ jobs:
         run: |
           pkill -9 anvil 2>/dev/null || true
 
-      # The snapshots are gzipped dumps of a wall-clock-dependent chain, so every
-      # regeneration differs byte-for-byte even when nothing semantic changed —
-      # committing on a raw `git diff` pushes a pointless commit, and a full CI
-      # round, onto any PR this is dispatched for. Asking the comparator that
-      # state-generation-check uses keeps the writer's notion of "unchanged"
-      # identical to the verifier's.
-      - name: Decide whether the regeneration is more than drift
-        id: semantic
-        working-directory: l1-contracts/test/anvil-interop
-        run: |
-          if yarn ts-node compare-chain-states.ts chain-states-committed chain-states; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Regenerated states are semantically identical to the committed ones; nothing to push."
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "Regenerated states differ beyond tolerated drift; committing them."
-          fi
-
+      # Deliberately commits on any byte difference, which for these gzipped dumps of a
+      # wall-clock-dependent chain means every run. Suppressing that with
+      # compare-chain-states was tried and reverted: the comparator skips the *entire*
+      # storage of every chain diamond (see collectSkipStorageAccounts), so a change
+      # confined to diamond storage compares as "up to date" — and a writer that trusts
+      # that verdict leaves the committed snapshots stale while reporting success. A
+      # redundant commit is the cheaper mistake. Narrowing those exclusions to the
+      # genuinely volatile slots would let this be smarter, and would also close the
+      # matching blind spot in state-generation-check.
       - name: Commit and push updated chain states
-        if: steps.semantic.outputs.changed == 'true'
         run: |
           set -euo pipefail
           git config user.name "zksync[bot]"

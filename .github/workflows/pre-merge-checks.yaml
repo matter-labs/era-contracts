@@ -195,9 +195,11 @@ jobs:
   # interval mining (`--block-time 1`, required so the interop relayers/TBM keep
   # progressing), so the block count is wall-clock-dependent. compare-chain-states
   # ignores block.number and storage slots that just hold a block number (values
-  # ≤ block height), plus the block-indexed MessageRoot storage. Everything else
-  # (balances, roots, addresses, code, protocol version) must match exactly, so
-  # this still catches real drift.
+  # ≤ block height). It also skips the entire storage of the MessageRoot and of
+  # every chain diamond, so a difference confined to diamond storage is a known
+  # blind spot — narrowing that to the volatile slots is follow-up work. Balances,
+  # addresses and deployed code are compared exactly everywhere, and all other
+  # accounts' storage exactly, so this still catches real drift.
   state-generation-check:
     needs: [changes]
     if: needs.changes.outputs.contracts == 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
