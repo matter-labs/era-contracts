@@ -11,14 +11,11 @@ import {PUBLIC_INPUT_SHIFT} from "../../common/Config.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The Airbender lane of the Era dual-prover gate. Derives the public input an Airbender proof was
 /// generated against and hands it to the generated Airbender PLONK verifier.
-///
-/// @dev The guest emits `program_output = keccak(prevCommitment | currentCommitment)` — the untruncated
-/// transition hash the Executor passes through — and the SNARK public input is that value shifted by
-/// `PUBLIC_INPUT_SHIFT`. The audited guest binary is bound inside the recursion circuit rather than carried
-/// in the public input, so there is nothing here to re-derive from it.
-///
-/// @dev The prover also supports binding the guest commitment into the public input. Adopting that mode
-/// means a new lane contract and a new gate, so no extension point is kept here for it.
+/// @dev The guest emits `program_output = keccak(prevCommitment | currentCommitment)`, the untruncated
+/// transition hash the Executor passes through, and the SNARK public input is that value shifted by
+/// `PUBLIC_INPUT_SHIFT`. The guest binary is bound inside the recursion circuit, not in the public input.
+/// @dev The prover's alternative mode, binding the guest commitment into the public input, would need a
+/// new lane contract and gate, so no extension point is kept for it.
 contract AirbenderVerifier is IVerifier {
     /// @notice The generated Airbender PLONK verifier.
     /// @dev Immutable, for the reason given on `EraMultiProofVerifier`'s lanes.

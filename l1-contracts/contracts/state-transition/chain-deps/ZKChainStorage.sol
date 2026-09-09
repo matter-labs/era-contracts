@@ -258,27 +258,23 @@ struct ZKChainStorage {
     uint256 lastTokenMultiplierUpdateTimestamp;
     /// @dev Whether the chain has correct base token total supply tracked. It is the case for all chains,
     /// except for ZKsync OS chains that have existed before the v31 upgrade.
-    /// @dev STORAGE SLOT: 68 (offset 0)
+    /// @dev STORAGE SLOT: 68
     bool baseTokenHasTotalSupply;
     /// @dev The ZKsync OS single-transaction gas limit (EIP-7825), committed into each batch proof
     /// public input. A chain may raise the cap above the Ethereum limit but must not set it below.
     /// `0` means the default (`ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`) for chains that existed before
     /// this field was introduced.
-    /// @dev STORAGE SLOT: 68 (offset 1)
+    /// @dev STORAGE SLOT: 68
     uint64 zksyncOSMaxTxGasLimit;
-    /// @dev Bit mask of the proof systems this Era chain does not require. `0`, the value every chain has
-    /// until its admin writes it, requires all of them.
-    /// @dev Era only; set via `Admin.setProofSystemStatus` and read by `EraMultiProofVerifier` off the
-    /// calling chain, since one verifier instance serves every chain of a protocol version.
-    /// @dev STORAGE SLOT: 68 (offset 9). Packed with the two fields above: 1 + 8 + 1 of 32 bytes.
+    /// @dev Bit mask of the proof systems this Era chain does not require. `0` requires all of them.
+    /// @dev Era only; set via `Admin.setProofSystemStatus`, and read by `EraMultiProofVerifier` off the
+    /// calling chain since one verifier instance serves every chain of a protocol version.
+    /// @dev STORAGE SLOT: 68 (packed with baseTokenHasTotalSupply + zksyncOSMaxTxGasLimit)
     uint8 disabledProofSystems;
-    /// @dev Whether this Era chain runs the multi-proof gate, and so must commit the Airbender data
-    /// every batch needs to be proved by it.
-    /// @dev This is capability, not incident state: it says which verifier the chain is configured
-    /// against, and `Committer` requires the Airbender heap hash exactly when it is set. It is kept
-    /// separate from `disabledProofSystems`, which says only that a system is temporarily down.
-    /// @dev Defaults to `false`, so a chain that never enables it commits no Airbender data and is
-    /// unaffected by the lane existing.
-    /// @dev STORAGE SLOT: 68 (offset 10). Packed with the three fields above.
+    /// @dev Whether this Era chain runs the multi-proof gate, and so commits Airbender data each batch.
+    /// @dev Capability, not incident state: `Committer` requires the Airbender heap hash exactly when it
+    /// is set, unlike `disabledProofSystems`, which says only that a system is temporarily down.
+    /// @dev STORAGE SLOT: 68 (packed with baseTokenHasTotalSupply + zksyncOSMaxTxGasLimit +
+    /// disabledProofSystems)
     bool multiProofEnabled;
 }

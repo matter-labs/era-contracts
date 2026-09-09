@@ -139,7 +139,7 @@ contract EraMultiProofTestnetVerifierTest is Test {
 
 /// @notice Every Era verifier a chain can install answers `isTestnetVerifier()`, production ones included.
 /// @dev A flag only the testnet build exposes cannot be told apart from a call that failed for another
-/// reason, which is what pushes tooling into probing. Answering `false` is the point of the production case.
+/// reason, so the production `false` is the point of this test.
 contract EraVerifierTestnetFlagTest is Test {
     function test_productionVerifiersAnswerFalse() public {
         EraDualVerifier boojumRouter = new EraDualVerifier(IVerifierV2(address(0)), IVerifier(address(0)));

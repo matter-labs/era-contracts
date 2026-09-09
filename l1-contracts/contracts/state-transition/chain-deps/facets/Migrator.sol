@@ -164,11 +164,8 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         if (_originalCaller != s.admin) {
             revert NotChainAdmin(_originalCaller, s.admin);
         }
-        // The multi-proof settings are not part of `ZKChainCommitment`, so a migrating chain would be
-        // re-initialised on the destination as single-proof: it would settle behind Boojum alone, with
-        // no event and no governance action, while its sequencer kept committing Airbender data that
-        // the destination refuses. Withdraw the capability first — deliberately, through the guarded
-        // transition — rather than have a migration silently drop it.
+        // The multi-proof settings are not carried in `ZKChainCommitment`, so the destination would
+        // bring the chain up single-proof, silently. Withdraw the capability first.
         if (s.multiProofEnabled) {
             revert MultiProofChainCannotMigrate();
         }

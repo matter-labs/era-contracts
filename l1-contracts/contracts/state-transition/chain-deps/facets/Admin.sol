@@ -204,20 +204,16 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setMultiProofEnabled(bool _multiProofEnabled) external onlyAdmin onlySettlementLayer onlyEra {
-        // Only while the Airbender lane is masked off, in either direction. Masked off, the gate takes
-        // both the one- and the two-input shape, so a backlog spanning the change settles batch by
-        // batch: `ExecutorFacet` reads the shape from each batch's own authenticated `StoredBatchInfo`
-        // and never from this setting. That is what makes a drained pipeline unnecessary here — the
-        // change only ever reaches batches committed after it. Under a required lane the same change
-        // would put the very next batch in a shape the gate rejects.
+        // Only while the Airbender lane is masked off, in either direction. A masked-off gate takes both
+        // input shapes and `ExecutorFacet` reads each batch's shape from its own `StoredBatchInfo`, so a
+        // backlog spanning the change still settles and no drain is needed. Under a required lane the
+        // change would put the next batch in a shape the gate rejects.
         if (s.disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
             revert AirbenderLaneMustBeDisabled();
         }
 
-        // Declaring the capability is not enough to have it: the chain has to be running a verifier
-        // with an Airbender lane, or `Committer` would start requiring Airbender data whose second
-        // public input the installed verifier cannot consume. Checked against the verifier actually
-        // installed rather than trusted from the caller.
+        // Without a verifier that has the lane, `Committer` would start requiring Airbender data whose
+        // second public input the installed verifier cannot consume.
         if (_multiProofEnabled) {
             _enforceVerifierHasAnAirbenderLane();
         }
@@ -227,10 +223,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit NewMultiProofEnabled(oldMultiProofEnabled, _multiProofEnabled);
     }
 
-    /// @dev Asks the verifier which proof systems it supports rather than testing whether some getter
-    /// answers. A verifier predating the interface does not implement the call at all, so a reverting
-    /// staticcall is still the negative answer — but for one that does implement it the answer is the
-    /// verifier's own statement of capability, not an inference drawn from its ABI.
+    /// @dev Asks the verifier what it supports instead of inferring it from which getters answer. A
+    /// verifier predating the interface does not implement the call, so a reverting staticcall is still
+    /// the negative answer.
     function _enforceVerifierHasAnAirbenderLane() internal view {
         try IEraMultiProofVerifier(address(s.verifier)).supportedProofSystems() returns (uint8 supported) {
             if (supported & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
@@ -243,8 +238,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setProofSystemStatus(uint8 _proofSystem, bool _enabled) external onlyAdmin onlySettlementLayer onlyEra {
-        // One system per call, named by its own bit. A mask would let a single call cross through a
-        // state no chain may occupy, and an unknown bit names no proof system at all.
+        // One system per call, named by its own bit; an unknown bit names no proof system.
         if (_proofSystem != BOOJUM_PROOF_SYSTEM_DISABLED && _proofSystem != AIRBENDER_PROOF_SYSTEM_DISABLED) {
             revert InvalidProofSystem(_proofSystem);
         }
@@ -255,19 +249,15 @@ contract AdminFacet is ZKChainBase, IAdmin {
             : oldDisabledProofSystems | _proofSystem;
 
         // Switching the second one off would settle a batch behind no proof at all. Checked on the
-        // result rather than the argument, since one bit alone cannot say what the pair becomes.
+        // result, since one bit alone cannot say what the pair becomes.
         if (newDisabledProofSystems >= ALL_PROOF_SYSTEMS_DISABLED) {
             revert InvalidDisabledProofSystemsMask(newDisabledProofSystems);
         }
 
-        // Disabling a system may happen with unproven batches waiting — that is the point of the
-        // switch, and it only ever widens what the gate accepts.
-        //
-        // Enabling one must not. A batch committed while the Airbender lane was off carries no
-        // Airbender commitment, so the Executor emits a single public input for it and the gate
-        // refuses that once the lane is on: the batch becomes unprovable and the chain stalls
-        // behind it. Draining first is the only ordering that works. A call that leaves the system
-        // as it already was changes nothing, so it does not need the drain.
+        // Disabling may happen with unproven batches waiting — that is the point of the switch, and it
+        // only widens what the gate accepts. Enabling must not: a batch committed while the lane was off
+        // carries a single public input the enabled lane cannot read, so it would strand the chain.
+        // A call that leaves the system as it was changes nothing and needs no drain.
         if (_enabled && (oldDisabledProofSystems & _proofSystem) != 0) {
             _enforceNoUnverifiedBatchesForChainConfigUpdate();
         }
@@ -280,25 +270,18 @@ contract AdminFacet is ZKChainBase, IAdmin {
                 revert AirbenderLaneRequiresMultiProof();
             }
 
-            // The lane's first batch is chained to the last settled batch. At genesis that is the
-            // configured `storedBatchZero`, whose commitment is a bare configuration value with no
-            // preimage the guest can open, so the batch would be unprovable. One settled batch of the
-            // chain's own is enough: its commitment is one the sequencer built and can open.
+            // The lane's first batch chains to the last settled one. At genesis that is `storedBatchZero`,
+            // a configured value with no preimage the guest can open. One batch of the chain's own is
+            // enough: its commitment is one the sequencer built.
             if (s.totalBatchesVerified == 0) {
                 revert AirbenderLaneRequiresSettledBatch();
             }
 
-            // That settled batch supplies the seed, and its `airbenderCommitment` was derived from a
-            // heap hash the sequencer supplied while the lane was off, so nothing has verified it:
-            // `Committer` only requires it to be present. A wrong one is not a soundness problem —
-            // Boojum verified the batch either way — but the lane cannot open it, so the next batch
-            // is unprovable and the chain stops behind it.
-            //
-            // Recoverable, and deliberately not guarded against here. Masking the lane again needs no
-            // drained pipeline, and the stalled batch already carries both public inputs, so it
-            // settles Boojum-only the moment the mask is back on. Activation is then retried against
-            // a later batch. Guarding it instead would mean verifying an Airbender proof from inside
-            // an admin call, which is the work the lane itself exists to do.
+            // That batch's `airbenderCommitment` came from a heap hash nothing verified — `Committer`
+            // only requires it to be present — so a wrong one leaves the next batch unprovable. Not a
+            // soundness problem, since Boojum verified the batch, and recoverable: masking the lane again
+            // needs no drain and the stalled batch settles Boojum-only, so activation can be retried
+            // later. Guarding it here would mean verifying an Airbender proof inside an admin call.
         }
 
         s.disabledProofSystems = newDisabledProofSystems;

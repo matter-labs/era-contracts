@@ -10,10 +10,8 @@ import {MAINNET_CHAIN_ID} from "../../common/Config.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Testnet variant of the Era dual-prover gate: an empty proof skips verification.
-/// @dev Inherits `EraMultiProofVerifier` rather than wrapping it. A wrapper would stand between the chain
-/// and the production contract, becoming the `msg.sender` that `disabledProofSystems` is read from, so the
-/// gate would take the mask off the wrapper rather than off the chain's diamond. Inheriting keeps the
-/// diamond as the caller, so a testnet chain exercises the same code path as mainnet.
+/// @dev Inherits rather than wraps `EraMultiProofVerifier`: a wrapper would become the `msg.sender` the
+/// gate reads `disabledProofSystems` from, taking the mask off the wrapper instead of the chain's diamond.
 contract EraMultiProofTestnetVerifier is EraMultiProofVerifier {
     /// @dev Kept alongside `isTestnetVerifier()` for tooling that predates the getter.
     bool public constant IS_TESTNET_VERIFIER = true;

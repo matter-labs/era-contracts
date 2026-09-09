@@ -42,31 +42,22 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// `ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`
     function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external;
 
-    /// @notice Turn one of this Era chain's proof systems on or off.
-    /// @dev Chain-admin action, callable on the active settlement layer. The chain settles behind two
-    /// independent proof systems; switching one off keeps the chain live through a prover incident.
-    /// Never both — the resulting mask is rejected if it would leave a batch proved by nothing.
-    /// @dev Switching a system **off** deliberately applies while committed batches are still unverified,
-    /// because that is the situation it exists for. Switching one **on** does not: batches committed
-    /// while it was off cannot satisfy it, so the pipeline has to be drained first. Requiring the
-    /// Airbender lane additionally needs the multi-proof capability and one settled batch of the chain's
-    /// own, since the lane's first batch chains to its predecessor.
-    /// @dev Updates only the named system's bit, and emits on every successful call, including one that
-    /// leaves the mask as it was.
-    /// @param _proofSystem A single proof system: `BOOJUM_PROOF_SYSTEM_DISABLED` (1) or
-    /// `AIRBENDER_PROOF_SYSTEM_DISABLED` (2). Not a mask, a bit index, or a proof-envelope type.
+    /// @notice Turn one of this Era chain's proof systems on or off, keeping the chain live through a
+    /// prover incident. Never both: a call leaving no system required is rejected.
+    /// @dev Switching off applies while committed batches are still unverified, which is the situation it
+    /// exists for. Switching on requires a drained pipeline, and requiring the Airbender lane also needs
+    /// the multi-proof capability and one settled batch of the chain's own.
+    /// @param _proofSystem `BOOJUM_PROOF_SYSTEM_DISABLED` (1) or `AIRBENDER_PROOF_SYSTEM_DISABLED` (2).
+    /// A single system, not a mask, a bit index or a proof-envelope type.
     /// @param _enabled Whether that system is required in order to settle a batch.
     function setProofSystemStatus(uint8 _proofSystem, bool _enabled) external;
 
     /// @notice Sets whether this chain runs the multi-proof gate.
-    /// @dev Capability, not incident state: it declares which verifier the chain is configured
-    /// against, and `Committer` requires the Airbender heap hash exactly when it is set. Separate
-    /// from `setProofSystemStatus`, which only says a system is temporarily down.
-    /// @dev Only changeable while the Airbender lane is masked off, in either direction. A masked-off
-    /// gate accepts both the one- and two-input shape and `ExecutorFacet` reads a batch's shape from
-    /// its own authenticated `StoredBatchInfo`, so a backlog spanning the change still settles and no
-    /// drained pipeline is needed. Under a required lane the change would put the next batch in a
-    /// shape the gate rejects. Declaring the capability also requires a verifier that has the lane.
+    /// @dev Capability, not incident state: `Committer` requires the Airbender heap hash exactly when it
+    /// is set, unlike `setProofSystemStatus`, which says only that a system is temporarily down.
+    /// @dev Only changeable while the Airbender lane is masked off, in either direction, and only on a
+    /// chain whose installed verifier has that lane. No drained pipeline is needed: a masked-off gate
+    /// takes both input shapes and `ExecutorFacet` reads each batch's shape from its `StoredBatchInfo`.
     /// @param _multiProofEnabled Whether the chain commits Airbender data and proves both lanes.
     function setMultiProofEnabled(bool _multiProofEnabled) external;
 

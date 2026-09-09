@@ -333,9 +333,8 @@ contract EraMultiProofVerifierTest is Test {
         assertEq(noAirbender.supportedProofSystems(), BOOJUM_PROOF_SYSTEM_DISABLED);
     }
 
-    /// The requirement policy comes from the pair the gate is built to check, not from what is wired, so
-    /// an unwired lane stays required. Deriving it from the wiring instead would answer that the missing
-    /// lane is not required and let `verify` skip it — a broken deployment settling single-proof.
+    /// Requirement comes from the pair the gate is built to check, not from what is wired, so an unwired
+    /// lane stays required rather than being skipped by `verify`.
     function test_unwiredLaneStaysRequired() public {
         EraMultiProofVerifier noAirbender = new EraMultiProofVerifier(
             IVerifier(address(boojum)),
@@ -375,10 +374,8 @@ contract EraMultiProofVerifierTest is Test {
         assertFalse(verifier.isTestnetVerifier(), "the production gate must answer the flag, not omit it");
     }
 
-    /// One verifier instance serves every chain of a protocol version, so a mask belongs to the chain that
-    /// set it and to no other. Two chains, one gate, one proof: the chain requiring Airbender is refused by
-    /// the failing lane while the chain that masked it off settles. Caching the mask in the verifier would
-    /// pass every other test here and hand one chain's proof-system policy to all of them.
+    /// One verifier instance serves every chain, so a mask belongs to the chain that set it. Caching it in
+    /// the verifier would pass every other test here and hand one chain's policy to all of them.
     function test_maskIsReadPerCallingChain() public {
         EraMultiProofVerifier shared = new EraMultiProofVerifier(
             IVerifier(address(new LaneVerifier(false, true))),

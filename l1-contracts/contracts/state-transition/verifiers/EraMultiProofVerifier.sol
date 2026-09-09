@@ -26,34 +26,26 @@ import {
 /// @title Era Multi-Proof Verifier
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Requires BOTH a Boojum proof and an Airbender proof for each Era state transition, and accepts
-/// only the combined proof type. Two independently built proof systems must agree before a batch settles, so
-/// the validity of a settled batch does not rest on either one alone.
+/// @notice Requires BOTH a Boojum proof and an Airbender proof for each Era state transition, unless the
+/// calling chain has masked one off. Accepts only the combined proof type.
 ///
-/// @dev Proof encoding received from the Executor. With a FFLONK Boojum proof the envelope is 71 words
-///      (2 + 25 + 44); with PLONK, 91. Both are a small fraction of the cost of verifying the two proofs.
-/// @dev Layout:
-///      `_proof[0]` = proof type. The type occupies the low 8 bits; bits 8-255 are reserved and must be zero.
+/// @dev Envelope layout:
+///      `_proof[0]` = proof type in the low 8 bits; bits 8-255 reserved and must be zero.
 ///      `_proof[1]` = N, the number of words in the Boojum sub-proof.
-///      `_proof[2 .. 2+N]`   = the Boojum sub-proof, in the envelope `EraDualVerifier` parses; its leading
-///                             word selects the FFLONK (0) or PLONK (1) wrapper.
+///      `_proof[2 .. 2+N]`   = the Boojum sub-proof as `EraDualVerifier` parses it; its leading word
+///                             selects the FFLONK (0) or PLONK (1) wrapper.
 ///      `_proof[2+N .. end]` = the Airbender SNARK, exactly `AIRBENDER_SNARK_PROOF_LENGTH` words.
-///      The total length is therefore exact, and an envelope with anything trailing is refused.
+///      The total length is exact, so a trailing word is refused. 71 words with FFLONK, 91 with PLONK.
 ///
-/// @dev There is no carried-hash slot, unlike the ZKsync OS envelope: Era has no continuation proofs, so a
-/// permanently-zero reserved word would be audited surface with no meaning.
-///
-/// @dev The batch public inputs reach both lanes whole and untruncated, because each lane applies
-/// `PUBLIC_INPUT_SHIFT` itself. Shifting here would double-shift them.
+/// @dev No carried-hash slot, unlike the ZKsync OS envelope: Era has no continuation proofs.
+/// @dev Public inputs reach both lanes untruncated; each lane applies `PUBLIC_INPUT_SHIFT` itself.
 contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVerifier {
     /// @notice The Boojum router (`EraDualVerifier`), which dispatches the FFLONK and PLONK wrappers.
-    /// @dev Immutable: the two lanes are fixed at deployment, so the pair of proof systems a batch is
-    /// checked against is a property of the deployed gate rather than of mutable state.
+    /// @dev Immutable, so the pair of proof systems a batch is checked against is a property of the
+    /// deployed gate rather than of mutable state.
     IVerifier public immutable BOOJUM_VERIFIER;
 
     /// @inheritdoc IEraMultiProofVerifier
-    /// @dev Immutable for the same reason as `BOOJUM_VERIFIER`. Doubles as the marker a chain checks
-    /// before declaring itself multi-proof: a single-system router does not answer this call.
     IVerifier public immutable AIRBENDER_VERIFIER;
 
     error BoojumVerificationFailed();
@@ -70,17 +62,15 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
             revert EmptyProofLength();
         }
 
-        // The header word carries the proof type and nothing else, so a value with data in the reserved
-        // bits is rejected rather than read as a bare type.
+        // Reserved bits must be clear, so a dirty header is not read as a bare type.
         if (_proof[0] >> 8 != 0) {
             revert InvalidProofFormat();
         }
         if ((_proof[0] & 255) != ERA_MULTI_PROOF_TYPE) {
             revert UnknownVerifierType();
         }
-        // Exact, not minimum: the Airbender SNARK is fixed-size, so the length is fully determined. Derived
-        // by subtracting from `_proof.length` rather than adding to the caller-supplied `_proof[1]`, so an
-        // out-of-range declared length reverts here instead of overflowing.
+        // The Airbender SNARK is fixed-size, so the length is exact rather than a minimum. Derived by
+        // subtracting from `_proof.length`, so an out-of-range `_proof[1]` reverts instead of overflowing.
         if (_proof.length < 2 + AIRBENDER_SNARK_PROOF_LENGTH) {
             revert InvalidProofFormat();
         }
@@ -89,27 +79,17 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
             revert InvalidProofFormat();
         }
 
-        // One verifier instance serves every chain of a protocol version, so the policy is read from the
-        // calling chain, which in settlement is that chain's diamond. Resolved through the same function
-        // callers use to ask what this gate would require, so settlement and discovery cannot disagree —
-        // and that function re-checks the mask, keeping the both-required property here on its own rather
-        // than depending on a value written elsewhere.
+        // One verifier instance serves every chain of a protocol version, so the policy comes from the
+        // calling chain. Resolved through the same getter callers use, so settlement and discovery agree.
         uint8 required = requiredProofSystems(IGetters(msg.sender).disabledProofSystems());
 
-        // One word per lane: the two systems commit to different `auxiliaryOutputHash` values, so a
-        // batch has a different transition hash under each.
+        // One word per lane, since the two systems commit to different `auxiliaryOutputHash` values.
+        // A single word is accepted only while the Airbender lane is masked off, which is what keeps
+        // Boojum-only settlement working for batches carrying no Airbender commitment.
         //
-        // A single word is accepted only while the Airbender lane is masked off. That is what lets
-        // the kill switch keep Boojum-only settlement working for batches carrying no Airbender
-        // commitment. It also means the converse: with the lane enabled, such a batch cannot be
-        // proved here at all — so enabling the lane on a chain with committed-but-unproven batches
-        // stalls it until they are drained. `Admin.setProofSystemStatus` enforces that.
-        //
-        // A two-word batch stays acceptable under a masked lane, and its Airbender segment then rides
-        // along unverified. Deliberate, and the opposite of the ZKsync OS lane, which refuses an
-        // envelope carrying a component it will not check: here the kill switch has to rescue batches
-        // already committed with Airbender data, and refusing them is what a stalled chain cannot
-        // afford. Unverified bytes cost calldata and decide nothing.
+        // A two-word batch stays acceptable under a masked lane, its Airbender segment riding along
+        // unverified. Unlike the ZKsync OS lane, which refuses an envelope it will not fully check: here
+        // the kill switch has to rescue batches already committed with Airbender data.
         if (
             _publicInputs.length != 2 && !(required & AIRBENDER_PROOF_SYSTEM_DISABLED == 0 && _publicInputs.length == 1)
         ) {
@@ -117,8 +97,7 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
         }
 
         if (required & BOOJUM_PROOF_SYSTEM_DISABLED != 0) {
-            // An enabled lane must carry a proof: a zero-length slice reaches a router that treats an empty
-            // proof as "skip", which would leave the lane unverified.
+            // A zero-length slice reaches a router that treats an empty proof as "skip".
             if (boojumLength == 0) {
                 revert BoojumVerificationFailed();
             }
@@ -137,16 +116,13 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
     }
 
     /// @notice The pair of systems this contract is built to check, before deployment wiring.
-    /// @dev The requirement policy is derived from this rather than from `supportedProofSystems`, and the
-    /// difference matters. A lane left at the zero address is missing, not exempt: deriving the policy
-    /// from what is wired would answer that such a lane is not required and let `verify` skip it, turning
-    /// a broken deployment into a silently single-proof chain. Derived from the constant, the lane stays
-    /// required and the call to a zero address reverts. `Admin` is what stops the pairing arising.
+    /// @dev Requirement is derived from this, not from `supportedProofSystems`: an unwired lane is
+    /// missing, not exempt, so deriving it from the wiring would let `verify` skip that lane and settle
+    /// a broken deployment single-proof. Kept required, the call to a zero address reverts instead.
     uint8 internal constant GATE_PROOF_SYSTEMS = BOOJUM_PROOF_SYSTEM_DISABLED | AIRBENDER_PROOF_SYSTEM_DISABLED;
 
     /// @inheritdoc IEraMultiProofVerifier
-    /// @dev Reports what this deployment can actually check, so a lane left unwired is absent from the
-    /// answer. That makes it the capability check a chain wants before declaring itself multi-proof.
+    /// @dev Reports what this deployment can check, so an unwired lane drops out of the answer.
     function supportedProofSystems() public view virtual returns (uint8) {
         uint8 supported;
         if (address(BOOJUM_VERIFIER) != address(0)) {
@@ -160,9 +136,8 @@ contract EraMultiProofVerifier is IVerifier, IEraDualVerifier, IEraMultiProofVer
 
     /// @inheritdoc IEraMultiProofVerifier
     function requiredProofSystems(uint8 _disabledProofSystems) public pure virtual returns (uint8) {
-        // The mask that switches off everything this gate checks would settle a batch behind no proof
-        // at all. Refused here as well as in the setter, so the answer given to a caller is the same one
-        // settlement would act on.
+        // A mask switching off everything would settle a batch behind no proof at all. Refused here as
+        // well as in the setter, so a caller is told what settlement would act on.
         if (_disabledProofSystems >= ALL_PROOF_SYSTEMS_DISABLED) {
             revert InvalidDisabledProofSystemsMask(_disabledProofSystems);
         }
