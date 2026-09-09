@@ -361,7 +361,9 @@ export async function relayTx(
         gasLimit: 30_000_000,
         ...(value && !value.isZero() ? { value } : {}),
       });
-      const receipt = await tx.wait();
+      // These impersonated relays are never replaced. Waiting by hash avoids ethers v5
+      // replacement watchers issuing RPCs after the receipt resolves and Anvil shuts down.
+      const receipt = await provider.waitForTransaction(tx.hash);
       return { txHash: receipt.transactionHash, success: receipt.status === 1, receipt };
     });
   } catch (error) {
