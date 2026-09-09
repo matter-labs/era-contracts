@@ -36,19 +36,15 @@ contract AirbenderVerifier is IVerifier {
             revert InvalidPublicInputsLength();
         }
 
+        // The SNARK public input is the untruncated transition hash shifted; the guest emits the
+        // hash and the wrapper consumes the shifted value.
         uint256[] memory args = new uint256[](1);
-        args[0] = _shiftPublicInput(_publicInputs[0]);
+        args[0] = _publicInputs[0] >> PUBLIC_INPUT_SHIFT;
         return AIRBENDER_PLONK_VERIFIER.verify(args, _proof);
     }
 
     /// @inheritdoc IVerifier
     function verificationKeyHash() external view returns (bytes32) {
         return AIRBENDER_PLONK_VERIFIER.verificationKeyHash();
-    }
-
-    /// @notice Applies `PUBLIC_INPUT_SHIFT` to the batch's transition hash to get the SNARK public input.
-    /// @param _transitionHash The untruncated `keccak(prevCommitment | currentCommitment)` for the batch.
-    function _shiftPublicInput(uint256 _transitionHash) internal pure returns (uint256) {
-        return _transitionHash >> PUBLIC_INPUT_SHIFT;
     }
 }

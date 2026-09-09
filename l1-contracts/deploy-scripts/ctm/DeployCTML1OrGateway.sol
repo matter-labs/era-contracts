@@ -265,14 +265,14 @@ library DeployCTML1OrGateway {
     /// @notice Retrieve sub-verifier addresses from a deployed dual verifier.
     /// @return fflonk The Boojum FFLONK sub-verifier.
     /// @return plonk The Boojum PLONK sub-verifier.
-    /// @return airbenderPlonk Always `address(0)`. The Airbender lane is not a sub-verifier of either
-    ///         router; it hangs off `EraMultiProofVerifier`, which this helper does not introspect.
+    /// @dev The Airbender lane is not a sub-verifier of either router — it hangs off
+    ///      `EraMultiProofVerifier` — so it is not returned here.
     function getSubVerifiers(
         address _verifier,
         bool _isZKsyncOS
-    ) internal view returns (address fflonk, address plonk, address airbenderPlonk) {
+    ) internal view returns (address fflonk, address plonk) {
         if (_verifier == address(0)) {
-            return (address(0), address(0), address(0));
+            return (address(0), address(0));
         }
 
         if (_isZKsyncOS) {
@@ -283,8 +283,6 @@ library DeployCTML1OrGateway {
             IEraDualVerifier verifier = IEraDualVerifier(_verifier);
             fflonk = address(verifier.FFLONK_VERIFIER());
             plonk = address(verifier.PLONK_VERIFIER());
-            // The Airbender lane is not reachable through the Boojum router; it is introspected from
-            // `EraMultiProofVerifier` instead, so nothing to read here.
         }
     }
 

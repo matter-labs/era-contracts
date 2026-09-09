@@ -245,87 +245,86 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             uint256[] memory proof
         ) = BatchDecoder.decodeAndCheckProofData(_proofData, _processBatchFrom, _processBatchTo);
 
-        // Save the variables into the stack to save gas on reading them later
         uint256 currentTotalBatchesVerified = s.totalBatchesVerified;
-        uint256 committedBatchesLength = committedBatches.length;
+        uint256[] memory proofPublicInput = s.zksyncOS
+            ? _zksyncOSProofPublicInputs(prevBatch, committedBatches, currentTotalBatchesVerified)
+            : _eraProofPublicInput(prevBatch, committedBatches, currentTotalBatchesVerified);
 
-        // Initialize the array, that will be used as public input to the ZKP. Sized once the proved
-        // batch has been authenticated, since whether it carries an Airbender commitment decides it.
-        uint256[] memory proofPublicInput;
-
-        // Era proves one batch per call. Unconditional: with the Airbender lane the public input is
-        // a (Boojum, Airbender) pair for a single batch, so a multi-batch Era call would otherwise
-        // produce a two-entry array that the gate reads as that pair and route batch 2's Boojum
-        // transition hash to the Airbender lane — settling each batch on one lane.
-        if (!s.zksyncOS && committedBatchesLength != 1) {
-            revert CanOnlyProcessOneBatch();
-        }
-
-        // Check that the batch passed by the validator is indeed the first unverified batch
-        bool prevAirbenderBound = _checkBatchHashMismatch(prevBatch, currentTotalBatchesVerified, true);
-
-        bool airbenderLane;
-        bytes32 prevBatchCommitment = prevBatch.commitment;
-        bytes32 prevBatchStateCommitment = prevBatch.batchHash;
-        for (uint256 i = 0; i < committedBatchesLength; ++i) {
-            currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
-            bool provedAirbenderBound = _checkBatchHashMismatch(
-                committedBatches[i],
-                currentTotalBatchesVerified,
-                false
-            );
-            if (i == 0) {
-                // A batch carries an Airbender commitment only if the hash form that covers it
-                // matched; one committed before the lane existed proves on Boojum alone.
-                airbenderLane =
-                    !s.zksyncOS &&
-                    provedAirbenderBound &&
-                    committedBatches[0].airbenderCommitment != bytes32(0);
-                proofPublicInput = new uint256[](airbenderLane ? 2 : committedBatchesLength);
-            }
-
-            bytes32 currentBatchCommitment = committedBatches[i].commitment;
-            bytes32 currentBatchStateCommitment = committedBatches[i].batchHash;
-            if (s.zksyncOS) {
-                proofPublicInput[i] = _getBatchProofPublicInputZKsyncOS(
-                    prevBatchStateCommitment,
-                    currentBatchStateCommitment,
-                    currentBatchCommitment
-                );
-            } else {
-                proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
-            }
-
-            prevBatchCommitment = currentBatchCommitment;
-            prevBatchStateCommitment = currentBatchStateCommitment;
-        }
+        currentTotalBatchesVerified += committedBatches.length;
         if (currentTotalBatchesVerified > s.totalBatchesCommitted) {
             revert VerifiedBatchesExceedsCommittedBatches();
-        }
-
-        if (airbenderLane) {
-            // Both ends come from `StoredBatchInfo`, authenticated by `storedBatchHashes` exactly as
-            // the Boojum commitments above are.
-            //
-            // A predecessor with no Airbender commitment of its own — one committed before the lane
-            // was enabled, or during a period with it switched off — seeds the chain from its Boojum
-            // commitment instead. The guest opens that value the same way the Boojum scheduler opens
-            // its own predecessor: it derives the pass-through hash from execution and takes the
-            // metadata and auxiliary hashes as witness. Genesis is not a special case for it.
-            bytes32 previousAirbenderCommitment = (prevAirbenderBound && prevBatch.airbenderCommitment != bytes32(0))
-                ? prevBatch.airbenderCommitment
-                : prevBatch.commitment;
-
-            proofPublicInput[1] = _getBatchProofPublicInput(
-                previousAirbenderCommitment,
-                committedBatches[0].airbenderCommitment
-            );
         }
 
         _verifyProof(proofPublicInput, proof);
 
         emit BlocksVerification(s.totalBatchesVerified, currentTotalBatchesVerified);
         s.totalBatchesVerified = currentTotalBatchesVerified;
+    }
+
+    /// @dev Era proves one batch per call, against one or two public inputs. Unconditional: with the
+    /// Airbender lane the pair belongs to a single batch, so a multi-batch call would produce a
+    /// two-entry array the gate reads as that pair, routing batch 2's Boojum transition hash to the
+    /// Airbender lane and settling each batch on one lane.
+    /// @dev Both batches are authenticated here, next to every use of their `airbenderCommitment`, so
+    /// a legacy hash form cannot supply an unauthenticated value.
+    function _eraProofPublicInput(
+        StoredBatchInfo memory _prevBatch,
+        StoredBatchInfo[] memory _committedBatches,
+        uint256 _verifiedBefore
+    ) internal view returns (uint256[] memory publicInput) {
+        if (_committedBatches.length != 1) {
+            revert CanOnlyProcessOneBatch();
+        }
+        StoredBatchInfo memory provedBatch = _committedBatches[0];
+
+        bool prevAirbenderBound = _checkBatchHashMismatch(_prevBatch, _verifiedBefore, true);
+        bool provedAirbenderBound = _checkBatchHashMismatch(provedBatch, _verifiedBefore + 1, false);
+
+        // A batch carries an Airbender commitment only if the hash form covering it matched; one
+        // committed before the lane existed proves on Boojum alone.
+        bool airbenderLane = provedAirbenderBound && provedBatch.airbenderCommitment != bytes32(0);
+
+        publicInput = new uint256[](airbenderLane ? 2 : 1);
+        publicInput[0] = _getBatchProofPublicInput(_prevBatch.commitment, provedBatch.commitment);
+        if (!airbenderLane) {
+            return publicInput;
+        }
+
+        // A predecessor with no Airbender commitment of its own — one committed before the lane was
+        // enabled, or during a period with it switched off — seeds the chain from its Boojum
+        // commitment instead. The guest opens that value the same way the Boojum scheduler opens its
+        // own predecessor: pass-through derived from execution, metadata and auxiliary hashes taken
+        // as witness. Genesis is not a special case for it.
+        bytes32 previousAirbenderCommitment = (prevAirbenderBound && _prevBatch.airbenderCommitment != bytes32(0))
+            ? _prevBatch.airbenderCommitment
+            : _prevBatch.commitment;
+        publicInput[1] = _getBatchProofPublicInput(previousAirbenderCommitment, provedBatch.airbenderCommitment);
+    }
+
+    /// @dev ZKsync OS proves a range, one public input per batch, chained through the state
+    /// commitment. It has no Airbender lane of its own here.
+    function _zksyncOSProofPublicInputs(
+        StoredBatchInfo memory _prevBatch,
+        StoredBatchInfo[] memory _committedBatches,
+        uint256 _verifiedBefore
+    ) internal view returns (uint256[] memory publicInput) {
+        _checkBatchHashMismatch(_prevBatch, _verifiedBefore, true);
+
+        uint256 batchesLength = _committedBatches.length;
+        publicInput = new uint256[](batchesLength);
+        bytes32 prevBatchStateCommitment = _prevBatch.batchHash;
+
+        for (uint256 i = 0; i < batchesLength; ++i) {
+            _checkBatchHashMismatch(_committedBatches[i], _verifiedBefore + i + 1, false);
+
+            bytes32 currentBatchStateCommitment = _committedBatches[i].batchHash;
+            publicInput[i] = _getBatchProofPublicInputZKsyncOS(
+                prevBatchStateCommitment,
+                currentBatchStateCommitment,
+                _committedBatches[i].commitment
+            );
+            prevBatchStateCommitment = currentBatchStateCommitment;
+        }
     }
 
     function _verifyProof(uint256[] memory proofPublicInput, uint256[] memory _proof) internal view {

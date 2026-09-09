@@ -771,82 +771,69 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         bytes32 passThroughDataHash = keccak256(_batchPassThroughData(_newBatchData));
         metadataHash = keccak256(_batchMetaParameters());
 
-        // Shared between the two shapes: the logs are hashed once and the blob region built once.
-        bytes32 l2ToL1LogsHash = keccak256(_newBatchData.systemLogs);
-        bytes32[] memory blobAuxOutputWords = _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes);
-
-        auxiliaryOutputHash = _boojumAuxiliaryOutputHash(
+        bytes32 airbenderAuxiliaryOutputHash;
+        (auxiliaryOutputHash, airbenderAuxiliaryOutputHash) = _batchAuxiliaryOutputHashes(
             _newBatchData,
-            l2ToL1LogsHash,
             _stateDiffHash,
-            blobAuxOutputWords
+            _blobCommitments,
+            _blobHashes
         );
+
         commitment = keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
-
-        // The Airbender shape reuses everything above and differs in exactly two words of the
-        // auxiliary output.
-        //
-        // A batch carries one exactly when the lane is required. Required and missing is refused here
-        // rather than surfacing later as an unprovable batch. Not required, and the heap hash is
-        // ignored rather than rejected: the kill switch takes effect on the next commit, so a
-        // sequencer still sending the old shape must not be locked out of committing.
-        if (s.disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED == 0) {
-            if (_newBatchData.airbenderBootloaderHeapHash == bytes32(0)) {
-                revert AirbenderCommitmentRequired();
-            }
-
-            bytes32 airbenderAuxiliaryOutputHash = _airbenderAuxiliaryOutputHash(
-                _newBatchData,
-                l2ToL1LogsHash,
-                _stateDiffHash,
-                blobAuxOutputWords
-            );
+        if (airbenderAuxiliaryOutputHash != bytes32(0)) {
             airbenderCommitment = keccak256(
                 abi.encode(passThroughDataHash, metadataHash, airbenderAuxiliaryOutputHash)
             );
         }
-        // Left at zero otherwise, which is what makes `ExecutorFacet` emit the single-input shape.
     }
 
-    /// @dev The Boojum lane's auxiliary output. The two words only this lane reproduces are pinned to
-    /// zero while it is masked: nothing verifies them then, and they would otherwise carry
-    /// operator-chosen entropy into a commitment that stays in the chain for good. Everything else is
-    /// shared with the Airbender shape and covered by its proof.
-    function _boojumAuxiliaryOutputHash(
+    /// @dev Both lanes' auxiliary outputs, over one hashing of the logs and one encoding of the blob
+    /// region. Returns `bytes32(0)` for the Airbender shape when that lane is not required, which is
+    /// what leaves the batch without an Airbender commitment and makes `ExecutorFacet` emit the
+    /// single-input shape.
+    /// @dev A batch carries an Airbender shape exactly when the lane is required. Required and
+    /// missing is refused here rather than surfacing later as an unprovable batch. Not required, and
+    /// the heap hash is ignored rather than rejected: the kill switch takes effect on the next
+    /// commit, so a sequencer still sending the old shape must not be locked out of committing.
+    /// @dev The Boojum shape pins the two words only that lane reproduces to zero while it is masked.
+    /// Nothing verifies them then, and they would otherwise carry operator-chosen entropy into a
+    /// commitment that stays in the chain for good.
+    function _batchAuxiliaryOutputHashes(
         CommitBatchInfo memory _batch,
-        bytes32 _l2ToL1LogsHash,
         bytes32 _stateDiffHash,
-        bytes32[] memory _blobAuxOutputWords
-    ) internal view returns (bytes32) {
+        bytes32[] memory _blobCommitments,
+        bytes32[] memory _blobHashes
+    ) internal view returns (bytes32 boojumAuxiliaryOutputHash, bytes32 airbenderAuxiliaryOutputHash) {
+        bytes32 l2ToL1LogsHash = keccak256(_batch.systemLogs);
+        bytes32[] memory blobAuxOutputWords = _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes);
+
         bool boojumRequired = s.disabledProofSystems & BOOJUM_PROOF_SYSTEM_DISABLED == 0;
-        return
-            // solhint-disable-next-line func-named-parameters
-            _auxiliaryOutputHash(
-                _l2ToL1LogsHash,
-                _stateDiffHash,
-                boojumRequired ? _batch.bootloaderHeapInitialContentsHash : bytes32(0),
-                boojumRequired ? _batch.eventsQueueStateHash : bytes32(0),
-                _blobAuxOutputWords
-            );
-    }
+        // solhint-disable-next-line func-named-parameters
+        boojumAuxiliaryOutputHash = _auxiliaryOutputHash(
+            l2ToL1LogsHash,
+            _stateDiffHash,
+            boojumRequired ? _batch.bootloaderHeapInitialContentsHash : bytes32(0),
+            boojumRequired ? _batch.eventsQueueStateHash : bytes32(0),
+            blobAuxOutputWords
+        );
 
-    /// @dev The Airbender lane's auxiliary output: the heap hash computed with Blake2s rather than
-    /// Poseidon2, and the events queue pinned to zero.
-    function _airbenderAuxiliaryOutputHash(
-        CommitBatchInfo memory _batch,
-        bytes32 _l2ToL1LogsHash,
-        bytes32 _stateDiffHash,
-        bytes32[] memory _blobAuxOutputWords
-    ) internal pure returns (bytes32) {
-        return
-            // solhint-disable-next-line func-named-parameters
-            _auxiliaryOutputHash(
-                _l2ToL1LogsHash,
-                _stateDiffHash,
-                _batch.airbenderBootloaderHeapHash,
-                bytes32(0),
-                _blobAuxOutputWords
-            );
+        if (s.disabledProofSystems & AIRBENDER_PROOF_SYSTEM_DISABLED != 0) {
+            return (boojumAuxiliaryOutputHash, bytes32(0));
+        }
+        if (_batch.airbenderBootloaderHeapHash == bytes32(0)) {
+            revert AirbenderCommitmentRequired();
+        }
+
+        // Airbender computes the heap hash with Blake2s rather than Poseidon2 and pins the events
+        // queue to zero; everything else is shared with the shape above.
+        // solhint-disable-next-line func-named-parameters
+        airbenderAuxiliaryOutputHash = _auxiliaryOutputHash(
+            l2ToL1LogsHash,
+            _stateDiffHash,
+            _batch.airbenderBootloaderHeapHash,
+            bytes32(0),
+            blobAuxOutputWords
+        );
     }
 
     /// @dev The shared digest both lanes build, over the words they agree on plus the two they do not.
