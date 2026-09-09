@@ -20,7 +20,8 @@ import {
     RemovingPermanentRestriction,
     TooHighDeploymentNonce,
     UnallowedImplementation,
-    ZeroAddress
+    ZeroAddress,
+    ZeroDeploymentNonce
 } from "contracts/common/L1ContractErrors.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -485,6 +486,12 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
 
         vm.expectRevert(TooHighDeploymentNonce.selector);
         permRestriction.allowL2Admin(tooHighNonce);
+    }
+
+    function test_allowL2Admin_ZeroDeploymentNonce() public {
+        // A contract account never deploys at nonce 0 (EIP-161), so the derived address is unreachable.
+        vm.expectRevert(ZeroDeploymentNonce.selector);
+        permRestriction.allowL2Admin(0);
     }
 
     function test_allowL2Admin_AlreadyWhitelisted() public {

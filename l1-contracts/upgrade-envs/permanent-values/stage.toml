@@ -23,12 +23,12 @@ bridgehub_proxy_addr = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
 governance_kind = "puh"
 
 [ctm_contracts]
-# Legacy single-CTM (Era) — kept for anvil-interop synthetic-state harnesses
-# that read the flat fields directly. The v31 multi-CTM upgrade flow uses the
-# `[[ctm_contracts.ctms]]` array below.
-ctm_proxy_addr = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"
+# Legacy single-CTM shape, kept only for the anvil-interop synthetic-state harness (which
+# overwrites `ctm_proxy_addr`). Points to the Atlas (ZKsync OS) CTM: the Era CTM cannot be
+# targeted by this release. protocol-ops consumes the `[[ctm_contracts.ctms]]` array below.
+ctm_proxy_addr = "0x73bee414c6e006525f3CceeDf6D8004c0370502E"
 l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
-rollup_da_manager = "0x5af0d94e50b271005AF1687e363FD104771EAe9d"
+rollup_da_manager = "0x461099b710C3Bd538FFF0bB0F817EDA52B5A532b"
 
 # Multi-CTM list for `protocol-ops ecosystem upgrade-prepare-all`:
 #   proxy, bytecodes_supplier, rollup_da_manager (address overrides optional —

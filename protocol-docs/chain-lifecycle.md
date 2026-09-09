@@ -56,6 +56,10 @@ must be 0 (ruling out chains onboarded at a non-zero starting batch and chains t
 real batches), and the batch-0 root must not already exist. `currentChainBatchNumber` stays 0, so
 the first real batch continues at 1 exactly as without the genesis leaf.
 
+Because the read root must be non-zero, `createNewChain` can no longer complete for a chain whose
+`DiamondInit` does not store the genesis root: creating a chain under a non-ZKsync-OS CTM registered
+on the same Bridgehub is not possible on this release.
+
 Why this exists: the atomic-interop timeout protocol requires that every chain interop can target
 has **at least one batch leaf inside the settlement layer's message root** — otherwise a leg on a
 chain that halts before ever settling could neither finalize nor be proven timed out. Seeding at

@@ -24,6 +24,19 @@ contract L1AssetRouterAuthTest is Test {
         router.bridgehubDepositBaseToken(DEST_CHAIN_ID, bytes32("assetId"), originalCaller, 1 ether);
     }
 
+    /// @dev Pins the removal of the historical `onlyBridgehubOrEra` exception: a chain diamond (formerly
+    /// the Era diamond for `ERA_CHAIN_ID`) can no longer deposit the base token directly. Any deployed
+    /// diamond that still exposes the legacy `Mailbox.requestL2Transaction` path must be upgraded off it
+    /// before the shared router is upgraded to this implementation.
+    function test_RevertWhen_ChainDiamondCallsBridgehubDepositBaseTokenDirectly() public {
+        address eraDiamond = makeAddr("eraDiamond");
+        vm.deal(eraDiamond, 1 ether);
+
+        vm.prank(eraDiamond);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, eraDiamond));
+        router.bridgehubDepositBaseToken{value: 1 ether}(DEST_CHAIN_ID, bytes32("assetId"), originalCaller, 1 ether);
+    }
+
     function test_RevertWhen_NonBridgehubCallsBridgehubDeposit() public {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
         router.bridgehubDeposit(DEST_CHAIN_ID, originalCaller, 0, hex"");

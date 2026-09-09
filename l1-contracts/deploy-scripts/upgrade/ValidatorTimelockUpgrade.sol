@@ -26,6 +26,7 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
 
     function runInner(address ctm) internal returns (Call[] memory calls) {
         ChainTypeManager chainTypeManager = ChainTypeManager(ctm);
+        _requireZKsyncOSCtm(chainTypeManager);
         console.logAddress(msg.sender);
         address validatorTimelock = chainTypeManager.validatorTimelockPostV29();
         address bridgehub = chainTypeManager.BRIDGE_HUB();
@@ -55,6 +56,7 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
 
     function addSharedValidators(address[] memory validators, address ctm) public {
         ChainTypeManager chainTypeManager = ChainTypeManager(ctm);
+        _requireZKsyncOSCtm(chainTypeManager);
         address validatorTimelock = chainTypeManager.validatorTimelockPostV29();
         Call[] memory calls = new Call[](0);
         for (uint256 i = 0; i < validators.length; i++) {
@@ -66,6 +68,7 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
 
     function removeSharedValidators(address[] memory validators, address ctm) public {
         ChainTypeManager chainTypeManager = ChainTypeManager(ctm);
+        _requireZKsyncOSCtm(chainTypeManager);
         address validatorTimelock = chainTypeManager.validatorTimelockPostV29();
         Call[] memory calls = new Call[](0);
         for (uint256 i = 0; i < validators.length; i++) {
@@ -98,9 +101,21 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
 
     function getValidatorAndChainAddress(address ctm, uint256 chainId) internal view returns (address, address) {
         ChainTypeManager chainTypeManager = ChainTypeManager(ctm);
+        _requireZKsyncOSCtm(chainTypeManager);
         address validatorTimelock = chainTypeManager.validatorTimelockPostV29();
         address chain = chainTypeManager.getZKChain(chainId);
         return (validatorTimelock, chain);
+    }
+
+    /// @dev The timelock implementation this script installs has no precommit entry point, so it must
+    /// never land on a timelock that still serves EraVM chains. Pre-v31 CTMs do not expose
+    /// `isZKsyncOS()` at all, hence the try/catch instead of a plain call.
+    function _requireZKsyncOSCtm(ChainTypeManager chainTypeManager) internal view {
+        try chainTypeManager.isZKsyncOS() returns (bool isZKsyncOS) {
+            require(isZKsyncOS, "CTM is not a ZKsync OS CTM; refusing to touch its ValidatorTimelock");
+        } catch {
+            revert("CTM does not expose isZKsyncOS() (pre-v31 / EraVM CTM); refusing to touch its ValidatorTimelock");
+        }
     }
 
     function prepareChainAdminCall(address proxyAddress, bytes memory data) internal returns (Call[] memory calls) {

@@ -359,15 +359,20 @@ pub async fn resolve_rollup_da_manager(
 }
 
 /// Assert that the CTM at `ctm_proxy` is a supported ZKsync OS CTM.
+///
+/// This is the single gate that keeps non-OS CTMs out of every protocol-ops command. Pre-v31
+/// CTMs (the EraVM ones among them) do not expose `isZKsyncOS()` at all, so the call reverts
+/// with empty data; report that as "unsupported CTM" instead of a bare RPC failure.
 pub async fn ensure_supported_os_ctm(l1_rpc_url: &str, ctm_proxy: Address) -> anyhow::Result<()> {
     let ctm = IChainTypeManagerAbi::new(ctm_proxy, provider(l1_rpc_url)?);
-    let is_zksync_os = ctm
-        .isZKsyncOS()
-        .call()
-        .await
-        .context("ctm.isZKsyncOS() call failed")?;
-    anyhow::ensure!(is_zksync_os, "CTM {ctm_proxy:#x} is not a ZKsync OS CTM");
-    Ok(())
+    match ctm.isZKsyncOS().call().await {
+        Ok(true) => Ok(()),
+        Ok(false) => anyhow::bail!("CTM {ctm_proxy:#x} is not a ZKsync OS CTM"),
+        Err(err) => anyhow::bail!(
+            "CTM {ctm_proxy:#x} is not a supported ZKsync OS CTM: `isZKsyncOS()` reverted or is \
+             not exposed (pre-v31 CTMs, including EraVM ones, lack it). Underlying error: {err}"
+        ),
+    }
 }
 
 /// Resolve `chain.getPubdataPricingMode()` — `Rollup` (0) or `Validium` (1). Available on every

@@ -57,7 +57,7 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
     // ZKsyncOS force deployment except the L2V32Upgrade delegate target (validated separately);
     // verify_v31_zksync_os_force_deployments enforces that no other unsafe FD is present.
     vec![
-        // ── Fixed-address core contracts (getFixedAddressCoreContracts, 12 entries; L2WrappedBaseToken excluded) ──
+        // ── Fixed-address core contracts (getFixedAddressCoreContracts, 14 entries; L2WrappedBaseToken excluded) ──
         proxy!("l1-contracts/L2Bridgehub", L2_BRIDGEHUB_ADDR),
         proxy!("l1-contracts/L2AssetRouter", L2_ASSET_ROUTER_ADDR),
         proxy!(

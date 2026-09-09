@@ -446,6 +446,8 @@ error WrongMagicValue(uint256 expectedMagicValue, uint256 providedMagicValue);
 error ZeroAddress();
 // 0xc84885d4
 error ZeroChainId();
+// 0xb9f11004
+error ZeroDeploymentNonce();
 // 0x16787758
 error ZeroUpgradeTimestamp();
 // 0x601b6882

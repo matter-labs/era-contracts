@@ -12,7 +12,9 @@ import {IChainUpgrader} from "../../chain-interfaces/IChainUpgrader.sol";
 /// interface must remain backwards compatible.
 interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     /// @notice Struct specifying which validator roles to grant or revoke in a single call.
-    /// @param rotatePrecommitterRole Deprecated selector-preserving flag; ignored by the implementation.
+    /// @param rotatePrecommitterRole Whether to rotate the retired PRECOMMITTER_ROLE. The role gates nothing
+    /// any more; the flag is still honoured so grants made before the precommit path was removed can be
+    /// revoked (`removeValidator` revokes it, `addValidator` does not grant it).
     /// @param rotateCommitterRole Whether to rotate the COMMITTER_ROLE.
     /// @param rotateReverterRole Whether to rotate the REVERTER_ROLE.
     /// @param rotateProverRole Whether to rotate the PROVER_ROLE.
@@ -30,7 +32,8 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     /// @notice The delay between committing and executing batches is changed.
     event NewExecutionDelay(uint256 _newExecutionDelay);
 
-    /// @notice Deprecated role hash retained for ABI compatibility.
+    /// @notice Retired role hash: gates nothing since precommits were removed. Kept so existing grants
+    /// can still be enumerated and revoked.
     function PRECOMMITTER_ROLE() external view returns (bytes32);
     /// @notice Role hash for addresses allowed to commit batches on a chain.
     function COMMITTER_ROLE() external view returns (bytes32);

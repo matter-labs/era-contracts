@@ -115,6 +115,11 @@ contract ValidatorTimelock is
         address _validator,
         ValidatorRotationParams memory _params
     ) public {
+        if (_params.rotatePrecommitterRole) {
+            // Retired role: it gates nothing any more, but grants made before the precommit path was
+            // removed must stay revocable through the same API that created them.
+            revokeRole(_chainAddress, PRECOMMITTER_ROLE, _validator);
+        }
         if (_params.rotateCommitterRole) {
             revokeRole(_chainAddress, COMMITTER_ROLE, _validator);
         }
@@ -138,7 +143,8 @@ contract ValidatorTimelock is
             _chainAddress,
             _validator,
             ValidatorRotationParams({
-                rotatePrecommitterRole: false,
+                // Also clears grants that predate the removal of the precommit path.
+                rotatePrecommitterRole: true,
                 rotateCommitterRole: true,
                 rotateReverterRole: true,
                 rotateProverRole: true,
@@ -159,6 +165,9 @@ contract ValidatorTimelock is
         address _validator,
         ValidatorRotationParams memory _params
     ) public {
+        if (_params.rotatePrecommitterRole) {
+            grantRole(_chainAddress, PRECOMMITTER_ROLE, _validator);
+        }
         if (_params.rotateCommitterRole) {
             grantRole(_chainAddress, COMMITTER_ROLE, _validator);
         }
