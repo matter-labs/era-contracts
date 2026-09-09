@@ -3,7 +3,7 @@ import "@nomiclabs/hardhat-ethers";
 import { Command } from "commander";
 import { Wallet, ethers, BigNumber } from "ethers";
 import { Provider } from "zksync-ethers";
-import { getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
+import { userPriorityTxMaxGasLimit } from "../../l1-contracts/src.ts/utils";
 import { web3Provider } from "../../l1-contracts/scripts/utils";
 import { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { getL1TxInfo } from "./utils";
@@ -11,7 +11,7 @@ import { ethTestConfig } from "./deploy-shared-bridge-on-l2-through-l1";
 
 // From openzeppelin-upgradable v4.9.5 Initializable contract implementation.
 const INITIALIZED_STORAGE_SLOT = 0;
-const priorityTxMaxGasLimit = BigNumber.from(getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT"));
+const l2TxGasLimit = BigNumber.from(userPriorityTxMaxGasLimit);
 const provider = web3Provider();
 
 async function getReinitializeTokenCalldata(
@@ -65,15 +65,7 @@ async function getReinitializeTokenTxInfo(
     ignoreDecimalsGetter,
     version
   );
-  return await getL1TxInfo(
-    deployer,
-    tokenAddress,
-    l2Calldata,
-    refundRecipient,
-    gasPrice,
-    priorityTxMaxGasLimit,
-    provider
-  );
+  return await getL1TxInfo(deployer, tokenAddress, l2Calldata, refundRecipient, gasPrice, l2TxGasLimit, provider);
 }
 
 async function main() {

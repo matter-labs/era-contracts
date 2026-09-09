@@ -4,7 +4,7 @@ import { Interface } from "ethers/lib/utils";
 import { deployedAddressesFromEnv } from "../../l1-contracts/src.ts/deploy-utils";
 import type { Deployer } from "../../l1-contracts/src.ts/deploy";
 import { ADDRESS_ONE } from "../../l1-contracts/src.ts/constants";
-import { getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
+import { userPriorityTxMaxGasLimit } from "../../l1-contracts/src.ts/utils";
 import { IBridgehubFactory } from "../../l1-contracts/typechain/IBridgehubFactory";
 import { web3Provider } from "../../l1-contracts/scripts/utils";
 
@@ -26,7 +26,8 @@ const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate
 const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
 
-export const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
+// Re-exported so the L2 deployment scripts keep taking their L1->L2 gas limit from one place.
+export { userPriorityTxMaxGasLimit };
 
 export function applyL1ToL2Alias(address: string): string {
   return ethers.utils.hexZeroPad(
@@ -202,7 +203,7 @@ export async function publishBytecodeFromL1(
     wallet,
     ethers.constants.AddressZero,
     "0x",
-    priorityTxMaxGasLimit,
+    userPriorityTxMaxGasLimit,
     gasPrice,
     factoryDeps
   );
@@ -243,7 +244,7 @@ export async function getL1TxInfo(
   l2Calldata: string,
   refundRecipient: string,
   gasPrice: BigNumber,
-  priorityTxMaxGasLimit: BigNumber,
+  l2GasLimit: BigNumber,
   provider: ethers.providers.JsonRpcProvider
 ): Promise<TxInfo> {
   const zksync = deployer.stateTransitionContract(ethers.Wallet.createRandom().connect(provider));
@@ -251,17 +252,13 @@ export async function getL1TxInfo(
     to,
     0,
     l2Calldata,
-    priorityTxMaxGasLimit,
+    l2GasLimit,
     REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
     [], // It is assumed that the target has already been deployed
     refundRecipient,
   ]);
 
-  const neededValue = await zksync.l2TransactionBaseCost(
-    gasPrice,
-    priorityTxMaxGasLimit,
-    REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT
-  );
+  const neededValue = await zksync.l2TransactionBaseCost(gasPrice, l2GasLimit, REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT);
 
   return {
     target: zksync.address,

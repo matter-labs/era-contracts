@@ -14,7 +14,7 @@ import {
   getNumberFromEnv,
   ADDRESS_ONE,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-  priorityTxMaxGasLimit,
+  userPriorityTxMaxGasLimit,
   L2_BRIDGEHUB_ADDRESS,
   computeL2Create2Address,
   DIAMOND_CUT_DATA_ABI_STRING,
@@ -404,7 +404,12 @@ async function registerSLContractsOnL1(deployer: Deployer) {
 
   const gasPrice = (await deployer.deployWallet.provider.getGasPrice()).mul(GAS_MULTIPLIER);
   const value = (
-    await l1Bridgehub.l2TransactionBaseCost(chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
+    await l1Bridgehub.l2TransactionBaseCost(
+      chainId,
+      gasPrice,
+      userPriorityTxMaxGasLimit,
+      REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+    )
   ).mul(10);
   const baseTokenAddress = await l1Bridgehub.baseToken(chainId);
   const ethIsBaseToken = baseTokenAddress == ADDRESS_ONE;
@@ -430,7 +435,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
         chainId,
         mintValue: value,
         l2Value: 0,
-        l2GasLimit: priorityTxMaxGasLimit,
+        l2GasLimit: userPriorityTxMaxGasLimit,
         l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
         refundRecipient: deployer.deployWallet.address,
         secondBridgeAddress: assetRouter.address,
@@ -453,7 +458,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
     L2_BRIDGEHUB_ADDRESS,
     gasPrice,
     l1Bridgehub.interface.encodeFunctionData("addChainTypeManager", [l2CTMAddress]),
-    priorityTxMaxGasLimit
+    userPriorityTxMaxGasLimit
   );
   const l2TxHash2dot5 = zkUtils.getL2HashFromPriorityOp(receipt3, gatewayAddress);
   console.log(`L2 CTM ,l2 txHash: ${l2TxHash2dot5}`);
@@ -468,7 +473,7 @@ async function registerSLContractsOnL1(deployer: Deployer) {
         chainId,
         mintValue: value,
         l2Value: 0,
-        l2GasLimit: priorityTxMaxGasLimit,
+        l2GasLimit: userPriorityTxMaxGasLimit,
         l2GasPerPubdataByteLimit: SYSTEM_CONFIG.requiredL2GasPricePerPubdata,
         refundRecipient: deployer.deployWallet.address,
         secondBridgeAddress: ctmDeploymentTracker.address,

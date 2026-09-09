@@ -15,6 +15,10 @@ import { L2_NATIVE_TOKEN_VAULT_ADDRESS, L1_TO_L2_ALIAS_OFFSET } from "./constant
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
 
 export const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
+// `USER_PRIORITY_TX_MAX_GAS_LIMIT` in `contracts/common/Config.sol`: the bound EraVM chains put on
+// the body gas of an L1->L2 transaction whose gas limit comes from the caller. `priorityTxMaxGasLimit`
+// above stays the chain configuration value, which only protocol-authored transactions may spend.
+export const userPriorityTxMaxGasLimit = 15_000_000;
 
 const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
 export const STORED_BATCH_INFO_ABI_STRING =
