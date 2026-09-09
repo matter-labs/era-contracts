@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {DefaultCTMUpgrade} from "deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
-import {PinnedRegistryObject} from "deploy-scripts/upgrade/default-upgrade/PinnedRegistryObject.sol";
+import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
 
 /// @dev Exposes the reuse predicate. Nothing else of the prepare pipeline runs: the predicate
 ///      depends only on the build artifacts and this run's constructor arguments.
@@ -43,7 +43,7 @@ contract ReleaseMemberReuseTest is Test {
         string memory _contractName,
         bytes memory _args
     ) private returns (address deployed) {
-        bytes memory initCode = abi.encodePacked(PinnedRegistryObject.creationCode(_fileName, _contractName), _args);
+        bytes memory initCode = abi.encodePacked(BytecodeUtils.readBytecodeL1(_fileName, _contractName), _args);
         // solhint-disable-next-line no-inline-assembly
         assembly {
             deployed := create(0, add(initCode, 0x20), mload(initCode))
@@ -106,7 +106,7 @@ contract ReleaseMemberReuseTest is Test {
         address live = _deployFromArtifact("DiamondInit.sol", "DiamondInit", abi.encode(true));
         assertTrue(harness.canReuseReleaseMember("DiamondInit", live), "identical code must be reused");
         assertTrue(
-            live.codehash != PinnedRegistryObject.codehash("DiamondInit.sol", "DiamondInit"),
+            live.codehash != BytecodeUtils.getDeployedBytecodeHash("DiamondInit.sol", "DiamondInit"),
             "an artifact comparison would have called this member changed"
         );
     }

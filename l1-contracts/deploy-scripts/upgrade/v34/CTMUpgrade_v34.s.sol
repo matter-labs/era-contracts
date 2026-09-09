@@ -33,7 +33,7 @@ import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {ExternalActionsLib} from "../default-upgrade/ExternalActionsLib.sol";
-import {PinnedRegistryObject} from "../default-upgrade/PinnedRegistryObject.sol";
+import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
 import {DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {Utils} from "../../utils/Utils.sol";
@@ -209,8 +209,8 @@ contract CTMUpgrade_v34 is DefaultCTMUpgrade {
                         ecosystemUpgradeExecutor(),
                         // The audited-object anchor for every FUTURE transition this executor
                         // accepts, taken from the artifact those transitions are DEPLOYED from
-                        // (see {PinnedRegistryObject}).
-                        PinnedRegistryObject.codehash("CTMTransition.sol", "CTMTransition")
+                        // (see {BytecodeUtils.getDeployedBytecodeHash}).
+                        BytecodeUtils.getDeployedBytecodeHash("CTMTransition.sol", "CTMTransition")
                     ),
                     "CTMUpgradeExecutor"
                 )

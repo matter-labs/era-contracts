@@ -27,7 +27,7 @@ import {BridgehubAddresses, CoreDeployedAddresses} from "../../utils/Types.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CoreUpgradeParams} from "./UpgradeParams.sol";
-import {PinnedRegistryObject} from "./PinnedRegistryObject.sol";
+import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {ExternalActionsLib} from "./ExternalActionsLib.sol";
 import {Utils} from "../../utils/Utils.sol";
 
@@ -130,10 +130,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             return;
         }
         // From the build ARTIFACT, which is also where the ecosystem executor's
-        // `CORE_REGISTRY_CODEHASH` came from — see {PinnedRegistryObject}.
+        // `CORE_REGISTRY_CODEHASH` came from — see {BytecodeUtils.getDeployedBytecodeHash}.
         coreRegistry = CoreRegistry(
             deployViaCreate2AndNotify(
-                PinnedRegistryObject.creationCode("CoreRegistry.sol", "CoreRegistry"),
+                BytecodeUtils.readBytecodeL1("CoreRegistry.sol", "CoreRegistry"),
                 abi.encode(CoreRegistryManifest({proxyUpgrades: rows})),
                 "CoreRegistry"
             )

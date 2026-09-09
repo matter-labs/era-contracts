@@ -79,7 +79,8 @@ be kept separate from documentation and reviewed with their owning batch.
   a codehash pin taken from a build artifact while the object is deployed from the script's own
   compiled copy can differ (the CBOR metadata records the compilation's remappings), so pinned
   registry objects are now deployed from the same artifact the pin is read from
-  ({PinnedRegistryObject}) and the CTM prepare re-checks every object it deploys against the live
+  ({BytecodeUtils}: `readBytecodeL1` to deploy, `getDeployedBytecodeHash` to pin) and the CTM
+  prepare re-checks every object it deploys against the live
   executors' immutables; and reading build artifacts inside the pipeline's own call frame charges
   memory quadratically, so the member probe runs in its own frame.
 

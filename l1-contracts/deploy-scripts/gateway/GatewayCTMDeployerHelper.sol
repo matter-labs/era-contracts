@@ -564,7 +564,7 @@ library GatewayCTMDeployerHelper {
         // NOT `_simulatedCodehash`: a release validates its manifest's pins against LIVE code in
         // its constructor, and none of the pinned targets exist at prediction time. A release has
         // no immutables either, so its runtime code is exactly the artifact's.
-        releaseCodehash = keccak256(BytecodeUtils.readDeployedBytecodeL1("CTMRelease.sol", "CTMRelease"));
+        releaseCodehash = BytecodeUtils.getDeployedBytecodeHash("CTMRelease.sol", "CTMRelease");
     }
 
     /// @dev Rebuilds — from build artifacts and simulated deployments, byte-identically — the

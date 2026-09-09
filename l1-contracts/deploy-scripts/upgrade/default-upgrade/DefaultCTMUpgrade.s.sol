@@ -49,7 +49,7 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
-import {PinnedRegistryObject} from "./PinnedRegistryObject.sol";
+import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {ReleaseMemberProbe} from "./ReleaseMemberProbe.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {CTMUpgradeParams} from "./UpgradeParams.sol";
@@ -375,9 +375,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             upgradeTimer: _pin(upgradeAddresses.upgradeTimer)
         });
         // From the build ARTIFACT, which is also where the bound executor's `TRANSITION_CODEHASH`
-        // came from — see {PinnedRegistryObject}.
+        // came from — see {BytecodeUtils.getDeployedBytecodeHash}.
         upgradeAddresses.ctmTransition = deployViaCreate2AndNotify(
-            PinnedRegistryObject.creationCode("CTMTransition.sol", "CTMTransition"),
+            BytecodeUtils.readBytecodeL1("CTMTransition.sol", "CTMTransition"),
             abi.encode(manifest),
             "CTMTransition"
         );
