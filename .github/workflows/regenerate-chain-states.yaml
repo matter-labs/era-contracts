@@ -65,11 +65,19 @@ jobs:
           # keep it non-fatal — the working tree is already at the correct commit.
           git submodule update --init --recursive || true
 
+      # Fill in only what the target branch lacks (`-n` never clobbers). The PR's own copy wins
+      # wherever it exists: a PR that updates the build recipe — a foundry bump, a profile change —
+      # has to regenerate with *its* recipe, or state-generation-check, which runs from the PR's
+      # copy, rejects the freshly generated snapshots. The stashed copies exist only so dispatch
+      # still works for branches that predate an action entirely.
       # Only chain-states/ is committed at the end, so these files staying modified is harmless.
-      - name: Restore this revision's composite actions
+      - name: Fall back to this revision's composite actions where the PR's branch has none
         run: |
+          set -euo pipefail
           mkdir -p .github/actions
-          cp -r "$RUNNER_TEMP/gha-actions/." .github/actions/
+          cp -rn "$RUNNER_TEMP/gha-actions/." .github/actions/
+          # Loud failure beats building with a half-populated actions directory.
+          test -f .github/actions/build-anvil-interop-artifacts/action.yaml
 
       - name: Build anvil-interop artifacts
         uses: ./.github/actions/build-anvil-interop-artifacts
