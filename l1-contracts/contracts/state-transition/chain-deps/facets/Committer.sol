@@ -15,7 +15,8 @@ import {
     PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS,
     TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
     DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH,
-    AIRBENDER_PROOF_SYSTEM_DISABLED
+    AIRBENDER_PROOF_SYSTEM_DISABLED,
+    BOOJUM_PROOF_SYSTEM_DISABLED
 } from "../../../common/Config.sol";
 import {
     IExecutor,
@@ -774,12 +775,17 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         bytes32 l2ToL1LogsHash = keccak256(_newBatchData.systemLogs);
         bytes32[] memory blobAuxOutputWords = _encodeBlobAuxiliaryOutput(_blobCommitments, _blobHashes);
 
+        // The two words only the Boojum lane reproduces. With that lane masked nothing verifies them,
+        // and they would otherwise carry operator-chosen entropy into a commitment that stays in the
+        // chain for good, so they are pinned to zero instead. Everything else in this commitment is
+        // shared with the Airbender one and checked there.
+        bool boojumRequired = s.disabledProofSystems & BOOJUM_PROOF_SYSTEM_DISABLED == 0;
         // solhint-disable-next-line func-named-parameters
         auxiliaryOutputHash = _auxiliaryOutputHash(
             l2ToL1LogsHash,
             _stateDiffHash,
-            _newBatchData.bootloaderHeapInitialContentsHash,
-            _newBatchData.eventsQueueStateHash,
+            boojumRequired ? _newBatchData.bootloaderHeapInitialContentsHash : bytes32(0),
+            boojumRequired ? _newBatchData.eventsQueueStateHash : bytes32(0),
             blobAuxOutputWords
         );
         commitment = keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));

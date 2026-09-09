@@ -142,6 +142,41 @@ contract AirbenderCommitmentEquivalenceTest is Test {
         committer.createAirbenderBatchCommitment(batch, CALLABLE_STATE_DIFF_HASH, commitments, hashes);
     }
 
+    /// With Boojum masked, the two words only that lane reproduces are pinned to zero rather than
+    /// carried as unverified operator input. Everything else in the commitment is shared with the
+    /// Airbender one, so what remains is covered by the Airbender proof.
+    function test_boojumDisabledZeroesItsOwnAuxWords() public {
+        (bytes32[] memory commitments, bytes32[] memory hashes) = _callableBlobs();
+
+        // The same batch, committed once with the lane required and once with it masked.
+        committer.setDisabledProofSystems(0);
+        bytes32 withBoojum = committer.createBatchCommitment(
+            _callableBatch(),
+            CALLABLE_STATE_DIFF_HASH,
+            commitments,
+            hashes
+        );
+
+        committer.setDisabledProofSystems(BOOJUM_PROOF_SYSTEM_DISABLED);
+        bytes32 masked = committer.createBatchCommitment(
+            _callableBatch(),
+            CALLABLE_STATE_DIFF_HASH,
+            commitments,
+            hashes
+        );
+        assertTrue(withBoojum != masked, "masking Boojum must drop its two aux words from the commitment");
+
+        // Zeroing must not collapse the two lanes onto one value: a single proof satisfying both
+        // public inputs is exactly what the two-system requirement exists to prevent.
+        bytes32 airbender = committer.createAirbenderBatchCommitment(
+            _callableBatch(),
+            CALLABLE_STATE_DIFF_HASH,
+            commitments,
+            hashes
+        );
+        assertTrue(masked != airbender, "the two commitments must stay distinct");
+    }
+
     /// Disabling Boojum leaves the Airbender lane required, so the batch still carries an Airbender
     /// commitment. The Boojum commitment keeps being built either way — it is the base commitment
     /// `storedBatchHashes` authenticates and the lane's fallback seed, not something the mask gates.
