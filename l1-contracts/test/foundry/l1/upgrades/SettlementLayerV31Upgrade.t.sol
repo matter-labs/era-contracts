@@ -29,7 +29,6 @@ import {
     L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2UpgradeTxLib} from "contracts/upgrades/L2UpgradeTxLib.sol";
-import {AIRBENDER_PROOF_SYSTEM_DISABLED} from "contracts/common/Config.sol";
 
 contract DummySettlementLayerV31Upgrade is EraSettlementLayerV31Upgrade, BaseUpgradeUtils {
     function setTotalBatchesCommitted(uint256 _totalBatchesCommitted) public {
@@ -58,10 +57,6 @@ contract DummySettlementLayerV31Upgrade is EraSettlementLayerV31Upgrade, BaseUpg
 
     function getAssetTracker() public view returns (address) {
         return s.assetTracker;
-    }
-
-    function getDisabledProofSystems() public view returns (uint8) {
-        return s.disabledProofSystems;
     }
 
     function getL2SystemContractsUpgradeTxHash() public view returns (bytes32) {
@@ -352,20 +347,6 @@ contract SettlementLayerV31UpgradeSharedTest is SettlementLayerV31UpgradeTestBas
         bytes32 result = upgrade.upgrade(proposedUpgrade);
 
         assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
-    }
-
-    /// The upgrade may install the multi-proof gate on a chain whose in-flight batches carry no
-    /// Airbender commitment, so it has to leave the chain single-proof. Enforced here rather than in
-    /// governance calldata: an upgrade that forgot the mask would strand those batches.
-    function test_LeavesTheChainSingleProof() public {
-        _setupMocks();
-        // Pre-upgrade state: the field is unused before the gate exists, so the upgrade must not rely
-        // on finding it already set.
-        assertEq(upgrade.getDisabledProofSystems(), 0);
-
-        upgrade.upgrade(proposedUpgrade);
-
-        assertEq(upgrade.getDisabledProofSystems(), AIRBENDER_PROOF_SYSTEM_DISABLED);
     }
 
     function test_SetsDeprecatedL2DAValidatorToZero() public {
