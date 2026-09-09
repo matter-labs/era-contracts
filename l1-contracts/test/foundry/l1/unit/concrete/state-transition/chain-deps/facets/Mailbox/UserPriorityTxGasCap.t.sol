@@ -10,6 +10,7 @@ import {
     DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     SERVICE_TX_MAX_GAS_LIMIT,
+    TX_SLOT_OVERHEAD_L2_GAS,
     USER_PRIORITY_TX_MAX_GAS_LIMIT,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT
 } from "contracts/common/Config.sol";
@@ -29,6 +30,8 @@ contract MailboxUserPriorityTxGasCapTest is MailboxTest {
     uint256 internal constant ABOVE_USER_CAP = USER_PRIORITY_TX_MAX_GAS_LIMIT + 5_000_000;
     /// Comfortably below the user cap, so nothing should reject it.
     uint256 internal constant BELOW_USER_CAP = USER_PRIORITY_TX_MAX_GAS_LIMIT - 5_000_000;
+    /// The largest `l2GasLimit` the cap accepts for a request with empty calldata.
+    uint256 internal constant MAX_ACCEPTED_GAS_LIMIT = USER_PRIORITY_TX_MAX_GAS_LIMIT + TX_SLOT_OVERHEAD_L2_GAS;
 
     function setUp() public virtual {
         setupDiamondProxy();
@@ -40,6 +43,30 @@ contract MailboxUserPriorityTxGasCapTest is MailboxTest {
     /// Pinned so that moving the constant is a deliberate act with a failing test attached.
     function test_userCapIsFifteenMillion() public pure {
         assertEq(USER_PRIORITY_TX_MAX_GAS_LIMIT, 15_000_000, "the user gas cap must not drift silently");
+    }
+
+    /// The cap is on transaction *body* gas: `getTransactionBodyGasLimit` subtracts the batch
+    /// overhead before the comparison, so the largest accepted `l2GasLimit` is the cap plus that
+    /// overhead. The request below encodes to 800 bytes, under the 1000 at which the per-byte
+    /// `MEMORY_OVERHEAD_GAS` term overtakes `TX_SLOT_OVERHEAD_L2_GAS`, so the overhead is the slot
+    /// one. Calldata or factory deps in the fixture would move the boundary.
+    function test_userTxAtTheBodyGasBoundarySucceeds() public {
+        utilsFacet.util_setPriorityTxMaxGasLimit(DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT);
+
+        vm.prank(bridgehub);
+        bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(_userRequest(MAX_ACCEPTED_GAS_LIMIT));
+        assertTrue(canonicalTxHash != bytes32(0), "the cap bounds body gas, not the requested gas limit");
+    }
+
+    /// One gas past that boundary. Paired with the test above this pins the overhead the cap is
+    /// measured against: capping the raw `l2GasLimit` fails the previous test, and measuring
+    /// against a larger overhead fails this one.
+    function test_revertWhen_userTxIsOneGasOverTheBodyGasBoundary() public {
+        utilsFacet.util_setPriorityTxMaxGasLimit(DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT);
+
+        vm.prank(bridgehub);
+        vm.expectRevert(TooMuchGas.selector);
+        mailboxFacet.bridgehubRequestL2Transaction(_userRequest(MAX_ACCEPTED_GAS_LIMIT + 1));
     }
 
     /// The chain limit stays at the 72M a chain is seeded with, so a pass here would mean the user
